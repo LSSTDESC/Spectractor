@@ -1,0 +1,11 @@
+*.ipynb_checkpoints
+*.fits
+*.png
+*.jpg
+*.pyc
+*~
+*.pdf
+*.pyc
+*.csv
+*_lambdaplot256000.txt
+*.DS_Store
