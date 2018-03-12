@@ -154,7 +154,7 @@ class Image():
         # extract a region 
         data=np.copy(self.data[y0-width_cut:y0+width_cut,0:right_edge])
         # compute hessian matrices on the image
-        Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order = 'xy')
+        Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order='xy')
         lambda_plus = 0.5*( (Hxx+Hyy) + np.sqrt( (Hxx-Hyy)**2 +4*Hxy*Hxy) )
         lambda_minus = 0.5*( (Hxx+Hyy) - np.sqrt( (Hxx-Hyy)**2 +4*Hxy*Hxy) )
         theta = 0.5*np.arctan2(2*Hxy,Hyy-Hxx)*180/np.pi
@@ -485,7 +485,7 @@ if __name__ == "__main__":
         
         
     filename = "../../CTIODataJune2017_reducedRed/data_05jun17/reduc_20170605_00.fits"
-    filename = "../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_007.fits"
+    filename = "notebooks/fits/trim_20170605_007.fits"
     guess = [745,643]
     target = "3C273"
 

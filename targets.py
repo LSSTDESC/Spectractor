@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 from astroquery.simbad import Simbad
 from astroquery.ned import Ned
 
-os.environ['PYSYN_CDBS']
-import pysynphot as S
+if os.getenv("PYSYN_CDSBS"):
+    os.environ['PYSYN_CDBS']
+    import pysynphot as S
 
 
 EPOCH = "J2000.0"
@@ -64,24 +65,25 @@ class Target():
         self.spectra = []
         # first try with pysynphot
         filenames = []
-        dirname = os.path.expandvars('$PYSYN_CDBS/calspec/')
-        for fname in os.listdir(dirname):
-            if os.path.isfile(dirname+fname):          
-                if self.label.lower() in fname.lower() :
-                    filenames.append(dirname+fname)
-        if len(filenames) > 0 :
-            self.emission_spectrum = False
-            self.hydrogen_only = True
-            for k,f in enumerate(filenames) :
-                if '_mod_' in f : continue
-                print 'Loading %s' % f
-                data = S.FileSpectrum(f,keepneg=True)
-                if isinstance(data.waveunits,S.units.Angstrom) : 
-                    self.wavelengths.append(data.wave/10.)
-                    self.spectra.append(data.flux*10.)
-                else : 
-                    self.wavelengths.append(data.wave)
-                    self.spectra.append(data.flux)
+	if os.getenv("PYSYN_CDBS") is not None:
+            dirname = os.path.expandvars('$PYSYN_CDBS/calspec/')
+            for fname in os.listdir(dirname):
+                if os.path.isfile(dirname+fname):          
+                    if self.label.lower() in fname.lower() :
+                        filenames.append(dirname+fname)
+            if len(filenames) > 0 :
+                self.emission_spectrum = False
+                self.hydrogen_only = True
+                for k,f in enumerate(filenames) :
+                    if '_mod_' in f : continue
+                    print 'Loading %s' % f
+                    data = S.FileSpectrum(f,keepneg=True)
+                    if isinstance(data.waveunits,S.units.Angstrom) : 
+                        self.wavelengths.append(data.wave/10.)
+                        self.spectra.append(data.flux*10.)
+                    else : 
+                        self.wavelengths.append(data.wave)
+                        self.spectra.append(data.flux)
         else :
             if 'PNG' not in self.label:
                 # Try with NED query
