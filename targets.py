@@ -71,19 +71,19 @@ class Target():
                 if os.path.isfile(dirname+fname):          
                     if self.label.lower() in fname.lower() :
                         filenames.append(dirname+fname)
-            if len(filenames) > 0 :
-                self.emission_spectrum = False
-                self.hydrogen_only = True
-                for k,f in enumerate(filenames) :
-                    if '_mod_' in f : continue
-                    print 'Loading %s' % f
-                    data = S.FileSpectrum(f,keepneg=True)
-                    if isinstance(data.waveunits,S.units.Angstrom) : 
-                        self.wavelengths.append(data.wave/10.)
-                        self.spectra.append(data.flux*10.)
-                    else : 
-                        self.wavelengths.append(data.wave)
-                        self.spectra.append(data.flux)
+        if len(filenames) > 0 :
+            self.emission_spectrum = False
+            self.hydrogen_only = True
+            for k,f in enumerate(filenames) :
+                if '_mod_' in f : continue
+                print 'Loading %s' % f
+                data = S.FileSpectrum(f,keepneg=True)
+                if isinstance(data.waveunits,S.units.Angstrom) : 
+                    self.wavelengths.append(data.wave/10.)
+                    self.spectra.append(data.flux*10.)
+                else : 
+                    self.wavelengths.append(data.wave)
+                    self.spectra.append(data.flux)
         else :
             if 'PNG' not in self.label:
                 # Try with NED query
