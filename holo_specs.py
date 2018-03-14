@@ -14,11 +14,10 @@ IMSIZE = 2048 # size of the image in pixel
 PIXEL2MM = 24e-3 # pixel size in mm
 PIXEL2ARCSEC = 0.401 # pixel size in arcsec
 ARCSEC2RADIANS = np.pi/(180.*3600.) # conversion factor from arcsec to radians
-#DISTANCE2CCD = 55.56 # distance between hologram and CCD in mm
-#DISTANCE2CCD_ERR = 0.17 # uncertainty on distance between hologram and CCD in mm
 DISTANCE2CCD = 55.45 # distance between hologram and CCD in mm
 DISTANCE2CCD_ERR = 0.19 # uncertainty on distance between hologram and CCD in mm
 MAXADU = 60000 # approximate maximum ADU output of the CCD
+
 # Making of the holograms
 LAMBDA_CONSTRUCTOR = 639e-6 # constructor wavelength to make holograms in mm
 GROOVES_PER_MM = 350 # approximate effective number of lines per millimeter of the hologram
@@ -27,9 +26,8 @@ PLATE_CENTER_SHIFT_Y = -8. # plate center shift on x in mm in filter frame
 PLATE_CENTER_SHIFT_X_ERR = 2. # estimate uncertainty on plate center shift on x in mm in filter frame
 PLATE_CENTER_SHIFT_Y_ERR = 2. # estimate uncertainty on plate center shift on x in mm in filter frame
 
-# H-alpha filter
-HALPHA_CENTER = 655.9e-6 # center of the filter in mm
-HALPHA_WIDTH = 6.4e-6 # width of the filter in mm
+# CTIO latitude
+CTIO_LATITUDE = '-30 10 07.90'
 
 # Main emission/absorption lines in nm
 HALPHA = {'lambda':656.3,'atmospheric':False,'label':'$H\\alpha$','pos':[-0.016,0.02]}
@@ -60,7 +58,11 @@ LINES = [HALPHA,HBETA,HGAMMA,HDELTA,O2,O2B,O2Y,O2Z,H2O_1,H2O_2,OIII,CII1,CII2,CI
 LINES = sorted(LINES, key=lambda x: x['lambda'])
 
 
-# Filters
+# H-alpha filter
+HALPHA_CENTER = 655.9e-6 # center of the filter in mm
+HALPHA_WIDTH = 6.4e-6 # width of the filter in mm
+
+# Other filters
 FGB37 = {'label':'FGB37','min':300,'max':800}
 RG715 = {'label':'RG715','min':690,'max':1100}
 HALPHA_FILTER = {'label':'Halfa','min':HALPHA_CENTER-2*HALPHA_WIDTH,'max':HALPHA_CENTER+2*HALPHA_WIDTH}
