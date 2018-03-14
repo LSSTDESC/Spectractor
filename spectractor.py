@@ -26,7 +26,12 @@ class Image():
         self.load(filename)
         # Load the target if given
         self.target = None
-        if target != "": self.target=Target(target,verbose=parameters.VERBOSE)
+        if target != "":
+            self.target=Target(target,verbose=parameters.VERBOSE)
+            self.header['TARGET'] = self.target.label
+            self.header.comments['TARGET'] = 'object targeted in the image'
+            self.header['REDSHIFT'] = self.target.redshift
+            self.header.comments['REDSHIFT'] = 'redshift of the target'
         self.err = None
 
     def load(self,filename):
@@ -51,6 +56,7 @@ class Image():
         self.my_logger.info('\n\tLoading disperser %s...' % self.disperser)
         self.disperser = Hologram(self.disperser,data_dir=parameters.HOLO_DIR,verbose=parameters.VERBOSE)
         self.compute_statistical_error()
+        self.compute_parallactic_angle()
 
     def build_gain_map(self):
         self.gain = np.zeros_like(self.data)
@@ -63,7 +69,33 @@ class Image():
         # ampli 22
         self.gain[IMSIZE/2:IMSIZE,IMSIZE/2:IMSIZE] = self.header['GTGAIN22']
         
+    def compute_statistical_error(self):
+        '''Comute the CCD gain map.'''
+        # compute CCD gain map
+        self.build_gain_map()
+        # removes the zeros and negative pixels first
+        # set to minimum positive value
+        data = np.copy(self.data)
+        zeros = np.where(data<=0)
+        min_noz = np.min(data[np.where(data>0)])
+        data[zeros] = min_noz
+        # compute poisson noise
+        self.stat_errors=np.sqrt(data)/np.sqrt(self.gain*self.expo)
 
+    def compute_parallactic_angle(self):
+        '''from A. Guyonnet.'''
+        latitude = CTIO_LATITUDE.split( )
+        latitude = float(latitude[0])- float(latitude[1])/60. - float(latitude[2])/3600.
+        latitude = Angle(latitude, units.deg).radian
+        ha       = Angle(self.header['HA'], unit='hourangle').radian
+        dec      = Angle(self.header['DEC'], unit=units.deg).radian
+        parallactic_angle = np.arctan( np.sin(ha) / ( np.cos(dec)*np.tan(latitude) - np.sin(dec)*np.cos(ha) ) )
+        self.parallactic_angle = parallactic_angle*180/np.pi
+        self.header['PARANGLE'] = self.parallactic_angle
+        self.header.comments['PARANGLE'] = 'parallactic angle in degree'
+        return self.parallactic_angle
+
+ 
     def find_target(self,guess,rotated=False):
         """
         Find precisely the position of the targeted object.
@@ -253,18 +285,7 @@ class Image():
             spectrum.plot_spectrum()    
         return spectrum
 
-    def compute_statistical_error(self):
-        # compute CCD gain map
-        self.build_gain_map()
-        # removes the zeros and negative pixels first
-        # set to minimum positive value
-        data = np.copy(self.data)
-        zeros = np.where(data<=0)
-        min_noz = np.min(data[np.where(data>0)])
-        data[zeros] = min_noz
-        # compute poisson noise
-        self.stat_errors=np.sqrt(data)/np.sqrt(self.gain*self.expo)
-    
+   
     def plot_image(self,scale="lin",title="",units="Image units",plot_stats=False):
         fig, ax = plt.subplots(1,1,figsize=[9.3,8])
         data = np.copy(self.data)
@@ -399,8 +420,6 @@ class Spectrum():
     def save_spectrum(self,output_filename,overwrite=False):
         hdu = fits.PrimaryHDU()
         hdu.data = [self.lambdas,self.data]
-        self.header['TARGET'] = self.target.label
-        self.header['REDSHIFT'] = self.target.redshift
         self.header['UNIT1'] = "nanometer"
         self.header['UNIT2'] = "spectrum unit thing"
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, second column gives the spectrum in unit UNIT2'
