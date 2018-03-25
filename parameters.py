@@ -1,10 +1,21 @@
 import os, sys
 mypath = os.path.dirname(__file__)
 import coloredlogs, logging
+import numpy as np
 
 
 # Paths
 HOLO_DIR = os.path.join(mypath,"dispersers/")
+
+# CCD characteristics
+IMSIZE = 2048 # size of the image in pixel
+PIXEL2MM = 24e-3 # pixel size in mm
+PIXEL2ARCSEC = 0.401 # pixel size in arcsec
+ARCSEC2RADIANS = np.pi/(180.*3600.) # conversion factor from arcsec to radians
+MAXADU = 60000 # approximate maximum ADU output of the CCD
+
+# Observatory latitude
+OBS_LATITUDE = '-30 10 07.90' # CTIO latitude
 
 # Search windows in images
 XWINDOW = 100 # window x size to search for the targetted object 
