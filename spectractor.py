@@ -360,7 +360,7 @@ class Spectrum():
             self.units = Image.units
             self.my_logger.info('\n\tSpectrum info copied from Image')
         self.atmospheric_lines = atmospheric_lines
-        self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only)
+        self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,emission_spectrum=self.target.emission_spectrum)
         self.load_filter()
 
     def load_filter(self):
@@ -379,6 +379,10 @@ class Spectrum():
             plt.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % self.order,zorder=0)
         else:
             plt.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % self.order)
+        #if len(self.target.spectra)>0:
+        #    for k in range(len(self.target.spectra)):
+        #        s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
+        #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
         plt.grid(True)
         plt.xlim([parameters.LAMBDA_MIN,parameters.LAMBDA_MAX])
         plt.ylim(0.,np.max(self.data)*1.2)
@@ -391,7 +395,8 @@ class Spectrum():
         if self.lambdas is not None:
             self.lines.plot_atomic_lines(plt.gca(),fontsize=12)
         if not nofit and self.lambdas is not None:
-            lambda_shift = detect_lines(self.lambdas,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=plt.gca(),verbose=False)
+            lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=plt.gca(),verbose=parameters.VERBOSE)
+        plt.legend(loc='best')
         plt.show()
 
     def calibrate_spectrum(self,xlims=None):
@@ -409,8 +414,6 @@ class Spectrum():
         if self.err is not None: self.err = self.err[self.lambdas_indices]
 
     def calibrate_spectrum_with_lines(self):
-        self.my_logger.warning('\n\tManual settings for tests')
-        atmospheric_lines = True
         self.my_logger.info('\n\tCalibrating order %d spectrum...' % self.order)
         # Detect emission/absorption lines and calibrate pixel/lambda 
         D = DISTANCE2CCD-DISTANCE2CCD_ERR
@@ -422,7 +425,7 @@ class Spectrum():
         while D < DISTANCE2CCD+4*DISTANCE2CCD_ERR and D > DISTANCE2CCD-4*DISTANCE2CCD_ERR and counts < 30 :
             self.disperser.D = D
             lambdas_test = self.disperser.grating_pixel_to_lambda(delta_pixels,self.target_pixcoords,order=self.order)
-            lambda_shift = detect_lines(lambdas_test,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=None,verbose=parameters.DEBUG)
+            lambda_shift = self.lines.detect_lines(lambdas_test,self.data,spec_err=self.err,ax=None,verbose=parameters.DEBUG)
             shifts.append(lambda_shift)
             counts += 1
             if abs(lambda_shift)<0.1 :
@@ -440,7 +443,7 @@ class Spectrum():
             D += D_step
         shift = np.mean(lambdas_test - self.lambdas)
         self.lambdas = lambdas_test
-        detect_lines(self.lambdas,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=None,verbose=parameters.DEBUG)
+        lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=None,verbose=parameters.DEBUG)
         self.my_logger.info('\n\tWavelenght total shift: %.2fnm (after %d steps)\n\twith D = %.2f mm (DISTANCE2CCD = %.2f +/- %.2f mm, %.1f sigma shift)' % (shift,len(shifts),D,DISTANCE2CCD,DISTANCE2CCD_ERR,(D-DISTANCE2CCD)/DISTANCE2CCD_ERR))
         if parameters.VERBOSE or parameters.DEBUG:
             self.plot_spectrum(xlim=None,nofit=False)
@@ -474,7 +477,7 @@ class Spectrum():
             self.my_logger.info('\n\tSpectrum file %s not found' % input_filename)
         
 
-def Spectractor(filename,outputdir,guess,target):
+def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
     """ Spectractor
     Main function to extract a spectrum from an image
 
@@ -503,16 +506,11 @@ def Spectractor(filename,outputdir,guess,target):
     target_pixcoords_rotated = image.find_target(guess,rotated=True)
     # Subtract background and bad pixels
     spectrum = image.extract_spectrum_from_image()
+    spectrum.atmospheric_lines = atmospheric_lines
     # Calibrate the spectrum
     spectrum.calibrate_spectrum()
     spectrum.calibrate_spectrum_with_lines()
     # Subtract second order
-
-    # Cut in wavelength
-
-    # Load target and its spectrum
-
-    # Run libratran ?
 
     # Save the spectra
     spectrum.save_spectrum(output_filename,overwrite=True)
