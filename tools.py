@@ -47,17 +47,17 @@ def multigauss_and_bgd(x,*params):
 
 def fit_multigauss_and_bgd(x,y,guess=[10,1000,1,0,0,1],bounds=(-np.inf,np.inf),sigma=None):
     maxfev=100000
-    popt,pcov = curve_fit(multigauss_and_bgd,x,y,p0=guess,bounds=bounds,maxfev=maxfev,sigma=None)
+    popt,pcov = curve_fit(multigauss_and_bgd,x,y,p0=guess,bounds=bounds,maxfev=maxfev,sigma=sigma)
     return popt, pcov
 
 
-def fit_line(x,y,guess=[1,1],bounds=(-np.inf,np.inf)):
-    popt,pcov = curve_fit(line,x,y,p0=guess,bounds=bounds)
+def fit_line(x,y,guess=[1,1],bounds=(-np.inf,np.inf),sigma=None):
+    popt,pcov = curve_fit(line,x,y,p0=guess,bounds=bounds,sigma=sigma)
     return popt, pcov
 
-def fit_bgd(x,y,guess=[1]*parameters.BGD_NPARAMS,bounds=(-np.inf,np.inf)):
+def fit_bgd(x,y,guess=[1]*parameters.BGD_NPARAMS,bounds=(-np.inf,np.inf),sigma=None):
     bgd = lambda x, *p: np.polyval(p,x) 
-    popt,pcov = curve_fit(bgd,x,y,p0=guess,bounds=bounds)
+    popt,pcov = curve_fit(bgd,x,y,p0=guess,bounds=bounds,sigma=sigma)
     return popt, pcov
 
 def fit_poly(x,y,degree,w=None):
