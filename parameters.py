@@ -20,6 +20,10 @@ ROT_ORDER = 5 # must be above 3
 LAMBDA_MIN = 350 # minimum wavelength for spectrum extraction (in nm)
 LAMBDA_MAX = 1100 # maxnimum wavelength for spectrum extraction (in nm)
 
+# Detection line algorithm
+BGD_ORDER = 1 # order of the background polynome to fit
+BGD_NPARAMS = BGD_ORDER + 1 # number of unknown parameters for background
+
 # Verbosity
 VERBOSE = False
 DEBUG = False

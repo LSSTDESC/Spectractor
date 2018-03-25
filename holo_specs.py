@@ -106,6 +106,7 @@ def plot_atomic_lines(ax,redshift=0,atmospheric_lines=True,hydrogen_only=False,c
             ax.annotate(LINE['label'],xy=(xpos,LINE['pos'][1]),rotation=90,ha='left',va='bottom',xycoords='axes fraction',color=color,fontsize=fontsize)
 
 def detect_lines(lambdas,spec,redshift=0,emission_spectrum=False,snr_minlevel=3,atmospheric_lines=True,hydrogen_only=False,ax=None,verbose=False):
+    bgd_npar = parameters.BGD_NPARAMS
     peak_look = 7 # half range to look for local maximum in pixels
     bgd_width = 7 # size of the peak sides to use to fit spectrum base line
     if hydrogen_only :
@@ -182,16 +183,13 @@ def detect_lines(lambdas,spec,redshift=0,emission_spectrum=False,snr_minlevel=3,
         index = range(max(0,index_inf-bgd_width),min(len(lambdas),index_sup+bgd_width))
         # guess and bounds to fit this line
         # min sigma at 1 pixel and max sigma at 10 pixels (half width)
-        guess = [0,1,0*abs(spec[peak_index]),lambdas[peak_index],3]
-        #if len(guess_list) > 0:
-        #    guess[3] = max(guess_list[-1][3],lambdas[peak_index]) # to keep guess list sorted if lines are too close
-        bounds = [[-np.inf,-np.inf,-np.inf,lambdas[index_inf],1], [np.inf,np.inf,2*np.max(spec[index]),lambdas[index_sup],10]  ] 
+        guess = [0]*bgd_npar+[0*abs(spec[peak_index]),lambdas[peak_index],3]
+        bounds = [[-np.inf]*bgd_npar+[-np.inf,lambdas[index_inf],1], [np.inf]*bgd_npar+[2*np.max(spec[index]),lambdas[index_sup],10]  ]
+        # gaussian amplitude bounds depend if line is emission/absorption
         if line_strategy == np.less :
-            bounds[1][2] = 0
-            guess[2] = - 0*spec[peak_index]
+            bounds[1][bgd_npar] = 0
         else :
-            bounds[0][2] = 0
-        #print LINE['label'],guess, bounds
+            bounds[0][bgd_npar] = 0
         index_list.append(index)
         lines_list.append(LINE)
         guess_list.append(guess)
@@ -207,10 +205,10 @@ def detect_lines(lambdas,spec,redshift=0,emission_spectrum=False,snr_minlevel=3,
         else :
             merges.append([idx+1])
             idx += 1
-    # reorder merge list with respect to guess list
+    # reorder merge list with respect to lambdas in guess list
     new_merges = []
     for merge in merges:
-        tmp_guess = [guess_list[i][3] for i in merge]
+        tmp_guess = [guess_list[i][bgd_npar+1] for i in merge]
         new_merges.append( [x for _,x in sorted(zip(tmp_guess,merge))] )
     # reorder lists with merges
     new_index_list = []
@@ -225,19 +223,19 @@ def detect_lines(lambdas,spec,redshift=0,emission_spectrum=False,snr_minlevel=3,
         for i in merge :
             # add the bgd parameters 
             if i == merge[0] :
-                new_guess_list[-1] += guess_list[i][:2]
-                new_bounds_list[-1][0] += bounds_list[i][0][:2]
-                new_bounds_list[-1][1] += bounds_list[i][1][:2]
+                new_guess_list[-1] += guess_list[i][:bgd_npar]
+                new_bounds_list[-1][0] += bounds_list[i][0][:bgd_npar]
+                new_bounds_list[-1][1] += bounds_list[i][1][:bgd_npar]
             # add the gauss parameters
             new_index_list[-1] += index_list[i]
-            new_guess_list[-1] += guess_list[i][2:]
-            new_bounds_list[-1][0] += bounds_list[i][0][2:]
-            new_bounds_list[-1][1] += bounds_list[i][1][2:]
+            new_guess_list[-1] += guess_list[i][bgd_npar:]
+            new_bounds_list[-1][0] += bounds_list[i][0][bgd_npar:]
+            new_bounds_list[-1][1] += bounds_list[i][1][bgd_npar:]
             new_lines_list[-1].append(lines_list[i])
         # set central peak bounds at middle of the lines
         for k in range(len(merge)-1) :
-            new_bounds_list[-1][0][2+3*(k+1)+1]  = 0.5*(new_guess_list[-1][2+3*k+1]+new_guess_list[-1][2+3*(k+1)+1])
-            new_bounds_list[-1][1][2+3*k+1] = 0.5*(new_guess_list[-1][2+3*k+1]+new_guess_list[-1][2+3*(k+1)+1])
+            new_bounds_list[-1][0][bgd_npar+3*(k+1)+1]  = 0.5*(new_guess_list[-1][bgd_npar+3*k+1]+new_guess_list[-1][bgd_npar+3*(k+1)+1])
+            new_bounds_list[-1][1][bgd_npar+3*k+1] = 0.5*(new_guess_list[-1][bgd_npar+3*k+1]+new_guess_list[-1][bgd_npar+3*(k+1)+1])
         new_index_list[-1] = sorted(list(set(new_index_list[-1])))
     rows = []
     for k in range(len(new_index_list)):
@@ -246,43 +244,36 @@ def detect_lines(lambdas,spec,redshift=0,emission_spectrum=False,snr_minlevel=3,
         guess = new_guess_list[k]
         bounds = new_bounds_list[k]
         bgd_index = index[:bgd_width]+index[-bgd_width:]
-        line_popt, line_pcov = fit_line(lambdas[bgd_index],spec[bgd_index])
-        guess[0] = line_popt[0]
-        guess[1] = line_popt[1]
-        bounds[0][0] = line_popt[0]-baseline_prior*np.sqrt(line_pcov[0][0])
-        bounds[0][1] = line_popt[1]-baseline_prior*np.sqrt(line_pcov[1][1])
-        bounds[1][0] = line_popt[0]+baseline_prior*np.sqrt(line_pcov[0][0])
-        bounds[1][1] = line_popt[1]+baseline_prior*np.sqrt(line_pcov[1][1])
+        line_popt, line_pcov = fit_bgd(lambdas[bgd_index],spec[bgd_index])
+        for n in range(bgd_npar):
+            guess[n] = line_popt[n]
+            bounds[0][n] = line_popt[n]-baseline_prior*np.sqrt(line_pcov[n][n])
+            bounds[1][n] = line_popt[n]+baseline_prior*np.sqrt(line_pcov[n][n])
         # fit local maximum with a gaussian + line
         popt, pcov = fit_multigauss_and_bgd(lambdas[index],spec[index],guess=guess, bounds=bounds)
+        # compute the base line subtracting the gaussians
         base_line = spec[index]
         for j in range(len(new_lines_list[k])) :
-            base_line -= gauss(lambdas[index],*popt[2+3*j:2+3*j+3])
-        #noise_level = np.std(base_line)
+            base_line -= gauss(lambdas[index],*popt[bgd_npar+3*j:bgd_npar+3*j+3])
+        # noise level defined as the std of the residuals
         noise_level = np.std(spec[index]-multigauss_and_bgd(lambdas[index],*popt))
-        #print base_line, noise_level
         for j in range(len(new_lines_list[k])) :
             LINE = new_lines_list[k][j]
             l = LINE['lambda']
-            #if not LINE['atmospheric'] : l = l*(1+redshift)
-            peak_pos = popt[2+3*j+1]
+            peak_pos = popt[bgd_npar+3*j+1]
             # SNR computation
-            signal_level = popt[2+3*j]
+            signal_level = popt[bgd_npar+3*j]
             snr = np.abs(signal_level / noise_level)
             if snr < snr_minlevel : continue
             # FWHM
-            FWHM = np.abs(popt[2+3*j+2])*2.355
-            #if verbose : print 'Line %s at %.1fnm: peak detected at %.1fnm (delta=%.1fnm) with FWHM=%.1fnm and SNR=%.1f' % (LINE["label"],l,peak_pos,peak_pos-l,FWHM,snr)
+            FWHM = np.abs(popt[bgd_npar+3*j+bgd_npar])*2.355
             rows.append((LINE["label"],l,peak_pos,peak_pos-l,FWHM,signal_level,snr))
             # wavelength shift between tabulate and observed lines
-            #if LINE['atmospheric'] : continue
             lambda_shifts.append(peak_pos-l)
             snrs.append(snr)
         if ax is not None :
             ax.plot(lambdas[index],multigauss_and_bgd(lambdas[index],*popt),lw=2,color='b')
-            ax.plot(lambdas[index],line(lambdas[index],popt[0],popt[1]),lw=2,color='b',linestyle='--')
-            #ax.plot(lambdas[index],line(lambdas[index],*line_popt),lw=2,color='g',linestyle='--')
-            #ax.axvline(peak_pos,lw=2,color='b',linestyle='--')
+            ax.plot(lambdas[index],np.polyval(popt[:bgd_npar],lambdas[index]),lw=2,color='b',linestyle='--')
     if len(rows) > 0 :
         t = Table(rows=rows,names=('Line','Tabulated','Detected','Shift','FWHM','Amplitude','SNR'),dtype=('a10','f4','f4','f4','f4','f4','f4'))
         for col in t.colnames[1:-2] : t[col].unit = 'nm'
