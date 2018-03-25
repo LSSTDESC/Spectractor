@@ -9,18 +9,13 @@ import warnings
 
 from skimage.feature import hessian_matrix
 
+import parameters
 
 def gauss(x,A,x0,sigma):
     return A*np.exp(-(x-x0)**2/(2*sigma**2))
 
-def gauss_and_bgd(x,a,b,A,x0,sigma):
+def gauss_and_line(x,a,b,A,x0,sigma):
     return gauss(x,A,x0,sigma) + line(x,a,b)
-
-def multigauss_and_bgd(x,*params):
-    out = line(x,params[0],params[1])
-    for k in range((len(params)-2)/3) :
-        out += gauss(x,*params[2+3*k:2+3*k+3])
-    return out
 
 def line(x, a, b):
     return a*x + b
@@ -32,13 +27,37 @@ def fit_gauss(x,y,guess=[10,1000,1],bounds=(-np.inf,np.inf)):
     popt,pcov = curve_fit(gauss,x,y,p0=guess,bounds=bounds)
     return popt, pcov
 
+def multigauss_and_line(x,*params):
+    out = line(x,params[0],params[1])
+    for k in range((len(params)-2)/3) :
+        out += gauss(x,*params[2+3*k:2+3*k+3])
+    return out
+
+def fit_multigauss_and_line(x,y,guess=[10,1000,1,0,0,1],bounds=(-np.inf,np.inf)):
+    maxfev=100000
+    popt,pcov = curve_fit(multigauss_and_line,x,y,p0=guess,bounds=bounds,maxfev=maxfev)
+    return popt, pcov
+
+def multigauss_and_bgd(x,*params):
+    bgd_nparams = parameters.BGD_NPARAMS
+    out = np.polyval(params[0:bgd_nparams],x)
+    for k in range((len(params)-bgd_nparams)/3) :
+        out += gauss(x,*params[bgd_nparams+3*k:bgd_nparams+3*k+3])
+    return out
+
 def fit_multigauss_and_bgd(x,y,guess=[10,1000,1,0,0,1],bounds=(-np.inf,np.inf)):
     maxfev=100000
     popt,pcov = curve_fit(multigauss_and_bgd,x,y,p0=guess,bounds=bounds,maxfev=maxfev)
     return popt, pcov
 
+
 def fit_line(x,y,guess=[1,1],bounds=(-np.inf,np.inf)):
     popt,pcov = curve_fit(line,x,y,p0=guess,bounds=bounds)
+    return popt, pcov
+
+def fit_bgd(x,y,guess=[1]*parameters.BGD_NPARAMS,bounds=(-np.inf,np.inf)):
+    bgd = lambda x, *p: np.polyval(p,x) 
+    popt,pcov = curve_fit(bgd,x,y,p0=guess,bounds=bounds)
     return popt, pcov
 
 def fit_poly(x,y,degree,w=None):
