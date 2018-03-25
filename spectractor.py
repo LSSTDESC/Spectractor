@@ -9,7 +9,7 @@ import copy
 from tools import *
 from holo_specs import *
 from targets import *
-import parameters
+import parameters 
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 import astropy.units as units
@@ -45,12 +45,12 @@ class Image():
         self.header = hdu_list[0].header
         self.data = hdu_list[0].data
         extract_info_from_CTIO_header(self,self.header)
-        IMSIZE = int(self.header['XLENGTH'])
-        PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
-        if self.header['YLENGTH'] != IMSIZE:
-            self.my_logger.warning('\n\tImage rectangular: X=%d pix, Y=%d pix' % (IMSIZE, self.header['YLENGTH']))
-        if self.header['YPIXSIZE'] != PIXEL2ARCSEC:
-            self.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (PIXEL2ARCSEC, self.header['YPIXSIZE']))
+        parameters.IMSIZE = int(self.header['XLENGTH'])
+        parameters.PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
+        if self.header['YLENGTH'] != parameters.IMSIZE:
+            self.my_logger.warning('\n\tImage rectangular: X=%d pix, Y=%d pix' % (parameters.IMSIZE, self.header['YLENGTH']))
+        if self.header['YPIXSIZE'] != parameters.PIXEL2ARCSEC:
+            self.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (parameters.PIXEL2ARCSEC, self.header['YPIXSIZE']))
         self.coord = SkyCoord(self.header['RA']+' '+self.header['DEC'],unit=(units.hourangle, units.deg),obstime=self.header['DATE-OBS'] )
         self.my_logger.info('\n\tImage loaded')
         # Load the disperser
@@ -63,15 +63,16 @@ class Image():
         self.compute_parallactic_angle()
 
     def build_gain_map(self):
+        l = parameters.IMSIZE
         self.gain = np.zeros_like(self.data)
         # ampli 11
-        self.gain[0:IMSIZE/2,0:IMSIZE/2] = self.header['GTGAIN11']
+        self.gain[0:l/2,0:l/2] = self.header['GTGAIN11']
         # ampli 12
-        self.gain[0:IMSIZE/2,IMSIZE/2:IMSIZE] = self.header['GTGAIN12']
+        self.gain[0:l/2,l/2:l] = self.header['GTGAIN12']
         # ampli 21
-        self.gain[IMSIZE/2:IMSIZE,0:IMSIZE] = self.header['GTGAIN21']
+        self.gain[l/2:l,0:l] = self.header['GTGAIN21']
         # ampli 22
-        self.gain[IMSIZE/2:IMSIZE,IMSIZE/2:IMSIZE] = self.header['GTGAIN22']
+        self.gain[l/2:l,l/2:l] = self.header['GTGAIN22']
 
     def convert_to_ADU_rate_units(self):
         self.data /= self.expo
@@ -89,7 +90,7 @@ class Image():
 
     def compute_parallactic_angle(self):
         '''from A. Guyonnet.'''
-        latitude = CTIO_LATITUDE.split( )
+        latitude = parameters.OBS_LATITUDE.split( )
         latitude = float(latitude[0])- float(latitude[1])/60. - float(latitude[2])/3600.
         latitude = Angle(latitude, units.deg).radian
         ha       = Angle(self.header['HA'], unit='hourangle').radian
@@ -185,7 +186,7 @@ class Image():
             self.target_pixcoords = [theX,theY]
         return [theX,theY]
 
-    def compute_rotation_angle_hessian(self, deg_threshold = 10, width_cut = parameters.YWINDOW, right_edge = IMSIZE-200, margin_cut=12):
+    def compute_rotation_angle_hessian(self, deg_threshold = 10, width_cut = parameters.YWINDOW, right_edge = parameters.IMSIZE-200, margin_cut=12):
         x0, y0 = np.array(self.target_pixcoords).astype(int)
         # extract a region 
         data=np.copy(self.data[y0-width_cut:y0+width_cut,0:right_edge])
@@ -216,9 +217,9 @@ class Image():
         theta_hist = []
         theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
         theta_median = np.median(theta_hist)
-        theta_critical = 180.*np.arctan(10./IMSIZE)/np.pi
+        theta_critical = 180.*np.arctan(10./parameters.IMSIZE)/np.pi
         if abs(theta_median-theta_guess)>theta_critical:
-            self.my_logger.warning('\n\tInterpolated angle and fitted angle disagrees with more than 10 pixels over %d pixels:  %.2f vs %.2f' % (IMSIZE,theta_median,theta_guess))
+            self.my_logger.warning('\n\tInterpolated angle and fitted angle disagrees with more than 10 pixels over %d pixels:  %.2f vs %.2f' % (parameters.IMSIZE,theta_median,theta_guess))
         if parameters.DEBUG:
             f, (ax1, ax2) = plt.subplots(1,2,figsize=(10,6))
             xindex=np.arange(data.shape[1])
@@ -388,26 +389,34 @@ class Spectrum():
             lambda_shift = detect_lines(self.lambdas,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=plt.gca(),verbose=False)
         plt.show()
 
-    def calibrate(self,order=1,atmospheric_lines=True):
+    def calibrate_spectrum(self,xlims=None):
+        if xlims == None :
+            left_cut, right_cut = [0,self.data.shape[0]]
+        else:
+            left_cut, right_cut = xlims
+        self.data = self.data[left_cut:right_cut]
+        pixels = np.arange(left_cut,right_cut,1)-self.target_pixcoords_rotated[0]
+        self.lambdas = self.disperser.grating_pixel_to_lambda(pixels,self.target_pixcoords,order=self.order)
+        # Cut spectra
+        self.lambdas_indices = np.where(np.logical_and(self.lambdas > parameters.LAMBDA_MIN, self.lambdas < parameters.LAMBDA_MAX))[0]
+        self.lambdas = self.lambdas[self.lambdas_indices]
+        self.data = self.data[self.lambdas_indices]
+        if self.err is not None: self.err = self.err[self.lambdas_indices]
+
+    def calibrate_spectrum_with_lines(self,atmospheric_lines=True):
         self.my_logger.warning('\n\tManual settings for tests')
         atmospheric_lines = True
-        self.my_logger.info('\n\tCalibrating order %d spectrum...' % order)
-        self.lambdas, self.data = extract_spectrum(self.data,self.disperser,[0,self.data.shape[0]],self.target_pixcoords_rotated[0],self.target_pixcoords,order=order)
-        # Cut spectra
-        lambdas_indices = np.where(np.logical_and(self.lambdas > parameters.LAMBDA_MIN, self.lambdas < parameters.LAMBDA_MAX))[0]
-        self.lambdas = self.lambdas[lambdas_indices]
-        self.data = self.data[lambdas_indices]
-        if self.err is not None: self.err = self.err[lambdas_indices]
+        self.my_logger.info('\n\tCalibrating order %d spectrum...' % self.order)
         # Detect emission/absorption lines and calibrate pixel/lambda 
         D = DISTANCE2CCD-DISTANCE2CCD_ERR
         shift = 0
         shifts = []
         counts = 0
         D_step = DISTANCE2CCD_ERR / 4
-        delta_pixels = lambdas_indices - int(self.target_pixcoords_rotated[0])
+        delta_pixels = self.lambdas_indices - int(self.target_pixcoords_rotated[0])
         while D < DISTANCE2CCD+4*DISTANCE2CCD_ERR and D > DISTANCE2CCD-4*DISTANCE2CCD_ERR and counts < 30 :
             self.disperser.D = D
-            lambdas_test = self.disperser.grating_pixel_to_lambda(delta_pixels,self.target_pixcoords,order=order)
+            lambdas_test = self.disperser.grating_pixel_to_lambda(delta_pixels,self.target_pixcoords,order=self.order)
             lambda_shift = detect_lines(lambdas_test,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=None,verbose=parameters.DEBUG)
             shifts.append(lambda_shift)
             counts += 1
@@ -429,7 +438,7 @@ class Spectrum():
         detect_lines(self.lambdas,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=None,verbose=parameters.DEBUG)
         self.my_logger.info('\n\tWavelenght total shift: %.2fnm (after %d steps)\n\twith D = %.2f mm (DISTANCE2CCD = %.2f +/- %.2f mm, %.1f sigma shift)' % (shift,len(shifts),D,DISTANCE2CCD,DISTANCE2CCD_ERR,(D-DISTANCE2CCD)/DISTANCE2CCD_ERR))
         if parameters.VERBOSE or parameters.DEBUG:
-            self.plot_spectrum(xlim=None,order=order,atmospheric_lines=atmospheric_lines,nofit=False)
+            self.plot_spectrum(xlim=None,order=self.order,atmospheric_lines=atmospheric_lines,nofit=False)
 
     def save_spectrum(self,output_filename,overwrite=False):
         hdu = fits.PrimaryHDU()
@@ -488,7 +497,8 @@ def Spectractor(filename,outputdir,guess,target):
     # Subtract background and bad pixels
     spectrum = image.extract_spectrum_from_image()
     # Calibrate the spectrum
-    spectrum.calibrate()
+    spectrum.calibrate_spectrum()
+    spectrum.calibrate_spectrum_with_lines()
     # Subtract second order
 
     # Cut in wavelength
