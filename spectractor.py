@@ -94,7 +94,6 @@ class Image():
         self.header['PARANGLE'] = self.parallactic_angle
         self.header.comments['PARANGLE'] = 'parallactic angle in degree'
         return self.parallactic_angle
-
  
     def find_target(self,guess,rotated=False):
         """
@@ -229,9 +228,7 @@ class Image():
             ax2.plot([theta_median,theta_median],[0,np.max(n)])
             ax2.set_xlabel("Rotation angles [degrees]")
             plt.show()
-
-        return theta_median
-    
+        return theta_median    
 
     def turn_image(self):
         self.rotation_angle = self.compute_rotation_angle_hessian()
@@ -243,13 +240,11 @@ class Image():
             f, (ax1,ax2) = plt.subplots(2,1,figsize=[8,8])
             y0 = int(self.target_pixcoords[1])
             ax1.imshow(np.log10(self.data[y0-parameters.YWINDOW:y0+parameters.YWINDOW,200:-200]),origin='lower',cmap='rainbow',aspect="auto")
-            #ax1.imshow(np.log10(self.data),origin='lower',cmap='rainbow',aspect="auto")
             ax1.plot([0,self.data.shape[0]-200],[parameters.YWINDOW,parameters.YWINDOW],'w-')
             ax1.grid(color='white', ls='solid')
             ax1.grid(True)
             ax1.set_title('Raw image (log10 scale)')
             ax2.imshow(np.log10(self.data_rotated[y0-parameters.YWINDOW:y0+parameters.YWINDOW,200:-200]),origin='lower',cmap='rainbow',aspect="auto")
-            #ax2.imshow(np.log10(self.data_rotated),origin='lower',cmap='rainbow',aspect="auto")
             ax2.plot([0,self.data_rotated.shape[0]-200],[parameters.YWINDOW,parameters.YWINDOW],'w-')
             ax2.grid(color='white', ls='solid')
             ax2.grid(True)

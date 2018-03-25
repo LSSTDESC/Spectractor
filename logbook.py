@@ -11,24 +11,34 @@ class LogBook():
             sys.exit()
         self.csvfile =  open(self.logbook,'rU')
         self.reader = csv.DictReader(self.csvfile, delimiter=';', dialect=csv.excel_tab)
-        
 
     def search_for_image(self,filename):
         target = None
         xpos = None
-        ypox = None
+        ypos = None
+        skip = False
         for row in self.reader:
             if filename == row['filename']:
+                target = row['object']
+                if 'bias' in target or 'flat' in target or 'zero' in target:
+                    self.my_logger.error('Fits file %s in logbook %s has flag %s. Skip file.' % (filename,self.logbook,target))
+                    skip = True
+                    break
+                if row['Obj-posXpix']=='':
+                    self.my_logger.error('Fits file %s in logbook %s has no target x position. Skip file.' % (filename,self.logbook))
+                    skip = True
+                    break
+                if row['Obj-posYpix']=='':
+                    self.my_logger.error('Fits file %s in logbook %s has no target y position. Skip file.' % (filename,self.logbook))
+                    skip = True
+                    break
                 xpos = int(row['Obj-posXpix'])
                 ypos = int(row['Obj-posYpix'])
-                target = row['object']
                 break
         self.csvfile.seek(0)
-        if target is not None:
-            return target,xpos,ypos
-        else:
+        if target is None and skip==False:
             self.my_logger.error('Fits file %s not found in logbook %s.' % (filename,self.logbook))
-            sys.exit()
+        return target,xpos,ypos
 
     def plot_columns_vs_date(self,column_names):
         dates = []
