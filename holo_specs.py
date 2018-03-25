@@ -105,7 +105,7 @@ def plot_atomic_lines(ax,redshift=0,atmospheric_lines=True,hydrogen_only=False,c
         if xpos > 0 and xpos < 1 :
             ax.annotate(LINE['label'],xy=(xpos,LINE['pos'][1]),rotation=90,ha='left',va='bottom',xycoords='axes fraction',color=color,fontsize=fontsize)
 
-def detect_lines(lambdas,spec,redshift=0,emission_spectrum=False,snr_minlevel=3,atmospheric_lines=True,hydrogen_only=False,ax=None,verbose=False):
+def detect_lines(lambdas,spec,spec_err=None,redshift=0,emission_spectrum=False,snr_minlevel=3,atmospheric_lines=True,hydrogen_only=False,ax=None,verbose=False):
     bgd_npar = parameters.BGD_NPARAMS
     peak_look = 7 # half range to look for local maximum in pixels
     bgd_width = 7 # size of the peak sides to use to fit spectrum base line
@@ -129,10 +129,8 @@ def detect_lines(lambdas,spec,redshift=0,emission_spectrum=False,snr_minlevel=3,
                 if not LINE['atmospheric'] and '$H\\' not in LINE['label'] : continue
         else :
             if not atmospheric_lines and LINE['atmospheric'] : continue
-        #if not((atmospheric_lines and LINE['atmospheric']) or (hydrogen_only and '$H\\' in LINE['label'])) : continue
         # wavelength of the line
         l = LINE['lambda']
-        #if not LINE['atmospheric'] : l = l*(1+redshift)
         l_index, l_lambdas = find_nearest(lambdas,l)
         if l_index < peak_look or l_index > len(lambdas)-peak_look : continue
         # look for local extrema to detect emission or absorption line
@@ -244,13 +242,17 @@ def detect_lines(lambdas,spec,redshift=0,emission_spectrum=False,snr_minlevel=3,
         guess = new_guess_list[k]
         bounds = new_bounds_list[k]
         bgd_index = index[:bgd_width]+index[-bgd_width:]
-        line_popt, line_pcov = fit_bgd(lambdas[bgd_index],spec[bgd_index])
+        sigma = None
+        if spec_err is not None: sigma = spec_err[bgd_index]
+        line_popt, line_pcov = fit_bgd(lambdas[bgd_index],spec[bgd_index],sigma=sigma)
         for n in range(bgd_npar):
             guess[n] = line_popt[n]
             bounds[0][n] = line_popt[n]-baseline_prior*np.sqrt(line_pcov[n][n])
             bounds[1][n] = line_popt[n]+baseline_prior*np.sqrt(line_pcov[n][n])
         # fit local maximum with a gaussian + line
-        popt, pcov = fit_multigauss_and_bgd(lambdas[index],spec[index],guess=guess, bounds=bounds)
+        sigma = None
+        if spec_err is not None: sigma = spec_err[index]
+        popt, pcov = fit_multigauss_and_bgd(lambdas[index],spec[index],guess=guess, bounds=bounds,sigma=sigma)
         # compute the base line subtracting the gaussians
         base_line = spec[index]
         for j in range(len(new_lines_list[k])) :

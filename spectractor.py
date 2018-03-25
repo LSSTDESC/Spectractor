@@ -381,12 +381,13 @@ class Spectrum():
         plt.xlim([parameters.LAMBDA_MIN,parameters.LAMBDA_MAX])
         plt.ylim(0.,np.max(self.data)*1.2)
         plt.xlabel('$\lambda$ [nm]')
+        plt.ylabel(self.units)
         if self.lambdas is None: plt.xlabel('Pixels')
         if xlim is not None :
             plt.xlim(xlim)
             plt.ylim(0.,np.max(self.data[xlim[0]:xlim[1]])*1.2)
         if not nofit and self.lambdas is not None:
-            lambda_shift = detect_lines(self.lambdas,self.data,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=plt.gca(),verbose=False)
+            lambda_shift = detect_lines(self.lambdas,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=plt.gca(),verbose=False)
         plt.show()
 
     def calibrate(self,order=1,atmospheric_lines=True):
@@ -409,7 +410,7 @@ class Spectrum():
         while D < DISTANCE2CCD+4*DISTANCE2CCD_ERR and D > DISTANCE2CCD-4*DISTANCE2CCD_ERR and counts < 30 :
             self.disperser.D = D
             lambdas_test = self.disperser.grating_pixel_to_lambda(delta_pixels,self.target_pixcoords,order=order)
-            lambda_shift = detect_lines(lambdas_test,self.data,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=None,verbose=parameters.DEBUG)
+            lambda_shift = detect_lines(lambdas_test,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=None,verbose=parameters.DEBUG)
             shifts.append(lambda_shift)
             counts += 1
             if abs(lambda_shift)<0.1 :
@@ -427,7 +428,7 @@ class Spectrum():
             D += D_step
         shift = np.mean(lambdas_test - self.lambdas)
         self.lambdas = lambdas_test
-        detect_lines(self.lambdas,self.data,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=None,verbose=parameters.DEBUG)
+        detect_lines(self.lambdas,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=None,verbose=parameters.DEBUG)
         self.my_logger.info('\n\tWavelenght total shift: %.2fnm (after %d steps)\n\twith D = %.2f mm (DISTANCE2CCD = %.2f +/- %.2f mm, %.1f sigma shift)' % (shift,len(shifts),D,DISTANCE2CCD,DISTANCE2CCD_ERR,(D-DISTANCE2CCD)/DISTANCE2CCD_ERR))
         if parameters.VERBOSE or parameters.DEBUG:
             self.plot_spectrum(xlim=None,order=order,atmospheric_lines=atmospheric_lines,nofit=False)
