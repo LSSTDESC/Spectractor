@@ -27,6 +27,7 @@ if __name__ == "__main__":
     
     logbook = LogBook()
     for filename in filenames:
-        target, xpos, ypos = logbook.search_for_image(filename)
+        tag = filename.split('/')[-1]
+        target, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None: continue
         Spectractor(filename,args.output_directory,[xpos,ypos],target)
