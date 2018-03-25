@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from astroquery.simbad import Simbad
 from astroquery.ned import Ned
 
-if os.getenv("PYSYN_CDSBS"):
+if os.getenv("PYSYN_CDBS"):
     os.environ['PYSYN_CDBS']
     import pysynphot as S
 
