@@ -45,9 +45,9 @@ def multigauss_and_bgd(x,*params):
         out += gauss(x,*params[bgd_nparams+3*k:bgd_nparams+3*k+3])
     return out
 
-def fit_multigauss_and_bgd(x,y,guess=[10,1000,1,0,0,1],bounds=(-np.inf,np.inf)):
+def fit_multigauss_and_bgd(x,y,guess=[10,1000,1,0,0,1],bounds=(-np.inf,np.inf),sigma=None):
     maxfev=100000
-    popt,pcov = curve_fit(multigauss_and_bgd,x,y,p0=guess,bounds=bounds,maxfev=maxfev)
+    popt,pcov = curve_fit(multigauss_and_bgd,x,y,p0=guess,bounds=bounds,maxfev=maxfev,sigma=None)
     return popt, pcov
 
 
