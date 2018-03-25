@@ -19,19 +19,6 @@ PLATE_CENTER_SHIFT_X_ERR = 2. # estimate uncertainty on plate center shift on x 
 PLATE_CENTER_SHIFT_Y_ERR = 2. # estimate uncertainty on plate center shift on x in mm in filter frame
 
 
-
-# H-alpha filter
-HALPHA_CENTER = 655.9e-6 # center of the filter in mm
-HALPHA_WIDTH = 6.4e-6 # width of the filter in mm
-
-# Other filters
-FGB37 = {'label':'FGB37','min':300,'max':800}
-RG715 = {'label':'RG715','min':690,'max':1100}
-HALPHA_FILTER = {'label':'Halfa','min':HALPHA_CENTER-2*HALPHA_WIDTH,'max':HALPHA_CENTER+2*HALPHA_WIDTH}
-ZGUNN = {'label':'Z-Gunn','min':800,'max':1100}
-FILTERS = [RG715,FGB37,HALPHA_FILTER,ZGUNN]
-
-
 def build_hologram(order0_position,order1_position,theta_tilt,lambda_plot=256000):
     # wavelength in nm, hologram porduced at 639nm
     # spherical wave centered in 0,0,0
@@ -89,7 +76,7 @@ def get_refraction_angle(deltaX,x0,D=DISTANCE2CCD):
     theta = np.arctan2(delta*PIXEL2MM,D)
     return theta
 
-def get_N(deltaX,x0,D=DISTANCE2CCD,l=HALPHA_CENTER,order=1):
+def get_N(deltaX,x0,D=DISTANCE2CCD,l=656,order=1):
     """ Return grooves per mm given the signal x position with 
     its wavelength in mm, the distance to CCD in mm and the order number.
     x0 is the order 0 position in the full raw image.
@@ -97,7 +84,7 @@ def get_N(deltaX,x0,D=DISTANCE2CCD,l=HALPHA_CENTER,order=1):
     in the rotated image."""
     theta = get_refraction_angle(deltaX,x0,D=D)
     theta0 = get_theta0(x0)
-    N = (np.sin(theta)-np.sin(theta0))/(order*HALPHA_CENTER)
+    N = (np.sin(theta)-np.sin(theta0))/(order*l)
     return N
     
 def neutral_lines(x_center,y_center,theta_tilt):
