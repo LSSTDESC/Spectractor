@@ -1,6 +1,5 @@
 import numpy as np
 import os, sys
-import copy
 from scipy import ndimage
 from scipy import interpolate
 from scipy.optimize import curve_fit
@@ -11,6 +10,7 @@ from astropy.table import Table
 from tools import *
 from parameters import *
 
+import copy
 # Making of the holograms
 DISTANCE2CCD = 55.45 # distance between hologram and CCD in mm
 DISTANCE2CCD_ERR = 0.19 # uncertainty on distance between hologram and CCD in mm

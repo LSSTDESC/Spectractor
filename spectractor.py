@@ -6,13 +6,16 @@ from matplotlib.ticker import MaxNLocator
 
 import sys,os
 import copy
-from tools import *
-from holo_specs import *
-from targets import *
-import parameters 
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 import astropy.units as units
+
+from tools import *
+from holo_specs import *
+from targets import *
+from optics import *
+import parameters 
+
 
 class Image():
 
@@ -328,7 +331,7 @@ class Spectrum():
     """ Spectrum class used to store information and methods
     relative to spectra nd their extraction.
     """
-    def __init__(self,filename="",Image=None,order=1):
+    def __init__(self,filename="",Image=None,atmospheric_lines=True,order=1):
         """
         Args:
             filename (:obj:`str`): path to the image
@@ -356,6 +359,8 @@ class Spectrum():
             self.target_pixcoords_rotated = Image.target_pixcoords_rotated
             self.units = Image.units
             self.my_logger.info('\n\tSpectrum info copied from Image')
+        self.atmospheric_lines = atmospheric_lines
+        self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only)
         self.load_filter()
 
     def load_filter(self):
@@ -366,16 +371,14 @@ class Spectrum():
                 self.my_logger.info('\n\tLoad filter %s: lambda between %.1f and %.1f' % (f['label'],parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
                 break
 
-    def plot_spectrum(self,xlim=None,order=1,atmospheric_lines=True,nofit=False):
+    def plot_spectrum(self,xlim=None,nofit=False):
         xs = self.lambdas
         if xs is None : xs = np.arange(self.data.shape[0])
         fig = plt.figure(figsize=[12,6])
         if self.err is not None:
-            plt.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % order,zorder=0)
+            plt.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % self.order,zorder=0)
         else:
-            plt.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % order)
-        if self.lambdas is not None:
-            plot_atomic_lines(plt.gca(),redshift=self.target.redshift,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,fontsize=12)
+            plt.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % self.order)
         plt.grid(True)
         plt.xlim([parameters.LAMBDA_MIN,parameters.LAMBDA_MAX])
         plt.ylim(0.,np.max(self.data)*1.2)
@@ -385,8 +388,10 @@ class Spectrum():
         if xlim is not None :
             plt.xlim(xlim)
             plt.ylim(0.,np.max(self.data[xlim[0]:xlim[1]])*1.2)
+        if self.lambdas is not None:
+            self.lines.plot_atomic_lines(plt.gca(),fontsize=12)
         if not nofit and self.lambdas is not None:
-            lambda_shift = detect_lines(self.lambdas,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=plt.gca(),verbose=False)
+            lambda_shift = detect_lines(self.lambdas,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=plt.gca(),verbose=False)
         plt.show()
 
     def calibrate_spectrum(self,xlims=None):
@@ -403,7 +408,7 @@ class Spectrum():
         self.data = self.data[self.lambdas_indices]
         if self.err is not None: self.err = self.err[self.lambdas_indices]
 
-    def calibrate_spectrum_with_lines(self,atmospheric_lines=True):
+    def calibrate_spectrum_with_lines(self):
         self.my_logger.warning('\n\tManual settings for tests')
         atmospheric_lines = True
         self.my_logger.info('\n\tCalibrating order %d spectrum...' % self.order)
@@ -438,7 +443,7 @@ class Spectrum():
         detect_lines(self.lambdas,self.data,spec_err=self.err,redshift=self.target.redshift,emission_spectrum=self.target.emission_spectrum,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,ax=None,verbose=parameters.DEBUG)
         self.my_logger.info('\n\tWavelenght total shift: %.2fnm (after %d steps)\n\twith D = %.2f mm (DISTANCE2CCD = %.2f +/- %.2f mm, %.1f sigma shift)' % (shift,len(shifts),D,DISTANCE2CCD,DISTANCE2CCD_ERR,(D-DISTANCE2CCD)/DISTANCE2CCD_ERR))
         if parameters.VERBOSE or parameters.DEBUG:
-            self.plot_spectrum(xlim=None,order=self.order,atmospheric_lines=atmospheric_lines,nofit=False)
+            self.plot_spectrum(xlim=None,nofit=False)
 
     def save_spectrum(self,output_filename,overwrite=False):
         hdu = fits.PrimaryHDU()
@@ -462,6 +467,8 @@ class Spectrum():
             extract_info_from_CTIO_header(self, self.header)
             if self.header['TARGET'] != "":
                 self.target=Target(self.header['TARGET'],verbose=parameters.VERBOSE)
+            if self.header['UNIT2'] != "":
+                self.units = self.header['UNIT2']
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_filename)
         else:
             self.my_logger.info('\n\tSpectrum file %s not found' % input_filename)
