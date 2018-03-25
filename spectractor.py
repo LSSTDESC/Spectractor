@@ -23,8 +23,8 @@ class Image():
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.filename = filename
-        self.load(filename)
         self.units = 'ADU'
+        self.load(filename)
         # Load the target if given
         self.target = None
         if target != "":
@@ -327,7 +327,7 @@ class Spectrum():
     """ Spectrum class used to store information and methods
     relative to spectra nd their extraction.
     """
-    def __init__(self,filename="",Image=None):
+    def __init__(self,filename="",Image=None,order=1):
         """
         Args:
             filename (:obj:`str`): path to the image
@@ -338,7 +338,7 @@ class Spectrum():
         self.data = None
         self.err = None
         self.lambdas = None
-        self.order = 1
+        self.order = order
         if filename != "" :
             self.filename = filename
             self.load_spectrum(filename)
@@ -368,8 +368,6 @@ class Spectrum():
     def plot_spectrum(self,xlim=None,order=1,atmospheric_lines=True,nofit=False):
         xs = self.lambdas
         if xs is None : xs = np.arange(self.data.shape[0])
-        #redshift = 0
-        #if self.target is not None : redshift = self.target.redshift
         fig = plt.figure(figsize=[12,6])
         if self.err is not None:
             plt.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % order,zorder=0)
@@ -478,7 +476,7 @@ def Spectractor(filename,outputdir,guess,target):
     output_filename = output_filename.replace('.fits','_spectrum.fits')
     output_filename = os.path.join(outputdir,output_filename)
     # Cut the image
-    
+  
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
     target_pixcoords = image.find_target(guess)
