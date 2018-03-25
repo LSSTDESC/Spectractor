@@ -24,6 +24,7 @@ class Image():
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.filename = filename
         self.load(filename)
+        self.units = 'ADU'
         # Load the target if given
         self.target = None
         if target != "":
@@ -55,6 +56,9 @@ class Image():
         # Load the disperser
         self.my_logger.info('\n\tLoading disperser %s...' % self.disperser)
         self.disperser = Hologram(self.disperser,data_dir=parameters.HOLO_DIR,verbose=parameters.VERBOSE)
+        # compute CCD gain map
+        self.build_gain_map()
+        self.convert_to_ADU_rate_units()
         self.compute_statistical_error()
         self.compute_parallactic_angle()
 
@@ -68,11 +72,12 @@ class Image():
         self.gain[IMSIZE/2:IMSIZE,0:IMSIZE] = self.header['GTGAIN21']
         # ampli 22
         self.gain[IMSIZE/2:IMSIZE,IMSIZE/2:IMSIZE] = self.header['GTGAIN22']
+
+    def convert_to_ADU_rate_units(self):
+        self.data /= self.expo
+        self.units = 'ADU rate'
         
     def compute_statistical_error(self):
-        '''Comute the CCD gain map.'''
-        # compute CCD gain map
-        self.build_gain_map()
         # removes the zeros and negative pixels first
         # set to minimum positive value
         data = np.copy(self.data)
@@ -235,7 +240,8 @@ class Image():
         self.my_logger.info('\n\tRotate the image with angle theta=%.2f degree' % self.rotation_angle)
         self.data_rotated = np.copy(self.data)
         if not np.isnan(self.rotation_angle):
-            self.data_rotated=ndimage.interpolation.rotate(self.data,self.rotation_angle,prefilter=False,order=5)
+            self.data_rotated=ndimage.interpolation.rotate(self.data,self.rotation_angle,prefilter=parameters.ROT_PREFILTER,order=parameters.ROT_ORDER)
+            self.stat_errors_rotated=ndimage.interpolation.rotate(self.stat_errors,self.rotation_angle,prefilter=parameters.ROT_PREFILTER,order=parameters.ROT_ORDER)
         if parameters.DEBUG:
             f, (ax1,ax2) = plt.subplots(2,1,figsize=[8,8])
             y0 = int(self.target_pixcoords[1])
@@ -253,29 +259,39 @@ class Image():
 
     def extract_spectrum_from_image(self,w=3,ws=[8,30],right_edge=1800):
         self.my_logger.info('\n\tExtracting spectrum from image: spectrum with width 2*%d pixels and background from %d to %d pixels' % (w,ws[0],ws[1]))
-        data=np.copy(self.data_rotated)[:,0:right_edge]
-        if self.expo <= 0 :
-            data /= self.expo
+        # Make a data copy
+        data = np.copy(self.data_rotated)[:,0:right_edge]
+        # Sum rotated image profile along y axis
         y0 = int(self.target_pixcoords_rotated[1])
-        spectrum2D=np.copy(data[y0-w:y0+w,:])
-        xprofile=np.mean(spectrum2D,axis=0)
-        
-        ### Lateral bands to remove sky background
-        ### ---------------------------------------
+        spectrum2D = np.copy(data[y0-w:y0+w,:])
+        xprofile = np.mean(spectrum2D,axis=0)
+        # Sum uncertainties in quadrature
+        err = np.copy(self.stat_errors_rotated)[:,0:right_edge]
+        err2D = np.copy(err[y0-w:y0+w,:])
+        xprofile_err = np.sqrt(np.mean(err2D**2,axis=0))
+        # Lateral bands to remove sky background
         Ny, Nx =  data.shape
         ymax = min(Ny,y0+ws[1])
         ymin = max(0,y0-ws[1])
-        spectrum2DUp=np.copy(data[y0+ws[0]:ymax,:])
+        spectrum2DUp = np.copy(data[y0+ws[0]:ymax,:])
         spectrum2DUp = filter_stars_from_bgd(spectrum2DUp,margin_cut=1)
-        xprofileUp=np.nanmedian(spectrum2DUp,axis=0)#*float(ymax-ws[0]-y0)
-        spectrum2DDown=np.copy(data[ymin:y0-ws[0],:])
+        err_spectrum2DUp = np.copy(err[y0+ws[0]:ymax,:])
+        err_spectrum2DUp = filter_stars_from_bgd(err_spectrum2DUp,margin_cut=1)
+        xprofileUp = np.nanmedian(spectrum2DUp,axis=0)
+        xprofileUp_err = np.sqrt(np.nanmean(err_spectrum2DUp**2,axis=0))
+        spectrum2DDown = np.copy(data[ymin:y0-ws[0],:])
         spectrum2DDown = filter_stars_from_bgd(spectrum2DDown,margin_cut=1)
-        xprofileDown=np.nanmedian(spectrum2DDown,axis=0)#*float(y0-ws[0]-ymin)
-        
-        #Clean_Up, Clean_Do,Clean_Av=CleanBadPixels(thespectraUp,thespectraDown)
+        err_spectrum2DDown = np.copy(err[ymin:y0-ws[0],:])
+        err_spectrum2DDown = filter_stars_from_bgd(err_spectrum2DDown,margin_cut=1)
+        xprofileDown = np.nanmedian(spectrum2DDown,axis=0)
+        xprofileDown_err = np.sqrt(np.nanmean(err_spectrum2DDown**2,axis=0))
+        # Subtract mean lateral profile
         xprofile_background = 0.5*(xprofileUp+xprofileDown)
+        xprofile_background_err = np.sqrt(0.5*(xprofileUp_err**2+xprofileDown_err**2))
+        # Create Spectrum object
         spectrum = Spectrum(Image=self)
         spectrum.data = xprofile - xprofile_background
+        spectrum.err = np.sqrt(xprofile_err**2 +  xprofile_background_err**2)
         if parameters.DEBUG:
             spectrum.plot_spectrum()    
         return spectrum
@@ -337,6 +353,7 @@ class Spectrum():
             self.target = Image.target
             self.target_pixcoords = Image.target_pixcoords
             self.target_pixcoords_rotated = Image.target_pixcoords_rotated
+            self.units = Image.units
             self.my_logger.info('\n\tSpectrum info copied from Image')
         self.load_filter()
 
@@ -347,7 +364,6 @@ class Spectrum():
                 parameters.LAMBDA_MAX = f['max']
                 self.my_logger.info('\n\tLoad filter %s: lambda between %.1f and %.1f' % (f['label'],parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
                 break
-            
 
     def plot_spectrum(self,xlim=None,order=1,atmospheric_lines=True,nofit=False):
         xs = self.lambdas
@@ -355,7 +371,10 @@ class Spectrum():
         #redshift = 0
         #if self.target is not None : redshift = self.target.redshift
         fig = plt.figure(figsize=[12,6])
-        plt.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % order)
+        if self.err is not None:
+            plt.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % order,zorder=0)
+        else:
+            plt.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % order)
         if self.lambdas is not None:
             plot_atomic_lines(plt.gca(),redshift=self.target.redshift,atmospheric_lines=atmospheric_lines,hydrogen_only=self.target.hydrogen_only,fontsize=12)
         plt.grid(True)
@@ -379,6 +398,7 @@ class Spectrum():
         lambdas_indices = np.where(np.logical_and(self.lambdas > parameters.LAMBDA_MIN, self.lambdas < parameters.LAMBDA_MAX))[0]
         self.lambdas = self.lambdas[lambdas_indices]
         self.data = self.data[lambdas_indices]
+        if self.err is not None: self.err = self.err[lambdas_indices]
         # Detect emission/absorption lines and calibrate pixel/lambda 
         D = DISTANCE2CCD-DISTANCE2CCD_ERR
         shift = 0
@@ -414,10 +434,10 @@ class Spectrum():
 
     def save_spectrum(self,output_filename,overwrite=False):
         hdu = fits.PrimaryHDU()
-        hdu.data = [self.lambdas,self.data]
+        hdu.data = [self.lambdas,self.data,self.err]
         self.header['UNIT1'] = "nanometer"
-        self.header['UNIT2'] = "spectrum unit thing"
-        self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, second column gives the spectrum in unit UNIT2'
+        self.header['UNIT2'] = self.units
+        self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, second column gives the spectrum in unit UNIT2, third column the corresponding errors.'
         hdu.header = self.header
         hdu.writeto(output_filename,overwrite=overwrite)
         self.my_logger.info('\n\tSpectrum saved in %s' % output_filename)
@@ -429,6 +449,8 @@ class Spectrum():
             self.header = hdu[0].header
             self.lambdas = hdu[0].data[0]
             self.data = hdu[0].data[1]
+            if len(hdu[0].data)==2:
+                self.err = hdu[0].data[2]
             extract_info_from_CTIO_header(self, self.header)
             if self.header['TARGET'] != "":
                 self.target=Target(self.header['TARGET'],verbose=parameters.VERBOSE)

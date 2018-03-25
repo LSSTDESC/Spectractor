@@ -6,21 +6,25 @@ import coloredlogs, logging
 # Paths
 HOLO_DIR = os.path.join(mypath,"dispersers/")
 
-# Spectractor parameters
+# Search windows in images
 XWINDOW = 100 # window x size to search for the targetted object 
 YWINDOW = 100  # window y size to search for the targetted object
 XWINDOW_ROT = 50 # window x size to search for the targetted object 
 YWINDOW_ROT = 50  # window y size to search for the targetted object
 
+# Rotation parameters
+ROT_PREFILTER = True # must be set to true, otherwise create residuals and correlated noise
+ROT_ORDER = 5 # must be above 3
+
+# Range for spectrum
 LAMBDA_MIN = 350 # minimum wavelength for spectrum extraction (in nm)
 LAMBDA_MAX = 1100 # maxnimum wavelength for spectrum extraction (in nm)
 
-# Verbose  mode
+# Verbosity
 VERBOSE = False
-MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"   #### ce sont des variables de classes
-logging.basicConfig(format=MY_FORMAT, level=logging.WARNING)
-# Debug mode
 DEBUG = False
+MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"  
+logging.basicConfig(format=MY_FORMAT, level=logging.WARNING)
 def set_logger(logger):
     my_logger = logging.getLogger(logger)
     if VERBOSE > 0:
