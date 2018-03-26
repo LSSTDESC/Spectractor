@@ -539,7 +539,7 @@ if __name__ == "__main__":
     guess = [745,643]
     target = "3C273"
 
-    #filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_029.fits"
+    #filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_028.fits"
     #guess = [814, 585]
     #target = "PNG321.0+3.9"
     #filename="../CTIOAnaJun2017/ana_29may17/OverScanRemove/trim_images/trim_20170529_150.fits"
