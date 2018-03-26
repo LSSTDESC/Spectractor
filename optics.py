@@ -6,6 +6,8 @@ from tools import *
 from scipy.signal import argrelextrema
 from astropy.table import Table
 
+import matplotlib.pyplot as plt
+
 # H-alpha filter
 HALPHA_CENTER = 655.9e-6 # center of the filter in mm
 HALPHA_WIDTH = 6.4e-6 # width of the filter in mm
@@ -19,7 +21,7 @@ FILTERS = [RG715,FGB37,HALPHA_FILTER,ZGUNN]
 
 class Line():
 
-    def __init__(self,wavelength,label,atmospheric=False,emission=False,label_pos=[0.007,0.02],width_bounds=[1,10]):
+    def __init__(self,wavelength,label,atmospheric=False,emission=False,label_pos=[0.007,0.02],width_bounds=[1,7]):
         self.my_logger = set_logger(self.__class__.__name__)
         self.wavelength = wavelength # in nm
         self.label = label
@@ -35,6 +37,7 @@ class Lines():
 
     def __init__(self,redshift=0,atmospheric_lines=True,hydrogen_only=False,emission_spectrum=False):
         # Main emission/absorption lines in nm
+        # see http://www.pa.uky.edu/~peter/atomic/
         HALPHA = Line(656.3,atmospheric=False,label='$H\\alpha$',label_pos=[-0.016,0.02])
         HBETA = Line( 486.3,atmospheric=False,label='$H\\beta$',label_pos=[0.007,0.02]) 
         HGAMMA = Line(434.0,atmospheric=False,label='$H\\gamma$',label_pos=[0.007,0.02]) 
@@ -46,8 +49,30 @@ class Lines():
         CII3 =  Line( 679.0,atmospheric=False,label='$C_{II}$',label_pos=[0.005,0.02])
         CIII1 =  Line( 673.0,atmospheric=False,label='$C_{III}$',label_pos=[-0.016,0.92])
         CIII2 =  Line( 570.0,atmospheric=False,label='$C_{III}$',label_pos=[0.007,0.02])
-        HEI =  Line( 587.5,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
-        HEII =  Line( 468.6,atmospheric=False,label='$He_{II}$',label_pos=[0.007,0.02])
+        CIII3 =  Line( 970.5,atmospheric=False,label='$C_{III}$',label_pos=[0.007,0.02])
+        FEII1 =  Line( 515.8,atmospheric=False,label='$Fe_{II}$',label_pos=[0.007,0.02])
+        FEII2 =  Line( 527.3,atmospheric=False,label='$Fe_{II}$',label_pos=[0.007,0.02])
+        FEII3 =  Line( 534.9,atmospheric=False,label='$Fe_{II}$',label_pos=[0.007,0.02])
+        HEI1 =  Line( 388.8,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI2 =  Line( 447.1,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI3 =  Line( 587.5,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI4 =  Line( 750.0,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI5 =  Line( 776.0,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI6 =  Line( 781.6,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI7 =  Line( 848.2,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI8 =  Line( 861.7,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI9 =  Line( 906.5,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI10 =  Line( 923.5,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI11 =  Line( 951.9,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI12 =  Line( 1023.5,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        HEI13 =  Line( 353.1,atmospheric=False,label='$He_{I}$',label_pos=[0.007,0.02])
+        OI =  Line( 630.0,atmospheric=False,label='$O_{II}$',label_pos=[0.007,0.02])
+        OII =  Line( 732.5,atmospheric=False,label='$O_{II}$',label_pos=[0.007,0.02])
+        HEII1 =  Line( 468.6,atmospheric=False,label='$He_{II}$',label_pos=[0.007,0.02])
+        HEII2 =  Line( 611.8,atmospheric=False,label='$He_{II}$',label_pos=[0.007,0.02])
+        HEII3 =  Line( 617.1,atmospheric=False,label='$He_{II}$',label_pos=[0.007,0.02])
+        HEII4 =  Line( 856.7,atmospheric=False,label='$He_{II}$',label_pos=[0.007,0.02])
+        HI =  Line( 833.9,atmospheric=False,label='$He_{II}$',label_pos=[0.007,0.02])
         CAII1 =  Line( 393.366,atmospheric=True,label='$Ca_{II}$',label_pos=[0.007,0.02]) # https://en.wikipedia.org/wiki/Fraunhofer_lines
         CAII2 =  Line( 396.847,atmospheric=True,label='$Ca_{II}$',label_pos=[0.007,0.02]) # https://en.wikipedia.org/wiki/Fraunhofer_lines
         O2 = Line( 762.1,atmospheric=True,label='$O_2$',label_pos=[0.007,0.02]) # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
@@ -56,11 +81,11 @@ class Lines():
         O2B = Line( 686.719,atmospheric=True,label='$O_2(B)$',label_pos=[0.007,0.02]) # https://en.wikipedia.org/wiki/Fraunhofer_lines
         O2Y = Line( 898.765,atmospheric=True,label='$O_2(Y)$',label_pos=[0.007,0.02]) # https://en.wikipedia.org/wiki/Fraunhofer_lines
         O2Z = Line( 822.696,atmospheric=True,label='$O_2(Z)$',label_pos=[0.007,0.02]) # https://en.wikipedia.org/wiki/Fraunhofer_lines
-        #H2O = Line( 960,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(1,100))  # 
+        #H2O = Line( 960,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(1,50))  # 
         H2O_1 = Line( 950,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(5,30))  # libradtran paper fig.3, broad line
         H2O_2 = Line( 970,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(5,30))  # libradtran paper fig.3, broad line
         
-        self.lines = [HALPHA,HBETA,HGAMMA,HDELTA,O2,O2B,O2Y,O2Z,H2O_1,H2O_2,OIII,CII1,CII2,CIV,CII3,CIII1,CIII2,HEI,HEII,CAII1,CAII2]
+        self.lines = [HALPHA,HBETA,HGAMMA,HDELTA,O2,O2B,O2Y,O2Z,H2O_1,H2O_2,OIII,CII1,CII2,CIV,CII3,CIII1,CIII2,CIII3,HEI1,HEI2,HEI3,HEI4,HEI5,HEI6,HEI7,HEI8,HEI9,HEI10,HEI11,HEI12,HEI13,OI,OII,HEII1,HEII2,HEII3,HEII4,CAII1,CAII2,HI,FEII1,FEII2,FEII3]
         self.redshift = redshift
         self.atmospheric_lines = atmospheric_lines
         self.hydrogen_only = hydrogen_only
@@ -102,11 +127,11 @@ class Lines():
         # main settings
         bgd_npar = BGD_NPARAMS
         peak_look = 7 # half range to look for local maximum in pixels
-        bgd_width = 7 # size of the peak sides to use to fit spectrum base line
+        bgd_width = 10 # size of the peak sides to use to fit spectrum base line
         if self.hydrogen_only :
             peak_look = 15
-            bgd_width = 15
-        baseline_prior = 3 # *sigma gaussian prior on base line fit
+            bgd_width = 20
+        baseline_prior = 0.1 # *sigma gaussian prior on base line fit
         # initialisation
         lambda_shifts = []
         snrs = []
@@ -173,8 +198,10 @@ class Lines():
             index = range(max(0,index_inf-bgd_width),min(len(lambdas),index_sup+bgd_width))
             # first guess and bounds to fit the line properties and
             # the background with BGD_ORDER order polynom
-            guess = [0]*bgd_npar+[0*abs(spec[peak_index]),lambdas[peak_index],0.5*(line.width_bounds[0]+line.width_bounds[1])]
-            bounds = [[-np.inf]*bgd_npar+[-np.inf,lambdas[index_inf],line.width_bounds[0]], [np.inf]*bgd_npar+[2*np.max(spec[index]),lambdas[index_sup],line.width_bounds[1]]  ]
+            guess = [0]*bgd_npar+[0.5*np.max(spec[index]),lambdas[peak_index],0.5*(line.width_bounds[0]+line.width_bounds[1])]
+            if line_strategy == np.less :
+                guess[bgd_npar] = -0.5*np.max(spec[index]) # look for abosrption under bgd
+            bounds = [[-np.inf]*bgd_npar+[-2*np.max(spec[index]),lambdas[index_inf],line.width_bounds[0]], [np.inf]*bgd_npar+[2*np.max(spec[index]),lambdas[index_sup],line.width_bounds[1]]  ]
             # gaussian amplitude bounds depend if line is emission/absorption
             if line_strategy == np.less :
                 bounds[1][bgd_npar] = 0 # look for abosrption under bgd
@@ -256,18 +283,25 @@ class Lines():
             noise_level = np.std(spec[index]-multigauss_and_bgd(lambdas[index],*popt))
             # otherwise mean of error bars of bgd lateral bands
             if spec_err is not None:
-                noise_level = np.mean(spec_err[bgd_index])
+                noise_level = np.mean(spec_err[index])
+            #f = plt.figure()
+            #plt.errorbar(lambdas[index],spec[index],yerr=spec_err[index])
+            #plt.plot(lambdas[bgd_index],spec[bgd_index])
+            #plt.plot(lambdas[index],np.polyval(popt[:bgd_npar],lambdas[index]),'b--')
+            #plt.plot(lambdas[index],multigauss_and_bgd(lambdas[index],*popt),'b-')
+            #plt.show()
             plot_line_subset = False
             for j in range(len(new_lines_list[k])) :
                 line = new_lines_list[k][j]
                 l = line.wavelength
                 peak_pos = popt[bgd_npar+3*j+1]
                 # SNR computation
-                signal_level = popt[bgd_npar+3*j]
+                #signal_level = popt[bgd_npar+3*j]
+                signal_level = multigauss_and_bgd(peak_pos,*popt)-np.polyval(popt[:bgd_npar],peak_pos)
                 snr = np.abs(signal_level / noise_level)
                 if snr < snr_minlevel : continue
                 # FWHM
-                FWHM = np.abs(popt[bgd_npar+3*j+bgd_npar])*2.355
+                FWHM = np.abs(popt[bgd_npar+3*j+2])*2.355
                 rows.append((line.label,l,peak_pos,peak_pos-l,FWHM,signal_level,snr))
                 # save fit results
                 plot_line_subset = True
