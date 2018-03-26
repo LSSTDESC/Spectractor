@@ -6,7 +6,7 @@ The goal of Spectractor is to extract spectra from CTIO images in order to test 
 
 Spectractor is written in Python 2.7. It needs the numpy, scipy, astropy, astroquery modules for science computations, and also logging and coloredlogs.
 
-## Basic use
+## Basic usage
 
 The main file is `spectractor.py` with the function `Spectractor`. It extracts the spectrum from one deflatted and trimmed CTIO images, given:
 - the path to the fits image from which to extract the image, 
