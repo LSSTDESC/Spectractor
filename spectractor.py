@@ -465,7 +465,7 @@ class Spectrum():
             self.header = hdu[0].header
             self.lambdas = hdu[0].data[0]
             self.data = hdu[0].data[1]
-            if len(hdu[0].data)==2:
+            if len(hdu[0].data)>2:
                 self.err = hdu[0].data[2]
             extract_info_from_CTIO_header(self, self.header)
             if self.header['TARGET'] != "":
