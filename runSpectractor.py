@@ -16,6 +16,8 @@ if __name__ == "__main__":
                       help="Enter verbose (print more stuff).",default=False)
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="test/",
                       help="Write results in given output directory (default: ./tests/).")
+    parser.add_argument("-c", "--csv", dest="csv", default="ctiofulllogbook_jun2017_V2.csv",
+                      help="CSV logbook file. (default: ctiofulllogbook_jun2017_V2.csv).")
     args = parser.parse_args()
 
     parameters.VERBOSE = args.verbose
@@ -25,7 +27,7 @@ if __name__ == "__main__":
 
     filenames = args.input
     
-    logbook = LogBook()
+    logbook = LogBook(logbook=args.csv)
     for filename in filenames:
         tag = filename.split('/')[-1]
         target, xpos, ypos = logbook.search_for_image(tag)

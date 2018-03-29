@@ -38,6 +38,7 @@ class Lines():
     def __init__(self,redshift=0,atmospheric_lines=True,hydrogen_only=False,emission_spectrum=False):
         # Main emission/absorption lines in nm
         # see http://www.pa.uky.edu/~peter/atomic/
+        # see https://physics.nist.gov/PhysRefData/ASD/lines_form.html
         HALPHA = Line(656.3,atmospheric=False,label='$H\\alpha$',label_pos=[-0.016,0.02])
         HBETA = Line( 486.3,atmospheric=False,label='$H\\beta$',label_pos=[0.007,0.02]) 
         HGAMMA = Line(434.0,atmospheric=False,label='$H\\gamma$',label_pos=[0.007,0.02]) 
@@ -127,11 +128,11 @@ class Lines():
         # main settings
         bgd_npar = BGD_NPARAMS
         peak_look = 7 # half range to look for local maximum in pixels
-        bgd_width = 10 # size of the peak sides to use to fit spectrum base line
+        bgd_width = 9 # size of the peak sides to use to fit spectrum base line
         if self.hydrogen_only :
             peak_look = 15
             bgd_width = 20
-        baseline_prior = 0.1 # *sigma gaussian prior on base line fit
+        baseline_prior = 0.5 # *sigma gaussian prior on base line fit
         # initialisation
         lambda_shifts = []
         snrs = []
