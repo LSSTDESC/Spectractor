@@ -30,6 +30,8 @@ class Image():
         self.load(filename)
         # Load the target if given
         self.target = None
+        self.target_pixcoords = None
+        self.target_pixcoords_rotated = None
         if target != "":
             self.target=Target(target,verbose=parameters.VERBOSE)
             self.header['TARGET'] = self.target.label
@@ -103,14 +105,8 @@ class Image():
         self.header['PARANGLE'] = self.parallactic_angle
         self.header.comments['PARANGLE'] = 'parallactic angle in degree'
         return self.parallactic_angle
- 
-    def find_target(self,guess,rotated=False):
-        """
-        Find precisely the position of the targeted object.
-        
-        Args:
-            guess (:obj:`list`): [x,y] guessed position of th target
-        """
+
+    def find_target_init(self,guess,rotated=False):
         x0 = guess[0]
         y0 = guess[1]
         Dx = parameters.XWINDOW
@@ -128,58 +124,142 @@ class Image():
             sub_image = np.copy(self.data_rotated[y0-Dy:y0+Dy,x0-Dx:x0+Dx])
         else:
             sub_image = np.copy(self.data[y0-Dy:y0+Dy,x0-Dx:x0+Dx])
-        NX=sub_image.shape[1]
-        NY=sub_image.shape[0]        
-        X_=np.arange(NX)
-        Y_=np.arange(NY)
+        return sub_image,x0,y0,Dx,Dy
+
+ 
+    def find_target_1Dprofile(self,guess,rotated=False):
+        """
+        Find precisely the position of the targeted object.
+        
+        Args:
+            guess (:obj:`list`): [x,y] guessed position of th target
+        """
+        sub_image,x0,y0,Dx,Dy = self.find_target_init(guess=guess,rotated=rotated)
+        NY, NX = sub_image.shape
+        X = np.arange(NX)
+        Y = np.arange(NY)
+        # compute profiles
         profile_X_raw=np.sum(sub_image,axis=0)
         profile_Y_raw=np.sum(sub_image,axis=1)
         # fit and subtract smooth polynomial background
         # with 3sigma rejection of outliers (star peaks)
-        bkgd_X = fit_poly1d_outlier_removal(X_,profile_X_raw,order=2)
-        bkgd_Y = fit_poly1d_outlier_removal(Y_,profile_Y_raw,order=2)
+        bkgd_X = fit_poly1d_outlier_removal(X,profile_X_raw,order=2)
+        bkgd_Y = fit_poly1d_outlier_removal(Y,profile_Y_raw,order=2)
         profile_X = profile_X_raw - bkgd_X #np.min(profile_X)
         profile_Y = profile_Y_raw - bkgd_Y #np.min(profile_Y)
-
-        avX,sigX=weighted_avg_and_std(X_,profile_X**4) 
-        avY,sigY=weighted_avg_and_std(Y_,profile_Y**4)
-
+        avX,sigX=weighted_avg_and_std(X,profile_X**4) 
+        avY,sigY=weighted_avg_and_std(Y,profile_Y**4)
         if profile_X[int(avX)] < 0.8*np.max(profile_X) :
             self.my_logger.warning('\n\tX position determination of the target probably wrong') 
-
         if profile_Y[int(avY)] < 0.8*np.max(profile_Y) :
             self.my_logger.warning('\n\tY position determination of the target probably wrong')
-
+        # compute target position
         theX=x0-Dx+avX
-        theY=y0-Dy+avY
-        
+        theY=y0-Dy+avY        
         if parameters.DEBUG:
             profile_X_max=np.max(profile_X_raw)*1.2
             profile_Y_max=np.max(profile_Y_raw)*1.2
 
             f, (ax1, ax2,ax3) = plt.subplots(1,3, figsize=(15,4))
-            ax1.imshow(sub_image,origin='lower',vmin=0,vmax=10000,cmap='rainbow')
-            ax1.plot([avX],[avY],'ko')
+            im = ax1.imshow(np.log10(sub_image),origin='lower',cmap='jet')
+            cb = f.colorbar(im,ax=ax1)
+            cb.formatter.set_powerlimits((0, 0))
+            cb.locator = MaxNLocator(7,prune=None)
+            cb.update_ticks()
+            cb.set_label('%s (log10 scale)' % (self.units)) #,fontsize=16)
+            ax1.scatter([avX],[avY],marker='o',s=100,facecolors='none',edgecolors='k')
             ax1.grid(True)
-            ax1.set_xlabel('X - pixel')
-            ax1.set_ylabel('Y - pixel')
+            ax1.set_xlabel('X (pixels)')
+            ax1.set_ylabel('Y (pixels)')
 
-            ax2.plot(X_,profile_X_raw,'r-',lw=2)
-            ax2.plot(X_,bkgd_X,'g--',lw=2,label='bkgd')
+            ax2.plot(X,profile_X_raw,'r-',lw=2)
+            ax2.plot(X,bkgd_X,'g--',lw=2,label='bkgd')
             ax2.axvline(Dx,color='y',linestyle='-',label='old',lw=2)
             ax2.axvline(avX,color='b',linestyle='-',label='new',lw=2)
             ax2.grid(True)
-            ax2.set_xlabel('X - pixel')
+            ax2.set_xlabel('X (pixels)')
             ax2.legend(loc=1)
 
-            ax3.plot(Y_,profile_Y_raw,'r-',lw=2)
-            ax3.plot(Y_,bkgd_Y,'g--',lw=2,label='bkgd')
+            ax3.plot(Y,profile_Y_raw,'r-',lw=2)
+            ax3.plot(Y,bkgd_Y,'g--',lw=2,label='bkgd')
             ax3.axvline(Dy,color='y',linestyle='-',label='old',lw=2)
             ax3.axvline(avY,color='b',linestyle='-',label='new',lw=2)
             ax3.grid(True)
-            ax3.set_xlabel('Y - pixel')
+            ax3.set_xlabel('Y (pixels)')
+            ax3.legend(loc=1)
+            f.tight_layout()
+            plt.show()
+
+        self.my_logger.info('\n\tX,Y target position in pixels: %.3f,%.3f' % (theX,theY))
+        if rotated:
+            self.target_pixcoords_rotated = [theX,theY]
+        else:
+            self.target_pixcoords = [theX,theY]
+        return [theX,theY]
+
+    def find_target_2Dprofile(self,guess,rotated=False):
+        """
+        Find precisely the position of the targeted object.
+        
+        Args:
+            guess (:obj:`list`): [x,y] guessed position of th target
+        """
+        sub_image,x0,y0,Dx,Dy = self.find_target_init(guess=guess,rotated=rotated)
+        NY, NX = sub_image.shape
+        X = np.arange(NX)
+        Y = np.arange(NY)
+        Y, X = np.mgrid[:NY,:NX]
+        # fit and subtract smooth polynomial background
+        # with 3sigma rejection of outliers (star peaks)
+        bkgd_2D = fit_poly2d_outlier_removal(X,Y,sub_image,order=2,sigma=2)
+        sub_image_subtracted = sub_image-bkgd_2D
+        avX,sigX = weighted_avg_and_std(X,(sub_image_subtracted)**4)
+        avY,sigY = weighted_avg_and_std(Y,(sub_image_subtracted)**4)
+        if sub_image_subtracted[int(avY),int(avX)] < 0.8*np.max(sub_image_subtracted) :
+            self.my_logger.warning('\n\tX,Y position determination of the target probably wrong') 
+        # compute target positions
+        theX=x0-Dx+avX
+        theY=y0-Dy+avY
+        # debugging plots
+        if parameters.DEBUG:
+            f, (ax1, ax2,ax3) = plt.subplots(1,3, figsize=(15,4))
+            im = ax1.imshow(sub_image,origin='lower',cmap='jet')
+            cb = f.colorbar(im,ax=ax1)
+            #cb.formatter.set_powerlimits((0, 0))
+            cb.locator = MaxNLocator(7,prune=None)
+            cb.update_ticks()
+            cb.set_label('Original image (%s)' % (self.units)) #,fontsize=16)
+            ax1.scatter([Dx],[Dy],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
+            ax1.scatter([avX],[avY],marker='o',s=100,facecolors='none',edgecolors='k',label='new')
+            ax1.grid(True)
+            ax1.set_xlabel('X (pixels)')
+            ax1.set_ylabel('Y (pixels)')
+            ax1.legend(loc=1)
+
+            im2 = ax2.imshow(bkgd_2D,origin='lower',cmap='jet',vmin=np.min(sub_image),vmax=np.max(sub_image))
+            cb = f.colorbar(im2,ax=ax2)
+            #cb.formatter.set_powerlimits((0, 0))
+            cb.locator = MaxNLocator(7,prune=None)
+            cb.update_ticks()
+            cb.set_label('Background (%s)' % (self.units)) #,fontsize=16)
+            ax2.set_xlabel('X (pixels)')
+            ax2.set_ylabel('Y (pixels)')
+            ax2.legend(loc=1)
+
+            im3 = ax3.imshow(sub_image_subtracted,origin='lower',cmap='jet')
+            cb = f.colorbar(im3,ax=ax3)
+            #cb.formatter.set_powerlimits((0, 0))
+            cb.locator = MaxNLocator(7,prune=None)
+            cb.update_ticks()
+            cb.set_label('Background subtracted image (%s)' % (self.units)) #,fontsize=16)
+            ax3.scatter([Dx],[Dy],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
+            ax3.scatter([avX],[avY],marker='o',s=100,facecolors='none',edgecolors='k',label='new')
+            ax3.grid(True)
+            ax3.set_xlabel('X (pixels)')
+            ax3.set_ylabel('Y (pixels)')
             ax3.legend(loc=1)
 
+            f.tight_layout()
             plt.show()
 
         self.my_logger.info('\n\tX,Y target position in pixels: %.3f,%.3f' % (theX,theY))
@@ -247,15 +327,20 @@ class Image():
             self.data_rotated=ndimage.interpolation.rotate(self.data,self.rotation_angle,prefilter=parameters.ROT_PREFILTER,order=parameters.ROT_ORDER)
             self.stat_errors_rotated=ndimage.interpolation.rotate(self.stat_errors,self.rotation_angle,prefilter=parameters.ROT_PREFILTER,order=parameters.ROT_ORDER)
         if parameters.DEBUG:
+            margin=200
             f, (ax1,ax2) = plt.subplots(2,1,figsize=[8,8])
             y0 = int(self.target_pixcoords[1])
-            ax1.imshow(np.log10(self.data[y0-parameters.YWINDOW:y0+parameters.YWINDOW,200:-200]),origin='lower',cmap='rainbow',aspect="auto")
-            ax1.plot([0,self.data.shape[0]-200],[parameters.YWINDOW,parameters.YWINDOW],'w-')
+            ax1.imshow(np.log10(self.data[y0-parameters.YWINDOW:y0+parameters.YWINDOW,margin:-margin]),origin='lower',cmap='rainbow',aspect="auto")
+            ax1.plot([0,self.data.shape[0]-2*margin],[parameters.YWINDOW,parameters.YWINDOW],'k-')
+            if self.target_pixcoords is not None:
+                ax1.scatter(self.target_pixcoords[0]-margin,parameters.YWINDOW,marker='o',s=100,edgecolors='k',facecolors='none')
             ax1.grid(color='white', ls='solid')
             ax1.grid(True)
             ax1.set_title('Raw image (log10 scale)')
-            ax2.imshow(np.log10(self.data_rotated[y0-parameters.YWINDOW:y0+parameters.YWINDOW,200:-200]),origin='lower',cmap='rainbow',aspect="auto")
-            ax2.plot([0,self.data_rotated.shape[0]-200],[parameters.YWINDOW,parameters.YWINDOW],'w-')
+            ax2.imshow(np.log10(self.data_rotated[y0-parameters.YWINDOW:y0+parameters.YWINDOW,margin:-margin]),origin='lower',cmap='rainbow',aspect="auto")
+            ax2.plot([0,self.data_rotated.shape[0]-2*margin],[parameters.YWINDOW,parameters.YWINDOW],'k-')
+            if self.target_pixcoords_rotated is not None:
+                ax2.scatter(self.target_pixcoords_rotated[0],self.target_pixcoords_rotated[1],marker='o',s=100,edgecolors='k',facecolors='none')
             ax2.grid(color='white', ls='solid')
             ax2.grid(True)
             ax2.set_title('Turned image (log10 scale)')
@@ -301,7 +386,7 @@ class Image():
         return spectrum
 
    
-    def plot_image(self,scale="lin",title="",units="Image units",plot_stats=False):
+    def plot_image(self,scale="lin",title="",units="Image units",plot_stats=False,target_pixcoords=None):
         fig, ax = plt.subplots(1,1,figsize=[9.3,8])
         data = np.copy(self.data)
         if plot_stats: data = np.copy(self.stat_errors)
@@ -312,17 +397,20 @@ class Image():
             data[zeros] = min_noz
             # apply log
             data = np.log10(data)
-        im = ax.imshow(data,origin='lower',cmap='rainbow')
+        im = ax.imshow(data,origin='lower',cmap='jet')
         ax.grid(color='white', ls='solid')
         ax.grid(True)
         ax.set_xlabel('X (pixels)')
         ax.set_ylabel('Y (pixels)')
+        if target_pixcoords is not None:
+            plt.scatter(target_pixcoords[0],target_pixcoords[1],marker='o',s=100,edgecolors='k',facecolors='none',label='Target')
         cb = fig.colorbar(im,ax=ax)
         cb.formatter.set_powerlimits((0, 0))
         cb.locator = MaxNLocator(7,prune=None)
         cb.update_ticks()
         cb.set_label('%s (%s scale)' % (units,scale)) #,fontsize=16)
         if title!="": ax.set_title(title)
+        plt.legend()
         plt.show()
         
 
@@ -489,21 +577,25 @@ def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
     my_logger.info('\n\tStart SPECTRACTOR')
     # Load reduced image
     image = Image(filename,target=target)
+    if parameters.DEBUG:
+        image.plot_image(scale='log10',target_pixcoords=guess)
     # Set output path
     ensure_dir(outputdir)
     output_filename = filename.split('/')[-1]
     output_filename = output_filename.replace('.fits','_spectrum.fits')
     output_filename = os.path.join(outputdir,output_filename)
-    # Cut the image
-  
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
-    target_pixcoords = image.find_target(guess)
+    target_pixcoords = image.find_target_1Dprofile(guess)
+    print target_pixcoords
+    target_pixcoords = image.find_target_2Dprofile(guess)
+    print target_pixcoords
+    return 
     # Rotate the image: several methods
     image.turn_image()
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-    target_pixcoords_rotated = image.find_target(guess,rotated=True)
+    target_pixcoords_rotated = image.find_target_2Dprofile(guess,rotated=True)
     # Subtract background and bad pixels
     spectrum = image.extract_spectrum_from_image()
     spectrum.atmospheric_lines = atmospheric_lines
@@ -539,7 +631,7 @@ if __name__ == "__main__":
     #guess = [745,643]
     #target = "3C273"
 
-    filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_029.fits"
+    filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_028.fits"
     guess = [814, 585]
     target = "PNG321.0+3.9"
     #filename="../CTIOAnaJun2017/ana_29may17/OverScanRemove/trim_images/trim_20170529_150.fits"

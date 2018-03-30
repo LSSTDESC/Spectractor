@@ -92,16 +92,24 @@ def fit_poly1d_outlier_removal(x,y,order=2,sigma=3.0,niter=3):
     with warnings.catch_warnings():
         # Ignore model linearity warning from the fitter
         warnings.simplefilter('ignore')
-        or_fit = fitting.LevMarLSQFitter()
-        fit = fitting.FittingWithOutlierRemoval(or_fit, sigma_clip, niter=niter, sigma=sigma)
+        fit = fitting.LevMarLSQFitter()
+        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
-        filtered_data, fitted_model = fit(gg_init, x, y)
-        or_fitted_model = or_fit(gg_init, x, y)
-        fitted_bkgd = models.Polynomial1D(2)
-        fitted_bkgd.c0 = fitted_model.c0.value
-        fitted_bkgd.c1 = fitted_model.c1.value
-        fitted_bkgd.c2 = fitted_model.c2.value
-        return fitted_bkgd(x)
+        filtered_data, or_fitted_model = or_fit(gg_init, x, y)
+        return or_fitted_model(x)
+
+def fit_poly2d_outlier_removal(x,y,z,order=2,sigma=3.0,niter=30):
+    gg_init = models.Polynomial2D(order)
+    gg_init.c0_0.min = np.min(z)
+    gg_init.c0_0.max = 2*np.max(z)
+    with warnings.catch_warnings():
+        # Ignore model linearity warning from the fitter
+        warnings.simplefilter('ignore')
+        fit = fitting.LevMarLSQFitter()
+        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+        # get fitted model and filtered data
+        filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        return or_fitted_model(x,y)
 
 def find_nearest(array,value):
     idx = (np.abs(array-value)).argmin()
