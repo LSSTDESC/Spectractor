@@ -96,7 +96,7 @@ def fit_poly1d_outlier_removal(x,y,order=2,sigma=3.0,niter=3):
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y)
-        return or_fitted_model(x)
+        return or_fitted_model
 
 def fit_poly2d_outlier_removal(x,y,z,order=2,sigma=3.0,niter=30):
     gg_init = models.Polynomial2D(order)
@@ -109,7 +109,53 @@ def fit_poly2d_outlier_removal(x,y,z,order=2,sigma=3.0,niter=30):
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        return or_fitted_model(x,y)
+        return or_fitted_model
+
+def tied_circular_gauss2d(g1):
+    std = g1.x_stddev
+    return std
+
+def fit_gauss2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None,circular=False):
+    '''Gauss2D parameters: amplitude, x_mean,y_mean,x_stddev, y_stddev,theta'''
+    gg_init = models.Gaussian2D()
+    if guess is not None:
+        for ip,p in enumerate(gg_init.param_names):
+            getattr(gg_init,p).value = guess[ip]
+    if bounds is not None:
+        for ip,p in enumerate(gg_init.param_names):
+            getattr(gg_init,p).min = bounds[0][ip]
+            getattr(gg_init,p).max = bounds[1][ip]
+    if circular:
+        gg_init.y_stddev.tied = tied_circular_gauss2d
+        gg_init.theta.fixed = True
+    with warnings.catch_warnings():
+        # Ignore model linearity warning from the fitter
+        warnings.simplefilter('ignore')
+        fit = fitting.LevMarLSQFitter()
+        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+        # get fitted model and filtered data
+        filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        return or_fitted_model
+
+def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None):
+    '''Moffat2D parameters: amplitude, x_mean,y_mean,gamma,alpha'''
+    gg_init = models.Moffat2D()
+    if guess is not None:
+        for ip,p in enumerate(gg_init.param_names):
+            getattr(gg_init,p).value = guess[ip]
+    if bounds is not None:
+        for ip,p in enumerate(gg_init.param_names):
+            getattr(gg_init,p).min = bounds[0][ip]
+            getattr(gg_init,p).max = bounds[1][ip]
+    with warnings.catch_warnings():
+        # Ignore model linearity warning from the fitter
+        warnings.simplefilter('ignore')
+        fit = fitting.LevMarLSQFitter()
+        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+        # get fitted model and filtered data
+        filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        print or_fitted_model
+        return or_fitted_model
 
 def find_nearest(array,value):
     idx = (np.abs(array-value)).argmin()
