@@ -145,8 +145,8 @@ class Image():
         # with 3sigma rejection of outliers (star peaks)
         bkgd_X = fit_poly1d_outlier_removal(X,profile_X_raw,order=2)
         bkgd_Y = fit_poly1d_outlier_removal(Y,profile_Y_raw,order=2)
-        profile_X = profile_X_raw - bkgd_X #np.min(profile_X)
-        profile_Y = profile_Y_raw - bkgd_Y #np.min(profile_Y)
+        profile_X = profile_X_raw - bkgd_X(X) #np.min(profile_X)
+        profile_Y = profile_Y_raw - bkgd_Y(Y) #np.min(profile_Y)
         avX,sigX=weighted_avg_and_std(X,profile_X**4) 
         avY,sigY=weighted_avg_and_std(Y,profile_Y**4)
         if profile_X[int(avX)] < 0.8*np.max(profile_X) :
@@ -173,7 +173,7 @@ class Image():
             ax1.set_ylabel('Y (pixels)')
 
             ax2.plot(X,profile_X_raw,'r-',lw=2)
-            ax2.plot(X,bkgd_X,'g--',lw=2,label='bkgd')
+            ax2.plot(X,bkgd_X(X),'g--',lw=2,label='bkgd')
             ax2.axvline(Dx,color='y',linestyle='-',label='old',lw=2)
             ax2.axvline(avX,color='b',linestyle='-',label='new',lw=2)
             ax2.grid(True)
@@ -181,7 +181,7 @@ class Image():
             ax2.legend(loc=1)
 
             ax3.plot(Y,profile_Y_raw,'r-',lw=2)
-            ax3.plot(Y,bkgd_Y,'g--',lw=2,label='bkgd')
+            ax3.plot(Y,bkgd_Y(Y),'g--',lw=2,label='bkgd')
             ax3.axvline(Dy,color='y',linestyle='-',label='old',lw=2)
             ax3.axvline(avY,color='b',linestyle='-',label='new',lw=2)
             ax3.grid(True)
@@ -211,16 +211,24 @@ class Image():
         Y, X = np.mgrid[:NY,:NX]
         # fit and subtract smooth polynomial background
         # with 3sigma rejection of outliers (star peaks)
-        bkgd_2D = fit_poly2d_outlier_removal(X,Y,sub_image,order=2,sigma=2)
-        sub_image_subtracted = sub_image-bkgd_2D
+        bkgd_2D = fit_poly2d_outlier_removal(X,Y,sub_image,order=2)
+        sub_image_subtracted = sub_image-bkgd_2D(X,Y)
+        # find a first guess of the target position
         avX,sigX = weighted_avg_and_std(X,(sub_image_subtracted)**4)
         avY,sigY = weighted_avg_and_std(Y,(sub_image_subtracted)**4)
-        if sub_image_subtracted[int(avY),int(avX)] < 0.8*np.max(sub_image_subtracted) :
-            self.my_logger.warning('\n\tX,Y position determination of the target probably wrong') 
+        # fit a 2D gaussian close to this position
+        guess = [np.max(sub_image_subtracted),avX,avY,2,2,0]
+        mean_prior = 10 # in pixels
+        bounds = [ [1,avX-mean_prior,avY-mean_prior,1,1,-np.pi], [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,10,10,np.pi] ]
+        gauss2D = fit_gauss2d_outlier_removal(X,Y,sub_image_subtracted,guess=guess,bounds=bounds, sigma = 3, circular = True)
         # compute target positions
+        avX = gauss2D.x_mean.value
+        avY = gauss2D.y_mean.value
         theX=x0-Dx+avX
         theY=y0-Dy+avY
-        # debugging plots
+        if sub_image_subtracted[int(avY),int(avX)] < 0.8*np.max(sub_image_subtracted) :
+            self.my_logger.warning('\n\tX,Y position determination of the target probably wrong') 
+         # debugging plots
         if parameters.DEBUG:
             f, (ax1, ax2,ax3) = plt.subplots(1,3, figsize=(15,4))
             im = ax1.imshow(sub_image,origin='lower',cmap='jet')
@@ -236,22 +244,22 @@ class Image():
             ax1.set_ylabel('Y (pixels)')
             ax1.legend(loc=1)
 
-            im2 = ax2.imshow(bkgd_2D,origin='lower',cmap='jet',vmin=np.min(sub_image),vmax=np.max(sub_image))
+            im2 = ax2.imshow(bkgd_2D(X,Y)+gauss2D(X,Y),origin='lower',cmap='jet',vmin=np.min(sub_image),vmax=np.max(sub_image))
             cb = f.colorbar(im2,ax=ax2)
             #cb.formatter.set_powerlimits((0, 0))
             cb.locator = MaxNLocator(7,prune=None)
             cb.update_ticks()
-            cb.set_label('Background (%s)' % (self.units)) #,fontsize=16)
+            cb.set_label('Background + Gauss (%s)' % (self.units)) #,fontsize=16)
             ax2.set_xlabel('X (pixels)')
             ax2.set_ylabel('Y (pixels)')
             ax2.legend(loc=1)
 
-            im3 = ax3.imshow(sub_image_subtracted,origin='lower',cmap='jet')
+            im3 = ax3.imshow(sub_image_subtracted-gauss2D(X,Y),origin='lower',cmap='jet')
             cb = f.colorbar(im3,ax=ax3)
             #cb.formatter.set_powerlimits((0, 0))
             cb.locator = MaxNLocator(7,prune=None)
             cb.update_ticks()
-            cb.set_label('Background subtracted image (%s)' % (self.units)) #,fontsize=16)
+            cb.set_label('Background+Gauss subtracted image (%s)' % (self.units)) #,fontsize=16)
             ax3.scatter([Dx],[Dy],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
             ax3.scatter([avX],[avY],marker='o',s=100,facecolors='none',edgecolors='k',label='new')
             ax3.grid(True)
@@ -484,7 +492,7 @@ class Spectrum():
             self.lines.plot_atomic_lines(plt.gca(),fontsize=12)
         if not nofit and self.lambdas is not None:
             lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=plt.gca(),verbose=parameters.VERBOSE)
-        plt.legend(loc='best')
+        plt.legend(loc='best',title=self.filters)
         plt.show()
 
     def calibrate_spectrum(self,xlims=None):
@@ -586,11 +594,9 @@ def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
     output_filename = os.path.join(outputdir,output_filename)
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
-    target_pixcoords = image.find_target_1Dprofile(guess)
-    print target_pixcoords
+    if parameters.DEBUG:
+        target_pixcoords = image.find_target_1Dprofile(guess)
     target_pixcoords = image.find_target_2Dprofile(guess)
-    print target_pixcoords
-    return 
     # Rotate the image: several methods
     image.turn_image()
     # Find the exact target position in the rotated image: several methods
