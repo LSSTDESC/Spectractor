@@ -1,4 +1,5 @@
 from spectractor import *
+import parameters
 import csv
 
 class LogBook():
@@ -24,14 +25,24 @@ class LogBook():
                     self.my_logger.error('Fits file %s in logbook %s has flag %s. Skip file.' % (filename,self.logbook,target))
                     skip = True
                     break
+                if row['skip']=='skip':
+                    self.my_logger.error('Fits file %s in logbook has flag "skip". Skip file.' % (filename))
+                    skip = True
+                    break
                 if row['Obj-posXpix']=='':
                     self.my_logger.error('Fits file %s in logbook %s has no target x position. Skip file.' % (filename,self.logbook))
                     skip = True
                     break
                 if row['Obj-posYpix']=='':
-                    self.my_logger.error('Fits file %s in logbook %s has no target y position. Skip file.' % (filename,self.logbook))
+                    self.my_logger.warning('Fits file %s in logbook %s has no target y position. Skip file.' % (filename,self.logbook))
                     skip = True
                     break
+                if row['dx']!='':
+                    parameters.XWINDOW=int(row['dx'])
+                    parameters.XWINDOW_ROT=int(row['dx'])
+                if row['dy']!='':
+                    parameters.YWINDOW=int(row['dy'])
+                    parameters.YWINDOW_ROT=int(row['dy'])
                 xpos = int(row['Obj-posXpix'])
                 ypos = int(row['Obj-posYpix'])
                 break
