@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from astroquery.simbad import Simbad
 from astroquery.ned import Ned
 
+import parameters
+
 if os.getenv("PYSYN_CDBS"):
     os.environ['PYSYN_CDBS']
     import pysynphot as S
@@ -19,6 +21,7 @@ EPOCH = "J2000.0"
 class Target():
 
     def __init__(self,label,verbose=False):
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.label = label
         self.ra = None
         self.dec = None
@@ -32,32 +35,13 @@ class Target():
         self.load()
 
     def load(self):
-        if self.label == "HD111980" :
-            self.ra = "12 53 15.1"
-            self.dec = "-18 31 20"
-            self.type = "CALSPEC"
-        elif self.label == "HD160617":
-            self.ra = "17 42 49.3"
-            self.dec = "-40 19 15"
-            self.type = "CALSPEC"
-        elif self.label == "HD185975":
-            self.ra = "20 28 18.7"
-            self.dec = "-87 28 19"
-            self.type = "CALSPEC"
-        elif self.label == "HD205905":
-            self.ra = "21 39 10.1"
-            self.dec = "-27 18 23"
-            self.type = "CALSPEC"
-        elif self.label == "3C273" :
-            self.ra = "12 29 06.7"
-            self.dec = "02 03 08"
-            self.type = "QSO"
-        #else :
-        #    sys.exit('Unknown target %s' % self.label)
         Simbad.add_votable_fields('flux(U)','flux(B)','flux(V)','flux(R)','flux(I)','flux(J)','sptype')
         self.simbad = Simbad.query_object(self.label)
-        if self.verbose: print self.simbad
-        self.coord = SkyCoord(self.simbad['RA'][0]+' '+self.simbad['DEC'][0], unit=(units.hourangle, units.deg))
+        if self.simbad is not None:
+            if self.verbose: print self.simbad
+            self.coord = SkyCoord(self.simbad['RA'][0]+' '+self.simbad['DEC'][0], unit=(units.hourangle, units.deg))
+        else:
+            self.my_logger.warning('Target %s not found in Simbad' % self.label)
         self.load_spectra()
 
     def load_spectra(self):
@@ -93,6 +77,10 @@ class Target():
                 self.redshift = self.ned['Redshift'][0]
                 self.emission_spectrum = True
                 self.hydrogen_only = False
+                if self.redshift > 0.2:
+                    self.hydrogen_only = True
+                    parameters.LAMBDA_MIN *= 1+self.redshift
+                    parameters.LAMBDA_MAX *= 1+self.redshift
                 for k,h in enumerate(hdulists) :
                     if h[0].header['NAXIS'] == 1 :
                         self.spectra.append(h[0].data)
