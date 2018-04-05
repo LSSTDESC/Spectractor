@@ -1,4 +1,5 @@
 import numpy as np
+import re
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -120,7 +121,7 @@ class Atmosphere():
                     atm=data[:,1]
                     func=interp1d(wl,atm,kind='linear')   # interpolation to conform to wavelength grid required
                     transm=func(WL)
-                    print transm.shape,self.atmgrid.shape
+                    
                     
                     self.atmgrid[count,index_atm_data:]=transm    # each of atmospheric transmission
                     
@@ -140,7 +141,8 @@ class Atmosphere():
        
             hdr['ATMSIM'] = "libradtran"
             hdr['SIMVERS'] = "2.0.1"
-            hdr['DATA']=self.filenamedata
+            hdr['DATAFILE']=self.filenamedata
+            hdr['SIMUFILE']=os.path.basename(self.filename)
             
             hdr['AIRMASS'] = self.airmass
             hdr['PRESSURE'] = self.pressure
@@ -172,9 +174,8 @@ class Atmosphere():
             hdr['IDX_OZ']=index_atm_oz
             hdr['IDX_DATA']=index_atm_data
     
-    
-    
-            print hdr
+            if parameters.VERBOSE:
+                print hdr
     
             hdu = fits.PrimaryHDU(self.atmgrid,header=hdr)
             hdu.writeto(self.filename,overwrite=True)
@@ -360,15 +361,24 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
  
     # Set output path
     ensure_dir(outputdir)
-    output_filename = filename.split('/')[-1]
-    output_filename = output_filename.replace('.fits','_spectrumsim.fits')
-    output_atmfilename = output_filename.replace('_spectrumsim.fits','_atmsim.fits')
+    # extract the basename : simimar as os.path.basename(file)
+    base_filename = filename.split('/')[-1]  # get "reduc_20170530_213.fits"
+    tag_filename=base_filename.split('_')[0] # get "reduc_"
+    search_str ='^%s_(.*)' % (tag_filename)  # get "^reduc_(.*)"
+    root_filename=re.findall(search_str,base_filename)[0]   # get "20170530_213.fits'
+    
+    #output_filename = root_filename.replace('.fits','_spectrumsim.fits')
+    #output_atmfilename = root_filename.replace('_spectrumsim.fits','_atmsim.fits')
+    output_filename='spectrasim_'+root_filename # get "spectrasim_20170530_213.fits"
+    output_atmfilename='atmsim_'+root_filename  # get "atmsim__20170530_213.fits"
+    
     output_filename = os.path.join(outputdir,output_filename)
     output_atmfilename = os.path.join(outputdir,output_atmfilename)
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tWill simulate the spectrum...')
     if parameters.DEBUG:
-            my_logger.info('\n\tWill debug simulated the spectrum...')
+            infostring='\n\tWill debug simulated the spectrum into file %s ...'%(output_filename)
+            my_logger.info(infostring)
  
     
     
@@ -402,6 +412,7 @@ if __name__ == "__main__":
     (opts, args) = parser.parse_args()
 
     parameters.VERBOSE = opts.verbose
+    
     if opts.debug:
         parameters.DEBUG = True
         parameters.VERBOSE = True
@@ -411,6 +422,10 @@ if __name__ == "__main__":
     #filename = "notebooks/fits/trim_20170605_007.fits"
     #guess = [745,643]
     #target = "3C273"
+
+    opts.debug=True
+    parameters.DEBUG = True
+    parameters.VERBOSE = True
 
     filename="reduc_20170530_213.fits"
     airmass=1.094

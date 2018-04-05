@@ -18,7 +18,7 @@ import sys,getopt
 
 import UVspec
 
-
+FLAG_DEBUG=False
 
 # Definitions and configuration
 #-------------------------------------
@@ -339,13 +339,15 @@ def ProcessSimulationaer(airmass_num,pwv_num,oz_num,aer_num,press_num):
     default profile
     """
  
-    print '--------------------------------------------'
-    print ' 1) airmass = ', airmass_num
-    print ' 2) pwv = ', pwv_num
-    print ' 3) oz = ', oz_num
-    print ' 4) aer = ',aer_num
-    print ' 5) pressure =',press_num
-    print '--------------------------------------------'    
+    if FLAG_DEBUG:
+        print '--------------------------------------------'
+        print 'ProcessSimulationaer'
+        print ' 1) airmass = ', airmass_num
+        print ' 2) pwv = ', pwv_num
+        print ' 3) oz = ', oz_num
+        print ' 4) aer = ',aer_num
+        print ' 5) pressure =',press_num
+        print '--------------------------------------------'    
    
     
     ensure_dir(TOPDIR)
@@ -475,7 +477,8 @@ def ProcessSimulationaer(airmass_num,pwv_num,oz_num,aer_num,press_num):
             
         BaseFilename=BaseFilename_part1+atmkey+'_'+Proc+'_'+Mod+'_z'+str(amfileindex)+'_'+WVXX+str(wvfileindex) +'_'+OZXX+str(ozfileindex)+'_'+AEXX+str(aer_index)                   
                     
-        verbose=True
+        verbose=FLAG_DEBUG
+        
         uvspec = UVspec.UVspec()
         uvspec.inp["data_files_path"]  =  libradtranpath+'data'
                 
