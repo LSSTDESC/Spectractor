@@ -39,13 +39,13 @@ WL=np.linspace(WLMIN,WLMAX,NBWLBINS) # Array of wavelength in Angstrom
 #NB_AER_POINTS=20
 NB_AER_POINTS=3
 AER_MIN=0.
-AER_MAX=0.2
+AER_MAX=0.1
 
 #ozone
 #NB_OZ_POINTS=5
 NB_OZ_POINTS=3
-OZ_MIN=250
-OZ_MAX=450
+OZ_MIN=200
+OZ_MAX=300
 
 # pwv
 #NB_PWV_POINTS=11
@@ -59,7 +59,7 @@ OZ_Points=np.linspace(OZ_MIN,OZ_MAX,NB_OZ_POINTS)
 PWV_Points=np.linspace(PWV_MIN,PWV_MAX,NB_PWV_POINTS)
 
 # total number of points
-NB_ATM_Points=NB_AER_POINTS*NB_OZ_POINTS*NB_PWV_POINTS
+NB_ATM_POINTS=NB_AER_POINTS*NB_OZ_POINTS*NB_PWV_POINTS
 
 #  column 0 : count number
 #  column 1 : aerosol value
@@ -96,7 +96,7 @@ class Atmosphere():
         self.filenamedata=filenamedata   
         
         # create the numpy array that will contains the atmospheric grid    
-        self.atmgrid=np.zeros((NB_ATM_Points+1,NB_atm_HEADER+NB_atm_DATA))
+        self.atmgrid=np.zeros((NB_ATM_POINTS+1,NB_atm_HEADER+NB_atm_DATA))
         self.atmgrid[0,index_atm_data:]=WL
 
         
@@ -147,7 +147,7 @@ class Atmosphere():
             hdr['AIRMASS'] = self.airmass
             hdr['PRESSURE'] = self.pressure
             hdr['TEMPERAT'] = self.temperature
-            hdr['NBATMPTS'] = NB_ATM_Points
+            hdr['NBATMPTS'] = NB_ATM_POINTS
         
             hdr['NBAERPTS'] = NB_AER_POINTS
             hdr['AERMIN'] = AER_MIN
@@ -399,7 +399,7 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     #spectrum.save_spectrum(output_filename,overwrite=True)
 
 if __name__ == "__main__":
-    import commands, string, re, time, os
+    import commands, string,  time
     from optparse import OptionParser
 
     parser = OptionParser()
