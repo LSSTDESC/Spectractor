@@ -54,6 +54,8 @@ OBS_Altitude = str(CTIO_Altitude)
 
 TOPDIR='simulations/RT/2.0.1/CT'
 
+def CleanSimDir():   
+    os.system("rm -rf simulations")
 
 
 ############################################################################
