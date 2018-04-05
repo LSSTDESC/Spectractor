@@ -78,9 +78,71 @@ NB_atm_HEADER=5
 NB_atm_DATA=len(WL)-1
 
 
+class SED():
+    """
+    SED()
+    
+    """
+    def __init__(self,target=""):
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.targetname=target
+        self.target=None
+        self.wl=None
+        self.flux=None
+        self.sed=None
+        
+    def get_sed(self):
+        self.target=Target(self.targetname,verbose=parameters.VERBOSE)
+        self.wl=self.target.wavelengths[-1]
+        self.flux=self.target.spectra[-1]
+        func=interp1d(self.wl,self.flux,kind='linear') 
+        self.sed=func(WL)
+        return self.sed
+
+    def plot_sed(self):
+        self.target.plot_spectra()
+        plt.figure()
+        plt.plot(WL,self.sed,'r-',lw=2,label='sed')
+        plt.legend()
+        plt.xlabel('$\lambda$ [nm]')
+        plt.ylabel('Flux')
+        plt.title('SED')
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+
+#----------------------------------------------------------------------------------
+class Disperser():
+    """
+    Disperser():
+        
+    """
+    def __init__(self,dispersername=""):
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.disperser=dispersername
+        self.td=0.0
+        
+    def load_transm(self):
+        self.td=np.ones(len(WL))
+        return self.td
+    
+    def plot_transm(self,xlim=None):
+        plt.figure()
+        if(len(self.td)!=0):
+            plt.plot(WL,self.td,'b-',label=dispersername)
+            plt.legend()
+            plt.grid()
+            plt.xlabel("$\lambda$ (nm)")
+            plt.ylabel("transmission")
+            plt.title("Disperser Transmissions")
+#----------------------------------------------------------------------------------
+            
+#----------------------------------------------------------------------------------
 class Atmosphere():
     """
-    Atmospheres classes to simulate series of atmospheres by calling libradtran
+    Atmospheres(): 
+        classes to simulate series of atmospheres by calling libradtran
     
     """
     def __init__(self,airmass,pressure,temperature,filenamedata):
@@ -103,7 +165,8 @@ class Atmosphere():
         
     def simulate(self):
         # first determine the length
-        
+        if parameters.VERBOSE or parameters.DEBUG:
+            self.my_logger.info('\n\tAtmosphere.simulate am=%4.2f, P=%4.2f, for data-file=%s ' % (self.airmass,self.pressure,self.filenamedata))
         count=0
         for  aer in AER_Points:
             for pwv in PWV_Points:
@@ -180,8 +243,11 @@ class Atmosphere():
     
             hdu = fits.PrimaryHDU(self.atmgrid,header=hdr)
             hdu.writeto(self.filename,overwrite=True)
-   
-
+            if parameters.VERBOSE or parameters.DEBUG:
+                self.my_logger.info('\n\tAtmosphere.save atm-file=%s' % (self.filename))
+ #----------------------------------------------------------------------------------
+  
+#----------------------------------------------------------------------------------
 class TelesTransm():
     """
     TelesTransm : Transmission of the telescope
@@ -201,48 +267,91 @@ class TelesTransm():
     
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.filtername = filtername
-     
+        self.qe= []
+        self.to=[]
+        self.tm=[]
+        self.tf=[]
+        self.tt=[]
+        self.tfr=[]
+        self.tfb=[]
         
     def load_transm(self):
         # QE
         wl,qe=ctio.Get_QE()
         # extend
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
-        qe=np.concatenate([[0.],qe,[0.]])
+        qe=np.concatenate([[0.],qe,[qe[-1]]])
         func=interp1d(wl,qe,kind='linear')   # interpolation to conform to wavelength grid required
         QE=func(WL)
+        self.qe=QE
+        
         #  Throughput
         wl,trt=ctio.Get_Throughput()
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
-        trt=np.concatenate([[0.],trt,[1.]])
+        trt=np.concatenate([[0.],trt,[trt[-1]]])
         func=interp1d(wl,trt,kind='linear')   # interpolation to conform to wavelength grid required
-        TH=func(WL)
+        TO=func(WL)
+        self.to=TO
+        
         # Mirrors 
         wl,trm=ctio.Get_Mirror()
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
-        trm=np.concatenate([[0.],trm,[1.]])
+        trm=np.concatenate([[0.],trm,[trm[-1]]])
         func=interp1d(wl,trm,kind='linear') 
-        THM=func(WL)
+        TM=func(WL)
+        self.tm=TM
+          
+        
+       
+        wl,trg=ctio.Get_RG715()
+        wl=np.concatenate([[WLMIN],wl,[WLMAX]])
+        trg=np.concatenate([[0.],trg,[trg[-1]]])
+        func=interp1d(wl,trg,kind='linear')
+        TFR=func(WL)
+        self.tfr=TFR
+        
+        wl,trb=ctio.Get_FGB37()
+        wl=np.concatenate([[WLMIN],wl,[WLMAX]])
+        trb=np.concatenate([[0.],trb,[0.]])
+        func=interp1d(wl,trb,kind='linear')
+        TFB=func(WL)
+        self.tfb=TFB
             
             
         if self.filtername == "RG715" :
-            wl,trg=ctio.Get_RG715()
-            wl=np.concatenate([[WLMIN],wl,[WLMAX]])
-            trg=np.concatenate([[0.],trg,[1.]])
-            func=interp1d(wl,trg,kind='linear')
-            TF=func(WL)
+            TF=TFR
         elif self.filtername =="FGB37":
-            wl,trb=ctio.Get_FGB37()
-            wl=np.concatenate([[WLMIN],wl,[WLMAX]])
-            trb=np.concatenate([[0.],trb,[0.]])
-            func=interp1d(wl,trb,kind='linear')
-            TF=func(WL)
+            
+            TF=TFB
         else:
             TF=np.ones(len(WL))
-                
-        return QE*TH*THM*THM*TF
+            
+        self.tf=TF
         
-
+        self.tt=QE*TO*TM*TM*TF
+                
+        return self.tt
+        
+    def plot_transm(self,xlim=None):
+        plt.figure()
+        if(len(self.tt)!=0):
+            plt.plot(WL,self.qe,'b-',label='qe')
+            plt.plot(WL,self.to,'g-',label='othr')
+            plt.plot(WL,self.tm,'y-',label='mirr')
+            plt.plot(WL,self.tf,'k-',label='filt')
+            plt.plot(WL,self.tfr,'k:',label='RG715')
+            plt.plot(WL,self.tfb,'k--',label='FGB37')
+            plt.plot(WL,self.tt,'r-',lw=2,label='tot')
+            plt.legend()
+            plt.grid()
+            plt.xlabel("$\lambda$ (nm)")
+            plt.ylabel("transmission")
+            plt.title("Telescope Transmissions")
+#----------------------------------------------------------------------------------        
+               
+        
+        
+#----------------------------------------------------------------------------------
 class SpectrumSim():
     """ SpectrumSim class used to store information and methods
     relative to spectrum simulation.
@@ -391,8 +500,10 @@ class SpectrumSim():
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_filename)
         else:
             self.my_logger.info('\n\tSpectrum file %s not found' % input_filename)
-        
+#----------------------------------------------------------------------------------        
 
+
+#----------------------------------------------------------------------------------
 def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,rhumidity,exposure,filtername,dispersername,atmospheric_lines=True):
     
     """ SpectractorSim
@@ -442,15 +553,56 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
             my_logger.info(infostring)
  
     
-    
+    # SIMULATE ATMOSPHERE GRID
+    # ------------------------
+    if parameters.VERBOSE:
+        infostring='\n\t ========= Atmospheric simulation :  ==============='
     atm=Atmosphere(airmass,pressure,temperature,filename)
     arr=atm.simulate()
     atm.savefile(filename=output_atmfilename)
     atmsim.CleanSimDir()
     
-    
+    # TELESCOPE TRANSMISSION
+    # ------------------------
     tel=TelesTransm(filtername)
     tr=tel.load_transm()
+    
+    if parameters.VERBOSE:
+        infostring='\n\t ========= Telescope transmission :  ==============='
+        my_logger.info(infostring)
+        tel.plot_transm()
+        
+    # DISPERSER TRANSMISSION
+    # ------------------------
+    disp=Disperser(dispersername)
+    td=disp.load_transm()
+    if parameters.VERBOSE:
+        infostring='\n\t ========= Disperser transmission :  ==============='
+        my_logger.info(infostring)
+        disp.plot_transm()
+    
+    # STAR SPECTRUM
+    # ------------------------
+    sed=SED(target)
+    flux=sed.get_sed()
+    
+    if parameters.VERBOSE:
+        infostring='\n\t ========= SED : %s  ===============' % target
+        my_logger.info(infostring)
+        sed.plot_sed()
+    
+    # SPECTRA-GRID  -> TBD
+    #-----------------------
+    spec=flux*td*tr*arr[-1,index_atm_data:]*WL
+    
+    plt.figure()
+    plt.plot(WL,spec,'b-',label='spectrum')
+    plt.xlabel('$\lambda$ [nm]')
+    plt.ylabel('Flux')
+    plt.title('SPECTRUM')
+    plt.legend()
+    plt.grid()
+    plt.show()
     
     #spectrum = image.extract_spectrum_from_image()
     #spectrum.atmospheric_lines = atmospheric_lines
@@ -461,6 +613,13 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
 
     # Save the spectra
     #spectrum.save_spectrum(output_filename,overwrite=True)
+    
+    
+    
+    
+#----------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------
+
 
 if __name__ == "__main__":
     import commands, string,  time
@@ -504,4 +663,4 @@ if __name__ == "__main__":
     
     
     SpectractorSim(filename,opts.output_directory,target,index,airmass,pressure,temperature,rhumidity,exposure,filtername,dispersername,atmospheric_lines=True)
-    
+#----------------------------------------------------------------------------------    
