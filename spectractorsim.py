@@ -23,6 +23,7 @@ import parameters
 
 
 import libsimulateTranspCTIOScattAbsAer as atmsim
+import libCTIOTransm as ctio
 
 #
 WLMIN=300. # Minimum wavelength : PySynPhot works with Angstrom
@@ -179,8 +180,68 @@ class Atmosphere():
     
             hdu = fits.PrimaryHDU(self.atmgrid,header=hdr)
             hdu.writeto(self.filename,overwrite=True)
-        
+   
 
+class TelesTransm():
+    """
+    TelesTransm : Transmission of the telescope
+    - mirrors
+    - throughput
+    - QE
+    - Filter
+    
+    """
+    
+    def __init__(self,filtername=""):
+        """
+        Args:
+        filename (:obj:`str`): path to the image
+        Image (:obj:`Image`): copy info from Image object
+        """
+    
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.filtername = filtername
+     
+        
+    def load_transm(self):
+        # QE
+        wl,qe=ctio.Get_QE()
+        # extend
+        wl=np.concatenate([[WLMIN],wl,[WLMAX]])
+        qe=np.concatenate([[0.],qe,[0.]])
+        func=interp1d(wl,qe,kind='linear')   # interpolation to conform to wavelength grid required
+        QE=func(WL)
+        #  Throughput
+        wl,trt=ctio.Get_Throughput()
+        wl=np.concatenate([[WLMIN],wl,[WLMAX]])
+        trt=np.concatenate([[0.],trt,[1.]])
+        func=interp1d(wl,trt,kind='linear')   # interpolation to conform to wavelength grid required
+        TH=func(WL)
+        # Mirrors 
+        wl,trm=ctio.Get_Mirror()
+        wl=np.concatenate([[WLMIN],wl,[WLMAX]])
+        trm=np.concatenate([[0.],trm,[1.]])
+        func=interp1d(wl,trm,kind='linear') 
+        THM=func(WL)
+            
+            
+        if self.filtername == "RG715" :
+            wl,trg=ctio.Get_RG715()
+            wl=np.concatenate([[WLMIN],wl,[WLMAX]])
+            trg=np.concatenate([[0.],trg,[1.]])
+            func=interp1d(wl,trg,kind='linear')
+            TF=func(WL)
+        elif self.filtername =="FGB37":
+            wl,trb=ctio.Get_FGB37()
+            wl=np.concatenate([[WLMIN],wl,[WLMAX]])
+            trb=np.concatenate([[0.],trb,[0.]])
+            func=interp1d(wl,trb,kind='linear')
+            TF=func(WL)
+        else:
+            TF=np.ones(len(WL))
+                
+        return QE*TH*THM*THM*TF
+        
 
 class SpectrumSim():
     """ SpectrumSim class used to store information and methods
@@ -387,6 +448,9 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     atm.savefile(filename=output_atmfilename)
     atmsim.CleanSimDir()
     
+    
+    tel=TelesTransm(filtername)
+    tr=tel.load_transm()
     
     #spectrum = image.extract_spectrum_from_image()
     #spectrum.atmospheric_lines = atmospheric_lines

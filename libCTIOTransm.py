@@ -25,13 +25,12 @@ from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import interp1d
 
 home = os.environ['HOME']+'/'  
-path_ctioanajun2017=os.environ['CTIOAnaJun2017DIR']
-path_CTIOtransm=path_ctioanajun2017+'/spectrumsim/CTIOThroughput'
+path_CTIOtransm='CTIOThroughput'
 
 #
 filename_qe = "qecurve.txt"  
 filename_FGB37="FGB37.txt"
-filename_RG175="RG175.txt"
+filename_RG715="RG175.txt"
 filename_Throughput='ctio_throughput.txt'
 filename_mirrors='lsst_mirrorthroughput.txt'
 
@@ -50,9 +49,9 @@ def Get_QE():
     return x[indexes],y[indexes]
 #------------------------------------------------------------------------------
 
-def Get_RG175():
+def Get_RG715():
     
-    filename=os.path.join(path_CTIOtransm,filename_RG175)
+    filename=os.path.join(path_CTIOtransm,filename_RG715)
     
     data_rg=ascii.read(filename) 
     x=data_rg["col2"]
@@ -108,7 +107,7 @@ def PlotQE():
 #---------------------------------------------------------------
 def PlotRG():
     
-    wl,trg=Get_RG175()
+    wl,trg=Get_RG715()
   
     plt.figure()
     plt.plot(wl,trg,"-")
