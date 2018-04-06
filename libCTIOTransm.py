@@ -38,9 +38,9 @@ WLMIN=300.
 WLMAX=1100.
 
 #-----------------------------------------------------------------------------
-def Get_QE():
+def Get_QE(path):
    
-    filename=os.path.join(path_CTIOtransm,filename_qe)
+    filename=os.path.join(path,filename_qe)
     
     data_qe=ascii.read(filename) 
     x=data_qe["col1"]
@@ -49,9 +49,9 @@ def Get_QE():
     return x[indexes],y[indexes]
 #------------------------------------------------------------------------------
 
-def Get_RG715():
+def Get_RG715(path):
     
-    filename=os.path.join(path_CTIOtransm,filename_RG715)
+    filename=os.path.join(path,filename_RG715)
     
     data_rg=ascii.read(filename) 
     x=data_rg["col2"]
@@ -60,9 +60,9 @@ def Get_RG715():
     return x[indexes],y[indexes]
 
 #------------------------------------------------------------------------------
-def Get_FGB37():
+def Get_FGB37(path):
     
-    filename=os.path.join(path_CTIOtransm,filename_FGB37)
+    filename=os.path.join(path,filename_FGB37)
     
     data_fgb=ascii.read(filename) 
     x=data_fgb["col2"]
@@ -71,9 +71,9 @@ def Get_FGB37():
     return x[indexes],y[indexes]
 
 #-----------------------------------------------------------------------------
-def Get_Throughput():
+def Get_Throughput(path):
     
-    filename=os.path.join(path_CTIOtransm,filename_Throughput)
+    filename=os.path.join(path,filename_Throughput)
     
     data_rg=ascii.read(filename) 
     x=data_rg["col1"]
@@ -82,9 +82,9 @@ def Get_Throughput():
     return x[indexes],y[indexes]
 #---------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
-def Get_Mirror():
+def Get_Mirror(path):
     
-    filename=os.path.join(path_CTIOtransm,filename_mirrors)
+    filename=os.path.join(path,filename_mirrors)
     
     data_m=ascii.read(filename) 
     x=data_m["col1"]
@@ -93,9 +93,9 @@ def Get_Mirror():
     return x[indexes],y[indexes]
 
 #---------------------------------------------------------------
-def PlotQE():
+def PlotQE(path):
     
-    wl,qe=Get_QE()
+    wl,qe=Get_QE(path)
   
     plt.figure()
     plt.plot(wl,qe,"-")
@@ -105,9 +105,9 @@ def PlotQE():
     plt.xlim(WLMIN,WLMAX)
 
 #---------------------------------------------------------------
-def PlotRG():
+def PlotRG(path):
     
-    wl,trg=Get_RG715()
+    wl,trg=Get_RG715(path)
   
     plt.figure()
     plt.plot(wl,trg,"-")
@@ -116,9 +116,9 @@ def PlotRG():
     plt.ylabel("transmission")
     plt.xlim(WLMIN,WLMAX)
 #---------------------------------------------------------------
-def PlotFGB():
+def PlotFGB(path):
     
-    wl,trg=Get_FGB37()
+    wl,trg=Get_FGB37(path)
   
     plt.figure()
     plt.plot(wl,trg,"-")
@@ -128,9 +128,9 @@ def PlotFGB():
     plt.xlim(WLMIN,WLMAX)
     
     #---------------------------------------------------------------
-def PlotThroughput():
+def PlotThroughput(path):
     
-    wl,trt=Get_Throughput()
+    wl,trt=Get_Throughput(path)
   
     plt.figure()
     plt.plot(wl,trt,"-")
@@ -140,9 +140,9 @@ def PlotThroughput():
     plt.xlim(WLMIN,WLMAX)
 
     #---------------------------------------------------------------
-def PlotMirror():
+def PlotMirror(path):
     
-    wl,tr=Get_Mirror()
+    wl,tr=Get_Mirror(path)
   
     plt.figure()
     plt.plot(wl,tr,"b-",label='1 mirror')
@@ -155,13 +155,16 @@ def PlotMirror():
 #---------------------------------------------------------------------------------
 if __name__ == "__main__":
 
-    PlotQE()
+    mypath = os.path.dirname(__file__)
+    datapath=os.path.join(mypath,"CTIOThroughput")
+    
+    PlotQE(datapath)
 
-    PlotRG()
+    PlotRG(datapath)
     
-    PlotFGB()
+    PlotFGB(datapath)
     
-    PlotThroughput()
+    PlotThroughput(datapath)
     
-    PlotMirror()
+    PlotMirror(datapath)
     

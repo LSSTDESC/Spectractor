@@ -39,6 +39,11 @@ from tools import *
 from targets import *
 from optics import *
 import parameters 
+#----------------------------------------------------------------------------
+# where is spectractorsim
+#----------------------------------------------------------------------------
+spectractorsim_path = os.path.dirname(__file__)
+
 
 #---------------------------------------------------------------------------
 # Libraries to interface LibRadTran and CTIO 0.9m telescope transparencies
@@ -175,7 +180,7 @@ class Disperser():
     def plot_transm(self,xlim=None):
         plt.figure()
         if(len(self.td)!=0):
-            plt.plot(WL,self.td,'b-',label=dispersername)
+            plt.plot(WL,self.td,'b-',label=self.disperser)
             plt.legend()
             plt.grid()
             plt.xlabel("$\lambda$ (nm)")
@@ -351,8 +356,12 @@ class TelesTransm():
         self.tfb=[]
         
     def load_transm(self):
+        
+       
+        datapath=os.path.join(spectractorsim_path,"CTIOThroughput")
+        
         # QE
-        wl,qe=ctio.Get_QE()
+        wl,qe=ctio.Get_QE(datapath)
         # extend
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
         qe=np.concatenate([[0.],qe,[qe[-1]]])
@@ -361,7 +370,7 @@ class TelesTransm():
         self.qe=QE
         
         #  Throughput
-        wl,trt=ctio.Get_Throughput()
+        wl,trt=ctio.Get_Throughput(datapath)
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
         trt=np.concatenate([[0.],trt,[trt[-1]]])
         func=interp1d(wl,trt,kind='linear')   # interpolation to conform to wavelength grid required
@@ -369,7 +378,7 @@ class TelesTransm():
         self.to=TO
         
         # Mirrors 
-        wl,trm=ctio.Get_Mirror()
+        wl,trm=ctio.Get_Mirror(datapath)
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
         trm=np.concatenate([[0.],trm,[trm[-1]]])
         func=interp1d(wl,trm,kind='linear') 
@@ -378,7 +387,7 @@ class TelesTransm():
           
         
         # Filter RG715
-        wl,trg=ctio.Get_RG715()
+        wl,trg=ctio.Get_RG715(datapath)
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
         trg=np.concatenate([[0.],trg,[trg[-1]]])
         func=interp1d(wl,trg,kind='linear')
@@ -386,7 +395,7 @@ class TelesTransm():
         self.tfr=TFR
         
         # Filter FGB37
-        wl,trb=ctio.Get_FGB37()
+        wl,trb=ctio.Get_FGB37(datapath)
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
         trb=np.concatenate([[0.],trb,[0.]])
         func=interp1d(wl,trb,kind='linear')
