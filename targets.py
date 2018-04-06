@@ -108,7 +108,8 @@ class Target():
 
         
     def plot_spectra(self):
-        target.load_spectra()
+        #target.load_spectra()  ## No global target object available  here (SDC)
+        plt.figure()  # necessary to create a new plot (SDC)
         for isp,sp in enumerate(self.spectra):
             plt.plot(self.wavelengths[isp],sp,label='Spectrum %d' % isp)
         #plt.xlim((400,1200))
