@@ -49,18 +49,22 @@ import libCTIOTransm as ctio
 #--------------------------------------------------------------------------
 # Telescope parameter
 #
+#   The goal is to calculate the numerical factor to get spectra into ADU
+#
 #  the SED is supposed to be in flam units ie erg/s/cm^-2 per angtrom
 #   however the binning is 10 A or 1 nm, the the SED has been multiplied by 10
 #--------------------------------------------------------------------------
-Tel_Diam=0.9*units.m
-Tel_Surf=np.pi*Tel_Diam**2/4.
-Time_unit=1*units.s
-SED_unit=1*units.erg/units.s/(units.cm)**2/(units.nanometer)
-hc=const.h*const.c
-wl_dwl_unit=(units.nanometer)**2
-Factor=(Tel_Surf*SED_unit*Time_unit*wl_dwl_unit).decompose()
+Tel_Diam=0.9*units.m                     # Diameter of the telescope
+Tel_Surf=np.pi*Tel_Diam**2/4.            # collection surface of telescope
+Time_unit=1*units.s                      # flux for 1 second
+SED_unit=1*units.erg/units.s/(units.cm)**2/(units.nanometer)          # Units of SEDs in flam (erg/s/cm2/nm)
+hc=const.h*const.c                        # h.c product of fontamental constants c and h 
+wl_dwl_unit=(units.nanometer)**2          # lambda.dlambda  in wavelength in nm
+g_elec=3.0                                # electronic gain : elec/ADU
+g_disperser_ronchi=0.2                   # theoretical gain for order+1 : 20%
+#Factor=2.1350444e11
+Factor=(Tel_Surf*SED_unit*Time_unit*wl_dwl_unit/hc/g_elec*g_disperser_ronchi).decompose()
 
-Factor=3.2025666e12
 
 
 #------------------------------------------------------------------------
@@ -78,7 +82,7 @@ WL=np.linspace(WLMIN,WLMAX,NBWLBINS) # Array of wavelength in Angstrom
 
 #aerosols
 #NB_AER_POINTS=20
-NB_AER_POINTS=3
+NB_AER_POINTS=5
 AER_MIN=0.
 AER_MAX=0.1
 
@@ -86,11 +90,11 @@ AER_MAX=0.1
 #NB_OZ_POINTS=5
 NB_OZ_POINTS=3
 OZ_MIN=200
-OZ_MAX=300
+OZ_MAX=400
 
 # pwv
 #NB_PWV_POINTS=11
-NB_PWV_POINTS=3
+NB_PWV_POINTS=5
 PWV_MIN=0.
 PWV_MAX=10.
 
@@ -208,6 +212,7 @@ class Atmosphere():
         # first determine the length
         if parameters.VERBOSE or parameters.DEBUG:
             self.my_logger.info('\n\tAtmosphere.simulate am=%4.2f, P=%4.2f, for data-file=%s ' % (self.airmass,self.pressure,self.filenamedata))
+            
         count=0
         for  aer in AER_Points:
             for pwv in PWV_Points:
@@ -231,6 +236,31 @@ class Atmosphere():
                     self.atmgrid[count,index_atm_data:]=transm    # each of atmospheric transmission
                     
         return self.atmgrid
+    
+    def plot_transm(self):
+        plt.figure()
+        counts=self.atmgrid[1:,index_atm_count]
+        
+        for count in counts:
+            
+            plt.plot(WL,self.atmgrid[int(count),index_atm_data:])
+        plt.grid()
+        plt.xlabel("$\lambda$ (nm)")
+        plt.ylabel("atmospheric transparency")
+        plt.title("Atmospheric variations")
+        plt.show()
+        
+    def plot_transm_img(self):
+        plt.figure()
+        img=plt.imshow(self.atmgrid[1:,index_atm_data:],origin='lower',cmap='jet')
+        plt.grid(True)
+        plt.xlabel("Wavelength bins [nm]")
+        plt.ylabel("simulation number")
+        plt.title(" Atmospheric variations",size=15)
+        cbar=plt.colorbar(img)
+        cbar.set_label('atmospheric transparency',size=15)
+        plt.show()
+    
     
     def savefile(self,filename=""):
         
@@ -347,7 +377,7 @@ class TelesTransm():
         self.tm=TM
           
         
-       
+        # Filter RG715
         wl,trg=ctio.Get_RG715()
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
         trg=np.concatenate([[0.],trg,[trg[-1]]])
@@ -355,6 +385,7 @@ class TelesTransm():
         TFR=func(WL)
         self.tfr=TFR
         
+        # Filter FGB37
         wl,trb=ctio.Get_FGB37()
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
         trb=np.concatenate([[0.],trb,[0.]])
@@ -427,6 +458,8 @@ class SpectrumSim():
         self.atmgrid = None
         self.spectragrid= None
 
+        self.filename=""
+
         self.atmospheric_lines = atmospheric_lines
         #self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,emission_spectrum=self.target.emission_spectrum)
     
@@ -436,6 +469,11 @@ class SpectrumSim():
         
     def compute(self,atmgrid,filtertransm , dispersertransm,sed, header):
         self.header=header
+        
+        if parameters.VERBOSE :
+            print self.header
+            
+            
         self.atmgrid=atmgrid
          
         self.spectragrid=np.zeros(self.atmgrid.shape)
@@ -450,6 +488,45 @@ class SpectrumSim():
         self.spectragrid[1:,index_atm_data:]=self.atmgrid[1:,index_atm_data:]* all_transm *Factor
          
         return self.spectragrid
+    
+    def plot_spectra(self):
+        plt.figure()
+        counts=self.spectragrid[1:,index_atm_count]
+        for count in counts:
+            plt.plot(WL,self.spectragrid[int(count),index_atm_data:])
+        plt.grid()
+        plt.xlabel("$\lambda$ [nm]")
+        plt.ylabel("Flux  [ADU/s]")
+        plt.title("Spectra for Atmospheric variations")
+        plt.show()
+        
+    def plot_spectra_img(self):
+        plt.figure()
+        img=plt.imshow(self.spectragrid[1:,index_atm_data:],origin='lower',cmap='jet')
+        plt.xlabel("Wavelength bins [nm]")
+        plt.ylabel("simulation number")
+        plt.title("Spectra for Atmospheric variations")
+        cbar=plt.colorbar(img)
+        cbar.set_label('ADU',size=15)
+        plt.grid(True)
+        plt.show()
+      
+    def save_spectra(self,filename):
+                   
+        if filename != "" :
+            self.filename = filename
+        
+        if self.filename=="":
+            return
+        else:
+         
+            hdu = fits.PrimaryHDU(self.spectragrid,header=self.header)
+            hdu.writeto(self.filename,overwrite=True)
+            if parameters.VERBOSE or parameters.DEBUG:
+                self.my_logger.info('\n\tSPECTRA.save atm-file=%s' % (self.filename))
+                
+                
+                
 
     def plot_spectrum(self,xlim=None,nofit=False):
         xs = self.lambdas
@@ -563,12 +640,16 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     
     # SIMULATE ATMOSPHERE GRID
     # ------------------------
-    if parameters.VERBOSE:
-        infostring='\n\t ========= Atmospheric simulation :  ==============='
+
     atm=Atmosphere(airmass,pressure,temperature,filename)
     atmgrid=atm.simulate()
     header=atm.savefile(filename=output_atmfilename)
     atmsim.CleanSimDir()
+    
+    if parameters.VERBOSE:
+        infostring='\n\t ========= Atmospheric simulation :  ==============='
+        atm.plot_transm()
+        atm.plot_transm_img()
     
     # TELESCOPE TRANSMISSION
     # ------------------------
@@ -599,34 +680,22 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
         my_logger.info(infostring)
         sed.plot_sed()
     
-    # SPECTRA-GRID  -> TBD
-    #-----------------------
-    spec=flux*td*tr*atmgrid[-1,index_atm_data:]*WL*BinWidth*Factor
-    
-    plt.figure()
-    plt.plot(WL,spec,'b-',label='spectrum')
-    plt.xlabel('$\lambda$ [nm]')
-    plt.ylabel('Flux in pel/s')
-    plt.title('SPECTRUM')
-    plt.legend()
-    plt.grid()
-    plt.show()
-    
+    # SPECTRA-GRID  
+    #-------------   
+   
     spectra=SpectrumSim()
     
     spectragrid=spectra.compute(atmgrid,tr,td,flux,header)
+    spectra.save_spectra(output_filename)
     
     
-    #spectrum = image.extract_spectrum_from_image()
-    #spectrum.atmospheric_lines = atmospheric_lines
-    # Calibrate the spectrum
-    #spectrum.calibrate_spectrum()
-    #spectrum.calibrate_spectrum_with_lines()
-    # Subtract second order
+    if parameters.VERBOSE:
+        infostring='\n\t ========= Spectra simulation :  ==============='
+        spectra.plot_spectra()
+        spectra.plot_spectra_img()
+    
+    
 
-    # Save the spectra
-    #spectrum.save_spectrum(output_filename,overwrite=True)
-    
     
     
     
@@ -635,7 +704,7 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
 
 
 if __name__ == "__main__":
-    import commands, string,  time
+    #import commands, string,  time
     from optparse import OptionParser
 
     parser = OptionParser()
@@ -653,11 +722,6 @@ if __name__ == "__main__":
         parameters.DEBUG = True
         parameters.VERBOSE = True
         
-        
-    #filename = "../../CTIODataJune2017_reducedRed/data_05jun17/reduc_20170605_00.fits"
-    #filename = "notebooks/fits/trim_20170605_007.fits"
-    #guess = [745,643]
-    #target = "3C273"
 
     opts.debug=True
     parameters.DEBUG = True
