@@ -1,3 +1,21 @@
+"""
+spectractorsim
+=============----
+
+author : Sylvie Dagoret-Campagne
+affiliation : LAL/CNRS/IN2P3/FRANCE
+Collaboration : DESC-LSST
+
+Purpose : Simulate a series of spectra for each experimental spectra measured by auxiliary telescope.
+Structure in parallel to Spectractor.
+For each experimental spectra a fits file image is generated which holds all possible auxiliary telescope spectra
+corresponding to different conditions in aerosols, pwv, and ozone. 
+
+creation date : April 18th 
+Last updaten : April 6th
+
+"""
+
 import numpy as np
 import re
 import matplotlib.pyplot as plt
@@ -10,6 +28,7 @@ import copy
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 import astropy.units as units
+from astropy import constants as const
 
 from scipy.interpolate import interp1d
 
@@ -21,11 +40,32 @@ from targets import *
 from optics import *
 import parameters 
 
+#---------------------------------------------------------------------------
+# Libraries to interface LibRadTran and CTIO 0.9m telescope transparencies
+#-------------------------------------------------------------------------
 
 import libsimulateTranspCTIOScattAbsAer as atmsim
 import libCTIOTransm as ctio
-
+#--------------------------------------------------------------------------
+# Telescope parameter
 #
+#  the SED is supposed to be in flam units ie erg/s/cm^-2 per angtrom
+#   however the binning is 10 A or 1 nm, the the SED has been multiplied by 10
+#--------------------------------------------------------------------------
+Tel_Diam=0.9*units.m
+Tel_Surf=np.pi*Tel_Diam**2/4.
+Time_unit=1*units.s
+SED_unit=1*units.erg/units.s/(units.cm)**2/(units.nanometer)
+hc=const.h*const.c
+wl_dwl_unit=(units.nanometer)**2
+Factor=(Tel_Surf*SED_unit*Time_unit*wl_dwl_unit).decompose()
+
+Factor=3.2025666e12
+
+
+#------------------------------------------------------------------------
+# Definition of data format for the atmospheric grid
+#-----------------------------------------------------------------------------
 WLMIN=300. # Minimum wavelength : PySynPhot works with Angstrom
 WLMAX=1100. # Minimum wavelength : PySynPhot works with Angstrom
 
@@ -76,8 +116,9 @@ index_atm_data=4
 
 NB_atm_HEADER=5
 NB_atm_DATA=len(WL)-1
-
-
+#----------------------------------------------------------------------------------------------
+# Specific class tools
+#---------------------------------------------------------------------------------------
 class SED():
     """
     SED()
@@ -193,14 +234,16 @@ class Atmosphere():
     
     def savefile(self,filename=""):
         
+        
+        hdr = fits.Header()
+        
+        
         if filename != "" :
             self.filename = filename
         
         if self.filename=="":
             return
         else:
-        
-            hdr = fits.Header()
         
        
             hdr['ATMSIM'] = "libradtran"
@@ -245,6 +288,8 @@ class Atmosphere():
             hdu.writeto(self.filename,overwrite=True)
             if parameters.VERBOSE or parameters.DEBUG:
                 self.my_logger.info('\n\tAtmosphere.save atm-file=%s' % (self.filename))
+                
+            return hdr
  #----------------------------------------------------------------------------------
   
 #----------------------------------------------------------------------------------
@@ -368,33 +413,43 @@ class SpectrumSim():
         self.err = None
         self.lambdas = None
         self.order = order
+
+        
+        self.header = None
+        self.date_obs = None
+        self.airmass = None
+        self.expo = None
+        self.filters = None
+        self.filter = None
+        self.disperser = None
+        self.target = None
+        
+        self.atmgrid = None
+        self.spectragrid= None
+
+        self.atmospheric_lines = atmospheric_lines
+        #self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,emission_spectrum=self.target.emission_spectrum)
+    
         if filename != "" :
             self.filename = filename
             self.load_spectrum(filename)
-        if Image is not None:
-            self.header = Image.header
-            self.date_obs = Image.date_obs
-            self.airmass = Image.airmass
-            self.expo = Image.expo
-            self.filters = Image.filters
-            self.filter = Image.filter
-            self.disperser = Image.disperser
-            self.target = Image.target
-            self.target_pixcoords = Image.target_pixcoords
-            self.target_pixcoords_rotated = Image.target_pixcoords_rotated
-            self.units = Image.units
-            self.my_logger.info('\n\tSpectrum info copied from Image')
-        self.atmospheric_lines = atmospheric_lines
-        self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,emission_spectrum=self.target.emission_spectrum)
-        self.load_filter()
-
-    def load_filter(self):
-        for f in FILTERS:
-            if f['label'] == self.filter:               
-                parameters.LAMBDA_MIN = f['min']
-                parameters.LAMBDA_MAX = f['max']
-                self.my_logger.info('\n\tLoad filter %s: lambda between %.1f and %.1f' % (f['label'],parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
-                break
+        
+    def compute(self,atmgrid,filtertransm , dispersertransm,sed, header):
+        self.header=header
+        self.atmgrid=atmgrid
+         
+        self.spectragrid=np.zeros(self.atmgrid.shape)
+         
+        # product of all sed and transmission except atmosphere
+        all_transm=filtertransm*dispersertransm*sed*WL*BinWidth
+         
+        # copy atmospheric grid parameters into spectra grid 
+        self.spectragrid[0,index_atm_data:]=WL
+        self.spectragrid[:,index_atm_count:index_atm_data]=self.atmgrid[:,index_atm_count:index_atm_data] 
+        # Is boradcasting working OK ?
+        self.spectragrid[1:,index_atm_data:]=self.atmgrid[1:,index_atm_data:]* all_transm *Factor
+         
+        return self.spectragrid
 
     def plot_spectrum(self,xlim=None,nofit=False):
         xs = self.lambdas
@@ -424,54 +479,7 @@ class SpectrumSim():
         plt.legend(loc='best',title=self.filters)
         plt.show()
 
-    def calibrate_spectrum(self,xlims=None):
-        if xlims == None :
-            left_cut, right_cut = [0,self.data.shape[0]]
-        else:
-            left_cut, right_cut = xlims
-        self.data = self.data[left_cut:right_cut]
-        pixels = np.arange(left_cut,right_cut,1)-self.target_pixcoords_rotated[0]
-        self.lambdas = self.disperser.grating_pixel_to_lambda(pixels,self.target_pixcoords,order=self.order)
-        # Cut spectra
-        self.lambdas_indices = np.where(np.logical_and(self.lambdas > parameters.LAMBDA_MIN, self.lambdas < parameters.LAMBDA_MAX))[0]
-        self.lambdas = self.lambdas[self.lambdas_indices]
-        self.data = self.data[self.lambdas_indices]
-        if self.err is not None: self.err = self.err[self.lambdas_indices]
 
-    def calibrate_spectrum_with_lines(self):
-        self.my_logger.info('\n\tCalibrating order %d spectrum...' % self.order)
-        # Detect emission/absorption lines and calibrate pixel/lambda 
-        D = DISTANCE2CCD-DISTANCE2CCD_ERR
-        shift = 0
-        shifts = []
-        counts = 0
-        D_step = DISTANCE2CCD_ERR / 4
-        delta_pixels = self.lambdas_indices - int(self.target_pixcoords_rotated[0])
-        while D < DISTANCE2CCD+4*DISTANCE2CCD_ERR and D > DISTANCE2CCD-4*DISTANCE2CCD_ERR and counts < 30 :
-            self.disperser.D = D
-            lambdas_test = self.disperser.grating_pixel_to_lambda(delta_pixels,self.target_pixcoords,order=self.order)
-            lambda_shift = self.lines.detect_lines(lambdas_test,self.data,spec_err=self.err,ax=None,verbose=parameters.DEBUG)
-            shifts.append(lambda_shift)
-            counts += 1
-            if abs(lambda_shift)<0.1 :
-                break
-            elif lambda_shift > 2 :
-                D_step = DISTANCE2CCD_ERR 
-            elif 0.5 < lambda_shift < 2 :
-                D_step = DISTANCE2CCD_ERR / 4
-            elif 0 < lambda_shift < 0.5 :
-                D_step = DISTANCE2CCD_ERR / 10
-            elif 0 > lambda_shift > -0.5 :
-                D_step = -DISTANCE2CCD_ERR / 20
-            elif  lambda_shift < -0.5 :
-                D_step = -DISTANCE2CCD_ERR / 6
-            D += D_step
-        shift = np.mean(lambdas_test - self.lambdas)
-        self.lambdas = lambdas_test
-        lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=None,verbose=parameters.DEBUG)
-        self.my_logger.info('\n\tWavelenght total shift: %.2fnm (after %d steps)\n\twith D = %.2f mm (DISTANCE2CCD = %.2f +/- %.2f mm, %.1f sigma shift)' % (shift,len(shifts),D,DISTANCE2CCD,DISTANCE2CCD_ERR,(D-DISTANCE2CCD)/DISTANCE2CCD_ERR))
-        if parameters.VERBOSE or parameters.DEBUG:
-            self.plot_spectrum(xlim=None,nofit=False)
 
     def save_spectrum(self,output_filename,overwrite=False):
         hdu = fits.PrimaryHDU()
@@ -558,8 +566,8 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     if parameters.VERBOSE:
         infostring='\n\t ========= Atmospheric simulation :  ==============='
     atm=Atmosphere(airmass,pressure,temperature,filename)
-    arr=atm.simulate()
-    atm.savefile(filename=output_atmfilename)
+    atmgrid=atm.simulate()
+    header=atm.savefile(filename=output_atmfilename)
     atmsim.CleanSimDir()
     
     # TELESCOPE TRANSMISSION
@@ -593,16 +601,21 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     
     # SPECTRA-GRID  -> TBD
     #-----------------------
-    spec=flux*td*tr*arr[-1,index_atm_data:]*WL
+    spec=flux*td*tr*atmgrid[-1,index_atm_data:]*WL*BinWidth*Factor
     
     plt.figure()
     plt.plot(WL,spec,'b-',label='spectrum')
     plt.xlabel('$\lambda$ [nm]')
-    plt.ylabel('Flux')
+    plt.ylabel('Flux in pel/s')
     plt.title('SPECTRUM')
     plt.legend()
     plt.grid()
     plt.show()
+    
+    spectra=SpectrumSim()
+    
+    spectragrid=spectra.compute(atmgrid,tr,td,flux,header)
+    
     
     #spectrum = image.extract_spectrum_from_image()
     #spectrum.atmospheric_lines = atmospheric_lines
