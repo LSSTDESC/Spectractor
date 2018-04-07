@@ -195,6 +195,8 @@ class Atmosphere():
         classes to simulate series of atmospheres by calling libradtran
     
     """
+    
+    #---------------------------------------------------------------------------
     def __init__(self,airmass,pressure,temperature,filenamedata):
         """
         Args:
@@ -211,8 +213,8 @@ class Atmosphere():
         # create the numpy array that will contains the atmospheric grid    
         self.atmgrid=np.zeros((NB_ATM_POINTS+1,NB_atm_HEADER+NB_atm_DATA))
         self.atmgrid[0,index_atm_data:]=WL
-
-        
+        self.header=fits.Header()
+    #---------------------------------------------------------------------------        
     def simulate(self):
         # first determine the length
         if parameters.VERBOSE or parameters.DEBUG:
@@ -241,7 +243,7 @@ class Atmosphere():
                     self.atmgrid[count,index_atm_data:]=transm    # each of atmospheric transmission
                     
         return self.atmgrid
-    
+    #---------------------------------------------------------------------------  
     def plot_transm(self):
         plt.figure()
         counts=self.atmgrid[1:,index_atm_count]
@@ -254,7 +256,7 @@ class Atmosphere():
         plt.ylabel("atmospheric transparency")
         plt.title("Atmospheric variations")
         plt.show()
-        
+    #---------------------------------------------------------------------------   
     def plot_transm_img(self):
         plt.figure()
         img=plt.imshow(self.atmgrid[1:,index_atm_data:],origin='lower',cmap='jet')
@@ -265,22 +267,19 @@ class Atmosphere():
         cbar=plt.colorbar(img)
         cbar.set_label('atmospheric transparency',size=15)
         plt.show()
-    
-    
+    #---------------------------------------------------------------------------    
     def savefile(self,filename=""):
-        
-        
+             
         hdr = fits.Header()
-        
-        
+               
         if filename != "" :
             self.filename = filename
         
         if self.filename=="":
+            infostring='\n\t Atmosphere:savefile no input file given ...'
+            self.my_logger.info(infostring)
             return
         else:
-        
-       
             hdr['ATMSIM'] = "libradtran"
             hdr['SIMVERS'] = "2.0.1"
             hdr['DATAFILE']=self.filenamedata
@@ -325,7 +324,76 @@ class Atmosphere():
                 self.my_logger.info('\n\tAtmosphere.save atm-file=%s' % (self.filename))
                 
             return hdr
- #----------------------------------------------------------------------------------
+    #---------------------------------------------------------------------------   
+    def loadfile(self,filename):
+             
+        if filename != "" :
+            self.filename = filename
+               
+        
+        if self.filename=="":
+            infostring='\n\t Atmosphere:loadfile no input file given ...'
+            self.my_logger.info(infostring)
+ 
+            return
+        else:
+        
+            hdu= fits.open(self.filename)
+            hdr=hdu[0].header
+       
+            #hdr['ATMSIM'] = "libradtran"
+            #hdr['SIMVERS'] = "2.0.1"
+            self.filenamedata=hdr['DATAFILE']
+            #hdr['SIMUFILE']=os.path.basename(self.filename)
+            
+            self.airmass=hdr['AIRMASS'] 
+            self.pressure=hdr['PRESSURE']
+            self.temperature=hdr['TEMPERAT']
+            
+            # hope those are the same parameters : TBD !!!!
+            NB_ATM_POINTS=hdr['NBATMPTS']
+        
+            NB_AER_POINTS=hdr['NBAERPTS'] 
+            AER_MIN=hdr['AERMIN']  
+            AER_MAX=hdr['AERMAX'] 
+
+            NB_PWV_POINTS=hdr['NBPWVPTS'] 
+            PWV_MIN=hdr['PWVMIN'] 
+            PWV_MAX=hdr['PWVMAX'] 
+        
+            NB_OZ_POINTS=hdr['NBOZPTS'] 
+            OZ_MIN=hdr['OZMIN'] 
+            OZ_MAX=hdr['OZMAX'] 
+            
+            AER_Points=np.linspace(AER_MIN,AER_MAX,NB_AER_POINTS)
+            OZ_Points=np.linspace(OZ_MIN,OZ_MAX,NB_OZ_POINTS)
+            PWV_Points=np.linspace(PWV_MIN,PWV_MAX,NB_PWV_POINTS)
+
+            #hdr['AER_PTS'] =np.array_str(AER_Points)
+            #hdr['PWV_PTS'] =np.array_str(PWV_Points)
+            #hdr['OZ_PTS'] =np.array_str(OZ_Points)
+            
+            NBWLBINS= hdr['NBWLBIN']
+            WLMIN= hdr['WLMIN']
+            WLMAX= hdr['WLMAX']
+    
+            index_atm_count=hdr['IDX_CNT']
+            index_atm_aer=hdr['IDX_AER']
+            index_atm_pwv=hdr['IDX_PWV']
+            index_atm_oz=hdr['IDX_OZ']
+            index_atm_data=hdr['IDX_DATA']
+    
+            self.atmgrid=np.zeros((NB_ATM_POINTS+1,NB_atm_HEADER+NB_atm_DATA))
+    
+            self.atmgrid[:,:]=hdu[0].data[:,:]
+           
+            if parameters.VERBOSE or parameters.DEBUG:
+                self.my_logger.info('\n\tAtmosphere.load atm-file=%s' % (self.filename))
+                
+            return self.atmgrid,self.header
+        #---------------------------------------------------------------------------
+        
+ 
   
 #----------------------------------------------------------------------------------
 class TelesTransm():
@@ -337,12 +405,11 @@ class TelesTransm():
     - Filter
     
     """
-    
+    #---------------------------------------------------------------------------
     def __init__(self,filtername=""):
         """
         Args:
-        filename (:obj:`str`): path to the image
-        Image (:obj:`Image`): copy info from Image object
+        filename (:obj:`str`): path to the data filename (for info only)
         """
     
         self.my_logger = parameters.set_logger(self.__class__.__name__)
@@ -354,10 +421,15 @@ class TelesTransm():
         self.tt=[]
         self.tfr=[]
         self.tfb=[]
-        
+    #---------------------------------------------------------------------------    
     def load_transm(self):
+        """
+        load_transm(self) :
+            load the telescope transmission
+            return the total telescope transmission, disperser excluded
+        """
         
-       
+        # defines the datapath relative to the Spectractor sim path
         datapath=os.path.join(spectractorsim_path,"CTIOThroughput")
         
         # QE
@@ -385,7 +457,6 @@ class TelesTransm():
         TM=func(WL)
         self.tm=TM
           
-        
         # Filter RG715
         wl,trg=ctio.Get_RG715(datapath)
         wl=np.concatenate([[WLMIN],wl,[WLMAX]])
@@ -416,8 +487,12 @@ class TelesTransm():
         self.tt=QE*TO*TM*TM*TF
                 
         return self.tt
-        
+    #---------------------------------------------------------------------------    
     def plot_transm(self,xlim=None):
+        """
+        plot_transm()
+            plot the various transmission
+        """
         plt.figure()
         if(len(self.tt)!=0):
             plt.plot(WL,self.qe,'b-',label='qe')
@@ -441,6 +516,7 @@ class SpectrumSim():
     """ SpectrumSim class used to store information and methods
     relative to spectrum simulation.
     """
+    #---------------------------------------------------------------------------
     def __init__(self,filename="",Image=None,atmospheric_lines=True,order=1):
         """
         Args:
@@ -475,7 +551,7 @@ class SpectrumSim():
         if filename != "" :
             self.filename = filename
             self.load_spectrum(filename)
-        
+    #----------------------------------------------------------------------------    
     def compute(self,atmgrid,filtertransm , dispersertransm,sed, header):
         self.header=header
         
@@ -497,7 +573,7 @@ class SpectrumSim():
         self.spectragrid[1:,index_atm_data:]=self.atmgrid[1:,index_atm_data:]* all_transm *Factor
          
         return self.spectragrid
-    
+    #---------------------------------------------------------------------------
     def plot_spectra(self):
         plt.figure()
         counts=self.spectragrid[1:,index_atm_count]
@@ -508,7 +584,7 @@ class SpectrumSim():
         plt.ylabel("Flux  [ADU/s]")
         plt.title("Spectra for Atmospheric variations")
         plt.show()
-        
+    #---------------------------------------------------------------------------   
     def plot_spectra_img(self):
         plt.figure()
         img=plt.imshow(self.spectragrid[1:,index_atm_data:],origin='lower',cmap='jet')
@@ -519,7 +595,7 @@ class SpectrumSim():
         cbar.set_label('ADU',size=15)
         plt.grid(True)
         plt.show()
-      
+    #---------------------------------------------------------------------------  
     def save_spectra(self,filename):
                    
         if filename != "" :
@@ -533,67 +609,9 @@ class SpectrumSim():
             hdu.writeto(self.filename,overwrite=True)
             if parameters.VERBOSE or parameters.DEBUG:
                 self.my_logger.info('\n\tSPECTRA.save atm-file=%s' % (self.filename))
+    #---------------------------------------------------------------------------            
                 
-                
-                
-
-    def plot_spectrum(self,xlim=None,nofit=False):
-        xs = self.lambdas
-        if xs is None : xs = np.arange(self.data.shape[0])
-        fig = plt.figure(figsize=[12,6])
-        if self.err is not None:
-            plt.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % self.order,zorder=0)
-        else:
-            plt.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % self.order)
-        #if len(self.target.spectra)>0:
-        #    for k in range(len(self.target.spectra)):
-        #        s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
-        #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
-        plt.grid(True)
-        plt.xlim([parameters.LAMBDA_MIN,parameters.LAMBDA_MAX])
-        plt.ylim(0.,np.max(self.data)*1.2)
-        plt.xlabel('$\lambda$ [nm]')
-        plt.ylabel(self.units)
-        if self.lambdas is None: plt.xlabel('Pixels')
-        if xlim is not None :
-            plt.xlim(xlim)
-            plt.ylim(0.,np.max(self.data[xlim[0]:xlim[1]])*1.2)
-        if self.lambdas is not None:
-            self.lines.plot_atomic_lines(plt.gca(),fontsize=12)
-        if not nofit and self.lambdas is not None:
-            lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=plt.gca(),verbose=parameters.VERBOSE)
-        plt.legend(loc='best',title=self.filters)
-        plt.show()
-
-
-
-    def save_spectrum(self,output_filename,overwrite=False):
-        hdu = fits.PrimaryHDU()
-        hdu.data = [self.lambdas,self.data,self.err]
-        self.header['UNIT1'] = "nanometer"
-        self.header['UNIT2'] = self.units
-        self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, second column gives the spectrum in unit UNIT2, third column the corresponding errors.'
-        hdu.header = self.header
-        hdu.writeto(output_filename,overwrite=overwrite)
-        self.my_logger.info('\n\tSpectrum saved in %s' % output_filename)
-
-
-    def load_spectrum(self,input_filename):
-        if os.path.isfile(input_filename):
-            hdu = fits.open(input_filename)
-            self.header = hdu[0].header
-            self.lambdas = hdu[0].data[0]
-            self.data = hdu[0].data[1]
-            if len(hdu[0].data)>2:
-                self.err = hdu[0].data[2]
-            extract_info_from_CTIO_header(self, self.header)
-            if self.header['TARGET'] != "":
-                self.target=Target(self.header['TARGET'],verbose=parameters.VERBOSE)
-            if self.header['UNIT2'] != "":
-                self.units = self.header['UNIT2']
-            self.my_logger.info('\n\tSpectrum loaded from %s' % input_filename)
-        else:
-            self.my_logger.info('\n\tSpectrum file %s not found' % input_filename)
+   
 #----------------------------------------------------------------------------------        
 
 
@@ -651,12 +669,20 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     # ------------------------
 
     atm=Atmosphere(airmass,pressure,temperature,filename)
-    atmgrid=atm.simulate()
-    header=atm.savefile(filename=output_atmfilename)
-    atmsim.CleanSimDir()
+    
+    # test if file already exists
+    if os.path.exists(output_atmfilename):
+        infostring=" atmospheric simulation file %s already exist, thus load it ..." % (output_atmfilename)
+        my_logger.info(infostring)
+        atmgrid,header=atm.loadfile(output_atmfilename)
+    else:
+        atmgrid=atm.simulate()
+        header=atm.savefile(filename=output_atmfilename)
+        atmsim.CleanSimDir()
     
     if parameters.VERBOSE:
         infostring='\n\t ========= Atmospheric simulation :  ==============='
+        my_logger.info(infostring)
         atm.plot_transm()
         atm.plot_transm_img()
     
@@ -702,13 +728,13 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
         infostring='\n\t ========= Spectra simulation :  ==============='
         spectra.plot_spectra()
         spectra.plot_spectra_img()
+    #--------------------------------------------------------------------------- 
     
-    
-
-    
+       
     
     
 #----------------------------------------------------------------------------------
+#  START SPECTRACTORSIM HERE !
 #----------------------------------------------------------------------------------
 
 
