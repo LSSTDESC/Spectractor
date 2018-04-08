@@ -268,9 +268,9 @@ class Atmosphere():
         plt.grid(True)
         plt.xlabel("Wavelength bins [nm]")
         plt.ylabel("simulation number")
-        plt.title(" Atmospheric variations",size=15)
+        plt.title(" Atmospheric variations")
         cbar=plt.colorbar(img)
-        cbar.set_label('atmospheric transparency',size=15)
+        cbar.set_label('atmospheric transparency')
         plt.show()
     #---------------------------------------------------------------------------    
     def savefile(self,filename=""):
@@ -597,7 +597,7 @@ class SpectrumSim():
         plt.ylabel("simulation number")
         plt.title("Spectra for Atmospheric variations")
         cbar=plt.colorbar(img)
-        cbar.set_label('ADU',size=15)
+        cbar.set_label('ADU')
         plt.grid(True)
         plt.show()
     #---------------------------------------------------------------------------  
@@ -689,8 +689,8 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     if parameters.VERBOSE:
         infostring='\n\t ========= Atmospheric simulation :  ==============='
         my_logger.info(infostring)
-        atm.plot_transm()
-        atm.plot_transm_img()
+        atm.plot_transm()   # plot all atm transp profiles
+        atm.plot_transm_img()   # plot 2D image summary of atm simulations
     
     # TELESCOPE TRANSMISSION
     # ------------------------
@@ -723,7 +723,8 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     
     # SPECTRA-GRID  
     #-------------   
-   
+    # in any case we re-calculate the spectra in case of change of transmission function
+    #
     spectra=SpectrumSim()
     
     spectragrid=spectra.compute(atmgrid,tr,td,flux,header)
