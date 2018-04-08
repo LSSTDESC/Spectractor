@@ -125,6 +125,11 @@ index_atm_data=4
 
 NB_atm_HEADER=5
 NB_atm_DATA=len(WL)-1
+
+
+
+MINFILESIZE=20000
+
 #----------------------------------------------------------------------------------------------
 # Specific class tools
 #---------------------------------------------------------------------------------------
@@ -671,8 +676,9 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     atm=Atmosphere(airmass,pressure,temperature,filename)
     
     # test if file already exists
-    if os.path.exists(output_atmfilename):
-        infostring=" atmospheric simulation file %s already exist, thus load it ..." % (output_atmfilename)
+    if os.path.exists(output_atmfilename) and os.path.getsize(output_atmfilename)>MINFILESIZE:       
+        filesize= os.path.getsize(output_atmfilename)
+        infostring=" atmospheric simulation file %s of size %d already exists, thus load it ..." % (output_atmfilename,filesize)
         my_logger.info(infostring)
         atmgrid,header=atm.loadfile(output_atmfilename)
     else:
