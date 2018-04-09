@@ -573,6 +573,7 @@ class Spectrum():
             self.my_logger.info('\n\tSpectrum file %s not found' % input_filename)
         
 
+            
 def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
     """ Spectractor
     Main function to extract a spectrum from an image
@@ -640,9 +641,12 @@ if __name__ == "__main__":
     filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_028.fits"
     guess = [814, 585]
     target = "PNG321.0+3.9"
-    #filename="../CTIOAnaJun2017/ana_29may17/OverScanRemove/trim_images/trim_20170529_150.fits"
-    #guess = [720, 670]
-    #target = "HD185975"
+    #filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_026.fits"
+    #guess = [735, 645]
+    #target = "PNG321.0+3.9"
+    filename="../CTIOAnaJun2017/ana_29may17/OverScanRemove/trim_images/trim_20170529_150.fits"
+    guess = [720, 670]
+    target = "HD185975"
     #filename="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
     #guess = [840, 530]
     #target = "HD205905"
