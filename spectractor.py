@@ -4,7 +4,7 @@ from spectroscopy import *
 from images import *
 import parameters 
 
-            
+
 def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
     """ Spectractor
     Main function to extract a spectrum from an image
@@ -24,6 +24,14 @@ def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
     output_filename = filename.split('/')[-1]
     output_filename = output_filename.replace('.fits','_spectrum.fits')
     output_filename = os.path.join(outputdir,output_filename)
+    
+    # Test if file already exists
+    if os.path.exists(output_filename) and os.path.getsize(output_filename)>20000:       
+        filesize= os.path.getsize(output_filename)
+        infostring=" !!!!!! Spectrum file file %s of size %d already exists, thus SKIP the reconstruction ..." % (output_filename,filesize)
+        my_logger.info(infostring)
+        return
+    
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
     if parameters.DEBUG:
