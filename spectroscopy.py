@@ -1,23 +1,16 @@
 import numpy as np
 import copy
+import matplotlib.pyplot as plt
+
+from scipy.signal import argrelextrema
+from astropy.table import Table
+from astropy.io import fits
 
 from parameters import *
 from tools import *
-from scipy.signal import argrelextrema
-from astropy.table import Table
+from filters import *
+from dispersers import *
 
-import matplotlib.pyplot as plt
-
-# H-alpha filter
-HALPHA_CENTER = 655.9e-6 # center of the filter in mm
-HALPHA_WIDTH = 6.4e-6 # width of the filter in mm
-
-# Other filters
-FGB37 = {'label':'FGB37','min':300,'max':800}
-RG715 = {'label':'RG715','min':690,'max':1100}
-HALPHA_FILTER = {'label':'Halfa','min':HALPHA_CENTER-2*HALPHA_WIDTH,'max':HALPHA_CENTER+2*HALPHA_WIDTH}
-ZGUNN = {'label':'Z-Gunn','min':800,'max':1100}
-FILTERS = [RG715,FGB37,HALPHA_FILTER,ZGUNN]
 
 class Line():
 
@@ -331,11 +324,154 @@ class Lines():
         return shift
 
 
-                
-class Filter():
 
-    def __init__(self,wavelength_min,wavelength_max,label):
-        self.min = wavelength_min
-        self.max = wavelength_max
-        self.label = label
+class Spectrum():
+    """ Spectrum class used to store information and methods
+    relative to spectra nd their extraction.
+    """
+    def __init__(self,filename="",Image=None,atmospheric_lines=True,order=1):
+        """
+        Args:
+            filename (:obj:`str`): path to the image
+            Image (:obj:`Image`): copy info from Image object
+        """
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.target = None
+        self.data = None
+        self.err = None
+        self.lambdas = None
+        self.order = order
+        if filename != "" :
+            self.filename = filename
+            self.load_spectrum(filename)
+        if Image is not None:
+            self.header = Image.header
+            self.date_obs = Image.date_obs
+            self.airmass = Image.airmass
+            self.expo = Image.expo
+            self.filters = Image.filters
+            self.filter = Image.filter
+            self.disperser = Image.disperser
+            self.target = Image.target
+            self.target_pixcoords = Image.target_pixcoords
+            self.target_pixcoords_rotated = Image.target_pixcoords_rotated
+            self.units = Image.units
+            self.my_logger.info('\n\tSpectrum info copied from Image')
+        self.atmospheric_lines = atmospheric_lines
+        self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,emission_spectrum=self.target.emission_spectrum)
+        self.load_filter()
+
+    def load_filter(self):
+        for f in FILTERS:
+            if f['label'] == self.filter:               
+                parameters.LAMBDA_MIN = f['min']
+                parameters.LAMBDA_MAX = f['max']
+                self.my_logger.info('\n\tLoad filter %s: lambda between %.1f and %.1f' % (f['label'],parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
+                break
+
+    def plot_spectrum(self,xlim=None,nofit=False):
+        xs = self.lambdas
+        if xs is None : xs = np.arange(self.data.shape[0])
+        fig = plt.figure(figsize=[12,6])
+        if self.err is not None:
+            plt.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % self.order,zorder=0)
+        else:
+            plt.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % self.order)
+        #if len(self.target.spectra)>0:
+        #    for k in range(len(self.target.spectra)):
+        #        s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
+        #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
+        plt.grid(True)
+        plt.xlim([parameters.LAMBDA_MIN,parameters.LAMBDA_MAX])
+        plt.ylim(0.,np.max(self.data)*1.2)
+        plt.xlabel('$\lambda$ [nm]')
+        plt.ylabel(self.units)
+        if self.lambdas is None: plt.xlabel('Pixels')
+        if xlim is not None :
+            plt.xlim(xlim)
+            plt.ylim(0.,np.max(self.data[xlim[0]:xlim[1]])*1.2)
+        if self.lambdas is not None:
+            self.lines.plot_atomic_lines(plt.gca(),fontsize=12)
+        if not nofit and self.lambdas is not None:
+            lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=plt.gca(),verbose=parameters.VERBOSE)
+        plt.legend(loc='best',title=self.filters)
+        plt.show()
+
+    def calibrate_spectrum(self,xlims=None):
+        if xlims == None :
+            left_cut, right_cut = [0,self.data.shape[0]]
+        else:
+            left_cut, right_cut = xlims
+        self.data = self.data[left_cut:right_cut]
+        pixels = np.arange(left_cut,right_cut,1)-self.target_pixcoords_rotated[0]
+        self.lambdas = self.disperser.grating_pixel_to_lambda(pixels,self.target_pixcoords,order=self.order)
+        # Cut spectra
+        self.lambdas_indices = np.where(np.logical_and(self.lambdas > parameters.LAMBDA_MIN, self.lambdas < parameters.LAMBDA_MAX))[0]
+        self.lambdas = self.lambdas[self.lambdas_indices]
+        self.data = self.data[self.lambdas_indices]
+        if self.err is not None: self.err = self.err[self.lambdas_indices]
+
+    def calibrate_spectrum_with_lines(self):
+        self.my_logger.info('\n\tCalibrating order %d spectrum...' % self.order)
+        # Detect emission/absorption lines and calibrate pixel/lambda 
+        D = DISTANCE2CCD-DISTANCE2CCD_ERR
+        shift = 0
+        shifts = []
+        counts = 0
+        D_step = DISTANCE2CCD_ERR / 4
+        delta_pixels = self.lambdas_indices - int(self.target_pixcoords_rotated[0])
+        while D < DISTANCE2CCD+4*DISTANCE2CCD_ERR and D > DISTANCE2CCD-4*DISTANCE2CCD_ERR and counts < 30 :
+            self.disperser.D = D
+            lambdas_test = self.disperser.grating_pixel_to_lambda(delta_pixels,self.target_pixcoords,order=self.order)
+            lambda_shift = self.lines.detect_lines(lambdas_test,self.data,spec_err=self.err,ax=None,verbose=parameters.DEBUG)
+            shifts.append(lambda_shift)
+            counts += 1
+            if abs(lambda_shift)<0.1 :
+                break
+            elif lambda_shift > 2 :
+                D_step = DISTANCE2CCD_ERR 
+            elif 0.5 < lambda_shift < 2 :
+                D_step = DISTANCE2CCD_ERR / 4
+            elif 0 < lambda_shift < 0.5 :
+                D_step = DISTANCE2CCD_ERR / 10
+            elif 0 > lambda_shift > -0.5 :
+                D_step = -DISTANCE2CCD_ERR / 20
+            elif  lambda_shift < -0.5 :
+                D_step = -DISTANCE2CCD_ERR / 6
+            D += D_step
+        shift = np.mean(lambdas_test - self.lambdas)
+        self.lambdas = lambdas_test
+        lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=None,verbose=parameters.DEBUG)
+        self.my_logger.info('\n\tWavelenght total shift: %.2fnm (after %d steps)\n\twith D = %.2f mm (DISTANCE2CCD = %.2f +/- %.2f mm, %.1f sigma shift)' % (shift,len(shifts),D,DISTANCE2CCD,DISTANCE2CCD_ERR,(D-DISTANCE2CCD)/DISTANCE2CCD_ERR))
+        if parameters.VERBOSE or parameters.DEBUG:
+            self.plot_spectrum(xlim=None,nofit=False)
+
+    def save_spectrum(self,output_filename,overwrite=False):
+        hdu = fits.PrimaryHDU()
+        hdu.data = [self.lambdas,self.data,self.err]
+        self.header['UNIT1'] = "nanometer"
+        self.header['UNIT2'] = self.units
+        self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, second column gives the spectrum in unit UNIT2, third column the corresponding errors.'
+        hdu.header = self.header
+        hdu.writeto(output_filename,overwrite=overwrite)
+        self.my_logger.info('\n\tSpectrum saved in %s' % output_filename)
+
+
+    def load_spectrum(self,input_filename):
+        if os.path.isfile(input_filename):
+            hdu = fits.open(input_filename)
+            self.header = hdu[0].header
+            self.lambdas = hdu[0].data[0]
+            self.data = hdu[0].data[1]
+            if len(hdu[0].data)>2:
+                self.err = hdu[0].data[2]
+            extract_info_from_CTIO_header(self, self.header)
+            if self.header['TARGET'] != "":
+                self.target=Target(self.header['TARGET'],verbose=parameters.VERBOSE)
+            if self.header['UNIT2'] != "":
+                self.units = self.header['UNIT2']
+            self.my_logger.info('\n\tSpectrum loaded from %s' % input_filename)
+        else:
+            self.my_logger.info('\n\tSpectrum file %s not found' % input_filename)
+        
 
