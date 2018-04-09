@@ -4,7 +4,7 @@ import csv
 
 class LogBook():
 
-    def __init__(self,logbook="ctiofulllogbook_jun2017_V2.csv"):
+    def __init__(self,logbook="ctiofulllogbook_jun2017_v4.csv"):
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.logbook = logbook
         if not os.path.isfile(logbook):
