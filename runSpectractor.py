@@ -16,8 +16,8 @@ if __name__ == "__main__":
                       help="Enter verbose (print more stuff).",default=False)
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="test/",
                       help="Write results in given output directory (default: ./tests/).")
-    parser.add_argument("-c", "--csv", dest="csv", default="ctiofulllogbook_jun2017_V2.csv",
-                      help="CSV logbook file. (default: ctiofulllogbook_jun2017_V2.csv).")
+    parser.add_argument("-c", "--csv", dest="csv", default="ctiofulllogbook_jun2017_v4.csv",
+                      help="CSV logbook file. (default: ctiofulllogbook_jun2017_v4.csv).")
     args = parser.parse_args()
 
     parameters.VERBOSE = args.verbose
