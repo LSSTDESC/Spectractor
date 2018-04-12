@@ -10,6 +10,7 @@ import parameters
 from tools import *
 from filters import *
 from dispersers import *
+from targets import *
 
 
 class Line():
