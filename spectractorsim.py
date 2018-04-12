@@ -395,19 +395,15 @@ class TelesTransm():
     
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.filtername = filtername
-        self.qe= []
-        self.to=[]
-        self.tm=[]
-        self.tf=[]
-        self.tt=[]
-        self.tfr=[]
-        self.tfb=[]
+        self.load_transmission()
+
     #---------------------------------------------------------------------------    
-    def load_transm(self):
+    def load_transmission(self):
         """
-        load_transm(self) :
+        load_transmission(self) :
             load the telescope transmission
-            return the total telescope transmission, disperser excluded
+            return the total telescope transmission, disperser excluded, 
+                as a fnction of the wavelength in Angstrom
         """
         
         # defines the datapath relative to the Spectractor sim path
@@ -415,76 +411,54 @@ class TelesTransm():
         
         # QE
         wl,qe=ctio.Get_QE(datapath)
-        # extend
-        wl=np.concatenate([[WLMIN],wl,[WLMAX]])
-        qe=np.concatenate([[0.],qe,[qe[-1]]])
-        func=interp1d(wl,qe,kind='linear')   # interpolation to conform to wavelength grid required
-        QE=func(WL)
-        self.qe=QE
+        self.qe=interp1d(wl,qe,kind='linear',bounds_error=False,fill_value=0.) 
         
         #  Throughput
         wl,trt=ctio.Get_Throughput(datapath)
-        wl=np.concatenate([[WLMIN],wl,[WLMAX]])
-        trt=np.concatenate([[0.],trt,[trt[-1]]])
-        func=interp1d(wl,trt,kind='linear')   # interpolation to conform to wavelength grid required
-        TO=func(WL)
-        self.to=TO
+        self.to=interp1d(wl,trt,kind='linear',bounds_error=False,fill_value=0.)
         
         # Mirrors 
         wl,trm=ctio.Get_Mirror(datapath)
-        wl=np.concatenate([[WLMIN],wl,[WLMAX]])
-        trm=np.concatenate([[0.],trm,[trm[-1]]])
-        func=interp1d(wl,trm,kind='linear') 
-        TM=func(WL)
-        self.tm=TM
+        self.tm=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.) 
           
         # Filter RG715
         wl,trg=ctio.Get_RG715(datapath)
-        wl=np.concatenate([[WLMIN],wl,[WLMAX]])
-        trg=np.concatenate([[0.],trg,[trg[-1]]])
-        func=interp1d(wl,trg,kind='linear')
-        TFR=func(WL)
-        self.tfr=TFR
+        self.tfr=interp1d(wl,trg,kind='linear',bounds_error=False,fill_value=0.)
         
         # Filter FGB37
         wl,trb=ctio.Get_FGB37(datapath)
-        self.tfb=interp1d(wl,trb,kind='linear',fill_value=0)
-        print self.tfb(200)
-            
+        self.tfb=interp1d(wl,trb,kind='linear',bounds_error=False,fill_value=0.)
             
         if self.filtername == "RG715" :
-            TF=TFR
+            TF=self.tfr
         elif self.filtername =="FGB37":
-            
-            TF=TFB
+            TF=self.tfb
         else:
-            TF=np.ones(len(WL))
+            TF=lambda x: np.ones_like(x)
             
         self.tf=TF
         
-        self.tt=QE*TO*TM*TM*TF
-                
-        return self.tt
+        self.transmission=lambda x: self.qe(x)*self.to(x)*(self.tm(x)**2)*self.tf(x)     
+        return self.transmission
     #---------------------------------------------------------------------------    
-    def plot_transm(self,xlim=None):
+    def plot_transmission(self,xlim=None):
         """
-        plot_transm()
-            plot the various transmission
+        plot_transmission()
+            plot the various transmissions of the instrument
         """
         plt.figure()
-        if(len(self.tt)!=0):
-            plt.plot(WL,self.qe,'b-',label='qe')
-            plt.plot(WL,self.to,'g-',label='othr')
-            plt.plot(WL,self.tm,'y-',label='mirr')
-            plt.plot(WL,self.tf,'k-',label='filt')
-            plt.plot(WL,self.tfr,'k:',label='RG715')
-            plt.plot(WL,self.tfb(WL),'k--',label='FGB37')
-            plt.plot(WL,self.tt,'r-',lw=2,label='tot')
-            plt.legend()
-            plt.grid()
-            plt.xlabel("$\lambda$ (nm)")
-            plt.ylabel("transmission")
-            plt.title("Telescope Transmissions")
+        plt.plot(WL,self.qe(WL),'b-',label='qe')
+        plt.plot(WL,self.to(WL),'g-',label='othr')
+        plt.plot(WL,self.tm(WL),'y-',label='mirr')
+        plt.plot(WL,self.tf(WL),'k-',label='filt')
+        plt.plot(WL,self.tfr(WL),'k:',label='RG715')
+        plt.plot(WL,self.tfb(WL),'k--',label='FGB37')
+        plt.plot(WL,self.transmission(WL),'r-',lw=2,label='tot')
+        plt.legend()
+        plt.grid()
+        plt.xlabel("$\lambda$ [nm]")
+        plt.ylabel("Transmission")
+        plt.title("Telescope transmissions")
 #----------------------------------------------------------------------------------        
                
         
@@ -530,7 +504,7 @@ class SpectrumSim():
             self.filename = filename
             self.load_spectrum(filename)
     #----------------------------------------------------------------------------    
-    def compute(self,atmgrid,filtertransm , dispersertransm,sed, header):
+    def compute(self,atmgrid,telescope,disperser,sed, header):
         self.header=header
         
         if parameters.VERBOSE :
@@ -542,7 +516,7 @@ class SpectrumSim():
         self.spectragrid=np.zeros(self.atmgrid.shape)
          
         # product of all sed and transmission except atmosphere
-        all_transm=filtertransm*dispersertransm*sed*WL*BinWidth
+        all_transm=disperser.transmission(WL)*telescope.transmission(WL)*sed*WL*BinWidth
          
         # copy atmospheric grid parameters into spectra grid 
         self.spectragrid[0,index_atm_data:]=WL
@@ -649,13 +623,11 @@ def SpectractorSim(filename,outputdir,atmospheric_lines=True):
     
     # TELESCOPE TRANSMISSION
     # ------------------------
-    tel=TelesTransm(spectrum.filter)
-    tr=tel.load_transm()
-    
+    telescope=TelesTransm(spectrum.filter)    
     if parameters.VERBOSE:
         infostring='\n\t ========= Telescope transmission :  ==============='
         my_logger.info(infostring)
-        tel.plot_transm()
+        telescope.plot_transmission()
         
     # DISPERSER TRANSMISSION
     # ------------------------
@@ -681,7 +653,7 @@ def SpectractorSim(filename,outputdir,atmospheric_lines=True):
     #
     spectra=SpectrumSim()
     
-    spectragrid=spectra.compute(atmgrid,tr,td,flux,header)
+    spectragrid=spectra.compute(atmgrid,telescope,disperser,flux,header)
     spectra.save_spectra(output_filename)
     
     
