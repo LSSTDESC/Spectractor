@@ -38,6 +38,7 @@ from tools import *
 #from holo_specs import *
 from targets import *
 from images import *
+from spectroscopy import *
 import parameters 
 #----------------------------------------------------------------------------
 # where is spectractorsim
@@ -87,19 +88,19 @@ WL=np.linspace(WLMIN,WLMAX,NBWLBINS) # Array of wavelength in Angstrom
 
 #aerosols
 #NB_AER_POINTS=20
-NB_AER_POINTS=5
+NB_AER_POINTS=1
 AER_MIN=0.
 AER_MAX=0.1
 
 #ozone
 #NB_OZ_POINTS=5
-NB_OZ_POINTS=3
+NB_OZ_POINTS=1
 OZ_MIN=200
 OZ_MAX=400
 
 # pwv
 #NB_PWV_POINTS=11
-NB_PWV_POINTS=5
+NB_PWV_POINTS=1
 PWV_MIN=0.
 PWV_MAX=10.
 
@@ -621,7 +622,7 @@ class SpectrumSim():
 
 
 #----------------------------------------------------------------------------------
-def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,rhumidity,exposure,filtername,dispersername,atmospheric_lines=True):
+def SpectractorSim(filename,outputdir,atmospheric_lines=True):
     
     """ SpectractorSim
     Main function to simulate several spectra 
@@ -631,38 +632,18 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
         filename (:obj:`str`): filename of the image (data)
         outputdir (:obj:`str`): path to the output directory
         
-        then the following parameters are required to do the spectum simulation.
-        
-        target           : 
-        index            :
-        airmass          :
-        pressure         : 
-        temperature      :
-        rhumidity        : 
-        exposure         :
-        filtername       :
-        dispersername    :
     """
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTORSIM')
     # Load reduced image
-    #image = Image(filename,target=target)
- 
+    spectrum = Spectrum(filename)
+
     # Set output path
     ensure_dir(outputdir)
     # extract the basename : simimar as os.path.basename(file)
     base_filename = filename.split('/')[-1]  # get "reduc_20170530_213.fits"
-    tag_filename=base_filename.split('_')[0] # get "reduc_"
-    search_str ='^%s_(.*)' % (tag_filename)  # get "^reduc_(.*)"
-    root_filename=re.findall(search_str,base_filename)[0]   # get "20170530_213.fits'
-    
-    #output_filename = root_filename.replace('.fits','_spectrumsim.fits')
-    #output_atmfilename = root_filename.replace('_spectrumsim.fits','_atmsim.fits')
-    output_filename='spectrasim_'+root_filename # get "spectrasim_20170530_213.fits"
-    output_atmfilename='atmsim_'+root_filename  # get "atmsim__20170530_213.fits"
-    
-    output_filename = os.path.join(outputdir,output_filename)
-    output_atmfilename = os.path.join(outputdir,output_atmfilename)
+    output_filename=os.path.join(outputdir,base_filename.replace('spectrum','spectrasim')) # get "reduc_20170530_213_spectrasim.fits"
+    output_atmfilename=os.path.join(outputdir,base_filename.replace('spectrum','atmsim'))  # get "reduc_20170530_213_atmsim.fits"
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tWill simulate the spectrum...')
     if parameters.DEBUG:
@@ -672,19 +653,21 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     
     # SIMULATE ATMOSPHERE GRID
     # ------------------------
-
+    airmass = spectrum.header['AIRMASS']
+    pressure = spectrum.header['OUTPRESS']
+    temperature = spectrum.header['OUTTEMP']
     atm=Atmosphere(airmass,pressure,temperature,filename)
     
     # test if file already exists
-    if os.path.exists(output_atmfilename) and os.path.getsize(output_atmfilename)>MINFILESIZE:       
-        filesize= os.path.getsize(output_atmfilename)
-        infostring=" atmospheric simulation file %s of size %d already exists, thus load it ..." % (output_atmfilename,filesize)
-        my_logger.info(infostring)
-        atmgrid,header=atm.loadfile(output_atmfilename)
-    else:
-        atmgrid=atm.simulate()
-        header=atm.savefile(filename=output_atmfilename)
-        atmsim.CleanSimDir()
+    #if os.path.exists(output_atmfilename) and os.path.getsize(output_atmfilename)>MINFILESIZE:       
+    #    filesize= os.path.getsize(output_atmfilename)
+    #    infostring=" atmospheric simulation file %s of size %d already exists, thus load it ..." % (output_atmfilename,filesize)
+    #    my_logger.info(infostring)
+    #    atmgrid,header=atm.loadfile(output_atmfilename)
+    #else:
+    atmgrid=atm.simulate()
+    header=atm.savefile(filename=output_atmfilename)
+    atmsim.CleanSimDir()
     
     if parameters.VERBOSE:
         infostring='\n\t ========= Atmospheric simulation :  ==============='
@@ -694,7 +677,7 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     
     # TELESCOPE TRANSMISSION
     # ------------------------
-    tel=TelesTransm(filtername)
+    tel=TelesTransm(spectrum.filter)
     tr=tel.load_transm()
     
     if parameters.VERBOSE:
@@ -704,7 +687,7 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
         
     # DISPERSER TRANSMISSION
     # ------------------------
-    disp=Disperser(dispersername)
+    disp=Disperser(spectrum.disperser)
     td=disp.load_transm()
     if parameters.VERBOSE:
         infostring='\n\t ========= Disperser transmission :  ==============='
@@ -713,11 +696,11 @@ def SpectractorSim(filename,outputdir,target,index,airmass,pressure,temperature,
     
     # STAR SPECTRUM
     # ------------------------
-    sed=SED(target)
+    sed=SED(spectrum.target.label)
     flux=sed.get_sed()
     
     if parameters.VERBOSE:
-        infostring='\n\t ========= SED : %s  ===============' % target
+        infostring='\n\t ========= SED : %s  ===============' % spectrum.target.label
         my_logger.info(infostring)
         sed.plot_sed()
     
@@ -769,17 +752,7 @@ if __name__ == "__main__":
     parameters.DEBUG = True
     parameters.VERBOSE = True
 
-    filename="reduc_20170530_213.fits"
-    airmass=1.094
-    pressure=782
-    temperature=9.5
-    rhumidity=24.0
-    target = "HD205905"
-    index=213
-    exposure=60.
-    filtername='dia'
-    dispersername='HoloPhP'
+    filename="notebooks/fits/reduc_20170528_060_spectrum.fits"
     
-    
-    SpectractorSim(filename,opts.output_directory,target,index,airmass,pressure,temperature,rhumidity,exposure,filtername,dispersername,atmospheric_lines=True)
+    SpectractorSim(filename,opts.output_directory,atmospheric_lines=True)
 #----------------------------------------------------------------------------------    
