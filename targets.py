@@ -105,6 +105,13 @@ class Target():
                         self.wavelengths.append(waves)
             else:
                 self.emission_spectrum = True
+        self.build_sed()
+
+    def build_sed(self,index=0):
+        if len(spectra)==0:
+            self.sed = lambda x: np.zeros_like(x)
+        else:
+            self.sed = interp1d(self.wavelengths[index],self.spectra[index],kind='linear',bounds_error=False,fill_value=0.) 
 
         
     def plot_spectra(self):
