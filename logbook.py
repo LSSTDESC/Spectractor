@@ -19,7 +19,7 @@ class LogBook():
         ypos = None
         skip = False
         for row in self.reader:
-            if filename == row['filename']:
+            if filename == row['file']:
                 target = row['object']
                 if 'bias' in target or 'flat' in target or 'zero' in target:
                     self.my_logger.error('Fits file %s in logbook %s has flag %s. Skip file.' % (filename,self.logbook,target))
@@ -37,12 +37,12 @@ class LogBook():
                     self.my_logger.warning('Fits file %s in logbook %s has no target y position. Skip file.' % (filename,self.logbook))
                     skip = True
                     break
-                if row['dx']!='':
-                    parameters.XWINDOW=int(row['dx'])
-                    parameters.XWINDOW_ROT=int(row['dx'])
-                if row['dy']!='':
-                    parameters.YWINDOW=int(row['dy'])
-                    parameters.YWINDOW_ROT=int(row['dy'])
+                if row['Dx']!='':
+                    parameters.XWINDOW=int(row['Dx'])
+                    parameters.XWINDOW_ROT=int(row['Dx'])
+                if row['Dy']!='':
+                    parameters.YWINDOW=int(row['Dy'])
+                    parameters.YWINDOW_ROT=int(row['Dy'])
                 xpos = int(row['Obj-posXpix'])
                 ypos = int(row['Obj-posYpix'])
                 break
