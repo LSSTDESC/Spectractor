@@ -137,6 +137,7 @@ class Grating():
         self.label = label
         self.data_dir = data_dir
         self.load_files(verbose=verbose)
+        self.transmission = lambda: wavelenth: 1.0
 
     def N(self,x) :
         return self.N_input
@@ -193,6 +194,15 @@ class Grating():
         res = (self.D**2/pow(self.D**2+delta**2,1.5))*PIXEL2MM*1e6/(order*self.N(x0))
         return(res)
 
+    def plot_transmission(self,xlim=None):
+        wavelengths = np.linspace(parameters.LAMBDA_MIN,parameters.LAMBDA_MAX,100)
+        plt.figure()
+        plt.plot(wavelengths,self.transmission(wavelengths),'b-',label=self.label)
+        plt.xlabel("$\lambda$ [nm]")
+        plt.ylabel("Transmission")
+        plt.legend()
+        plt.grid()
+        plt.show()
 
         
 class Hologram(Grating):
