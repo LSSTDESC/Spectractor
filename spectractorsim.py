@@ -448,11 +448,8 @@ class TelesTransm():
         
         # Filter FGB37
         wl,trb=ctio.Get_FGB37(datapath)
-        wl=np.concatenate([[WLMIN],wl,[WLMAX]])
-        trb=np.concatenate([[0.],trb,[0.]])
-        func=interp1d(wl,trb,kind='linear')
-        TFB=func(WL)
-        self.tfb=TFB
+        self.tfb=interp1d(wl,trb,kind='linear',fill_value=0)
+        print self.tfb(200)
             
             
         if self.filtername == "RG715" :
@@ -481,7 +478,7 @@ class TelesTransm():
             plt.plot(WL,self.tm,'y-',label='mirr')
             plt.plot(WL,self.tf,'k-',label='filt')
             plt.plot(WL,self.tfr,'k:',label='RG715')
-            plt.plot(WL,self.tfb,'k--',label='FGB37')
+            plt.plot(WL,self.tfb(WL),'k--',label='FGB37')
             plt.plot(WL,self.tt,'r-',lw=2,label='tot')
             plt.legend()
             plt.grid()
@@ -720,13 +717,7 @@ if __name__ == "__main__":
     if opts.debug:
         parameters.DEBUG = True
         parameters.VERBOSE = True
-        
-
-    opts.debug=True
-    parameters.DEBUG = True
-    parameters.VERBOSE = True
 
     filename="notebooks/fits/reduc_20170528_060_spectrum.fits"
     
     SpectractorSim(filename,opts.output_directory,atmospheric_lines=True)
-#----------------------------------------------------------------------------------    
