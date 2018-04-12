@@ -1,10 +1,12 @@
 import numpy as np
 import sys, os
+import matplotlib.pyplot as plt
+
+from scipy.interpolate import interp1d
+
 from astropy import units as units
 from astropy.coordinates import SkyCoord, Angle
-#import pyfits
 import astropy.io.fits as pyfits
-import matplotlib.pyplot as plt
 
 from astroquery.simbad import Simbad
 from astroquery.ned import Ned
@@ -108,7 +110,7 @@ class Target():
         self.build_sed()
 
     def build_sed(self,index=0):
-        if len(spectra)==0:
+        if len(self.spectra)==0:
             self.sed = lambda x: np.zeros_like(x)
         else:
             self.sed = interp1d(self.wavelengths[index],self.spectra[index],kind='linear',bounds_error=False,fill_value=0.) 
