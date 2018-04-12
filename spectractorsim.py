@@ -131,43 +131,6 @@ NB_atm_DATA=len(WL)-1
 
 MINFILESIZE=20000
 
-#----------------------------------------------------------------------------------------------
-# Specific class tools
-#---------------------------------------------------------------------------------------
-class SED():
-    """
-    SED()
-    
-    """
-    def __init__(self,target=""):
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
-        self.targetname=target
-        self.target=None
-        self.wl=None
-        self.flux=None
-        self.sed=None
-        
-    def get_sed(self):
-        self.target=Target(self.targetname,verbose=parameters.VERBOSE)
-        self.wl=self.target.wavelengths[-1]
-        self.flux=self.target.spectra[-1]
-        func=interp1d(self.wl,self.flux,kind='linear') 
-        self.sed=func(WL)
-        return self.sed
-
-    def plot_sed(self):
-        self.target.plot_spectra()
-        plt.figure()
-        plt.plot(WL,self.sed,'r-',lw=2,label='sed')
-        plt.legend()
-        plt.xlabel('$\lambda$ [nm]')
-        plt.ylabel('Flux')
-        plt.title('SED')
-        plt.legend()
-        plt.grid()
-        plt.show()
-
-
             
 #----------------------------------------------------------------------------------
 class Atmosphere():
@@ -504,7 +467,7 @@ class SpectrumSim():
             self.filename = filename
             self.load_spectrum(filename)
     #----------------------------------------------------------------------------    
-    def compute(self,atmgrid,telescope,disperser,sed, header):
+    def compute(self,atmgrid,telescope,disperser,target, header):
         self.header=header
         
         if parameters.VERBOSE :
@@ -516,7 +479,7 @@ class SpectrumSim():
         self.spectragrid=np.zeros(self.atmgrid.shape)
          
         # product of all sed and transmission except atmosphere
-        all_transm=disperser.transmission(WL)*telescope.transmission(WL)*sed*WL*BinWidth
+        all_transm=disperser.transmission(WL)*telescope.transmission(WL)*target.sed(WL)*WL*BinWidth
          
         # copy atmospheric grid parameters into spectra grid 
         self.spectragrid[0,index_atm_data:]=WL
@@ -583,7 +546,6 @@ def SpectractorSim(filename,outputdir,atmospheric_lines=True):
     my_logger.info('\n\tStart SPECTRACTORSIM')
     # Load data spectrum
     spectrum = Spectrum(filename)
-
     # Set output path
     ensure_dir(outputdir)
     # extract the basename : simimar as os.path.basename(file)
@@ -639,13 +601,11 @@ def SpectractorSim(filename,outputdir,atmospheric_lines=True):
     
     # STAR SPECTRUM
     # ------------------------
-    sed=SED(spectrum.target.label)
-    flux=sed.get_sed()
-    
+    target = spectrum.target
     if parameters.VERBOSE:
-        infostring='\n\t ========= SED : %s  ===============' % spectrum.target.label
+        infostring='\n\t ========= SED : %s  ===============' % target.label
         my_logger.info(infostring)
-        sed.plot_sed()
+        target.plot_spectra()
     
     # SPECTRA-GRID  
     #-------------   
@@ -653,7 +613,7 @@ def SpectractorSim(filename,outputdir,atmospheric_lines=True):
     #
     spectra=SpectrumSim()
     
-    spectragrid=spectra.compute(atmgrid,telescope,disperser,flux,header)
+    spectragrid=spectra.compute(atmgrid,telescope,disperser,target,header)
     spectra.save_spectra(output_filename)
     
     
