@@ -137,7 +137,7 @@ class Grating():
         self.label = label
         self.data_dir = data_dir
         self.load_files(verbose=verbose)
-        self.transmission = lambda: wavelenth: 1.0
+        self.transmission = lambda wavelength: 1.0
 
     def N(self,x) :
         return self.N_input
