@@ -168,31 +168,6 @@ class SED():
         plt.show()
 
 
-#----------------------------------------------------------------------------------
-class Disperser():
-    """
-    Disperser():
-        
-    """
-    def __init__(self,dispersername=""):
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
-        self.disperser=dispersername
-        self.td=0.0
-        
-    def load_transm(self):
-        self.td=np.ones(len(WL))
-        return self.td
-    
-    def plot_transm(self,xlim=None):
-        plt.figure()
-        if(len(self.td)!=0):
-            plt.plot(WL,self.td,'b-',label=self.disperser)
-            plt.legend()
-            plt.grid()
-            plt.xlabel("$\lambda$ (nm)")
-            plt.ylabel("transmission")
-            plt.title("Disperser Transmissions")
-#----------------------------------------------------------------------------------
             
 #----------------------------------------------------------------------------------
 class Atmosphere():
@@ -635,15 +610,15 @@ def SpectractorSim(filename,outputdir,atmospheric_lines=True):
     """
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTORSIM')
-    # Load reduced image
+    # Load data spectrum
     spectrum = Spectrum(filename)
 
     # Set output path
     ensure_dir(outputdir)
     # extract the basename : simimar as os.path.basename(file)
-    base_filename = filename.split('/')[-1]  # get "reduc_20170530_213.fits"
-    output_filename=os.path.join(outputdir,base_filename.replace('spectrum','spectrasim')) # get "reduc_20170530_213_spectrasim.fits"
-    output_atmfilename=os.path.join(outputdir,base_filename.replace('spectrum','atmsim'))  # get "reduc_20170530_213_atmsim.fits"
+    base_filename = filename.split('/')[-1] 
+    output_filename=os.path.join(outputdir,base_filename.replace('spectrum','spectrasim'))
+    output_atmfilename=os.path.join(outputdir,base_filename.replace('spectrum','atmsim')) 
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tWill simulate the spectrum...')
     if parameters.DEBUG:
@@ -687,12 +662,11 @@ def SpectractorSim(filename,outputdir,atmospheric_lines=True):
         
     # DISPERSER TRANSMISSION
     # ------------------------
-    disp=Disperser(spectrum.disperser)
-    td=disp.load_transm()
+    disperser = Grating(300,label=spectrum.disperser)
     if parameters.VERBOSE:
         infostring='\n\t ========= Disperser transmission :  ==============='
         my_logger.info(infostring)
-        disp.plot_transm()
+        disperser.plot_transmission()
     
     # STAR SPECTRUM
     # ------------------------
