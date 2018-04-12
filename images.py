@@ -9,11 +9,12 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord, Angle
 import astropy.units as units
 
-from parameters import *
+import parameters 
 from tools import *
 from dispersers import *
 from targets import *
 from spectroscopy import *
+
 
 class Image():
 
@@ -31,7 +32,7 @@ class Image():
         self.target_pixcoords = None
         self.target_pixcoords_rotated = None
         if target != "":
-            self.target=Target(target,verbose=VERBOSE)
+            self.target=Target(target,verbose=parameters.VERBOSE)
             self.header['TARGET'] = self.target.label
             self.header.comments['TARGET'] = 'object targeted in the image'
             self.header['REDSHIFT'] = self.target.redshift
@@ -49,16 +50,16 @@ class Image():
         self.data = hdu_list[0].data
         extract_info_from_CTIO_header(self,self.header)
         IMSIZE = int(self.header['XLENGTH'])
-        PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
+        parameters.PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
         if self.header['YLENGTH'] != IMSIZE:
             self.my_logger.warning('\n\tImage rectangular: X=%d pix, Y=%d pix' % (IMSIZE, self.header['YLENGTH']))
-        if self.header['YPIXSIZE'] != PIXEL2ARCSEC:
-            self.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (PIXEL2ARCSEC, self.header['YPIXSIZE']))
+        if self.header['YPIXSIZE'] != parameters.PIXEL2ARCSEC:
+            self.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (parameters.PIXEL2ARCSEC, self.header['YPIXSIZE']))
         self.coord = SkyCoord(self.header['RA']+' '+self.header['DEC'],unit=(units.hourangle, units.deg),obstime=self.header['DATE-OBS'] )
         self.my_logger.info('\n\tImage loaded')
         # Load the disperser
         self.my_logger.info('\n\tLoading disperser %s...' % self.disperser)
-        self.disperser = Hologram(self.disperser,data_dir=HOLO_DIR,verbose=VERBOSE)
+        self.disperser = Hologram(self.disperser,data_dir=parameters.HOLO_DIR,verbose=parameters.VERBOSE)
         # compute CCD gain map
         self.build_gain_map()
         self.convert_to_ADU_rate_units()
@@ -93,7 +94,7 @@ class Image():
 
     def compute_parallactic_angle(self):
         '''from A. Guyonnet.'''
-        latitude = OBS_LATITUDE.split( )
+        latitude = parameters.OBS_LATITUDE.split( )
         latitude = float(latitude[0])- float(latitude[1])/60. - float(latitude[2])/3600.
         latitude = Angle(latitude, units.deg).radian
         ha       = Angle(self.header['HA'], unit='hourangle').radian
@@ -107,8 +108,8 @@ class Image():
     def find_target_init(self,guess,rotated=False):
         x0 = guess[0]
         y0 = guess[1]
-        Dx = XWINDOW
-        Dy = YWINDOW
+        Dx = parameters.XWINDOW
+        Dy = parameters.YWINDOW
         if rotated:
             angle = self.rotation_angle*np.pi/180.
             rotmat = np.matrix([[np.cos(angle),-np.sin(angle)],[np.sin(angle),np.cos(angle)]])
@@ -117,8 +118,8 @@ class Image():
             x0 = int(guess2[0,0])
             y0 = int(guess2[0,1])
         if rotated:
-            Dx = XWINDOW_ROT
-            Dy = YWINDOW_ROT
+            Dx = parameters.XWINDOW_ROT
+            Dy = parameters.YWINDOW_ROT
             sub_image = np.copy(self.data_rotated[y0-Dy:y0+Dy,x0-Dx:x0+Dx])
         else:
             sub_image = np.copy(self.data[y0-Dy:y0+Dy,x0-Dx:x0+Dx])
@@ -153,8 +154,8 @@ class Image():
             self.my_logger.warning('\n\tY position determination of the target probably wrong')
         # compute target position
         theX=x0-Dx+avX
-        theY=y0-Dy+avY        
-        if DEBUG:
+        theY=y0-Dy+avY
+        if parameters.DEBUG:
             profile_X_max=np.max(profile_X_raw)*1.2
             profile_Y_max=np.max(profile_Y_raw)*1.2
 
@@ -227,7 +228,7 @@ class Image():
         if sub_image_subtracted[int(avY),int(avX)] < 0.8*np.max(sub_image_subtracted) :
             self.my_logger.warning('\n\tX,Y position determination of the target probably wrong') 
          # debugging plots
-        if DEBUG:
+        if parameters.DEBUG:
             f, (ax1, ax2,ax3) = plt.subplots(1,3, figsize=(15,4))
             im = ax1.imshow(sub_image,origin='lower',cmap='jet')
             cb = f.colorbar(im,ax=ax1)
@@ -309,7 +310,7 @@ class Image():
         theta_critical = 180.*np.arctan(10./IMSIZE)/np.pi
         if abs(theta_median-theta_guess)>theta_critical:
             self.my_logger.warning('\n\tInterpolated angle and fitted angle disagrees with more than 10 pixels over %d pixels:  %.2f vs %.2f' % (IMSIZE,theta_median,theta_guess))
-        if DEBUG:
+        if parameters.DEBUG:
             f, (ax1, ax2) = plt.subplots(1,2,figsize=(10,6))
             xindex=np.arange(data.shape[1])
             x_new = np.linspace(xindex.min(),xindex.max(), 50)
@@ -330,21 +331,21 @@ class Image():
         self.my_logger.info('\n\tRotate the image with angle theta=%.2f degree' % self.rotation_angle)
         self.data_rotated = np.copy(self.data)
         if not np.isnan(self.rotation_angle):
-            self.data_rotated=ndimage.interpolation.rotate(self.data,self.rotation_angle,prefilter=ROT_PREFILTER,order=ROT_ORDER)
-            self.stat_errors_rotated=ndimage.interpolation.rotate(self.stat_errors,self.rotation_angle,prefilter=ROT_PREFILTER,order=ROT_ORDER)
-        if DEBUG:
+            self.data_rotated=ndimage.interpolation.rotate(self.data,self.rotation_angle,prefilter=parameters.ROT_PREFILTER,order=parameters.ROT_ORDER)
+            self.stat_errors_rotated=ndimage.interpolation.rotate(self.stat_errors,self.rotation_angle,prefilter=parameters.ROT_PREFILTER,order=parameters.ROT_ORDER)
+        if parameters.DEBUG:
             margin=200
             f, (ax1,ax2) = plt.subplots(2,1,figsize=[8,8])
             y0 = int(self.target_pixcoords[1])
-            ax1.imshow(np.log10(self.data[y0-YWINDOW:y0+YWINDOW,margin:-margin]),origin='lower',cmap='rainbow',aspect="auto")
-            ax1.plot([0,self.data.shape[0]-2*margin],[YWINDOW,YWINDOW],'k-')
+            ax1.imshow(np.log10(self.data[y0-parameters.YWINDOW:y0+parameters.YWINDOW,margin:-margin]),origin='lower',cmap='rainbow',aspect="auto")
+            ax1.plot([0,self.data.shape[0]-2*margin],[parameters.YWINDOW,parameters.YWINDOW],'k-')
             if self.target_pixcoords is not None:
-                ax1.scatter(self.target_pixcoords[0]-margin,YWINDOW,marker='o',s=100,edgecolors='k',facecolors='none')
+                ax1.scatter(self.target_pixcoords[0]-margin,parameters.YWINDOW,marker='o',s=100,edgecolors='k',facecolors='none')
             ax1.grid(color='white', ls='solid')
             ax1.grid(True)
             ax1.set_title('Raw image (log10 scale)')
-            ax2.imshow(np.log10(self.data_rotated[y0-YWINDOW:y0+YWINDOW,margin:-margin]),origin='lower',cmap='rainbow',aspect="auto")
-            ax2.plot([0,self.data_rotated.shape[0]-2*margin],[YWINDOW,YWINDOW],'k-')
+            ax2.imshow(np.log10(self.data_rotated[y0-parameters.YWINDOW:y0+parameters.YWINDOW,margin:-margin]),origin='lower',cmap='rainbow',aspect="auto")
+            ax2.plot([0,self.data_rotated.shape[0]-2*margin],[parameters.YWINDOW,parameters.YWINDOW],'k-')
             if self.target_pixcoords_rotated is not None:
                 ax2.scatter(self.target_pixcoords_rotated[0],self.target_pixcoords_rotated[1],marker='o',s=100,edgecolors='k',facecolors='none')
             ax2.grid(color='white', ls='solid')
@@ -387,7 +388,7 @@ class Image():
         spectrum = Spectrum(Image=self)
         spectrum.data = xprofile - xprofile_background
         spectrum.err = np.sqrt(xprofile_err**2 +  xprofile_background_err**2)
-        if DEBUG:
+        if parameters.DEBUG:
             spectrum.plot_spectrum()    
         return spectrum
 

@@ -26,11 +26,11 @@ def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
     output_filename = os.path.join(outputdir,output_filename)
     
     # Test if file already exists
-    if os.path.exists(output_filename) and os.path.getsize(output_filename)>20000:       
-        filesize= os.path.getsize(output_filename)
-        infostring=" !!!!!! Spectrum file file %s of size %d already exists, thus SKIP the reconstruction ..." % (output_filename,filesize)
-        my_logger.info(infostring)
-        return
+    #if os.path.exists(output_filename) and os.path.getsize(output_filename)>20000:       
+    #    filesize= os.path.getsize(output_filename)
+    #    infostring=" !!!!!! Spectrum file file %s of size %d already exists, thus SKIP the reconstruction ..." % (output_filename,filesize)
+    #    my_logger.info(infostring)
+    #    return
     
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
@@ -47,7 +47,11 @@ def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
     spectrum.atmospheric_lines = atmospheric_lines
     # Calibrate the spectrum
     spectrum.calibrate_spectrum()
-    spectrum.calibrate_spectrum_with_lines()
+    try:
+        spectrum.calibrate_spectrum_with_lines()
+    except:
+        my_logger.warning('\n\tCalibration procedure with spectral features failed.')
+        spectrum.header['WARNINGS'] = 'Calibration procedure with spectral features failed.'
     # Subtract second order
 
     # Save the spectra
@@ -67,6 +71,7 @@ if __name__ == "__main__":
     parser.add_option("-o", "--output_directory", dest="output_directory", default="test/",
                       help="Write results in given output directory (default: ./tests/).")
     (opts, args) = parser.parse_args()
+
 
     parameters.VERBOSE = opts.verbose
     if opts.debug:

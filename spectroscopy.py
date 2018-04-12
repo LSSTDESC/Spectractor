@@ -6,7 +6,7 @@ from scipy.signal import argrelextrema
 from astropy.table import Table
 from astropy.io import fits
 
-from parameters import *
+import parameters 
 from tools import *
 from filters import *
 from dispersers import *
@@ -119,7 +119,7 @@ class Lines():
 
     def detect_lines(self,lambdas,spec,spec_err=None,snr_minlevel=3,ax=None,verbose=False):
         # main settings
-        bgd_npar = BGD_NPARAMS
+        bgd_npar = parameters.BGD_NPARAMS
         peak_look = 7 # half range to look for local maximum in pixels
         bgd_width = 9 # size of the peak sides to use to fit spectrum base line
         if self.hydrogen_only :
