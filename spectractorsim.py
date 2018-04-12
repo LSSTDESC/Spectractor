@@ -37,7 +37,7 @@ sys.path.append("../Spectractor")
 from tools import *
 #from holo_specs import *
 from targets import *
-from optics import *
+from images import *
 import parameters 
 #----------------------------------------------------------------------------
 # where is spectractorsim
