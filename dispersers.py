@@ -137,10 +137,12 @@ class Grating():
         self.label = label
         self.data_dir = data_dir
         self.load_files(verbose=verbose)
-        self.transmission = lambda wavelength: 1.0
 
     def N(self,x) :
         return self.N_input
+
+    def transmission(self,wavelength):
+        return np.ones_like(wavelength)
 
     def load_files(self,verbose=False):
         filename = self.data_dir+self.label+"/N.txt"
@@ -196,12 +198,12 @@ class Grating():
 
     def plot_transmission(self,xlim=None):
         wavelengths = np.linspace(parameters.LAMBDA_MIN,parameters.LAMBDA_MAX,100)
-        plt.figure()
+        fig = plt.figure()
         plt.plot(wavelengths,self.transmission(wavelengths),'b-',label=self.label)
         plt.xlabel("$\lambda$ [nm]")
         plt.ylabel("Transmission")
-        plt.legend()
         plt.grid()
+        plt.legend(loc='best')
         plt.show()
 
         
