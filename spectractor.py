@@ -79,10 +79,10 @@ if __name__ == "__main__":
         parameters.VERBOSE = True
         
         
-    #filename = "../../CTIODataJune2017_reducedRed/data_05jun17/reduc_20170605_00.fits"
-    #filename = "notebooks/fits/trim_20170605_007.fits"
-    #guess = [745,643]
-    #target = "3C273"
+    filename = "../../CTIODataJune2017_reducedRed/data_05jun17/reduc_20170605_00.fits"
+    filename = "notebooks/fits/trim_20170605_007.fits"
+    guess = [745,643]
+    target = "3C273"
 
     filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_028.fits"
     guess = [814, 585]
