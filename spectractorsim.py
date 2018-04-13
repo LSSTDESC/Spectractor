@@ -456,6 +456,39 @@ class TelescopeTransmission():
                
         
         
+                
+#----------------------------------------------------------------------------------
+class SpectrumSimulation(Spectrum):
+    """ SpectrumSim class used to store information and methods
+    relative to spectrum simulation.
+    """
+    #---------------------------------------------------------------------------
+    def __init__(self,atmosphere,telescope,disperser,target,filename=""):
+        """
+        Args:
+            filename (:obj:`str`): path to the image
+        """
+        Spectrum.__init__(self,filename=filename,target=target)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)        
+        self.disperser = disperser
+        self.telescope = telescope        
+        self.atmosphere = atmosphere
+    #----------------------------------------------------------------------------    
+    def simulate_without_atmosphere(self,lambdas):
+        self.lambdas = lambdas
+        self.lambda_binwidths = np.gradient(lambdas)
+        all_transm = self.disperser.transmission(self.lambdas)
+        all_transm *= self.telescope.transmission(self.lambdas)
+        all_transm *= self.target.sed(self.lambdas)
+        all_transm *= self.lambdas*self.lambda_binwidths         
+        return all_transm
+    #----------------------------------------------------------------------------    
+    def simulate(self,lambdas):
+        all_transm = self.simulate_without_atmosphere(lambdas)
+        all_transm *= self.atmosphere(lambdas)
+        return all_transm
+    #---------------------------------------------------------------------------            
+                
 #----------------------------------------------------------------------------------
 class SpectrumSimGrid():
     """ SpectrumSim class used to store information and methods
@@ -477,12 +510,9 @@ class SpectrumSimGrid():
         self.atmgrid = atmgrid
         self.lambdas = atmgrid[0,index_atm_data:]
         self.lambda_binwidths = np.gradient(self.lambdas)
-        self.spectragrid= None
+        self.spectragrid = None
 
         self.filename=""
-
-        #self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,emission_spectrum=self.target.emission_spectrum)
-    
         if filename != "" :
             self.filename = filename
             self.load_spectrum(filename)
@@ -492,14 +522,11 @@ class SpectrumSimGrid():
 
     #----------------------------------------------------------------------------    
     def compute(self):
-        self.spectragrid=np.zeros(self.atmgrid.shape)
-         
+        sim = SpectrumSimulation(self.atmgrid,self.telescope,self.disperser,self.target)
         # product of all sed and transmission except atmosphere
-        all_transm = self.disperser.transmission(self.lambdas)
-        all_transm *= self.telescope.transmission(self.lambdas)
-        all_transm *= self.target.sed(self.lambdas)
-        all_transm *= self.lambdas*self.lambda_binwidths
-        # copy atmospheric grid parameters into spectra grid 
+        all_transm = sim.simulate_without_atmosphere(self.lambdas)
+        # copy atmospheric grid parameters into spectra grid
+        self.spectragrid = np.zeros_like(self.atmgrid) 
         self.spectragrid[0,index_atm_data:]=self.lambdas
         self.spectragrid[:,index_atm_count:index_atm_data]=self.atmgrid[:,index_atm_count:index_atm_data] 
         # Is broadcasting working OK ?
@@ -543,7 +570,6 @@ class SpectrumSimGrid():
             if parameters.VERBOSE or parameters.DEBUG:
                 self.my_logger.info('\n\tSPECTRA.save atm-file=%s' % (self.filename))
     #---------------------------------------------------------------------------            
-                
    
 #----------------------------------------------------------------------------------        
 
