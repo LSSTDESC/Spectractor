@@ -24,6 +24,7 @@ class Line():
         self.emission = emission
         if self.atmospheric: self.emission = False
         self.width_bounds = width_bounds
+        self.fitted = False
         self.high_snr = False
 
 
@@ -77,8 +78,8 @@ class Lines():
         O2Y = Line( 898.765,atmospheric=True,label='$O_2(Y)$',label_pos=[0.007,0.02]) # https://en.wikipedia.org/wiki/Fraunhofer_lines
         O2Z = Line( 822.696,atmospheric=True,label='$O_2(Z)$',label_pos=[0.007,0.02]) # https://en.wikipedia.org/wiki/Fraunhofer_lines
         #H2O = Line( 960,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(1,50))  # 
-        H2O_1 = Line( 950,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(5,30))  # libradtran paper fig.3, broad line
-        H2O_2 = Line( 970,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(5,30))  # libradtran paper fig.3, broad line
+        H2O_1 = Line( 935,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(5,30))  # libradtran paper fig.3, broad line
+        H2O_2 = Line( 960,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(5,30))  # libradtran paper fig.3, broad line
         
         self.lines = [HALPHA,HBETA,HGAMMA,HDELTA,O2,O2B,O2Y,O2Z,H2O_1,H2O_2,OIII,CII1,CII2,CIV,CII3,CIII1,CIII2,CIII3,HEI1,HEI2,HEI3,HEI4,HEI5,HEI6,HEI7,HEI8,HEI9,HEI10,HEI11,HEI12,HEI13,OI,OII,HEII1,HEII2,HEII3,HEII4,CAII1,CAII2,HI,FEII1,FEII2,FEII3]
         self.redshift = redshift
@@ -109,7 +110,7 @@ class Lines():
     def plot_atomic_lines(self,ax,color_atomic='g',color_atmospheric='b',fontsize=12):
         xlim = ax.get_xlim()
         for l in self.lines:
-            if not l.high_snr : continue
+            if l.fitted and not l.high_snr : continue
             color = color_atomic
             if l.atmospheric: color = color_atmospheric
             ax.axvline(l.wavelength,lw=2,color=color)
@@ -300,6 +301,7 @@ class Lines():
                 rows.append((line.label,l,peak_pos,peak_pos-l,FWHM,signal_level,snr))
                 # save fit results
                 plot_line_subset = True
+                line.fitted = True
                 line.high_snr = True
                 line.fit_lambdas = lambdas[index]
                 line.fit_gauss = gauss(lambdas[index],*popt[bgd_npar+3*j:bgd_npar+3*j+3])
@@ -330,18 +332,21 @@ class Spectrum():
     """ Spectrum class used to store information and methods
     relative to spectra nd their extraction.
     """
-    def __init__(self,filename="",Image=None,atmospheric_lines=True,order=1):
+    def __init__(self,filename="",Image=None,atmospheric_lines=True,order=1,target=None):
         """
         Args:
             filename (:obj:`str`): path to the image
             Image (:obj:`Image`): copy info from Image object
         """
         self.my_logger = set_logger(self.__class__.__name__)
-        self.target = None
+        self.target = target
         self.data = None
         self.err = None
         self.lambdas = None
         self.order = order
+        self.filter = None
+        self.filters = None
+        self.units = 'Flux [ADU/s]'
         if filename != "" :
             self.filename = filename
             self.load_spectrum(filename)
@@ -359,7 +364,9 @@ class Spectrum():
             self.units = Image.units
             self.my_logger.info('\n\tSpectrum info copied from Image')
         self.atmospheric_lines = atmospheric_lines
-        self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,emission_spectrum=self.target.emission_spectrum)
+        self.lines = None
+        if self.target is not None :
+            self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,emission_spectrum=self.target.emission_spectrum)
         self.load_filter()
 
     def load_filter(self):
@@ -395,7 +402,9 @@ class Spectrum():
             self.lines.plot_atomic_lines(plt.gca(),fontsize=12)
         if not nofit and self.lambdas is not None:
             lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=plt.gca(),verbose=parameters.VERBOSE)
-        plt.legend(loc='best',title=self.filters)
+        plt.legend(loc='best')
+        if self.filters is not None:
+            plt.gca().get_legend().set_title(self.filters)
         plt.show()
 
     def calibrate_spectrum(self,xlims=None):
