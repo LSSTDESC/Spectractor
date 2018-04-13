@@ -142,7 +142,7 @@ class Grating():
         return self.N_input
 
     def transmission(self,wavelength):
-        return np.ones_like(wavelength)
+        return np.ones_like(wavelength).astype(float)
 
     def load_files(self,verbose=False):
         filename = self.data_dir+self.label+"/N.txt"
