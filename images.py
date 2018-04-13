@@ -353,20 +353,23 @@ class Image():
             ax2.set_title('Turned image (log10 scale)')
             plt.show()
 
-    def extract_spectrum_from_image(self,w=3,ws=[8,30],right_edge=1800):
+    def extract_spectrum_from_image(self,w=10,ws=[20,30],right_edge=1800):
+        """
+            extract_spectrum_from_image(self,w=10,ws=[20,30],right_edge=1800):
+            
+                Extract the 1D spectrum from the image.
+                Remove background estimated from the lateral Bands
+                    w: half width of central region where the spectrum is supposed to be
+                    ws=[8,30]  : up/down region where the sky background is estimated 
+                    right_edge : position above which no pixel should be used
+        """
         self.my_logger.info('\n\tExtracting spectrum from image: spectrum with width 2*%d pixels and background from %d to %d pixels' % (w,ws[0],ws[1]))
         # Make a data copy
         data = np.copy(self.data_rotated)[:,0:right_edge]
-        # Sum rotated image profile along y axis
-        y0 = int(self.target_pixcoords_rotated[1])
-        spectrum2D = np.copy(data[y0-w:y0+w,:])
-        xprofile = np.mean(spectrum2D,axis=0)
-        # Sum uncertainties in quadrature
         err = np.copy(self.stat_errors_rotated)[:,0:right_edge]
-        err2D = np.copy(err[y0-w:y0+w,:])
-        xprofile_err = np.sqrt(np.mean(err2D**2,axis=0))
         # Lateral bands to remove sky background
         Ny, Nx =  data.shape
+        y0 = int(self.target_pixcoords_rotated[1])
         ymax = min(Ny,y0+ws[1])
         ymin = max(0,y0-ws[1])
         spectrum2DUp = np.copy(data[y0+ws[0]:ymax,:])
@@ -381,13 +384,19 @@ class Image():
         err_spectrum2DDown = filter_stars_from_bgd(err_spectrum2DDown,margin_cut=1)
         xprofileDown = np.nanmedian(spectrum2DDown,axis=0)
         xprofileDown_err = np.sqrt(np.nanmean(err_spectrum2DDown**2,axis=0))
+        # Sum rotated image profile along y axis
         # Subtract mean lateral profile
         xprofile_background = 0.5*(xprofileUp+xprofileDown)
         xprofile_background_err = np.sqrt(0.5*(xprofileUp_err**2+xprofileDown_err**2))
+        spectrum2D = np.copy(data[y0-w:y0+w,:])
+        xprofile = np.sum(spectrum2D,axis=0) - 2*w*xprofile_background
+        # Sum uncertainties in quadrature
+        err2D = np.copy(err[y0-w:y0+w,:])
+        xprofile_err = np.sqrt( np.sum(err2D**2,axis=0) + (2*w*xprofile_background_err)**2 )
         # Create Spectrum object
         spectrum = Spectrum(Image=self)
-        spectrum.data = xprofile - xprofile_background
-        spectrum.err = np.sqrt(xprofile_err**2 +  xprofile_background_err**2)
+        spectrum.data = xprofile
+        spectrum.err = xprofile_err
         if parameters.DEBUG:
             spectrum.plot_spectrum()    
         return spectrum
@@ -420,4 +429,317 @@ class Image():
         plt.legend()
         plt.show()
         
+
+    def extract_spectrum_from_image_sylvie(self,w=3,ws=[8,30],right_edge=1800,meanflag=False,filterstarflag=False):
+        """
+            extract_spectrum_from_image(self,w=3,ws=[8,30],right_edge=1800,meanflag=False,filterstarflag=False):
+            
+                Extract the 1D spectrum from the image.
+                Remove background estimated from the lateral Bands
+
+                    w: half width of central region where the spectrum is supposed to be
+                    ws=[8,30]  : up/down region where the sky background is estimated 
+
+                    right_edge : position above which no pixel should be used
+                    meanflag   : flag to compute signal from the mean
+                    filterflag : flag to clean region from stars 
+                
+                Original values : 
+                    w=3,ws=[8,30],right_edge=1800,meanflag=True,filterstarflag=True
+                    
+                New Values ( Sylvie April 12th)
+                    w=10,ws=[20,30],right_edge=1800,meanflag=False,filterstarflag=False
+                
+                
+        """
+        self.my_logger.info('\n\tExtracting spectrum from image: spectrum with width 2*%d pixels and background from %d to %d pixels' % (w,ws[0],ws[1]))
+        # Make a data copy of the image portion
+        data = np.copy(self.data_rotated)[:,0:right_edge]
+        # Sum rotated image profile along y axis
+        y0 = int(self.target_pixcoords_rotated[1])
+        x0 = int(self.target_pixcoords_rotated[0])
+        # 1 first consider a big area around the spectrum
+        WBIG=50
+        spectrum2Dbig = np.copy(data[y0-WBIG:y0+WBIG,:])
+        if parameters.DEBUG:
+           plt.figure(figsize=(20,5))
+           img=plt.imshow(spectrum2Dbig,origin='lower',cmap='jet',vmin=0,vmax=500)
+           cbar=plt.colorbar(img,orientation='horizontal')
+           plt.plot([0,right_edge],[WBIG,WBIG],'y-',lw=2)
+           plt.title("extract_spectrum_from_image : spectrum2DBig : with central star")
+           plt.grid()
+           plt.show()
+           
+        # 2 erase the central star   
+        spectrum2Dbig2 = np.copy(spectrum2Dbig)
+        spectrum2Dbig2[:,x0-2*WBIG:x0+2*WBIG]=0
+        SPECMAX=spectrum2Dbig2[:,:right_edge].max()
+        if parameters.DEBUG:
+           plt.figure(figsize=(20,5))
+           img=plt.imshow(spectrum2Dbig2,origin='lower',cmap='jet',vmin=0,vmax=SPECMAX)
+           cbar=plt.colorbar(img,orientation='horizontal')
+           plt.plot([0,right_edge],[WBIG,WBIG],'y-',lw=2)
+           plt.title("extract_spectrum_from_image : spectrum2DBig2 : with central star ERASED")
+           plt.grid()
+           plt.show()   
+        # 3 find the new central y0
+        yprofileBig=np.sum(spectrum2Dbig2[:,x0+2*WBIG:right_edge],axis=1)
+        delta_y0=np.where(yprofileBig==yprofileBig.max())[0][0]-WBIG
+        print ' Delta y0 =',delta_y0
+        
+        if parameters.DEBUG or parameters.VERBOSE:
+             plt.figure(figsize=(8,4))
+             plt.plot(yprofileBig,'b-')
+             plt.plot([delta_y0+WBIG,delta_y0+WBIG],[0,yprofileBig.max()],'r-',lw=2)
+             plt.plot([delta_y0+WBIG-w,delta_y0+WBIG-w],[0,yprofileBig.max()/2],'r:',lw=2)
+             plt.plot([delta_y0+WBIG+w,delta_y0+WBIG+w],[0,yprofileBig.max()/2],'r:',lw=2)
+             
+             plt.plot([delta_y0+WBIG-ws[0],delta_y0+WBIG-ws[0]],[0,yprofileBig.max()/5],'g:',lw=2)
+             plt.plot([delta_y0+WBIG+ws[0],delta_y0+WBIG+ws[0]],[0,yprofileBig.max()/5],'g:',lw=2)
+             plt.plot([delta_y0+WBIG-ws[1],delta_y0+WBIG-ws[1]],[0,yprofileBig.max()/5],'g:',lw=2)
+             plt.plot([delta_y0+WBIG+ws[1],delta_y0+WBIG+ws[1]],[0,yprofileBig.max()/5],'g:',lw=2)
+             
+             ws=[8,30]
+             
+             plt.title('yprofile: check the center')
+             plt.grid()
+             plt.xlabel('y (pix)')
+             plt.show()
+             
+             self.my_logger.info('\n\t extract_spectrum_from_image::Correct vertical center delta_y0=%s' % (delta_y0))
+        
+        # readjust the center of vertical profile
+        y0=y0+delta_y0
+        
+        # 3 Extract the image corresponding to the spectrum
+        spectrum2D = np.copy(data[y0-w:y0+w,:])
+        spectrum2Dsmall = np.copy(spectrum2D)
+        spectrum2Dsmall[:,x0-2*WBIG:x0+2*WBIG]=0
+        yprofilesmall=np.sum(spectrum2Dsmall[:,x0+2*WBIG:right_edge],axis=1)
+
+        
+        if parameters.DEBUG:
+            plt.figure(figsize=(8,4))
+            plt.plot(yprofilesmall,'b-')
+            plt.plot([w,w],[0,yprofilesmall.max()],'r-',lw=2)
+ 
+            plt.title('yprofile: selected spectra')
+            plt.grid()
+            plt.xlabel('y (pix)')
+            plt.show() 
+            
+           
+            plt.figure(figsize=(20,5))
+            img=plt.imshow(spectrum2D,origin='lower',cmap='jet',vmin=0,vmax=SPECMAX)
+            cbar=plt.colorbar(img,orientation='horizontal')
+            plt.plot([0,right_edge],[w,w],'y-',lw=2)
+            plt.title("extract_spectrum_from_image : spectrum2D")
+            plt.grid()
+            plt.show()
+
+
+            
+        
+        # Simulatio can only provide the sum (SDC)
+        if meanflag:  # Jeremy's method
+            xprofile = np.mean(spectrum2D,axis=0)
+        else:             # Sylvie's method unsing the sum in a band y of width 2*w
+            xprofile = np.sum(spectrum2D,axis=0)
+            
+            
+        # Sum uncertainties in quadrature
+        err = np.copy(self.stat_errors_rotated)[:,0:right_edge]
+        err2D = np.copy(err[y0-w:y0+w,:])
+        if meanflag:
+            xprofile_err = np.sqrt(np.mean(err2D**2,axis=0))
+        else:
+            xprofile_err = np.sqrt(np.sum(err2D**2,axis=0))
+        
+        # Lateral bands to remove sky background
+        Ny, Nx =  data.shape
+        ymax = min(Ny,y0+ws[1])
+        ymin = max(0,y0-ws[1])
+        
+        # Upper band with width ws[1]-ws[0]
+        spectrum2DUp = np.copy(data[y0+ws[0]:ymax,:])
+        if filterstarflag:
+            spectrum2DUp = filter_stars_from_bgd(spectrum2DUp,margin_cut=1)
+        
+        err_spectrum2DUp = np.copy(err[y0+ws[0]:ymax,:])
+        if filterstarflag:
+            err_spectrum2DUp = filter_stars_from_bgd(err_spectrum2DUp,margin_cut=1)
+        
+        if meanflag:
+            xprofileUp = np.nanmedian(spectrum2DUp,axis=0)
+            xprofileUp_err = np.sqrt(np.nanmean(err_spectrum2DUp**2,axis=0))
+        else:
+            xprofileUp = np.sum(spectrum2DUp,axis=0)
+            xprofileUp_err = np.sqrt(np.sum(err_spectrum2DUp**2,axis=0))
+            
+         # lower band with width ws[1]-ws[0]
+        spectrum2DDown = np.copy(data[ymin:y0-ws[0],:])
+        if filterstarflag:
+            spectrum2DDown = filter_stars_from_bgd(spectrum2DDown,margin_cut=1)
+        
+        err_spectrum2DDown = np.copy(err[ymin:y0-ws[0],:])
+        if filterstarflag:
+            err_spectrum2DDown = filter_stars_from_bgd(err_spectrum2DDown,margin_cut=1)
+        
+        
+        if meanflag:
+            xprofileDown = np.nanmedian(spectrum2DDown,axis=0)
+            xprofileDown_err = np.sqrt(np.nanmean(err_spectrum2DDown**2,axis=0))
+        else:
+            xprofileDown = np.sum(spectrum2DDown,axis=0)
+            xprofileDown_err = np.sqrt(np.sum(err_spectrum2DDown**2,axis=0))
+        
+        if parameters.DEBUG:
+            plt.figure(figsize=(20,5))
+            plt.subplot(311)
+            plt.imshow( spectrum2DUp ,origin='lower',cmap='jet',vmin=0,vmax=SPECMAX/5.)
+            plt.grid()
+            plt.subplot(312) 
+            img=plt.imshow( spectrum2D ,origin='lower',cmap='jet',vmin=0,vmax=SPECMAX/5.)
+            plt.subplot(313) 
+            plt.grid()
+            plt.imshow( spectrum2DDown ,origin='lower',cmap='jet',vmin=0,vmax=SPECMAX/5.)
+            plt.grid()
+            #plt.subplot(111)
+            #cbar=plt.colorbar(img)
+            plt.suptitle("extract_spectrum_from_image() : spectrum2D Backgrounds")
+            #plt.grid()
+            plt.show()
+        
+        
+        
+      
+        
+        # Subtract mean lateral profile by renormalisationof the surface
+        xprofile_background = 0.5*(xprofileUp+xprofileDown)*2*w/(ws[1]-ws[0])
+        
+        xprofile_background_err = np.sqrt(0.5*(xprofileUp_err**2+xprofileDown_err**2))
+        
+        
+        if parameters.DEBUG:
+            
+            plt.figure(figsize=(8,4))
+            plt.plot(xprofile,'b-')
+            plt.plot(xprofile_background,'r-')
+            plt.ylim(0.,xprofile.max())
+            plt.grid()
+            plt.show()
+            
+            plt.figure(figsize=(8,4))
+            plt.plot(xprofile,'b-')
+            plt.plot(xprofile_background,'r-')
+            plt.ylim(0.,xprofile.max()/20.)
+            plt.grid()
+            plt.show()
+        
+        
+        # Suppressed code to select spectrum in 90% CL band
+        if 0:
+            # first check about background subtraction
+            spectrum2D_nobkg=np.copy(spectrum2D)-xprofile_background
+            they=np.arange(spectrum2D_nobkg.shape[0])
+            thex=np.arange(spectrum2D_nobkg.shape[1])
+        
+            all_aver=np.zeros(spectrum2D_nobkg.shape[1])
+            all_sig=np.zeros(spectrum2D_nobkg.shape[1])
+      
+            # compute average and sigma
+            for x in thex:
+                if np.sum(spectrum2D_nobkg[:,x]>5) and x<right_edge:
+                    all_aver[x],all_sig[x]=weighted_avg_and_std(they, spectrum2D_nobkg[:,x])
+        
+            indexes_wthsig=np.where(all_sig>3)[0]
+            indexes_nosig=np.where(all_sig<=3)[0]
+        
+        
+            av_sig=np.median(all_sig[indexes_wthsig])
+            
+            if parameters.VERBOSE:
+                self.my_logger.info('\n\t extract_spectrum_from_image:: average sigma=%4.5f' % (av_sig))
+        
+        
+            all_aver[indexes_nosig]=10
+            all_sig[indexes_nosig]=av_sig
+        
+            if parameters.DEBUG:
+            
+                plt.figure(figsize=(20,5))
+                img=plt.imshow( spectrum2D_nobkg ,origin='lower',cmap='jet',vmin=0,vmax=SPECMAX)
+                cbar=plt.colorbar(img,orientation='horizontal')            
+                plt.grid()
+                plt.show()
+            
+                plt.figure(figsize=(16,8))
+                for x in thex:
+                    if (x> x0+2*WBIG) and (all_aver[x]>0) and (x<right_edge) :
+                        if x%10==0: # sample 10%
+                            plt.plot(spectrum2D_nobkg[:,x])
+                plt.xlabel('ypix')
+                plt.title('transverse profiles')
+                plt.grid()
+                plt.show()
+            
+                up=all_aver+1.645*all_sig
+                do=all_aver-1.645*all_sig
+            
+           
+     
+                plt.figure(figsize=(16,4))
+                #plt.errorbar(thex,all_aver,yerr=1.645*all_sig,color='red',fmt='o',lw=2)
+                plt.plot(thex,all_aver,'k-',lw=2)           
+                plt.fill_between(thex,up, do, alpha=.25)          
+                plt.ylim(0,spectrum2D_nobkg.shape[0])
+                plt.title("Confidence belt 90% CL")
+                plt.xlabel('xpix')
+                plt.ylabel('ypix')
+                plt.grid()
+                plt.show()
+        
+        
+            # accumulate the signal in 90% CL
+            # init
+            xprofile_sum=np.zeros(spectrum2D.shape[1])
+            xprofile_width_inCL=np.zeros(spectrum2D.shape[1])
+            xprofile_sum_bg=np.zeros(spectrum2D.shape[1])
+            for x in thex:                
+                if  x<right_edge:
+                    y_max= all_aver[x]+1.645*all_sig[x]
+                    y_min= all_aver[x]-1.645*all_sig[x]
+                    xprofile_width_inCL[x]=ymax-ymin
+                    index_sel=np.where(np.logical_and(they>=y_min,they<=y_max))[0]
+                    xprofile_sum[x]=np.sum(spectrum2D[index_sel,x])
+                    xprofile_sum_bg[x] = 0.5*(xprofileUp[x]+xprofileDown[x])*xprofile_width_inCL[x]/(ws[1]-ws[0])
+ 
+        
+            SPECMAX=xprofile_sum[x0+2*WBIG:right_edge].max()
+    
+            if parameters.DEBUG:
+                plt.figure(figsize=(8,4))
+                plt.plot(xprofile_sum,'b-')
+                plt.plot(xprofile_sum_bg,'r-')
+                plt.ylim(0.,SPECMAX)
+                plt.grid()
+                plt.title("Spectrum 90%CL")
+                plt.show()
+            
+                plt.figure(figsize=(8,4))
+                plt.plot(xprofile_sum,'b-')
+                plt.plot(xprofile_sum_bg,'r-')
+                plt.ylim(0.,SPECMAX/20.)
+                plt.grid()
+                plt.title("Spectrum 90%CL")
+                plt.show()
+
+       
+        # Create Spectrum object
+        spectrum = Spectrum(Image=self)
+        spectrum.data = xprofile - xprofile_background
+        spectrum.err = np.sqrt(xprofile_err**2 +  xprofile_background_err**2)
+        if parameters.DEBUG:
+            spectrum.plot_spectrum()    
+        return spectrum
 
