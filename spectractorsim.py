@@ -145,7 +145,6 @@ class Atmosphere():
         """
         Args:
             filename (:obj:`str`): path to the image
-            Image (:obj:`Image`): copy info from Image object
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.airmass = airmass
@@ -340,9 +339,9 @@ class Atmosphere():
  
   
 #----------------------------------------------------------------------------------
-class TelesTransm():
+class TelescopeTransmission():
     """
-    TelesTransm : Transmission of the telescope
+    TelescopeTransmission : Transmission of the telescope
     - mirrors
     - throughput
     - QE
@@ -432,18 +431,16 @@ class SpectrumSim():
     relative to spectrum simulation.
     """
     #---------------------------------------------------------------------------
-    def __init__(self,filename="",Image=None,atmospheric_lines=True,order=1):
+    def __init__(self,filename=""):
         """
         Args:
             filename (:obj:`str`): path to the image
-            Image (:obj:`Image`): copy info from Image object
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.target = None
         self.data = None
         self.err = None
         self.lambdas = None
-        self.order = order
 
         
         self.header = None
@@ -460,7 +457,6 @@ class SpectrumSim():
 
         self.filename=""
 
-        self.atmospheric_lines = atmospheric_lines
         #self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,emission_spectrum=self.target.emission_spectrum)
     
         if filename != "" :
@@ -531,7 +527,7 @@ class SpectrumSim():
 
 
 #----------------------------------------------------------------------------------
-def SpectractorSim(filename,outputdir,atmospheric_lines=True):
+def SpectractorSim(filename,outputdir):
     
     """ SpectractorSim
     Main function to simulate several spectra 
@@ -585,7 +581,7 @@ def SpectractorSim(filename,outputdir,atmospheric_lines=True):
     
     # TELESCOPE TRANSMISSION
     # ------------------------
-    telescope=TelesTransm(spectrum.filter)    
+    telescope=TelescopeTransmission(spectrum.filter)    
     if parameters.VERBOSE:
         infostring='\n\t ========= Telescope transmission :  ==============='
         my_logger.info(infostring)
@@ -593,7 +589,7 @@ def SpectractorSim(filename,outputdir,atmospheric_lines=True):
         
     # DISPERSER TRANSMISSION
     # ------------------------
-    disperser = Grating(300,label=spectrum.disperser)
+    disperser = Hologram(label=spectrum.disperser)
     if parameters.VERBOSE:
         infostring='\n\t ========= Disperser transmission :  ==============='
         my_logger.info(infostring)
@@ -652,4 +648,4 @@ if __name__ == "__main__":
 
     filename="notebooks/fits/reduc_20170528_060_spectrum.fits"
     
-    SpectractorSim(filename,opts.output_directory,atmospheric_lines=True)
+    SpectractorSim(filename,opts.output_directory)
