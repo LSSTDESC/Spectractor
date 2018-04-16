@@ -397,7 +397,7 @@ class Spectrum():
         #    for k in range(len(self.target.spectra)):
         #        s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
         #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
-        if self.lambdas is not None:
+        if self.lambdas is not None and self.lines is not None:
             self.lines.plot_atomic_lines(plt.gca(),fontsize=12)
         if not nofit and self.lambdas is not None:
             lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=plt.gca(),verbose=parameters.VERBOSE)

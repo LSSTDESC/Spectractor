@@ -217,6 +217,8 @@ class Image():
         avY = gauss2D.y_mean.value
         theX=x0-Dx+avX
         theY=y0-Dy+avY
+        self.target_gauss2D = gauss2D
+        self.target_bkgd2D = bkgd_2D
         if sub_image_subtracted[int(avY),int(avX)] < 0.8*np.max(sub_image_subtracted) :
             self.my_logger.warning('\n\tX,Y position determination of the target probably wrong') 
          # debugging plots
@@ -388,6 +390,14 @@ class Image():
         self.plot_image_simple(ax,data=data,scale=scale,title=title,units=units,plot_stats=plot_stats,target_pixcoords=target_pixcoords)
         plt.legend()
         plt.show()
+
+    def save_image(self,output_filename,overwrite=False):
+        hdu = fits.PrimaryHDU()
+        hdu.data = self.data
+        hdu.header = self.header
+        hdu.writeto(output_filename,overwrite=overwrite)
+        self.my_logger.info('\n\tImage saved in %s' % output_filename)
+
         
 
     def extract_spectrum_from_image_sylvie(self,w=3,ws=[8,30],right_edge=1800,meanflag=False,filterstarflag=False):
