@@ -377,27 +377,26 @@ class Spectrum():
                 self.my_logger.info('\n\tLoad filter %s: lambda between %.1f and %.1f' % (f['label'],parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
                 break
 
-    def plot_spectrum(self,xlim=None,nofit=False):
+    def plot_spectrum_simple(self,ax,xlim=None):
         xs = self.lambdas
         if xs is None : xs = np.arange(self.data.shape[0])
-        fig = plt.figure(figsize=[12,6])
         if self.err is not None:
-            plt.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % self.order,zorder=0)
+            ax.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % self.order,zorder=0)
         else:
-            plt.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % self.order)
+            ax.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % self.order)
+        ax.grid(True)
+        ax.set_xlim([parameters.LAMBDA_MIN,parameters.LAMBDA_MAX])
+        ax.set_ylim(0.,np.max(self.data)*1.2)
+        ax.set_xlabel('$\lambda$ [nm]')
+        ax.set_ylabel(self.units)
+
+    def plot_spectrum(self,xlim=None,nofit=False):
+        fig = plt.figure(figsize=[12,6])
+        self.plot_spectrum_simple(plt.gca(),xlim=xlim)
         #if len(self.target.spectra)>0:
         #    for k in range(len(self.target.spectra)):
         #        s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
         #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
-        plt.grid(True)
-        plt.xlim([parameters.LAMBDA_MIN,parameters.LAMBDA_MAX])
-        plt.ylim(0.,np.max(self.data)*1.2)
-        plt.xlabel('$\lambda$ [nm]')
-        plt.ylabel(self.units)
-        if self.lambdas is None: plt.xlabel('Pixels')
-        if xlim is not None :
-            plt.xlim(xlim)
-            plt.ylim(0.,np.max(self.data[xlim[0]:xlim[1]])*1.2)
         if self.lambdas is not None:
             self.lines.plot_atomic_lines(plt.gca(),fontsize=12)
         if not nofit and self.lambdas is not None:
