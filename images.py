@@ -160,23 +160,15 @@ class Image():
             profile_Y_max=np.max(profile_Y_raw)*1.2
 
             f, (ax1, ax2,ax3) = plt.subplots(1,3, figsize=(15,4))
-            im = ax1.imshow(np.log10(sub_image),origin='lower',cmap='jet')
-            cb = f.colorbar(im,ax=ax1)
-            cb.formatter.set_powerlimits((0, 0))
-            cb.locator = MaxNLocator(7,prune=None)
-            cb.update_ticks()
-            cb.set_label('%s (log10 scale)' % (self.units)) #,fontsize=16)
-            ax1.scatter([avX],[avY],marker='o',s=100,facecolors='none',edgecolors='k')
-            ax1.grid(True)
-            ax1.set_xlabel('X (pixels)')
-            ax1.set_ylabel('Y (pixels)')
+            self.plot_image_simple(ax1,data=sub_image,scale="log",title="",units=self.units,plot_stats=False,target_pixcoords=[avX,avY])
+            ax1.legend(loc=1)
 
             ax2.plot(X,profile_X_raw,'r-',lw=2)
             ax2.plot(X,bkgd_X(X),'g--',lw=2,label='bkgd')
             ax2.axvline(Dx,color='y',linestyle='-',label='old',lw=2)
             ax2.axvline(avX,color='b',linestyle='-',label='new',lw=2)
             ax2.grid(True)
-            ax2.set_xlabel('X (pixels)')
+            ax2.set_xlabel('X [pixels]')
             ax2.legend(loc=1)
 
             ax3.plot(Y,profile_Y_raw,'r-',lw=2)
@@ -184,7 +176,7 @@ class Image():
             ax3.axvline(Dy,color='y',linestyle='-',label='old',lw=2)
             ax3.axvline(avY,color='b',linestyle='-',label='new',lw=2)
             ax3.grid(True)
-            ax3.set_xlabel('Y (pixels)')
+            ax3.set_xlabel('Y [pixels]')
             ax3.legend(loc=1)
             f.tight_layout()
             plt.show()
@@ -230,40 +222,15 @@ class Image():
          # debugging plots
         if parameters.DEBUG:
             f, (ax1, ax2,ax3) = plt.subplots(1,3, figsize=(15,4))
-            im = ax1.imshow(sub_image,origin='lower',cmap='jet')
-            cb = f.colorbar(im,ax=ax1)
-            #cb.formatter.set_powerlimits((0, 0))
-            cb.locator = MaxNLocator(7,prune=None)
-            cb.update_ticks()
-            cb.set_label('Original image (%s)' % (self.units)) #,fontsize=16)
+            self.plot_image_simple(ax1,data=sub_image,scale="lin",title="",units=self.units,target_pixcoords=[avX,avY])
             ax1.scatter([Dx],[Dy],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
-            ax1.scatter([avX],[avY],marker='o',s=100,facecolors='none',edgecolors='k',label='new')
-            ax1.grid(True)
-            ax1.set_xlabel('X (pixels)')
-            ax1.set_ylabel('Y (pixels)')
             ax1.legend(loc=1)
-
-            im2 = ax2.imshow(bkgd_2D(X,Y)+gauss2D(X,Y),origin='lower',cmap='jet',vmin=np.min(sub_image),vmax=np.max(sub_image))
-            cb = f.colorbar(im2,ax=ax2)
-            #cb.formatter.set_powerlimits((0, 0))
-            cb.locator = MaxNLocator(7,prune=None)
-            cb.update_ticks()
-            cb.set_label('Background + Gauss (%s)' % (self.units)) #,fontsize=16)
-            ax2.set_xlabel('X (pixels)')
-            ax2.set_ylabel('Y (pixels)')
+            
+            self.plot_image_simple(ax2,data=bkgd_2D(X,Y)+gauss2D(X,Y),scale="lin",title="",units='Background + Gauss (%s)' % (self.units))
             ax2.legend(loc=1)
 
-            im3 = ax3.imshow(sub_image_subtracted-gauss2D(X,Y),origin='lower',cmap='jet')
-            cb = f.colorbar(im3,ax=ax3)
-            #cb.formatter.set_powerlimits((0, 0))
-            cb.locator = MaxNLocator(7,prune=None)
-            cb.update_ticks()
-            cb.set_label('Background+Gauss subtracted image (%s)' % (self.units)) #,fontsize=16)
+            self.plot_image_simple(ax3,data=sub_image_subtracted-gauss2D(X,Y),scale="lin",title="",units='Background+Gauss subtracted image (%s)' % (self.units),target_pixcoords=[avX,avY])
             ax3.scatter([Dx],[Dy],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
-            ax3.scatter([avX],[avY],marker='o',s=100,facecolors='none',edgecolors='k',label='new')
-            ax3.grid(True)
-            ax3.set_xlabel('X (pixels)')
-            ax3.set_ylabel('Y (pixels)')
             ax3.legend(loc=1)
 
             f.tight_layout()
@@ -335,22 +302,12 @@ class Image():
             self.stat_errors_rotated=ndimage.interpolation.rotate(self.stat_errors,self.rotation_angle,prefilter=parameters.ROT_PREFILTER,order=parameters.ROT_ORDER)
         if parameters.DEBUG:
             margin=200
-            f, (ax1,ax2) = plt.subplots(2,1,figsize=[8,8])
             y0 = int(self.target_pixcoords[1])
-            ax1.imshow(np.log10(self.data[y0-parameters.YWINDOW:y0+parameters.YWINDOW,margin:-margin]),origin='lower',cmap='rainbow',aspect="auto")
+            f, (ax1,ax2) = plt.subplots(2,1,figsize=[8,8])
+            self.plot_image_simple(ax1,data=self.data[y0-parameters.YWINDOW:y0+parameters.YWINDOW,margin:-margin],scale="log",title='Raw image (log10 scale)',units=self.units,target_pixcoords=(self.target_pixcoords[0]-margin,parameters.YWINDOW))
             ax1.plot([0,self.data.shape[0]-2*margin],[parameters.YWINDOW,parameters.YWINDOW],'k-')
-            if self.target_pixcoords is not None:
-                ax1.scatter(self.target_pixcoords[0]-margin,parameters.YWINDOW,marker='o',s=100,edgecolors='k',facecolors='none')
-            ax1.grid(color='white', ls='solid')
-            ax1.grid(True)
-            ax1.set_title('Raw image (log10 scale)')
-            ax2.imshow(np.log10(self.data_rotated[y0-parameters.YWINDOW:y0+parameters.YWINDOW,margin:-margin]),origin='lower',cmap='rainbow',aspect="auto")
+            self.plot_image_simple(ax2,data=self.data_rotated[y0-parameters.YWINDOW:y0+parameters.YWINDOW,margin:-margin],scale="log",title='Turned image (log10 scale)',units=self.units,target_pixcoords=self.target_pixcoords_rotated)
             ax2.plot([0,self.data_rotated.shape[0]-2*margin],[parameters.YWINDOW,parameters.YWINDOW],'k-')
-            if self.target_pixcoords_rotated is not None:
-                ax2.scatter(self.target_pixcoords_rotated[0],self.target_pixcoords_rotated[1],marker='o',s=100,edgecolors='k',facecolors='none')
-            ax2.grid(color='white', ls='solid')
-            ax2.grid(True)
-            ax2.set_title('Turned image (log10 scale)')
             plt.show()
 
     def extract_spectrum_from_image(self,w=10,ws=[20,30],right_edge=1800):
@@ -402,9 +359,8 @@ class Image():
         return spectrum
 
    
-    def plot_image(self,scale="lin",title="",units="Image units",plot_stats=False,target_pixcoords=None):
-        fig, ax = plt.subplots(1,1,figsize=[9.3,8])
-        data = np.copy(self.data)
+    def plot_image_simple(self,ax,data=None,scale="lin",title="",units="Image units",plot_stats=False,target_pixcoords=None):
+        if data is None: data = np.copy(self.data)
         if plot_stats: data = np.copy(self.stat_errors)
         if scale=="log" or scale=="log10":
             # removes the zeros and negative pixels first
@@ -416,16 +372,20 @@ class Image():
         im = ax.imshow(data,origin='lower',cmap='jet')
         ax.grid(color='white', ls='solid')
         ax.grid(True)
-        ax.set_xlabel('X (pixels)')
-        ax.set_ylabel('Y (pixels)')
-        if target_pixcoords is not None:
-            plt.scatter(target_pixcoords[0],target_pixcoords[1],marker='o',s=100,edgecolors='k',facecolors='none',label='Target')
-        cb = fig.colorbar(im,ax=ax)
+        ax.set_xlabel('X [pixels]')
+        ax.set_ylabel('Y [pixels]')
+        cb = plt.colorbar(im,ax=ax)
         cb.formatter.set_powerlimits((0, 0))
         cb.locator = MaxNLocator(7,prune=None)
         cb.update_ticks()
         cb.set_label('%s (%s scale)' % (units,scale)) #,fontsize=16)
         if title!="": ax.set_title(title)
+        if target_pixcoords is not None:
+            ax.scatter(target_pixcoords[0],target_pixcoords[1],marker='o',s=100,edgecolors='k',facecolors='none',label='Target',linewidth=2)
+        
+    def plot_image(self,data=None,scale="lin",title="",units="Image units",plot_stats=False,target_pixcoords=None):
+        fig, ax = plt.subplots(1,1,figsize=[9.3,8])
+        self.plot_image_simple(ax,data=data,scale=scale,title=title,units=units,plot_stats=plot_stats,target_pixcoords=target_pixcoords)
         plt.legend()
         plt.show()
         
