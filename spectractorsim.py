@@ -478,6 +478,7 @@ class SpectrumSimulation(Spectrum):
         self.lambdas = None
         self.data = None
         self.err = None
+        self.model = lambda x: np.zeros_like(x) 
     #----------------------------------------------------------------------------    
     def simulate_without_atmosphere(self,lambdas):
         self.lambdas = lambdas
@@ -492,6 +493,7 @@ class SpectrumSimulation(Spectrum):
         all_transm = self.simulate_without_atmosphere(lambdas)
         all_transm *= self.atmosphere.transmission(lambdas)
         self.data = all_transm*Factor
+        self.model = interp1d(lambdas,self.data,kind="linear",bounds_error=False,fill_value=(0,0))
         return all_transm
     #---------------------------------------------------------------------------            
                 
@@ -578,11 +580,9 @@ class SpectrumSimGrid():
                 self.my_logger.info('\n\tSPECTRA.save atm-file=%s' % (self.filename))
     #---------------------------------------------------------------------------            
    
-#----------------------------------------------------------------------------------        
-
 
 #----------------------------------------------------------------------------------
-def SpectractorInit(filename,outputdir):
+def SpectractorSimInit(filename):
     
     """ SpectractorInit
     Main function to simulate several spectra 
@@ -590,18 +590,19 @@ def SpectractorInit(filename,outputdir):
 
     Args:
         filename (:obj:`str`): filename of the image (data)
-        outputdir (:obj:`str`): path to the output directory
-        
     """
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTORSIM initialisation')
     # Load data spectrum
-    spectrum = Spectrum(filename)
-    
+    try:
+        spectrum = Spectrum(filename)
+    except:
+        spectrum = Image(filename)
+        
     # TELESCOPE TRANSMISSION
     # ------------------------
     telescope=TelescopeTransmission(spectrum.filter)    
-    if parameters.VERBOSE:
+    if parameters.DEBUG:
         infostring='\n\t ========= Telescope transmission :  ==============='
         my_logger.info(infostring)
         telescope.plot_transmission()
@@ -609,7 +610,7 @@ def SpectractorInit(filename,outputdir):
     # DISPERSER TRANSMISSION
     # ------------------------
     disperser = Hologram(label=spectrum.disperser)
-    if parameters.VERBOSE:
+    if parameters.DEBUG:
         infostring='\n\t ========= Disperser transmission :  ==============='
         my_logger.info(infostring)
         disperser.plot_transmission()
@@ -617,14 +618,58 @@ def SpectractorInit(filename,outputdir):
     # STAR SPECTRUM
     # ------------------------
     target = spectrum.target
-    if parameters.VERBOSE:
+    if parameters.DEBUG:
         infostring='\n\t ========= SED : %s  ===============' % target.label
         my_logger.info(infostring)
         target.plot_spectra()
 
     return spectrum, telescope, disperser, target 
     
-       
+
+#----------------------------------------------------------------------------------
+def SpectractorSimCore(spectrum, telescope, disperser, target, lambdas,airmass=1.0,pressure=800,temperature=10,pwv=5,ozone=300,aerosols=0.05):
+    
+    """ SpectractorCore
+    Main function to simulate several spectra 
+    A grid of spectra will be produced for a given target, airmass and pressure
+
+    Args:
+        spectrum (:obj:`Spectrum`): data spectrum object
+        telescope (:obj:`TelescopeTransmission`): telescope transmission
+        disperer (:obj:`Hologram`): disperser object
+        target (:obj:`Target`): target object
+        lambdas (:obj:`float`): wavelength array (in nm)
+        airmass (:obj:`float`): airmass of the target
+        pressure (:obj:`float`): pressure in hPa
+        temperature (:obj:`float`): temperature in celsius
+        pwv (:obj:`float`): pressure water vapor
+        ozone (:obj:`float`): ozone quantity
+        aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth        
+    """
+    my_logger = parameters.set_logger(__name__)
+    my_logger.info('\n\tStart SPECTRACTOR core program')
+    # SIMULATE ATMOSPHERE
+    # -------------------
+    atmosphere = Atmosphere(airmass,pressure,temperature)
+    atmosphere.simulate(pwv,ozone,aerosols)    
+    if parameters.DEBUG:
+        infostring='\n\t ========= Atmospheric simulation :  ==============='
+        my_logger.info(infostring)
+        atmosphere.plot_transmission()   # plot all atm transp profiles
+    
+    # SPECTRUM SIMULATION  
+    #--------------------
+    spectrum_simulation = SpectrumSimulation(spectrum,atmosphere,telescope,disperser)
+    spectrum_simulation.simulate(lambdas)    
+    if parameters.DEBUG:
+        infostring='\n\t ========= Spectra simulation :  ==============='
+        spectrum_simulation.plot_spectrum(nofit=True)
+
+    return spectrum_simulation
+    #--------------------------------------------------------------------------- 
+
+
+
 #----------------------------------------------------------------------------------
 def SpectractorSimGrid(filename,outputdir):
     
@@ -640,7 +685,7 @@ def SpectractorSimGrid(filename,outputdir):
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTORSIMGRID')
     # Initialisation
-    spectrum, telescope, disperser, target = SpectractorInit(filename,outputdir)
+    spectrum, telescope, disperser, target = SpectractorSimInit(filename)
     # Set output path
     ensure_dir(outputdir)
     # extract the basename : simimar as os.path.basename(file)
@@ -685,7 +730,7 @@ def SpectractorSimGrid(filename,outputdir):
     
        
 #----------------------------------------------------------------------------------
-def SpectractorSim(filename,outputdir,lambdas,pwv=5,ozone=300,aerosols=0.05):
+def SpectractorSim(filename,lambdas,pwv=5,ozone=300,aerosols=0.05):
     
     """ SpectractorSim
     Main function to simulate several spectra 
@@ -701,28 +746,16 @@ def SpectractorSim(filename,outputdir,lambdas,pwv=5,ozone=300,aerosols=0.05):
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTORSIM')
     # Initialisation
-    spectrum, telescope, disperser, target = SpectractorInit(filename,outputdir)
+    spectrum, telescope, disperser, target = SpectractorSimInit(filename)
 
-    # SIMULATE ATMOSPHERE
+    # SIMULATE SPECTRUM
     # -------------------
     airmass = spectrum.header['AIRMASS']
     pressure = spectrum.header['OUTPRESS']
     temperature = spectrum.header['OUTTEMP']
-    atmosphere = Atmosphere(airmass,pressure,temperature)
-    atmosphere.simulate(pwv,ozone,aerosols)    
-    if parameters.VERBOSE:
-        infostring='\n\t ========= Atmospheric simulation :  ==============='
-        my_logger.info(infostring)
-        atmosphere.plot_transmission()   # plot all atm transp profiles
-    
-    # SPECTRUM SIMULATION  
-    #--------------------
-    spectrum_simulation = SpectrumSimulation(spectrum,atmosphere,telescope,disperser)
-    spectrum_simulation.simulate(lambdas)    
-    if parameters.VERBOSE:
-        infostring='\n\t ========= Spectra simulation :  ==============='
-        spectrum_simulation.plot_spectrum(nofit=True)
 
+    spectrum_simulation = SpectractorSimCore(spectrum, telescope, disperser, target, lambdas, airmass, pressure, temperature, pwv, ozone, aerosols)
+    
     return spectrum_simulation
     #--------------------------------------------------------------------------- 
     
@@ -755,5 +788,5 @@ if __name__ == "__main__":
 
     filename="notebooks/fits/reduc_20170528_060_spectrum.fits"
     
-    spectrum_simulation = SpectractorSim(filename,opts.output_directory,lambdas=WL,pwv=5,ozone=300,aerosols=0.05)
+    spectrum_simulation = SpectractorSim(filename,lambdas=WL,pwv=5,ozone=300,aerosols=0.05)
     #SpectractorSimGrid(filename,opts.output_directory)
