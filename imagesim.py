@@ -190,7 +190,21 @@ class ImageModel(Image):
         
 
 
-def ImageSim(filename,outputdir,guess,target,A1=1,A2=0,with_rotation=True,with_stars=True):
+def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A1=1, A2=0, with_rotation=True, with_stars=True):
+    """ The basic use of the pipeline consists first to define: 
+    - the path to the fits image from which to extract the image, 
+    - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
+    - the rough position of the object in the image,
+    - the name of the target (to search for the extra-atmospheric spectrum if available).
+    Then different parameters and systematics can be set:
+    - pwv: the pressure water vapor (in mm)
+    - ozone: the ozone quantity (in XX)
+    - aerosols: the vertical aerosol optical depth
+    - A1: a global grey absorption parameter for the spectrum
+    - A2: the relative amplitude of second order compared with first order
+    - with_rotation: rotate the spectrum according to the disperser characteristics (True by default)
+    - with_stars: include stars in the image field (True by default)
+    """
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart IMAGE SIMULATOR')
     # Load reduced image
