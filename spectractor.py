@@ -56,6 +56,7 @@ def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
 
     # Save the spectra
     spectrum.save_spectrum(output_filename,overwrite=True)
+    return spectrum
 
     
 
