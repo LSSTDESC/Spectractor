@@ -81,6 +81,10 @@ class Image():
     def convert_to_ADU_rate_units(self):
         self.data /= self.expo
         self.units = 'ADU/s'
+
+    def convert_to_ADU_units(self):
+        self.data *= self.expo
+        self.units = 'ADU'            
         
     def compute_statistical_error(self):
         # removes the zeros and negative pixels first
