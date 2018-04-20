@@ -6,6 +6,7 @@ import numpy as np
 from astropy.modeling import models, fitting
 from astropy.stats import sigma_clip
 import warnings
+from scipy.signal import fftconvolve, gaussian
 
 from skimage.feature import hessian_matrix
 
@@ -62,7 +63,7 @@ def fit_bgd(x,y,guess=[1]*parameters.BGD_NPARAMS,bounds=(-np.inf,np.inf),sigma=N
 
 def fit_poly(x,y,degree,w=None):
     cov = -1
-    if(len(x)> order):
+    if(len(x)> degree):
         if(w is None):
             fit, cov = np.polyfit(x,y,degree,cov=True)
         else:
@@ -224,4 +225,16 @@ def extract_info_from_CTIO_header(obj,header):
     obj.filter = header['FILTER1']
     obj.disperser = header['FILTER2']
 
-    
+def fftconvolve_gaussian(array,reso):
+    if array.ndim == 2:
+        kernel = gaussian(array.shape[1],reso)
+        kernel /= np.sum(kernel)
+        for i in range(array.shape[0]):
+            array[i] = fftconvolve(array[i], kernel, mode='same')
+    elif array.ndim == 1:
+        kernel = gaussian(array.size,reso)
+        kernel /= np.sum(kernel)
+        array = fftconvolve(array, kernel, mode='same')
+    else:
+        sys.exit('fftconvolve_gaussian: array dimension must be 1 or 2.')
+    return array
