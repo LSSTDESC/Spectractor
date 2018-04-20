@@ -119,7 +119,6 @@ class BackgroundModel():
             bkgd *= self.level/bkgd[IMSIZE/2,IMSIZE/2]
             return bkgd
             
-
     def plot_model(self):
         yy, xx = np.mgrid[0:IMSIZE:1, 0:IMSIZE:1]
         bkgd = self.model(xx,yy)
@@ -164,10 +163,7 @@ class SpectrumModel():
         l = self.disperser.grating_pixel_to_lambda(x-x0,x0=self.base_image.target_pixcoords,order=1)
         amp = self.A1*self.spectrumsim.model(l)*self.yprofile(y-y0) + self.A1*self.A2*self.spectrumsim.model(l/2)*self.yprofile(y-y0)
         if self.reso is not None:
-            kernel = gaussian(amp.shape[1],self.reso)
-            kernel /= np.sum(kernel)
-            for i in range(amp.shape[0]):
-                amp[i] = fftconvolve(amp[i], kernel, mode='same')
+            amp = fftconvolve_gaussian(amp,self.reso)
         return amp
 
 class ImageModel(Image):
@@ -178,16 +174,37 @@ class ImageModel(Image):
 
     def compute(self,star,background,spectrum,starfield=None):
         yy, xx = np.mgrid[0:IMSIZE:1, 0:IMSIZE:1]
+        self.true_lambdas = np.arange(parameters.LAMBDA_MIN,parameters.LAMBDA_MAX)
+        self.true_spectrum = spectrum.spectrumsim.model(self.true_lambdas)
         self.data = star.model(xx,yy) + background.model(xx,yy) + spectrum.model(xx,yy)
         if starfield is not None:
             self.data += starfield.model(xx,yy)
 
     def add_poisson_noise(self):
+        if self.units == 'ADU':
+            self.my_logger.error('\n\tPoisson noise procedure has to be applied on map in ADU/s units')
         d = np.copy(self.data).astype(float)
         d *= self.expo*self.gain
         noisy = np.random.poisson(d).astype(float)
         self.data = noisy /(self.expo*self.gain)
         
+    def save_image(self,output_filename,overwrite=False):
+        hdu0 = fits.PrimaryHDU()
+        hdu0.data = self.data
+        hdu0.header = self.header
+        hdu1 = fits.ImageHDU()
+        hdu1.data = [self.true_lambdas, self.true_spectrum]
+        hdulist = fits.HDUList([hdu0,hdu1])
+        hdulist.writeto(output_filename,overwrite=overwrite)
+        self.my_logger.info('\n\tImage saved in %s' % output_filename)
+
+    def load_image(self,filename):
+        super(ImageModel,self).load(filename)
+        hdu_list = fits.open(filename)
+        self.true_lambdas, self.true_spectrum = hdu_list[1].data
+
+
+   
 
 
 def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A1=1, A2=0, with_rotation=True, with_stars=True):
@@ -239,13 +256,14 @@ def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A
     airmass = image.header['AIRMASS']
     pressure = image.header['OUTPRESS']
     temperature = image.header['OUTTEMP']
-    telescope=TelescopeTransmission(image.filter)    
-    spectrumsim = SpectractorSimCore(image, telescope, image.disperser, image.target, lambdas, airmass, pressure, temperature, pwv=5, ozone=300,aerosols=0)
+    telescope = TelescopeTransmission(image.filter)    
+    spectrumsim = SpectractorSimCore(image, telescope, image.disperser, image.target, lambdas, airmass, pressure, temperature, pwv=pwv, ozone=ozone, aerosols=aerosols)
     spectrum = SpectrumModel(image,spectrumsim,sigma=reso,A1=A1,A2=A2,reso=reso,rotation=with_rotation)
     # Image model
     my_logger.info('\n\tImage model...')
     image.compute(star,background,spectrum,starfield=starfield)
     image.add_poisson_noise()
+    image.convert_to_ADU_units()
     if parameters.VERBOSE:
         image.plot_image(scale="log",title="Image simulation",target_pixcoords=target_pixcoords,units=spectrumsim.units)
     # Set output path
@@ -256,6 +274,9 @@ def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A
     # Save images and parameters
     image.header['A1'] = A1
     image.header['A2'] = A2
+    image.header['OZONE'] = ozone
+    image.header['PWV'] = pwv
+    image.header['VAOD'] = aerosols
     image.header['reso'] = reso
     image.header['ROTATION'] = int(with_rotation)
     image.header['STARS'] = int(with_stars)
