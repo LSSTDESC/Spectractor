@@ -452,8 +452,8 @@ class Spectrum():
         self.lambdas = lambdas_test
         lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=None,verbose=parameters.DEBUG)
         self.my_logger.info('\n\tWavelenght total shift: %.2fnm (after %d steps)\n\twith D = %.2f mm (DISTANCE2CCD = %.2f +/- %.2f mm, %.1f sigma shift)' % (shift,len(shifts),D,DISTANCE2CCD,DISTANCE2CCD_ERR,(D-DISTANCE2CCD)/DISTANCE2CCD_ERR))
-        if parameters.VERBOSE or parameters.DEBUG:
-            if os.getenv("DISPLAY") : self.plot_spectrum(xlim=None,nofit=False)
+        self.header['LSHIFT'] = shift
+        self.header['D2CCD'] = D
 
     def save_spectrum(self,output_filename,overwrite=False):
         hdu = fits.PrimaryHDU()
