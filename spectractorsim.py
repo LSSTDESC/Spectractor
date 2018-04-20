@@ -67,7 +67,7 @@ SED_unit=1*units.erg/units.s/(units.cm)**2/(units.nanometer)          # Units of
 hc=const.h*const.c                        # h.c product of fontamental constants c and h 
 wl_dwl_unit=(units.nanometer)**2          # lambda.dlambda  in wavelength in nm
 g_elec=3.0                                # electronic gain : elec/ADU
-g_disperser_ronchi=0.2                   # theoretical gain for order+1 : 20%
+g_disperser_ronchi=0.2                    # theoretical gain for order+1 : 20%
 #Factor=2.1350444e11
 Factor=(Tel_Surf*SED_unit*Time_unit*wl_dwl_unit/hc/g_elec*g_disperser_ronchi).decompose()
 
@@ -85,19 +85,19 @@ WL=np.arange(WLMIN,WLMAX,1) # Array of wavelength in Angstrom
 
 #aerosols
 #NB_AER_POINTS=20
-NB_AER_POINTS=3
+NB_AER_POINTS=10
 AER_MIN=0.
 AER_MAX=0.1
 
 #ozone
 #NB_OZ_POINTS=5
-NB_OZ_POINTS=2
+NB_OZ_POINTS=5
 OZ_MIN=200
 OZ_MAX=400
 
 # pwv
 #NB_PWV_POINTS=11
-NB_PWV_POINTS=4
+NB_PWV_POINTS=10
 PWV_MIN=0.
 PWV_MAX=10.
 
@@ -130,7 +130,7 @@ MINFILESIZE=20000
 
             
 #----------------------------------------------------------------------------------
-class Atmosphere():
+class Atmosphere(object):
     """
     Atmosphere(): 
         class to simulate an atmospheric transmission calling libradtran
@@ -164,7 +164,7 @@ class Atmosphere():
         data = np.loadtxt(os.path.join(path,thefile))
         wl = data[:,0]
         atm = data[:,1]
-        self.transmission = interp1d(wl,atm,kind='linear')   
+        self.transmission = interp1d(wl,atm,kind='linear',bounds_error=False,fill_value=(0,0))   
                     
         return self.transmission
     #---------------------------------------------------------------------------  
@@ -218,7 +218,7 @@ class AtmosphereGrid(Atmosphere):
                     self.atmgrid[count,index_atm_aer]=aer
                     self.atmgrid[count,index_atm_pwv]=pwv
                     self.atmgrid[count,index_atm_oz]=oz
-                    transmission = self.simulate(pwv,oz,aer)
+                    transmission = super(AtmosphereGrid, self).simulate(oz,pwv,aer)
                     transm=transmission(WL)   
                     self.atmgrid[count,index_atm_data:]=transm    # each of atmospheric transmission
                     
@@ -365,30 +365,22 @@ class AtmosphereGrid(Atmosphere):
             if parameters.VERBOSE or parameters.DEBUG:
                 self.my_logger.info('\n\tAtmosphere.load atm-file=%s' % (self.filename))
 
+            # interpolate the grid
             self.lambdas = self.atmgrid[0,index_atm_data:]
-            #self.parameter_grid = np.meshgrid(self.lambdas,PWV_Points,OZ_Points,AER_Points,indexing='ij')
-            #print self.parameter_grid
-            #print np.array(self.parameter_grid).T.shape, self.atmgrid[1:,index_atm_data:].shape
-            #print self.atmgrid[1:,:].reshape((2,2,2,750))
-            self.model = RegularGridInterpolator((self.lambdas,OZ_Points,PWV_Points,AER_Points),(self.atmgrid[1:,index_atm_data:].reshape(NB_AER_POINTS,NB_PWV_POINTS,NB_OZ_POINTS,len(self.lambdas))).T,bounds_error=False,fill_value=None)
+            self.model = RegularGridInterpolator((self.lambdas,OZ_Points,PWV_Points,AER_Points),(self.atmgrid[1:,index_atm_data:].reshape(NB_AER_POINTS,NB_PWV_POINTS,NB_OZ_POINTS,len(self.lambdas))).T,bounds_error=False,fill_value=0)
             
-
             return self.atmgrid,self.header
         #---------------------------------------------------------------------------
 
         
     def simulate(self,ozone,pwv,aerosols):
         """ first ozone, second pwv, last aerosols, to respect order of loops when generating the grid"""
-        #points = np.meshgrid(self.lambdas,pwv,ozone,aerosols)
-        #atm = griddata(self.parameter_grid,self.atmgrid,points, method='linear')
         ones = np.ones_like(self.lambdas)
         points = np.array([self.lambdas,ozone*ones,pwv*ones,aerosols*ones]).T
         atm = self.model(points)
-        if parameters.VERBOSE:
-            plt.figure()
-            plt.plot(self.lambdas,atm)
-            plt.show()
-        return atm
+        self.transmission = interp1d(self.lambdas,atm,kind='linear',bounds_error=False,fill_value=(0,0))
+        return self.transmission(self.lambdas)
+
         
 #----------------------------------------------------------------------------------
 class TelescopeTransmission():
@@ -484,7 +476,7 @@ class SpectrumSimulation(Spectrum):
     relative to spectrum simulation.
     """
     #---------------------------------------------------------------------------
-    def __init__(self,spectrum,atmosphere,telescope,disperser):
+    def __init__(self,spectrum,atmosphere,telescope,disperser,reso=None):
         """
         Args:
             filename (:obj:`str`): path to the image
@@ -499,10 +491,12 @@ class SpectrumSimulation(Spectrum):
         self.lambdas = None
         self.data = None
         self.err = None
+        self.reso = reso
         self.model = lambda x: np.zeros_like(x) 
     #----------------------------------------------------------------------------    
     def simulate_without_atmosphere(self,lambdas):
         self.lambdas = lambdas
+        self.err = np.zeros_like(lambdas)
         self.lambda_binwidths = np.gradient(lambdas)
         all_transm = self.disperser.transmission(lambdas)
         all_transm *= self.telescope.transmission(lambdas)
@@ -513,9 +507,18 @@ class SpectrumSimulation(Spectrum):
     def simulate(self,lambdas):
         all_transm = self.simulate_without_atmosphere(lambdas)
         all_transm *= self.atmosphere.transmission(lambdas)
+        print lambdas
+        print self.lambda_binwidths
+        print self.target.sed(500)
+        print self.telescope.transmission(550)
+        print Factor
+        print all_transm[200]
+
         self.data = all_transm*Factor
+        if self.reso is not None:
+            self.data = fftconvolve_gaussian(self.data.value,self.reso)
         self.model = interp1d(lambdas,self.data,kind="linear",bounds_error=False,fill_value=(0,0))
-        return all_transm
+        return self.data
     #---------------------------------------------------------------------------            
                 
 #----------------------------------------------------------------------------------
@@ -630,7 +633,10 @@ def SpectractorSimInit(filename):
         
     # DISPERSER TRANSMISSION
     # ------------------------
-    disperser = spectrum.disperser
+    if not isinstance(spectrum.disperser,str):
+        disperser = spectrum.disperser
+    else:
+        disperser = Hologram(spectrum.disperser)
     if parameters.DEBUG:
         infostring='\n\t ========= Disperser transmission :  ==============='
         my_logger.info(infostring)
@@ -639,6 +645,10 @@ def SpectractorSimInit(filename):
     # STAR SPECTRUM
     # ------------------------
     target = spectrum.target
+    if not isinstance(spectrum.target,str):
+        target = spectrum.target
+    else:
+        target = Target(spectrum.target)
     if parameters.DEBUG:
         infostring='\n\t ========= SED : %s  ===============' % target.label
         my_logger.info(infostring)
@@ -648,7 +658,7 @@ def SpectractorSimInit(filename):
     
 
 #----------------------------------------------------------------------------------
-def SpectractorSimCore(spectrum, telescope, disperser, target, lambdas,airmass=1.0,pressure=800,temperature=10,pwv=5,ozone=300,aerosols=0.05):
+def SpectractorSimCore(spectrum, telescope, disperser, target, lambdas,airmass=1.0,pressure=800,temperature=10,pwv=5,ozone=300,aerosols=0.05,reso=None):
     
     """ SpectractorCore
     Main function to simulate several spectra 
@@ -666,13 +676,14 @@ def SpectractorSimCore(spectrum, telescope, disperser, target, lambdas,airmass=1
         pwv (:obj:`float`): pressure water vapor
         ozone (:obj:`float`): ozone quantity
         aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth        
+        reso (:obj:`float`): width of gaussian in nm to convolve with spectrum
     """
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTOR core program')
     # SIMULATE ATMOSPHERE
     # -------------------
     atmosphere = Atmosphere(airmass,pressure,temperature)
-    atmosphere.simulate(ozone,pwv,aerosols)    
+    atmosphere.simulate(ozone,pwv,aerosols)
     if parameters.DEBUG:
         infostring='\n\t ========= Atmospheric simulation :  ==============='
         my_logger.info(infostring)
@@ -680,7 +691,7 @@ def SpectractorSimCore(spectrum, telescope, disperser, target, lambdas,airmass=1
     
     # SPECTRUM SIMULATION  
     #--------------------
-    spectrum_simulation = SpectrumSimulation(spectrum,atmosphere,telescope,disperser)
+    spectrum_simulation = SpectrumSimulation(spectrum,atmosphere,telescope,disperser,reso=reso)
     spectrum_simulation.simulate(lambdas)    
     if parameters.DEBUG:
         infostring='\n\t ========= Spectra simulation :  ==============='
@@ -747,11 +758,11 @@ def SpectractorSimGrid(filename,outputdir):
         infostring='\n\t ========= Spectra simulation :  ==============='
         spectra.plot_spectra()
         spectra.plot_spectra_img()
-    #--------------------------------------------------------------------------- 
+    #---------------------------------------------------------------------------
     
        
 #----------------------------------------------------------------------------------
-def SpectractorSim(filename,lambdas,pwv=5,ozone=300,aerosols=0.05):
+def SpectractorSim(filename,lambdas,outputdir="",pwv=5,ozone=300,aerosols=0.05,reso=None):
     
     """ SpectractorSim
     Main function to simulate several spectra 
@@ -763,6 +774,7 @@ def SpectractorSim(filename,lambdas,pwv=5,ozone=300,aerosols=0.05):
         pwv (:obj:`float`): pressure water vapor
         ozone (:obj:`float`): ozone quantity
         aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth        
+        reso (:obj:`float`): width of gaussian in nm to convolve with spectrum
     """
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTORSIM')
@@ -775,7 +787,18 @@ def SpectractorSim(filename,lambdas,pwv=5,ozone=300,aerosols=0.05):
     pressure = spectrum.header['OUTPRESS']
     temperature = spectrum.header['OUTTEMP']
 
-    spectrum_simulation = SpectractorSimCore(spectrum, telescope, disperser, target, lambdas, airmass, pressure, temperature, pwv, ozone, aerosols)
+    spectrum_simulation = SpectractorSimCore(spectrum, telescope, disperser, target, lambdas, airmass, pressure, temperature, pwv, ozone, aerosols, reso=reso)
+
+    # Save the spectrum
+    if outputdir != "":
+        base_filename = filename.split('/')[-1] 
+        output_filename=os.path.join(outputdir,base_filename.replace('spectrum','sim'))
+        spectrum_simulation.header['OZONE'] = ozone
+        spectrum_simulation.header['PWV'] = pwv
+        spectrum_simulation.header['VAOD'] = aerosols
+        spectrum_simulation.header['reso'] = reso
+        spectrum_simulation.save_spectrum(output_filename,overwrite=True)
+
     
     return spectrum_simulation
     #--------------------------------------------------------------------------- 
@@ -812,10 +835,13 @@ if __name__ == "__main__":
     #spectrum_simulation = SpectractorSim(filename,lambdas=WL,pwv=5,ozone=300,aerosols=0.05)
     #SpectractorSimGrid(filename,opts.output_directory)
 
-    atmgrid = AtmosphereGrid(filename,"test/reduc_20170528_060_atmsim.fits")
+    atmgrid = AtmosphereGrid(filename,"../Spectractor/output/data_28may17/reduc_20170528_060_atmsim.fits")
+    atm = Atmosphere(atmgrid.airmass,atmgrid.pressure,atmgrid.temperature)
 
     fig = plt.figure()
-    for i in range(10):
-        a = atmgrid.simulate(200,0,0.01*i)
-        plt.plot(atmgrid.lambdas,a/atmgrid.simulate(200,0,0.0))
+    for i in range(5):
+        print i
+        a = atmgrid.simulate(300,5,i*0.01+0.005)
+        plt.plot(atmgrid.lambdas,a/atm.simulate(300,5,i*0.01+0.005)(atmgrid.lambdas),label="%d" % i)
+    plt.legend()
     plt.show()
