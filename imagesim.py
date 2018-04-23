@@ -20,7 +20,7 @@ import parameters
 class StarModel():
 
     def __init__(self,pixcoords,A,sigma,target=None):
-        """ x0, y0 coords in pixels, sigma witdth in pixels, A height in image units"""
+        """ [x0, y0] coords in pixels, sigma width in pixels, A height in image units"""
         self.my_logger = set_logger(self.__class__.__name__)
         self.x0 = pixcoords[0]
         self.y0 = pixcoords[1]
@@ -153,6 +153,8 @@ class SpectrumModel():
         self.yprofile = models.Gaussian1D(1,0,sigma)
 
     def model(self,x,y):
+        self.true_lambdas = np.arange(parameters.LAMBDA_MIN,parameters.LAMBDA_MAX)
+        self.true_spectrum = np.copy(self.spectrumsim.model(self.true_lambdas))
         x0, y0 = self.base_image.target_pixcoords
         if self.rotation:
             theta = self.disperser.theta(self.base_image.target_pixcoords)*np.pi/180.
@@ -162,6 +164,7 @@ class SpectrumModel():
             y = v + y0
         l = self.disperser.grating_pixel_to_lambda(x-x0,x0=self.base_image.target_pixcoords,order=1)
         amp = self.A1*self.spectrumsim.model(l)*self.yprofile(y-y0) + self.A1*self.A2*self.spectrumsim.model(l/2)*self.yprofile(y-y0)
+        amp = amp*parameters.FLAM_TO_ADURATE*l*np.gradient(l,axis=1)
         if self.reso is not None:
             amp = fftconvolve_gaussian(amp,self.reso)
         return amp
@@ -174,9 +177,9 @@ class ImageModel(Image):
 
     def compute(self,star,background,spectrum,starfield=None):
         yy, xx = np.mgrid[0:IMSIZE:1, 0:IMSIZE:1]
-        self.true_lambdas = np.arange(parameters.LAMBDA_MIN,parameters.LAMBDA_MAX)
-        self.true_spectrum = spectrum.spectrumsim.model(self.true_lambdas)
         self.data = star.model(xx,yy) + background.model(xx,yy) + spectrum.model(xx,yy)
+        self.true_lambdas = spectrum.true_lambdas
+        self.true_spectrum = spectrum.true_spectrum
         if starfield is not None:
             self.data += starfield.model(xx,yy)
 
