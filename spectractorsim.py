@@ -28,7 +28,6 @@ import copy
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 import astropy.units as units
-from astropy import constants as const
 
 from scipy.interpolate import interp1d, griddata, RegularGridInterpolator
 
@@ -52,25 +51,6 @@ spectractorsim_path = os.path.dirname(__file__)
 
 import libsimulateTranspCTIOScattAbsAer as atmsim
 import libCTIOTransm as ctio
-#--------------------------------------------------------------------------
-# Telescope parameter
-#
-#   The goal is to calculate the numerical factor to get spectra into ADU
-#
-#  the SED is supposed to be in flam units ie erg/s/cm^-2 per angtrom
-#   however the binning is 10 A or 1 nm, the the SED has been multiplied by 10
-#--------------------------------------------------------------------------
-Tel_Diam=0.9*units.m                     # Diameter of the telescope
-Tel_Surf=np.pi*Tel_Diam**2/4.            # collection surface of telescope
-Time_unit=1*units.s                      # flux for 1 second
-SED_unit=1*units.erg/units.s/(units.cm)**2/(units.nanometer)          # Units of SEDs in flam (erg/s/cm2/nm)
-hc=const.h*const.c                        # h.c product of fontamental constants c and h 
-wl_dwl_unit=(units.nanometer)**2          # lambda.dlambda  in wavelength in nm
-g_elec=3.0                                # electronic gain : elec/ADU
-g_disperser_ronchi=0.2                    # theoretical gain for order+1 : 20%
-#Factor=2.1350444e11
-Factor=(Tel_Surf*SED_unit*Time_unit*wl_dwl_unit/hc/g_elec*g_disperser_ronchi).decompose()
-
 
 
 #------------------------------------------------------------------------
@@ -498,25 +478,18 @@ class SpectrumSimulation(Spectrum):
         self.lambdas = lambdas
         self.err = np.zeros_like(lambdas)
         self.lambda_binwidths = np.gradient(lambdas)
-        all_transm = self.disperser.transmission(lambdas)
-        all_transm *= self.telescope.transmission(lambdas)
-        all_transm *= self.target.sed(lambdas)
-        all_transm *= self.lambdas*self.lambda_binwidths         
-        return all_transm
+        self.data = self.disperser.transmission(lambdas)
+        self.data *= self.telescope.transmission(lambdas)
+        self.data *= self.target.sed(lambdas)
+        #self.data *= self.lambdas*self.lambda_binwidths         
+        return self.data
     #----------------------------------------------------------------------------    
     def simulate(self,lambdas):
         all_transm = self.simulate_without_atmosphere(lambdas)
         all_transm *= self.atmosphere.transmission(lambdas)
-        print lambdas
-        print self.lambda_binwidths
-        print self.target.sed(500)
-        print self.telescope.transmission(550)
-        print Factor
-        print all_transm[200]
-
-        self.data = all_transm*Factor
+        #self.data = all_transm*Factor
         if self.reso is not None:
-            self.data = fftconvolve_gaussian(self.data.value,self.reso)
+            self.data = fftconvolve_gaussian(self.data,self.reso)
         self.model = interp1d(lambdas,self.data,kind="linear",bounds_error=False,fill_value=(0,0))
         return self.data
     #---------------------------------------------------------------------------            
