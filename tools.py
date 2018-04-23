@@ -1,4 +1,4 @@
-import os, re
+import os, re, sys
 import scipy
 from scipy.optimize import curve_fit
 from scipy.misc import imresize
@@ -11,6 +11,7 @@ from scipy.signal import fftconvolve, gaussian
 from skimage.feature import hessian_matrix
 
 import parameters
+from math import floor, ceil
 
 def gauss(x,A,x0,sigma):
     return A*np.exp(-(x-x0)**2/(2*sigma**2))
@@ -238,3 +239,48 @@ def fftconvolve_gaussian(array,reso):
     else:
         sys.exit('fftconvolve_gaussian: array dimension must be 1 or 2.')
     return array
+
+def formatting_numbers(value,errorhigh,errorlow,std=None,label=None):
+    str_value = ""
+    str_errorhigh = ""
+    str_errorlow = ""
+    str_std = ""
+    out = []
+    if label is not None : out.append(label)
+    power10 = min(int(floor(np.log10(np.abs(errorhigh)))),int(floor(np.log10(np.abs(errorlow)))))
+    if np.isclose(0.0, float("%.*f" % ( abs(power10), value ))) :
+        str_value = "%.*f"  % (abs(power10), 0)
+        str_errorhigh = "%.*f" % (abs(power10), errorhigh)
+        str_errorlow = "%.*f" % (abs(power10), errorlow)
+        if std is not None :
+            str_std = "%.*f" % (abs(power10), std)
+    elif power10 > 0 :
+        str_value = "%d"  % (value)
+        str_errorhigh = "%d" % (errorhigh)
+        str_errorlow = "%d" % (errorlow)
+        if std is not None :
+            str_std = "%d" % (std)
+    else :
+        if int(floor(np.log10(np.abs(errorhigh)))) == int(floor(np.log10(np.abs(errorlow)))):
+            str_value = "%.*f"  % (abs(power10), value)
+            str_errorhigh = "%.1g" % (errorhigh)
+            str_errorlow = "%.1g" % (errorlow)
+            if std is not None :
+                str_std = "%.1g" % (std)
+        elif int(floor(np.log10(np.abs(errorhigh)))) > int(floor(np.log10(np.abs(errorlow)))):
+            str_value = "%.*f"  % (abs(power10), value)
+            str_errorhigh = "%.2g" % (errorhigh)
+            str_errorlow = "%.1g" % (errorlow)
+            if std is not None :
+                str_std = "%.2g" % (std)
+        else :
+            str_value = "%.*f"  % (abs(power10), value)
+            str_errorhigh = "%.1g" % (errorhigh)
+            str_errorlow = "%.2g" % (errorlow)
+            if std is not None :
+                str_std = "%.2g" % (std)
+    out += [str_value, str_errorhigh]
+    if not np.isclose(errorhigh,errorlow) : out += [str_errorlow]
+    if std is not None : out += [str_std]
+    out = tuple(out)
+    return out
