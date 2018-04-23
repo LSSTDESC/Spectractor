@@ -2,6 +2,8 @@ import os, sys
 mypath = os.path.dirname(__file__)
 import coloredlogs, logging
 import numpy as np
+import astropy.units as units
+from astropy import constants as const
 
 
 # Paths
@@ -13,15 +15,29 @@ PIXEL2MM = 24e-3 # pixel size in mm
 PIXEL2ARCSEC = 0.401 # pixel size in arcsec
 ARCSEC2RADIANS = np.pi/(180.*3600.) # conversion factor from arcsec to radians
 MAXADU = 60000 # approximate maximum ADU output of the CCD
+GAIN = 3. # electronic gain : elec/ADU
 
-# Observatory latitude
+# Observatory characteristics
 OBS_LATITUDE = '-30 10 07.90' # CTIO latitude
+OBS_DIAMETER = 0.9*units.m    # Diameter of the telescope
+OBS_SURFACE = np.pi*OBS_DIAMETER**2/4. # Surface of telescope
+
+# Conversion factor
+# Units of SEDs in flam (erg/s/cm2/nm) :
+SED_UNIT = 1*units.erg/units.s/(units.cm)**2/(units.nanometer)  
+TIME_UNIT=1*units.s               # flux for 1 second
+hc=const.h*const.c     # h.c product of fontamental constants c and h 
+wl_dwl_unit=(units.nanometer)**2  # lambda.dlambda  in wavelength in nm
+g_disperser_ronchi=0.2            # theoretical gain for order+1 : 20%
+FLAM_TO_ADURATE=((OBS_SURFACE*SED_UNIT*TIME_UNIT*wl_dwl_unit/hc/GAIN*g_disperser_ronchi).decompose()).value
+
+
 
 # Search windows in images
 XWINDOW = 100 # window x size to search for the targetted object 
-YWINDOW = 100  # window y size to search for the targetted object
+YWINDOW = 100 # window y size to search for the targetted object
 XWINDOW_ROT = 50 # window x size to search for the targetted object 
-YWINDOW_ROT = 50  # window y size to search for the targetted object
+YWINDOW_ROT = 50 # window y size to search for the targetted object
 
 # Rotation parameters
 ROT_PREFILTER = True # must be set to true, otherwise create residuals and correlated noise
@@ -34,6 +50,12 @@ LAMBDA_MAX = 1100 # maxnimum wavelength for spectrum extraction (in nm)
 # Detection line algorithm
 BGD_ORDER = 3 # order of the background polynome to fit
 BGD_NPARAMS = BGD_ORDER + 1 # number of unknown parameters for background
+
+# Plotting
+PAPER = False
+LINEWIDTH = 2
+PLOT_DIR = 'plots'
+SAVE = False
 
 # Verbosity
 VERBOSE = False
