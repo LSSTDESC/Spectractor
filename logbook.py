@@ -39,10 +39,8 @@ class LogBook():
                     break
                 if row['Dx']!='':
                     parameters.XWINDOW=int(row['Dx'])
-                    parameters.XWINDOW_ROT=int(row['Dx'])
                 if row['Dy']!='':
                     parameters.YWINDOW=int(row['Dy'])
-                    parameters.YWINDOW_ROT=int(row['Dy'])
                 xpos = int(row['Obj-posXpix'])
                 ypos = int(row['Obj-posYpix'])
                 break
