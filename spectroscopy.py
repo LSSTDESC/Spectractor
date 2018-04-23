@@ -346,7 +346,8 @@ class Spectrum():
         self.order = order
         self.filter = None
         self.filters = None
-        self.units = 'Flux [ADU/s]'
+        self.units = 'ADU/s'
+        self.gain = parameters.GAIN
         if filename != "" :
             self.filename = filename
             self.load_spectrum(filename)
@@ -362,12 +363,31 @@ class Spectrum():
             self.target_pixcoords = Image.target_pixcoords
             self.target_pixcoords_rotated = Image.target_pixcoords_rotated
             self.units = Image.units
+            self.gain = Image.gain
             self.my_logger.info('\n\tSpectrum info copied from Image')
         self.atmospheric_lines = atmospheric_lines
         self.lines = None
         if self.target is not None :
             self.lines = Lines(self.target.redshift,atmospheric_lines=self.atmospheric_lines,hydrogen_only=self.target.hydrogen_only,emission_spectrum=self.target.emission_spectrum)
         self.load_filter()
+
+    def convert_from_ADUrate_to_flam(self):
+        '''The SED is supposed to be in flam units ie erg/s/cm^2/nm'''
+        self.data = self.data / FLAM_TO_ADURATE
+        self.data /= self.lambdas*self.lambda_binwidths
+        if self.err is not None:
+            self.err = self.err / parameters.FLAM_TO_ADURATE
+            self.err /= (self.lambdas*self.lambda_binwidths)
+        self.units = 'erg/s/cm$^2$/nm'
+
+    def convert_from_flam_to_ADUrate(self):
+        '''The SED is supposed to be in flam units ie erg/s/cm^2/nm'''
+        self.data = self.data * parameters.FLAM_TO_ADURATE
+        self.data *= self.lambda_binwidths*self.lambdas
+        if self.err is not None:
+            self.err = self.err * parameters.FLAM_TO_ADURATE
+            self.err *= self.lambda_binwidths*self.lambdas
+        self.units = 'ADU/s'
 
     def load_filter(self):
         for f in FILTERS:
@@ -388,7 +408,7 @@ class Spectrum():
         ax.set_xlim([parameters.LAMBDA_MIN,parameters.LAMBDA_MAX])
         ax.set_ylim(0.,np.max(self.data)*1.2)
         ax.set_xlabel('$\lambda$ [nm]')
-        ax.set_ylabel(self.units)
+        ax.set_ylabel('Flux [%s]' % self.units)
 
     def plot_spectrum(self,xlim=None,nofit=False):
         fig = plt.figure(figsize=[12,6])
@@ -397,7 +417,7 @@ class Spectrum():
         #    for k in range(len(self.target.spectra)):
         #        s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
         #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
-        if self.lambdas is not None:
+        if self.lambdas is not None and self.lines is not None:
             self.lines.plot_atomic_lines(plt.gca(),fontsize=12)
         if not nofit and self.lambdas is not None:
             lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=plt.gca(),verbose=parameters.VERBOSE)
@@ -413,12 +433,15 @@ class Spectrum():
             left_cut, right_cut = xlims
         self.data = self.data[left_cut:right_cut]
         pixels = np.arange(left_cut,right_cut,1)-self.target_pixcoords_rotated[0]
-        self.lambdas = self.disperser.grating_pixel_to_lambda(pixels,self.target_pixcoords,order=self.order)
+        self.lambdas = self.disperser.grating_pixel_to_lambda(pixels,self.target_pixcoords,order=self.order) 
+        self.lambda_binwidths = np.gradient(self.lambdas)
         # Cut spectra
         self.lambdas_indices = np.where(np.logical_and(self.lambdas > parameters.LAMBDA_MIN, self.lambdas < parameters.LAMBDA_MAX))[0]
         self.lambdas = self.lambdas[self.lambdas_indices]
+        self.lambda_binwidths = self.lambda_binwidths[self.lambdas_indices]
         self.data = self.data[self.lambdas_indices]
         if self.err is not None: self.err = self.err[self.lambdas_indices]
+        self.convert_from_ADUrate_to_flam()
 
     def calibrate_spectrum_with_lines(self):
         self.my_logger.info('\n\tCalibrating order %d spectrum...' % self.order)
@@ -452,8 +475,8 @@ class Spectrum():
         self.lambdas = lambdas_test
         lambda_shift = self.lines.detect_lines(self.lambdas,self.data,spec_err=self.err,ax=None,verbose=parameters.DEBUG)
         self.my_logger.info('\n\tWavelenght total shift: %.2fnm (after %d steps)\n\twith D = %.2f mm (DISTANCE2CCD = %.2f +/- %.2f mm, %.1f sigma shift)' % (shift,len(shifts),D,DISTANCE2CCD,DISTANCE2CCD_ERR,(D-DISTANCE2CCD)/DISTANCE2CCD_ERR))
-        if parameters.VERBOSE or parameters.DEBUG:
-            if os.getenv("DISPLAY") : self.plot_spectrum(xlim=None,nofit=False)
+        self.header['LSHIFT'] = shift
+        self.header['D2CCD'] = D
 
     def save_spectrum(self,output_filename,overwrite=False):
         hdu = fits.PrimaryHDU()

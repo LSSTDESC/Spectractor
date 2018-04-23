@@ -5,7 +5,7 @@ from images import *
 import parameters 
 
 
-def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
+def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True,line_detection=False):
     """ Spectractor
     Main function to extract a spectrum from an image
 
@@ -47,15 +47,20 @@ def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True):
     spectrum.atmospheric_lines = atmospheric_lines
     # Calibrate the spectrum
     spectrum.calibrate_spectrum()
-    try:
-        spectrum.calibrate_spectrum_with_lines()
-    except:
-        my_logger.warning('\n\tCalibration procedure with spectral features failed.')
-        spectrum.header['WARNINGS'] = 'Calibration procedure with spectral features failed.'
-    # Subtract second order
-
-    # Save the spectra
+    if line_detection:
+        try:
+            spectrum.calibrate_spectrum_with_lines()
+        except:
+            my_logger.warning('\n\tCalibration procedure with spectral features failed.')
+            spectrum.header['WARNINGS'] = 'Calibration procedure with spectral features failed.'
+    else:
+        spectrum.header['WARNINGS'] = 'No calibration procedure with spectral features.'
+    # Save the spectrum
     spectrum.save_spectrum(output_filename,overwrite=True)
+    # Plot the spectrum
+    if parameters.VERBOSE:
+        if os.getenv("DISPLAY") : spectrum.plot_spectrum(xlim=None,nofit=False)
+    return spectrum
 
     
 
