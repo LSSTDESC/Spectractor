@@ -224,8 +224,8 @@ class Image():
         if len(saturated_pixels) > 0:
             self.my_logger.info('\n\tRemove %d saturated pixels.' % len(saturated_pixels))
             sub_image_subtracted[saturated_pixels] = np.nan
-            bounds[0][0] = parameters.MAXADU/self.expo
-            guess[0] = 2*parameters.MAXADU/self.expo
+            bounds[0][0] = saturation
+            guess[0] = 2*saturation
         # fit 
         star2D = fit_gauss2d_outlier_removal(X,Y,sub_image_subtracted,guess=guess,bounds=bounds, sigma = 5, circular=True)
         # compute target positions
