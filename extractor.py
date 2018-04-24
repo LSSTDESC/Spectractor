@@ -326,8 +326,8 @@ if __name__ == "__main__":
     
     #m = Extractor(filename,atmgrid_filename)
     #m.minimizer(live_fit=True)
-    covfile = 'covariances/proposal2.txt'
-    m = Extractor_MCMC(filename,covfile,nchains=4,nsteps=3000,burnin=500,nbins=10,exploration_time=200,atmgrid_filename=atmgrid_filename,live_fit=False)
+    covfile = 'covariances/proposal.txt'
+    m = Extractor_MCMC(filename,covfile,nchains=4,nsteps=4000,burnin=500,nbins=10,exploration_time=200,atmgrid_filename=atmgrid_filename,live_fit=False)
     m.run_mcmc()
     m.plot_fit()
 
