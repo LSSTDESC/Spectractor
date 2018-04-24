@@ -117,7 +117,7 @@ def tied_circular_gauss2d(g1):
     std = g1.x_stddev
     return std
 
-def fit_gauss2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None,circular=False):
+def fit_gauss2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None,circular=False):
     '''Gauss2D parameters: amplitude, x_mean,y_mean,x_stddev, y_stddev,theta'''
     gg_init = models.Gaussian2D()
     if guess is not None:
@@ -137,8 +137,9 @@ def fit_gauss2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None,
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        if parameters.VERBOSE: print or_fitted_model
         return or_fitted_model
-
+   
 def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None):
     '''Moffat2D parameters: amplitude, x_mean,y_mean,gamma,alpha'''
     gg_init = models.Moffat2D()
@@ -156,6 +157,7 @@ def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        if parameters.VERBOSE: print or_fitted_model
         return or_fitted_model
 
 def find_nearest(array,value):
