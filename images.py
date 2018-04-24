@@ -227,7 +227,7 @@ class Image():
         dist = np.sqrt((ymax-avY)**2+(xmax-avX)**2)
         if dist > 2 :
             self.my_logger.warning('\n\tX=%.2f,Y=%.2f target position determination probably wrong: %.1f  pixels from image maximum (%d,%d)' % (avX,avY,dist,xmax,ymax)) 
-         # debugging plots
+        # debugging plots
         if parameters.DEBUG:
             f, (ax1, ax2,ax3) = plt.subplots(1,3, figsize=(15,4))
             self.plot_image_simple(ax1,data=sub_image,scale="lin",title="",units=self.units,target_pixcoords=[avX,avY])
