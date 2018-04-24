@@ -3,7 +3,7 @@ import scipy
 from scipy.optimize import curve_fit
 from scipy.misc import imresize
 import numpy as np
-from astropy.modeling import models, fitting
+from astropy.modeling import models, fitting, Fittable2DModel, Parameter
 from astropy.stats import sigma_clip
 import warnings
 from scipy.signal import fftconvolve, gaussian
@@ -150,6 +150,73 @@ def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None
         for ip,p in enumerate(gg_init.param_names):
             getattr(gg_init,p).min = bounds[0][ip]
             getattr(gg_init,p).max = bounds[1][ip]
+    with warnings.catch_warnings():
+        # Ignore model linearity warning from the fitter
+        warnings.simplefilter('ignore')
+        fit = fitting.LevMarLSQFitter()
+        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+        # get fitted model and filtered data
+        filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        if parameters.VERBOSE: print or_fitted_model
+        return or_fitted_model
+
+
+class Star2D(Fittable2DModel):
+
+    #def __init__(self):
+    #    Fittable2DModel.__init__(self)
+    #    self.inputs = ('amplitude','x_mean','y_mean','stddev','saturation')
+    #    self.param_names = ('amplitude','x_mean','y_mean','stddev','saturation')
+    #    self.amplitude = Parameter('amplitude')
+    #    self.x_mean = Parameter('x_mean')
+    #    self.y_mean = Parameter('y_mean')
+    #    self.stddev = Parameter('stddev')
+    #    self.saturation = Parameter('saturation')
+    amplitude =  Parameter('amplitude',default=1)
+    x_mean = Parameter('x_mean',default=0)
+    y_mean = Parameter('y_mean',default=0)
+    stddev = Parameter('stddev',default=1)
+    saturation = Parameter('saturation',default=1)
+
+    def __init__(self,amplitude=amplitude.default, x_mean=x_mean.default, y_mean=y_mean.default, stddev=stddev.default, saturation=saturation.default, **kwargs):
+        
+        super(Fittable2DModel, self).__init__(**kwargs)
+        #amplitude=amplitude, x_mean=x_mean, y_mean=y_mean,
+        #x_stddev=stddev, y_stddev=stddev, theta=0, **kwargs)
+
+    
+    @staticmethod
+    def evaluate(x, y, amplitude, x_mean, y_mean, stddev, saturation):
+        a = amplitude * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
+        if isinstance(x, float) and isinstance(y, float):
+            if a > saturation:
+                return saturation
+            else:
+                return a
+        else:
+            a[np.where(a>saturation)] = saturation
+            return a
+
+    @staticmethod
+    def fit_deriv(x, y, amplitude, x_mean, y_mean, stddev, saturation):
+        d_amplitude = np.exp(-((1 / (2. * stddev**2)) * (x - x_mean)**2 + (1 / (2. * stddev**2)) * (y - y_mean)**2))
+        d_x_mean = - amplitude * (x - x_mean) / (stddev**2) * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
+        d_y_mean = - amplitude * (y - y_mean) / (stddev**2) * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
+        d_stddev = amplitude * ((x - x_mean)**2+(y - y_mean)**2) / (stddev**3) * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
+        d_saturation = 0
+        return [d_amplitude, d_x_mean, d_y_mean, d_stddev, d_saturation]
+    
+def fit_star2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None):
+    '''Gauss2D parameters: amplitude, x_mean,y_mean,x_stddev, y_stddev,theta'''
+    gg_init = Star2D()
+    if guess is not None:
+        for ip,p in enumerate(gg_init.param_names):
+            getattr(gg_init,p).value = guess[ip]
+    if bounds is not None:
+        for ip,p in enumerate(gg_init.param_names):
+            getattr(gg_init,p).min = bounds[0][ip]
+            getattr(gg_init,p).max = bounds[1][ip]
+    gg_init.saturation.fixed = True
     with warnings.catch_warnings():
         # Ignore model linearity warning from the fitter
         warnings.simplefilter('ignore')
