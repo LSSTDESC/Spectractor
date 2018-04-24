@@ -218,7 +218,6 @@ class Image():
         saturated_pixels = np.where(sub_image >= saturation)
         if len(saturated_pixels[0]) > 0:
             saturation = np.mean(sub_image_subtracted[saturated_pixels])
-            print saturation
         guess = [np.max(sub_image_subtracted),avX,avY,1,saturation]
         mean_prior = 10 # in pixels
         #bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf], [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] for Moffat2D
