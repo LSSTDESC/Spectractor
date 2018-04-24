@@ -139,7 +139,7 @@ def fit_gauss2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None,
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
         return or_fitted_model
 
-def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None):
+def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None):
     '''Moffat2D parameters: amplitude, x_mean,y_mean,gamma,alpha'''
     gg_init = models.Moffat2D()
     if guess is not None:
@@ -156,7 +156,6 @@ def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        print or_fitted_model
         return or_fitted_model
 
 def find_nearest(array,value):

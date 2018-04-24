@@ -241,7 +241,7 @@ def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A
         background.plot_model()
     # Target model
     my_logger.info('\n\tStar model...')
-    star = StarModel(target_pixcoords,A=image.target_gauss2D.amplitude.value,sigma=image.target_gauss2D.x_stddev.value,target=image.target)
+    star = StarModel(target_pixcoords,A=image.target_star2D.amplitude.value,sigma=image.target_star2D.x_stddev.value,target=image.target)
     reso = star.sigma
     if parameters.DEBUG:
         star.plot_model()
@@ -249,7 +249,7 @@ def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A
     starfield = None
     if with_stars:
         my_logger.info('\n\tStar field model...')
-        starfield = StarFieldModel(image,sigma=image.target_gauss2D.x_stddev.value,threshold=0.01*star.A)
+        starfield = StarFieldModel(image,sigma=image.target_star2D.x_stddev.value,threshold=0.01*star.A)
         if parameters.VERBOSE:
             image.plot_image(scale='log10',target_pixcoords=starfield.pixcoords)
             starfield.plot_model()
