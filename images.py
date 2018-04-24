@@ -219,7 +219,7 @@ class Image():
         bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,1.5,1.5,0], [np.inf,avX+mean_prior,avY+mean_prior,10,10,np.pi] ]
         # force looking for amplitudes higher than saturation
         # for saturated stars and remove saturated pixels
-        saturation = 0.98*parameters.MAXADU/self.expo
+        saturation = 0.99*parameters.MAXADU/self.expo
         saturated_pixels = np.where(sub_image >= saturation)
         if len(saturated_pixels[0]) > 0:
             self.my_logger.info('\n\tRemove %d saturated pixels.' % len(saturated_pixels[0]))
