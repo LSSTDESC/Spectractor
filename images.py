@@ -211,14 +211,26 @@ class Image():
         # find a first guess of the target position
         avX,sigX = weighted_avg_and_std(X,(sub_image_subtracted)**4)
         avY,sigY = weighted_avg_and_std(Y,(sub_image_subtracted)**4)
-        # fit a 2D Moffat profile close to this position
-        guess = [np.max(sub_image_subtracted),avX,avY,1,1]
+        # fit a 2D Gaussian profile close to this position
+        #guess = [np.max(sub_image_subtracted),avX,avY,1,1] for Moffat2D
+        guess = [np.max(sub_image_subtracted),avX,avY,1,1,0]
         mean_prior = 10 # in pixels
-        bounds = [ [0.1*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf], [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ]
-        star2D = fit_moffat2d_outlier_removal(X,Y,sub_image_subtracted,guess=guess,bounds=bounds, sigma = 3)
+        #bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf], [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] for Moffat2D
+        bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,1.5,1.5,0], [np.inf,avX+mean_prior,avY+mean_prior,10,10,np.pi] ]
+        # force looking for amplitudes higher than saturation
+        # for saturated stars and remove saturated pixels
+        saturation = 0.98*parameters.MAXADU/self.expo
+        saturated_pixels = np.where(sub_image >= saturation)
+        if len(saturated_pixels) > 0:
+            self.my_logger.info('\n\tRemove %d saturated pixels.' % len(saturated_pixels))
+            sub_image_subtracted[saturated_pixels] = np.nan
+            bounds[0][0] = parameters.MAXADU/self.expo
+            guess[0] = 2*parameters.MAXADU/self.expo
+        # fit 
+        star2D = fit_gauss2d_outlier_removal(X,Y,sub_image_subtracted,guess=guess,bounds=bounds, sigma = 5, circular=True)
         # compute target positions
-        new_avX = star2D.x_0.value
-        new_avY = star2D.y_0.value
+        new_avX = star2D.x_mean.value
+        new_avY = star2D.y_mean.value
         theX=x0-Dx+new_avX
         theY=y0-Dy+new_avY
         self.target_star2D = star2D
