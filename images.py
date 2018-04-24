@@ -201,8 +201,8 @@ class Image():
         """
         sub_image,x0,y0,Dx,Dy = self.find_target_init(guess=guess,rotated=rotated)
         NY, NX = sub_image.shape
-        X = np.arange(NX)
-        Y = np.arange(NY)
+        XX = np.arange(NX)
+        YY = np.arange(NY)
         Y, X = np.mgrid[:NY,:NX]
         # fit and subtract smooth polynomial background
         # with 3sigma rejection of outliers (star peaks)
@@ -211,33 +211,33 @@ class Image():
         # find a first guess of the target position
         avX,sigX = weighted_avg_and_std(X,(sub_image_subtracted)**4)
         avY,sigY = weighted_avg_and_std(Y,(sub_image_subtracted)**4)
-        # fit a 2D gaussian close to this position
-        guess = [np.max(sub_image_subtracted),avX,avY,2,2,0]
+        # fit a 2D Moffat profile close to this position
+        guess = [np.max(sub_image_subtracted),avX,avY,1,1]
         mean_prior = 10 # in pixels
-        bounds = [ [1,avX-mean_prior,avY-mean_prior,1,1,-np.pi], [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,10,10,np.pi] ]
-        gauss2D = fit_gauss2d_outlier_removal(X,Y,sub_image_subtracted,guess=guess,bounds=bounds, sigma = 3, circular = True)
+        bounds = [ [0.1*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf], [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ]
+        star2D = fit_moffat2d_outlier_removal(X,Y,sub_image_subtracted,guess=guess,bounds=bounds, sigma = 3)
         # compute target positions
-        avX = gauss2D.x_mean.value
-        avY = gauss2D.y_mean.value
-        theX=x0-Dx+avX
-        theY=y0-Dy+avY
-        self.target_gauss2D = gauss2D
+        new_avX = star2D.x_0.value
+        new_avY = star2D.y_0.value
+        theX=x0-Dx+new_avX
+        theY=y0-Dy+new_avY
+        self.target_star2D = star2D
         self.target_bkgd2D = bkgd_2D
         ymax, xmax = np.unravel_index(sub_image_subtracted.argmax(), sub_image_subtracted.shape)
-        dist = np.sqrt((ymax-avY)**2+(xmax-avX)**2)
-        if dist > 2 :
-            self.my_logger.warning('\n\tX=%.2f,Y=%.2f target position determination probably wrong: %.1f  pixels from image maximum (%d,%d)' % (avX,avY,dist,xmax,ymax)) 
+        dist = np.sqrt((new_avY-avY)**2+(new_avX-avX)**2)
+        if dist > mean_prior/2 :
+            self.my_logger.warning('\n\tX=%.2f,Y=%.2f target position determination probably wrong: %.1f  pixels from profile detection (%d,%d)' % (new_avX,new_avY,dist,avX,avY)) 
         # debugging plots
         if parameters.DEBUG:
             f, (ax1, ax2,ax3) = plt.subplots(1,3, figsize=(15,4))
-            self.plot_image_simple(ax1,data=sub_image,scale="lin",title="",units=self.units,target_pixcoords=[avX,avY])
+            self.plot_image_simple(ax1,data=sub_image,scale="lin",title="",units=self.units,target_pixcoords=[new_avX,new_avY])
             ax1.scatter([Dx],[Dy],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
             ax1.legend(loc=1)
             
-            self.plot_image_simple(ax2,data=bkgd_2D(X,Y)+gauss2D(X,Y),scale="lin",title="",units='Background + Gauss (%s)' % (self.units))
+            self.plot_image_simple(ax2,data=bkgd_2D(X,Y)+star2D(X,Y),scale="lin",title="",units='Background + Gauss (%s)' % (self.units))
             ax2.legend(loc=1)
 
-            self.plot_image_simple(ax3,data=sub_image_subtracted-gauss2D(X,Y),scale="lin",title="",units='Background+Gauss subtracted image (%s)' % (self.units),target_pixcoords=[avX,avY])
+            self.plot_image_simple(ax3,data=sub_image_subtracted-star2D(X,Y),scale="lin",title="",units='Background+Gauss subtracted image (%s)' % (self.units),target_pixcoords=[new_avX,new_avY])
             ax3.scatter([Dx],[Dy],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
             ax3.legend(loc=1)
 
