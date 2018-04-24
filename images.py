@@ -215,25 +215,26 @@ class Image():
         #guess = [np.max(sub_image_subtracted),avX,avY,1,1] for Moffat2D
         #guess = [np.max(sub_image_subtracted),avX,avY,1,1,0] for Gauss2D
         saturation = parameters.MAXADU/self.expo
-        saturated_pixels = np.where(sub_image >= saturation)
+        saturated_pixels = np.where(sub_image > saturation)
         if len(saturated_pixels[0]) > 0:
+            if parameters.DEBUG:
+                self.my_logger.info('\n\t%d saturated pixels.' % len(saturated_pixels[0]))
             saturation = np.mean(sub_image_subtracted[saturated_pixels])
-        guess = [np.max(sub_image_subtracted),avX,avY,1,saturation]
+        guess = [np.max(sub_image_subtracted),avX,avY,2,saturation]
         mean_prior = 10 # in pixels
         #bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf], [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] for Moffat2D
         #bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,2,2,0], [np.inf,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] for Gauss2D
-        bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,2,0.9*saturation], [np.inf,avX+mean_prior,avY+mean_prior,10,1.1*saturation] ]
+        bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,1.5,0.9*saturation], [1.5*saturation,avX+mean_prior,avY+mean_prior,15,1.1*saturation] ]
         # force looking for amplitudes higher than saturation
         # for saturated stars and remove saturated pixels
         #saturation = 0.99*parameters.MAXADU/self.expo
         #saturated_pixels = np.where(sub_image >= saturation)
-        #if len(saturated_pixels[0]) > 0:
-        #    self.my_logger.info('\n\tRemove %d saturated pixels.' % len(saturated_pixels[0]))
-            #sub_image_subtracted[saturated_pixels] = np.nan
-        #    bounds[0][0] = saturation
-        #    guess[0] = 2*saturation
+        if len(saturated_pixels[0]) > 0:
+            sub_image_subtracted[saturated_pixels] = np.nan
+            bounds[0][0] = saturation
+            guess[0] = 1.2*saturation
         # fit 
-        star2D = fit_star2d_outlier_removal(X,Y,sub_image_subtracted,guess=guess,bounds=bounds, sigma = 5 )
+        star2D = fit_star2d_outlier_removal(X,Y,sub_image_subtracted,guess=guess,bounds=bounds, sigma = 10 )
         # compute target positions
         new_avX = star2D.x_mean.value
         new_avY = star2D.y_mean.value
@@ -244,7 +245,8 @@ class Image():
         ymax, xmax = np.unravel_index(sub_image_subtracted.argmax(), sub_image_subtracted.shape)
         dist = np.sqrt((new_avY-avY)**2+(new_avX-avX)**2)
         if dist > mean_prior/2 :
-            self.my_logger.warning('\n\tX=%.2f,Y=%.2f target position determination probably wrong: %.1f  pixels from profile detection (%d,%d)' % (new_avX,new_avY,dist,avX,avY)) 
+            self.my_logger.warning('\n\tX=%.2f,Y=%.2f target position determination probably wrong: %.1f  pixels from profile detection (%d,%d)' % (new_avX,new_avY,dist,avX,avY))
+                
         # debugging plots
         if parameters.DEBUG:
             f, (ax1, ax2,ax3) = plt.subplots(1,3, figsize=(15,4))

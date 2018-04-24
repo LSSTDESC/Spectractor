@@ -179,10 +179,7 @@ class Star2D(Fittable2DModel):
     saturation = Parameter('saturation',default=1)
 
     def __init__(self,amplitude=amplitude.default, x_mean=x_mean.default, y_mean=y_mean.default, stddev=stddev.default, saturation=saturation.default, **kwargs):
-        
         super(Fittable2DModel, self).__init__(**kwargs)
-        #amplitude=amplitude, x_mean=x_mean, y_mean=y_mean,
-        #x_stddev=stddev, y_stddev=stddev, theta=0, **kwargs)
 
     
     @staticmethod
@@ -194,7 +191,7 @@ class Star2D(Fittable2DModel):
             else:
                 return a
         else:
-            a[np.where(a>saturation)] = saturation
+            a[np.where(a>=saturation)] = saturation
             return a
 
     @staticmethod
@@ -203,7 +200,7 @@ class Star2D(Fittable2DModel):
         d_x_mean = - amplitude * (x - x_mean) / (stddev**2) * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
         d_y_mean = - amplitude * (y - y_mean) / (stddev**2) * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
         d_stddev = amplitude * ((x - x_mean)**2+(y - y_mean)**2) / (stddev**3) * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
-        d_saturation = 0
+        d_saturation = np.zeros_like(x)
         return [d_amplitude, d_x_mean, d_y_mean, d_stddev, d_saturation]
     
 def fit_star2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None):
