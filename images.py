@@ -223,8 +223,10 @@ class Image():
         theY=y0-Dy+avY
         self.target_gauss2D = gauss2D
         self.target_bkgd2D = bkgd_2D
-        if sub_image_subtracted[int(avY),int(avX)] < 0.8*np.max(sub_image_subtracted) :
-            self.my_logger.warning('\n\tX,Y position determination of the target probably wrong') 
+        ymax, xmax = np.unravel_index(sub_image_subtracted.argmax(), sub_image_subtracted.shape)
+        dist = np.sqrt((ymax-avY)**2+(xmax-avX)**2)
+        if dist > 2 :
+            self.my_logger.warning('\n\tX=%.2f,Y=%.2f target position determination probably wrong: %.1f  pixels from image maximum (%d,%d)' % (avX,avY,dist,xmax,ymax)) 
          # debugging plots
         if parameters.DEBUG:
             f, (ax1, ax2,ax3) = plt.subplots(1,3, figsize=(15,4))
@@ -280,9 +282,9 @@ class Image():
         theta_hist = []
         theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
         theta_median = np.median(theta_hist)
-        theta_critical = 180.*np.arctan(10./IMSIZE)/np.pi
+        theta_critical = 180.*np.arctan(20./IMSIZE)/np.pi
         if abs(theta_median-theta_guess)>theta_critical:
-            self.my_logger.warning('\n\tInterpolated angle and fitted angle disagrees with more than 10 pixels over %d pixels:  %.2f vs %.2f' % (IMSIZE,theta_median,theta_guess))
+            self.my_logger.warning('\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels over %d pixels:  %.2f vs %.2f' % (IMSIZE,theta_median,theta_guess))
         if parameters.DEBUG:
             f, (ax1, ax2) = plt.subplots(1,2,figsize=(10,6))
             xindex=np.arange(data.shape[1])

@@ -3,19 +3,21 @@ sys.path.append('../SpectractorSim')
 
 from spectractorsim import *
 from spectractor import *
+from mcmc import *
 import parameters
 
-import emcee 
-import corner
+import tqdm
 from scipy.optimize import minimize, least_squares
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
-from multiprocessing import Pool
+from pathos.multiprocessing import Pool
+
 
 class Extractor():
 
     def __init__(self,filename,atmgrid_filename="",live_fit=False):
         self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.filename = filename
         self.live_fit = live_fit
         self.A1 = 1.0
         self.A2 = 0.1
@@ -23,8 +25,7 @@ class Extractor():
         self.pwv = 3
         self.aerosols = 0.03
         self.reso = 3.
-        self.shift = 1.
-        self.dilatation = 1.
+        self.shift = 1e-3
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.shift ])
         self.labels = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso", "$\lambda_{\\mathrm{shift}}$" ]
         self.bounds = ((0,0,0,0,0,1,-20), (np.inf,1.0,np.inf,10,1.0,10,20))
@@ -91,7 +92,7 @@ class Extractor():
     def chisq(self,p):
         model = self.simulation(self.spectrum.lambdas,*p)
         chisq = np.sum(((model - self.spectrum.data)/self.spectrum.err)**2)
-        #chisq /= self.spectrum.data.size
+        chisq /= self.spectrum.data.size
         #print '\tReduced chisq =',chisq/self.spectrum.data.size
         return chisq
 
@@ -137,12 +138,26 @@ class Extractor():
         else:
             plt.show()
 
+
 class Extractor_MCMC(Extractor):
 
-    def __init__(self,filename,atmgrid_filename="",live_fit=False):
+    def __init__(self,filename,covfile,nchains=1,nsteps=1000,burnin=100,nbins=10,exploration_time=100,atmgrid_filename="",live_fit=False):
         Extractor.__init__(self,filename,atmgrid_filename=atmgrid_filename,live_fit=live_fit)
-        self.ndim = len(self.p)
-        self.nwalkers = 4*self.ndim
+        #self.ndim = len(self.p)
+        #self.nwalkers = 4*self.ndim
+        self.nchains = nchains
+        self.nsteps = nsteps
+        self.covfile = covfile
+        self.nbins = nbins
+        self.burnin = burnin
+        self.exploration_time = exploration_time
+        self.chains = Chains(filename,covfile,nchains,nsteps,burnin,nbins,truth=self.truth)
+        self.covfile = filename.replace('spectrum.fits','cov.txt')
+        self.results = []
+        self.results_err = []
+        for i in range(self.chains.dim):
+            self.results.append(ParameterList(self.chains.labels[i],self.chains.axisnames[i]))
+            self.results_err.append([])
 
     def lnprior(self,p):
         in_bounds = True
@@ -163,8 +178,29 @@ class Extractor_MCMC(Extractor):
         if not np.isfinite(lp):
             return -1e20
         return lp + self.lnlike(p)
+
+    def prior(self,p):
+        in_bounds = True
+        for npar,par in enumerate(p):
+            if par < self.bounds[0][npar] or par > self.bounds[1][npar]:
+                in_bounds = False
+                break
+        if in_bounds:
+            return 1.0
+        else:
+            return 0.
+
+    def likelihood(self,p):
+        return np.exp(-0.5*self.chisq(p))
+
+    def posterior(self,p):
+        prior = self.prior(p)
+        if np.isclose(prior,0.) :
+            return 0.
+        else:
+            return prior*self.likelihood(p)
             
-    def mcmc(self):
+    def mcmc_emcee(self):
         pos = np.array([self.p  + 0.1*self.p*np.random.randn(self.ndim) for i in range(self.nwalkers)])
         # Set up the backend
         # Don't forget to clear it in case the file already exists
@@ -174,7 +210,7 @@ class Extractor_MCMC(Extractor):
 
         #with Pool() as pool:
         self.sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, self.lnprob, args=())
-        nsamples = 4000
+        nsamples = 6000
         self.sampler.run_mcmc(pos, nsamples)
         #tau = sampler.get_autocorr_time()
         burnin = nsamples / 2
@@ -194,33 +230,78 @@ class Extractor_MCMC(Extractor):
         plt.show()
         fig.savefig("triangle.png")
 
-    def load_walkers(self):
-        reader = emcee.backends.HDFBackend(filename)
-        tau = reader.get_autocorr_time()
-        burnin = int(2*np.max(tau))
-        thin = int(0.5*np.min(tau))
-        samples = reader.get_chain(discard=burnin, flat=True, thin=thin)
-        log_prob_samples = reader.get_log_prob(discard=burnin, flat=True, thin=thin)
-        log_prior_samples = reader.get_blobs(discard=burnin, flat=True, thin=thin)
 
-        print("burn-in: {0}".format(burnin))
-        print("thin: {0}".format(thin))
-        print("flat chain shape: {0}".format(samples.shape))
-        print("flat log prob shape: {0}".format(log_prob_samples.shape))
-        print("flat log prior shape: {0}".format(log_prior_samples.shape))
+    def mcmc(self,chain):
+        np.random.seed(chain.nchain) # very important othewise parallel processes have same random generator
+        vec1 = chain.start_vec
+        prior1 = 1
+        # initialisation of the chain
+        if chain.start_key == -1:
+            prior1 = 1e-10
+            while(prior1<1e-9):
+                vec1 = chain.draw_vector(chain.start_vec)
+                prior1 = self.prior(vec1)
+        else :
+            chain.start_index += 1
+        vec1[0] *= np.max(self.spectrum.data)/np.max(self.simulation(self.spectrum.lambdas,*vec1))
+        if parameters.DEBUG: print "First vector : ",vec1
+        chisq1 = self.chisq(vec1)
+        L1 = np.exp(-0.5*chisq1)
+        # MCMC exploration
+        keys = range(chain.start_index,chain.nsteps)
+        new_keys = []
+        for i in tqdm.tqdm(keys,desc='Processing chain %i:' % chain.nchain, position=chain.nchain): 
+            if parameters.DEBUG:
+                print 'Step : %d (start=%d, stop=%d, remaining nsteps=%d)' % (i,chain.start_index,chain.start_index+chain.nsteps-1,chain.nsteps+chain.start_index-i)
+            vec2 = []
+            prior2 = 1
+            vec2 = chain.draw_vector(vec1)
+            prior2 = self.prior(vec2)
+            if prior2 > 1e-10:
+                chisq2 = self.chisq(vec2)
+            else:
+                chisq2 = 1e20
+            L2 = np.exp(-0.5*chisq2)
+            if parameters.DEBUG:
+                print "Sample chisq : %.2f      Prior : %.2f" % (chisq2,prior2)
+                print "Sample vector : ",vec2
+            r = np.random.uniform(0,1)
+            if L2/L1 > r : 
+                dictline = chain.make_dictline(i,chisq2,vec2)
+                vec1 = vec2
+                L1 = L2
+                chisq1 = chisq2
+            else : 
+                dictline = chain.make_dictline(i,chisq1,vec1)
+            new_key = chain.newrow(dictline,key=i+chain.nchain*chain.nsteps)
+            chain.append2filelastkey(self.chains.chains_filename)
+            if i > self.exploration_time:
+                chain.update_proposal_cov(vec1)
 
 
+    def run_mcmc(self):
+        pool = Pool(processes=self.nchains)
+        try:
+            # Without the .get(9999), you can't interrupt this with Ctrl+C.
+            pool.map_async(self.mcmc, self.chains.chains).get(999999) 
+            pool.close()
+            pool.join()
+            # to skip lines after the progress bars
+            print '\n'*self.nchains
+        except KeyboardInterrupt:
+            pool.terminate()
+        self.likelihood = self.chains.chains_to_likelihood()
+        self.likelihood.stats(self.covfile) 
+        #[self.results[i].append(self.likelihood.pdfs[i].mean) for i in range(self.chains.dim)]
+        self.p = [self.likelihood.pdfs[i].mean for i in range(self.chains.dim)]
+        self.simulation(self.spectrum.lambdas,*self.p)
+        #[self.results_err[i].append([self.likelihood.pdfs[i].errorhigh,self.likelihood.pdfs[i].errorlow]) for i in range(self.chains.dim)]
+        #if(self.plot): 
+        self.likelihood.triangle_plots()
+        #if convergence_test :
+        self.chains.convergence_tests()
+        return(self.likelihood)
 
-    def test_convergence(self):
-        fig, axes = plt.subplots(3, figsize=(10, 7), sharex=True)
-        for i in range(self.ndim):
-            ax = axes[i]
-            ax.plot(self.samples[:, i, :], "k", alpha=0.3)
-            ax.set_xlim(0, len(self.samples))
-            ax.set_ylabel(self.labels[i])
-            ax.yaxis.set_label_coords(-0.1, 0.5)
-        axes[-1].set_xlabel("step number")
-        plt.show()
         
 if __name__ == "__main__":
     import commands, string, re, time, os
@@ -245,15 +326,8 @@ if __name__ == "__main__":
     
     #m = Extractor(filename,atmgrid_filename)
     #m.minimizer(live_fit=True)
-    m = Extractor_MCMC(filename,atmgrid_filename=atmgrid_filename,live_fit=False)
-    m.mcmc()
-    m.test_convergence()
+    covfile = 'covariances/proposal2.txt'
+    m = Extractor_MCMC(filename,covfile,nchains=4,nsteps=3000,burnin=500,nbins=10,exploration_time=200,atmgrid_filename=atmgrid_filename,live_fit=False)
+    m.run_mcmc()
     m.plot_fit()
 
-    #p0 = [0.1,0.1,5,300,0.01,150]
-    #constraints = ({'type':'eq', 'fun':lambda p: p[1]=300},
-    #               {'type':'eq', 'fun':lambda p: p[1]=300})
-    #bounds = ((0,None), (0,1), (0,20), (200,400), (0,0.2),  (0,500))
-    #res = minimize(m.chisq,p0,method='Powell',bounds=bounds,
-    #               options={'gtol': 1e-2, 'disp': True, 'xtol': 0.1})
-    #popt, pcov = curve_fit(func, xdata, ydata)
