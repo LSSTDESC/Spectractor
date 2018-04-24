@@ -14,23 +14,28 @@ from targets import *
 from images import *
 from spectroscopy import *
 from spectractorsim import *
-import parameters 
+import parameters
+import copy
 
 
 class StarModel():
 
-    def __init__(self,pixcoords,A,sigma,target=None):
+    def __init__(self,pixcoords,model,amplitude,target=None):
         """ [x0, y0] coords in pixels, sigma width in pixels, A height in image units"""
         self.my_logger = set_logger(self.__class__.__name__)
         self.x0 = pixcoords[0]
         self.y0 = pixcoords[1]
-        self.A = A
-        self.sigma = sigma
+        self.amplitude = amplitude
         self.target = target
-        self.model = models.Gaussian2D(A, self.x0, self.y0, sigma, sigma, 0)
+        self.model = copy.copy(model)
+        self.model.x_mean = self.x0
+        self.model.y_mean = self.y0
+        self.model.amplitude = amplitude
+        self.fwhm = self.model.x_fwhm
+        self.sigma = self.fwhm / 2.355
 
     def plot_model(self):
-        yy, xx = np.meshgrid(np.linspace(self.y0-10*self.sigma,self.y0+10*self.sigma,50),  np.linspace(self.x0-10*self.sigma,self.x0+10*self.sigma,50))
+        yy, xx = np.meshgrid(np.linspace(self.y0-10*self.fwhm,self.y0+10*self.fwhm,50),  np.linspace(self.x0-10*self.fwhm,self.x0+10*self.fwhm,50))
         star = self.model(xx,yy)
         fig, ax = plt.subplots(1,1)
         im = plt.imshow(star,origin='lower', cmap='jet')
@@ -38,7 +43,7 @@ class StarModel():
         ax.grid(True)
         ax.set_xlabel('X [pixels]')
         ax.set_ylabel('Y [pixels]')
-        ax.set_title('Star model: A=%.2f, sigma=%.2f' % (self.A,self.sigma))
+        ax.set_title('Star model: A=%.2f, fwhm=%.2f' % (self.amplitude,self.fwhm))
         cb = plt.colorbar(im,ax=ax)
         cb.formatter.set_powerlimits((0, 0))
         cb.locator = MaxNLocator(7,prune=None)
@@ -48,9 +53,8 @@ class StarModel():
 
 class StarFieldModel():
 
-    def __init__(self,base_image,sigma,threshold=0):
+    def __init__(self,base_image,threshold=0):
         self.target = base_image.target
-        self.sigma = sigma
         self.field = None
         result = Gaia.query_object_async(self.target.coord, width=IMSIZE*PIXEL2ARCSEC*units.arcsec/np.cos(self.target.coord.dec.radian), height=IMSIZE*PIXEL2ARCSEC*units.arcsec)
         if parameters.DEBUG:
@@ -59,19 +63,20 @@ class StarFieldModel():
         self.pixcoords = []
         x0, y0 = base_image.target_pixcoords
         for o in result:
-            if o['dist'] < 0.01 : continue
+            if o['dist'] < 0.005 : continue
             radec = SkyCoord(ra=float(o['ra']),dec=float(o['dec']), frame='icrs', unit='deg')
             y = int(y0 - (radec.dec.arcsec - self.target.coord.dec.arcsec)/PIXEL2ARCSEC)
             x = int(x0 - (radec.ra.arcsec - self.target.coord.ra.arcsec)*np.cos(radec.dec.radian)/PIXEL2ARCSEC)
-            w = 20 # search windows in pixels
+            w = 10 # search windows in pixels
             if x<w or x>IMSIZE-w: continue
             if y<w or y>IMSIZE-w: continue
             sub =  base_image.data[y-w:y+w,x-w:x+w]
             A = np.max(sub) - np.min(sub)
             if A < threshold: continue
-            self.stars.append( StarModel([x,y],A,sigma) )
+            self.stars.append( StarModel([x,y],base_image.target_star2D,A) )
             self.pixcoords.append([x,y])
         self.pixcoords = np.array(self.pixcoords).T
+        self.fwhm = base_image.target_star2D.x_fwhm
 
     def model(self,x,y):
         if self.field is None:
@@ -89,7 +94,7 @@ class StarFieldModel():
         ax.grid(True)
         ax.set_xlabel('X [pixels]')
         ax.set_ylabel('Y [pixels]')
-        ax.set_title('Star field model: sigma=%.2f' % (self.sigma))
+        ax.set_title('Star field model: fwhm=%.2f' % (self.fwhm))
         cb = plt.colorbar(im,ax=ax)
         cb.formatter.set_powerlimits((0, 0))
         cb.locator = MaxNLocator(7,prune=None)
@@ -241,7 +246,7 @@ def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A
         background.plot_model()
     # Target model
     my_logger.info('\n\tStar model...')
-    star = StarModel(target_pixcoords,A=image.target_star2D.amplitude.value,sigma=image.target_star2D.x_stddev.value,target=image.target)
+    star = StarModel(target_pixcoords, image.target_star2D, image.target_star2D.amplitude.value,target=image.target)
     reso = star.sigma
     if parameters.DEBUG:
         star.plot_model()
@@ -249,7 +254,7 @@ def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A
     starfield = None
     if with_stars:
         my_logger.info('\n\tStar field model...')
-        starfield = StarFieldModel(image,sigma=image.target_star2D.x_stddev.value,threshold=0.01*star.A)
+        starfield = StarFieldModel(image,threshold=0.01*star.amplitude)
         if parameters.VERBOSE:
             image.plot_image(scale='log10',target_pixcoords=starfield.pixcoords)
             starfield.plot_model()
@@ -268,7 +273,7 @@ def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A
     image.add_poisson_noise()
     image.convert_to_ADU_units()
     if parameters.VERBOSE:
-        image.plot_image(scale="log",title="Image simulation",target_pixcoords=target_pixcoords,units=spectrumsim.units)
+        image.plot_image(scale="log",title="Image simulation",target_pixcoords=target_pixcoords,units=image.units)
     # Set output path
     ensure_dir(outputdir)
     output_filename = filename.split('/')[-1]
