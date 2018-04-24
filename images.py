@@ -221,8 +221,8 @@ class Image():
         # for saturated stars and remove saturated pixels
         saturation = 0.98*parameters.MAXADU/self.expo
         saturated_pixels = np.where(sub_image >= saturation)
-        if len(saturated_pixels) > 0:
-            self.my_logger.info('\n\tRemove %d saturated pixels.' % len(saturated_pixels))
+        if len(saturated_pixels[0]) > 0:
+            self.my_logger.info('\n\tRemove %d saturated pixels.' % len(saturated_pixels[0]))
             sub_image_subtracted[saturated_pixels] = np.nan
             bounds[0][0] = saturation
             guess[0] = 2*saturation
