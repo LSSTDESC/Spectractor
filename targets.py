@@ -62,7 +62,7 @@ class Target():
             self.hydrogen_only = True
             for k,f in enumerate(filenames) :
                 if '_mod_' in f : continue
-                print 'Loading %s' % f
+                if self.verbose : print 'Loading %s' % f
                 data = S.FileSpectrum(f,keepneg=True)
                 if isinstance(data.waveunits,S.units.Angstrom) : 
                     self.wavelengths.append(data.wave/10.)
