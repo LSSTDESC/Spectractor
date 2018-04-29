@@ -209,7 +209,7 @@ class Grating():
         
 class Hologram(Grating):
 
-    def __init__(self,label,D=DISTANCE2CCD,lambda_plot=256000,data_dir=HOLO_DIR,verbose=True):
+    def __init__(self,label,D=DISTANCE2CCD,lambda_plot=256000,data_dir=HOLO_DIR,verbose=False):
         Grating.__init__(self,GROOVES_PER_MM,D=D,label=label,data_dir=data_dir,verbose=False)
         self.holo_center = None # center of symmetry of the hologram interferences in pixels
         self.plate_center = None # center of the hologram plate
