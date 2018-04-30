@@ -480,6 +480,7 @@ class Spectrum():
 
     def save_spectrum(self,output_filename,overwrite=False):
         hdu = fits.PrimaryHDU()
+        
         hdu.data = [self.lambdas,self.data,self.err]
         self.header['UNIT1'] = "nanometer"
         self.header['UNIT2'] = self.units
@@ -503,6 +504,7 @@ class Spectrum():
             if self.header['UNIT2'] != "":
                 self.units = self.header['UNIT2']
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_filename)
+            hdu.close()   # need to free allocation for file descriptor
         else:
             self.my_logger.info('\n\tSpectrum file %s not found' % input_filename)
         
