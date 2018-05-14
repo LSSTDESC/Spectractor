@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 sys.path.append("../SpectractorSim")
 
 from scipy.signal import fftconvolve, gaussian
-from astroquery.gaia import Gaia, TapPlus, GaiaClass
-Gaia = GaiaClass(TapPlus(url='http://gaia.ari.uni-heidelberg.de/tap'))
+#from astroquery.gaia import Gaia, TapPlus, GaiaClass
+#Gaia = GaiaClass(TapPlus(url='http://gaia.ari.uni-heidelberg.de/tap'))
 
 from tools import *
 from dispersers import *
@@ -27,12 +27,13 @@ class StarModel():
         self.y0 = pixcoords[1]
         self.amplitude = amplitude
         self.target = target
-        self.model = copy.copy(model)
+        self.model = copy.deepcopy(model)
         self.model.x_mean = self.x0
         self.model.y_mean = self.y0
         self.model.amplitude = amplitude
-        self.fwhm = self.model.x_fwhm
-        self.sigma = self.fwhm / 2.355
+        # to be realistic, usually fitted fwhm is too big, divide by 2
+        self.fwhm = self.model.fwhm / 2
+        self.sigma = self.model.stddev / 2
 
     def plot_model(self):
         yy, xx = np.meshgrid(np.linspace(self.y0-10*self.fwhm,self.y0+10*self.fwhm,50),  np.linspace(self.x0-10*self.fwhm,self.x0+10*self.fwhm,50))
@@ -56,12 +57,13 @@ class StarFieldModel():
     def __init__(self,base_image,threshold=0):
         self.target = base_image.target
         self.field = None
-        result = Gaia.query_object_async(self.target.coord, width=IMSIZE*PIXEL2ARCSEC*units.arcsec/np.cos(self.target.coord.dec.radian), height=IMSIZE*PIXEL2ARCSEC*units.arcsec)
-        if parameters.DEBUG:
-            print result.pprint()
         self.stars = []
         self.pixcoords = []
         x0, y0 = base_image.target_pixcoords
+        '''
+        result = Gaia.query_object_async(self.target.coord, width=IMSIZE*PIXEL2ARCSEC*units.arcsec/np.cos(self.target.coord.dec.radian), height=IMSIZE*PIXEL2ARCSEC*units.arcsec)
+        if parameters.DEBUG:
+            print result.pprint()
         for o in result:
             if o['dist'] < 0.005 : continue
             radec = SkyCoord(ra=float(o['ra']),dec=float(o['dec']), frame='icrs', unit='deg')
@@ -76,13 +78,45 @@ class StarFieldModel():
             self.stars.append( StarModel([x,y],base_image.target_star2D,A) )
             self.pixcoords.append([x,y])
         self.pixcoords = np.array(self.pixcoords).T
-        self.fwhm = base_image.target_star2D.x_fwhm
+        np.savetxt('starfield.txt',self.pixcoords)
+'''
+        # mask background, faint stars, and saturated pixels
+        image_thresholded = np.copy(base_image.data)
+        self.saturation =  0.99*parameters.MAXADU/base_image.expo
+        self.saturated_pixels = np.where(image_thresholded > self.saturation)
+        image_thresholded[self.saturated_pixels] = 0.
+        image_thresholded -= threshold
+        image_thresholded[np.where(image_thresholded < 0)] = 0.
+        # mask order0 and spectrum
+        margin = 30
+        for y in range(int(y0)-100,int(y0)+100):
+            for x in range(IMSIZE):
+                u, v = pixel_rotation(x,y,base_image.disperser.theta([x0,y0])*np.pi/180.,x0,y0)
+                if v < margin and v > -margin:
+                    image_thresholded[y,x] = 0.
+        # look for local maxima and create stars
+        peak_positions = detect_peaks(image_thresholded)
+        for y in range(IMSIZE):
+            for x in range(IMSIZE):
+                if peak_positions[y,x]:
+                    if np.sqrt((y-y0)**2+(x-x0)**2) < 10*base_image.target_star2D.fwhm: continue # no double star 
+                    self.stars.append( StarModel([x,y],base_image.target_star2D,image_thresholded[y,x]) )
+                    self.pixcoords.append([x,y])  
+        self.pixcoords = np.array(self.pixcoords).T
+        self.fwhm = base_image.target_star2D.fwhm
 
     def model(self,x,y):
         if self.field is None:
+            window = int(10*self.fwhm)
             self.field = self.stars[0].model(x,y)
-            for k in range(len(self.stars)):
-                self.field += self.stars[k].model(x,y)
+            for k in range(1,len(self.stars)):
+                left = max(0,int(self.pixcoords[0][k])-window)
+                right = min(IMSIZE,int(self.pixcoords[0][k])+window)
+                low = max(0,int(self.pixcoords[1][k])-window)
+                up = min(IMSIZE,int(self.pixcoords[1][k])+window)
+                yy, xx = np.mgrid[low:up,left:right]
+                self.field[low:up,left:right] += self.stars[k].model(xx,yy)
+            self.field[self.saturated_pixels] += self.saturation
         return self.field
 
     def plot_model(self):
