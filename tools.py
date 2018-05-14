@@ -7,6 +7,8 @@ from astropy.modeling import models, fitting, Fittable2DModel, Parameter
 from astropy.stats import sigma_clip
 import warnings
 from scipy.signal import fftconvolve, gaussian
+from scipy.ndimage.filters import maximum_filter
+from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 
 from skimage.feature import hessian_matrix
 
@@ -181,6 +183,9 @@ class Star2D(Fittable2DModel):
     def __init__(self,amplitude=amplitude.default, x_mean=x_mean.default, y_mean=y_mean.default, stddev=stddev.default, saturation=saturation.default, **kwargs):
         super(Fittable2DModel, self).__init__(**kwargs)
 
+    @property
+    def fwhm(self):
+        return self.stddev / 2.335
     
     @staticmethod
     def evaluate(x, y, amplitude, x_mean, y_mean, stddev, saturation):
@@ -349,3 +354,41 @@ def formatting_numbers(value,errorhigh,errorlow,std=None,label=None):
     if std is not None : out += [str_std]
     out = tuple(out)
     return out
+
+def pixel_rotation(x,y,theta,x0=0,y0=0):
+    u =  np.cos(theta)*(x-x0) + np.sin(theta)*(y-y0)
+    v = -np.sin(theta)*(x-x0) + np.cos(theta)*(y-y0)
+    x = u + x0
+    y = v + y0
+    return u,v
+
+def detect_peaks(image):
+    """
+    Takes an image and detect the peaks usingthe local maximum filter.
+    Returns a boolean mask of the peaks (i.e. 1 when
+    the pixel's value is the neighborhood maximum, 0 otherwise)
+    """
+
+    # define an 8-connected neighborhood
+    neighborhood = generate_binary_structure(2,2)
+
+    #apply the local maximum filter; all pixel of maximal value 
+    #in their neighborhood are set to 1
+    local_max = maximum_filter(image, footprint=neighborhood)==image
+    #local_max is a mask that contains the peaks we are 
+    #looking for, but also the background.
+    #In order to isolate the peaks we must remove the background from the mask.
+
+    #we create the mask of the background
+    background = (image==0)
+
+    #a little technicality: we must erode the background in order to 
+    #successfully subtract it form local_max, otherwise a line will 
+    #appear along the background border (artifact of the local maximum filter)
+    eroded_background = binary_erosion(background, structure=neighborhood, border_value=50)
+
+    #we obtain the final mask, containing only peaks, 
+    #by removing the background from the local_max mask (xor operation)
+    detected_peaks = local_max ^ eroded_background
+
+    return detected_peaks
