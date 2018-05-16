@@ -165,15 +165,6 @@ def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None
 
 class Star2D(Fittable2DModel):
 
-    #def __init__(self):
-    #    Fittable2DModel.__init__(self)
-    #    self.inputs = ('amplitude','x_mean','y_mean','stddev','saturation')
-    #    self.param_names = ('amplitude','x_mean','y_mean','stddev','saturation')
-    #    self.amplitude = Parameter('amplitude')
-    #    self.x_mean = Parameter('x_mean')
-    #    self.y_mean = Parameter('y_mean')
-    #    self.stddev = Parameter('stddev')
-    #    self.saturation = Parameter('saturation')
     amplitude =  Parameter('amplitude',default=1)
     x_mean = Parameter('x_mean',default=0)
     y_mean = Parameter('y_mean',default=0)
@@ -209,7 +200,7 @@ class Star2D(Fittable2DModel):
         return [d_amplitude, d_x_mean, d_y_mean, d_stddev, d_saturation]
     
 def fit_star2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None):
-    '''Gauss2D parameters: amplitude, x_mean,y_mean,x_stddev, y_stddev,theta'''
+    '''Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation'''
     gg_init = Star2D()
     if guess is not None:
         for ip,p in enumerate(gg_init.param_names):
@@ -392,3 +383,25 @@ def detect_peaks(image):
     detected_peaks = local_max ^ eroded_background
 
     return detected_peaks
+
+def clean_target_spikes(data,saturation):
+    saturated_pixels = np.where(data > saturation)
+    data[saturated_pixels] = saturation
+    NY, NX = data.shape
+    delta  = len(saturated_pixels[0])
+    while delta > 0:
+        delta = len(saturated_pixels[0])
+        grady, gradx = np.gradient(data)
+        for iy in range(1,NY-1):
+            for ix in range(1,NX-1):
+                #if grady[iy,ix]  > 0.8*np.max(grady) :
+                #    data[iy,ix] = data[iy-1,ix]
+                #if grady[iy,ix]  < 0.8*np.min(grady) :
+                #    data[iy,ix] = data[iy+1,ix]
+                if gradx[iy,ix]  > 0.8*np.max(gradx) :
+                    data[iy,ix] = data[iy,ix-1]
+                if gradx[iy,ix]  < 0.8*np.min(gradx) :
+                    data[iy,ix] = data[iy,ix+1]
+        saturated_pixels = np.where(data >= saturation)
+        delta = delta - len(saturated_pixels[0])
+    return data

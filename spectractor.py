@@ -34,14 +34,16 @@ def Spectractor(filename,outputdir,guess,target,atmospheric_lines=True,line_dete
     
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
-    if parameters.DEBUG:
-        target_pixcoords = image.find_target_1Dprofile(guess)
-    target_pixcoords = image.find_target_2Dprofile(guess)
+    #if parameters.DEBUG:
+    #    target_pixcoords = image.find_target_1Dprofile(guess)
+    target_pixcoords = image.find_target(guess)
     # Rotate the image: several methods
     image.turn_image()
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-    target_pixcoords_rotated = image.find_target_2Dprofile(guess,rotated=True)
+    #if parameters.DEBUG:
+    #    target_pixcoords_rotated = image.find_target_1Dprofile(guess,rotated=True)
+    target_pixcoords_rotated = image.find_target(guess,rotated=True)
     # Subtract background and bad pixels
     spectrum = image.extract_spectrum_from_image()
     spectrum.atmospheric_lines = atmospheric_lines
@@ -89,15 +91,15 @@ if __name__ == "__main__":
     guess = [745,643]
     target = "3C273"
 
-    filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_028.fits"
-    guess = [814, 585]
-    target = "PNG321.0+3.9"
+    #filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_028.fits"
+    #guess = [814, 585]
+    #target = "PNG321.0+3.9"
     #filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_026.fits"
     #guess = [735, 645]
     #target = "PNG321.0+3.9"
-    filename="../CTIOAnaJun2017/ana_29may17/OverScanRemove/trim_images/trim_20170529_150.fits"
-    guess = [720, 670]
-    target = "HD185975"
+    #filename="../CTIOAnaJun2017/ana_29may17/OverScanRemove/trim_images/trim_20170529_150.fits"
+    #guess = [720, 670]
+    #target = "HD185975"
     #filename="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
     #guess = [840, 530]
     #target = "HD205905"
