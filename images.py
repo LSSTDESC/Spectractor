@@ -125,6 +125,10 @@ class Image():
             self.target_pixcoords_rotated = [theX,theY]
         else:
             self.target_pixcoords = [theX,theY]
+            self.header['TARGETX'] = theX
+            self.header.comments['TARGETX'] = 'target position on X axis'
+            self.header['TARGETY'] = theY
+            self.header.comments['TARGETY'] = 'target position on Y axis'
         return [theX,theY]
         
 
