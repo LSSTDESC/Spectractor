@@ -528,7 +528,7 @@ class Likelihood(Grid):
         if self.best_chisq > 1e6 :
             self.best_chisq = -2.0*np.log( self.total*self.getMaximum() )
         print 'Maximum likelihood position: chi2=%.3g' % self.best_chisq
-        for i in self.rangedim: 
+        for i in self.rangedim:
             print "\t"+self.labels[i]+": "+str(self.getAxisVal(i,self.maxindex[i][0]))
 
     def stats(self,output='',pdfonly=False,verbose=True):

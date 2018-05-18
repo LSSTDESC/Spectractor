@@ -141,8 +141,8 @@ class Grating():
     def N(self,x) :
         return self.N_input
 
-    def transmission(self,wavelength):
-        return np.ones_like(wavelength).astype(float)
+    #def transmission(self,wavelength):
+    #    return np.ones_like(wavelength).astype(float)
 
     def load_files(self,verbose=False):
         filename = self.data_dir+self.label+"/N.txt"
@@ -150,6 +150,13 @@ class Grating():
             a = np.loadtxt(filename)
             self.N_input = a[0]
             self.N_err = a[1]
+        filename = self.data_dir+self.label+"/transmission.txt"
+        if os.path.isfile(filename):
+            a = np.loadtxt(filename)
+            l, t = a.T
+            self.transmission = interpolate.interp1d(l,t,bounds_error=False,fill_value=0.)
+        else :
+            self.transmission = lambda x: np.ones_like(x).astype(float)
         filename = self.data_dir+self.label+"/hologram_center.txt"
         if os.path.isfile(filename):
             lines = [line.rstrip('\n') for line in open(filename)]
