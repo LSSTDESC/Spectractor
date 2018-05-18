@@ -38,6 +38,7 @@ class Chain(txttableclass):
         if(os.path.isfile(filename)):
             if parameters.VERBOSE:
                 self.my_logger.info('\n\tLoading '+filename+'...')
+            self.check_file(filename)
             self.loadfile(filename)
             self.config_columns_chain()
         else:
@@ -47,6 +48,21 @@ class Chain(txttableclass):
             else:
                 self.config_columns_chain()
 
+    def check_file(self,filename):
+        f = open(filename,'r')
+        line_index = 1
+        ncols = 0
+        for line in f:
+            words = line.rsplit('\n')[0].split()
+            if line_index == 1 :
+                ncols = len(words)
+            else:
+                if ncols != len(words):
+                    print 'Warning ! Line %d unequal number of elements %d != %d in file %s' % (line_index,ncols,len(words),filename)
+            line_index += 1
+        f.close()
+            
+
     def load_and_init(filename,createtit=True):
         self.load(filename,createit)
         self.nsteps = len(self.chain.allrowkeys)
@@ -54,7 +70,7 @@ class Chain(txttableclass):
     def config_columns_chain(self):
         # Respect this order
         self.configcols(['Chain', 'Index'],'d','%d',visible=1)
-        self.configcols(['Chi2'],'f','%.4g',visible=1)
+        self.configcols(['Chi2'],'f','%.1f',visible=1)
         for i in range(self.dim):
             self.configcols([self.labels[i]],'f','%.3g',visible=1)
 
@@ -136,7 +152,8 @@ class Chain(txttableclass):
         c = self.gelman*self.gelman / self.dim
         c_corr = (ar-0.25)/index
         c = c*(1.-1./index) + c_corr
-        self.gelman = np.sqrt(c*self.dim)
+        if c > 0 :
+            self.gelman = np.sqrt(c*self.dim)
         if parameters.DEBUG:
             print 'Gelman coefficient: %.3f (index=%d)' % (self.gelman,index)
              
@@ -213,8 +230,10 @@ class Chains(Chain):
         if self.best_key > -1 :
             best_row = self.getrow(self.best_key)
             #self.best_sample.loaddict(best_row)
+            self.best_row_params = []
             print 'Maximum likelihood sample: chi2=%.3g' % self.best_chisq
-            for i in range(self.dim): 
+            for i in range(self.dim):
+                self.best_row_params.append(best_row[self.labels[i]])
                 print "\t"+self.labels[i]+": "+str(best_row[self.labels[i]])
 
 

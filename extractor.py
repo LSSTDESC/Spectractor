@@ -24,11 +24,11 @@ class Extractor():
         self.ozone = 300.
         self.pwv = 3
         self.aerosols = 0.03
-        self.reso = 3.
+        self.reso = 10.
         self.shift = 1e-3
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.shift ])
         self.labels = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso", "$\lambda_{\\mathrm{shift}}$" ]
-        self.bounds = ((0,0,0,0,0,1,-20), (np.inf,1.0,np.inf,10,1.0,10,20))
+        self.bounds = ((0,0,0,0,0,1,-20), (np.inf,1.0,np.inf,10,1.0,100,20))
         self.title = ""
         self.spectrum, self.telescope, self.disperser, self.target = SpectractorSimInit(filename)
         self.airmass = self.spectrum.header['AIRMASS']
@@ -266,7 +266,7 @@ class Extractor_MCMC(Extractor):
                 print "Sample chisq : %.2f      Prior : %.2f" % (chisq2,prior2)
                 print "Sample vector : ",vec2
             r = np.random.uniform(0,1)
-            if L2/L1 > r : 
+            if L1>0 and L2/L1 > r : 
                 dictline = chain.make_dictline(i,chisq2,vec2)
                 vec1 = vec2
                 L1 = L2
@@ -274,9 +274,10 @@ class Extractor_MCMC(Extractor):
             else : 
                 dictline = chain.make_dictline(i,chisq1,vec1)
             new_key = chain.newrow(dictline,key=i+chain.nchain*chain.nsteps)
-            chain.append2filelastkey(self.chains.chains_filename)
+            #chain.append2filelastkey(self.chains.chains_filename)
             if i > self.exploration_time:
                 chain.update_proposal_cov(vec1)
+        chain.append2file(self.chains.chains_filename)
 
 
     def run_mcmc(self):
@@ -293,7 +294,8 @@ class Extractor_MCMC(Extractor):
         self.likelihood = self.chains.chains_to_likelihood()
         self.likelihood.stats(self.covfile) 
         #[self.results[i].append(self.likelihood.pdfs[i].mean) for i in range(self.chains.dim)]
-        self.p = [self.likelihood.pdfs[i].mean for i in range(self.chains.dim)]
+        #self.p = [self.likelihood.pdfs[i].mean for i in range(self.chains.dim)]
+        self.p = self.chains.best_row_params
         self.simulation(self.spectrum.lambdas,*self.p)
         #[self.results_err[i].append([self.likelihood.pdfs[i].errorhigh,self.likelihood.pdfs[i].errorlow]) for i in range(self.chains.dim)]
         #if(self.plot): 
@@ -318,16 +320,16 @@ if __name__ == "__main__":
 
 
     parameters.VERBOSE = False
-    filename = 'output/data_28may17/sim_20170528_060_spectrum.fits'
+    filename = 'output/data_30may17/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim','reduc').replace('spectrum','atmsim')
-    #filename = 'output/data_28may17/reduc_20170528_060_sim.fits'
+    filename = 'output/data_30may17/reduc_20170530_134_spectrum.fits'
  
 
     
     #m = Extractor(filename,atmgrid_filename)
     #m.minimizer(live_fit=True)
     covfile = 'covariances/proposal.txt'
-    m = Extractor_MCMC(filename,covfile,nchains=4,nsteps=4000,burnin=500,nbins=10,exploration_time=200,atmgrid_filename=atmgrid_filename,live_fit=False)
+    m = Extractor_MCMC(filename,covfile,nchains=4,nsteps=5000,burnin=1000,nbins=10,exploration_time=200,atmgrid_filename=atmgrid_filename,live_fit=False)
     m.run_mcmc()
     m.plot_fit()
 
