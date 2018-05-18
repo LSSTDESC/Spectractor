@@ -65,7 +65,7 @@ WL=np.arange(WLMIN,WLMAX,1) # Array of wavelength in Angstrom
 
 #aerosols
 #NB_AER_POINTS=20
-NB_AER_POINTS=10
+NB_AER_POINTS=5
 AER_MIN=0.
 AER_MAX=0.1
 
@@ -77,7 +77,7 @@ OZ_MAX=400
 
 # pwv
 #NB_PWV_POINTS=11
-NB_PWV_POINTS=10
+NB_PWV_POINTS=5
 PWV_MIN=0.
 PWV_MAX=10.
 
@@ -394,7 +394,8 @@ class TelescopeTransmission():
         
         # defines the datapath relative to the Spectractor sim path
         datapath=os.path.join(spectractorsim_path,"CTIOThroughput")
-        
+
+        '''
         # QE
         wl,qe=ctio.Get_QE(datapath)
         self.qe=interp1d(wl,qe,kind='linear',bounds_error=False,fill_value=0.) 
@@ -406,7 +407,10 @@ class TelescopeTransmission():
         # Mirrors 
         wl,trm=ctio.Get_Mirror(datapath)
         self.tm=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.) 
-          
+        '''
+        wl,trm = ctio.Get_Total_Throughput(datapath)
+        self.to=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.)
+        
         # Filter RG715
         wl,trg=ctio.Get_RG715(datapath)
         self.tfr=interp1d(wl,trg,kind='linear',bounds_error=False,fill_value=0.)
@@ -424,7 +428,8 @@ class TelescopeTransmission():
             
         self.tf=TF
         
-        self.transmission=lambda x: self.qe(x)*self.to(x)*(self.tm(x)**2)*self.tf(x)     
+        #self.transmission=lambda x: self.qe(x)*self.to(x)*(self.tm(x)**2)*self.tf(x)     
+        self.transmission=lambda x: self.to(x)*self.tf(x)     
         return self.transmission
     #---------------------------------------------------------------------------    
     def plot_transmission(self,xlim=None):
@@ -433,9 +438,9 @@ class TelescopeTransmission():
             plot the various transmissions of the instrument
         """
         plt.figure()
-        plt.plot(WL,self.qe(WL),'b-',label='qe')
+        #plt.plot(WL,self.qe(WL),'b-',label='qe')
         plt.plot(WL,self.to(WL),'g-',label='othr')
-        plt.plot(WL,self.tm(WL),'y-',label='mirr')
+        #plt.plot(WL,self.tm(WL),'y-',label='mirr')
         plt.plot(WL,self.tf(WL),'k-',label='filt')
         plt.plot(WL,self.tfr(WL),'k:',label='RG715')
         plt.plot(WL,self.tfb(WL),'k--',label='FGB37')
@@ -536,7 +541,7 @@ class SpectrumSimGrid():
         self.spectragrid[0,index_atm_data:]=self.lambdas
         self.spectragrid[:,index_atm_count:index_atm_data]=self.atmgrid[:,index_atm_count:index_atm_data] 
         # Is broadcasting working OK ?
-        self.spectragrid[1:,index_atm_data:]=self.atmgrid[1:,index_atm_data:]*all_transm*Factor
+        self.spectragrid[1:,index_atm_data:]=self.atmgrid[1:,index_atm_data:]*all_transm #*Factor
          
         return self.spectragrid
     #---------------------------------------------------------------------------
@@ -803,12 +808,12 @@ if __name__ == "__main__":
         parameters.DEBUG = True
         parameters.VERBOSE = True
 
-    filename="notebooks/fits/reduc_20170528_060_spectrum.fits"
+    filename="../Spectractor/output/data_30may17/reduc_20170530_134_spectrum.fits"
     
     #spectrum_simulation = SpectractorSim(filename,lambdas=WL,pwv=5,ozone=300,aerosols=0.05)
-    #SpectractorSimGrid(filename,opts.output_directory)
+    SpectractorSimGrid(filename,opts.output_directory)
 
-    atmgrid = AtmosphereGrid(filename,"../Spectractor/output/data_28may17/reduc_20170528_060_atmsim.fits")
+    atmgrid = AtmosphereGrid(filename,"../Spectractor/output/data_30may17/reduc_20170530_134_atmsim.fits")
     atm = Atmosphere(atmgrid.airmass,atmgrid.pressure,atmgrid.temperature)
 
     fig = plt.figure()
