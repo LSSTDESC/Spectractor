@@ -267,14 +267,10 @@ class Lines():
             bgd_index = index[:bgd_width]+index[-bgd_width:]
             sigma = None
             if spec_err is not None: sigma = spec_err[bgd_index]
-            #line_popt, line_pcov = fit_bgd(lambdas[bgd_index],spec[bgd_index],sigma=sigma)
             bgd = fit_poly1d_outlier_removal(lambdas[index],spec[index],order=BGD_ORDER,sigma=2,niter=100)
             for n in range(bgd_npar):
                 guess[n] = getattr(bgd,bgd.param_names[BGD_ORDER-n]).value
-                #bounds[0][n] = line_popt[n]-baseline_prior*np.sqrt(line_pcov[n][n])
-                #bounds[1][n] = line_popt[n]+baseline_prior*np.sqrt(line_pcov[n][n])
                 b = abs(baseline_prior*guess[n]) 
-                #b = abs(baseline_prior**(BGD_ORDER+1-n) * guess[n])
                 bounds[0][n] = guess[n] - b
                 bounds[1][n] = guess[n] + b
             for j in range(len(new_lines_list[k])) :
