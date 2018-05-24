@@ -50,7 +50,7 @@ def multigauss_and_bgd(x,*params):
     return out
 
 def fit_multigauss_and_bgd(x,y,guess=[10,1000,1,0,0,1],bounds=(-np.inf,np.inf),sigma=None):
-    maxfev=100000
+    maxfev=1000000
     popt,pcov = curve_fit(multigauss_and_bgd,x,y,p0=guess,bounds=bounds,maxfev=maxfev,sigma=sigma)
     return popt, pcov
 
@@ -100,6 +100,16 @@ def fit_poly1d_outlier_removal(x,y,order=2,sigma=3.0,niter=3):
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y)
+        '''
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(8,5))
+        plt.plot(x, y, 'gx', label="original data")
+        plt.plot(x, filtered_data, 'r+', label="filtered data")
+        plt.plot(x, or_fitted_model(x), 'r--',
+                 label="model fitted w/ filtered data")
+        plt.legend(loc=2, numpoints=1)
+        plt.show()
+        '''
         return or_fitted_model
 
 def fit_poly2d_outlier_removal(x,y,z,order=2,sigma=3.0,niter=30):
