@@ -52,14 +52,21 @@ class Chain(txttableclass):
         f = open(filename,'r')
         line_index = 1
         ncols = 0
+        new_file = ''
         for line in f:
             words = line.rsplit('\n')[0].split()
             if line_index == 1 :
                 ncols = len(words)
+                new_file += line
             else:
                 if ncols != len(words):
                     print 'Warning ! Line %d unequal number of elements %d != %d in file %s' % (line_index,ncols,len(words),filename)
+                else :
+                    new_file += line 
             line_index += 1
+        f.close()
+        f = open(filename,'w')
+        f.write(new_file)
         f.close()
             
 
@@ -186,8 +193,6 @@ class Chains(Chain):
         self.nbins = nbins
         self.truth = truth
         self.chains = []
-        for i in range(nchains):
-            self.chains.append( Chain(self.chains_filename, covfile, nchain=i, nsteps=nsteps) )
 
     def build_chains_filename(self):
         chain_name = self.filename.replace('spectrum.fits','chains.txt')
@@ -224,6 +229,18 @@ class Chains(Chain):
                     self.best_key = key
             self.best_sample_stats()
         return self.likelihood
+
+    def check_completness(self):
+        nchains = np.sort(np.unique(self.getentries(self.allrowkeys,'Chain')))
+        # Select keys
+        chain_keys = []
+        keys = self.allrowkeys
+        for nchain in nchains:
+            chain_keys.append(self.selectkeys(keys=keys,mask=[nchain,'exact'],col4mask='Chain'))
+        complete = True
+        for n in range(len(nchains)):
+            if len(chain_keys[n]) < self.nsteps-1 : complete = False
+        return complete
             
 
     def best_sample_stats(self):
@@ -231,7 +248,7 @@ class Chains(Chain):
             best_row = self.getrow(self.best_key)
             #self.best_sample.loaddict(best_row)
             self.best_row_params = []
-            print 'Maximum likelihood sample: chi2=%.3g' % self.best_chisq
+            print 'Minimum chisq sample: chisq=%.3g' % self.best_chisq
             for i in range(self.dim):
                 self.best_row_params.append(best_row[self.labels[i]])
                 print "\t"+self.labels[i]+": "+str(best_row[self.labels[i]])
@@ -239,7 +256,6 @@ class Chains(Chain):
 
 
     def convergence_tests(self):
-        self.load(self.chains_filename)
         nchains = np.sort(np.unique(self.getentries(self.allrowkeys,'Chain')))
         fig = plt.figure(figsize=(16,9))
         ax = [None]*(self.dim+2)

@@ -250,18 +250,27 @@ class Extractor_MCMC(Extractor):
         # MCMC exploration
         keys = range(chain.start_index,chain.nsteps)
         new_keys = []
-        for i in tqdm.tqdm(keys,desc='Processing chain %i:' % chain.nchain, position=chain.nchain): 
+        #import time
+        for i in tqdm.tqdm(keys,desc='Processing chain %i:' % chain.nchain, position=chain.nchain):
+            #start = time.time()
             if parameters.DEBUG:
                 print 'Step : %d (start=%d, stop=%d, remaining nsteps=%d)' % (i,chain.start_index,chain.start_index+chain.nsteps-1,chain.nsteps+chain.start_index-i)
             vec2 = []
             prior2 = 1
+            #print 'init',time.time()-start
+            #start = time.time()
             vec2 = chain.draw_vector(vec1)
             prior2 = self.prior(vec2)
+            #print 'prior',time.time()-start
+            #start = time.time()
+            
             if prior2 > 1e-10:
                 chisq2 = self.chisq(vec2)
             else:
                 chisq2 = 1e20
             L2 = np.exp(-0.5*chisq2)
+            #print 'chisq',time.time()-start
+            #start = time.time()
             if parameters.DEBUG:
                 print "Sample chisq : %.2f      Prior : %.2f" % (chisq2,prior2)
                 print "Sample vector : ",vec2
@@ -274,23 +283,31 @@ class Extractor_MCMC(Extractor):
             else : 
                 dictline = chain.make_dictline(i,chisq1,vec1)
             new_key = chain.newrow(dictline,key=i+chain.nchain*chain.nsteps)
+            #print 'newrow',time.time()-start
+            #start = time.time()
             #chain.append2filelastkey(self.chains.chains_filename)
             if i > self.exploration_time:
                 chain.update_proposal_cov(vec1)
+            #print 'proposal',time.time()-start
+            #start = time.time()
         chain.append2file(self.chains.chains_filename)
 
 
     def run_mcmc(self):
-        pool = Pool(processes=self.nchains)
-        try:
-            # Without the .get(9999), you can't interrupt this with Ctrl+C.
-            pool.map_async(self.mcmc, self.chains.chains).get(999999) 
-            pool.close()
-            pool.join()
-            # to skip lines after the progress bars
-            print '\n'*self.nchains
-        except KeyboardInterrupt:
-            pool.terminate()
+        complete = self.chains.check_completness()
+        if not complete :
+            for i in range(self.nchains):
+                self.chains.append( Chain(self.chains_filename, self.covfile, nchain=i, nsteps=self.nsteps) )
+            pool = Pool(processes=self.nchains)
+            try:
+                # Without the .get(9999), you can't interrupt this with Ctrl+C.
+                pool.map_async(self.mcmc, self.chains.chains).get(999999) 
+                pool.close()
+                pool.join()
+                # to skip lines after the progress bars
+                print '\n'*self.nchains
+            except KeyboardInterrupt:
+                pool.terminate()
         self.likelihood = self.chains.chains_to_likelihood()
         self.likelihood.stats(self.covfile) 
         #[self.results[i].append(self.likelihood.pdfs[i].mean) for i in range(self.chains.dim)]
@@ -300,6 +317,7 @@ class Extractor_MCMC(Extractor):
         #[self.results_err[i].append([self.likelihood.pdfs[i].errorhigh,self.likelihood.pdfs[i].errorlow]) for i in range(self.chains.dim)]
         #if(self.plot): 
         self.likelihood.triangle_plots()
+        self.plot_fit()
         #if convergence_test :
         self.chains.convergence_tests()
         return(self.likelihood)
@@ -320,16 +338,40 @@ if __name__ == "__main__":
 
 
     parameters.VERBOSE = False
-    filename = 'output/data_30may17/sim_20170530_134_spectrum.fits'
+    filename = 'output/data_30may17/sim_20170530_130_spectrum.fits'
     atmgrid_filename = filename.replace('sim','reduc').replace('spectrum','atmsim')
-    filename = 'output/data_30may17/reduc_20170530_134_spectrum.fits'
+    filename = 'output/data_30may17/reduc_20170530_130_spectrum.fits'
  
 
     
     #m = Extractor(filename,atmgrid_filename)
     #m.minimizer(live_fit=True)
     covfile = 'covariances/proposal.txt'
-    m = Extractor_MCMC(filename,covfile,nchains=4,nsteps=5000,burnin=1000,nbins=10,exploration_time=200,atmgrid_filename=atmgrid_filename,live_fit=False)
+    m = Extractor_MCMC(filename,covfile,nchains=4,nsteps=10000,burnin=5000,nbins=10,exploration_time=200,atmgrid_filename=atmgrid_filename,live_fit=False)
     m.run_mcmc()
-    m.plot_fit()
 
+'''
+init 2.86102294922e-06
+prior 0.000349044799805
+chisq 0.00533509254456
+newrow 7.10487365723e-05
+proposal 1.90734863281e-06
+init 2.86102294922e-06
+prior 0.000433921813965
+chisq 0.00504517555237
+newrow 0.00012993812561
+proposal 2.14576721191e-06
+'''
+
+'''
+init 3.81469726562e-06
+prior 0.000443935394287
+chisq 0.0124859809875
+newrow 0.000123023986816
+proposal 0.00762915611267
+init 7.15255737305e-06
+prior 0.00104594230652
+chisq 0.0136859416962
+newrow 9.89437103271e-05
+proposal 0.0144948959351
+'''
