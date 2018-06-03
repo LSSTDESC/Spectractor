@@ -408,8 +408,9 @@ class TelescopeTransmission():
         wl,trm=ctio.Get_Mirror(datapath)
         self.tm=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.) 
         '''
-        wl,trm = ctio.Get_Total_Throughput(datapath)
-        self.to=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.)
+        wl,trm,err = ctio.Get_Total_Throughput(datapath)
+        self.to = interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.)
+        self.to_err =interp1d(wl,err,kind='linear',bounds_error=False,fill_value=0.)
         
         # Filter RG715
         wl,trg=ctio.Get_RG715(datapath)
@@ -430,6 +431,7 @@ class TelescopeTransmission():
         
         #self.transmission=lambda x: self.qe(x)*self.to(x)*(self.tm(x)**2)*self.tf(x)     
         self.transmission=lambda x: self.to(x)*self.tf(x)     
+        self.transmission_err=lambda x: self.to_err(x)     
         return self.transmission
     #---------------------------------------------------------------------------    
     def plot_transmission(self,xlim=None):
@@ -444,7 +446,7 @@ class TelescopeTransmission():
         plt.plot(WL,self.tf(WL),'k-',label='filt')
         plt.plot(WL,self.tfr(WL),'k:',label='RG715')
         plt.plot(WL,self.tfb(WL),'k--',label='FGB37')
-        plt.plot(WL,self.transmission(WL),'r-',lw=2,label='tot')
+        plt.errorbar(WL,self.transmission(WL),yerr=self.transmission_err(WL),color='r',linestyle='-',lw=2,label='tot')
         plt.legend()
         plt.grid()
         plt.xlabel("$\lambda$ [nm]")
@@ -486,17 +488,22 @@ class SpectrumSimulation(Spectrum):
         self.data = self.disperser.transmission(lambdas)
         self.data *= self.telescope.transmission(lambdas)
         self.data *= self.target.sed(lambdas)
+        self.err = np.zeros_like(self.data)
+        idx = np.where(self.telescope.transmission(lambdas)>0)[0]
+        self.err[idx] = self.telescope.transmission_err(lambdas)[idx]/self.telescope.transmission(lambdas)[idx] * self.data[idx]
         #self.data *= self.lambdas*self.lambda_binwidths         
-        return self.data
+        return self.data, self.err
     #----------------------------------------------------------------------------    
     def simulate(self,lambdas):
-        all_transm = self.simulate_without_atmosphere(lambdas)
-        all_transm *= self.atmosphere.transmission(lambdas)
+        self.simulate_without_atmosphere(lambdas)
+        self.data *= self.atmosphere.transmission(lambdas)
+        self.err *= self.atmosphere.transmission(lambdas)
         #self.data = all_transm*Factor
         if self.reso is not None:
             self.data = fftconvolve_gaussian(self.data,self.reso)
+            self.err = np.sqrt( fftconvolve_gaussian(self.err**2,self.reso) )
         self.model = interp1d(lambdas,self.data,kind="linear",bounds_error=False,fill_value=(0,0))
-        return self.data
+        return self.data, self.err
     #---------------------------------------------------------------------------            
                 
 #----------------------------------------------------------------------------------
@@ -535,7 +542,7 @@ class SpectrumSimGrid():
     def compute(self):
         sim = SpectrumSimulation(self.spectrum,self.atmgrid,self.telescope,self.disperser)
         # product of all sed and transmission except atmosphere
-        all_transm = sim.simulate_without_atmosphere(self.lambdas)
+        all_transm, all_transm_err = sim.simulate_without_atmosphere(self.lambdas)
         # copy atmospheric grid parameters into spectra grid
         self.spectragrid = np.zeros_like(self.atmgrid) 
         self.spectragrid[0,index_atm_data:]=self.lambdas

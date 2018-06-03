@@ -32,7 +32,7 @@ filename_qe = "qecurve.txt"
 filename_FGB37="FGB37.txt"
 filename_RG715="RG175.txt"
 filename_Throughput='ctio_throughput.txt'
-filename_Total_Throughput='ctio_throughput_300517_v0.txt'
+filename_Total_Throughput='ctio_throughput_300517_v1.txt'
 filename_mirrors='lsst_mirrorthroughput.txt'
 
 WLMIN=300.
@@ -89,8 +89,9 @@ def Get_Total_Throughput(path):
     data_rg=ascii.read(filename) 
     x=data_rg["col1"]
     y=data_rg["col2"]
+    z=data_rg["col3"]
     indexes = np.where(np.logical_and(x>WLMIN,x<WLMAX)) 
-    return x[indexes],y[indexes]
+    return x[indexes],y[indexes],z[indexes]
 #---------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
 def Get_Mirror(path):
