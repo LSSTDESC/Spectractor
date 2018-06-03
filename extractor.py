@@ -74,24 +74,25 @@ class Extractor():
         else:
             self.truth = None
 
-
     def simulation(self,lambdas,A1,A2,ozone,pwv,aerosols,reso,shift=0.):
         self.title = 'Parameters: A1=%.3f, A2=%.3f, PWV=%.3f, OZ=%.3g, VAOD=%.3f, reso=%.2f, shift=%.2f' % (A1,A2,pwv,ozone,aerosols,reso,shift)
-        #print self.title
         self.atmosphere.simulate(ozone, pwv, aerosols)
         simulation = SpectrumSimulation(self.spectrum,self.atmosphere,self.telescope,self.disperser)
         simulation.simulate(lambdas-shift)    
         self.model_noconv = A1*np.copy(simulation.data)
         sim_conv = fftconvolve_gaussian(simulation.data,reso)
+        err_conv = np.sqrt(fftconvolve_gaussian(simulation.err**2,reso))
         sim_conv = interp1d(lambdas,sim_conv,kind="linear",bounds_error=False,fill_value=(0,0))
+        err_conv = interp1d(lambdas,err_conv,kind="linear",bounds_error=False,fill_value=(0,0))
         self.lambdas = lambdas
         self.model = lambda x: A1*sim_conv(x) + A1*A2*sim_conv(x/2)
+        self.model_err = lambda x: A1*err_conv(x) + A1*A2*err_conv(x/2)
         if self.live_fit: self.plot_fit()
-        return self.model(lambdas)
+        return self.model(lambdas), self.model_err(lambdas)
 
     def chisq(self,p):
-        model = self.simulation(self.spectrum.lambdas,*p)
-        chisq = np.sum(((model - self.spectrum.data)/self.spectrum.err)**2)
+        model, err = self.simulation(self.spectrum.lambdas,*p)
+        chisq = np.sum((model - self.spectrum.data)**2/(err**2 + self.spectrum.err**2))
         chisq /= self.spectrum.data.size
         #print '\tReduced chisq =',chisq/self.spectrum.data.size
         return chisq
@@ -110,23 +111,23 @@ class Extractor():
         ax3 = plt.subplot(121)
         # main plot
         self.spectrum.plot_spectrum_simple(ax3)
+        ax3.errorbar(self.lambdas,self.model(self.lambdas),yerr=self.model_err(self.lambdas),label='model')
         ax3.plot(self.lambdas,self.model_noconv,label='before conv')
-        ax3.plot(self.lambdas,self.model(self.lambdas),label='model')
         ax3.set_title(self.title,fontsize=10)
         ax3.legend()
         # zoom O2
         sub = np.where((self.lambdas>730) & (self.lambdas<800))
         self.spectrum.plot_spectrum_simple(ax2)
+        ax2.errorbar(self.lambdas[sub],self.model(self.lambdas[sub]),yerr=self.model_err(self.lambdas[sub]),label='model')
         ax2.plot(self.lambdas[sub],self.model_noconv[sub],label='before conv')
-        ax2.plot(self.lambdas[sub],self.model(self.lambdas[sub]),label='model')
         ax2.set_xlim((self.lambdas[sub][0],self.lambdas[sub][-1]))
         ax2.set_ylim((0.9*np.min(self.spectrum.data[sub]),1.1*np.max(self.spectrum.data[sub])))
         ax2.set_title('Zoom $O_2$',fontsize=10)
         # zoom H2O
         sub = np.where((self.lambdas>870) & (self.lambdas<1000))
         self.spectrum.plot_spectrum_simple(ax1)
+        ax1.errorbar(self.lambdas[sub],self.model(self.lambdas[sub]),yerr=self.model_err(self.lambdas[sub]),label='model')
         ax1.plot(self.lambdas[sub],self.model_noconv[sub],label='before conv')
-        ax1.plot(self.lambdas[sub],self.model(self.lambdas[sub]),label='model')
         ax1.set_xlim((self.lambdas[sub][0],self.lambdas[sub][-1]))
         ax1.set_ylim((0.9*np.min(self.spectrum.data[sub]),1.1*np.max(self.spectrum.data[sub])))
         ax1.set_title('Zoom $H_2 O$',fontsize=10)
@@ -338,9 +339,9 @@ if __name__ == "__main__":
 
 
     parameters.VERBOSE = False
-    filename = 'output/data_30may17/sim_20170530_130_spectrum.fits'
+    filename = 'output/data_30may17/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim','reduc').replace('spectrum','atmsim')
-    filename = 'output/data_30may17/reduc_20170530_130_spectrum.fits'
+    filename = 'output/data_30may17/reduc_20170530_134_spectrum.fits'
  
 
     
@@ -349,29 +350,3 @@ if __name__ == "__main__":
     covfile = 'covariances/proposal.txt'
     m = Extractor_MCMC(filename,covfile,nchains=4,nsteps=10000,burnin=5000,nbins=10,exploration_time=200,atmgrid_filename=atmgrid_filename,live_fit=False)
     m.run_mcmc()
-
-'''
-init 2.86102294922e-06
-prior 0.000349044799805
-chisq 0.00533509254456
-newrow 7.10487365723e-05
-proposal 1.90734863281e-06
-init 2.86102294922e-06
-prior 0.000433921813965
-chisq 0.00504517555237
-newrow 0.00012993812561
-proposal 2.14576721191e-06
-'''
-
-'''
-init 3.81469726562e-06
-prior 0.000443935394287
-chisq 0.0124859809875
-newrow 0.000123023986816
-proposal 0.00762915611267
-init 7.15255737305e-06
-prior 0.00104594230652
-chisq 0.0136859416962
-newrow 9.89437103271e-05
-proposal 0.0144948959351
-'''

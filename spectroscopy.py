@@ -198,7 +198,7 @@ class Lines():
             guess = [0]*bgd_npar+[0.5*np.max(spec[index]),lambdas[peak_index],0.5*(line.width_bounds[0]+line.width_bounds[1])]
             if line_strategy == np.less :
                 guess[bgd_npar] = -0.5*np.max(spec[index]) # look for abosrption under bgd
-            bounds = [[-np.inf]*bgd_npar+[-np.max(spec[index]),lambdas[index_inf],line.width_bounds[0]], [np.inf]*bgd_npar+[np.max(spec[index]),lambdas[index_sup],line.width_bounds[1]]  ]
+            bounds = [[-np.inf]*bgd_npar+[-abs(np.max(spec[index])),lambdas[index_inf],line.width_bounds[0]], [np.inf]*bgd_npar+[abs(np.max(spec[index])),lambdas[index_sup],line.width_bounds[1]]  ]
             # gaussian amplitude bounds depend if line is emission/absorption
             if line_strategy == np.less :
                 bounds[1][bgd_npar] = 0 # look for absorption under bgd
@@ -253,7 +253,7 @@ class Lines():
             # set central peak bounds exactly between two close lines
             for k in range(len(merge)-1) :
                 new_bounds_list[-1][0][bgd_npar+3*(k+1)+1]  = 0.5*(new_guess_list[-1][bgd_npar+3*k+1]+new_guess_list[-1][bgd_npar+3*(k+1)+1])
-                new_bounds_list[-1][1][bgd_npar+3*k+1] = 0.5*(new_guess_list[-1][bgd_npar+3*k+1]+new_guess_list[-1][bgd_npar+3*(k+1)+1])
+                new_bounds_list[-1][1][bgd_npar+3*k+1] = 0.5*(new_guess_list[-1][bgd_npar+3*k+1]+new_guess_list[-1][bgd_npar+3*(k+1)+1])+1e-3 # last term is to avoid equalities between bounds in some pathological case
             # sort pixel indices and remove doublons
             new_index_list[-1] = sorted(list(set(new_index_list[-1])))
         # fit the line subsets and background
@@ -276,6 +276,10 @@ class Lines():
             for j in range(len(new_lines_list[k])) :
                 idx = new_peak_index_list[k][j]
                 guess[bgd_npar+3*j] = np.sign(guess[bgd_npar+3*j])*abs(spec[idx] - np.polyval(guess[:bgd_npar],lambdas[idx]))
+                if np.sign(guess[bgd_npar+3*j]) < 0 : # absorption
+                    bounds[0][bgd_npar+3*j] = 2*guess[bgd_npar+3*j]
+                else: # emission
+                    bounds[1][bgd_npar+3*j] = 2*guess[bgd_npar+3*j]
             # fit local extrema with a multigaussian + BGD_ORDER polynom
             # account for the spectrum uncertainties if provided
             sigma = None
