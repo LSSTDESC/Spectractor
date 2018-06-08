@@ -417,7 +417,7 @@ class Spectrum():
         xs = self.lambdas
         if xs is None : xs = np.arange(self.data.shape[0])
         if self.err is not None:
-            ax.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % self.order,zorder=0)
+            ax.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % self.order,zorder=0,markersize=2)
         else:
             ax.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % self.order)
         ax.grid(True)
