@@ -3,10 +3,12 @@ import scipy
 from scipy.optimize import curve_fit
 from scipy.misc import imresize
 import numpy as np
-from astropy.modeling import models, fitting
+from astropy.modeling import models, fitting, Fittable2DModel, Parameter
 from astropy.stats import sigma_clip
 import warnings
 from scipy.signal import fftconvolve, gaussian
+from scipy.ndimage.filters import maximum_filter
+from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 
 from skimage.feature import hessian_matrix
 
@@ -48,7 +50,7 @@ def multigauss_and_bgd(x,*params):
     return out
 
 def fit_multigauss_and_bgd(x,y,guess=[10,1000,1,0,0,1],bounds=(-np.inf,np.inf),sigma=None):
-    maxfev=100000
+    maxfev=1000000
     popt,pcov = curve_fit(multigauss_and_bgd,x,y,p0=guess,bounds=bounds,maxfev=maxfev,sigma=sigma)
     return popt, pcov
 
@@ -98,6 +100,16 @@ def fit_poly1d_outlier_removal(x,y,order=2,sigma=3.0,niter=3):
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y)
+        '''
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(8,5))
+        plt.plot(x, y, 'gx', label="original data")
+        plt.plot(x, filtered_data, 'r+', label="filtered data")
+        plt.plot(x, or_fitted_model(x), 'r--',
+                 label="model fitted w/ filtered data")
+        plt.legend(loc=2, numpoints=1)
+        plt.show()
+        '''
         return or_fitted_model
 
 def fit_poly2d_outlier_removal(x,y,z,order=2,sigma=3.0,niter=30):
@@ -117,7 +129,7 @@ def tied_circular_gauss2d(g1):
     std = g1.x_stddev
     return std
 
-def fit_gauss2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None,circular=False):
+def fit_gauss2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None,circular=False):
     '''Gauss2D parameters: amplitude, x_mean,y_mean,x_stddev, y_stddev,theta'''
     gg_init = models.Gaussian2D()
     if guess is not None:
@@ -137,9 +149,10 @@ def fit_gauss2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None,
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        if parameters.VERBOSE: print or_fitted_model
         return or_fitted_model
-
-def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None):
+   
+def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None):
     '''Moffat2D parameters: amplitude, x_mean,y_mean,gamma,alpha'''
     gg_init = models.Moffat2D()
     if guess is not None:
@@ -156,7 +169,65 @@ def fit_moffat2d_outlier_removal(x,y,z,sigma=3.0,niter=30,guess=None,bounds=None
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        print or_fitted_model
+        if parameters.VERBOSE: print or_fitted_model
+        return or_fitted_model
+
+
+class Star2D(Fittable2DModel):
+
+    amplitude =  Parameter('amplitude',default=1)
+    x_mean = Parameter('x_mean',default=0)
+    y_mean = Parameter('y_mean',default=0)
+    stddev = Parameter('stddev',default=1)
+    saturation = Parameter('saturation',default=1)
+
+    def __init__(self,amplitude=amplitude.default, x_mean=x_mean.default, y_mean=y_mean.default, stddev=stddev.default, saturation=saturation.default, **kwargs):
+        super(Fittable2DModel, self).__init__(**kwargs)
+
+    @property
+    def fwhm(self):
+        return self.stddev / 2.335
+    
+    @staticmethod
+    def evaluate(x, y, amplitude, x_mean, y_mean, stddev, saturation):
+        a = amplitude * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
+        if isinstance(x, float) and isinstance(y, float):
+            if a > saturation:
+                return saturation
+            else:
+                return a
+        else:
+            a[np.where(a>=saturation)] = saturation
+            return a
+
+    @staticmethod
+    def fit_deriv(x, y, amplitude, x_mean, y_mean, stddev, saturation):
+        d_amplitude = np.exp(-((1 / (2. * stddev**2)) * (x - x_mean)**2 + (1 / (2. * stddev**2)) * (y - y_mean)**2))
+        d_x_mean = - amplitude * (x - x_mean) / (stddev**2) * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
+        d_y_mean = - amplitude * (y - y_mean) / (stddev**2) * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
+        d_stddev = amplitude * ((x - x_mean)**2+(y - y_mean)**2) / (stddev**3) * np.exp(-(1 / (2. * stddev**2)) * (x - x_mean)**2 - (1 / (2. * stddev**2)) * (y - y_mean)**2)
+        d_saturation = np.zeros_like(x)
+        return [d_amplitude, d_x_mean, d_y_mean, d_stddev, d_saturation]
+    
+def fit_star2d_outlier_removal(x,y,z,sigma=3.0,niter=50,guess=None,bounds=None):
+    '''Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation'''
+    gg_init = Star2D()
+    if guess is not None:
+        for ip,p in enumerate(gg_init.param_names):
+            getattr(gg_init,p).value = guess[ip]
+    if bounds is not None:
+        for ip,p in enumerate(gg_init.param_names):
+            getattr(gg_init,p).min = bounds[0][ip]
+            getattr(gg_init,p).max = bounds[1][ip]
+    gg_init.saturation.fixed = True
+    with warnings.catch_warnings():
+        # Ignore model linearity warning from the fitter
+        warnings.simplefilter('ignore')
+        fit = fitting.LevMarLSQFitter()
+        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+        # get fitted model and filtered data
+        filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        if parameters.VERBOSE: print or_fitted_model
         return or_fitted_model
 
 def find_nearest(array,value):
@@ -284,3 +355,63 @@ def formatting_numbers(value,errorhigh,errorlow,std=None,label=None):
     if std is not None : out += [str_std]
     out = tuple(out)
     return out
+
+def pixel_rotation(x,y,theta,x0=0,y0=0):
+    u =  np.cos(theta)*(x-x0) + np.sin(theta)*(y-y0)
+    v = -np.sin(theta)*(x-x0) + np.cos(theta)*(y-y0)
+    x = u + x0
+    y = v + y0
+    return u,v
+
+def detect_peaks(image):
+    """
+    Takes an image and detect the peaks usingthe local maximum filter.
+    Returns a boolean mask of the peaks (i.e. 1 when
+    the pixel's value is the neighborhood maximum, 0 otherwise)
+    """
+
+    # define an 8-connected neighborhood
+    neighborhood = generate_binary_structure(2,2)
+
+    #apply the local maximum filter; all pixel of maximal value 
+    #in their neighborhood are set to 1
+    local_max = maximum_filter(image, footprint=neighborhood)==image
+    #local_max is a mask that contains the peaks we are 
+    #looking for, but also the background.
+    #In order to isolate the peaks we must remove the background from the mask.
+
+    #we create the mask of the background
+    background = (image==0)
+
+    #a little technicality: we must erode the background in order to 
+    #successfully subtract it form local_max, otherwise a line will 
+    #appear along the background border (artifact of the local maximum filter)
+    eroded_background = binary_erosion(background, structure=neighborhood, border_value=50)
+
+    #we obtain the final mask, containing only peaks, 
+    #by removing the background from the local_max mask (xor operation)
+    detected_peaks = local_max ^ eroded_background
+
+    return detected_peaks
+
+def clean_target_spikes(data,saturation):
+    saturated_pixels = np.where(data > saturation)
+    data[saturated_pixels] = saturation
+    NY, NX = data.shape
+    delta  = len(saturated_pixels[0])
+    while delta > 0:
+        delta = len(saturated_pixels[0])
+        grady, gradx = np.gradient(data)
+        for iy in range(1,NY-1):
+            for ix in range(1,NX-1):
+                #if grady[iy,ix]  > 0.8*np.max(grady) :
+                #    data[iy,ix] = data[iy-1,ix]
+                #if grady[iy,ix]  < 0.8*np.min(grady) :
+                #    data[iy,ix] = data[iy+1,ix]
+                if gradx[iy,ix]  > 0.8*np.max(gradx) :
+                    data[iy,ix] = data[iy,ix-1]
+                if gradx[iy,ix]  < 0.8*np.min(gradx) :
+                    data[iy,ix] = data[iy,ix+1]
+        saturated_pixels = np.where(data >= saturation)
+        delta = delta - len(saturated_pixels[0])
+    return data
