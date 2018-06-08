@@ -10,6 +10,7 @@ import tqdm
 from scipy.optimize import minimize, least_squares
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pathos.multiprocessing import Pool
 
 
@@ -78,7 +79,7 @@ class Extractor():
         self.title = 'Parameters: A1=%.3f, A2=%.3f, PWV=%.3f, OZ=%.3g, VAOD=%.3f, reso=%.2f, shift=%.2f' % (A1,A2,pwv,ozone,aerosols,reso,shift)
         self.atmosphere.simulate(ozone, pwv, aerosols)
         simulation = SpectrumSimulation(self.spectrum,self.atmosphere,self.telescope,self.disperser)
-        simulation.simulate(lambdas-shift)    
+        simulation.simulate(lambdas-shift)
         self.model_noconv = A1*np.copy(simulation.data)
         sim_conv = fftconvolve_gaussian(simulation.data,reso)
         err_conv = np.sqrt(fftconvolve_gaussian(simulation.err**2,reso))
@@ -86,14 +87,14 @@ class Extractor():
         err_conv = interp1d(lambdas,err_conv,kind="linear",bounds_error=False,fill_value=(0,0))
         self.lambdas = lambdas
         self.model = lambda x: A1*sim_conv(x) + A1*A2*sim_conv(x/2)
-        self.model_err = lambda x: A1*err_conv(x) + A1*A2*err_conv(x/2)
+        self.model_err = lambda x: np.sqrt( (A1*err_conv(x))**2 + (0.5*A1*A2*err_conv(x/2))**2)
         if self.live_fit: self.plot_fit()
         return self.model(lambdas), self.model_err(lambdas)
 
     def chisq(self,p):
         model, err = self.simulation(self.spectrum.lambdas,*p)
         chisq = np.sum((model - self.spectrum.data)**2/(err**2 + self.spectrum.err**2))
-        chisq /= self.spectrum.data.size
+        #chisq /= self.spectrum.data.size
         #print '\tReduced chisq =',chisq/self.spectrum.data.size
         return chisq
 
@@ -104,33 +105,46 @@ class Extractor():
         print res
         print res.x
 
+    def plot_spectrum_comparison_simple(self,ax,title='',extent=None,size=0.4):
+        self.spectrum.plot_spectrum_simple(ax)
+        sub = np.where((self.lambdas>parameters.LAMBDA_MIN) & (self.lambdas<parameters.LAMBDA_MAX))
+        if extent != None : 
+            sub = np.where((self.lambdas>extent[0]) & (self.lambdas<extent[1]))
+        p0 = ax.plot(self.lambdas,self.model(self.lambdas),label='model')
+        ax.fill_between(self.lambdas,self.model(self.lambdas)-self.model_err(self.lambdas),self.model(self.lambdas)+self.model_err(self.lambdas),alpha=0.3,color=p0[0].get_color())
+        ax.plot(self.lambdas,self.model_noconv,label='before conv')
+        if title != '' : ax.set_title(title,fontsize=10)
+        ax.legend()
+        divider = make_axes_locatable(ax)
+        ax2 = divider.append_axes("bottom",size=size,pad=0)
+        ax.figure.add_axes(ax2)
+        residuals = (self.spectrum.data-self.model(self.lambdas)) / self.model(self.lambdas)
+        residuals_err = self.spectrum.err / self.model(self.lambdas)
+        ax2.errorbar(self.lambdas,residuals,yerr=residuals_err,fmt='ro',markersize=2)
+        ax2.axhline(0,color=p0[0].get_color())
+        ax2.grid(True)
+        residuals_model = self.model_err(self.lambdas)/self.model(self.lambdas)
+        ax2.fill_between(self.lambdas,-residuals_model,residuals_model,alpha=0.3,color=p0[0].get_color())
+        std = np.std(residuals[sub])
+        ax2.set_ylim([-2.*std,2.*std])
+        ax2.set_xlabel(ax.get_xlabel())
+        ax2.set_ylabel('(data-fit)/fit')
+        ax2.set_xlim((self.lambdas[sub][0],self.lambdas[sub][-1]))
+        ax.set_xlim((self.lambdas[sub][0],self.lambdas[sub][-1]))
+        ax.set_ylim((0.9*np.min(self.spectrum.data[sub]),1.1*np.max(self.spectrum.data[sub])))
+        ax.set_xticks(ax2.get_xticks()[1:-1])
+
     def plot_fit(self):
         fig = plt.figure(figsize=(12,6))
         ax1 = plt.subplot(222)
         ax2 = plt.subplot(224)
         ax3 = plt.subplot(121)
         # main plot
-        self.spectrum.plot_spectrum_simple(ax3)
-        ax3.errorbar(self.lambdas,self.model(self.lambdas),yerr=self.model_err(self.lambdas),label='model')
-        ax3.plot(self.lambdas,self.model_noconv,label='before conv')
-        ax3.set_title(self.title,fontsize=10)
-        ax3.legend()
+        self.plot_spectrum_comparison_simple(ax3,title=self.title,size=0.8)
         # zoom O2
-        sub = np.where((self.lambdas>730) & (self.lambdas<800))
-        self.spectrum.plot_spectrum_simple(ax2)
-        ax2.errorbar(self.lambdas[sub],self.model(self.lambdas[sub]),yerr=self.model_err(self.lambdas[sub]),label='model')
-        ax2.plot(self.lambdas[sub],self.model_noconv[sub],label='before conv')
-        ax2.set_xlim((self.lambdas[sub][0],self.lambdas[sub][-1]))
-        ax2.set_ylim((0.9*np.min(self.spectrum.data[sub]),1.1*np.max(self.spectrum.data[sub])))
-        ax2.set_title('Zoom $O_2$',fontsize=10)
+        self.plot_spectrum_comparison_simple(ax2,extent=[730,800],title='Zoom $O_2$',size=0.8)
         # zoom H2O
-        sub = np.where((self.lambdas>870) & (self.lambdas<1000))
-        self.spectrum.plot_spectrum_simple(ax1)
-        ax1.errorbar(self.lambdas[sub],self.model(self.lambdas[sub]),yerr=self.model_err(self.lambdas[sub]),label='model')
-        ax1.plot(self.lambdas[sub],self.model_noconv[sub],label='before conv')
-        ax1.set_xlim((self.lambdas[sub][0],self.lambdas[sub][-1]))
-        ax1.set_ylim((0.9*np.min(self.spectrum.data[sub]),1.1*np.max(self.spectrum.data[sub])))
-        ax1.set_title('Zoom $H_2 O$',fontsize=10)
+        self.plot_spectrum_comparison_simple(ax1,extent=[870,1000],title='Zoom $H_2 O$',size=0.8)
         fig.tight_layout()
         if self.live_fit:
             plt.draw()
@@ -244,10 +258,11 @@ class Extractor_MCMC(Extractor):
                 prior1 = self.prior(vec1)
         else :
             chain.start_index += 1
-        vec1[0] *= np.max(self.spectrum.data)/np.max(self.simulation(self.spectrum.lambdas,*vec1))
+        sim = self.simulation(self.spectrum.lambdas,*vec1)
+        if np.max(sim) > 0 : vec1[0] *= np.max(self.spectrum.data)/np.max(sim)
         if parameters.DEBUG: print "First vector : ",vec1
         chisq1 = self.chisq(vec1)
-        L1 = np.exp(-0.5*chisq1)
+        L1 = np.exp(-0.5*chisq1 +0.5*self.spectrum.lambdas.size)
         # MCMC exploration
         keys = range(chain.start_index,chain.nsteps)
         new_keys = []
@@ -269,14 +284,15 @@ class Extractor_MCMC(Extractor):
                 chisq2 = self.chisq(vec2)
             else:
                 chisq2 = 1e20
-            L2 = np.exp(-0.5*chisq2)
+            L2 = np.exp(-0.5*chisq2) # +0.5*self.spectrum.lambdas.size)
             #print 'chisq',time.time()-start
             #start = time.time()
             if parameters.DEBUG:
                 print "Sample chisq : %.2f      Prior : %.2f" % (chisq2,prior2)
                 print "Sample vector : ",vec2
             r = np.random.uniform(0,1)
-            if L1>0 and L2/L1 > r : 
+            #if L1>0 and L2/L1 > r : 
+            if np.exp(-0.5*(chisq2-chisq1)) > r : 
                 dictline = chain.make_dictline(i,chisq2,vec2)
                 vec1 = vec2
                 L1 = L2
@@ -298,7 +314,7 @@ class Extractor_MCMC(Extractor):
         complete = self.chains.check_completness()
         if not complete :
             for i in range(self.nchains):
-                self.chains.append( Chain(self.chains_filename, self.covfile, nchain=i, nsteps=self.nsteps) )
+                self.chains.chains.append( Chain(self.chains.chains_filename, self.covfile, nchain=i, nsteps=self.nsteps) )
             pool = Pool(processes=self.nchains)
             try:
                 # Without the .get(9999), you can't interrupt this with Ctrl+C.
@@ -348,5 +364,5 @@ if __name__ == "__main__":
     #m = Extractor(filename,atmgrid_filename)
     #m.minimizer(live_fit=True)
     covfile = 'covariances/proposal.txt'
-    m = Extractor_MCMC(filename,covfile,nchains=4,nsteps=10000,burnin=5000,nbins=10,exploration_time=200,atmgrid_filename=atmgrid_filename,live_fit=False)
+    m = Extractor_MCMC(filename,covfile,nchains=4,nsteps=10000,burnin=2000,nbins=10,exploration_time=500,atmgrid_filename=atmgrid_filename,live_fit=False)
     m.run_mcmc()

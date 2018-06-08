@@ -79,7 +79,7 @@ class Chain(txttableclass):
         self.configcols(['Chain', 'Index'],'d','%d',visible=1)
         self.configcols(['Chi2'],'f','%.1f',visible=1)
         for i in range(self.dim):
-            self.configcols([self.labels[i]],'f','%.3g',visible=1)
+            self.configcols([self.labels[i]],'f','%.4g',visible=1)
 
     def read_covfile(self,covfile):
         if(os.path.isfile(covfile)):
@@ -237,9 +237,9 @@ class Chains(Chain):
         keys = self.allrowkeys
         for nchain in nchains:
             chain_keys.append(self.selectkeys(keys=keys,mask=[nchain,'exact'],col4mask='Chain'))
-        complete = True
+        complete = False
         for n in range(len(nchains)):
-            if len(chain_keys[n]) < self.nsteps-1 : complete = False
+            if len(chain_keys[n]) == self.nsteps-1 : complete = True
         return complete
             
 
