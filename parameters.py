@@ -31,8 +31,6 @@ wl_dwl_unit=(units.nanometer)**2  # lambda.dlambda  in wavelength in nm
 g_disperser_ronchi=0.2            # theoretical gain for order+1 : 20%
 FLAM_TO_ADURATE=((OBS_SURFACE*SED_UNIT*TIME_UNIT*wl_dwl_unit/hc/GAIN*g_disperser_ronchi).decompose()).value
 
-
-
 # Search windows in images
 XWINDOW = 100 # window x size to search for the targetted object 
 YWINDOW = 100 # window y size to search for the targetted object

@@ -123,15 +123,16 @@ class Lines():
         # main settings
         bgd_npar = parameters.BGD_NPARAMS
         peak_look = 7 # half range to look for local maximum in pixels
-        bgd_width = 9 # size of the peak sides to use to fit spectrum base line
+        bgd_width = 7 # size of the peak sides to use to fit spectrum base line
         if self.hydrogen_only :
             peak_look = 15
             bgd_width = 20
-        baseline_prior = 0.5 # *sigma gaussian prior on base line fit
+        baseline_prior = 1e-10 # *sigma gaussian prior on base line fit
         # initialisation
         lambda_shifts = []
         snrs = []
         index_list = []
+        peak_index_list = []
         guess_list = []
         bounds_list = []
         lines_list = []
@@ -197,12 +198,13 @@ class Lines():
             guess = [0]*bgd_npar+[0.5*np.max(spec[index]),lambdas[peak_index],0.5*(line.width_bounds[0]+line.width_bounds[1])]
             if line_strategy == np.less :
                 guess[bgd_npar] = -0.5*np.max(spec[index]) # look for abosrption under bgd
-            bounds = [[-np.inf]*bgd_npar+[-2*np.max(spec[index]),lambdas[index_inf],line.width_bounds[0]], [np.inf]*bgd_npar+[2*np.max(spec[index]),lambdas[index_sup],line.width_bounds[1]]  ]
+            bounds = [[-np.inf]*bgd_npar+[-abs(np.max(spec[index])),lambdas[index_inf],line.width_bounds[0]], [np.inf]*bgd_npar+[abs(np.max(spec[index])),lambdas[index_sup],line.width_bounds[1]]  ]
             # gaussian amplitude bounds depend if line is emission/absorption
             if line_strategy == np.less :
-                bounds[1][bgd_npar] = 0 # look for abosrption under bgd
+                bounds[1][bgd_npar] = 0 # look for absorption under bgd
             else :
                 bounds[0][bgd_npar] = 0 # look for emission above bgd
+            peak_index_list.append(peak_index)
             index_list.append(index)
             lines_list.append(line)
             guess_list.append(guess)
@@ -224,11 +226,13 @@ class Lines():
             tmp_guess = [guess_list[i][bgd_npar+1] for i in merge]
             new_merges.append( [x for _,x in sorted(zip(tmp_guess,merge))] )
         # reorder lists with merges
+        new_peak_index_list = []
         new_index_list = []
         new_guess_list = []
         new_bounds_list = []
         new_lines_list = []
         for merge in new_merges :
+            new_peak_index_list.append([])
             new_index_list.append([])
             new_guess_list.append([])
             new_bounds_list.append([[],[]])
@@ -240,6 +244,7 @@ class Lines():
                     new_bounds_list[-1][0] += bounds_list[i][0][:bgd_npar]
                     new_bounds_list[-1][1] += bounds_list[i][1][:bgd_npar]
                 # add the gauss parameters
+                new_peak_index_list[-1].append(peak_index_list[i])
                 new_index_list[-1] += index_list[i]
                 new_guess_list[-1] += guess_list[i][bgd_npar:]
                 new_bounds_list[-1][0] += bounds_list[i][0][bgd_npar:]
@@ -248,24 +253,33 @@ class Lines():
             # set central peak bounds exactly between two close lines
             for k in range(len(merge)-1) :
                 new_bounds_list[-1][0][bgd_npar+3*(k+1)+1]  = 0.5*(new_guess_list[-1][bgd_npar+3*k+1]+new_guess_list[-1][bgd_npar+3*(k+1)+1])
-                new_bounds_list[-1][1][bgd_npar+3*k+1] = 0.5*(new_guess_list[-1][bgd_npar+3*k+1]+new_guess_list[-1][bgd_npar+3*(k+1)+1])
+                new_bounds_list[-1][1][bgd_npar+3*k+1] = 0.5*(new_guess_list[-1][bgd_npar+3*k+1]+new_guess_list[-1][bgd_npar+3*(k+1)+1])+1e-3 # last term is to avoid equalities between bounds in some pathological case
             # sort pixel indices and remove doublons
             new_index_list[-1] = sorted(list(set(new_index_list[-1])))
         # fit the line subsets and background
         rows = []
         for k in range(len(new_index_list)):
             # first guess for the base line with the lateral bands
+            peak_index = new_peak_index_list[k]
             index = new_index_list[k]
             guess = new_guess_list[k]
             bounds = new_bounds_list[k]
             bgd_index = index[:bgd_width]+index[-bgd_width:]
             sigma = None
             if spec_err is not None: sigma = spec_err[bgd_index]
-            line_popt, line_pcov = fit_bgd(lambdas[bgd_index],spec[bgd_index],sigma=sigma)
+            bgd = fit_poly1d_outlier_removal(lambdas[index],spec[index],order=BGD_ORDER,sigma=2,niter=100)
             for n in range(bgd_npar):
-                guess[n] = line_popt[n]
-                bounds[0][n] = line_popt[n]-baseline_prior*np.sqrt(line_pcov[n][n])
-                bounds[1][n] = line_popt[n]+baseline_prior*np.sqrt(line_pcov[n][n])
+                guess[n] = getattr(bgd,bgd.param_names[BGD_ORDER-n]).value
+                b = abs(baseline_prior*guess[n]) 
+                bounds[0][n] = guess[n] - b
+                bounds[1][n] = guess[n] + b
+            for j in range(len(new_lines_list[k])) :
+                idx = new_peak_index_list[k][j]
+                guess[bgd_npar+3*j] = np.sign(guess[bgd_npar+3*j])*abs(spec[idx] - np.polyval(guess[:bgd_npar],lambdas[idx]))
+                if np.sign(guess[bgd_npar+3*j]) < 0 : # absorption
+                    bounds[0][bgd_npar+3*j] = 2*guess[bgd_npar+3*j]
+                else: # emission
+                    bounds[1][bgd_npar+3*j] = 2*guess[bgd_npar+3*j]
             # fit local extrema with a multigaussian + BGD_ORDER polynom
             # account for the spectrum uncertainties if provided
             sigma = None
@@ -285,6 +299,8 @@ class Lines():
             #plt.plot(lambdas[bgd_index],spec[bgd_index])
             #plt.plot(lambdas[index],np.polyval(popt[:bgd_npar],lambdas[index]),'b--')
             #plt.plot(lambdas[index],multigauss_and_bgd(lambdas[index],*popt),'b-')
+            #plt.plot(lambdas[index],multigauss_and_bgd(lambdas[index],*guess),'g-')
+            #plt.plot(lambdas[index],base_line,'r-')
             #plt.show()
             plot_line_subset = False
             for j in range(len(new_lines_list[k])) :
@@ -401,7 +417,7 @@ class Spectrum():
         xs = self.lambdas
         if xs is None : xs = np.arange(self.data.shape[0])
         if self.err is not None:
-            ax.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % self.order,zorder=0)
+            ax.errorbar(xs,self.data,yerr=self.err,fmt='ro',lw=1,label='Order %d spectrum' % self.order,zorder=0,markersize=2)
         else:
             ax.plot(xs,self.data,'r-',lw=2,label='Order %d spectrum' % self.order)
         ax.grid(True)
