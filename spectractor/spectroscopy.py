@@ -489,7 +489,7 @@ class Spectrum(object):
             self.lines.plot_atomic_lines(plt.gca(), fontsize=12)
         if not nofit and self.lambdas is not None:
             self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
-                                                   verbose=parameters.VERBOSE)
+                                    verbose=parameters.VERBOSE)
         plt.legend(loc='best')
         if self.filters is not None:
             plt.gca().get_legend().set_title(self.filters)

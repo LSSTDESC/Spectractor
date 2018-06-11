@@ -1,16 +1,10 @@
-import sys, os
-import numpy as np
-import matplotlib.pyplot as plt
+import sys
 
 sys.path.append("../SpectractorSim")
 
-from scipy.signal import fftconvolve, gaussian
 # from astroquery.gaia import Gaia, TapPlus, GaiaClass
 # Gaia = GaiaClass(TapPlus(url='http://gaia.ari.uni-heidelberg.de/tap'))
 
-from tools import *
-from dispersers import *
-from targets import *
 from images import *
 from spectroscopy import *
 from spectractorsim import *
@@ -351,8 +345,8 @@ if __name__ == "__main__":
                       help="Enter debug mode (more verbose and plots).", default=False)
     parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
                       help="Enter verbose (print more stuff).", default=False)
-    parser.add_option("-o", "--output_directory", dest="output_directory", default="test/",
-                      help="Write results in given output directory (default: ./tests/).")
+    parser.add_option("-o", "--output_directory", dest="output_directory", default="outputs/",
+                      help="Write results in given output directory (default: ./outputs/).")
     (opts, args) = parser.parse_args()
 
     parameters.VERBOSE = opts.verbose

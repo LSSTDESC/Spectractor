@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
-import re, sys, string, math, os, types, time
+import re, sys, string, math, os, types
 import tools
 # import spline
-import numpy as np
 
 
 # class to test for skipping
@@ -988,7 +987,6 @@ class txttableclass:
             self.errorflag = 1
             return 1
 
-        import time
         # read the files
         lines = open(self.filename).readlines()
         # read the fitsheader

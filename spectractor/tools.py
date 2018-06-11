@@ -13,7 +13,7 @@ from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 from skimage.feature import hessian_matrix
 
 import parameters
-from math import floor, ceil
+from math import floor
 
 
 def gauss(x, A, x0, sigma):
