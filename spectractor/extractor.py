@@ -356,8 +356,8 @@ if __name__ == "__main__":
                       help="Enter debug mode (more verbose and plots).", default=False)
     parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
                       help="Enter verbose (print more stuff).", default=False)
-    parser.add_option("-o", "--output_directory", dest="output_directory", default="test/",
-                      help="Write results in given output directory (default: ./tests/).")
+    parser.add_option("-o", "--output_directory", dest="output_directory", default="outputs/",
+                      help="Write results in given output directory (default: ./outputs/).")
     (opts, args) = parser.parse_args()
 
     parameters.VERBOSE = False
