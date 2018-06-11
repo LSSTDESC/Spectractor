@@ -38,15 +38,11 @@ def Spectractor(filename, outputdir, guess, target, atmospheric_lines=True, line
 
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
-    # if parameters.DEBUG:
-    #    target_pixcoords = image.find_target_1Dprofile(guess)
     target_pixcoords = image.find_target(guess)
     # Rotate the image: several methods
     image.turn_image()
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-    # if parameters.DEBUG:
-    #    target_pixcoords_rotated = image.find_target_1Dprofile(guess,rotated=True)
     target_pixcoords_rotated = image.find_target(guess, rotated=True)
     # Create Spectrum object
     spectrum = Spectrum(Image=image)
