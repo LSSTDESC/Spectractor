@@ -4,6 +4,7 @@ from spectractor.spectractor import parameters, Spectractor
 from spectractor.logbook import LogBook
 import os
 
+
 def test_spectractor():
     file_names = ['./tests/data/reduc_20170605_028.fits']
 
@@ -17,7 +18,8 @@ def test_spectractor():
             continue
         spectrum = Spectractor(file_name, './outputs/', [xpos, ypos], target)
         assert spectrum.data is not None
-        assert os.path.isfile('./outputs/'+tag.replace('.fits','_spectrum.fits')) is True
+        assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrum.fits')) is True
+
 
 if __name__ == "__main__":
     run_module_suite()

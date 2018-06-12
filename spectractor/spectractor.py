@@ -57,7 +57,7 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     # Plot the spectrum
     if parameters.VERBOSE:
         if os.getenv("DISPLAY"):
-            spectrum.plot_spectrum(xlim=None, fit=False)
+            spectrum.plot_spectrum(xlim=None, fit=True)
     return spectrum
 
 
