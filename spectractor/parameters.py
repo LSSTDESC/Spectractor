@@ -23,6 +23,15 @@ OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
 OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
 EPOCH = "J2000.0"
 
+# Filters
+HALPHA_CENTER = 655.9e-6  # center of the filter in mm
+HALPHA_WIDTH = 6.4e-6  # width of the filter in mm
+FGB37 = {'label': 'FGB37', 'min': 300, 'max': 800}
+RG715 = {'label': 'RG715', 'min': 690, 'max': 1100}
+HALPHA_FILTER = {'label': 'Halfa', 'min': HALPHA_CENTER - 2 * HALPHA_WIDTH, 'max': HALPHA_CENTER + 2 * HALPHA_WIDTH}
+ZGUNN = {'label': 'Z-Gunn', 'min': 800, 'max': 1100}
+FILTERS = [RG715, FGB37, HALPHA_FILTER, ZGUNN]
+
 # Conversion factor
 # Units of SEDs in flam (erg/s/cm2/nm) :
 SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
