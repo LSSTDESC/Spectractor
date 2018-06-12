@@ -26,6 +26,9 @@ install:
 
   - pip install numpy nose coveralls
   - pip install matplotlib scipy
+  - pip install astropy astroquery
+  - pip install scikit-image
+  - pip install coloredlogs
 script:
 - python setup.py build
 - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker
