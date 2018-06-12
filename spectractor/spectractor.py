@@ -2,40 +2,33 @@ from images import *
 from spectroscopy import *
 
 
-def Spectractor(filename, outputdir, guess, target, atmospheric_lines=True, line_detection=False):
+def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=True, line_detection=False):
     """ Spectractor
     Main function to extract a spectrum from an image
 
     Args:
-        filename (str):
-        outputdir: 
-        guess: 
-        target: 
-        atmospheric_lines: 
-        line_detection: 
+        file_name (str): input file nam of the image to analyse
+        output_directory (str): output directory
+        guess: [x0,y0] list of the guessed pixel positions of the target in the image (must be integers)
+        target: (str) the name of the targeted object
+        atmospheric_lines: if True atmospheric lines are used in the calibration fit
+        line_detection: if True the absorption or emission lines are
+            used to calibrate the pixel to wavelength relationship
 
     Returns:
-        spectrum:
+        spectrum (Spectrum): the extracted spectrum
     """
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTOR')
     # Load reduced image
-    image = Image(filename, target=target)
+    image = Image(file_name, target=target)
     if parameters.DEBUG:
         image.plot_image(scale='log10', target_pixcoords=guess)
     # Set output path
-    ensure_dir(outputdir)
-    output_filename = filename.split('/')[-1]
+    ensure_dir(output_directory)
+    output_filename = file_name.split('/')[-1]
     output_filename = output_filename.replace('.fits', '_spectrum.fits')
-    output_filename = os.path.join(outputdir, output_filename)
-
-    # Test if file already exists
-    # if os.path.exists(output_filename) and os.path.getsize(output_filename)>20000:
-    #    filesize= os.path.getsize(output_filename)
-    #    infostring=" !!!!!! Spectrum file file %s of size %d already exists, thus SKIP the reconstruction ..." % (output_filename,filesize)
-    #    my_logger.info(infostring)
-    #    return
-
+    output_filename = os.path.join(output_directory, output_filename)
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
     target_pixcoords = image.find_target(guess)
@@ -63,7 +56,8 @@ def Spectractor(filename, outputdir, guess, target, atmospheric_lines=True, line
     spectrum.save_spectrum(output_filename, overwrite=True)
     # Plot the spectrum
     if parameters.VERBOSE:
-        if os.getenv("DISPLAY"): spectrum.plot_spectrum(xlim=None, nofit=False)
+        if os.getenv("DISPLAY"):
+            spectrum.plot_spectrum(xlim=None, fit=False)
     return spectrum
 
 

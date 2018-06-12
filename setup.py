@@ -4,7 +4,7 @@ setup(
     name='Spectractor',
     version='1.0',
     packages=['spectractor'],
-    install_requires=['numpy','astropy','astroquery'],
+    install_requires=['numpy','astropy','astroquery','coloredlogs','scikit-image'],
     test_suite='nose.collector',
     tests_require=['nose'],
     url='https://github.com/LSSTDESC/Spectractor',

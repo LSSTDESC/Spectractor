@@ -8,19 +8,19 @@ from targets import *
 
 
 class Line:
+    """Class modeling the emission or absorption lines."""
 
     # noinspection PyDefaultArgument
     def __init__(self, wavelength, label, atmospheric=False, emission=False, label_pos=[0.007, 0.02],
                  width_bounds=[1, 7]):
         """
-
         Args:
-            wavelength:
-            label:
-            atmospheric:
-            emission:
-            label_pos:
-            width_bounds:
+            wavelength: wavelength of the line in nm
+            label: name of the line
+            atmospheric: if True the line is flagged as an atmospheric line
+            emission: if True the line is flagged as an emission line
+            label_pos: position of the label in the plot with respect to the vertical lin (default: [0.007,0.02])
+            width_bounds: minimum and maximum width (in nm) of the line for fitting procedures (default: [1,7])
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.wavelength = wavelength  # in nm
@@ -36,6 +36,7 @@ class Line:
 
 
 class Lines:
+    """Class gathering all the lines and associated methods."""
 
     def __init__(self, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=False):
         # Main emission/absorption lines in nm
@@ -106,6 +107,7 @@ class Lines:
         self.lines = self.sort_lines()
 
     def sort_lines(self):
+        """Sort the lines in increasing order of wavelength."""
         sorted_lines = []
         for line in self.lines:
             if self.hydrogen_only:
@@ -129,6 +131,14 @@ class Lines:
         return sorted_lines
 
     def plot_atomic_lines(self, ax, color_atomic='g', color_atmospheric='b', fontsize=12):
+        """Plot the atomic lines as vertical lines.
+
+        Args:
+            ax: an Axes instance
+            color_atomic: color of the atomic lines (default: 'g')
+            color_atmospheric: color of the atmospheric lines (default: 'b')
+            fontsize: font size of the labels (default: 12)
+        """
         xlim = ax.get_xlim()
         for l in self.lines:
             if l.fitted and not l.high_snr:
@@ -143,6 +153,25 @@ class Lines:
                             xycoords='axes fraction', color=color, fontsize=fontsize)
 
     def detect_lines(self, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None, verbose=False):
+        """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
+        around emission or absorption tabulated lines, and to select surrounding pixels
+        to fit a (positive or negative) gaussian and a polynomial background. If several regions
+        overlap, a multi-gaussian fit is performed above a common polynomial background.
+        The mean global shift (in nm) between the detected and tabulated lines is returned, considering
+        only the lines with a signal-to-noise ratio above a threshold.
+        The order of the polynomial bakcground is set in parameters.py with BGD_ORDER.
+
+        Args:
+            lambdas: the wavelength array (in nm)
+            spec: the spectrum array
+            spec_err: the spectrum uncertainty array
+            snr_minlevel: minimum signal-to-noise ratio for line detection
+            ax: an Axes instance (optional: for plot only)
+            verbose: if True print many stuff.
+
+        Returns:
+            shift: the mean shift (in nm) between the detected and tabulated lines
+        """
         # main settings
         bgd_npar = parameters.BGD_NPARAMS
         peak_look = 7  # half range to look for local maximum in pixels
@@ -387,7 +416,11 @@ class Spectrum(object):
     def __init__(self, filename="", Image=None, atmospheric_lines=True, order=1, target=None):
         """
         Args:
-            filename (:obj:`str`): path to the image
+            atmospheric_lines (bool): if True atmospheric absorption lines
+                are plotted and eventually used for the spectrum calibration
+            order (int): order of the spectrum
+            target (:obj:`str`): name of the image target
+            filename (:obj:`str`): path to the image file
             Image (:obj:`Image`): copy info from Image object
         """
         self.my_logger = set_logger(self.__class__.__name__)
@@ -427,7 +460,8 @@ class Spectrum(object):
         self.load_filter()
 
     def convert_from_ADUrate_to_flam(self):
-        """The SED is supposed to be in flam units ie erg/s/cm^2/nm"""
+        """Convert units from ADU/s to erg/s/cm^2/nm.
+        The SED is supposed to be in flam units ie erg/s/cm^2/nm"""
         self.data = self.data / FLAM_TO_ADURATE
         self.data /= self.lambdas * self.lambdas_binwidths
         if self.err is not None:
@@ -436,7 +470,8 @@ class Spectrum(object):
         self.units = 'erg/s/cm$^2$/nm'
 
     def convert_from_flam_to_ADUrate(self):
-        """The SED is supposed to be in flam units ie erg/s/cm^2/nm"""
+        """Convert units from erg/s/cm^2/nm to ADU/s.
+        The SED is supposed to be in flam units ie erg/s/cm^2/nm"""
         self.data = self.data * parameters.FLAM_TO_ADURATE
         self.data *= self.lambdas_binwidths * self.lambdas
         if self.err is not None:
@@ -445,7 +480,7 @@ class Spectrum(object):
         self.units = 'ADU/s'
 
     def load_filter(self):
-        """Function to load filter properties and set relevant LAMBDA_MIN and LAMBDA_MAX values."""
+        """Load filter properties and set relevant LAMBDA_MIN and LAMBDA_MAX values."""
         for f in FILTERS:
             if f['label'] == self.filter:
                 parameters.LAMBDA_MIN = f['min']
@@ -455,7 +490,7 @@ class Spectrum(object):
                 break
 
     def plot_spectrum_simple(self, ax, xlim=None):
-        """Simple function to plot a spectrum
+        """Simple function to plot a spectrum with error bars and labels.
 
         Args:
             ax: Axes instance of a figure
@@ -478,7 +513,13 @@ class Spectrum(object):
         ax.set_xlabel('$\lambda$ [nm]')
         ax.set_ylabel('Flux [%s]' % self.units)
 
-    def plot_spectrum(self, xlim=None, nofit=False):
+    def plot_spectrum(self, xlim=None, fit=False):
+        """Plot spectrum with emission and absorption lines.
+
+        Args:
+            xlim: (optional) list of minimum and maximum abscisses
+            fit: if True lines are fitted.
+        """
         fig = plt.figure(figsize=[12, 6])
         self.plot_spectrum_simple(plt.gca(), xlim=xlim)
         # if len(self.target.spectra)>0:
@@ -487,7 +528,7 @@ class Spectrum(object):
         #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
         if self.lambdas is not None and self.lines is not None:
             self.lines.plot_atomic_lines(plt.gca(), fontsize=12)
-        if not nofit and self.lambdas is not None:
+        if fit and self.lambdas is not None:
             self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
                                     verbose=parameters.VERBOSE)
         plt.legend(loc='best')
@@ -496,6 +537,12 @@ class Spectrum(object):
         plt.show()
 
     def calibrate_spectrum(self, xlim=None):
+        """Convert pixels into wavelengths given the position of the order 0,
+        the data for the spectrum, and the properties of the disperser.
+
+        Args:
+            xlim: (optional) list of minimum and maximum abscisses
+        """
         if xlim is None:
             left_cut, right_cut = [0, self.data.shape[0]]
         else:
@@ -515,6 +562,16 @@ class Spectrum(object):
         self.convert_from_ADUrate_to_flam()
 
     def calibrate_spectrum_with_lines(self):
+        """Convert pixels into wavelengths given the position of the order 0,
+        the data for the spectrum, the properties of the disperser. Fit the absorption
+        (and eventually the emission) lines to perform a second calibration of the
+        distance between the CCD and the disperser. The number of fitting steps is
+        limited to 30.
+
+        Returns:
+            float: the final shift value of the spectrum in nm
+
+        """
         self.my_logger.info('\n\tCalibrating order %d spectrum...' % self.order)
         # Detect emission/absorption lines and calibrate pixel/lambda 
         D = DISTANCE2CCD - DISTANCE2CCD_ERR
@@ -557,6 +614,12 @@ class Spectrum(object):
         return lambda_shift
 
     def save_spectrum(self, output_filename, overwrite=False):
+        """Save the spectrum into a fits file (data, error and wavelengths).
+
+        Args:
+            output_filename: path to the output fits file
+            overwrite: if True overwrite the output file if needed.
+        """
         hdu = fits.PrimaryHDU()
         hdu.data = [self.lambdas, self.data, self.err]
         self.header['UNIT1'] = "nanometer"
@@ -569,6 +632,11 @@ class Spectrum(object):
         self.my_logger.info('\n\tSpectrum saved in %s' % output_filename)
 
     def load_spectrum(self, input_filename):
+        """Load the spectrum from a fits file (data, error and wavelengths).
+
+        Args:
+            input_filename: path to the input fits file
+        """
         if os.path.isfile(input_filename):
             hdu = fits.open(input_filename)
             self.header = hdu[0].header
