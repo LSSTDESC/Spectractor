@@ -489,22 +489,26 @@ class Spectrum(object):
                     f['label'], parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
                 break
 
-    def plot_spectrum_simple(self, ax, xlim=None):
+    def plot_spectrum_simple(self, ax, xlim=None, color='r', label=''):
         """Simple function to plot a spectrum with error bars and labels.
 
         Args:
+            label: string label for the plot legend
+            color: character for the color of the spectrum (default: 'r')
             ax: Axes instance of a figure
             xlim: (optional) list of minimum and maximum abscisses
         """
         xs = self.lambdas
+        if label == '':
+            label = 'Order {:d} spectrum'.format(self.order)
         if xs is None:
             xs = np.arange(self.data.shape[0])
         if self.err is not None:
-            ax.errorbar(xs, self.data, yerr=self.err, fmt='ro', lw=1,
-                        label='Order %d spectrum' % self.order, zorder=0,
+            ax.errorbar(xs, self.data, yerr=self.err, fmt='{}o'.format(color), lw=1,
+                        label=label, zorder=0,
                         markersize=2)
         else:
-            ax.plot(xs, self.data, 'r-', lw=2, label='Order %d spectrum' % self.order)
+            ax.plot(xs, self.data, '{}-'.format(color), lw=2, label=label)
         ax.grid(True)
         if xlim is None:
             xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
@@ -513,12 +517,12 @@ class Spectrum(object):
         ax.set_xlabel('$\lambda$ [nm]')
         ax.set_ylabel('Flux [%s]' % self.units)
 
-    def plot_spectrum(self, xlim=None, fit=False):
+    def plot_spectrum(self, xlim=None, fit=True):
         """Plot spectrum with emission and absorption lines.
 
         Args:
             xlim: (optional) list of minimum and maximum abscisses
-            fit: if True lines are fitted.
+            fit: if True lines are fitted (default: True).
         """
         fig = plt.figure(figsize=[12, 6])
         self.plot_spectrum_simple(plt.gca(), xlim=xlim)
