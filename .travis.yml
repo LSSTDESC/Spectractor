@@ -33,6 +33,4 @@ install:
   - pip install scikit-image
 script:
 - python setup.py build
-- nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
-after_success:
-- coveralls
+- nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker
