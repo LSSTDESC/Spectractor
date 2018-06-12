@@ -5,9 +5,9 @@ from spectractor.logbook import LogBook
 import os
 
 def test_spectractor():
-    file_names = ['../data/data_05jun17/reduc_20170605_028.fits']
+    file_names = ['./tests/data/reduc_20170605_028.fits']
 
-    logbook = LogBook(logbook='../ctiofulllogbook_jun2017_v5.csv')
+    logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
     parameters.VERBOSE = True
 
     for file_name in file_names:
