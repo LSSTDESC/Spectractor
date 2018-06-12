@@ -32,6 +32,7 @@ install:
   - source activate test-environment
 
 - pip install numpy nose coveralls
+- pip install matplotlib scipy
 - pip install astropy
 - pip install astroquery
 - pip install pysynphot
