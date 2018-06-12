@@ -6,9 +6,6 @@ matrix:
     python: 2.7
     sudo: required
     env: TOXENV=py27
-  - os: osx
-    language: generic
-    env: TOXENV=py27
     
 install:
   - sudo apt-get update
