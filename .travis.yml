@@ -9,12 +9,13 @@ matrix:
   - os: osx
     language: generic
     env: TOXENV=py27
-before-install:
+install:
 - pip install numpy nose coveralls
 - pip install astropy
 - pip install astroquery
+- pip install pysynphot
 script:
 - python setup.py build
-- nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=pyccl
+- nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
 after_success:
 - coveralls
