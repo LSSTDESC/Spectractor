@@ -4,9 +4,9 @@ import numpy as np
 import astropy.units as units
 from astropy import constants as const
 import os
-mypath = os.path.dirname(__file__)
 
 # Paths
+mypath = os.path.dirname(__file__)
 HOLO_DIR = os.path.join(mypath, "dispersers/")
 
 # CCD characteristics

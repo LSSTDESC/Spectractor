@@ -1,3 +1,4 @@
+# coding=utf-8
 from spectractor import *
 import parameters
 import csv
@@ -5,8 +6,14 @@ import csv
 
 # noinspection PyShadowingNames
 class LogBook:
+    """Class to load and analyse observation logbook csv files."""
 
     def __init__(self, logbook="ctiofulllogbook_jun2017_v5.csv"):
+        """Load and initialise the logbook
+
+        Args:
+            logbook (str): path to the logbook. Must be a CSV file.
+        """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.logbook = logbook
         if not os.path.isfile(logbook):
@@ -16,6 +23,21 @@ class LogBook:
         self.reader = csv.DictReader(self.csvfile, delimiter=';', dialect=csv.excel_tab)
 
     def search_for_image(self, filename):
+        """Look for an image file name in the logbook and load properties:
+        * Obj-posXpix and Obj-posYpix: the [x0,y0] guessed pixel position in the image
+        * Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables
+            in parameters.py
+        * object: the name of the target
+
+        Args:
+            filename (str): the fits image file name (not the path, only the file name.)
+
+        Returns:
+            target: the name of the target
+            xpos: the x position of the target (in pixel)
+            ypos: the y position of the target (in pixel)
+
+        """
         target = None
         xpos = None
         ypos = None
@@ -57,6 +79,11 @@ class LogBook:
         return target, xpos, ypos
 
     def plot_columns_vs_date(self, column_names):
+        """Plot of the column property with respect to the dates.
+
+        Args:
+            column_names: a list of the names of the columns to plot
+        """
         dates = []
         cols = []
         ncols = len(column_names)
@@ -71,6 +98,7 @@ class LogBook:
             ax[icol].plot(dates, cols[icol], 'b+')
             ax[icol].set_xlabel('Dates')
             ax[icol].set_ylabel(col)
+        fig.autofmt_xdate()
         fig.tight_layout()
         plt.show()
 
