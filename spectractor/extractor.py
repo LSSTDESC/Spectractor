@@ -361,9 +361,9 @@ if __name__ == "__main__":
     (opts, args) = parser.parse_args()
 
     parameters.VERBOSE = False
-    filename = 'output/data_30may17/sim_20170530_134_spectrum.fits'
+    filename = 'outputs/data_30may17/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-    filename = 'output/data_30may17/reduc_20170530_134_spectrum.fits'
+    filename = 'outputs/data_30may17/reduc_20170530_134_spectrum.fits'
 
     # m = Extractor(filename,atmgrid_filename)
     # m.minimizer(live_fit=True)
