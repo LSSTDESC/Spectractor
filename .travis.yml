@@ -1,0 +1,17 @@
+language: python
+
+matrix:
+  include:
+  - os: linux
+    python: 2.7
+    sudo: required
+    env: TOXENV=py27
+  - os: osx
+    language: generic
+    env: TOXENV=py27
+
+script:
+- python setup.py build
+- nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=pyccl
+after_success:
+- coveralls
