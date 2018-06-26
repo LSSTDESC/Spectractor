@@ -9,6 +9,8 @@ from mcmc import *
 import parameters
 
 import pymc as pm
+import emcee
+from multiprocessing import Pool
 
 
 class Extractor:
@@ -157,7 +159,7 @@ class Extractor_MCMC(Extractor):
                  atmgrid_filename="", live_fit=False):
         Extractor.__init__(self, filename, atmgrid_filename=atmgrid_filename, live_fit=live_fit)
         self.ndim = len(self.p)
-        self.nwalkers = 4*self.ndim
+        self.nwalkers = 4 * self.ndim
         self.nchains = nchains
         self.nsteps = nsteps
         self.covfile = covfile
@@ -240,7 +242,7 @@ class Extractor_MCMC(Extractor):
             # if self.live_fit:
             # self.plot_fit()
             # print(np.mean(self.model(self.lambdas)/self.spectrum.data))
-            #print(np.sum((self.model(self.lambdas) - self.spectrum.data) ** 2 / self.spectrum.err ** 2))
+            # print(np.sum((self.model(self.lambdas) - self.spectrum.data) ** 2 / self.spectrum.err ** 2))
             return self.model(self.lambdas)  # , self.model_err(self.lambdas)
 
         @pm.deterministic(plot=False, trace=False)
@@ -253,13 +255,13 @@ class Extractor_MCMC(Extractor):
                     db='pickle', dbname='MCMC.pickle')
         S.use_step_method(pm.AdaptiveMetropolis, [A1, A2, ozone, pwv, aerosols, reso, shift],
                           scales={A1: 0.1, A2: 0.1, ozone: 0.005, pwv: 0.005, aerosols: 0.005, reso: 0.05,
-                                           shift: 0.05},
-                          verbose=1, delay=100, interval=20, greedy=True, shrink_if_necessary=True )
+                                  shift: 0.05},
+                          verbose=1, delay=100, interval=20, greedy=True, shrink_if_necessary=True)
         # cov=self.chains.proposal_cov,
         S.db
-        #S.restore_sampler_state()
-        S.sample(10000, burn=2000,  threads=4)
-        #S.save_state()
+        # S.restore_sampler_state()
+        S.sample(10000, burn=2000)
+        # S.save_state()
         S.db.close()
         trace = S.trace('PWV')[:]
         # print(S.trace('probability')[:].shape)
@@ -284,10 +286,10 @@ class Extractor_MCMC(Extractor):
         # backend = emcee.backends.HDFBackend(filename)
         # backend.reset(self.nwalkers, self.ndim)
 
-        # with Pool() as pool:
-        self.sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, self.lnprob, args=())
-        nsamples = 6000
-        self.sampler.run_mcmc(pos, nsamples)
+        with Pool() as pool:
+            self.sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, self.lnprob, args=(), pool=pool)
+            nsamples = 20
+            self.sampler.run_mcmc(pos, nsamples)
         # tau = sampler.get_autocorr_time()
         burnin = nsamples / 2
         thin = nsamples / 4
