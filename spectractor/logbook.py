@@ -1,6 +1,5 @@
-# coding=utf-8
-from spectractor import *
-import parameters
+from .spectractor import *
+from . import parameters
 import csv
 
 
@@ -19,7 +18,7 @@ class LogBook:
         if not os.path.isfile(logbook):
             self.my_logger.error('CSV logbook file {} not found.'.format(logbook))
             sys.exit()
-        self.csvfile = open(self.logbook, 'rU')
+        self.csvfile = open(self.logbook, 'rU', encoding='latin-1')
         self.reader = csv.DictReader(self.csvfile, delimiter=';', dialect=csv.excel_tab)
 
     def search_for_image(self, filename):

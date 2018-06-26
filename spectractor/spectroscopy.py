@@ -2,9 +2,9 @@ from astropy.io import fits
 from astropy.table import Table
 from scipy.signal import argrelextrema
 
-from dispersers import *
-from filters import *
-from targets import *
+from .dispersers import *
+from .filters import *
+from .targets import *
 
 
 class Line:
@@ -202,7 +202,7 @@ class Lines:
             if not self.emission_spectrum or line.atmospheric:
                 line_strategy = np.less  # look for absorption line
                 bgd_strategy = np.greater
-            index = range(l_index - peak_look, l_index + peak_look)
+            index = list(range(l_index - peak_look, l_index + peak_look))
             extrema = argrelextrema(spec[index], line_strategy)
             if len(extrema[0]) == 0:
                 continue
@@ -228,7 +228,7 @@ class Lines:
             # around +/- 3*peak_look
             index_inf = peak_index - 1  # extrema on the left
             while index_inf > max(0, peak_index - 3 * peak_look):
-                test_index = range(index_inf, peak_index)
+                test_index = list(range(index_inf, peak_index))
                 minm = argrelextrema(spec[test_index], bgd_strategy)
                 if len(minm[0]) > 0:
                     index_inf = index_inf + minm[0][0]
@@ -237,7 +237,7 @@ class Lines:
                     index_inf -= 1
             index_sup = peak_index + 1  # extrema on the right
             while index_sup < min(len(spec) - 1, peak_index + 3 * peak_look):
-                test_index = range(peak_index, index_sup)
+                test_index = list(range(peak_index, index_sup))
                 minm = argrelextrema(spec[test_index], bgd_strategy)
                 if len(minm[0]) > 0:
                     index_sup = peak_index + minm[0][0]
@@ -246,7 +246,7 @@ class Lines:
                     index_sup += 1
             # pixel range to consider around the peak, adding bgd_width pixels
             # to fit for background around the peak
-            index = range(max(0, index_inf - bgd_width), min(len(lambdas), index_sup + bgd_width))
+            index = list(range(max(0, index_inf - bgd_width), min(len(lambdas), index_sup + bgd_width)))
             # first guess and bounds to fit the line properties and
             # the background with BGD_ORDER order polynom
             guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), lambdas[peak_index],
@@ -397,7 +397,7 @@ class Lines:
             for col in t.colnames[1:-2]:
                 t[col].unit = 'nm'
             if verbose:
-                print t
+                print(t)
             shift = np.average(lambda_shifts, weights=np.array(snrs) ** 2)
             # remove lines with low SNR from plot
             for line in self.lines:

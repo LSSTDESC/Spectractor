@@ -4,11 +4,13 @@ sys.path.append('../SpectractorSim')
 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from spectractorsim import *
-from spectractor import *
-from mcmc import *
-import parameters
+from .spectractor import *
+from .mcmc import *
+from . import parameters
 
 import pymc as pm
+import emcee
+from multiprocessing import Pool
 
 
 class Extractor:
@@ -60,17 +62,17 @@ class Extractor:
             plt.show()
 
     def get_truth(self):
-        if 'A1' in self.spectrum.header.keys():
+        if 'A1' in list(self.spectrum.header.keys()):
             A1_truth = self.spectrum.header['A1']
-            if 'A2' in self.spectrum.header.keys():
+            if 'A2' in list(self.spectrum.header.keys()):
                 A2_truth = self.spectrum.header['A2']
-            if 'OZONE' in self.spectrum.header.keys():
+            if 'OZONE' in list(self.spectrum.header.keys()):
                 ozone_truth = self.spectrum.header['OZONE']
-            if 'PWV' in self.spectrum.header.keys():
+            if 'PWV' in list(self.spectrum.header.keys()):
                 pwv_truth = self.spectrum.header['PWV']
-            if 'VAOD' in self.spectrum.header.keys():
+            if 'VAOD' in list(self.spectrum.header.keys()):
                 aerosols_truth = self.spectrum.header['VAOD']
-            if 'RESO' in self.spectrum.header.keys():
+            if 'RESO' in list(self.spectrum.header.keys()):
                 reso_truth = self.spectrum.header['RESO']
             self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth, reso_truth, None, None)
         else:
@@ -157,7 +159,7 @@ class Extractor_MCMC(Extractor):
                  atmgrid_filename="", live_fit=False):
         Extractor.__init__(self, filename, atmgrid_filename=atmgrid_filename, live_fit=live_fit)
         self.ndim = len(self.p)
-        self.nwalkers = 4*self.ndim
+        self.nwalkers = 4 * self.ndim
         self.nchains = nchains
         self.nsteps = nsteps
         self.covfile = covfile
@@ -240,7 +242,7 @@ class Extractor_MCMC(Extractor):
             # if self.live_fit:
             # self.plot_fit()
             # print(np.mean(self.model(self.lambdas)/self.spectrum.data))
-            #print(np.sum((self.model(self.lambdas) - self.spectrum.data) ** 2 / self.spectrum.err ** 2))
+            # print(np.sum((self.model(self.lambdas) - self.spectrum.data) ** 2 / self.spectrum.err ** 2))
             return self.model(self.lambdas)  # , self.model_err(self.lambdas)
 
         @pm.deterministic(plot=False, trace=False)
@@ -253,21 +255,21 @@ class Extractor_MCMC(Extractor):
                     db='pickle', dbname='MCMC.pickle')
         S.use_step_method(pm.AdaptiveMetropolis, [A1, A2, ozone, pwv, aerosols, reso, shift],
                           scales={A1: 0.1, A2: 0.1, ozone: 0.005, pwv: 0.005, aerosols: 0.005, reso: 0.05,
-                                           shift: 0.05},
-                          verbose=1, delay=100, interval=20, greedy=True, shrink_if_necessary=True )
+                                  shift: 0.05},
+                          verbose=1, delay=100, interval=20, greedy=True, shrink_if_necessary=True)
         # cov=self.chains.proposal_cov,
         S.db
-        #S.restore_sampler_state()
-        S.sample(10000, burn=2000,  threads=4)
-        #S.save_state()
+        # S.restore_sampler_state()
+        S.sample(10000, burn=2000)
+        # S.save_state()
         S.db.close()
         trace = S.trace('PWV')[:]
         # print(S.trace('probability')[:].shape)
-        print(pwv.summary())
+        print((pwv.summary()))
         y_fit = np.mean(trace)
-        print(S.db.trace_names)
-        print np.mean(S.trace('A2')[:]), np.std(S.trace('A2')[:])
-        print np.mean(S.trace('PWV')[:]), np.std(S.trace('PWV')[:])
+        print((S.db.trace_names))
+        print(np.mean(S.trace('A2')[:]), np.std(S.trace('A2')[:]))
+        print(np.mean(S.trace('PWV')[:]), np.std(S.trace('PWV')[:]))
         pm.Matplot.plot(S)
         samples = np.array([A1.trace(), A2.trace(), pwv.trace(), aerosols.trace()]).T
         samples = samples[0]
@@ -284,10 +286,10 @@ class Extractor_MCMC(Extractor):
         # backend = emcee.backends.HDFBackend(filename)
         # backend.reset(self.nwalkers, self.ndim)
 
-        # with Pool() as pool:
-        self.sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, self.lnprob, args=())
-        nsamples = 6000
-        self.sampler.run_mcmc(pos, nsamples)
+        with Pool() as pool:
+            self.sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, self.lnprob, args=(), pool=pool)
+            nsamples = 20
+            self.sampler.run_mcmc(pos, nsamples)
         # tau = sampler.get_autocorr_time()
         burnin = nsamples / 2
         thin = nsamples / 4
@@ -296,8 +298,8 @@ class Extractor_MCMC(Extractor):
         # log_prob_samples = sampler.get_log_prob(discard=burnin, flat=True, thin=thin)
         # log_prior_samples = sampler.get_blobs(discard=burnin, flat=True, thin=thin)
 
-        print("burn-in: {0}".format(burnin))
-        print("thin: {0}".format(thin))
+        print(("burn-in: {0}".format(burnin)))
+        print(("thin: {0}".format(thin)))
         # print("flat chain shape: {0}".format(samples.shape))
         # print("flat log prob shape: {0}".format(log_prob_samples.shape))
         # print("flat log prior shape: {0}".format(log_prior_samples.shape))
@@ -323,18 +325,18 @@ class Extractor_MCMC(Extractor):
         if np.max(sim) > 0:
             vec1[0] *= np.max(self.spectrum.data) / np.max(sim)
         if parameters.DEBUG:
-            print "First vector : ", vec1
+            print("First vector : ", vec1)
         chisq1 = self.chisq(vec1)
         L1 = np.exp(-0.5 * chisq1 + 0.5 * self.spectrum.lambdas.size)
         # MCMC exploration
-        keys = range(chain.start_index, chain.nsteps)
+        keys = list(range(chain.start_index, chain.nsteps))
         new_keys = []
         # import time
         for i in tqdm.tqdm(keys, desc='Processing chain %i:' % chain.nchain, position=chain.nchain):
             # start = time.time()
             if parameters.DEBUG:
-                print 'Step : %d (start=%d, stop=%d, remaining nsteps=%d)' % (
-                    i, chain.start_index, chain.start_index + chain.nsteps - 1, chain.nsteps + chain.start_index - i)
+                print('Step : %d (start=%d, stop=%d, remaining nsteps=%d)' % (
+                    i, chain.start_index, chain.start_index + chain.nsteps - 1, chain.nsteps + chain.start_index - i))
             vec2 = []
             prior2 = 1
             # print 'init',time.time()-start
@@ -352,8 +354,8 @@ class Extractor_MCMC(Extractor):
             # print 'chisq',time.time()-start
             # start = time.time()
             if parameters.DEBUG:
-                print "Sample chisq : %.2f      Prior : %.2f" % (chisq2, prior2)
-                print "Sample vector : ", vec2
+                print("Sample chisq : %.2f      Prior : %.2f" % (chisq2, prior2))
+                print("Sample vector : ", vec2)
             r = np.random.uniform(0, 1)
             # if L1>0 and L2/L1 > r :
             if np.exp(-0.5 * (chisq2 - chisq1)) > r:
@@ -386,7 +388,7 @@ class Extractor_MCMC(Extractor):
                 pool.close()
                 pool.join()
                 # to skip lines after the progress bars
-                print '\n' * self.nchains
+                print('\n' * self.nchains)
             except KeyboardInterrupt:
                 pool.terminate()
         self.likelihood = self.chains.chains_to_likelihood()

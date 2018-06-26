@@ -7,7 +7,7 @@ from astroquery.ned import Ned
 from astroquery.simbad import Simbad
 from scipy.interpolate import interp1d
 
-import parameters
+from . import parameters
 
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
@@ -36,7 +36,7 @@ class Target:
         simbad = Simbad.query_object(self.label)
         if simbad is not None:
             if self.verbose:
-                print simbad
+                print(simbad)
             self.coord = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(units.hourangle, units.deg))
         else:
             self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
@@ -60,7 +60,7 @@ class Target:
                 if '_mod_' in f:
                     continue
                 if self.verbose:
-                    print 'Loading %s' % f
+                    print('Loading %s' % f)
                 data = S.FileSpectrum(f, keepneg=True)
                 if isinstance(data.waveunits, S.units.Angstrom):
                     self.wavelengths.append(data.wave / 10.)
@@ -95,7 +95,7 @@ class Target:
                     wave_end = wave_start + wave_n * wave_step
                     waves = np.linspace(wave_start, wave_end, wave_n)
                     is_angstrom = False
-                    for key in h[0].header.keys():
+                    for key in list(h[0].header.keys()):
                         if 'angstrom' in str(h[0].header[key]).lower():
                             is_angstrom = True
                     if is_angstrom:
@@ -138,7 +138,7 @@ if __name__ == "__main__":
                       help="Label of the target.", default="HD111980")
     (opts, args) = parser.parse_args()
 
-    print 'Load information on target {}'.format(opts.label)
+    print('Load information on target {}'.format(opts.label))
     target = Target(opts.label)
-    print target.coord
+    print(target.coord)
     target.plot_spectra()
