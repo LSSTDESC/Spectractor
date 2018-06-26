@@ -156,8 +156,8 @@ class Extractor_MCMC(Extractor):
     def __init__(self, filename, covfile, nchains=1, nsteps=1000, burnin=100, nbins=10, exploration_time=100,
                  atmgrid_filename="", live_fit=False):
         Extractor.__init__(self, filename, atmgrid_filename=atmgrid_filename, live_fit=live_fit)
-        # self.ndim = len(self.p)
-        # self.nwalkers = 4*self.ndim
+        self.ndim = len(self.p)
+        self.nwalkers = 4*self.ndim
         self.nchains = nchains
         self.nsteps = nsteps
         self.covfile = covfile
@@ -427,4 +427,4 @@ if __name__ == "__main__":
     covfile = 'covariances/proposal.txt'
     m = Extractor_MCMC(filename, covfile, nchains=4, nsteps=10000, burnin=2000, nbins=10, exploration_time=500,
                        atmgrid_filename=atmgrid_filename, live_fit=False)
-    m.run_pymc()
+    m.run_emcee()
