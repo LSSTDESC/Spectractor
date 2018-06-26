@@ -2,7 +2,7 @@ from astropy.coordinates import Angle
 from matplotlib import cm
 from matplotlib.ticker import MaxNLocator
 
-from spectroscopy import *
+from .spectroscopy import *
 
 
 # noinspection PyAttributeOutsideInit
@@ -64,13 +64,13 @@ class Image(object):
         l = IMSIZE
         self.gain = np.zeros_like(self.data)
         # ampli 11
-        self.gain[0:l / 2, 0:l / 2] = self.header['GTGAIN11']
+        self.gain[0:l // 2, 0:l // 2] = self.header['GTGAIN11']
         # ampli 12
-        self.gain[0:l / 2, l / 2:l] = self.header['GTGAIN12']
+        self.gain[0:l // 2, l // 2:l] = self.header['GTGAIN12']
         # ampli 21
-        self.gain[l / 2:l, 0:l] = self.header['GTGAIN21']
+        self.gain[l // 2:l, 0:l] = self.header['GTGAIN21']
         # ampli 22
-        self.gain[l / 2:l, l / 2:l] = self.header['GTGAIN22']
+        self.gain[l // 2:l, l // 2:l] = self.header['GTGAIN22']
 
     def convert_to_ADU_rate_units(self):
         self.data /= self.expo
@@ -523,7 +523,7 @@ class Image(object):
             # 3 find the new central y0
         yprofileBig = np.sum(spectrum2Dbig2[:, x0 + 2 * WBIG:right_edge], axis=1)
         delta_y0 = np.where(yprofileBig == yprofileBig.max())[0][0] - WBIG
-        print ' Delta y0 =', delta_y0
+        print(' Delta y0 =', delta_y0)
 
         if parameters.DEBUG or parameters.VERBOSE:
             plt.figure(figsize=(8, 4))

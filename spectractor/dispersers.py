@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 from scipy import interpolate
 from scipy import ndimage
 
-from parameters import *
-from tools import *
+from .parameters import *
+from .tools import *
 
 # Making of the holograms
 DISTANCE2CCD = 55.45  # distance between hologram and CCD in mm
@@ -110,9 +110,9 @@ def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
     order0_position = [-0.5 * AB * np.cos(theta_tilt * np.pi / 180) + x_center,
                        -0.5 * AB * np.sin(theta_tilt * np.pi / 180) + y_center]
     if verbose:
-        print 'Order  0 position at x0 = %.1f and y0 = %.1f' % (order0_position[0], order0_position[1])
-        print 'Order +1 position at x0 = %.1f and y0 = %.1f' % (order1_position[0], order1_position[1])
-        print 'Distance between the orders: %.2f pixels (%.2f mm)' % (AB, AB * PIXEL2MM)
+        print('Order  0 position at x0 = %.1f and y0 = %.1f' % (order0_position[0], order0_position[1]))
+        print('Order +1 position at x0 = %.1f and y0 = %.1f' % (order1_position[0], order1_position[1]))
+        print('Distance between the orders: %.2f pixels (%.2f mm)' % (AB, AB * PIXEL2MM))
     return order0_position, order1_position, AB
 
 
@@ -170,8 +170,8 @@ class Grating:
             self.theta_tilt = 0
             return
         if verbose:
-            print 'Grating plate center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
-                self.plate_center[0], self.plate_center[1], self.theta_tilt)
+            print('Grating plate center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
+                self.plate_center[0], self.plate_center[1], self.theta_tilt))
 
     def refraction_angle(self, deltaX, x0):
         """ Refraction angle in radians. 
@@ -255,8 +255,8 @@ class Hologram(Grating):
 
     def load_specs(self, verbose=True):
         if verbose:
-            print 'Load disperser {}:'.format(self.label)
-            print '\tfrom {}'.format(self.data_dir + self.label)
+            print('Load disperser {}:'.format(self.label))
+            print('\tfrom {}'.format(self.data_dir + self.label))
         filename = self.data_dir + self.label + "/hologram_grooves_per_mm.txt"
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
@@ -277,7 +277,7 @@ class Hologram(Grating):
         filename = self.data_dir + self.label + "/hologram_center.txt"
         if os.path.isfile(filename):
             lines = [ll.rstrip('\n') for ll in open(filename)]
-            self.holo_center = map(float, lines[1].split(' ')[:2])
+            self.holo_center = list(map(float, lines[1].split(' ')[:2]))
             self.theta_tilt = float(lines[1].split(' ')[2])
         else:
             self.holo_center = [0.5 * IMSIZE, 0.5 * IMSIZE]
@@ -295,16 +295,16 @@ class Hologram(Grating):
         self.x_lines, self.line1, self.line2 = neutral_lines(self.holo_center[0], self.holo_center[1], self.theta_tilt)
         if verbose:
             if self.is_hologram:
-                print 'Hologram characteristics:'
-                print '\tN = {:.2f} +/- {:.2f} grooves/mm at plate center'.format(self.N(self.plate_center), self.N_err)
-                print '\tPlate center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
-                    self.plate_center[0], self.plate_center[1], self.theta_tilt)
-                print '\tHologram center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
-                    self.holo_center[0], self.holo_center[1], self.theta_tilt)
+                print('Hologram characteristics:')
+                print('\tN = {:.2f} +/- {:.2f} grooves/mm at plate center'.format(self.N(self.plate_center), self.N_err))
+                print('\tPlate center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
+                    self.plate_center[0], self.plate_center[1], self.theta_tilt))
+                print('\tHologram center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
+                    self.holo_center[0], self.holo_center[1], self.theta_tilt))
             else:
-                print 'Grating characteristics:'
-                print '\tN = {:.2f} +/- {:.2f} grooves/mm'.format(self.N([0, 0]), self.N_err)
-                print '\tAverage tilt of {:.1f} degrees'.format(self.theta_tilt)
+                print('Grating characteristics:')
+                print('\tN = {:.2f} +/- {:.2f} grooves/mm'.format(self.N([0, 0]), self.N_err))
+                print('\tAverage tilt of {:.1f} degrees'.format(self.theta_tilt))
         if self.is_hologram:
             self.order0_position, self.order1_position, self.AB = find_order01_positions(self.holo_center,
                                                                                          self.N_interp, self.theta,

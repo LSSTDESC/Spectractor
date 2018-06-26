@@ -5,10 +5,10 @@ sys.path.append("../SpectractorSim")
 # from astroquery.gaia import Gaia, TapPlus, GaiaClass
 # Gaia = GaiaClass(TapPlus(url='http://gaia.ari.uni-heidelberg.de/tap'))
 
-from images import *
-from spectroscopy import *
+from .images import *
+from .spectroscopy import *
 from spectractorsim import *
-import parameters
+from . import parameters
 import copy
 
 

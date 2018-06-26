@@ -1,5 +1,5 @@
-from images import *
-from spectroscopy import *
+from .images import *
+from .spectroscopy import *
 
 
 def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=True, line_detection=False):

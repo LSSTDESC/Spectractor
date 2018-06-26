@@ -11,7 +11,7 @@ from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 
 from skimage.feature import hessian_matrix
 
-import parameters
+from . import parameters
 from math import floor
 
 
@@ -52,7 +52,7 @@ def fit_multigauss_and_line(x, y, guess=[10, 1000, 1, 0, 0, 1], bounds=(-np.inf,
 def multigauss_and_bgd(x, *params):
     bgd_nparams = parameters.BGD_NPARAMS
     out = np.polyval(params[0:bgd_nparams], x)
-    for k in range((len(params) - bgd_nparams) / 3):
+    for k in range((len(params) - bgd_nparams) // 3):
         out += gauss(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
     return out
 
@@ -164,7 +164,7 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE: print or_fitted_model
+        if parameters.VERBOSE: print(or_fitted_model)
         return or_fitted_model
 
 
@@ -185,7 +185,7 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bound
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE: print or_fitted_model
+        if parameters.VERBOSE: print(or_fitted_model)
         return or_fitted_model
 
 
@@ -249,7 +249,7 @@ def fit_star2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds=
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE: print or_fitted_model
+        if parameters.VERBOSE: print(or_fitted_model)
         return or_fitted_model
 
 
