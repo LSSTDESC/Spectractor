@@ -1,5 +1,5 @@
-from statistics import *
-from texttable import *
+from .statistics import *
+from .texttable import *
 
 
 class Chain(txttableclass):
@@ -51,10 +51,10 @@ class Chain(txttableclass):
                 new_file += line
             else:
                 if ncols != len(words):
-                    print 'Warning ! Line {:d} unequal number of elements {:d} != {:d} in file {}'.format(line_index,
+                    print('Warning ! Line {:d} unequal number of elements {:d} != {:d} in file {}'.format(line_index,
                                                                                                           ncols,
                                                                                                           len(words),
-                                                                                                          filename)
+                                                                                                          filename))
                 else:
                     new_file += line
             line_index += 1
@@ -155,7 +155,7 @@ class Chain(txttableclass):
         if c > 0:
             self.gelman = np.sqrt(c * self.dim)
         if parameters.DEBUG:
-            print 'Gelman coefficient: %.3f (index=%d)' % (self.gelman, index)
+            print('Gelman coefficient: %.3f (index=%d)' % (self.gelman, index))
 
     def compute_local_acceptance_rate(self, start_index, last_index, keys=None):
         if keys == None:
@@ -197,7 +197,7 @@ class Chains(Chain):
         keys = []
         for key in self.allrowkeys:
             if self.getentry(key, 'Index') > self.burnin: keys.append(key)
-        rangedim = range(self.dim)
+        rangedim = list(range(self.dim))
         if nchain != -1: keys = self.selectkeys(keys=keys, mask=[nchain, 'exact'], col4mask='Chain')
         for i in rangedim:
             columns.append(self.getentries(keys, self.labels[i]))
@@ -240,10 +240,10 @@ class Chains(Chain):
             best_row = self.getrow(self.best_key)
             # self.best_sample.loaddict(best_row)
             self.best_row_params = []
-            print 'Minimum chisq sample: chisq=%.3g' % self.best_chisq
+            print('Minimum chisq sample: chisq=%.3g' % self.best_chisq)
             for i in range(self.dim):
                 self.best_row_params.append(best_row[self.labels[i]])
-                print "\t" + self.labels[i] + ": " + str(best_row[self.labels[i]])
+                print("\t" + self.labels[i] + ": " + str(best_row[self.labels[i]]))
 
     def convergence_tests(self):
         nchains = np.sort(np.unique(self.getentries(self.allrowkeys, 'Chain')))
@@ -257,7 +257,7 @@ class Chains(Chain):
             if self.getentry(key, 'Index') > self.burnin: keys.append(key)
         for nchain in nchains:
             chain_keys.append(self.selectkeys(keys=keys, mask=[nchain, 'exact'], col4mask='Chain'))
-        print "Computing Parameter vs Index plots..."
+        print("Computing Parameter vs Index plots...")
         # Parameter vs Index
         for i in range(self.dim):
             ax[i] = fig.add_subplot(nrow, 3, i + 1)
@@ -269,17 +269,17 @@ class Chains(Chain):
             ax[i].legend(loc='upper left', ncol=2, fontsize=10)
         # Chi2 vs Index
         ax[self.dim] = fig.add_subplot(nrow, 3, self.dim + 1)
-        print "Chisq statistics:"
+        print("Chisq statistics:")
         for n in range(len(nchains)):
             chisqs = self.getentries(chain_keys[n], 'Chi2')
             ax[self.dim].plot(self.getentries(chain_keys[n], 'Index'), chisqs, label='Chain ' + str(nchains[n]))
-            print "\tChain %d: %.3f +/- %.3f" % (nchains[n], np.mean(chisqs), np.std(chisqs))
+            print("\tChain %d: %.3f +/- %.3f" % (nchains[n], np.mean(chisqs), np.std(chisqs)))
             ax[self.dim].set_xlabel('Index')
             ax[self.dim].set_ylabel('$\chi^2$')
         ax[self.dim].legend(loc='upper left', ncol=2, fontsize=10)
-        print "Computing acceptance rate..."
+        print("Computing acceptance rate...")
         # Acceptance rate vs Index
-        min_len = np.min(map(len, chain_keys))
+        min_len = np.min(list(map(len, chain_keys)))
         window = 100
         if min_len > window:
             ax[self.dim + 1] = fig.add_subplot(nrow, 3, self.dim + 2)
@@ -307,7 +307,7 @@ class Chains(Chain):
                 ax[self.dim + 1].set_ylabel('Aceptance rate')
                 ax[self.dim + 1].legend(loc='upper left', ncol=2, fontsize=10)
         # Parameter PDFs by chain
-        print "Computing chain by chain PDFs..."
+        print("Computing chain by chain PDFs...")
         fig2 = plt.figure(figsize=(16, 9))
         ax2 = [None] * (self.dim + 1)
         nrow = self.dim / 2 + self.dim % 2
@@ -328,7 +328,7 @@ class Chains(Chain):
             #    step = 20
             # elif min_len < 100 :
             #    step = 2
-            print 'Gelman-Rubin tests (burnin=%d, step=%d):' % (self.burnin, step)
+            print('Gelman-Rubin tests (burnin=%d, step=%d):' % (self.burnin, step))
             ax2[self.dim] = fig2.add_subplot(nrow, 3, self.dim + 1)
             for i in range(self.dim):
                 Rs = []
@@ -355,7 +355,7 @@ class Chains(Chain):
                     Rs.append(R - 1)
                     lens.append(self.burnin + l + 1)
                 plt.plot(lens, Rs, lw=parameters.LINEWIDTH, label=self.axis_names[i])
-                print '\t' + self.labels[i] + ' : R-1 = %.3f (l = %d)' % (Rs[-1], lens[-1] - 1)
+                print('\t' + self.labels[i] + ' : R-1 = %.3f (l = %d)' % (Rs[-1], lens[-1] - 1))
             plt.plot(lens, [0.03] * len(lens), 'k--')
             plt.xlabel('Chain length')
             plt.ylabel('$R-1$')

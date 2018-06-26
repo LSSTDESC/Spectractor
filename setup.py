@@ -4,7 +4,7 @@ setup(
     name='Spectractor',
     version='1.0',
     packages=['spectractor'],
-    install_requires=['numpy', 'scipy', 'matplotlib', 'astropy', 'astroquery', 'coloredlogs', 'scikit-image'],
+    install_requires=['numpy', 'scipy', 'matplotlib', 'astropy', 'astroquery', 'coloredlogs', 'scikit-image', 'pysynphot', 'emcee'],
     test_suite='nose.collector',
     tests_require=['nose'],
     package_dir={'spectractor': './spectractor'},

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import re, sys, string, math, os, types
-import tools
+from . import tools
 # import spline
 
 
@@ -61,7 +61,7 @@ class maskclass:
                     return 1
 
                 else:
-                    if (type(value) is types.StringType) or (type(mask) is types.StringType):
+                    if (type(value) is bytes) or (type(mask) is bytes):
                         return 0
             V = value and mask
             if maskOP == 'or':
@@ -73,7 +73,7 @@ class maskclass:
             elif maskOP == 'exact':
                 if value == mask: return 1
             else:
-                raise RuntimeError, 'ERROR: wrong maskOP:', maskOP
+                raise RuntimeError('ERROR: wrong maskOP:').with_traceback(maskOP)
         else:
             return 1
 
@@ -107,9 +107,9 @@ class maskclass:
             return None, None, None, None
 
         # parse the argument
-        if type(maskargument) is types.IntType:
+        if type(maskargument) is int:
             return maskargument, 'or', None, None
-        elif type(maskargument) in [types.TupleType, types.ListType]:
+        elif type(maskargument) in [tuple, list]:
             if len(maskargument) == 1:
                 # standard usemask, operator is 'or'
                 return maskargument[0], 'or', None, None
@@ -120,7 +120,7 @@ class maskclass:
             elif len(maskargument) == 4:
                 return maskargument[0], maskargument[1], maskargument[2], maskargument[3]
             else:
-                raise RuntimeError, 'bad arguments for parsemaskargument:', maskargument
+                raise RuntimeError('bad arguments for parsemaskargument:').with_traceback(maskargument)
 
 
 class txttableclass:
@@ -205,16 +205,16 @@ class txttableclass:
 
     def setcolmap(self, col2map, col):
         self.colmap[col2map] = col
-        self.cols2map = self.colmap.keys()
+        self.cols2map = list(self.colmap.keys())
 
     def setcol2visible(self, cols, visible):
-        if type(cols) is types.StringType:
+        if type(cols) is bytes:
             cols = [cols, ]
         for col in cols:
             if not visible == None:
                 self.colinfo[col]['visible'] = visible
             else:
-                if not self.colinfo[col].has_key('visible'):
+                if 'visible' not in self.colinfo[col]:
                     self.colinfo[col]['visible'] = 0
 
     def setpattern4undefined(self, pattern):
@@ -259,28 +259,28 @@ class txttableclass:
             if self.colinfo[col]['type'] == 'f':
                 return float(self.data[key][col])
             if self.colinfo[col]['type'] in ['ld', 'lx']:
-                return long(self.data[key][col])
+                return int(self.data[key][col])
             if self.colinfo[col]['type'] == 's':
-                if type(self.data[key][col]) == types.StringType:
+                if type(self.data[key][col]) == bytes:
                     return self.data[key][col]
-                if type(self.data[key][col]) == types.FloatType:
+                if type(self.data[key][col]) == float:
                     return "%f" % self.data[key][col]
-                if type(self.data[key][col]) == types.IntType:
+                if type(self.data[key][col]) == int:
                     return "%d" % self.data[key][col]
-                if type(self.data[key][col]) == types.LongType:
+                if type(self.data[key][col]) == int:
                     return "%ld" % self.data[key][col]
-                if type(self.data[key][col]) in [types.LongType, types.FloatType, types.StringType]:
+                if type(self.data[key][col]) in [int, float, bytes]:
                     return int(self.data[key][col])
-                raise RuntimeError, 'ERROR: Don\'t know to convert ' + self.data[key][col] + ' of type ' + type(
-                    self.data[key][col]) + ' into a string!'
+                raise RuntimeError('ERROR: Don\'t know to convert ' + self.data[key][col] + ' of type ' + type(
+                    self.data[key][col]) + ' into a string!')
             else:
-                raise RuntimeError, 'ERROR: wrong type %s for column %s' % (self.colinfo[col]['type'], col)
-        except Exception, e:
+                raise RuntimeError('ERROR: wrong type %s for column %s' % (self.colinfo[col]['type'], col))
+        except Exception as e:
             if verbose:
-                print 'Error (texttable.getentry): returning unformatted value'
-                print e
-                print 'key:', key, 'col:', col, 'val:', self.data[key][col], 'datatype:', type(
-                    self.data[key][col]), 'coltype', self.colinfo[col]['type']
+                print('Error (texttable.getentry): returning unformatted value')
+                print(e)
+                print('key:', key, 'col:', col, 'val:', self.data[key][col], 'datatype:', type(
+                    self.data[key][col]), 'coltype', self.colinfo[col]['type'])
                 if not exit4Error:
                     return self.data[key][col]
 
@@ -291,7 +291,7 @@ class txttableclass:
             if value != None:
                 if self.colinfo[col]['type'] == 'o':
                     self.data[key][col] = value
-                elif (type(value) is types.StringType) and (
+                elif (type(value) is bytes) and (
                         self.pattern4undefined != None) and self.pattern4undefined.search(value):
                     self.data[key][col] = None
                 elif self.colinfo[col]['type'] == 'f':
@@ -299,41 +299,41 @@ class txttableclass:
                 elif self.colinfo[col]['type'] == 'd':
                     self.data[key][col] = int(float(value))
                 elif self.colinfo[col]['type'] == 'x':
-                    if type(value) is types.StringType:
+                    if type(value) is bytes:
                         self.data[key][col] = int(value, 16)
                     else:
                         self.data[key][col] = int(value)
                 elif self.colinfo[col]['type'] == 'ld':
-                    self.data[key][col] = long(value)
+                    self.data[key][col] = int(value)
                 elif self.colinfo[col]['type'] == 'lx':
-                    if type(value) is types.StringType:
-                        self.data[key][col] = long(value, 16)
+                    if type(value) is bytes:
+                        self.data[key][col] = int(value, 16)
                     else:
-                        self.data[key][col] = long(value)
+                        self.data[key][col] = int(value)
                 elif self.colinfo[col]['type'] == 's':
                     self.data[key][col] = value
                 elif self.colinfo[col]['type'] == 'deg':
                     # convert to decimal degrees
                     self.data[key][col] = tools.sex2deg(value)
                 else:
-                    raise RuntimeError, 'ERROR: wrong type %s for column %s' % (self.colinfo[col]['type'], col)
+                    raise RuntimeError('ERROR: wrong type %s for column %s' % (self.colinfo[col]['type'], col))
             else:
                 self.data[key][col] = None
-        except ValueError, e:
+        except ValueError as e:
             if verbose:
-                print "setentry error"
-                print e
-                print 'key:', key, 'col:', col
-                print 'value:', self.data[key][col]
+                print("setentry error")
+                print(e)
+                print('key:', key, 'col:', col)
+                print('value:', self.data[key][col])
 
     def setentries(self, key, cols, values):
-        if type(cols) is types.StringType:
+        if type(cols) is bytes:
             cols = [cols, ]
-        if type(values) is types.StringType:
+        if type(values) is bytes:
             cols = [values, ]
         if len(cols) != len(values):
-            raise RuntimeError, 'ERROR: need some number of cols (%d) than values (%d)' % (len(cols), len(values))
-        irange = range(len(cols))
+            raise RuntimeError('ERROR: need some number of cols (%d) than values (%d)' % (len(cols), len(values)))
+        irange = list(range(len(cols)))
         for i in irange:
             self.setentry(key, cols[i], values[i])
 
@@ -389,15 +389,15 @@ class txttableclass:
 
         # don't do anything if coltype=None
         if coltype == None:
-            if not self.colinfo.has_key(col):
+            if col not in self.colinfo:
                 # error if col doesn't exist
-                print 'ERROR: coltype must be defined for non-existing column: ', col
+                print('ERROR: coltype must be defined for non-existing column: ', col)
                 exit(0)
         else:
             self.colinfo[col]['type'] = coltype
             # check for error
             if not coltype in ('f', 's', 'd', 'x', 'o', 'ld', 'lx', 'deg'):
-                raise RuntimeError, 'ERROR: unknown column type: ', coltype
+                raise RuntimeError('ERROR: unknown column type: ').with_traceback(coltype)
 
         # if there is no colformat info: set the default colformat
         if colformat == None and self.colinfo[col]['format'] == None:
@@ -415,7 +415,7 @@ class txttableclass:
             elif self.colinfo[col]['type'] == 'deg':
                 self.colinfo[col]['format'] = '%f'
             else:
-                print 'ERROR: unknown column type: ', coltype
+                print('ERROR: unknown column type: ', coltype)
                 exit(0)
         # Don't change format if colformat == None, otherwise assign new format
         elif not colformat == None:
@@ -427,11 +427,11 @@ class txttableclass:
         Set the type of the value returned for a given column.
         E.g. from 'getentry(key,col)'.
         """
-        if type(cols) is types.StringType:
+        if type(cols) is bytes:
             cols = [cols, ]
         for col in cols:  # test if the column already exist
             if col == None: continue
-            if self.colinfo.has_key(col):
+            if col in self.colinfo:
                 newcolflag = 0
                 oldcoltype = self.colinfo[col]['type']  # save the previous setting
                 # if the coltype is changed, and no new format given: give it default format
@@ -469,7 +469,7 @@ class txttableclass:
     def colsexist(self, cols, verbose=0):
         for col in cols:
             if not self.colexist(col):
-                if verbose: print 'ERROR: col %s does not exist!' % col
+                if verbose: print('ERROR: col %s does not exist!' % col)
                 return 0
         return 1
 
@@ -479,7 +479,7 @@ class txttableclass:
         #    print 'ERROR: no measurements found in '+self.filename 
         #    return(1)
         if not self.colsexist(self.cols):
-            print 'ERROR: something is wrong with the col definition in ' + self.filename
+            print('ERROR: something is wrong with the col definition in ' + self.filename)
             return 2
 
         return 0
@@ -489,29 +489,29 @@ class txttableclass:
         if key in self.allrowkeys:
             return self.data[key]
         else:
-            raise RuntimeError, 'ERROR: key %s out of range!' % key
+            raise RuntimeError('ERROR: key %s out of range!' % key)
 
     def add2row(self, rowkey, dict2add, forceExit=False):
         for col in dict2add:
             if self.colexist(col):
                 self.setentry(rowkey, col, dict2add[col])
             else:
-                print 'ERROR (texttable.txttableclass.add2row): You are trying to add a column, %s, that does not exist!' % col
+                print('ERROR (texttable.txttableclass.add2row): You are trying to add a column, %s, that does not exist!' % col)
                 if forceExit:
-                    raise RuntimeError, "Exiting..."
+                    raise RuntimeError("Exiting...")
                 else:
-                    print 'I am going to keep going without adding the entry for this column, I hope you know what you are doing.\n'
+                    print('I am going to keep going without adding the entry for this column, I hope you know what you are doing.\n')
 
     def newrow(self, dict2add, newcolsokflag=0, key=None):
-        if not (type(dict2add) is types.DictType):
-            print 'ERROR: wrong type passed to setrow, dictionary expected!'
+        if not (type(dict2add) is dict):
+            print('ERROR: wrong type passed to setrow, dictionary expected!')
             return 1
 
         if key == None:
             # get the rowkey, in general  self.internalrowid
             if self.col4rowkey != '_id':
-                if not dict2add.has_key(self.col4rowkey):
-                    raise RuntimeError, 'ERROR: trying to add new row to table, but col key %s doesnt exist!' % self.col4rowkey
+                if self.col4rowkey not in dict2add:
+                    raise RuntimeError('ERROR: trying to add new row to table, but col key %s doesnt exist!' % self.col4rowkey)
                 rowkey = dict2add[self.col4rowkey]
             else:
                 rowkey = self.internalrowid
@@ -522,7 +522,7 @@ class txttableclass:
 
         # add new cols if necessary
         if newcolsokflag:
-            for col in dict2add.keys():
+            for col in list(dict2add.keys()):
                 if not self.colexist(col):
                     self.configcols([col], 's')
 
@@ -550,15 +550,15 @@ class txttableclass:
 
     def newrow_quick(self, dict2add, cols, key=None):
         """ This is a quicker newrow, but with less error checking: The cols are passed and have to exist! """
-        if not (type(dict2add) is types.DictType):
-            print 'ERROR: wrong type passed to setrow, dictionary expected!'
+        if not (type(dict2add) is dict):
+            print('ERROR: wrong type passed to setrow, dictionary expected!')
             return 1
 
         if key == None:
             # get the rowkey, in general  self.internalrowid
             if self.col4rowkey != '_id':
-                if not dict2add.has_key(self.col4rowkey):
-                    raise RuntimeError, 'ERROR: trying to add new row to table, but col key %s doesnt exist!' % self.col4rowkey
+                if self.col4rowkey not in dict2add:
+                    raise RuntimeError('ERROR: trying to add new row to table, but col key %s doesnt exist!' % self.col4rowkey)
                 rowkey = dict2add[self.col4rowkey]
             else:
                 rowkey = self.internalrowid
@@ -595,7 +595,7 @@ class txttableclass:
 
     def delrow(self, rowkey):
         del (self.data[rowkey])
-        self.allrowkeys = self.data.keys()
+        self.allrowkeys = list(self.data.keys())
 
     def parsetable(self, headerstring, lines, startindex=0, stopindex=None, addflag=0, skipheaderline=1, skipcomments=1,
                    onlyparse2nextheader=0, maxsplit=0, onlyparsecols=None, noheader=False, comments=None):
@@ -622,10 +622,10 @@ class txttableclass:
         # header=headerstring.split(self.inputseparator)
         headerinfo = re.split(self.inputseparator, headerstring, maxsplit=maxsplit)
         if self.debug:
-            print "TEXTTABLE::TXTTABLECLASS::PARSETABLE : headerinfo  ", headerinfo
+            print("TEXTTABLE::TXTTABLECLASS::PARSETABLE : headerinfo  ", headerinfo)
         # headerinfo=re.split(self.inputseparator,headerstring)
         # if the col is not set yet, set it to a string
-        headerinfoindices = range(len(headerinfo))
+        headerinfoindices = list(range(len(headerinfo)))
         if onlyparsecols:
             newheaderinfoindices = []
             for col in onlyparsecols:
@@ -657,7 +657,7 @@ class txttableclass:
                     col4rowkeyindex = c
                     break
             if col4rowkeyindex == None:
-                raise RuntimeError, 'Could not find column %s!' % self.col4rowkey
+                raise RuntimeError('Could not find column %s!' % self.col4rowkey)
 
         # add internal cols if not yet added
         if not '_id' in self.cols:
@@ -689,7 +689,7 @@ class txttableclass:
 
         # We have to set this to something because we're returning it at the end
         i = imin
-        irange = range(imin, imax)
+        irange = list(range(imin, imax))
         for i in irange:
             if skipheaderline or onlyparse2nextheader:
                 # only do the parsing test after the first real line is read
@@ -721,15 +721,15 @@ class txttableclass:
             # lineinfo= re.split(self.inputseparator,lines[i])
             if len(lineinfo) != len(headerinfo):
                 if self.requireentry:
-                    print 'headerinfo:', headerinfo
-                    print lineinfo, maxsplit
+                    print('headerinfo:', headerinfo)
+                    print(lineinfo, maxsplit)
                     #                    print (headerinfo[8], lineinfo[8])
                     #                    print (headerinfo[18], lineinfo[18])
                     #                    print (headerinfo[38], lineinfo[38])
                     #                    print lineinfo[38]
-                    print len(headerinfo), len(lineinfo)
-                    raise RuntimeError, 'While parsing table: header and line have unequal number of elements: %d != %d !!!!' % (
-                    len(headerinfo), len(lineinfo))
+                    print(len(headerinfo), len(lineinfo))
+                    raise RuntimeError('While parsing table: header and line have unequal number of elements: %d != %d !!!!' % (
+                    len(headerinfo), len(lineinfo)))
 
             if col4rowkeyindex == None:
                 rowkey = self.internalrowid
@@ -757,7 +757,7 @@ class txttableclass:
             i += 1
 
         # get the primary keys
-        self.allrowkeys = self.data.keys()
+        self.allrowkeys = list(self.data.keys())
 
         # if _mask does not exist, add it to the cols
         if not '_mask' in self.cols:
@@ -778,7 +778,7 @@ class txttableclass:
             imax = len(lines)
 
         i = startindex
-        irange = range(startindex, imax)
+        irange = list(range(startindex, imax))
         for i in irange:
             # for i in range(startindex,imax):
             # header?
@@ -804,16 +804,16 @@ class txttableclass:
                 self.comments.append(lines[i])
                 i += 1
             else:
-                raise RuntimeError, "Unaccountable lines when trying to find next header: %s" % (lines[i])
+                raise RuntimeError("Unaccountable lines when trying to find next header: %s" % (lines[i]))
         # some more error checking
         if headerstring == '':
-            raise RuntimeError, 'could not find the header!'
+            raise RuntimeError('could not find the header!')
         return headerstring, i
 
     def getfromdb(self, db, columns, command, keys=None, columnconversion=None):
 
         if columnconversion != None:
-            convcols = columnconversion.keys()
+            convcols = list(columnconversion.keys())
             for col in columns:
                 if not (col in convcols):
                     columnconversion[col] = col
@@ -840,9 +840,9 @@ class txttableclass:
         if key == None:
             key = self.newrow({})
         if len(columns) != len(dboutput):
-            print 'ERROR: # of columns (%d) unequal # of db output (%d)' % (len(columns), len(dboutput))
+            print('ERROR: # of columns (%d) unequal # of db output (%d)' % (len(columns), len(dboutput)))
             sys.exit(0)
-        for i in xrange(len(columns)):
+        for i in range(len(columns)):
             if columnconversion != None:
                 col = columnconversion[columns[i]]
                 self.setentry(key, col, dboutput[i])
@@ -854,7 +854,7 @@ class txttableclass:
                  headerstring=None, loadstartline=None, headerindex=None):
         self.errorflag = 0
         if not os.path.isfile(filename):
-            print 'Warning: The file %s does not exist!' % filename
+            print('Warning: The file %s does not exist!' % filename)
             self.errorflag = 1
             return 1
 
@@ -872,7 +872,7 @@ class txttableclass:
         else:
             (headerstring, i) = self.search4nextheader(lines, startindex=0, takelastheader=takelastheader)
             if self.debug:
-                print 'TEST:', (headerstring, i)
+                print('TEST:', (headerstring, i))
 
         if loadstartline:
             i = loadstartline
@@ -887,17 +887,17 @@ class txttableclass:
                      getzptmag=True):
         if defaultheaderstring:
             if headerstring:
-                print 'WARNING: headerstring specified and defaultheaderstring=True.\n I think you want to use the specified headerstring, so that is what I am going to do:\n %s' % headerstring
+                print('WARNING: headerstring specified and defaultheaderstring=True.\n I think you want to use the specified headerstring, so that is what I am going to do:\n %s' % headerstring)
             else:
                 dheaderstring = 'Xpos\tYpos\tM\tdM\tflux\tdflux\ttype\tpeakflux\tsigx\tsigxy\tsigy\tsky\tchisqrt\tclass\tFWHM1\tFWHM2\tFWHM\tangle\textendedness\tflag\tmask\tNmask'
-                print "Using default headerstring for fits file:\n%s" % dheaderstring
+                print("Using default headerstring for fits file:\n%s" % dheaderstring)
                 headerstring = dheaderstring
         errorflag = self.loadfile(fitsfilename, headerstring=headerstring, loadstartline=loadstartline)
         if getzptmag:
-            import commands
-            zptmag = commands.getoutput('gethead %s ZPTMAG' % fitsfilename)
+            import subprocess
+            zptmag = subprocess.getoutput('gethead %s ZPTMAG' % fitsfilename)
             if len(zptmag.split()) != 1:
-                print 'Something went wrong with getting ZPTMAG: %s\nSetting it to None' % zptmag
+                print('Something went wrong with getting ZPTMAG: %s\nSetting it to None' % zptmag)
                 self.zptmag = None
             self.zptmag = float(zptmag)
         return errorflag
@@ -917,7 +917,7 @@ class txttableclass:
             elif col == 'type':
                 self.configcols('type', 'x', visible=1)
             else:
-                print 'Unknown col for configcmpcols %s\nYou need to configure this col on your own!' % col
+                print('Unknown col for configcmpcols %s\nYou need to configure this col on your own!' % col)
 
     def parsefitsheaderline(self, fitsheaderline, keypattern, stringvalpattern, valpattern, commentpattern):
         # get the keyword
@@ -954,8 +954,8 @@ class txttableclass:
         # how many lines are in the header?
         N = int((len(hdrAsString) - 1) / 80.0)
         if N != (len(hdrAsString) - 1) / 80.0:
-            raise RuntimeError, 'ERROR: Something is wrong with this fitsheader, number of chars (%d) is not a multiple of 80 ' % (
-                        len(hdrAsString) - 1)
+            raise RuntimeError('ERROR: Something is wrong with this fitsheader, number of chars (%d) is not a multiple of 80 ' % (
+                        len(hdrAsString) - 1))
 
         # compile the patterns. makes it faster
         keypattern = re.compile('(\S+)\s*=\s*(.*)')
@@ -983,7 +983,7 @@ class txttableclass:
         self.filename = filename
         if not os.path.isfile(filename):
             self.cmpheader = {}
-            print 'Warning: The file %s does not exist!' % filename
+            print('Warning: The file %s does not exist!' % filename)
             self.errorflag = 1
             return 1
 
@@ -992,8 +992,8 @@ class txttableclass:
         # read the fitsheader
         self.cmpheader = self.parsefitsheader(lines[0])
 
-        if not self.cmpheader.has_key('NCOLTBL'):
-            print 'Warning: The file %s seems not to be a cmpfile! NCOLTBL is missing from the header' % filename
+        if 'NCOLTBL' not in self.cmpheader:
+            print('Warning: The file %s seems not to be a cmpfile! NCOLTBL is missing from the header' % filename)
             self.errorflag = 1
             return 1
 
@@ -1015,7 +1015,7 @@ class txttableclass:
         self.filename = filename
 
         if not os.path.isfile(filename):
-            print 'Warning: The file %s does not exist!' % filename
+            print('Warning: The file %s does not exist!' % filename)
             self.errorflag = 1
             return 1
 
@@ -1024,8 +1024,8 @@ class txttableclass:
         # read the fitsheader
         self.cmpheader = self.parsefitsheader(lines[0])
 
-        if not self.cmpheader.has_key('NCOLTBL'):
-            print 'Warning: The file %s seems not to be a cmpfile! NCOLTBL is missing from the header' % filename
+        if 'NCOLTBL' not in self.cmpheader:
+            print('Warning: The file %s seems not to be a cmpfile! NCOLTBL is missing from the header' % filename)
             self.errorflag = 1
             return 1
 
@@ -1041,8 +1041,8 @@ class txttableclass:
         return self.errorflag
 
     def save2file(self, filename, **args):
-        if args.has_key('verbose'):
-            print 'Saving ', filename
+        if 'verbose' in args:
+            print('Saving ', filename)
         f = open(filename, 'w')
         self.printtxttable(file=f, **args)
         f.close()
@@ -1057,12 +1057,12 @@ class txttableclass:
         outputadd2lineend_bkp = self.outputadd2lineend
         self.outputseparator = ' & '
         self.outputadd2lineend = '\\\\'
-        print cols
+        print(cols)
         colline = ''
         colnumberline = ''
         formatstring = ''
         cols = self.__cols2use__(cols=cols)
-        for i in xrange(len(cols)):
+        for i in range(len(cols)):
             if colline != '':
                 colline += ' & '
                 colnumberline += ' & '
@@ -1096,25 +1096,25 @@ class txttableclass:
         if self.getentry(key, col, verbose=verbose) == None:
             return '%s' % self.outputundefined
         else:
-            if self.colinfo.has_key(col):
+            if col in self.colinfo:
                 return self.colinfo[col]['format'] % (self.getentry(key, col))
             else:
                 # That's a hack! remove it asap
-                if type(self.getentry(key, col)) in [types.IntType, types.LongType]:
+                if type(self.getentry(key, col)) in [int, int]:
                     return '%ld' % (self.getentry(key, col, verbose=verbose))
-                elif type(self.getentry(key, col)) in [types.FloatType]:
+                elif type(self.getentry(key, col)) in [float]:
                     return '%f' % (self.getentry(key, col, verbose=verbose))
-                elif type(self.getentry(key, col)) in [types.StringType]:
+                elif type(self.getentry(key, col)) in [bytes]:
                     return '%s' % (self.getentry(key, col, verbose=verbose))
                 else:
-                    raise RuntimeError, 'ERROR: unknown type of ', self.getentry(key, col)
+                    raise RuntimeError('ERROR: unknown type of ').with_traceback(self.getentry(key, col))
 
     def colheader2string(self, col):
         return '%s' % col
 
     def __cols2use__(self, cols=None, showallcols=0):
         if cols != None:
-            if type(cols) is types.StringType:
+            if type(cols) is bytes:
                 cols = [cols, ]
             return cols
         collist = []
@@ -1132,9 +1132,9 @@ class txttableclass:
             else:
                 s += self.outputseparator
             if autoformat:
-                if (not self.colinfo.has_key(col)) and (col in self.cols2map):
+                if (col not in self.colinfo) and (col in self.cols2map):
                     col = self.colmap[col]
-                if not self.colinfo.has_key(col):
+                if col not in self.colinfo:
                     s += '%s' % self.outputundefined
                 else:
                     s += self.colinfo[col]['autoformat'] % self.outputundefined
@@ -1152,9 +1152,9 @@ class txttableclass:
             else:
                 s += self.outputseparator
             if autoformat:
-                if (not self.colinfo.has_key(col)) and (col in self.cols2map):
+                if (col not in self.colinfo) and (col in self.cols2map):
                     col = self.colmap[col]
-                if not self.colinfo.has_key(col):
+                if col not in self.colinfo:
                     s += self.colvalue2string(key, col, verbose=verbose)
                 else:
                     s += self.colinfo[col]['autoformat'] % self.colvalue2string(key, col, verbose=verbose)
@@ -1176,15 +1176,15 @@ class txttableclass:
                 #                if (not self.colinfo.has_key(col)) and (col in self.cols2map):
                 #                    col = self.colmap[col]
                 #                s+=self.colinfo[col]['autoformat'] % self.colheader2string(colname)
-                if (not self.colinfo.has_key(col)) and (col in self.cols2map):
+                if (col not in self.colinfo) and (col in self.cols2map):
                     col = self.colmap[col]
                 #                 try:
                 #                     s+=self.colinfo[col]['autoformat'] % self.colheader2string(colname)
                 #                 except: #allows for older formats (with perhaps extra columns) of files where the columns are configured
                 #                     print "WARNING (texttable:outputheaer): This column, %s,  is not in colinfo so it will be converted to a string.  If this is unacceptable, check your code\n" % col
                 #                     s+=self.colheader2string(col)
-                if not self.colinfo.has_key(col):
-                    print "WARNING (texttable.outputheaer): This column, %s,  is not in colinfo so it will be converted to a string.  If this is unacceptable, check your code\n" % col
+                if col not in self.colinfo:
+                    print("WARNING (texttable.outputheaer): This column, %s,  is not in colinfo so it will be converted to a string.  If this is unacceptable, check your code\n" % col)
                     s += self.colheader2string(colname)
                 else:
                     s += self.colinfo[col]['autoformat'] % self.colheader2string(colname)
@@ -1199,7 +1199,7 @@ class txttableclass:
             keys = self.rowkeys(keys=keys, mask=mask, col4mask=col4mask, showallrows=showallrows)
         for col in cols:
             colname = col
-            if not self.colinfo.has_key(col):
+            if col not in self.colinfo:
                 if col in self.cols2map:
                     col = self.colmap[col]
                 else:
@@ -1276,7 +1276,7 @@ class txttableclass:
         ##   When would you use 'self.rowkeys(keys=keylist)'?
         ##   It just returns 'keylist' which you had in the first place.
         if keys != None:
-            if not (type(keys) is types.ListType):
+            if not (type(keys) is list):
                 keys = [keys, ]
             return keys
 
@@ -1323,8 +1323,8 @@ class txttableclass:
             if reverse: temp.reverse()
             return [x[1] for x in temp]
         else:
-            if not (type(cols) is types.StringType):
-                raise RuntimeError, "sorting can only be done with one col if asstring=0"
+            if not (type(cols) is bytes):
+                raise RuntimeError("sorting can only be done with one col if asstring=0")
             temp = [(self.getentry(key, cols), key) for key in keys]
             temp.sort()
             if reverse: temp.reverse()
@@ -1338,8 +1338,8 @@ class txttableclass:
             if reverse: temp.reverse()
             self.allrowkeys = [x[1] for x in temp]
         else:
-            if not (type(cols) is types.StringType):
-                raise RuntimeError, "sorting can only be done with one col if asstring=0"
+            if not (type(cols) is bytes):
+                raise RuntimeError("sorting can only be done with one col if asstring=0")
             temp = [(self.getentry(key, cols), key) for key in self.allrowkeys]
             temp.sort()
             if reverse: temp.reverse()
@@ -1349,11 +1349,11 @@ class txttableclass:
         if keys == None:
             return None
         if keys == 'all':
-            keys = self.data.keys()
+            keys = list(self.data.keys())
         if keys == 'allunmasked':
             keys = self.rowkeys()
         #       print 'FFFFFFFFFF', type(cols), n_cols
-        if type(cols) is types.StringType:
+        if type(cols) is bytes:
             cols = [cols]
         #        print 'GGGGGGGGG', type(cols)
         n_cols = len(cols)
@@ -1384,7 +1384,7 @@ class txttableclass:
             for i in range(len(args)):
                 temp.append(args[i])
 
-            if apply(fctn, tuple(temp)):
+            if fctn(*tuple(temp)):
                 goodkeys.append(key)
         return goodkeys
 
@@ -1402,7 +1402,7 @@ class txttableclass:
             for i in range(len(args)):
                 temp.append(args[i])
 
-            if apply(fctn, tuple(temp)):
+            if fctn(*tuple(temp)):
                 goodkeys.append(key)
         return goodkeys
 
@@ -1514,7 +1514,7 @@ class txttableclass:
             Nused += 1
         if Nused < 1:
             if verbose:
-                print 'WARNING: no data to calculate average!'
+                print('WARNING: no data to calculate average!')
             if returnusekeys:
                 return None, None, None, None, None, []
             else:
@@ -1535,8 +1535,8 @@ class txttableclass:
                 sum2 += diff * diff
                 Nused2 += 1
             if Nused2 != Nused:
-                raise RuntimeError, 'ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_sigmacut' % (
-                Nused2, Nused)
+                raise RuntimeError('ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_sigmacut' % (
+                Nused2, Nused))
             sigma = math.sqrt(1.0 / (Nused - 1) * sum2)
         if returnusekeys:
             return mu, sigma, Nchanged, Nused, Nskipped, usekeys
@@ -1568,10 +1568,10 @@ class txttableclass:
             # Only do a sigma cut if wanted
             if verbose >= 2:
                 if mu != None and sigma != None:
-                    print "i:%d  mu:%f  sigma:%f Nchanged:%d Nused:%d Nskipped:%d" % (
-                    i, mu, sigma, Nchanged, Nused, Nskipped)
+                    print("i:%d  mu:%f  sigma:%f Nchanged:%d Nused:%d Nskipped:%d" % (
+                    i, mu, sigma, Nchanged, Nused, Nskipped))
                 else:
-                    print "i:", i, " mu:", mu, " sigma:", sigma, " Nchanged:", Nchanged, " Nused:", Nused, " Nskipped:", Nskipped
+                    print("i:", i, " mu:", mu, " sigma:", sigma, " Nchanged:", Nchanged, " Nused:", Nused, " Nskipped:", Nskipped)
                     break
             if Nsigma == 0.0:
                 break
@@ -1601,18 +1601,18 @@ class txttableclass:
                 if sigma > 0.0 and Nsigma > 0.0:
                     delta = mu - self.getentry(key, col)
                     if delta * delta > Nsigma * Nsigma * (self.getentry(key, dcol) * self.getentry(key, dcol)):
-                        if verbose == 1: print "I am getting skipped", abs(delta), Nsigma * self.getentry(key, dcol), (
-                                    abs(delta) > Nsigma * self.getentry(key, dcol))
+                        if verbose == 1: print("I am getting skipped", abs(delta), Nsigma * self.getentry(key, dcol), (
+                                    abs(delta) > Nsigma * self.getentry(key, dcol)))
                         if verbose > 1:
-                            print "I am getting skipped0", mu, self.getentry(key, col), self.getentry(key, dcol)
-                            print "I am getting skipped1", abs(delta), Nsigma * self.getentry(key, dcol), (
-                                        abs(delta) > Nsigma * self.getentry(key, dcol))
+                            print("I am getting skipped0", mu, self.getentry(key, col), self.getentry(key, dcol))
+                            print("I am getting skipped1", abs(delta), Nsigma * self.getentry(key, dcol), (
+                                        abs(delta) > Nsigma * self.getentry(key, dcol)))
                         skipflag = 1
                     else:
                         if verbose > 1:
-                            print "I DONT get skipped0", mu, self.getentry(key, col), self.getentry(key, dcol)
-                            print "I DONT get skipped1", abs(delta), Nsigma * self.getentry(key, dcol), (
-                                        abs(delta) > Nsigma * self.getentry(key, dcol))
+                            print("I DONT get skipped0", mu, self.getentry(key, col), self.getentry(key, dcol))
+                            print("I DONT get skipped1", abs(delta), Nsigma * self.getentry(key, dcol), (
+                                        abs(delta) > Nsigma * self.getentry(key, dcol)))
                     if skipflag != self.getentry(key, '__temp4calcaverage_skipflag'):
                         Nchanged += 1
                 self.setentry(key, '__temp4calcaverage_skipflag', skipflag)
@@ -1626,8 +1626,8 @@ class txttableclass:
                 Nused += 1
             if Nused < 1:
                 if verbose:
-                    print 'WARNING: no data to calculate average of col %s!' % col
-                    print 'mu = %.2f, Nsigma=%.0f' % (mu, Nsigma)
+                    print('WARNING: no data to calculate average of col %s!' % col)
+                    print('mu = %.2f, Nsigma=%.0f' % (mu, Nsigma))
                     self.printtxttable(keys=keys, cols=[col, dcol])
                 return None, None, None, None, None, None, None
             mu = C1 / C2
@@ -1646,8 +1646,8 @@ class txttableclass:
                     X2norm += diff * diff / (self.getentry(key, dcol) * self.getentry(key, dcol))
                     Nused2 += 1
                 if Nused2 != Nused:
-                    raise RuntimeError, 'ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
-                    Nused2, Nused)
+                    raise RuntimeError('ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
+                    Nused2, Nused))
                 sigma = math.sqrt(1.0 / (Nused - 1) * C1)
                 X2norm = X2norm / (Nused2 - 1)
 
@@ -1657,20 +1657,20 @@ class txttableclass:
                 if sigma > 0.0 and Nsigma > 0.0:
                     delta = mu - self.getentry(key, col)
                     if delta * delta > Nsigma * Nsigma * self.getentry(key, dcol2):
-                        if verbose == 1: print "I am getting skipped", abs(delta), Nsigma * math.sqrt(
-                            self.getentry(key, dcol2)), (abs(delta) > Nsigma * math.sqrt(self.getentry(key, dcol2)))
+                        if verbose == 1: print("I am getting skipped", abs(delta), Nsigma * math.sqrt(
+                            self.getentry(key, dcol2)), (abs(delta) > Nsigma * math.sqrt(self.getentry(key, dcol2))))
                         if verbose > 1:
-                            print "I am getting skipped0", mu, self.getentry(key, col), math.sqrt(
-                                self.getentry(key, dcol2))
-                            print "I am getting skipped1", abs(delta), Nsigma * math.sqrt(self.getentry(key, dcol2)), (
-                                        abs(delta) > Nsigma * math.sqrt(self.getentry(key, dcol2)))
+                            print("I am getting skipped0", mu, self.getentry(key, col), math.sqrt(
+                                self.getentry(key, dcol2)))
+                            print("I am getting skipped1", abs(delta), Nsigma * math.sqrt(self.getentry(key, dcol2)), (
+                                        abs(delta) > Nsigma * math.sqrt(self.getentry(key, dcol2))))
                         skipflag = 1
                     else:
                         if verbose > 1:
-                            print "I DONT get skipped0", mu, self.getentry(key, col), math.sqrt(
-                                self.getentry(key, dcol2))
-                            print "I DONT get skipped1", abs(delta), Nsigma * math.sqrt(self.getentry(key, dcol2)), (
-                                        abs(delta) > Nsigma * math.sqrt(self.getentry(key, dcol2)))
+                            print("I DONT get skipped0", mu, self.getentry(key, col), math.sqrt(
+                                self.getentry(key, dcol2)))
+                            print("I DONT get skipped1", abs(delta), Nsigma * math.sqrt(self.getentry(key, dcol2)), (
+                                        abs(delta) > Nsigma * math.sqrt(self.getentry(key, dcol2))))
                     if skipflag != self.getentry(key, '__temp4calcaverage_skipflag'):
                         Nchanged += 1
                 self.setentry(key, '__temp4calcaverage_skipflag', skipflag)
@@ -1683,8 +1683,8 @@ class txttableclass:
                 Nused += 1
             if Nused < 1:
                 if verbose:
-                    print 'WARNING: no data to calculate average of col %s!' % col
-                    print 'mu = %.2f, Nsigma=%.0f' % (mu, Nsigma)
+                    print('WARNING: no data to calculate average of col %s!' % col)
+                    print('mu = %.2f, Nsigma=%.0f' % (mu, Nsigma))
                     self.printtxttable(keys=keys, cols=[col, dcol2])
                 return None, None, None, None, None, None, None
             mu = C1 / C2
@@ -1703,8 +1703,8 @@ class txttableclass:
                     X2norm += diff * diff / (self.getentry(key, dcol2))
                     Nused2 += 1
                 if Nused2 != Nused:
-                    raise RuntimeError, 'ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
-                    Nused2, Nused)
+                    raise RuntimeError('ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
+                    Nused2, Nused))
                 sigma = math.sqrt(1.0 / (Nused - 1) * C1)
                 X2norm = X2norm / (Nused2 - 1)
 
@@ -1712,7 +1712,7 @@ class txttableclass:
 
     def calcaverage_errorcutloop(self, keys, col, dcol=None, dcol2=None, Nsigma=0.0, Nitmax=10, verbose=0):
         if dcol == None and dcol2 == None:
-            print 'WARNING! GIVE AT LEAST ONE ERROR COLUMN IN CALCAVERAGE_ERRORCUTLOOP, SQUARED OR NOT'
+            print('WARNING! GIVE AT LEAST ONE ERROR COLUMN IN CALCAVERAGE_ERRORCUTLOOP, SQUARED OR NOT')
             return False
         self.configcols(['__temp4calcaverage_skipflag'], 'd', visible=0)
         for key in keys:
@@ -1733,8 +1733,8 @@ class txttableclass:
                                                                                                verbose=verbose)
             # Only do a sigma cut if wanted
             if verbose >= 1 and mu != None and sigma != None:
-                print "mu:%f mu_err:%f sigma:%f X2norm:%f Nchanged:%d Nused:%d Nskipped:%d" % (
-                mu, mu_err, sigma, X2norm, Nchanged, Nused, Nskipped)
+                print("mu:%f mu_err:%f sigma:%f X2norm:%f Nchanged:%d Nused:%d Nskipped:%d" % (
+                mu, mu_err, sigma, X2norm, Nchanged, Nused, Nskipped))
             if Nsigma == 0.0:
                 break
             if (i > 0) and (Nchanged == 0):
@@ -1749,14 +1749,14 @@ class txttableclass:
 
     def calcweightedaverage(self, keys, col, dcol, verbose=False):
         if len(keys) < 1:
-            print 'No Data!'
+            print('No Data!')
             return None, None, None
         sum = sumweight = 0.0
 
         for key in keys:
             if self.getentry(key, dcol) == 0.0:
                 if verbose:
-                    print "Skipping key %d b/c weight, %s, have 0.0 value\n" % (key, dcol)
+                    print("Skipping key %d b/c weight, %s, have 0.0 value\n" % (key, dcol))
                 continue
             weight = 1.0 / (self.getentry(key, dcol) * self.getentry(key, dcol))
             sum += weight * self.getentry(key, col)
@@ -1782,14 +1782,14 @@ class txttableclass:
             keys = self.rowkeys()
         FORCEDPHOTFLAG = 0x10
         # check the passed photcodes: make it a list, and make sure it is in hexadecimal format
-        if type(photcodes) is types.IntType:
+        if type(photcodes) is int:
             photcodes = [photcodes, ]
         if photcodes != None:
             for i in range(len(photcodes)):
                 photcodes[i] = tools.hex2int(photcodes[i]) & 0xffff
 
         # check the passed dophot types: make it a list
-        if type(dophottypes) is types.IntType:
+        if type(dophottypes) is int:
             dophottypes = [dophottypes, ]
 
         self.configcols(['type'], 'x')
@@ -1882,7 +1882,7 @@ class txttableclass:
         return list
 
     def cols_as_dict(self, key, cols):
-        if type(cols) is types.StringType:
+        if type(cols) is bytes:
             cols = [cols, ]
         dict = {}
         for col in cols:
@@ -1893,7 +1893,7 @@ class txttableclass:
         if cols == None:
             cols = self.cols
         else:
-            if type(cols) is types.StringType:
+            if type(cols) is bytes:
                 cols = [cols, ]
         list = [self.getentry(key, col) for col in cols]
         return list
@@ -1973,8 +1973,8 @@ class txttableclass:
     def get_binned_keys(self, bins, col, keys=None, minkeys4bin=None, binstepsize=0.1, minval=None, maxkeys4bin=None):
         if keys == None: keys = self.rowkeys()
         Nbins = len(bins)
-        binnedkeys = range(Nbins)
-        binds = range(Nbins)
+        binnedkeys = list(range(Nbins))
+        binds = list(range(Nbins))
 
         for bin in binds:
             if bin == 0:
@@ -2075,7 +2075,7 @@ class txttableclass:
             return default
 
     def keys_undefcolval(self, cols, keys=None):
-        if not (type(cols) is types.ListType): cols = [cols, ]
+        if not (type(cols) is list): cols = [cols, ]
         if keys == None: keys = self.rowkeys()
         undefkeys = []
         for key in keys:
@@ -2089,7 +2089,7 @@ class txttableclass:
         return undefkeys
 
     def keys_defcolval(self, cols, keys=None):
-        if not (type(cols) is types.ListType): cols = [cols, ]
+        if not (type(cols) is list): cols = [cols, ]
         if keys == None: keys = self.rowkeys()
         defkeys = []
         for key in keys:
@@ -2131,7 +2131,7 @@ class txttableclass:
             logy = [math.log(z) for z in y]
             self.splinefunc = spline.Spline(logx, logy, low_slope=low_slope, high_slope=high_slope)
         else:
-            raise RuntimeError, 'ERROR: interpolationtype=%s is not allowed!' % interpolationtype
+            raise RuntimeError('ERROR: interpolationtype=%s is not allowed!' % interpolationtype)
         self.spline_interpolation_type = interpolationtype
 
     def spline(self, x):
@@ -2140,7 +2140,7 @@ class txttableclass:
         elif self.spline_interpolation_type == 'logspline':
             return math.exp(self.splinefunc(math.log(x)))
         else:
-            raise RuntimeError, 'ERROR: interpolationtype=%s is not allowed!' % interpolationtype
+            raise RuntimeError('ERROR: interpolationtype=%s is not allowed!' % interpolationtype)
 
     def mkds9regionlist(self, xcol, ycol, keys=None, color='red', symbol='circle', WCSflag=False, save2file=None):
         """
@@ -2242,22 +2242,22 @@ class txttableclass:
                 if Nsigma > 0.0:
                     delta = slope * self.getentry(key, xcol) + offset - self.getentry(key, ycol)
                     if delta * delta > Nsigma * Nsigma * (self.getentry(key, dycol) * self.getentry(key, dycol)):
-                        if verbose == 1: print "I am getting skipped", abs(delta), Nsigma * self.getentry(key, dycol), (
-                                    abs(delta) > Nsigma * self.getentry(key, dycol))
+                        if verbose == 1: print("I am getting skipped", abs(delta), Nsigma * self.getentry(key, dycol), (
+                                    abs(delta) > Nsigma * self.getentry(key, dycol)))
                         if verbose > 1:
-                            print "I am getting skipped0", self.getentry(key, xcol), self.getentry(key,
+                            print("I am getting skipped0", self.getentry(key, xcol), self.getentry(key,
                                                                                                    ycol), self.getentry(
-                                key, dycol)
-                            print "I am getting skipped1", abs(delta), Nsigma * self.getentry(key, dycol), (
-                                        abs(delta) > Nsigma * self.getentry(key, dycol))
+                                key, dycol))
+                            print("I am getting skipped1", abs(delta), Nsigma * self.getentry(key, dycol), (
+                                        abs(delta) > Nsigma * self.getentry(key, dycol)))
                         skipflag = 1
                     else:
                         if verbose > 1:
-                            print "I DONT get skipped0", self.getentry(key, xcol), self.getentry(key,
+                            print("I DONT get skipped0", self.getentry(key, xcol), self.getentry(key,
                                                                                                  ycol), self.getentry(
-                                key, dycol)
-                            print "I DONT get skipped1", abs(delta), Nsigma * self.getentry(key, dycol), (
-                                        abs(delta) > Nsigma * self.getentry(key, dycol))
+                                key, dycol))
+                            print("I DONT get skipped1", abs(delta), Nsigma * self.getentry(key, dycol), (
+                                        abs(delta) > Nsigma * self.getentry(key, dycol)))
                     if skipflag != self.getentry(key, '__temp4calcaverage_skipflag'):
                         Nchanged += 1
                 self.setentry(key, '__temp4calcaverage_skipflag', skipflag)
@@ -2270,8 +2270,8 @@ class txttableclass:
                 Nused += 1
             if Nused < 1:
                 if verbose:
-                    print 'WARNING: no data to calculate average of col %s!' % col
-                    print 'slope = %.2f, Nsigma=%.0f' % (slope, Nsigma)
+                    print('WARNING: no data to calculate average of col %s!' % col)
+                    print('slope = %.2f, Nsigma=%.0f' % (slope, Nsigma))
                     self.printtxttable(keys=keys, cols=[ycol, dycol])
                 return None, None, None, None, None, None, None
             if Nused == 1:
@@ -2283,8 +2283,8 @@ class txttableclass:
                     data_err = self.getentry(key, dycol)
                     Nused2 += 1
                 if Nused2 != Nused:
-                    raise RuntimeError, 'ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
-                    Nused2, Nused)
+                    raise RuntimeError('ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
+                    Nused2, Nused))
                 offset_a = data
                 slope_b = 0
                 offset_a_err = data_err
@@ -2302,8 +2302,8 @@ class txttableclass:
                     sumxy += inversesigma2 * self.getentry(key, xcol) * self.getentry(key, ycol)
                     Nused2 += 1
                 if Nused2 != Nused:
-                    raise RuntimeError, 'ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
-                    Nused2, Nused)
+                    raise RuntimeError('ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
+                    Nused2, Nused))
                 delta = sumis2 * sumx2 - sumx * sumx
                 if delta > 0:
                     offset_a = 1.0 / delta * (sumx2 * sumy - sumx * sumxy)
@@ -2320,21 +2320,21 @@ class txttableclass:
                 if Nsigma > 0.0:
                     delta = slope * self.getentry(key, xcol) + offset - self.getentry(key, ycol)
                     if delta * delta > Nsigma * Nsigma * (self.getentry(key, dycol2)):
-                        if verbose == 1: print "I am getting skipped", abs(delta), Nsigma * math.sqrt(
-                            self.getentry(key, dycol2)), (abs(delta) > Nsigma * math.sqrt(self.getentry(key, dycol2)))
+                        if verbose == 1: print("I am getting skipped", abs(delta), Nsigma * math.sqrt(
+                            self.getentry(key, dycol2)), (abs(delta) > Nsigma * math.sqrt(self.getentry(key, dycol2))))
                         if verbose > 1:
-                            print "I am getting skipped0", self.getentry(key, xcol), self.getentry(key,
+                            print("I am getting skipped0", self.getentry(key, xcol), self.getentry(key,
                                                                                                    ycol), math.sqrt(
-                                self.getentry(key, dycol2))
-                            print "I am getting skipped1", abs(delta), Nsigma * math.sqrt(self.getentry(key, dycol2)), (
-                                        delta * delta > Nsigma * Nsigma * self.getentry(key, dycol2))
+                                self.getentry(key, dycol2)))
+                            print("I am getting skipped1", abs(delta), Nsigma * math.sqrt(self.getentry(key, dycol2)), (
+                                        delta * delta > Nsigma * Nsigma * self.getentry(key, dycol2)))
                         skipflag = 1
                     else:
                         if verbose > 1:
-                            print "I DONT get skipped0", self.getentry(key, xcol), self.getentry(key, ycol), math.sqrt(
-                                self.getentry(key, dycol2))
-                            print "I DONT get skipped1", abs(delta), Nsigma * math.sqrt(self.getentry(key, dycol2)), (
-                                        delta * delta > Nsigma * Nsigma * self.getentry(key, dycol2))
+                            print("I DONT get skipped0", self.getentry(key, xcol), self.getentry(key, ycol), math.sqrt(
+                                self.getentry(key, dycol2)))
+                            print("I DONT get skipped1", abs(delta), Nsigma * math.sqrt(self.getentry(key, dycol2)), (
+                                        delta * delta > Nsigma * Nsigma * self.getentry(key, dycol2)))
                     if skipflag != self.getentry(key, '__temp4calcaverage_skipflag'):
                         Nchanged += 1
                 self.setentry(key, '__temp4calcaverage_skipflag', skipflag)
@@ -2345,8 +2345,8 @@ class txttableclass:
                 Nused += 1
             if Nused < 1:
                 if verbose:
-                    print 'WARNING: no data to calculate average of col %s!' % ycol
-                    print 'slope = %.2f, Nsigma=%.0f' % (slope, Nsigma)
+                    print('WARNING: no data to calculate average of col %s!' % ycol)
+                    print('slope = %.2f, Nsigma=%.0f' % (slope, Nsigma))
                     self.printtxttable(keys=keys, cols=[ycol, dycol2])
                 return None, None, None, None, None, None, None
             if Nused == 1:
@@ -2358,8 +2358,8 @@ class txttableclass:
                     data_err = math.sqrt(self.getentry(key, dycol2))
                     Nused2 += 1
                 if Nused2 != Nused:
-                    raise RuntimeError, 'ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
-                    Nused2, Nused)
+                    raise RuntimeError('ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
+                    Nused2, Nused))
                 offset_a = data
                 slope_b = 0
                 offset_a_err = data_err
@@ -2377,8 +2377,8 @@ class txttableclass:
                     sumxy += inversesigma2 * self.getentry(key, xcol) * self.getentry(key, ycol)
                     Nused2 += 1
                 if Nused2 != Nused:
-                    raise RuntimeError, 'ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
-                    Nused2, Nused)
+                    raise RuntimeError('ERROR: BUG!!!!!! Nused2 != Nused (%d!=%d) in calcaverage_errorcut' % (
+                    Nused2, Nused))
                 delta = sumis2 * sumx2 - sumx * sumx
                 if delta > 0:
                     offset_a = 1.0 / delta * (sumx2 * sumy - sumx * sumxy)
@@ -2393,7 +2393,7 @@ class txttableclass:
     def straightline_errorcutloop(self, keys, xcol, ycol, dycol=None, dycol2=None, Nsigma=3.0, dyval=1.0, Nitmax=10,
                                   verbose=0):
         if dycol == None and dycol2 == None:
-            print 'WARNING! GIVE AT LEAST ONE ERROR COLUMN IN STRAIGHTLINE_ERRORCUTLOOP, SQUARED OR NOT'
+            print('WARNING! GIVE AT LEAST ONE ERROR COLUMN IN STRAIGHTLINE_ERRORCUTLOOP, SQUARED OR NOT')
             return False
         self.configcols(['__temp4calcaverage_skipflag'], 'd', visible=0)
         for key in keys:
@@ -2419,8 +2419,8 @@ class txttableclass:
                                                                                                                    verbose=verbose)
             # Only do a sigma cut if wanted
             if verbose >= 1 and slope_b != None and slope_b != None:
-                print "slope_b:%f slope_b_err:%f offset_a:%f offset_a_err:%f Nchanged:%d Nused:%d Nskipped:%d" % (
-                slope_b, slope_b_err, offset_a, offset_a_err, Nchanged, Nused, Nskipped)
+                print("slope_b:%f slope_b_err:%f offset_a:%f offset_a_err:%f Nchanged:%d Nused:%d Nskipped:%d" % (
+                slope_b, slope_b_err, offset_a, offset_a_err, Nchanged, Nused, Nskipped))
             if Nsigma == 0.0:
                 break
             if (i > 0) and (Nchanged == 0):
