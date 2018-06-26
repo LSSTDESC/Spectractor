@@ -48,7 +48,7 @@ spectractorsim_path = os.path.dirname(__file__)
 # -------------------------------------------------------------------------
 
 import libradtran
-import libCTIOTransm as ctio
+from throughput import Throughput
 
 # ------------------------------------------------------------------------
 # Definition of data format for the atmospheric grid
@@ -403,27 +403,28 @@ class TelescopeTransmission():
 
         '''
         # QE
-        wl,qe=ctio.Get_QE(datapath)
+        wl,qe=ctio.get_quantum_efficiency(datapath)
         self.qe=interp1d(wl,qe,kind='linear',bounds_error=False,fill_value=0.) 
         
         #  Throughput
-        wl,trt=ctio.Get_Throughput(datapath)
+        wl,trt=ctio.get_telescope_throughput(datapath)
         self.to=interp1d(wl,trt,kind='linear',bounds_error=False,fill_value=0.)
         
         # Mirrors 
-        wl,trm=ctio.Get_Mirror(datapath)
+        wl,trm=ctio.get_mirror_reflectivity(datapath)
         self.tm=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.) 
         '''
-        wl, trm, err = ctio.Get_Total_Throughput(datapath)
+        throughput = Throughput()
+        wl, trm, err = throughput.get_total_throughput()
         self.to = interp1d(wl, trm, kind='linear', bounds_error=False, fill_value=0.)
         self.to_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
 
         # Filter RG715
-        wl, trg = ctio.Get_RG715(datapath)
+        wl, trg = throughput.get_RG715()
         self.tfr = interp1d(wl, trg, kind='linear', bounds_error=False, fill_value=0.)
 
         # Filter FGB37
-        wl, trb = ctio.Get_FGB37(datapath)
+        wl, trb = throughput.get_FGB37()
         self.tfb = interp1d(wl, trb, kind='linear', bounds_error=False, fill_value=0.)
 
         if self.filtername == "RG715":
@@ -463,9 +464,6 @@ class TelescopeTransmission():
 
 
 # ----------------------------------------------------------------------------------
-
-
-# ----------------------------------------------------------------------------------
 class SpectrumSimulation(Spectrum):
     """ SpectrumSim class used to store information and methods
     relative to spectrum simulation.
@@ -489,7 +487,7 @@ class SpectrumSimulation(Spectrum):
         self.err = None
         self.reso = reso
         self.model = lambda x: np.zeros_like(x)
-        # ----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
 
     def simulate_without_atmosphere(self, lambdas):
         self.lambdas = lambdas
