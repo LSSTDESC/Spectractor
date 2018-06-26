@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy import interpolate
 
-from tools import *
+from .tools import *
 
 
 class Parameter(object):
@@ -163,7 +163,7 @@ class Grid:
         self.max = 0
         self.max_index = -1
         self.total = 0
-        self.rangedim = range(dim)
+        self.rangedim = list(range(dim))
         if dim == 1 and len(ranges) != dim:
             ranges = [ranges]
         if dim == 1 and len(axis_names) != dim:
@@ -285,12 +285,12 @@ class PDF(Grid):
         cumbest = np.interp(self.mean, self.axe.axis, cumprob)
         if cumbest > 1 - self.probability_levels[0] / 2.0:
             if verbose > 2:
-                print '\tWarning! {{}} estimate is too close to cumulative prob upper limit of 1. ' \
-                      'Errors may not be accurate.'.format(self.label)
+                print('\tWarning! {{}} estimate is too close to cumulative prob upper limit of 1. ' \
+                      'Errors may not be accurate.'.format(self.label))
         if cumbest < self.probability_levels[0] / 2.0:
             if verbose > 2:
-                print '\tWarning! {{}} estimate is too close to cumulative prob lower limit of 0. ' \
-                      'Errors may not be accurate.'.format(self.label)
+                print('\tWarning! {{}} estimate is too close to cumulative prob lower limit of 0. ' \
+                      'Errors may not be accurate.'.format(self.label))
         upcum = cumbest + self.probability_levels[0] / 2.0
         if upcum > 1.0:
             uplimit = np.interp(1, cumprob, self.axe.axis)
@@ -332,7 +332,7 @@ class PDF(Grid):
                                                                 std=np.sqrt(self.variance), label=self.label)
         self.title = '$%s^{+%s}_{-%s}$' % formatting_numbers(self.mean, self.error_high, self.error_low)
         if verbose:
-            print txt
+            print(txt)
 
 
 class Contours(Grid):
@@ -396,7 +396,7 @@ class Contours(Grid):
         # Sort dxdyprod keeping a trace of grid sorting
         sortgrid = np.array(sortgrid, dtype=[('dxdyprod', float), ('grid', float)])
         sortprob = np.sort(sortgrid, order='dxdyprod')
-        dxdyprod, sortgrid = zip(*sortprob)
+        dxdyprod, sortgrid = list(zip(*sortprob))
         # Cumulative integration
         totprob = np.zeros_like(dxdyprod)
         totprob[0] = dxdyprod[0]
@@ -459,7 +459,7 @@ class Likelihood(Grid):
              self.rangedim] for j in self.rangedim]
         self.grid = None
         if self.dim <= 6:
-            self.grid = np.zeros(map(len, ranges))
+            self.grid = np.zeros(list(map(len, ranges)))
         self.labels = labels
         self.best_chisq = 1e20
         self.best_key = -1
@@ -568,29 +568,29 @@ class Likelihood(Grid):
         plt.axes([0.65, 0.65, 0.3, 0.3])  # This defines the inset
         cax = plt.imshow(self.rho_matrix, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
         plt.title('Correlation matrix')
-        plt.xticks(range(self.dim), self.axis_names, rotation='vertical', fontsize=11)
-        plt.yticks(range(self.dim), self.axis_names, fontsize=11)
+        plt.xticks(list(range(self.dim)), self.axis_names, rotation='vertical', fontsize=11)
+        plt.yticks(list(range(self.dim)), self.axis_names, fontsize=11)
         cbar = fig.colorbar(cax)
         cbar.ax.tick_params(labelsize=9)
         # plot the triangle
         fig.subplots_adjust(hspace=0, wspace=0)
         plt.show()
         if parameters.SAVE:
-            print 'Save ' + parameters.PLOT_DIR + 'triangle_plot.eps'
+            print('Save ' + parameters.PLOT_DIR + 'triangle_plot.eps')
             fig.savefig(parameters.PLOT_DIR + 'triangle_plot.eps', bbox_inches='tight')
 
     def max_likelihood_stats(self):
         self.getMaximum()
         if self.best_chisq > 1e6:
             self.best_chisq = -2.0 * np.log(self.total * self.getMaximum())
-        print 'Maximum likelihood position: chi2={:.3g}'.format(self.best_chisq)
+        print('Maximum likelihood position: chi2={:.3g}'.format(self.best_chisq))
         for i in self.rangedim:
-            print "\t" + self.labels[i] + ": " + str(self.getAxisVal(i, self.max_index))
+            print("\t" + self.labels[i] + ": " + str(self.getAxisVal(i, self.max_index)))
 
     def stats(self, output='', pdfonly=False, verbose=True):
         # self.max_likelihood_stats()
         if verbose:
-            print 'Marginalised best fit values (Mean and MCI):'
+            print('Marginalised best fit values (Mean and MCI):')
         self.mean_vec = np.zeros(self.dim)
         for i in self.rangedim:
             self.pdfs[i].stats(verbose=verbose)
@@ -608,9 +608,9 @@ class Likelihood(Grid):
                         self.cov_matrix[i][j] = self.contours[i][j].covariance()
                         self.rho_matrix[i][j] = self.contours[i][j].rho
             if verbose:
-                print 'Correlation matrix:'
+                print('Correlation matrix:')
             if verbose:
-                print('\n'.join([''.join(['\t{0:4.3f}'.format(item) for item in row]) for row in self.rho_matrix]))
+                print(('\n'.join([''.join(['\t{0:4.3f}'.format(item) for item in row]) for row in self.rho_matrix])))
             # Output results
             if output is not '':
                 txt = ''
@@ -618,8 +618,8 @@ class Likelihood(Grid):
                     txt += 'Parameter ' + self.labels[i] + ' ' + self.axis_names[i] + ' ' + str(
                         self.pdfs[i].max_pdf) + '\n'
                     if self.labels[i] == 'Depth' and self.cov_matrix[i][i] > 20 * 20:
-                        print 'Warning! Depth covariance above 15 pixels. ' \
-                              'Reduce this to have a correct sampling inside depth prior.'
+                        print('Warning! Depth covariance above 15 pixels. ' \
+                              'Reduce this to have a correct sampling inside depth prior.')
                 cov = '\n'.join([''.join(['\t{0:8.6f}'.format(item) for item in row]) for row in self.cov_matrix])
                 f = open(output, 'w')
                 f.write(txt + cov)
