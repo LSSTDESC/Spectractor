@@ -18,13 +18,11 @@ from subprocess import Popen, PIPE
 from spectractor.tools import ensure_dir
 import spectractor.parameters as parameters
 
-# LSST_Altitude = 2.750  # in k meters from astropy package (Cerro Pachon)
-# OBS_Altitude = str(LSST_Altitude)
-
 
 class Libradtran:
 
     def __init__(self, home=''):
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
         if home == '':
             self.home = os.environ['HOME']
         else:
@@ -58,16 +56,16 @@ class Libradtran:
                 f.write(key + ' ' + str(self.settings[key]) + '\n')
         f.close()
 
-    def run(self, inp, out, verbose, path=''):
-        if verbose:
-            print(("Running uvspec with settings file: ", inp))
-            print(("Output to file                : ", out))
+    def run(self, inp, out, path=''):
+        if parameters.DEBUG:
+            self.my_logger.info("Running uvspec with settings file: ", inp)
+            self.my_logger.info("Output to file                : ", out)
         if path != '':
             cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
         else:
             cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
-        if verbose:
-            print(("uvspec cmd: ", cmd))
+        if parameters.DEBUG:
+            self.my_logger.info("uvspec cmd: ", cmd)
         #        p   = call(cmd,shell=True,stdin=PIPE,stdout=PIPE)
         p = Popen(cmd, shell=True, stdout=PIPE)
         p.wait()
@@ -105,9 +103,6 @@ class Libradtran:
         elif self.proc == 'ab':
             runtype = 'no_scattering'
             outtext = 'no_scattering'
-        elif self.proc == 'sa':
-            runtype == 'clearsky'
-            outtext = 'clearsky'
         elif self.proc == 'ae':
             runtype = 'aerosol_default'
             outtext = 'aerosol_default'
@@ -249,7 +244,7 @@ class Libradtran:
             output_filename = os.path.join(input_directory, base_filename + '.OUT')
 
             self.write_input(input_filename)
-            self.run(input_filename, output_filename, verbose, path=self.libradtran_path)
+            self.run(input_filename, output_filename, path=self.libradtran_path)
 
         return output_filename
 
