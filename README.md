@@ -1,4 +1,4 @@
-# SpectractorSim
+# Simulator
 
 - author : Sylvie Dagoret-Campagne
 - affiliation : LAL/CNRS/IN2P3
@@ -10,11 +10,11 @@
 Package to simulate standard Star spectrum for Auxiliary Telescope and Atmospheric calibration purpose
 
 
-- SpectractorSim must be installed at the same level as Spectractor package
-- SpectractorSim requires Spectractor tools
+- Simulator must be installed at the same level as Spectractor package
+- Simulator requires Spectractor tools
 
 
-## SpectractorSim library
+## Simulator library
 
 Main user interface for simulating the observable spectra
  
@@ -37,5 +37,5 @@ Main user interface for simulating the observable spectra
 ### util
 
 
-git remote set-url origin git@github.com:LSSTDESC/SpectractorSim.git
+git remote set-url origin git@github.com:LSSTDESC/Simulator.git
 

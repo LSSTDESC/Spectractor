@@ -1,5 +1,5 @@
 """
-libCTIOSTransm.py
+throughput.py
 =============----
 
 author : Sylvie Dagoret-Campagne, Jérémy Neveu
