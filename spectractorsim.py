@@ -2,7 +2,7 @@
 spectractorsim
 =============----
 
-author : Sylvie Dagoret-Campagne
+author : Sylvie Dagoret-Campagne, Jérémy Neveu
 affiliation : LAL/CNRS/IN2P3/FRANCE
 Collaboration : DESC-LSST
 
@@ -12,7 +12,7 @@ For each experimental spectra a fits file image is generated which holds all pos
 corresponding to different conditions in aerosols, pwv, and ozone. 
 
 creation date : April 18th 
-Last updaten : April 6th
+Last update : July 2018
 
 """
 
@@ -31,8 +31,6 @@ import astropy.units as units
 
 from scipy.interpolate import interp1d, griddata, RegularGridInterpolator
 
-sys.path.append("../Spectractor")
-
 from spectractor.tools import *
 from spectractor.dispersers import *
 from spectractor.targets import *
@@ -49,7 +47,7 @@ spectractorsim_path = os.path.dirname(__file__)
 # Libraries to interface LibRadTran and CTIO 0.9m telescope transparencies
 # -------------------------------------------------------------------------
 
-import libsimulateTranspCTIOScattAbsAer as atmsim
+import libradtran
 import libCTIOTransm as ctio
 
 # ------------------------------------------------------------------------
@@ -138,8 +136,9 @@ class Atmosphere(object):
                 '\n\tAtmospheric simulation with z=%4.2f, P=%4.2f, T=%4.2f, PWV=%4.2f, OZ=%4.2f, VAOD=%4.2f ' % (
                 self.airmass, self.pressure, self.temperature, pwv, ozone, aerosols))
 
-        path, thefile = atmsim.ProcessSimulationaer(self.airmass, pwv, ozone, aerosols, self.pressure)
-        data = np.loadtxt(os.path.join(path, thefile))
+        lib = libradtran.Libradtran()
+        path = lib.simulate(self.airmass, pwv, ozone, aerosols, self.pressure)
+        data = np.loadtxt(path)
         wl = data[:, 0]
         atm = data[:, 1]
         self.transmission = interp1d(wl, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
@@ -239,7 +238,7 @@ class AtmosphereGrid(Atmosphere):
             self.filename = filename
 
         if self.filename == "":
-            infostring = '\n\t Atmosphere:savefile no input file given ...'
+            infostring = '\n\t Atmosphere:savefile no settings file given ...'
             self.my_logger.info(infostring)
             return
         else:
@@ -295,7 +294,7 @@ class AtmosphereGrid(Atmosphere):
             self.filename = filename
 
         if self.filename == "":
-            infostring = '\n\t Atmosphere:loadfile no input file given ...'
+            infostring = '\n\t Atmosphere:loadfile no settings file given ...'
             self.my_logger.info(infostring)
 
             return
@@ -742,7 +741,7 @@ def SpectractorSimGrid(filename, outputdir):
     else:
         atmgrid = atm.compute()
         header = atm.savefile(filename=output_atmfilename)
-        atmsim.CleanSimDir()
+        libradtran.clean_simulation_directory()
     if parameters.VERBOSE:
         infostring = '\n\t ========= Atmospheric simulation :  ==============='
         my_logger.info(infostring)
