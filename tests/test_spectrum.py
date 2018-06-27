@@ -1,5 +1,5 @@
 from unittest import TestCase
-from spectractor.spectroscopy import Spectrum
+from spectractor.pipeline.spectroscopy import Spectrum
 import spectractor.parameters as parameters
 import numpy as np
 

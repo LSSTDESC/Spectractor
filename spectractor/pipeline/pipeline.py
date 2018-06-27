@@ -1,5 +1,7 @@
 from .images import *
 from .spectroscopy import *
+from spectractor import parameters
+from spectractor.tools import ensure_dir
 
 
 def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=True, line_detection=False):

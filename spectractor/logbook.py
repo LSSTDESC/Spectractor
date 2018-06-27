@@ -1,4 +1,6 @@
-from .spectractor import *
+import sys
+import os
+import matplotlib.pyplot as plt
 from . import parameters
 import csv
 
