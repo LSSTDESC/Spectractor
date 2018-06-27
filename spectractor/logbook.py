@@ -12,8 +12,23 @@ class LogBook:
     def __init__(self, logbook="ctiofulllogbook_jun2017_v5.csv"):
         """Load and initialise the logbook
 
-        Args:
-            logbook (str): path to the logbook. Must be a CSV file.
+        Parameters
+        ----------
+        logbook: str
+            Path to the logbook. Must be a CSV file.
+
+        Examples
+        ----------
+        >>> f = open('test.csv','w')
+        >>> f.write('43;2017-05-30T03:36:50.655;data_29may17;85;PNG321.3+02.8;dia;'+
+        ...     'Ron400;1,106;300;12500;1,283;779;2,7;47;13,1;reduc_20170529_085.fits;895;785;;;'+
+        ...     'spectre pollués par les étoiles;skip\n')
+        >>> f.close()
+        >>> logbook = LogBook('test.csv')
+        >>> assert logbook.csvfile is not None
+        >>> print(logbook.logbook)
+        >>> logbook = LogBook('wrong.csv')
+        >>> assert logbook.csvfile is None
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.logbook = logbook
@@ -38,6 +53,28 @@ class LogBook:
             xpos: the x position of the target (in pixel)
             ypos: the y position of the target (in pixel)
 
+        Parameters
+        ----------
+        filename: str
+            the fits image file name (not the path, only the file name.)
+
+        Returns
+        -------
+        target: str
+            the name of the target
+        xpos: int
+            the x position of the target (in pixel)
+        ypos: int
+            the y position of the target (in pixel)
+
+        Examples
+        --------
+        >>> logbook = LogBook('ctio_png+qso_jun2017.csv')
+        >>> print(logbook.logbook)
+        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
+        >>> assert target is None
+        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
+        >>> assert xpos is 830
         """
         target = None
         xpos = None
