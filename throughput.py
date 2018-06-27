@@ -6,7 +6,7 @@ author : Sylvie Dagoret-Campagne, Jérémy Neveu
 affiliation : LAL/CNRS/IN2P3/FRANCE
 Collaboration : DESC-LSST
 
-Purpose : Provide the various transmission usefull
+Purpose : Provide the various useful transmission functions
 update : July 2018
 
 """

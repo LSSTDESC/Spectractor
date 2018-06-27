@@ -1,5 +1,5 @@
 """
-spectractorsim
+simulator
 =============----
 
 author : Sylvie Dagoret-Campagne, Jérémy Neveu
@@ -39,7 +39,6 @@ import libradtran
 from throughput import Throughput
 
 
-# ----------------------------------------------------------------------------------
 class Atmosphere(object):
     """
     Atmosphere(): 
@@ -50,7 +49,6 @@ class Atmosphere(object):
         temperature (:obj:`float`): temperature of the atmosphere 
     """
 
-    # ---------------------------------------------------------------------------
     def __init__(self, airmass, pressure, temperature):
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.airmass = airmass
@@ -58,7 +56,6 @@ class Atmosphere(object):
         self.temperature = temperature
         self.transmission = lambda x: np.ones_like(x).astype(float)
 
-    # ---------------------------------------------------------------------------
     def simulate(self, ozone, pwv, aerosols):
         """
         Args:
@@ -81,7 +78,6 @@ class Atmosphere(object):
 
         return self.transmission
 
-    # ---------------------------------------------------------------------------
     def plot_transmission(self):
         plt.figure()
         plt.plot(parameters.LAMBDAS, self.transmission(parameters.LAMBDAS),
@@ -106,7 +102,6 @@ class AtmosphereGrid(Atmosphere):
         filename (:obj:`strt`): atmospheric grid file name to load   
     """
 
-    # ---------------------------------------------------------------------------
     def __init__(self, data_filename, filename="", airmass=1., pressure=800., temperature=10.):
         Atmosphere.__init__(self, airmass, pressure, temperature)
         self.my_logger = parameters.set_logger(self.__class__.__name__)
@@ -148,7 +143,6 @@ class AtmosphereGrid(Atmosphere):
         #  column 2 : pwv value
         #  column 3 : ozone value
         #  column 4 : data start
-        #
         self.index_atm_count = 0
         self.index_atm_aer = 1
         self.index_atm_pwv = 2
@@ -165,13 +159,11 @@ class AtmosphereGrid(Atmosphere):
         if filename != "":
             self.loadfile(filename)
 
-    # ---------------------------------------------------------------------------
     def compute(self):
         # first determine the length
         if parameters.VERBOSE or parameters.DEBUG:
             self.my_logger.info('\n\tAtmosphere simulations for z=%4.2f, P=%4.2f, T=%4.2f, for data-file=%s ' % (
                 self.airmass, self.pressure, self.temperature, self.data_filename))
-
         count = 0
         for aer in self.AER_Points:
             for pwv in self.PWV_Points:
@@ -185,10 +177,8 @@ class AtmosphereGrid(Atmosphere):
                     transmission = super(AtmosphereGrid, self).simulate(oz, pwv, aer)
                     transm = transmission(parameters.LAMBDAS)
                     self.atmgrid[count, self.index_atm_data:] = transm  # each of atmospheric transmission
-
         return self.atmgrid
 
-    # ---------------------------------------------------------------------------
     def plot_transmission(self):
         plt.figure()
         counts = self.atmgrid[1:, self.index_atm_count]
@@ -200,7 +190,6 @@ class AtmosphereGrid(Atmosphere):
         plt.title("Atmospheric variations")
         plt.show()
 
-    # ---------------------------------------------------------------------------
     def plot_transm_img(self):
         plt.figure()
         img = plt.imshow(self.atmgrid[1:, self.index_atm_data:], origin='lower', cmap='jet')
@@ -212,7 +201,6 @@ class AtmosphereGrid(Atmosphere):
         cbar.set_label('Atmospheric transmission')
         plt.show()
 
-    # ---------------------------------------------------------------------------
     def savefile(self, filename=""):
 
         hdr = fits.Header()
@@ -270,7 +258,6 @@ class AtmosphereGrid(Atmosphere):
 
             return hdr
 
-    # ---------------------------------------------------------------------------
     def loadfile(self, filename):
 
         if filename != "":
@@ -297,35 +284,35 @@ class AtmosphereGrid(Atmosphere):
             self.temperature = hdr['TEMPERAT']
 
             # hope those are the same parameters : TBD !!!!
-            NB_ATM_POINTS = hdr['NBATMPTS']
+            self.NB_ATM_POINTS = hdr['NBATMPTS']
 
-            NB_AER_POINTS = hdr['NBAERPTS']
-            AER_MIN = hdr['AERMIN']
-            AER_MAX = hdr['AERMAX']
+            self.NB_AER_POINTS = hdr['NBAERPTS']
+            self.AER_MIN = hdr['AERMIN']
+            self.AER_MAX = hdr['AERMAX']
 
-            NB_PWV_POINTS = hdr['NBPWVPTS']
-            PWV_MIN = hdr['PWVMIN']
-            PWV_MAX = hdr['PWVMAX']
+            self.NB_PWV_POINTS = hdr['NBPWVPTS']
+            self.PWV_MIN = hdr['PWVMIN']
+            self.PWV_MAX = hdr['PWVMAX']
 
-            NB_OZ_POINTS = hdr['NBOZPTS']
-            OZ_MIN = hdr['OZMIN']
-            OZ_MAX = hdr['OZMAX']
+            self.NB_OZ_POINTS = hdr['NBOZPTS']
+            self.OZ_MIN = hdr['OZMIN']
+            self.OZ_MAX = hdr['OZMAX']
 
-            AER_Points = np.linspace(AER_MIN, AER_MAX, NB_AER_POINTS)
-            OZ_Points = np.linspace(OZ_MIN, OZ_MAX, NB_OZ_POINTS)
-            PWV_Points = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
+            self.AER_Points = np.linspace(self.AER_MIN, self.AER_MAX, self.NB_AER_POINTS)
+            self.OZ_Points = np.linspace(self.OZ_MIN, self.OZ_MAX, self.NB_OZ_POINTS)
+            self.PWV_Points = np.linspace(self.PWV_MIN, self.PWV_MAX, self.NB_PWV_POINTS)
 
-            NBWLBINS = hdr['NBWLBIN']
-            WLMIN = hdr['WLMIN']
-            WLMAX = hdr['WLMAX']
+            self.NBWLBINS = hdr['NBWLBIN']
+            self.WLMIN = hdr['WLMIN']
+            self.WLMAX = hdr['WLMAX']
 
-            index_atm_count = hdr['IDX_CNT']
-            index_atm_aer = hdr['IDX_AER']
-            index_atm_pwv = hdr['IDX_PWV']
-            index_atm_oz = hdr['IDX_OZ']
-            index_atm_data = hdr['IDX_DATA']
+            self.index_atm_count = hdr['IDX_CNT']
+            self.index_atm_aer = hdr['IDX_AER']
+            self.index_atm_pwv = hdr['IDX_PWV']
+            self.index_atm_oz = hdr['IDX_OZ']
+            self.index_atm_data = hdr['IDX_DATA']
 
-            self.atmgrid = np.zeros((NB_ATM_POINTS + 1, self.NB_atm_HEADER + self.NB_atm_DATA))
+            self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_atm_HEADER + self.NB_atm_DATA))
 
             self.atmgrid[:, :] = hdu[0].data[:, :]
 
@@ -333,13 +320,12 @@ class AtmosphereGrid(Atmosphere):
                 self.my_logger.info('\n\tAtmosphere.load atm-file=%s' % (self.filename))
 
             # interpolate the grid
-            self.lambdas = self.atmgrid[0, index_atm_data:]
-            self.model = RegularGridInterpolator((self.lambdas, OZ_Points, PWV_Points, AER_Points), (
-                self.atmgrid[1:, index_atm_data:].reshape(NB_AER_POINTS, NB_PWV_POINTS, NB_OZ_POINTS,
+            self.lambdas = self.atmgrid[0, self.index_atm_data:]
+            self.model = RegularGridInterpolator((self.lambdas, self.OZ_Points, self.PWV_Points, self.AER_Points), (
+                self.atmgrid[1:, self.index_atm_data:].reshape(self.NB_AER_POINTS, self.NB_PWV_POINTS, self.NB_OZ_POINTS,
                                                           len(self.lambdas))).T, bounds_error=False, fill_value=0)
 
             return self.atmgrid, self.header
-        # ---------------------------------------------------------------------------
 
     def simulate(self, ozone, pwv, aerosols):
         """ first ozone, second pwv, last aerosols, to respect order of loops when generating the grid"""
