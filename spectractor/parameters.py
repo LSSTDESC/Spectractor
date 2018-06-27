@@ -7,7 +7,7 @@ import os
 
 # Paths
 mypath = os.path.dirname(__file__)
-HOLO_DIR = os.path.join(mypath, "dispersers/")
+HOLO_DIR = os.path.join(mypath, "pipeline/dispersers/")
 
 # CCD characteristics
 IMSIZE = 2048  # size of the image in pixel
@@ -44,6 +44,16 @@ wl_dwl_unit = units.nanometer ** 2  # lambda.dlambda  in wavelength in nm
 g_disperser_ronchi = 0.2  # theoretical gain for order+1 : 20%
 FLAM_TO_ADURATE = (
     (OBS_SURFACE * SED_UNIT * TIME_UNIT * wl_dwl_unit / hc / GAIN * g_disperser_ronchi).decompose()).value
+
+# Making of the holograms
+DISTANCE2CCD = 55.45  # distance between hologram and CCD in mm
+DISTANCE2CCD_ERR = 0.19  # uncertainty on distance between hologram and CCD in mm
+LAMBDA_CONSTRUCTOR = 639e-6  # constructor wavelength to make holograms in mm
+GROOVES_PER_MM = 350  # approximate effective number of lines per millimeter of the hologram
+PLATE_CENTER_SHIFT_X = -6.  # plate center shift on x in mm in filter frame
+PLATE_CENTER_SHIFT_Y = -8.  # plate center shift on x in mm in filter frame
+PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
+PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
 
 # Search windows in images
 XWINDOW = 100  # window x size to search for the targetted object

@@ -2,18 +2,8 @@ import matplotlib.pyplot as plt
 from scipy import interpolate
 from scipy import ndimage
 
-from .parameters import *
-from .tools import *
-
-# Making of the holograms
-DISTANCE2CCD = 55.45  # distance between hologram and CCD in mm
-DISTANCE2CCD_ERR = 0.19  # uncertainty on distance between hologram and CCD in mm
-LAMBDA_CONSTRUCTOR = 639e-6  # constructor wavelength to make holograms in mm
-GROOVES_PER_MM = 350  # approximate effective number of lines per millimeter of the hologram
-PLATE_CENTER_SHIFT_X = -6.  # plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_Y = -8.  # plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
+from spectractor.parameters import *
+from spectractor.tools import *
 
 
 def build_hologram(order0_position, order1_position, theta_tilt, lambda_plot=256000):
