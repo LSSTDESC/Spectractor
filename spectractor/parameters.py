@@ -18,6 +18,9 @@ MAXADU = 60000  # approximate maximum ADU output of the CCD
 GAIN = 3.  # electronic gain : elec/ADU
 
 # Observatory characteristics
+OBS_NAME = 'CTIO'
+OBS_ALTITUDE = 2.200 # CTIO altitude in k meters from astropy package (Cerro Pachon)
+# LSST_Altitude = 2.750  # in k meters from astropy package (Cerro Pachon)
 OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
 OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
 OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
@@ -55,6 +58,7 @@ ROT_ORDER = 5  # must be above 3
 # Range for spectrum
 LAMBDA_MIN = 350  # minimum wavelength for spectrum extraction (in nm)
 LAMBDA_MAX = 1100  # maxnimum wavelength for spectrum extraction (in nm)
+LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, 1)
 
 # Detection line algorithm
 BGD_ORDER = 3  # order of the background polynome to fit
