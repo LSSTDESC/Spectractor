@@ -23,6 +23,7 @@ class Extractor:
         self.reso = 10.
         self.shift = 1e-3
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.shift])
+        self.truth = None
         self.lambdas = None
         self.model = None
         self.model_err = None
@@ -30,7 +31,7 @@ class Extractor:
         self.labels = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso", "$\lambda_{\\mathrm{shift}}$"]
         self.bounds = ((0, 0, 0, 0, 0, 1, -20), (np.inf, 1.0, np.inf, 10, 1.0, 100, 20))
         self.title = ""
-        self.spectrum, self.telescope, self.disperser, self.target = SpectractorSimInit(filename)
+        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(filename)
         self.airmass = self.spectrum.header['AIRMASS']
         self.pressure = self.spectrum.header['OUTPRESS']
         self.temperature = self.spectrum.header['OUTTEMP']
