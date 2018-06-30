@@ -2,9 +2,9 @@ from astropy.io import fits
 from astropy.table import Table
 from scipy.signal import argrelextrema
 
-from .dispersers import *
-from .filters import *
-from .targets import *
+from spectractor.pipeline.dispersers import *
+from spectractor.pipeline.filters import *
+from spectractor.pipeline.targets import *
 
 
 class Line:
@@ -13,14 +13,37 @@ class Line:
     # noinspection PyDefaultArgument
     def __init__(self, wavelength, label, atmospheric=False, emission=False, label_pos=[0.007, 0.02],
                  width_bounds=[1, 7]):
-        """
-        Args:
-            wavelength: wavelength of the line in nm
-            label: name of the line
-            atmospheric: if True the line is flagged as an atmospheric line
-            emission: if True the line is flagged as an emission line
-            label_pos: position of the label in the plot with respect to the vertical lin (default: [0.007,0.02])
-            width_bounds: minimum and maximum width (in nm) of the line for fitting procedures (default: [1,7])
+        """Class modeling the emission or absorption lines. lines attributes contains main spectral lines
+        sorted in wavelength.
+
+        Parameters
+        ----------
+        wavelength: float
+            Wavelength of the spectral line in nm
+        label: str
+
+        atmospheric: bool
+            Set True if the spectral line is atmospheric (default: False)
+        emission: bool
+            Set True if the spectral line has to be detected in emission. Can't be true if the line is atmospheric.
+            (default: False)
+        label_pos: [float, float]
+            Position of the label in the plot with respect to the vertical lin (default: [0.007,0.02])
+        width_bounds: [float, float]
+            Minimum and maximum width (in nm) of the line for fitting procedures (default: [1,7])
+
+        Examples
+        --------
+        >>> l = Line(550, label='test', atmospheric=True, emission=True)
+        >>> print(l.wavelength)
+        550
+        >>> print(l.label)
+        'test'
+        >>> print(l.atmospheric)
+        True
+        >>> print(l.emission)
+        False
+
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.wavelength = wavelength  # in nm
@@ -39,9 +62,25 @@ class Lines:
     """Class gathering all the lines and associated methods."""
 
     def __init__(self, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=False):
-        # Main emission/absorption lines in nm
-        # see http://www.pa.uky.edu/~peter/atomic/
-        # see https://physics.nist.gov/PhysRefData/ASD/lines_form.html
+        """ Main emission/absorption lines in nm
+        see http://www.pa.uky.edu/~peter/atomic/
+        see https://physics.nist.gov/PhysRefData/ASD/lines_form.html
+
+        Parameters
+        ----------
+        redshift: float
+            Red shift the spectral lines. Must be positive or null (default: 0)
+        atmospheric_lines: bool
+            Set True if the atmospheric spectral lines must be included (default: True)
+        hydrogen_only: bool
+            Set True to gather only the hydrogen spectral lines, atmospheric lines still included (default: False)
+        emission_spectrum: bool
+            Set True if the spectral line has to be detected in emission (default: False)
+        """
+        self.my_logger = set_logger(self.__class__.__name__)
+        if redshift < 0:
+            self.my_logger.warning(f'Redshift must be positive or null. Got {redshift}')
+            sys.exit()
         HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02])
         HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02])
         HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02])
@@ -461,7 +500,20 @@ class Spectrum(object):
 
     def convert_from_ADUrate_to_flam(self):
         """Convert units from ADU/s to erg/s/cm^2/nm.
-        The SED is supposed to be in flam units ie erg/s/cm^2/nm"""
+        The SED is supposed to be in flam units ie erg/s/cm^2/nm
+
+        Examples
+        --------
+        >>> s = Spectrum()
+        >>> s.lambdas = np.linspace(parameters.LAMBDA_MIN,parameters.LAMBDA_MAX,100)
+        >>> s.lambdas_binwidths = np.gradient(s.lambdas)
+        >>> s.data = np.ones_like(s.lambdas)
+        >>> s.convert_from_ADUrate_to_flam()
+        >>> assert np.max(s.data) < 1e-14
+
+        """
+
+
         self.data = self.data / FLAM_TO_ADURATE
         self.data /= self.lambdas * self.lambdas_binwidths
         if self.err is not None:
@@ -471,7 +523,18 @@ class Spectrum(object):
 
     def convert_from_flam_to_ADUrate(self):
         """Convert units from erg/s/cm^2/nm to ADU/s.
-        The SED is supposed to be in flam units ie erg/s/cm^2/nm"""
+        The SED is supposed to be in flam units ie erg/s/cm^2/nm
+
+        Examples
+        --------
+        >>> s = Spectrum()
+        >>> s.lambdas = np.linspace(parameters.LAMBDA_MIN,parameters.LAMBDA_MAX,100)
+        >>> s.lambdas_binwidths = np.gradient(s.lambdas)
+        >>> s.data = np.ones_like(s.lambdas)
+        >>> s.convert_from_flam_to_ADUrate()
+        >>> assert np.max(s.data) > 1e14
+
+        """
         self.data = self.data * parameters.FLAM_TO_ADURATE
         self.data *= self.lambdas_binwidths * self.lambdas
         if self.err is not None:
@@ -480,7 +543,17 @@ class Spectrum(object):
         self.units = 'ADU/s'
 
     def load_filter(self):
-        """Load filter properties and set relevant LAMBDA_MIN and LAMBDA_MAX values."""
+        """Load filter properties and set relevant LAMBDA_MIN and LAMBDA_MAX values.
+
+        Examples
+        --------
+        >>> s = Spectrum()
+        >>> s.filter = 'FGB37'
+        >>> s.load_filter()
+        >>> assert parameters.LAMBDA_MIN == parameters.FGB37['min']
+        >>> assert parameters.LAMBDA_MAX == parameters.FGB37['max']
+
+        """
         for f in FILTERS:
             if f['label'] == self.filter:
                 parameters.LAMBDA_MIN = f['min']
@@ -657,3 +730,9 @@ class Spectrum(object):
             hdu.close()  # need to free allocation for file descriptor
         else:
             self.my_logger.info('\n\tSpectrum file %s not found' % input_filename)
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
