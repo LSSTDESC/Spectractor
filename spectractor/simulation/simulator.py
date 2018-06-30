@@ -24,19 +24,15 @@ from astropy.io import fits
 
 from scipy.interpolate import interp1d, RegularGridInterpolator
 
-from spectractor.images import Image
-from spectractor.spectroscopy import Spectrum
-from spectractor.dispersers import Hologram
-from spectractor.targets import Target
+from spectractor.pipeline.images import Image
+from spectractor.pipeline.spectroscopy import Spectrum
+from spectractor.pipeline.dispersers import Hologram
+from spectractor.pipeline.targets import Target
 from spectractor.tools import fftconvolve_gaussian, ensure_dir
 import spectractor.parameters as parameters
 
-# ---------------------------------------------------------------------------
-# Libraries to interface LibRadTran and CTIO 0.9m telescope transparencies
-# -------------------------------------------------------------------------
-
-import libradtran
-from throughput import Throughput
+import spectractor.simulation.libradtran as libradtran
+from spectractor.simulation.throughput import Throughput
 
 
 class Atmosphere(object):
