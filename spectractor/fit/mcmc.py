@@ -1,5 +1,5 @@
-from .statistics import *
-from .texttable import *
+from spectractor.fit.statistics import *
+from spectractor.fit.texttable import *
 
 
 class Chain(txttableclass):

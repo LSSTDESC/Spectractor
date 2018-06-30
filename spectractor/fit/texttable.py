@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import re, sys, string, math, os, types
-from . import tools
+from spectractor import tools
 # import spline
 
 

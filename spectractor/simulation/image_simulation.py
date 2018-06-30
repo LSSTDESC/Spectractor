@@ -1,15 +1,11 @@
-import sys
-
-sys.path.append("../SpectractorSim")
+from spectractor.pipeline.images import *
+from spectractor.pipeline.spectroscopy import *
+from spectractor.simulation.simulator import *
+from spectractor import parameters
+import copy
 
 # from astroquery.gaia import Gaia, TapPlus, GaiaClass
 # Gaia = GaiaClass(TapPlus(url='http://gaia.ari.uni-heidelberg.de/tap'))
-
-from .images import *
-from .spectroscopy import *
-from spectractorsim import *
-from . import parameters
-import copy
 
 
 class StarModel:

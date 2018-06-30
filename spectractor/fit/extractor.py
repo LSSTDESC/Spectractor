@@ -1,12 +1,8 @@
-import sys
-
-sys.path.append('../SpectractorSim')
-
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from spectractorsim import *
-from .spectractor import *
-from .mcmc import *
-from . import parameters
+from spectractor.simulation.simulator import *
+from spectractor.pipeline.pipeline import *
+from spectractor.fit.mcmc import *
+from spectractor import parameters
 
 import pymc as pm
 import emcee
