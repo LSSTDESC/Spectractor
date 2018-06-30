@@ -19,7 +19,7 @@ GAIN = 3.  # electronic gain : elec/ADU
 
 # Observatory characteristics
 OBS_NAME = 'CTIO'
-OBS_ALTITUDE = 2.200 # CTIO altitude in k meters from astropy package (Cerro Pachon)
+OBS_ALTITUDE = 2.200  # CTIO altitude in k meters from astropy package (Cerro Pachon)
 # LSST_Altitude = 2.750  # in k meters from astropy package (Cerro Pachon)
 OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
 OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
@@ -88,6 +88,30 @@ logging.basicConfig(format=MY_FORMAT, level=logging.WARNING)
 
 
 def set_logger(logger):
+    """Logger function for all classes.
+
+    Parameters
+    ----------
+    logger: str
+        Name of the class, usually self.__class__.__name__
+
+    Returns
+    -------
+    my_logger: logging
+        Logging object
+
+    Examples
+    --------
+    >>> class Test:
+    ...     def __init__(self):
+    ...         self.my_logger = set_logger(self.__class__.__name__)
+    ...     def log(self):
+    ...         self.my_logger.info('This info test function works.')
+    ...         self.my_logger.debug('This debug test function works.')
+    ...         self.my_logger.warning('This warning test function works.')
+    >>> test = Test()
+    >>> test.log()
+    """
     my_logger = logging.getLogger(logger)
     if VERBOSE > 0:
         my_logger.setLevel(logging.INFO)
@@ -99,3 +123,9 @@ def set_logger(logger):
         my_logger.setLevel(logging.DEBUG)
         coloredlogs.install(fmt=MY_FORMAT, level=logging.DEBUG)
     return my_logger
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
