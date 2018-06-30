@@ -1,5 +1,5 @@
-from .images import *
-from .spectroscopy import *
+from spectractor.pipeline.images import *
+from spectractor.pipeline.spectroscopy import *
 from spectractor import parameters
 from spectractor.tools import ensure_dir
 
