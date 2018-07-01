@@ -1,4 +1,5 @@
-from spectractor.spectractor import parameters, Spectractor
+from spectractor import parameters
+from spectractor.pipeline.pipeline import Spectractor
 from spectractor.logbook import LogBook
 
 if __name__ == "__main__":

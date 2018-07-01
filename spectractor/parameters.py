@@ -7,7 +7,8 @@ import os
 
 # Paths
 mypath = os.path.dirname(__file__)
-HOLO_DIR = os.path.join(mypath, "dispersers/")
+HOLO_DIR = os.path.join(mypath, "pipeline/dispersers/")
+THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
 
 # CCD characteristics
 IMSIZE = 2048  # size of the image in pixel
@@ -18,6 +19,9 @@ MAXADU = 60000  # approximate maximum ADU output of the CCD
 GAIN = 3.  # electronic gain : elec/ADU
 
 # Observatory characteristics
+OBS_NAME = 'CTIO'
+OBS_ALTITUDE = 2.200  # CTIO altitude in k meters from astropy package (Cerro Pachon)
+# LSST_Altitude = 2.750  # in k meters from astropy package (Cerro Pachon)
 OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
 OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
 OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
@@ -42,6 +46,16 @@ g_disperser_ronchi = 0.2  # theoretical gain for order+1 : 20%
 FLAM_TO_ADURATE = (
     (OBS_SURFACE * SED_UNIT * TIME_UNIT * wl_dwl_unit / hc / GAIN * g_disperser_ronchi).decompose()).value
 
+# Making of the holograms
+DISTANCE2CCD = 55.45  # distance between hologram and CCD in mm
+DISTANCE2CCD_ERR = 0.19  # uncertainty on distance between hologram and CCD in mm
+LAMBDA_CONSTRUCTOR = 639e-6  # constructor wavelength to make holograms in mm
+GROOVES_PER_MM = 350  # approximate effective number of lines per millimeter of the hologram
+PLATE_CENTER_SHIFT_X = -6.  # plate center shift on x in mm in filter frame
+PLATE_CENTER_SHIFT_Y = -8.  # plate center shift on x in mm in filter frame
+PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
+PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
+
 # Search windows in images
 XWINDOW = 100  # window x size to search for the targetted object
 YWINDOW = 100  # window y size to search for the targetted object
@@ -55,6 +69,7 @@ ROT_ORDER = 5  # must be above 3
 # Range for spectrum
 LAMBDA_MIN = 350  # minimum wavelength for spectrum extraction (in nm)
 LAMBDA_MAX = 1100  # maxnimum wavelength for spectrum extraction (in nm)
+LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, 1)
 
 # Detection line algorithm
 BGD_ORDER = 3  # order of the background polynome to fit
@@ -74,6 +89,30 @@ logging.basicConfig(format=MY_FORMAT, level=logging.WARNING)
 
 
 def set_logger(logger):
+    """Logger function for all classes.
+
+    Parameters
+    ----------
+    logger: str
+        Name of the class, usually self.__class__.__name__
+
+    Returns
+    -------
+    my_logger: logging
+        Logging object
+
+    Examples
+    --------
+    >>> class Test:
+    ...     def __init__(self):
+    ...         self.my_logger = set_logger(self.__class__.__name__)
+    ...     def log(self):
+    ...         self.my_logger.info('This info test function works.')
+    ...         self.my_logger.debug('This debug test function works.')
+    ...         self.my_logger.warning('This warning test function works.')
+    >>> test = Test()
+    >>> test.log()
+    """
     my_logger = logging.getLogger(logger)
     if VERBOSE > 0:
         my_logger.setLevel(logging.INFO)
@@ -85,3 +124,9 @@ def set_logger(logger):
         my_logger.setLevel(logging.DEBUG)
         coloredlogs.install(fmt=MY_FORMAT, level=logging.DEBUG)
     return my_logger
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

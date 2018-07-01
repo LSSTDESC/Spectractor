@@ -1,12 +1,8 @@
-import sys
-
-sys.path.append('../SpectractorSim')
-
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from spectractorsim import *
-from .spectractor import *
-from .mcmc import *
-from . import parameters
+from spectractor.simulation.simulator import *
+from spectractor.pipeline.pipeline import *
+from spectractor.fit.mcmc import *
+from spectractor import parameters
 
 import pymc as pm
 import emcee
@@ -25,16 +21,18 @@ class Extractor:
         self.pwv = 3
         self.aerosols = 0.03
         self.reso = 10.
-        self.shift = 1e-3
-        self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.shift])
+        self.D = DISTANCE2CCD
+        self.shift = 1
+        self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D, self.shift])
+        self.truth = None
         self.lambdas = None
         self.model = None
         self.model_err = None
         self.model_noconv = None
-        self.labels = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso", "$\lambda_{\\mathrm{shift}}$"]
-        self.bounds = ((0, 0, 0, 0, 0, 1, -20), (np.inf, 1.0, np.inf, 10, 1.0, 100, 20))
+        self.labels = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso", r"$D_{CCD}$", r"$\alpha_{\mathrm{pix}}$"]
+        self.bounds = ((0, 0, 0, 0, 0, 1, 50, -20), (np.inf, 1.0, np.inf, 10, 1.0, 20, 60, 20))
         self.title = ""
-        self.spectrum, self.telescope, self.disperser, self.target = SpectractorSimInit(filename)
+        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(filename)
         self.airmass = self.spectrum.header['AIRMASS']
         self.pressure = self.spectrum.header['OUTPRESS']
         self.temperature = self.spectrum.header['OUTTEMP']
@@ -53,7 +51,7 @@ class Extractor:
         if parameters.DEBUG:
             fig = plt.figure()
             for i in range(10):
-                a = self.atmosphere.interpolate(300, i, 0.05)
+                a = self.atmosphere.simulate(300, i, 0.05)
                 plt.plot(self.atmosphere.lambdas, a, label='pwv=%dmm' % i)
             plt.grid()
             plt.xlabel('$\lambda$ [nm]')
@@ -64,35 +62,38 @@ class Extractor:
     def get_truth(self):
         if 'A1' in list(self.spectrum.header.keys()):
             A1_truth = self.spectrum.header['A1']
-            if 'A2' in list(self.spectrum.header.keys()):
-                A2_truth = self.spectrum.header['A2']
-            if 'OZONE' in list(self.spectrum.header.keys()):
-                ozone_truth = self.spectrum.header['OZONE']
-            if 'PWV' in list(self.spectrum.header.keys()):
-                pwv_truth = self.spectrum.header['PWV']
-            if 'VAOD' in list(self.spectrum.header.keys()):
-                aerosols_truth = self.spectrum.header['VAOD']
-            if 'RESO' in list(self.spectrum.header.keys()):
-                reso_truth = self.spectrum.header['RESO']
-            self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth, reso_truth, None, None)
+            A2_truth = self.spectrum.header['A2']
+            ozone_truth = self.spectrum.header['OZONE']
+            pwv_truth = self.spectrum.header['PWV']
+            aerosols_truth = self.spectrum.header['VAOD']
+            reso_truth = self.spectrum.header['RESO']
+            self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth, reso_truth, None, None, None)
         else:
             self.truth = None
 
-    def simulation(self, A1, A2, ozone, pwv, aerosols, reso, shift):
+    def simulation(self, A1, A2, ozone, pwv, aerosols, reso, D, shift):
+        if reso < 0 or reso > 20:
+            return np.zeros_like(self.spectrum.lambdas), np.zeros_like(self.spectrum.lambdas)
         self.title = 'Parameters: A1={:.3f}, A2={:.3f}, PWV={:.3f}, OZ={:.3g}, ' \
                      'VAOD={:.3f}, reso={:.2f}, shift={:.2f}'.format(
             A1, A2, pwv, ozone, aerosols, reso, shift)
         self.atmosphere.simulate(ozone, pwv, aerosols)
         simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
-        simulation.simulate(self.spectrum.lambdas - shift)
+        simulation.simulate(self.spectrum.lambdas)
         self.model_noconv = A1 * np.copy(simulation.data)
         sim_conv = fftconvolve_gaussian(simulation.data, reso)
         err_conv = np.sqrt(fftconvolve_gaussian(simulation.err ** 2, reso))
         sim_conv = interp1d(self.spectrum.lambdas, sim_conv, kind="linear", bounds_error=False, fill_value=(0, 0))
         err_conv = interp1d(self.spectrum.lambdas, err_conv, kind="linear", bounds_error=False, fill_value=(0, 0))
-        self.lambdas = self.spectrum.lambdas
         self.model = lambda x: A1 * sim_conv(x) + A1 * A2 * sim_conv(x / 2)
         self.model_err = lambda x: np.sqrt((A1 * err_conv(x)) ** 2 + (0.5 * A1 * A2 * err_conv(x / 2)) ** 2)
+        x0 = [self.spectrum.header['TARGETX'], self.spectrum.header['TARGETY']]
+        pixels = self.disperser.grating_lambda_to_pixel(self.spectrum.lambdas, x0, order=1)
+        new_x0 = x0 + shift
+        pixels = pixels + shift
+        self.disperser.D = D
+        self.lambdas = self.disperser.grating_pixel_to_lambda(pixels, new_x0, order=1)
+        #self.lambdas = 1e-6 * lambdas[np.where(np.logical_and(lambdas > parameters.LAMBDA_MIN, lambdas < parameters.LAMBDA_MAX))[0]]
         if self.live_fit: self.plot_fit()
         return self.model(self.lambdas), self.model_err(self.lambdas)
 
@@ -286,13 +287,16 @@ class Extractor_MCMC(Extractor):
         # backend = emcee.backends.HDFBackend(filename)
         # backend.reset(self.nwalkers, self.ndim)
 
-        with Pool() as pool:
-            self.sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, self.lnprob, args=(), pool=pool)
-            nsamples = 20
-            self.sampler.run_mcmc(pos, nsamples)
+        nsamples = 2000
+        #with Pool() as pool:
+        self.sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, self.lnprob, args=())#, pool=pool)
+        for i, result in enumerate(self.sampler.sample(pos, iterations=nsamples)):
+            if (i + 1) % 100 == 0:
+                print("{0:5.1%}".format(float(i) / nsamples))
+        self.sampler.run_mcmc(pos, nsamples)
         # tau = sampler.get_autocorr_time()
-        burnin = nsamples / 2
-        thin = nsamples / 4
+        burnin = int(nsamples / 2)
+        thin = int(nsamples / 4)
         # self.samples = sampler.get_chain(discard=burnin, flat=True, thin=thin)
         self.samples = self.sampler.chain[:, burnin:, :].reshape((-1, self.ndim))
         # log_prob_samples = sampler.get_log_prob(discard=burnin, flat=True, thin=thin)

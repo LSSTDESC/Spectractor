@@ -1,5 +1,7 @@
-from .spectractor import *
-from . import parameters
+import sys
+import os
+import matplotlib.pyplot as plt
+import spectractor.parameters as parameters
 import csv
 
 
@@ -10,8 +12,18 @@ class LogBook:
     def __init__(self, logbook="ctiofulllogbook_jun2017_v5.csv"):
         """Load and initialise the logbook
 
-        Args:
-            logbook (str): path to the logbook. Must be a CSV file.
+        Parameters
+        ----------
+        logbook: str
+            Path to the logbook. Must be a CSV file.
+
+        Examples
+        ----------
+        >>> logbook = LogBook('ctio_png+qso_jun2017.csv')
+        >>> assert logbook.csvfile is not None
+        >>> print(logbook.logbook)
+        ctio_png+qso_jun2017.csv
+
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.logbook = logbook
@@ -28,13 +40,28 @@ class LogBook:
             in parameters.py
         * object: the name of the target
 
-        Args:
-            filename (str): the fits image file name (not the path, only the file name.)
+        Parameters
+        ----------
+        filename: str
+            the fits image file name (not the path, only the file name.)
 
-        Returns:
-            target: the name of the target
-            xpos: the x position of the target (in pixel)
-            ypos: the y position of the target (in pixel)
+        Returns
+        -------
+        target: str
+            the name of the target
+        xpos: int
+            the x position of the target (in pixel)
+        ypos: int
+            the y position of the target (in pixel)
+
+        Examples
+        --------
+        >>> logbook = LogBook('ctio_png+qso_jun2017.csv')
+        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
+        >>> assert xpos is None
+        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
+        >>> print(target, xpos, ypos)
+        PKS1510-089 830 590
 
         """
         target = None
@@ -82,6 +109,16 @@ class LogBook:
 
         Args:
             column_names: a list of the names of the columns to plot
+
+        Parameters
+        ----------
+        column_names: list, str
+            List of column names to plot versus time from the log book.
+
+        Examples
+        --------
+        >>> logbook = LogBook('ctio_png+qso_jun2017.csv')
+        >>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
         """
         dates = []
         cols = []
@@ -103,14 +140,6 @@ class LogBook:
 
 
 if __name__ == "__main__":
-    from optparse import OptionParser
+    import doctest
 
-    parser = OptionParser()
-    parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
-                      help="Enter verbose (print more stuff).", default=False)
-    (opts, args) = parser.parse_args()
-
-    parameters.VERBOSE = opts.verbose
-
-    logbook = LogBook()
-    logbook.plot_columns_vs_date(['Temperature', 'seeing', 'PWV (mm)'])
+    doctest.testmod()
