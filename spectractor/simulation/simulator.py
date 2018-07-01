@@ -153,7 +153,7 @@ class AtmosphereGrid(Atmosphere):
         self.atmgrid[0, self.index_atm_data:] = parameters.LAMBDAS
         self.header = fits.Header()
         if filename != "":
-            self.loadfile(filename)
+            self.load_file(filename)
 
     def compute(self):
         # first determine the length
@@ -197,7 +197,7 @@ class AtmosphereGrid(Atmosphere):
         cbar.set_label('Atmospheric transmission')
         plt.show()
 
-    def savefile(self, filename=""):
+    def save_file(self, filename=""):
 
         hdr = fits.Header()
 
@@ -205,7 +205,7 @@ class AtmosphereGrid(Atmosphere):
             self.filename = filename
 
         if self.filename == "":
-            infostring = '\n\t Atmosphere:savefile no settings file given ...'
+            infostring = '\n\t Atmosphere:save_file no settings file given ...'
             self.my_logger.info(infostring)
             return
         else:
@@ -254,13 +254,13 @@ class AtmosphereGrid(Atmosphere):
 
             return hdr
 
-    def loadfile(self, filename):
+    def load_file(self, filename):
 
         if filename != "":
             self.filename = filename
 
         if self.filename == "":
-            infostring = '\n\t Atmosphere:loadfile no settings file given ...'
+            infostring = '\n\t Atmosphere:load_file no settings file given ...'
             self.my_logger.info(infostring)
 
             return
@@ -697,10 +697,10 @@ def SimulatorSimGrid(filename, outputdir):
         infostring = " atmospheric simulation file %s of size %d already exists, thus load it ..." % (
             output_atmfilename, filesize)
         my_logger.info(infostring)
-        atmgrid, header = atm.loadfile(output_atmfilename)
+        atmgrid, header = atm.load_file(output_atmfilename)
     else:
         atmgrid = atm.compute()
-        header = atm.savefile(filename=output_atmfilename)
+        header = atm.save_file(filename=output_atmfilename)
         libradtran.clean_simulation_directory()
     if parameters.VERBOSE:
         infostring = '\n\t ========= Atmospheric simulation :  ==============='

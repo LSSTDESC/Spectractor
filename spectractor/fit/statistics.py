@@ -6,7 +6,6 @@ from spectractor.tools import *
 
 
 class Parameter(object):
-    __slots__ = ('label', 'title', 'value', 'set')
     """Class to store parameter value, name and title"""
 
     def __init__(self, value=None, label="", title=""):
@@ -19,7 +18,6 @@ class Parameter(object):
 
 
 class FitParameter(object):
-    __slots__ = ('label', 'title', 'value', 'cov', 'chi2', 'set', 'write', 'read')
     """Class to store parameter result from curve fitting"""
 
     def __init__(self, value, cov=-1, chi2=-1, label="", title=""):
@@ -46,8 +44,6 @@ class FitParameter(object):
 
 
 class ParameterList(object):
-    __slots__ = ('data', 'label', 'title', 'mu', 'std', 'size', 'new_sample',
-                 'set_stats', 'append', 'stats', 'write', 'read', 'write_header')
     """Class to store 1D lists and their statistical properties"""
 
     def __init__(self, label="", title=""):

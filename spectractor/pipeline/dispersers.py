@@ -171,11 +171,11 @@ class Grating:
         theta = get_refraction_angle(deltaX, x0, D=self.D)
         return theta
 
-    def refraction_angle_lambda(self, l, x0, order=1):
+    def refraction_angle_lambda(self, lambdas, x0, order=1):
         """ Return refraction angle in radians with lambda in mm. 
         x0: the order 0 position on the full raw image."""
         theta0 = get_theta0(x0)
-        return np.arcsin(order * l * self.N(x0) + np.sin(theta0))
+        return np.arcsin(order * lambdas * self.N(x0) + np.sin(theta0))
 
     def grating_pixel_to_lambda(self, deltaX, x0, order=1):
         """ Convert pixels into wavelength in nm.
@@ -186,6 +186,39 @@ class Grating:
         theta0 = get_theta0(x0)
         lambdas = (np.sin(theta) - np.sin(theta0)) / (order * self.N(x0))
         return lambdas * 1e6
+
+    def grating_lambda_to_pixel(self, lambdas, x0, order=1):
+        """ Convert wavelength in nm into pixel distance with order 0.
+        x0: the order 0 position on the full raw image.
+        deltaX: the distance in pixels between order 0 and signal point
+        in the rotated image.
+
+        Parameters
+        ----------
+        lambdas: array, float
+            Wavelengths in nm
+        x0: float or [float, float]
+            Order 0 position detected in the raw image.
+        order: int
+            Order of the spectrum (default: 1)
+
+        Examples
+        --------
+        >>> disperser = Grating(N=300, D=55)
+        >>> x0 = [800,800]
+        >>> deltaX = np.arange(0,1000,1).astype(float)
+        >>> lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, order=1)
+        >>> print(lambdas[:5])
+        [ 0.          1.45454532  2.90909063  4.36363511  5.81817793]
+        >>> pixels = disperser.grating_lambda_to_pixel(lambdas, x0, order=1)
+        >>> print(pixels[:5])
+        [ 0.  1.  2.  3.  4.]
+        """
+        lambdas = np.copy(lambdas)*1e-6
+        theta0 = get_theta0(x0)
+        theta = self.refraction_angle_lambda(lambdas, x0, order=order)
+        deltaX = self.D * (np.tan(theta) - np.tan(theta0)) / PIXEL2MM
+        return deltaX
 
     def grating_resolution(self, deltaX, x0, order=1):
         """ Return wavelength resolution in nm per pixel.
@@ -299,3 +332,9 @@ class Hologram(Grating):
             self.order0_position, self.order1_position, self.AB = find_order01_positions(self.holo_center,
                                                                                          self.N_interp, self.theta,
                                                                                          verbose=verbose)
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
