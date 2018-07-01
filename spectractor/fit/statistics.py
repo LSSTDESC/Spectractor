@@ -2,11 +2,10 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy import interpolate
 
-from .tools import *
+from spectractor.tools import *
 
 
 class Parameter(object):
-    __slots__ = ('label', 'title', 'value', 'set')
     """Class to store parameter value, name and title"""
 
     def __init__(self, value=None, label="", title=""):
@@ -19,7 +18,6 @@ class Parameter(object):
 
 
 class FitParameter(object):
-    __slots__ = ('label', 'title', 'value', 'cov', 'chi2', 'set', 'write', 'read')
     """Class to store parameter result from curve fitting"""
 
     def __init__(self, value, cov=-1, chi2=-1, label="", title=""):
@@ -46,8 +44,6 @@ class FitParameter(object):
 
 
 class ParameterList(object):
-    __slots__ = ('data', 'label', 'title', 'mu', 'std', 'size', 'new_sample',
-                 'set_stats', 'append', 'stats', 'write', 'read', 'write_header')
     """Class to store 1D lists and their statistical properties"""
 
     def __init__(self, label="", title=""):
@@ -285,11 +281,11 @@ class PDF(Grid):
         cumbest = np.interp(self.mean, self.axe.axis, cumprob)
         if cumbest > 1 - self.probability_levels[0] / 2.0:
             if verbose > 2:
-                print('\tWarning! {{}} estimate is too close to cumulative prob upper limit of 1. ' \
+                print('\tWarning! {{}} estimate is too close to cumulative prob upper limit of 1. '
                       'Errors may not be accurate.'.format(self.label))
         if cumbest < self.probability_levels[0] / 2.0:
             if verbose > 2:
-                print('\tWarning! {{}} estimate is too close to cumulative prob lower limit of 0. ' \
+                print('\tWarning! {{}} estimate is too close to cumulative prob lower limit of 0. '
                       'Errors may not be accurate.'.format(self.label))
         upcum = cumbest + self.probability_levels[0] / 2.0
         if upcum > 1.0:
@@ -618,7 +614,7 @@ class Likelihood(Grid):
                     txt += 'Parameter ' + self.labels[i] + ' ' + self.axis_names[i] + ' ' + str(
                         self.pdfs[i].max_pdf) + '\n'
                     if self.labels[i] == 'Depth' and self.cov_matrix[i][i] > 20 * 20:
-                        print('Warning! Depth covariance above 15 pixels. ' \
+                        print('Warning! Depth covariance above 15 pixels. '
                               'Reduce this to have a correct sampling inside depth prior.')
                 cov = '\n'.join([''.join(['\t{0:8.6f}'.format(item) for item in row]) for row in self.cov_matrix])
                 f = open(output, 'w')

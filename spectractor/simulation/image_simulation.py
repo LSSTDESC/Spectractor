@@ -1,15 +1,11 @@
-import sys
-
-sys.path.append("../SpectractorSim")
+from spectractor.pipeline.images import *
+from spectractor.pipeline.spectroscopy import *
+from spectractor.simulation.simulator import *
+from spectractor import parameters
+import copy
 
 # from astroquery.gaia import Gaia, TapPlus, GaiaClass
 # Gaia = GaiaClass(TapPlus(url='http://gaia.ari.uni-heidelberg.de/tap'))
-
-from .images import *
-from .spectroscopy import *
-from spectractorsim import *
-from . import parameters
-import copy
 
 
 class StarModel:
@@ -97,8 +93,8 @@ class StarFieldModel:
         for y in range(IMSIZE):
             for x in range(IMSIZE):
                 if peak_positions[y, x]:
-                    if np.sqrt(
-                        (y - y0) ** 2 + (x - x0) ** 2) < 10 * base_image.target_star2D.fwhm: continue  # no double star
+                    if np.sqrt((y - y0) ** 2 + (x - x0) ** 2) < 10 * base_image.target_star2D.fwhm:
+                        continue  # no double star
                     self.stars.append(StarModel([x, y], base_image.target_star2D, image_thresholded[y, x]))
                     self.pixcoords.append([x, y])
         self.pixcoords = np.array(self.pixcoords).T
@@ -308,7 +304,7 @@ def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A
     pressure = image.header['OUTPRESS']
     temperature = image.header['OUTTEMP']
     telescope = TelescopeTransmission(image.filter)
-    spectrumsim = SpectractorSimCore(image, telescope, image.disperser, image.target, lambdas, airmass, pressure,
+    spectrumsim = SimulatorCore(image, telescope, image.disperser, image.target, lambdas, airmass, pressure,
                                      temperature, pwv=pwv, ozone=ozone, aerosols=aerosols)
     spectrum = SpectrumModel(image, spectrumsim, sigma=reso, A1=A1, A2=A2, reso=reso, rotation=with_rotation)
     # Image model

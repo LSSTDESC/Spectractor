@@ -7,7 +7,7 @@ from astroquery.ned import Ned
 from astroquery.simbad import Simbad
 from scipy.interpolate import interp1d
 
-from . import parameters
+from spectractor import parameters
 
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S

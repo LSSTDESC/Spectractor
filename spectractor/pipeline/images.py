@@ -2,7 +2,7 @@ from astropy.coordinates import Angle
 from matplotlib import cm
 from matplotlib.ticker import MaxNLocator
 
-from .spectroscopy import *
+from spectractor.pipeline.spectroscopy import *
 
 
 # noinspection PyAttributeOutsideInit
