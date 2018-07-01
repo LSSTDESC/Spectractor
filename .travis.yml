@@ -30,7 +30,7 @@ install:
   - pip install scikit-image
   - pip install coloredlogs
 script:
-- python setup.py build
+- python setup.py install
 - coverage run spectractor/*.py
 - coverage run --omit=spectractor/pipeline/pipeline.py spectractor/pipeline/*.py
 - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker  --with-coverage --cover-package=spectractor
