@@ -8,6 +8,7 @@ import os
 # Paths
 mypath = os.path.dirname(__file__)
 HOLO_DIR = os.path.join(mypath, "pipeline/dispersers/")
+THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
 
 # CCD characteristics
 IMSIZE = 2048  # size of the image in pixel

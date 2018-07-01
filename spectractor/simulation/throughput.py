@@ -21,7 +21,7 @@ import spectractor.parameters as parameters
 
 class Throughput():
 
-    def __init__(self,input_directory='CTIOThroughput'):
+    def __init__(self,input_directory=parameters.THROUGHPUT_DIR):
         self.path_transmission = input_directory
         self.filename_quantum_efficiency = os.path.join(self.path_transmission, "qecurve.txt")
         self.filename_FGB37 = os.path.join(self.path_transmission, "FGB37.txt")

@@ -118,8 +118,7 @@ class LogBook:
         Examples
         --------
         >>> logbook = LogBook('ctio_png+qso_jun2017.csv')
-        >>> plot = logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
-        >>> assert plot is True
+        >>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
         """
         dates = []
         cols = []
@@ -138,7 +137,6 @@ class LogBook:
         fig.autofmt_xdate()
         fig.tight_layout()
         plt.show()
-        return True
 
 
 if __name__ == "__main__":
