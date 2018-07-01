@@ -32,7 +32,7 @@ install:
 script:
 - python setup.py build
 - coverage run spectractor/*.py
-- coverage run spectractor/pipeline/*.py
+- coverage run --omit=spectractor/pipeline/pipeline.py spectractor/pipeline/*.py
 - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker  --with-coverage --cover-package=spectractor
 after_success:
 - coveralls
