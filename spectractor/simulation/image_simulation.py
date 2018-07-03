@@ -1,5 +1,5 @@
-from spectractor.pipeline.images import *
-from spectractor.pipeline.spectroscopy import *
+from spectractor.extractor.images import *
+from spectractor.extractor.spectroscopy import *
 from spectractor.simulation.simulator import *
 from spectractor import parameters
 import copy
@@ -255,7 +255,7 @@ class ImageModel(object, Image):
 
 def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A1=1, A2=0, with_rotation=True,
              with_stars=True):
-    """ The basic use of the pipeline consists first to define: 
+    """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image, 
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
     - the rough position of the object in the image,
