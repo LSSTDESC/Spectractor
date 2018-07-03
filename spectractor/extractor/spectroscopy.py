@@ -729,7 +729,7 @@ class Spectrum(object):
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_filename)
             hdu.close()  # need to free allocation for file descriptor
         else:
-            self.my_logger.info('\n\tSpectrum file %s not found' % input_filename)
+            self.my_logger.warning('\n\tSpectrum file %s not found' % input_filename)
 
 
 if __name__ == "__main__":
