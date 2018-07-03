@@ -1,7 +1,7 @@
 from numpy.testing import run_module_suite
 
 from spectractor import parameters
-from spectractor.pipeline.pipeline import Spectractor
+from spectractor.extractor.extractor import Spectractor
 from spectractor.logbook import LogBook
 import os
 
