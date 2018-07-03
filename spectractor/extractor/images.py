@@ -41,6 +41,8 @@ class Image(object):
         self.header = hdu_list[0].header
         self.data = hdu_list[0].data
         extract_info_from_CTIO_header(self, self.header)
+        self.header['LSHIFT'] = 0.
+        self.header['D2CCD'] = DISTANCE2CCD
         IMSIZE = int(self.header['XLENGTH'])
         parameters.PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
         if self.header['YLENGTH'] != IMSIZE:
