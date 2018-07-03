@@ -51,12 +51,8 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
             spectrum.calibrate_spectrum_with_lines()
         except:
             my_logger.warning('\n\tCalibration procedure with spectral features failed.')
-            spectrum.header['LSHIFT'] = 0.
-            spectrum.header['D2CCD'] = DISTANCE2CCD
             spectrum.header['WARNINGS'] = 'Calibration procedure with spectral features failed.'
     else:
-        spectrum.header['LSHIFT'] = 0.
-        spectrum.header['D2CCD'] = DISTANCE2CCD
         spectrum.header['WARNINGS'] = 'No calibration procedure with spectral features.'
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
