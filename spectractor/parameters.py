@@ -7,7 +7,7 @@ import os
 
 # Paths
 mypath = os.path.dirname(__file__)
-HOLO_DIR = os.path.join(mypath, "pipeline/dispersers/")
+HOLO_DIR = os.path.join(mypath, "extractor/dispersers/")
 THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
 
 # CCD characteristics

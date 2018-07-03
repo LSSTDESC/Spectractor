@@ -2,9 +2,9 @@ from astropy.io import fits
 from astropy.table import Table
 from scipy.signal import argrelextrema
 
-from spectractor.pipeline.dispersers import *
-from spectractor.pipeline.filters import *
-from spectractor.pipeline.targets import *
+from spectractor.extractor.dispersers import *
+from spectractor.extractor.filters import *
+from spectractor.extractor.targets import *
 
 
 class Line:
