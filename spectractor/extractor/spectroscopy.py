@@ -562,7 +562,7 @@ class Spectrum(object):
                     f['label'], parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
                 break
 
-    def plot_spectrum_simple(self, ax, xlim=None, color='r', label=''):
+    def plot_spectrum_simple(self, ax, xlim=None, color='r', label='', lambdas=None):
         """Simple function to plot a spectrum with error bars and labels.
 
         Args:
@@ -572,14 +572,14 @@ class Spectrum(object):
             xlim: (optional) list of minimum and maximum abscisses
         """
         xs = self.lambdas
+        if lambdas is not None : xs = lambdas
         if label == '':
             label = 'Order {:d} spectrum'.format(self.order)
         if xs is None:
             xs = np.arange(self.data.shape[0])
         if self.err is not None:
             ax.errorbar(xs, self.data, yerr=self.err, fmt='{}o'.format(color), lw=1,
-                        label=label, zorder=0,
-                        markersize=2)
+                        label=label, zorder=0, markersize=2)
         else:
             ax.plot(xs, self.data, '{}-'.format(color), lw=2, label=label)
         ax.grid(True)
