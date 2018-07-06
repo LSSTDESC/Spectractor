@@ -211,6 +211,7 @@ class Lines:
         Returns:
             shift: the mean shift (in nm) between the detected and tabulated lines
         """
+
         # main settings
         bgd_npar = parameters.BGD_NPARAMS
         peak_look = 7  # half range to look for local maximum in pixels
@@ -219,6 +220,7 @@ class Lines:
             peak_look = 15
             bgd_width = 20
         baseline_prior = 1e-10  # *sigma gaussian prior on base line fit
+
         # initialisation
         lambda_shifts = []
         snrs = []
@@ -364,7 +366,17 @@ class Lines:
             guess = new_guess_list[k]
             bounds = new_bounds_list[k]
             bgd_index = index[:bgd_width] + index[-bgd_width:]
-            bgd = fit_poly1d_outlier_removal(lambdas[index], spec[index], order=BGD_ORDER, sigma=2, niter=100)
+            try:
+                bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
+                                                 order=BGD_ORDER, sigma=2, niter=300)
+            except:
+                bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
+                                                 order=BGD_ORDER, sigma=3, niter=300)
+            # f = plt.figure()
+            # plt.errorbar(lambdas[index],spec[index],yerr=spec_err[index])
+            # plt.plot(lambdas[bgd_index],spec[bgd_index],'r-')
+            # plt.plot(lambdas[index],bgd(lambdas[index]),'b--')
+            # plt.show()
             for n in range(bgd_npar):
                 guess[n] = getattr(bgd, bgd.param_names[BGD_ORDER - n]).value
                 b = abs(baseline_prior * guess[n])
@@ -384,10 +396,6 @@ class Lines:
             if spec_err is not None:
                 sigma = spec_err[index]
             popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma)
-            # compute the base line subtracting the gaussians
-            base_line = spec[index]
-            for j in range(len(new_lines_list[k])):
-                base_line -= gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
             # noise level defined as the std of the residuals if no error
             noise_level = np.std(spec[index] - multigauss_and_bgd(lambdas[index], *popt))
             # otherwise mean of error bars of bgd lateral bands
@@ -406,24 +414,24 @@ class Lines:
                 line = new_lines_list[k][j]
                 l = line.wavelength
                 peak_pos = popt[bgd_npar + 3 * j + 1]
+                # FWHM
+                FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
                 # SNR computation
                 # signal_level = popt[bgd_npar+3*j]
                 signal_level = multigauss_and_bgd(peak_pos, *popt) - np.polyval(popt[:bgd_npar], peak_pos)
                 snr = np.abs(signal_level / noise_level)
-                if snr < snr_minlevel:
-                    continue
-                # FWHM
-                FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
-                rows.append((line.label, l, peak_pos, peak_pos - l, FWHM, signal_level, snr))
                 # save fit results
-                plot_line_subset = True
                 line.fitted = True
                 line.high_snr = True
                 line.fit_lambdas = lambdas[index]
                 line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
-                line.fit_bgd = base_line
+                line.fit_bgd = np.polyval(popt[:bgd_npar], lambdas[index])
                 line.fit_snr = snr
                 line.fit_fwhm = FWHM
+                if snr < snr_minlevel:
+                    continue
+                plot_line_subset = True
+                rows.append((line.label, l, peak_pos, peak_pos - l, FWHM, signal_level, snr))
                 # wavelength shift between tabulate and observed lines
                 lambda_shifts.append(peak_pos - l)
                 snrs.append(snr)
@@ -602,11 +610,11 @@ class Spectrum(object):
         #    for k in range(len(self.target.spectra)):
         #        s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
         #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
-        if self.lambdas is not None and self.lines is not None:
-            self.lines.plot_atomic_lines(plt.gca(), fontsize=12)
         if fit and self.lambdas is not None:
             self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
                                     verbose=parameters.VERBOSE)
+        if self.lambdas is not None and self.lines is not None:
+            self.lines.plot_atomic_lines(plt.gca(), fontsize=12)
         plt.legend(loc='best')
         if self.filters is not None:
             plt.gca().get_legend().set_title(self.filters)
