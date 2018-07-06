@@ -513,7 +513,6 @@ class Spectrum(object):
 
         """
 
-
         self.data = self.data / FLAM_TO_ADURATE
         self.data /= self.lambdas * self.lambdas_binwidths
         if self.err is not None:
@@ -572,7 +571,7 @@ class Spectrum(object):
             xlim: (optional) list of minimum and maximum abscisses
         """
         xs = self.lambdas
-        if lambdas is not None : xs = lambdas
+        if lambdas is not None: xs = lambdas
         if label == '':
             label = 'Order {:d} spectrum'.format(self.order)
         if xs is None:
@@ -613,83 +612,6 @@ class Spectrum(object):
             plt.gca().get_legend().set_title(self.filters)
         plt.show()
 
-    def calibrate_spectrum(self, xlim=None):
-        """Convert pixels into wavelengths given the position of the order 0,
-        the data for the spectrum, and the properties of the disperser.
-
-        Args:
-            xlim: (optional) list of minimum and maximum abscisses
-        """
-        if xlim is None:
-            left_cut, right_cut = [0, self.data.shape[0]]
-        else:
-            left_cut, right_cut = xlim
-        self.data = self.data[left_cut:right_cut]
-        pixels = np.arange(left_cut, right_cut, 1) - self.target_pixcoords_rotated[0]
-        self.lambdas = self.disperser.grating_pixel_to_lambda(pixels, self.target_pixcoords, order=self.order)
-        self.lambdas_binwidths = np.gradient(self.lambdas)
-        # Cut spectra
-        self.lambdas_indices = \
-            np.where(np.logical_and(self.lambdas > parameters.LAMBDA_MIN, self.lambdas < parameters.LAMBDA_MAX))[0]
-        self.lambdas = self.lambdas[self.lambdas_indices]
-        self.lambdas_binwidths = self.lambdas_binwidths[self.lambdas_indices]
-        self.data = self.data[self.lambdas_indices]
-        if self.err is not None:
-            self.err = self.err[self.lambdas_indices]
-        self.convert_from_ADUrate_to_flam()
-
-    def calibrate_spectrum_with_lines(self):
-        """Convert pixels into wavelengths given the position of the order 0,
-        the data for the spectrum, the properties of the disperser. Fit the absorption
-        (and eventually the emission) lines to perform a second calibration of the
-        distance between the CCD and the disperser. The number of fitting steps is
-        limited to 30.
-
-        Returns:
-            float: the final shift value of the spectrum in nm
-
-        """
-        self.my_logger.info('\n\tCalibrating order %d spectrum...' % self.order)
-        # Detect emission/absorption lines and calibrate pixel/lambda 
-        D = DISTANCE2CCD - DISTANCE2CCD_ERR
-        shifts = []
-        counts = 0
-        D_step = DISTANCE2CCD_ERR / 4
-        delta_pixels = self.lambdas_indices - int(self.target_pixcoords_rotated[0])
-        lambdas_test = self.disperser.grating_pixel_to_lambda(delta_pixels, self.target_pixcoords, order=self.order)
-        while DISTANCE2CCD + 4 * DISTANCE2CCD_ERR > D > DISTANCE2CCD - 4 * DISTANCE2CCD_ERR and counts < 30:
-            self.disperser.D = D
-            lambdas_test = self.disperser.grating_pixel_to_lambda(delta_pixels,
-                                                                  self.target_pixcoords, order=self.order)
-            lambda_shift = self.lines.detect_lines(lambdas_test, self.data, spec_err=self.err, ax=None,
-                                                   verbose=parameters.DEBUG)
-            shifts.append(lambda_shift)
-            counts += 1
-            if abs(lambda_shift) < 0.1:
-                break
-            elif lambda_shift > 2:
-                D_step = DISTANCE2CCD_ERR
-            elif 0.5 < lambda_shift < 2:
-                D_step = DISTANCE2CCD_ERR / 4
-            elif 0 < lambda_shift < 0.5:
-                D_step = DISTANCE2CCD_ERR / 10
-            elif 0 > lambda_shift > -0.5:
-                D_step = -DISTANCE2CCD_ERR / 20
-            elif lambda_shift < -0.5:
-                D_step = -DISTANCE2CCD_ERR / 6
-            D += D_step
-        shift = np.mean(lambdas_test - self.lambdas)
-        self.lambdas = lambdas_test
-        lambda_shift = self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=None,
-                                               verbose=parameters.DEBUG)
-        self.my_logger.info(
-            '\n\tWavelenght total shift: {:.2f}nm (after {:d} steps)'
-            '\n\twith D = {:.2f} mm (DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
-                shift, len(shifts), D, DISTANCE2CCD, DISTANCE2CCD_ERR, (D - DISTANCE2CCD) / DISTANCE2CCD_ERR))
-        self.header['LSHIFT'] = shift
-        self.header['D2CCD'] = D
-        return lambda_shift
-
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).
 
@@ -725,6 +647,86 @@ class Spectrum(object):
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
+
+
+def calibrate_spectrum(spectrum, xlim=None):
+    """Convert pixels into wavelengths given the position of the order 0,
+    the data for the spectrum, and the properties of the disperser.
+
+    Args:
+        xlim: (optional) list of minimum and maximum abscisses
+    """
+    if xlim is None:
+        left_cut, right_cut = [0, spectrum.data.shape[0]]
+    else:
+        left_cut, right_cut = xlim
+    spectrum.data = spectrum.data[left_cut:right_cut]
+    pixels = np.arange(left_cut, right_cut, 1) - spectrum.target_pixcoords_rotated[0]
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
+                                                                  order=spectrum.order)
+    spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
+    # Cut spectra
+    spectrum.lambdas_indices = \
+        np.where(np.logical_and(spectrum.lambdas > parameters.LAMBDA_MIN, spectrum.lambdas < parameters.LAMBDA_MAX))[0]
+    spectrum.lambdas = spectrum.lambdas[spectrum.lambdas_indices]
+    spectrum.lambdas_binwidths = spectrum.lambdas_binwidths[spectrum.lambdas_indices]
+    spectrum.data = spectrum.data[spectrum.lambdas_indices]
+    if spectrum.err is not None:
+        spectrum.err = spectrum.err[spectrum.lambdas_indices]
+    spectrum.convert_from_ADUrate_to_flam()
+
+
+def calibrate_spectrum_with_lines(spectrum):
+    """Convert pixels into wavelengths given the position of the order 0,
+    the data for the spectrum, the properties of the disperser. Fit the absorption
+    (and eventually the emission) lines to perform a second calibration of the
+    distance between the CCD and the disperser. The number of fitting steps is
+    limited to 30.
+
+    Returns:
+        float: the final shift value of the spectrum in nm
+
+    """
+    # Detect emission/absorption lines and calibrate pixel/lambda
+    D = DISTANCE2CCD - DISTANCE2CCD_ERR
+    shifts = []
+    counts = 0
+    D_step = DISTANCE2CCD_ERR / 4
+    delta_pixels = spectrum.lambdas_indices - int(spectrum.target_pixcoords_rotated[0])
+    lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels, spectrum.target_pixcoords,
+                                                              order=spectrum.order)
+    while DISTANCE2CCD + 4 * DISTANCE2CCD_ERR > D > DISTANCE2CCD - 4 * DISTANCE2CCD_ERR and counts < 30:
+        spectrum.disperser.D = D
+        lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels,
+                                                                  spectrum.target_pixcoords, order=spectrum.order)
+        lambda_shift = spectrum.lines.detect_lines(lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None,
+                                                   verbose=parameters.DEBUG)
+        shifts.append(lambda_shift)
+        counts += 1
+        if abs(lambda_shift) < 0.1:
+            break
+        elif lambda_shift > 2:
+            D_step = DISTANCE2CCD_ERR
+        elif 0.5 < lambda_shift < 2:
+            D_step = DISTANCE2CCD_ERR / 4
+        elif 0 < lambda_shift < 0.5:
+            D_step = DISTANCE2CCD_ERR / 10
+        elif 0 > lambda_shift > -0.5:
+            D_step = -DISTANCE2CCD_ERR / 20
+        elif lambda_shift < -0.5:
+            D_step = -DISTANCE2CCD_ERR / 6
+        D += D_step
+    shift = np.mean(lambdas_test - spectrum.lambdas)
+    spectrum.lambdas = lambdas_test
+    lambda_shift = spectrum.lines.detect_lines(spectrum.lambdas, spectrum.data, spec_err=spectrum.err, ax=None,
+                                               verbose=parameters.DEBUG)
+    spectrum.my_logger.info(
+        '\n\tWavelenght total shift: {:.2f}nm (after {:d} steps)'
+        '\n\twith D = {:.2f} mm (DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
+            shift, len(shifts), D, DISTANCE2CCD, DISTANCE2CCD_ERR, (D - DISTANCE2CCD) / DISTANCE2CCD_ERR))
+    spectrum.header['LSHIFT'] = shift
+    spectrum.header['D2CCD'] = D
+    return lambda_shift
 
 
 if __name__ == "__main__":
