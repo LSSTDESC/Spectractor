@@ -18,7 +18,7 @@ class Image(object):
         self.filename = filename
         self.units = 'ADU'
         self.expo = -1
-        self.load(filename)
+        self.load_image(filename)
         # Load the target if given
         self.target = None
         self.target_pixcoords = None
@@ -31,15 +31,13 @@ class Image(object):
             self.header.comments['REDSHIFT'] = 'redshift of the target'
         self.err = None
 
-    def load(self, filename):
+    def load_image(self, file_name):
         """
         Args:
-            filename (:obj:`str`): path to the image
+            file_name (:obj:`str`): path to the image
         """
-        self.my_logger.info('\n\tLoading image %s...' % filename)
-        hdu_list = fits.open(filename)
-        self.header = hdu_list[0].header
-        self.data = hdu_list[0].data
+        self.my_logger.info('\n\tLoading image %s...' % file_name)
+        self.header, self.data = load_fits(file_name)
         extract_info_from_CTIO_header(self, self.header)
         self.header['LSHIFT'] = 0.
         self.header['D2CCD'] = DISTANCE2CCD
@@ -61,6 +59,10 @@ class Image(object):
         self.convert_to_ADU_rate_units()
         self.compute_statistical_error()
         self.compute_parallactic_angle()
+
+    def save_image(self, output_file_name, overwrite=False):
+        save_fits(output_file_name, self.header, self.data, overwrite=overwrite)
+        self.my_logger.info('\n\tImage saved in %s' % output_file_name)
 
     def build_gain_map(self):
         l = IMSIZE
@@ -459,13 +461,6 @@ class Image(object):
                                target_pixcoords=target_pixcoords)
         plt.legend()
         plt.show()
-
-    def save_image(self, output_filename, overwrite=False):
-        hdu = fits.PrimaryHDU()
-        hdu.data = self.data
-        hdu.header = self.header
-        hdu.writeto(output_filename, overwrite=overwrite)
-        self.my_logger.info('\n\tImage saved in %s' % output_filename)
 
     def extract_spectrum_from_image_sylvie(self, w=3, ws=[8, 30], right_edge=1800, meanflag=False,
                                            filterstarflag=False):

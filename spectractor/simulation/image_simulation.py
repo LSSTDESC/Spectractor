@@ -248,7 +248,7 @@ class ImageModel(object, Image):
         self.my_logger.info('\n\tImage saved in %s' % output_filename)
 
     def load_image(self, filename):
-        super(ImageModel, self).load(filename)
+        super(ImageModel, self).load_image(filename)
         hdu_list = fits.open(filename)
         self.true_lambdas, self.true_spectrum = hdu_list[1].data
 

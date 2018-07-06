@@ -690,46 +690,41 @@ class Spectrum(object):
         self.header['D2CCD'] = D
         return lambda_shift
 
-    def save_spectrum(self, output_filename, overwrite=False):
+    def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).
 
         Args:
-            output_filename: path to the output fits file
+            output_file_name: path to the output fits file
             overwrite: if True overwrite the output file if needed.
         """
-        hdu = fits.PrimaryHDU()
-        hdu.data = [self.lambdas, self.data, self.err]
         self.header['UNIT1'] = "nanometer"
         self.header['UNIT2'] = self.units
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
                                   'second column gives the spectrum in unit UNIT2, ' \
                                   'third column the corresponding errors.'
-        hdu.header = self.header
-        hdu.writeto(output_filename, overwrite=overwrite)
-        self.my_logger.info('\n\tSpectrum saved in %s' % output_filename)
+        save_fits(output_file_name, self.header, [self.lambdas, self.data, self.err], overwrite=overwrite)
+        self.my_logger.info('\n\tSpectrum saved in %s' % output_file_name)
 
-    def load_spectrum(self, input_filename):
+    def load_spectrum(self, input_file_name):
         """Load the spectrum from a fits file (data, error and wavelengths).
 
         Args:
-            input_filename: path to the input fits file
+            input_file_name: path to the input fits file
         """
-        if os.path.isfile(input_filename):
-            hdu = fits.open(input_filename)
-            self.header = hdu[0].header
-            self.lambdas = hdu[0].data[0]
-            self.data = hdu[0].data[1]
-            if len(hdu[0].data) > 2:
-                self.err = hdu[0].data[2]
+        if os.path.isfile(input_file_name):
+            self.header, raw_data = load_fits(input_file_name)
+            self.lambdas = raw_data[0]
+            self.data = raw_data[1]
+            if len(raw_data) > 2:
+                self.err = raw_data[2]
             extract_info_from_CTIO_header(self, self.header)
             if self.header['TARGET'] != "":
                 self.target = Target(self.header['TARGET'], verbose=parameters.VERBOSE)
             if self.header['UNIT2'] != "":
                 self.units = self.header['UNIT2']
-            self.my_logger.info('\n\tSpectrum loaded from %s' % input_filename)
-            hdu.close()  # need to free allocation for file descriptor
+            self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
         else:
-            self.my_logger.warning('\n\tSpectrum file %s not found' % input_filename)
+            self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
 
 
 if __name__ == "__main__":

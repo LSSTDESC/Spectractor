@@ -97,7 +97,7 @@ class AtmosphereGrid(Atmosphere):
         pressure (:obj:`float`): pressure of the atmosphere 
         temperature (:obj:`float`): temperature of the atmosphere 
         filenamedata (:obj:`strt`): XXXXXXXXXX    
-        filename (:obj:`strt`): atmospheric grid file name to load   
+        filename (:obj:`strt`): atmospheric grid file name to load_image
     """
 
     def __init__(self, data_filename, filename="", airmass=1., pressure=800., temperature=10.):
@@ -315,7 +315,7 @@ class AtmosphereGrid(Atmosphere):
             self.atmgrid[:, :] = hdu[0].data[:, :]
 
             if parameters.VERBOSE or parameters.DEBUG:
-                self.my_logger.info('\n\tAtmosphere.load atm-file=%s' % (self.filename))
+                self.my_logger.info('\n\tAtmosphere.load_image atm-file=%s' % (self.filename))
 
             # interpolate the grid
             self.lambdas = self.atmgrid[0, self.index_atm_data:]
@@ -364,7 +364,7 @@ class TelescopeTransmission():
     def load_transmission(self):
         """
         load_transmission(self) :
-            load the telescope transmission
+            load_image the telescope transmission
             return the total telescope transmission, disperser excluded, 
                 as a fnction of the wavelength in Angstrom
         """
@@ -709,7 +709,7 @@ def SimulatorSimGrid(filename, outputdir):
     # test if file already exists
     if os.path.exists(output_atmfilename) and os.path.getsize(output_atmfilename) > 20000:
         filesize = os.path.getsize(output_atmfilename)
-        infostring = " atmospheric simulation file %s of size %d already exists, thus load it ..." % (
+        infostring = " atmospheric simulation file %s of size %d already exists, thus load_image it ..." % (
             output_atmfilename, filesize)
         my_logger.info(infostring)
         atmgrid, header = atm.load_file(output_atmfilename)

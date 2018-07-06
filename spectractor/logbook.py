@@ -7,7 +7,7 @@ import csv
 
 # noinspection PyShadowingNames
 class LogBook:
-    """Class to load and analyse observation logbook csv files."""
+    """Class to load_image and analyse observation logbook csv files."""
 
     def __init__(self, logbook="ctiofulllogbook_jun2017_v5.csv"):
         """Load and initialise the logbook
@@ -34,7 +34,7 @@ class LogBook:
         self.reader = csv.DictReader(self.csvfile, delimiter=';', dialect=csv.excel_tab)
 
     def search_for_image(self, filename):
-        """Look for an image file name in the logbook and load properties:
+        """Look for an image file name in the logbook and load_image properties:
         * Obj-posXpix and Obj-posYpix: the [x0,y0] guessed pixel position in the image
         * Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables
             in parameters.py
