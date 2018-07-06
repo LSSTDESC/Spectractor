@@ -147,7 +147,7 @@ def find_target(image, guess, rotated=False):
     # find the target
     saturated_pixels = np.where(sub_image >= image.saturation)
     if len(saturated_pixels[0]) > 100:
-        avX, avY = find_target_1Dprofile(image, guess, rotated)
+        avX, avY = find_target_1Dprofile(image, sub_image, guess, rotated)
     else:
         avX, avY = find_target_2Dprofile(image, sub_image, guess, rotated)
     # compute target position
