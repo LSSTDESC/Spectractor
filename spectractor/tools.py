@@ -330,6 +330,13 @@ def fftconvolve_gaussian(array, reso):
     return array
 
 
+def restrict_lambdas(lambdas):
+    lambdas_indices = \
+        np.where(np.logical_and(lambdas > parameters.LAMBDA_MIN, lambdas < parameters.LAMBDA_MAX))[0]
+    lambdas = lambdas[lambdas_indices]
+    return lambdas
+
+
 def formatting_numbers(value, errorhigh, errorlow, std=None, label=None):
     str_value = ""
     str_errorhigh = ""
