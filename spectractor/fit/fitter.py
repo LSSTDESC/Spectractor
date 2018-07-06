@@ -1,10 +1,10 @@
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from spectractor.simulation.simulator import Atmosphere
+from spectractor.simulation.simulator import *
 from spectractor.extractor.extractor import *
 from spectractor.fit.mcmc import *
 from spectractor import parameters
 
-#import pymc as pm
+# import pymc as pm
 import emcee
 from multiprocessing import Pool
 
@@ -33,7 +33,6 @@ class Extractor:
         self.bounds = ((0, 0, 0, 0, 0, 1, 50, -20), (2, 0.5, 800, 10, 1.0, 10, 60, 20))
         self.title = ""
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(filename)
-        self.x0 = [self.spectrum.header['TARGETX'], self.spectrum.header['TARGETY']]
         self.airmass = self.spectrum.header['AIRMASS']
         self.pressure = self.spectrum.header['OUTPRESS']
         self.temperature = self.spectrum.header['OUTTEMP']
@@ -47,12 +46,14 @@ class Extractor:
                 self.my_logger.info('\n\tUse atmospheric grid models from file %s. ' % atmgrid_filename)
         # self.p[0] *= np.max(self.spectrum.data) / np.max(self.simulation(self.A1,self.A2,self.ozone,self.pwv,self.aerosols,self.reso,self.shift))
         self.get_truth()
-        #if 0. in self.spectrum.err:
+        # if 0. in self.spectrum.err:
         #    self.spectrum.err = np.ones_like(self.spectrum.err)
+        self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
+
         if parameters.DEBUG:
-            for i in range(10):
-                a = self.atmosphere.simulate(300, i, 0.05)
-                plt.plot(self.atmosphere.lambdas, a, label='pwv=%dmm' % i)
+            for k in range(10):
+                atmo = self.atmosphere.simulate(300, k, 0.05)
+                plt.plot(self.atmosphere.lambdas, atmo, label='pwv=%dmm' % k)
             plt.grid()
             plt.xlabel('$\lambda$ [nm]')
             plt.ylabel('Atmospheric transmission')
@@ -67,16 +68,15 @@ class Extractor:
             pwv_truth = self.spectrum.header['PWV']
             aerosols_truth = self.spectrum.header['VAOD']
             reso_truth = self.spectrum.header['RESO']
-            self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth, reso_truth, None, None, None)
+            D_truth = self.spectrum.header['D2CCD']
+            shift_truth = self.spectrum.header['X0SHIFT']
+            self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth, reso_truth, D_truth, shift_truth)
         else:
             self.truth = None
 
-    def simulation(self, A1, A2, ozone, pwv, aerosols, reso, D, shift):
-        if reso < 0 or reso > 20:
-            return np.zeros_like(self.spectrum.lambdas), np.zeros_like(self.spectrum.lambdas)
-        self.title = 'A1={:.3f}, A2={:.3f}, PWV={:.3f}, OZ={:.3g}, ' \
-                     'VAOD={:.3f}, reso={:.2f}, D={:.2f}, shift={:.2f}'.format(
-            A1, A2, pwv, ozone, aerosols, reso, D, shift)
+    def simulate(self, A1, A2, ozone, pwv, aerosols, reso, D, shift):
+
+        '''
         self.atmosphere.simulate(ozone, pwv, aerosols)
         self.disperser.D = DISTANCE2CCD
         pixels = self.disperser.grating_lambda_to_pixel(self.spectrum.lambdas, self.x0, order=1)
@@ -84,8 +84,10 @@ class Extractor:
         pixels = pixels - shift
         self.disperser.D = D
         self.lambdas = self.disperser.grating_pixel_to_lambda(pixels, new_x0, order=1)
-        simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
-        simulation.simulate(self.lambdas)
+        '''
+        self.lambdas, self.model, self.model_err = self.simulation.simulate(A1, A2,
+                                                                            ozone, pwv, aerosols, reso, D, shift)
+        '''
         self.model_noconv = A1 * np.copy(simulation.data)
         sim_conv = fftconvolve_gaussian(simulation.data, reso)
         err_conv = np.sqrt(fftconvolve_gaussian(simulation.err ** 2, reso))
@@ -94,44 +96,47 @@ class Extractor:
         self.model = lambda x: A1 * sim_conv(x) + A1 * A2 * sim_conv(x / 2)
         self.model_err = lambda x: np.sqrt((A1 * err_conv(x)) ** 2 + (0.5 * A1 * A2 * err_conv(x / 2)) ** 2)
         #self.lambdas = 1e-6 * lambdas[np.where(np.logical_and(lambdas > parameters.LAMBDA_MIN, lambdas < parameters.LAMBDA_MAX))[0]]
+        '''
         if self.live_fit:
             self.plot_fit()
-        return self.model(self.lambdas), self.model_err(self.lambdas)
+        return self.model(self.spectrum.lambdas), self.model_err(self.spectrum.lambdas)
 
     def chisq(self, p):
-        model, err = self.simulation(*p)
+        model, err = self.simulate(*p)
         chisq = np.sum((model - self.spectrum.data) ** 2 / (err ** 2 + self.spectrum.err ** 2))
         # chisq /= self.spectrum.data.size
         # print '\tReduced chisq =',chisq/self.spectrum.data.size
         return chisq
 
     def plot_spectrum_comparison_simple(self, ax, title='', extent=None, size=0.4):
-        self.spectrum.plot_spectrum_simple(ax)
-        sub = np.where((self.lambdas > parameters.LAMBDA_MIN) & (self.lambdas < parameters.LAMBDA_MAX))
-        if extent != None:
-            sub = np.where((self.lambdas > extent[0]) & (self.lambdas < extent[1]))
-        p0 = ax.plot(self.lambdas, self.model(self.lambdas), label='model')
-        ax.fill_between(self.lambdas, self.model(self.lambdas) - self.model_err(self.lambdas),
-                        self.model(self.lambdas) + self.model_err(self.lambdas), alpha=0.3, color=p0[0].get_color())
-        #ax.plot(self.lambdas, self.model_noconv, label='before conv')
-        if title != '': ax.set_title(title, fontsize=10)
+        l = self.spectrum.lambdas
+        sub = np.where((l > parameters.LAMBDA_MIN) & (l < parameters.LAMBDA_MAX))
+        if extent is not None:
+            sub = np.where((l > extent[0]) & (l < extent[1]))
+        self.spectrum.plot_spectrum_simple(ax, lambdas=l)
+        p0 = ax.plot(l, self.model(l), label='model')
+        ax.fill_between(l, self.model(l) - self.model_err(l),
+                        self.model(l) + self.model_err(l), alpha=0.3, color=p0[0].get_color())
+        # ax.plot(self.lambdas, self.model_noconv, label='before conv')
+        if title != '':
+            ax.set_title(title, fontsize=10)
         ax.legend()
         divider = make_axes_locatable(ax)
         ax2 = divider.append_axes("bottom", size=size, pad=0)
         ax.figure.add_axes(ax2)
-        residuals = (self.spectrum.data - self.model(self.lambdas)) / self.model(self.lambdas)
-        residuals_err = self.spectrum.err / self.model(self.lambdas)
-        ax2.errorbar(self.lambdas, residuals, yerr=residuals_err, fmt='ro', markersize=2)
+        residuals = (self.spectrum.data - self.model(l)) / self.model(l)
+        residuals_err = self.spectrum.err / self.model(l)
+        ax2.errorbar(l, residuals, yerr=residuals_err, fmt='ro', markersize=2)
         ax2.axhline(0, color=p0[0].get_color())
         ax2.grid(True)
-        residuals_model = self.model_err(self.lambdas) / self.model(self.lambdas)
-        ax2.fill_between(self.lambdas, -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
+        residuals_model = self.model_err(l) / self.model(l)
+        ax2.fill_between(l, -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
         std = np.std(residuals[sub])
         ax2.set_ylim([-2. * std, 2. * std])
         ax2.set_xlabel(ax.get_xlabel())
         ax2.set_ylabel('(data-fit)/fit')
-        ax2.set_xlim((self.lambdas[sub][0], self.lambdas[sub][-1]))
-        ax.set_xlim((self.lambdas[sub][0], self.lambdas[sub][-1]))
+        ax2.set_xlim((l[sub][0], l[sub][-1]))
+        ax.set_xlim((l[sub][0], l[sub][-1]))
         ax.set_ylim((0.9 * np.min(self.spectrum.data[sub]), 1.1 * np.max(self.spectrum.data[sub])))
         ax.set_xticks(ax2.get_xticks()[1:-1])
 
@@ -140,6 +145,10 @@ class Extractor:
         ax1 = plt.subplot(222)
         ax2 = plt.subplot(224)
         ax3 = plt.subplot(121)
+        A1, A2, ozone, pwv, aerosols, reso, D, shift = self.p
+        self.title = 'A1={:.3f}, A2={:.3f}, PWV={:.3f}, OZ={:.3g}, ' \
+                     'VAOD={:.3f}, reso={:.2f}, D={:.2f}, shift={:.2f}'.format(A1, A2,
+                                                                               pwv, ozone, aerosols, reso, D, shift)
         # main plot
         self.plot_spectrum_comparison_simple(ax3, title=self.title, size=0.8)
         # zoom O2
@@ -172,8 +181,8 @@ class Extractor_MCMC(Extractor):
         self.covfile = filename.replace('spectrum.fits', 'cov.txt')
         self.results = []
         self.results_err = []
-        for i in range(self.chains.dim):
-            self.results.append(ParameterList(self.chains.labels[i], self.chains.axis_names[i]))
+        for k in range(self.chains.dim):
+            self.results.append(ParameterList(self.chains.labels[k], self.chains.axis_names[k]))
             self.results_err.append([])
 
     def lnprior(self, p):
@@ -281,54 +290,54 @@ class Extractor_MCMC(Extractor):
         pm.gelman_rubin(S)
 
     def run_minimisation(self):
-        bounds = tuple([ (self.bounds[0][i], self.bounds[1][i]) for i in range(self.ndim)])
+        bounds = tuple([(self.bounds[0][i], self.bounds[1][i]) for i in range(self.ndim)])
         import scipy.optimize as op
         nll = lambda *args: -self.lnlike(*args)
-        result = op.minimize(nll, self.p, method='SLSQP',
-                            options={'ftol': 1e-6, 'xtol': 1e-20, 'gtol': 1e-6, 'disp': True, 'maxiter': 100000,
-                                     'maxls': 50, 'maxcor': 30},
+        result = op.minimize(nll, self.p, method='L-BFGS-B',
+                             options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True, 'maxiter': 100000,
+                                      'maxls': 50, 'maxcor': 30},
                              bounds=bounds)
-        #popt, pcov = op.curve_fit(self.simulation, self.spectrum.lambdas, self.spectrum.data, p0=self.p, sigma=self.spectrum.err)
+        # popt, pcov = op.curve_fit(self.simulation, self.spectrum.lambdas, self.spectrum.data, p0=self.p, sigma=self.spectrum.err)
         self.p = result['x']
         print(self.p)
-        self.simulation(*self.p)
+        self.simulate(*self.p)
         self.plot_fit()
 
     def run_emcee(self):
-        #start = np.array([self.p + 0.1 * self.p * np.random.randn(self.ndim) for i in range(self.nwalkers)])
-        start = np.array([np.random.uniform(self.p[i] - 0.001 * (self.bounds[1][i] - self.bounds[0][i]),
-                                            self.p[i] + 0.001 * (self.bounds[1][i] - self.bounds[0][i]), self.nwalkers)
+        ntemps = 20
+        # start = np.array([self.p + 0.1 * self.p * np.random.randn(self.ndim) for i in range(self.nwalkers)])
+        start = np.array([np.random.uniform(self.p[i] - 0.01 * (self.bounds[1][i] - self.bounds[0][i]),
+                                            self.p[i] + 0.01 * (self.bounds[1][i] - self.bounds[0][i]), self.nwalkers)
                           for i in range(self.ndim)]).T
-
         # Set up the backend
         # Don't forget to clear it in case the file already exists
-        filename = "tutorial.h5"
+        # filename = "tutorial.h5"
         # backend = emcee.backends.HDFBackend(filename)
         # backend.reset(self.nwalkers, self.ndim)
 
-
-        nsamples = 1000
-        #with Pool() as pool:
-        self.sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, self.lnprob, args=())#, pool=pool)
+        nsamples = 2000
+        # with Pool() as pool:
+        self.sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim, self.lnprob, args=())  # , pool=pool)
+        #self.sampler = emcee.PTSampler(ntemps, self.nwalkers, self.ndim, self.lnlike, self.lnprob)  # , pool=pool)
         for i, result in enumerate(self.sampler.sample(start, iterations=nsamples)):
             if (i + 1) % 100 == 0:
                 print("{0:5.1%}".format(float(i) / nsamples))
-        #self.sampler.run_mcmc(start, nsamples)
+        # self.sampler.run_mcmc(start, nsamples)
         # tau = sampler.get_autocorr_time()
-        burnin = 200 #int(nsamples / 2)
+        burnin = 1000  # int(nsamples / 2)
         thin = int(nsamples / 4)
-        #self.chains = self.sampler(discard=burnin, flat=True, thin=thin)
-        self.chains = self.sampler.chain[:, burnin:, :] #.reshape((-1, self.ndim))
-        self.p = [ np.mean(self.sampler.flatchain[burnin:, i]) for i in range(self.ndim)]
+        # self.chains = self.sampler(discard=burnin, flat=True, thin=thin)
+        self.chains = self.sampler.chain[:, burnin:, :]  # .reshape((-1, self.ndim))
+        self.p = [np.mean(self.sampler.flatchain[burnin:, i]) for i in range(self.ndim)]
         print(self.p)
-        fig, ax = plt.subplots(self.ndim + 1,1,figsize=(16,8))
-        steps = np.arange(0,nsamples-burnin)
+        fig, ax = plt.subplots(self.ndim + 1, 1, figsize=(16, 8))
+        steps = np.arange(0, nsamples - burnin)
         for i in range(self.ndim):
             ax[i].set_ylabel(self.labels[i])
             for k in range(self.nwalkers):
                 ax[i].plot(steps, self.chains[k, :, i])
         for k in range(self.nwalkers):
-            ax[self.ndim].plot(steps,-2*self.sampler.lnprobability[k, burnin:])
+            ax[self.ndim].plot(steps, -2 * self.sampler.lnprobability[k, burnin:])
         ax[self.ndim].set_ylabel(r'$\chi^2$')
         ax[self.ndim].set_xlabel('Steps')
         plt.show()
@@ -337,15 +346,16 @@ class Extractor_MCMC(Extractor):
         # print("flat chain shape: {0}".format(samples.shape))
         # print("flat log prob shape: {0}".format(log_prob_samples.shape))
         # print("flat log prior shape: {0}".format(log_prior_samples.shape))
-        self.simulation(*self.p)
+        self.simulate(*self.p)
         self.plot_fit()
         import corner
-        fig = corner.corner(self.sampler.flatchain[burnin:, :], labels=self.labels, truths=self.truth, quantiles=[0.16, 0.5, 0.84],
+        fig = corner.corner(self.sampler.flatchain[burnin*self.nwalkers:, :], labels=self.labels, truths=self.truth,
+                            quantiles=[0.16, 0.5, 0.84],
                             show_titles=True)
-        fig.set_size_inches(10, 10)
-        fig.tight_layout()
+        #fig.set_size_inches(5, 5)
+        #fig.tight_layout()
         print(self.sampler.acceptance_fraction)
-        #print(self.sampler.acor)
+        # print(self.sampler.acor)
         plt.show()
         fig.savefig("triangle.png")
 
@@ -361,7 +371,7 @@ class Extractor_MCMC(Extractor):
                 prior1 = self.prior(vec1)
         else:
             chain.start_index += 1
-        sim = self.simulation(*vec1)
+        sim = self.simulate(*vec1)
         if np.max(sim) > 0:
             vec1[0] *= np.max(self.spectrum.data) / np.max(sim)
         if parameters.DEBUG:
@@ -418,9 +428,9 @@ class Extractor_MCMC(Extractor):
     def run_mcmc(self):
         complete = self.chains.check_completness()
         if not complete:
-            for i in range(self.nchains):
+            for k in range(self.nchains):
                 self.chains.chains.append(
-                    Chain(self.chains.chains_filename, self.covfile, nchain=i, nsteps=self.nsteps))
+                    Chain(self.chains.chains_filename, self.covfile, nchain=k, nsteps=self.nsteps))
             pool = Pool(processes=self.nchains)
             try:
                 # Without the .get(9999), you can't interrupt this with Ctrl+C.
@@ -436,7 +446,7 @@ class Extractor_MCMC(Extractor):
         # [self.results[i].append(self.likelihood.pdfs[i].mean) for i in range(self.chains.dim)]
         # self.p = [self.likelihood.pdfs[i].mean for i in range(self.chains.dim)]
         self.p = self.chains.best_row_params
-        self.simulation(*self.p)
+        self.simulate(*self.p)
         # [self.results_err[i].append([self.likelihood.pdfs[i].error_high,
         # self.likelihood.pdfs[i].error_low]) for i in range(self.chains.dim)]
         # if(self.plot):
@@ -455,18 +465,19 @@ if __name__ == "__main__":
                       help="Enter debug mode (more verbose and plots).", default=False)
     parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
                       help="Enter verbose (print more stuff).", default=False)
-    parser.add_option("-o", "--output_directory", dest="output_directory", default="outputs/",
+    parser.add_option("-o", "--output_directory", dest="output_directory", default="./outputs/",
                       help="Write results in given output directory (default: ./outputs/).")
     (opts, args) = parser.parse_args()
 
     parameters.VERBOSE = False
     filename = 'outputs/data_30may17/reduc_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-    filename = 'outputs/data_30may17/reduc_20170530_134_sim.fits'
+    filename = 'outputs/data_30may17/reduc_20170530_134_spectrum.fits'
 
     # m = Extractor(filename,atmgrid_filename)
     # m.minimizer(live_fit=True)
     covfile = 'covariances/proposal.txt'
     m = Extractor_MCMC(filename, covfile, nchains=4, nsteps=10000, burnin=2000, nbins=10, exploration_time=500,
                        atmgrid_filename=atmgrid_filename, live_fit=False)
+    #m.run_minimisation()
     m.run_emcee()
