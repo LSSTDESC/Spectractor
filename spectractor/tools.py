@@ -4,6 +4,8 @@ from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting, Fittable2DModel, Parameter
 from astropy.stats import sigma_clip
+from astropy.io import fits
+
 import warnings
 from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
@@ -306,15 +308,6 @@ def filter_stars_from_bgd(data, margin_cut=1):
     return data
 
 
-def extract_info_from_CTIO_header(obj, header):
-    obj.date_obs = header['DATE-OBS']
-    obj.airmass = header['AIRMASS']
-    obj.expo = header['EXPTIME']
-    obj.filters = header['FILTERS']
-    obj.filter = header['FILTER1']
-    obj.disperser = header['FILTER2']
-
-
 def fftconvolve_gaussian(array, reso):
     if array.ndim == 2:
         kernel = gaussian(array.shape[1], reso)
@@ -444,3 +437,27 @@ def clean_target_spikes(data, saturation):
         saturated_pixels = np.where(data >= saturation)
         delta = delta - len(saturated_pixels[0])
     return data
+
+
+def load_fits(file_name, hdu_index=0):
+    hdu_list = fits.open(file_name)
+    header = hdu_list[hdu_index].header
+    data = hdu_list[hdu_index].data
+    hdu_list.close()  # need to free allocation for file descripto
+    return header, data
+
+
+def extract_info_from_CTIO_header(obj, header):
+    obj.date_obs = header['DATE-OBS']
+    obj.airmass = header['AIRMASS']
+    obj.expo = header['EXPTIME']
+    obj.filters = header['FILTERS']
+    obj.filter = header['FILTER1']
+    obj.disperser = header['FILTER2']
+
+
+def save_fits(file_name, header, data, overwrite=False):
+    hdu = fits.PrimaryHDU()
+    hdu.header = header
+    hdu.data = data
+    hdu.writeto(file_name, overwrite=overwrite)

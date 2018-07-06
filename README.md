@@ -35,7 +35,7 @@ Spectractor comes with two verbosity modes, ste in the `parameters.py` file:
 
 ### Plot an extracted spectrum
 
-To check a posteriori the quality of a spectrum, it is possible to load it via the `Spectrum` class and plot it:
+To check a posteriori the quality of a spectrum, it is possible to load_image it via the `Spectrum` class and plot it:
 ```
 spec = Spectrum('./outputs/trim_20170605_007_spectrum.fits')
 spec.plot_spectrum()
