@@ -400,7 +400,7 @@ class Lines:
             noise_level = np.std(spec[index] - multigauss_and_bgd(lambdas[index], *popt))
             # otherwise mean of error bars of bgd lateral bands
             if spec_err is not None:
-                noise_level = np.mean(spec_err[index])
+                noise_level = np.sqrt(np.mean(spec_err[index]**2))
             # f = plt.figure()
             # plt.errorbar(lambdas[index],spec[index],yerr=spec_err[index])
             # plt.plot(lambdas[bgd_index],spec[bgd_index])
@@ -418,11 +418,10 @@ class Lines:
                 FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
                 # SNR computation
                 # signal_level = popt[bgd_npar+3*j]
-                signal_level = multigauss_and_bgd(peak_pos, *popt) - np.polyval(popt[:bgd_npar], peak_pos)
+                signal_level = popt[bgd_npar + 3 * j] #multigauss_and_bgd(peak_pos, *popt) - np.polyval(popt[:bgd_npar], peak_pos)
                 snr = np.abs(signal_level / noise_level)
                 # save fit results
                 line.fitted = True
-                line.high_snr = True
                 line.fit_lambdas = lambdas[index]
                 line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
                 line.fit_bgd = np.polyval(popt[:bgd_npar], lambdas[index])
@@ -430,6 +429,7 @@ class Lines:
                 line.fit_fwhm = FWHM
                 if snr < snr_minlevel:
                     continue
+                line.high_snr = True
                 plot_line_subset = True
                 rows.append((line.label, l, peak_pos, peak_pos - l, FWHM, signal_level, snr))
                 # wavelength shift between tabulate and observed lines
