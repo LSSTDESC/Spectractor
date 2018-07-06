@@ -289,6 +289,8 @@ class Hologram(Grating):
             self.N_interp = lambda x: float(N_interp(x[0], x[1]))
         else:
             self.is_hologram = False
+            self.N_x = np.arange(0, IMSIZE)
+            self.N_y = np.arange(0, IMSIZE)
             filename = self.data_dir + self.label + "/N.txt"
             if os.path.isfile(filename):
                 a = np.loadtxt(filename)
