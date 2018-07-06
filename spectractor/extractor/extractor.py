@@ -33,22 +33,23 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     output_filename = os.path.join(output_directory, output_filename)
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
-    target_pixcoords = image.find_target(guess)
+    target_pixcoords = find_target(image, guess)
     # Rotate the image: several methods
-    image.turn_image()
+    turn_image(image)
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-    target_pixcoords_rotated = image.find_target(guess, rotated=True)
+    target_pixcoords_rotated = find_target(image, guess, rotated=True)
     # Create Spectrum object
     spectrum = Spectrum(Image=image)
     # Subtract background and bad pixels
-    image.extract_spectrum_from_image(spectrum)
+    extract_spectrum_from_image(image, spectrum)
     spectrum.atmospheric_lines = atmospheric_lines
     # Calibrate the spectrum
-    spectrum.calibrate_spectrum()
+    calibrate_spectrum(spectrum)
     if line_detection:
+        my_logger.info('\n\tCalibrating order %d spectrum...' % spectrum.order)
         try:
-            spectrum.calibrate_spectrum_with_lines()
+            calibrate_spectrum_with_lines(spectrum)
         except:
             my_logger.warning('\n\tCalibration procedure with spectral features failed.')
             spectrum.header['WARNINGS'] = 'Calibration procedure with spectral features failed.'
