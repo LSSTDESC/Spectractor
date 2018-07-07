@@ -40,7 +40,7 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf)):
 
 def multigauss_and_line(x, *params):
     out = line(x, params[0], params[1])
-    for k in range((len(params) - 2) / 3):
+    for k in range((len(params) - 2) // 3):
         out += gauss(x, *params[2 + 3 * k:2 + 3 * k + 3])
     return out
 

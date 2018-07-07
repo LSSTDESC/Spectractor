@@ -1,16 +1,12 @@
-from astropy.io import fits
 from astropy.table import Table
 from scipy.signal import argrelextrema
 
-from spectractor.extractor.dispersers import *
-from spectractor.extractor.filters import *
-from spectractor.extractor.targets import *
+from spectractor.extractor.images import *
 
 
 class Line:
     """Class modeling the emission or absorption lines."""
 
-    # noinspection PyDefaultArgument
     def __init__(self, wavelength, label, atmospheric=False, emission=False, label_pos=[0.007, 0.02],
                  width_bounds=[1, 7]):
         """Class modeling the emission or absorption lines. lines attributes contains main spectral lines
@@ -38,12 +34,11 @@ class Line:
         >>> print(l.wavelength)
         550
         >>> print(l.label)
-        'test'
+        test
         >>> print(l.atmospheric)
         True
         >>> print(l.emission)
         False
-
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.wavelength = wavelength  # in nm
@@ -56,15 +51,69 @@ class Line:
         self.width_bounds = width_bounds
         self.fitted = False
         self.high_snr = False
+        self.fit_lambdas = None
+        self.fit_gauss = None
+        self.fit_bgd = None
+        self.fit_snr = None
+        self.fit_fwhm = None
+
+    def gaussian_model(self, lambdas, A=1, sigma=2, use_fit=False):
+        """Return a Gaussian model of the spectral line.
+
+        Parameters
+        ----------
+        lambdas: float, array
+            Wavelength array of float in nm
+        A: float
+            Amplitude of the Gaussian (default: +1)
+        sigma: float
+            Standard deviation of the Gaussian (default: 2)
+        use_fit: bool, optional
+            If True, it overrides the previous setting values and use the Gaussian fit made on data, if ti exists.
+
+        Returns
+        -------
+        model: float, array
+            The amplitude array of float of the Gaussian model of the line.
+
+        Examples
+        --------
+
+        Give lambdas as a float:
+        >>> l = Line(656.3, atmospheric=False, label='$H\\alpha$')
+        >>> sigma = 2.
+        >>> model = l.gaussian_model(656.3, A=1, sigma=sigma, use_fit=False)
+        >>> print(model)
+        1.0
+        >>> model = l.gaussian_model(656.3+sigma*np.sqrt(2*np.log(2)), A=1, sigma=sigma, use_fit=False)
+        >>> print(model)
+        0.5
+
+        Use a fit (for the example we create a mock fit result):
+        >>> l.fit_lambdas = np.arange(600,700,2)
+        >>> l.fit_gauss = gauss(l.fit_lambdas, 1e-10, 650, 2.3)
+        >>> l.fit_fwhm = 2.3*2*np.sqrt(2*np.log(2))
+        >>> lambdas = np.arange(500,1000,1)
+        >>> model = l.gaussian_model(lambdas, A=1, sigma=sigma, use_fit=True)
+        >>> print(model[:5])
+        [ 0.  0.  0.  0.  0.]
+
+        """
+        if use_fit and self.fit_gauss is not None :
+            sigma = self.fit_fwhm / 2.355
+            interp = interpolate.interp1d(self.fit_lambdas, self.fit_gauss, bounds_error=False, fill_value=0.)
+            return interp(lambdas)
+        else:
+            return gauss(lambdas, A=A, x0=self.wavelength, sigma=sigma)
+
 
 
 class Lines:
     """Class gathering all the lines and associated methods."""
 
     def __init__(self, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=False):
-        """ Main emission/absorption lines in nm
-        see http://www.pa.uky.edu/~peter/atomic/
-        see https://physics.nist.gov/PhysRefData/ASD/lines_form.html
+        """ Main emission/absorption lines in nm. Sorted lines are sorted in self.lines.
+        See http://www.pa.uky.edu/~peter/atomic/ or https://physics.nist.gov/PhysRefData/ASD/lines_form.html
 
         Parameters
         ----------
@@ -76,64 +125,88 @@ class Lines:
             Set True to gather only the hydrogen spectral lines, atmospheric lines still included (default: False)
         emission_spectrum: bool
             Set True if the spectral line has to be detected in emission (default: False)
+
+        Examples
+        --------
+        The default first five lines:
+        >>> lines = Lines(redshift=0, atmospheric_lines=False, hydrogen_only=False, emission_spectrum=False)
+        >>> print([lines.lines[i].wavelength for i in range(5)])
+        [353.1, 388.8, 410.2, 434.0, 447.1]
+
+        The four hydrogen lines only:
+        >>> lines = Lines(redshift=0, atmospheric_lines=False, hydrogen_only=True, emission_spectrum=True)
+        >>> print([lines.lines[i].wavelength for i in range(4)])
+        [410.2, 434.0, 486.3, 656.3]
+        >>> print(lines.emission_spectrum)
+        True
+
+        Redshift the hydrogen lines, the atmospheric lines stay unchanged:
+        >>> lines = Lines(redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
+        >>> print([lines.lines[i].wavelength for i in range(5)])
+        [393.366, 396.847, 686.719, 762.1, 820.4]
+
+        Redshift all the spectral lines, except the atmospheric lines:
+        >>> lines = Lines(redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
+        >>> print([lines.lines[i].wavelength for i in range(5)])
+        [393.366, 396.847, 686.719, 706.2, 762.1]
         """
         self.my_logger = set_logger(self.__class__.__name__)
         if redshift < 0:
             self.my_logger.warning(f'Redshift must be positive or null. Got {redshift}')
             sys.exit()
-        HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02])
-        HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02])
-        HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02])
-        HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02])
-        OIII = Line(500.7, atmospheric=False, label='$O_{III}$', label_pos=[0.007, 0.02])
-        CII1 = Line(723.5, atmospheric=False, label='$C_{II}$', label_pos=[0.005, 0.92])
-        CII2 = Line(711.0, atmospheric=False, label='$C_{II}$', label_pos=[0.005, 0.02])
-        CIV = Line(706.0, atmospheric=False, label='$C_{IV}$', label_pos=[-0.016, 0.92])
-        CII3 = Line(679.0, atmospheric=False, label='$C_{II}$', label_pos=[0.005, 0.02])
-        CIII1 = Line(673.0, atmospheric=False, label='$C_{III}$', label_pos=[-0.016, 0.92])
-        CIII2 = Line(570.0, atmospheric=False, label='$C_{III}$', label_pos=[0.007, 0.02])
-        CIII3 = Line(970.5, atmospheric=False, label='$C_{III}$', label_pos=[0.007, 0.02])
-        FEII1 = Line(515.8, atmospheric=False, label='$Fe_{II}$', label_pos=[0.007, 0.02])
-        FEII2 = Line(527.3, atmospheric=False, label='$Fe_{II}$', label_pos=[0.007, 0.02])
-        FEII3 = Line(534.9, atmospheric=False, label='$Fe_{II}$', label_pos=[0.007, 0.02])
-        HEI1 = Line(388.8, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI2 = Line(447.1, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI3 = Line(587.5, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI4 = Line(750.0, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI5 = Line(776.0, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI6 = Line(781.6, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI7 = Line(848.2, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI8 = Line(861.7, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI9 = Line(906.5, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI10 = Line(923.5, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI11 = Line(951.9, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI12 = Line(1023.5, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        HEI13 = Line(353.1, atmospheric=False, label='$He_{I}$', label_pos=[0.007, 0.02])
-        OI = Line(630.0, atmospheric=False, label='$O_{II}$', label_pos=[0.007, 0.02])
-        OII = Line(732.5, atmospheric=False, label='$O_{II}$', label_pos=[0.007, 0.02])
-        HEII1 = Line(468.6, atmospheric=False, label='$He_{II}$', label_pos=[0.007, 0.02])
-        HEII2 = Line(611.8, atmospheric=False, label='$He_{II}$', label_pos=[0.007, 0.02])
-        HEII3 = Line(617.1, atmospheric=False, label='$He_{II}$', label_pos=[0.007, 0.02])
-        HEII4 = Line(856.7, atmospheric=False, label='$He_{II}$', label_pos=[0.007, 0.02])
-        HI = Line(833.9, atmospheric=False, label='$He_{II}$', label_pos=[0.007, 0.02])
-        CAII1 = Line(393.366, atmospheric=True, label='$Ca_{II}$',
+        HALPHA = Line(656.3, atmospheric=False, label=r'$H\alpha$', label_pos=[-0.016, 0.02])
+        HBETA = Line(486.3, atmospheric=False, label=r'$H\beta$', label_pos=[0.007, 0.02])
+        HGAMMA = Line(434.0, atmospheric=False, label=r'$H\gamma$', label_pos=[0.007, 0.02])
+        HDELTA = Line(410.2, atmospheric=False, label=r'$H\delta$', label_pos=[0.007, 0.02])
+        OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
+        CII1 = Line(723.5, atmospheric=False, label=r'$C_{II}$', label_pos=[0.005, 0.92])
+        CII2 = Line(711.0, atmospheric=False, label=r'$C_{II}$', label_pos=[0.005, 0.02])
+        CIV = Line(706.0, atmospheric=False, label=r'$C_{IV}$', label_pos=[-0.016, 0.92])
+        CII3 = Line(679.0, atmospheric=False, label=r'$C_{II}$', label_pos=[0.005, 0.02])
+        CIII1 = Line(673.0, atmospheric=False, label=r'$C_{III}$', label_pos=[-0.016, 0.92])
+        CIII2 = Line(570.0, atmospheric=False, label=r'$C_{III}$', label_pos=[0.007, 0.02])
+        CIII3 = Line(970.5, atmospheric=False, label=r'$C_{III}$', label_pos=[0.007, 0.02])
+        FEII1 = Line(515.8, atmospheric=False, label=r'$Fe_{II}$', label_pos=[0.007, 0.02])
+        FEII2 = Line(527.3, atmospheric=False, label=r'$Fe_{II}$', label_pos=[0.007, 0.02])
+        FEII3 = Line(534.9, atmospheric=False, label=r'$Fe_{II}$', label_pos=[0.007, 0.02])
+        HEI1 = Line(388.8, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI2 = Line(447.1, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI3 = Line(587.5, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI4 = Line(750.0, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI5 = Line(776.0, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI6 = Line(781.6, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI7 = Line(848.2, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI8 = Line(861.7, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI9 = Line(906.5, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI10 = Line(923.5, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI11 = Line(951.9, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI12 = Line(1023.5, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        HEI13 = Line(353.1, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
+        OI = Line(630.0, atmospheric=False, label=r'$O_{II}$', label_pos=[0.007, 0.02])
+        OII = Line(732.5, atmospheric=False, label=r'$O_{II}$', label_pos=[0.007, 0.02])
+        HEII1 = Line(468.6, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
+        HEII2 = Line(611.8, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
+        HEII3 = Line(617.1, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
+        HEII4 = Line(856.7, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
+        HI = Line(833.9, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
+        CAII1 = Line(393.366, atmospheric=True, label=r'$Ca_{II}$',
                      label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-        CAII2 = Line(396.847, atmospheric=True, label='$Ca_{II}$',
+        CAII2 = Line(396.847, atmospheric=True, label=r'$Ca_{II}$',
                      label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-        O2 = Line(762.1, atmospheric=True, label='$O_2$',
+        O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
                   label_pos=[0.007, 0.02])  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
         # O2_1 = Line( 760.6,atmospheric=True,label='',label_pos=[0.007,0.02]) # libradtran paper fig.3
         # O2_2 = Line( 763.2,atmospheric=True,label='$O_2$',label_pos=[0.007,0.02])  # libradtran paper fig.3
-        O2B = Line(686.719, atmospheric=True, label='$O_2(B)$',
+        O2B = Line(686.719, atmospheric=True, label=r'$O_2(B)$',
                    label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-        O2Y = Line(898.765, atmospheric=True, label='$O_2(Y)$',
+        O2Y = Line(898.765, atmospheric=True, label=r'$O_2(Y)$',
                    label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-        O2Z = Line(822.696, atmospheric=True, label='$O_2(Z)$',
+        O2Z = Line(822.696, atmospheric=True, label=r'$O_2(Z)$',
                    label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         # H2O = Line( 960,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(1,50))  #
-        H2O_1 = Line(935, atmospheric=True, label='$H_2 O$', label_pos=[0.007, 0.02],
+        H2O_1 = Line(935, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
                      width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-        H2O_2 = Line(960, atmospheric=True, label='$H_2 O$', label_pos=[0.007, 0.02],
+        H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
                      width_bounds=[5, 30])  # libradtran paper fig.3, broad line
 
         self.lines = [HALPHA, HBETA, HGAMMA, HDELTA, O2, O2B, O2Y, O2Z, H2O_1, H2O_2, OIII, CII1, CII2, CIV, CII3,
@@ -146,7 +219,19 @@ class Lines:
         self.lines = self.sort_lines()
 
     def sort_lines(self):
-        """Sort the lines in increasing order of wavelength."""
+        """Sort the lines in increasing order of wavelength, and add the redshift effect.
+
+        Returns
+        -------
+        sorted_lines: list
+            List of the sorted lines
+
+        Examples
+        --------
+        >>> lines = Lines()
+        >>> sorted_lines = lines.sort_lines()
+
+        """
         sorted_lines = []
         for line in self.lines:
             if self.hydrogen_only:
@@ -170,13 +255,28 @@ class Lines:
         return sorted_lines
 
     def plot_atomic_lines(self, ax, color_atomic='g', color_atmospheric='b', fontsize=12):
-        """Plot the atomic lines as vertical lines.
+        """Over plot the atomic lines as vertical lines.
 
-        Args:
-            ax: an Axes instance
-            color_atomic: color of the atomic lines (default: 'g')
-            color_atmospheric: color of the atmospheric lines (default: 'b')
-            fontsize: font size of the labels (default: 12)
+        Parameters
+        ----------
+        ax: Axes
+            An Axes instance on which plot the spectral lines
+        color_atomic: str
+            Color of the atomic lines (default: 'g')
+        color_atmospheric: str
+            Color of the atmospheric lines (default: 'b')
+        fontsize: int
+            Font size of the spectral line labels (default: 12)
+
+        Examples
+        --------
+        >>> import matplotlib.pyplot as plt
+        >>> f, ax = plt.subplots(1,1)
+        >>> ax.set_xlim(300,1000)
+        (300, 1000)
+        >>> lines = Lines()
+        >>> ax = lines.plot_atomic_lines(ax)
+        >>> assert ax is not None
         """
         xlim = ax.get_xlim()
         for l in self.lines:
@@ -190,8 +290,9 @@ class Lines:
             if 0 < xpos < 1:
                 ax.annotate(l.label, xy=(xpos, l.label_pos[1]), rotation=90, ha='left', va='bottom',
                             xycoords='axes fraction', color=color, fontsize=fontsize)
+        return ax
 
-    def detect_lines(self, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None, verbose=False):
+    def detect_lines(self, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None, print_table=False):
         """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
         around emission or absorption tabulated lines, and to select surrounding pixels
         to fit a (positive or negative) gaussian and a polynomial background. If several regions
@@ -200,16 +301,55 @@ class Lines:
         only the lines with a signal-to-noise ratio above a threshold.
         The order of the polynomial bakcground is set in parameters.py with BGD_ORDER.
 
-        Args:
-            lambdas: the wavelength array (in nm)
-            spec: the spectrum array
-            spec_err: the spectrum uncertainty array
-            snr_minlevel: minimum signal-to-noise ratio for line detection
-            ax: an Axes instance (optional: for plot only)
-            verbose: if True print many stuff.
+        Parameters
+        ----------
+        lambdas: float array
+            The wavelength array (in nm)
+        spec: float array
+            The spectrum amplitude array
+        spec_err: float array, optional
+            The spectrum amplitude uncertainty array (default: None)
+        snr_minlevel: float
+            The minimum signal over noise ratio to consider using a fitted line in the computation of the mean
+            shift output and to print it in the outpur table (default: 3)
+        ax: Axes, optional
+            An Axes instance to over plot the result of the fit (default: None).
+        print_table: bool, optional
+            Print a table with the detected lines (default: False).
 
-        Returns:
-            shift: the mean shift (in nm) between the detected and tabulated lines
+        Returns
+        -------
+        shift: float
+            The mean shift (in nm) between the detected and tabulated lines
+
+        Examples
+        --------
+
+        Creation of a mock spectrum with emission and absorption lines
+        >>> import numpy as np
+        >>> lambdas = np.arange(300,1000,1)
+        >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
+        >>> HALPHA = Line(656.3, atmospheric=False, label=r'$H\alpha$')
+        >>> HBETA = Line(486.3, atmospheric=False, label=r'$H\beta$')
+        >>> O2 = Line(762.1, atmospheric=True, label=r'$O_2$')
+        >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
+        >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
+        >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=3)
+        >>> spectrum_err = np.sqrt(spectrum)
+        >>> spec = Spectrum()
+        >>> spec.lambdas = lambdas
+        >>> spec.data = spectrum
+        >>> spec.err = spectrum_err
+
+        Detect the lines
+        >>> lines = Lines(hydrogen_only=True, atmospheric_lines=True, redshift=0, emission_spectrum=True)
+        >>> shift = lines.detect_lines(lambdas, spectrum, spectrum_err, print_table=False)
+        >>> print('{:.1f}'.format(shift))
+        0.0
+
+        Plot the result, if fit=True the detect_lines algorithm is run.
+        >>> spec.lines = lines
+        >>> spec.plot_spectrum(fit=True)
         """
 
         # main settings
@@ -218,8 +358,8 @@ class Lines:
         bgd_width = 7  # size of the peak sides to use to fit spectrum base line
         if self.hydrogen_only:
             peak_look = 15
-            bgd_width = 20
-        baseline_prior = 1e-10  # *sigma gaussian prior on base line fit
+            bgd_width = 15
+        baseline_prior = 0.1  # *sigma gaussian prior on base line fit
 
         # initialisation
         lambda_shifts = []
@@ -232,6 +372,7 @@ class Lines:
         for line in self.lines:
             # wavelength of the line: find the nearest pixel index
             line_wavelength = line.wavelength
+            line.fitted = True
             l_index, l_lambdas = find_nearest(lambdas, line_wavelength)
             # reject if pixel index is too close to image bounds
             if l_index < peak_look or l_index > len(lambdas) - peak_look:
@@ -443,7 +584,7 @@ class Lines:
                       dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
             for col in t.colnames[1:-2]:
                 t[col].unit = 'nm'
-            if verbose:
+            if print_table:
                 print(t)
             shift = np.average(lambda_shifts, weights=np.array(snrs) ** 2)
             # remove lines with low SNR from plot
@@ -456,19 +597,42 @@ class Lines:
 
 
 class Spectrum(object):
-    """ Spectrum class used to store information and methods
-    relative to spectra nd their extraction.
-    """
 
-    def __init__(self, filename="", Image=None, atmospheric_lines=True, order=1, target=None):
-        """
-        Args:
-            atmospheric_lines (bool): if True atmospheric absorption lines
-                are plotted and eventually used for the spectrum calibration
-            order (int): order of the spectrum
-            target (:obj:`str`): name of the image target
-            filename (:obj:`str`): path to the image file
-            Image (:obj:`Image`): copy info from Image object
+    def __init__(self, file_name="", image=None, atmospheric_lines=True, order=1, target=None):
+        """ Spectrum class used to store information and methods
+        relative to spectra nd their extraction.
+
+        Parameters
+        ----------
+        file_name: str, optional
+            Path to the spectrum file (default: "").
+        image: Image, optional
+            Image object from which to create the Spectrum object:
+            copy the information from the Image header (default: None).
+        atmospheric_lines: bool
+            If True atmospheric absorption lines are plotted and eventually
+            used for the spectrum calibration (default: True).
+        order: int
+            Order of the spectrum (default: 1)
+        target: Target, optional
+            Target object if provided (default: None)
+
+        Examples
+        --------
+        Load a spectrum from a fits file
+        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> print(s.order)
+        1
+        >>> print(s.target.label)
+        HD185975
+        >>> print(s.disperser)
+        Thor300
+
+        Load a spectrum from a fits image file
+        >>> image = Image('notebooks/fits/trim_20170605_007.fits', target='3C273')
+        >>> s = Spectrum(image=image)
+        >>> print(s.target.label)
+        3C273
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.target = target
@@ -482,23 +646,23 @@ class Spectrum(object):
         self.filters = None
         self.units = 'ADU/s'
         self.gain = parameters.GAIN
-        if filename != "":
-            self.filename = filename
-            self.load_spectrum(filename)
-        if Image is not None:
-            self.header = Image.header
-            self.date_obs = Image.date_obs
-            self.airmass = Image.airmass
-            self.expo = Image.expo
-            self.filters = Image.filters
-            self.filter = Image.filter
-            self.disperser = Image.disperser
-            self.target = Image.target
-            self.target_pixcoords = Image.target_pixcoords
-            self.target_pixcoords_rotated = Image.target_pixcoords_rotated
-            self.units = Image.units
-            self.gain = Image.gain
-            self.my_logger.info('\n\tSpectrum info copied from Image')
+        if file_name != "":
+            self.filename = file_name
+            self.load_spectrum(file_name)
+        if image is not None:
+            self.header = image.header
+            self.date_obs = image.date_obs
+            self.airmass = image.airmass
+            self.expo = image.expo
+            self.filters = image.filters
+            self.filter = image.filter
+            self.disperser = image.disperser
+            self.target = image.target
+            self.target_pixcoords = image.target_pixcoords
+            self.target_pixcoords_rotated = image.target_pixcoords_rotated
+            self.units = image.units
+            self.gain = image.gain
+            self.my_logger.info('\n\tSpectrum info copied from image')
         self.atmospheric_lines = atmospheric_lines
         self.lines = None
         if self.target is not None:
@@ -512,12 +676,10 @@ class Spectrum(object):
 
         Examples
         --------
-        >>> s = Spectrum()
-        >>> s.lambdas = np.linspace(parameters.LAMBDA_MIN,parameters.LAMBDA_MAX,100)
-        >>> s.lambdas_binwidths = np.gradient(s.lambdas)
-        >>> s.data = np.ones_like(s.lambdas)
+        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
         >>> s.convert_from_ADUrate_to_flam()
-        >>> assert np.max(s.data) < 1e-14
+        >>> assert np.max(s.data) < 1e-10
+        >>> assert np.max(s.err) < 1e-10
 
         """
 
@@ -534,12 +696,10 @@ class Spectrum(object):
 
         Examples
         --------
-        >>> s = Spectrum()
-        >>> s.lambdas = np.linspace(parameters.LAMBDA_MIN,parameters.LAMBDA_MAX,100)
-        >>> s.lambdas_binwidths = np.gradient(s.lambdas)
-        >>> s.data = np.ones_like(s.lambdas)
+        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
         >>> s.convert_from_flam_to_ADUrate()
-        >>> assert np.max(s.data) > 1e14
+        >>> assert np.max(s.data) > 1e10
+        >>> assert np.max(s.err) > 1e10
 
         """
         self.data = self.data * parameters.FLAM_TO_ADURATE
@@ -572,14 +732,30 @@ class Spectrum(object):
     def plot_spectrum_simple(self, ax, xlim=None, color='r', label='', lambdas=None):
         """Simple function to plot a spectrum with error bars and labels.
 
-        Args:
-            label: string label for the plot legend
-            color: character for the color of the spectrum (default: 'r')
-            ax: Axes instance of a figure
-            xlim: (optional) list of minimum and maximum abscisses
+        Parameters
+        ----------
+        ax: Axes
+            Axes instance to make the plot
+        xlim: list, optional
+            List of minimum and maximum abscisses
+        color: str
+            String for the color of the spectrum (default: 'r')
+        label: str
+            String label for the plot legend
+        lambdas: array, optional
+            The wavelengths array if it has been given externally (default: None)
+
+        Examples
+        --------
+        >>> import matplotlib.pyplot as plt
+        >>> f, ax = plt.subplots(1,1)
+        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> s.plot_spectrum_simple(ax, xlim=[500,700], color='r', label='test')
+        >>> plt.show()
         """
         xs = self.lambdas
-        if lambdas is not None: xs = lambdas
+        if lambdas is not None:
+            xs = lambdas
         if label == '':
             label = 'Order {:d} spectrum'.format(self.order)
         if xs is None:
@@ -600,9 +776,18 @@ class Spectrum(object):
     def plot_spectrum(self, xlim=None, fit=True):
         """Plot spectrum with emission and absorption lines.
 
-        Args:
-            xlim: (optional) list of minimum and maximum abscisses
-            fit: if True lines are fitted (default: True).
+        Parameters
+        ----------
+        xlim: list, optional
+            List of minimum and maximum abscisses
+        fit: bool, optional
+            If True lines are fitted (default: True).
+
+        Examples
+        --------
+        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> s.plot_spectrum(xlim=[500,700], fit=False)
+        >>> plt.show()
         """
         fig = plt.figure(figsize=[12, 6])
         self.plot_spectrum_simple(plt.gca(), xlim=xlim)
@@ -612,7 +797,7 @@ class Spectrum(object):
         #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
         if fit and self.lambdas is not None:
             self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
-                                    verbose=parameters.VERBOSE)
+                                    print_table=parameters.VERBOSE)
         if self.lambdas is not None and self.lines is not None:
             self.lines.plot_atomic_lines(plt.gca(), fontsize=12)
         plt.legend(loc='best')
@@ -623,9 +808,24 @@ class Spectrum(object):
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).
 
-        Args:
-            output_file_name: path to the output fits file
-            overwrite: if True overwrite the output file if needed.
+        Parameters
+        ----------
+        output_file_name: str
+            Path of the output fits file.
+        overwrite: bool
+            If True overwrite the output file if needed (default: False).
+
+        Examples
+        --------
+        >>> import os
+        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> s.save_spectrum('./tests/test.fits')
+        >>> assert os.path.isfile('./tests/test.fits')
+
+        Overwrite previous file:
+        >>> s.save_spectrum('./tests/test.fits', overwrite=True)
+        >>> assert os.path.isfile('./tests/test.fits')
+        >>> os.remove('./tests/test.fits')
         """
         self.header['UNIT1'] = "nanometer"
         self.header['UNIT2'] = self.units
@@ -638,12 +838,22 @@ class Spectrum(object):
     def load_spectrum(self, input_file_name):
         """Load the spectrum from a fits file (data, error and wavelengths).
 
-        Args:
-            input_file_name: path to the input fits file
+        Parameters
+        ----------
+        input_file_name: str
+            Path to the input fits file
+
+        Examples
+        --------
+        >>> s = Spectrum()
+        >>> s.load_spectrum('notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> print(s.units)
+        ADU rate
         """
         if os.path.isfile(input_file_name):
             self.header, raw_data = load_fits(input_file_name)
             self.lambdas = raw_data[0]
+            self.lambdas_binwidths = np.gradient(self.lambdas)
             self.data = raw_data[1]
             if len(raw_data) > 2:
                 self.err = raw_data[2]
@@ -659,10 +869,17 @@ class Spectrum(object):
 
 def calibrate_spectrum(spectrum, xlim=None):
     """Convert pixels into wavelengths given the position of the order 0,
-    the data for the spectrum, and the properties of the disperser.
+    the data for the spectrum, and the properties of the disperser. Convert the
+    spectrum amplitude from ADU rate to flams. Truncate the outputs to the wavelenghts
+    between parameters.LAMBDA_MIN and parameters.LAMBDA_MAX.
 
-    Args:
-        xlim: (optional) list of minimum and maximum abscisses
+    Parameters
+    ----------
+    spectrum: Spectrum
+        Spectrum object to calibrate
+    xlim: list, optional
+        List of minimum and maximum abscisses
+
     """
     if xlim is None:
         left_cut, right_cut = [0, spectrum.data.shape[0]]
@@ -691,8 +908,17 @@ def calibrate_spectrum_with_lines(spectrum):
     distance between the CCD and the disperser. The number of fitting steps is
     limited to 30.
 
-    Returns:
-        float: the final shift value of the spectrum in nm
+    Prerequisites: a first calibration from pixels to wavelengths must have been performed before
+
+    Parameters
+    ----------
+    spectrum: Spectrum
+        Spectrum object to calibrate
+
+    Returns
+    -------
+    D: float
+        The new distance between the CCD and the disperser.
 
     """
     # Detect emission/absorption lines and calibrate pixel/lambda
@@ -708,7 +934,7 @@ def calibrate_spectrum_with_lines(spectrum):
         lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels,
                                                                   spectrum.target_pixcoords, order=spectrum.order)
         lambda_shift = spectrum.lines.detect_lines(lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None,
-                                                   verbose=parameters.DEBUG)
+                                                   print_table=parameters.DEBUG)
         shifts.append(lambda_shift)
         counts += 1
         if abs(lambda_shift) < 0.1:
@@ -727,17 +953,91 @@ def calibrate_spectrum_with_lines(spectrum):
     shift = np.mean(lambdas_test - spectrum.lambdas)
     spectrum.lambdas = lambdas_test
     lambda_shift = spectrum.lines.detect_lines(spectrum.lambdas, spectrum.data, spec_err=spectrum.err, ax=None,
-                                               verbose=parameters.DEBUG)
+                                               print_table=parameters.DEBUG)
     spectrum.my_logger.info(
         '\n\tWavelenght total shift: {:.2f}nm (after {:d} steps)'
         '\n\twith D = {:.2f} mm (DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
             shift, len(shifts), D, DISTANCE2CCD, DISTANCE2CCD_ERR, (D - DISTANCE2CCD) / DISTANCE2CCD_ERR))
     spectrum.header['LSHIFT'] = shift
     spectrum.header['D2CCD'] = D
-    return lambda_shift
+    return D
+
+
+def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=1800):
+    """Extract the 1D spectrum from the image.
+
+    Method : remove a uniform background estimated from the rectangular lateral bands
+
+    The spectrum amplitude is the sum of the pixels in the 2*w rectangular window
+    centered on the order 0 y position.
+    The up and down backgrounds are estimated as the median in rectangular regions
+    above and below the spectrum, in the ws-defined rectangular regions; stars are filtered
+    as nan values using an hessian analysis of the image to remove structures.
+    The subtracted background is the mean of the two up and down backgrounds.
+    Stars are filtered.
+
+    Prerequisites: the target position must have been found before, and the
+        image turned to have an horizontal dispersion line
+
+    Parameters
+    ----------
+    image: Image
+        Image object from which to extract the spectrum
+    spectrum: Spectrum
+        Spectrum object to store new wavelengths, data and error arrays
+    w: int
+        Half width of central region where the spectrum is extracted and summed (default: 10)
+    ws: [int,int]
+        up/down region extension where the sky background is estimated (default: [20,30])
+    right_edge: int
+        Right-hand pixel position above which no pixel should be used (default: 1800)
+    """
+    if ws is None:
+        ws = [20, 30]
+    image.my_logger.info(
+        '\n\tExtracting spectrum from image: spectrum with width 2*{:d} pixels'
+        ' and background from {:d} to {:d} pixels'.format(
+            w, ws[0], ws[1]))
+    # Make a data copy
+    data = np.copy(image.data_rotated)[:, 0:right_edge]
+    err = np.copy(image.stat_errors_rotated)[:, 0:right_edge]
+    # Lateral bands to remove sky background
+    Ny, Nx = data.shape
+    y0 = int(image.target_pixcoords_rotated[1])
+    ymax = min(Ny, y0 + ws[1])
+    ymin = max(0, y0 - ws[1])
+    spectrum2DUp = np.copy(data[y0 + ws[0]:ymax, :])
+    spectrum2DUp = filter_stars_from_bgd(spectrum2DUp, margin_cut=1)
+    err_spectrum2DUp = np.copy(err[y0 + ws[0]:ymax, :])
+    err_spectrum2DUp = filter_stars_from_bgd(err_spectrum2DUp, margin_cut=1)
+    xprofileUp = np.nanmedian(spectrum2DUp, axis=0)
+    xprofileUp_err = np.sqrt(np.nanmean(err_spectrum2DUp ** 2, axis=0))
+    spectrum2DDown = np.copy(data[ymin:y0 - ws[0], :])
+    spectrum2DDown = filter_stars_from_bgd(spectrum2DDown, margin_cut=1)
+    err_spectrum2DDown = np.copy(err[ymin:y0 - ws[0], :])
+    err_spectrum2DDown = filter_stars_from_bgd(err_spectrum2DDown, margin_cut=1)
+    xprofileDown = np.nanmedian(spectrum2DDown, axis=0)
+    xprofileDown_err = np.sqrt(np.nanmean(err_spectrum2DDown ** 2, axis=0))
+    # Sum rotated image profile along y axis
+    # Subtract mean lateral profile
+    xprofile_background = 0.5 * (xprofileUp + xprofileDown)
+    xprofile_background_err = np.sqrt(0.5 * (xprofileUp_err ** 2 + xprofileDown_err ** 2))
+    spectrum2D = np.copy(data[y0 - w:y0 + w, :])
+    xprofile = np.sum(spectrum2D, axis=0) - 2 * w * xprofile_background
+    # Sum uncertainties in quadrature
+    err2D = np.copy(err[y0 - w:y0 + w, :])
+    xprofile_err = np.sqrt(np.sum(err2D ** 2, axis=0) + (2 * w * xprofile_background_err) ** 2)
+    # Fill spectrum object
+    spectrum.data = xprofile
+    spectrum.err = xprofile_err
+    if parameters.DEBUG:
+        spectrum.plot_spectrum()
+    return spectrum
 
 
 if __name__ == "__main__":
     import doctest
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
 
     doctest.testmod()

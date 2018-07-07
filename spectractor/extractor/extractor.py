@@ -40,7 +40,7 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     my_logger.info('\n\tSearch for the target in the rotated image...')
     target_pixcoords_rotated = find_target(image, guess, rotated=True)
     # Create Spectrum object
-    spectrum = Spectrum(Image=image)
+    spectrum = Spectrum(image=image)
     # Subtract background and bad pixels
     extract_spectrum_from_image(image, spectrum)
     spectrum.atmospheric_lines = atmospheric_lines
