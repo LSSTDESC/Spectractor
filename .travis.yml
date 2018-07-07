@@ -29,10 +29,11 @@ install:
   - pip install astropy astroquery
   - pip install scikit-image
   - pip install coloredlogs
-script:
+install:
 - python setup.py install
-- coverage run spectractor/*.py
-- coverage run spectractor/extractor/*.py
-- nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --cover-package=spectractor
+script:
+- coverage run -a --source=spectractor spectractor/*.py
+- coverage run -a --source=spectractor spectractor/extractor/*.py
+#- nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --cover-package=spectractor
 after_success:
 - coveralls
