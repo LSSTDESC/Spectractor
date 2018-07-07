@@ -2,10 +2,10 @@ from astropy.coordinates import Angle
 from matplotlib import cm
 from matplotlib.ticker import MaxNLocator
 
-from spectractor.extractor.spectroscopy import *
+from spectractor.extractor.targets import *
+from spectractor.extractor.dispersers import *
 
 
-# noinspection PyAttributeOutsideInit
 class Image(object):
 
     def __init__(self, filename, target=""):
@@ -18,6 +18,14 @@ class Image(object):
         self.filename = filename
         self.units = 'ADU'
         self.expo = -1
+        self.airmass = None
+        self.date_obs = None
+        self.filter = None
+        self.filters = None
+        self.data = None
+        self.data_rotated = None
+        self.stat_errors = None
+        self.stat_errors_rotated = None
         self.load_image(filename)
         # Load the target if given
         self.target = None
@@ -402,68 +410,3 @@ def turn_image(image):
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         plt.show()
 
-
-def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=1800):
-    # type: (Image, Spectrum, int, list, int) -> Spectrum
-    """Extract the 1D spectrum from the image.
-
-    Method : remove a uniform background estimated from the rectangular lateral bands
-
-    The spectrum amplitude is the sum of the pixels in the 2*w rectangular window
-    centered on the order 0 y position.
-    The up and down backgrounds are estimated as the median in rectangular regions
-    above and below the spectrum, in the ws-defined rectangular regions; stars are filtered
-    as nan values using an hessian analysis of the image to remove structures.
-    The subtracted background is the mean of the two up and down backgrounds.
-    Stars are filtered
-
-    Args:
-        spectrum: Spectrum object to store new wavelengths, data and error arrays
-        w: half width of central region where the spectrum is supposed to be
-        ws: up/down regions where the sky background is estimated
-        right_edge: right-hand pixel position above which no pixel should be used
-
-    Returns:
-        spectrum: the updated Spectrum object
-    """
-    if ws is None:
-        ws = [20, 30]
-    image.my_logger.info(
-        '\n\tExtracting spectrum from image: spectrum with width 2*{:d} pixels'
-        ' and background from {:d} to {:d} pixels'.format(
-            w, ws[0], ws[1]))
-    # Make a data copy
-    data = np.copy(image.data_rotated)[:, 0:right_edge]
-    err = np.copy(image.stat_errors_rotated)[:, 0:right_edge]
-    # Lateral bands to remove sky background
-    Ny, Nx = data.shape
-    y0 = int(image.target_pixcoords_rotated[1])
-    ymax = min(Ny, y0 + ws[1])
-    ymin = max(0, y0 - ws[1])
-    spectrum2DUp = np.copy(data[y0 + ws[0]:ymax, :])
-    spectrum2DUp = filter_stars_from_bgd(spectrum2DUp, margin_cut=1)
-    err_spectrum2DUp = np.copy(err[y0 + ws[0]:ymax, :])
-    err_spectrum2DUp = filter_stars_from_bgd(err_spectrum2DUp, margin_cut=1)
-    xprofileUp = np.nanmedian(spectrum2DUp, axis=0)
-    xprofileUp_err = np.sqrt(np.nanmean(err_spectrum2DUp ** 2, axis=0))
-    spectrum2DDown = np.copy(data[ymin:y0 - ws[0], :])
-    spectrum2DDown = filter_stars_from_bgd(spectrum2DDown, margin_cut=1)
-    err_spectrum2DDown = np.copy(err[ymin:y0 - ws[0], :])
-    err_spectrum2DDown = filter_stars_from_bgd(err_spectrum2DDown, margin_cut=1)
-    xprofileDown = np.nanmedian(spectrum2DDown, axis=0)
-    xprofileDown_err = np.sqrt(np.nanmean(err_spectrum2DDown ** 2, axis=0))
-    # Sum rotated image profile along y axis
-    # Subtract mean lateral profile
-    xprofile_background = 0.5 * (xprofileUp + xprofileDown)
-    xprofile_background_err = np.sqrt(0.5 * (xprofileUp_err ** 2 + xprofileDown_err ** 2))
-    spectrum2D = np.copy(data[y0 - w:y0 + w, :])
-    xprofile = np.sum(spectrum2D, axis=0) - 2 * w * xprofile_background
-    # Sum uncertainties in quadrature
-    err2D = np.copy(err[y0 - w:y0 + w, :])
-    xprofile_err = np.sqrt(np.sum(err2D ** 2, axis=0) + (2 * w * xprofile_background_err) ** 2)
-    # Fill spectrum object
-    spectrum.data = xprofile
-    spectrum.err = xprofile_err
-    if parameters.DEBUG:
-        spectrum.plot_spectrum()
-    return spectrum
