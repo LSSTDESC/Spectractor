@@ -32,7 +32,7 @@ install:
 script:
 - python setup.py install
 - coverage run spectractor/*.py
-- coverage run --omit=spectractor/extractor/extractor.py spectractor/extractor/*.py
+- coverage run spectractor/extractor/*.py
 - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --cover-package=spectractor
 after_success:
 - coveralls
