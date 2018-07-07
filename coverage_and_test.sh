@@ -4,7 +4,7 @@
 ## Launch it using ./coverage
 ## and open the html files under the folder htmlcov/
 ## Skip xpure.py as it is not really part of the pipeline
-for i in specatractor/*.py
+for i in spectractor/*.py
 do
     coverage run -a --source=spectractor $i
 done
