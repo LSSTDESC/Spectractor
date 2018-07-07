@@ -8,17 +8,44 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     """ Spectractor
     Main function to extract a spectrum from an image
 
-    Args:
-        file_name (str): input file nam of the image to analyse
-        output_directory (str): output directory
-        guess: [x0,y0] list of the guessed pixel positions of the target in the image (must be integers)
-        target: (str) the name of the targeted object
-        atmospheric_lines: if True atmospheric lines are used in the calibration fit
-        line_detection: if True the absorption or emission lines are
+    Parameters
+    ----------
+    file_name: str
+        Input file nam of the image to analyse
+    output_directory: str
+        Output directory
+    guess: [int,int]
+        [x0,y0] list of the guessed pixel positions of the target in the image (must be integers)
+    target: str
+        The name of the targeted object
+    atmospheric_lines: bool
+        If True atmospheric lines are used in the calibration fit
+    line_detection: bool
+        If True the absorption or emission lines are
             used to calibrate the pixel to wavelength relationship
 
-    Returns:
-        spectrum (Spectrum): the extracted spectrum
+    Returns
+    -------
+    spectrum: Spectrum
+        The extracted spectrum object
+
+    Examples
+    --------
+    Look for the image charactristics:
+    >>> import os
+    >>> from spectractor.logbook import LogBook
+    >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+    >>> file_names = ['./tests/data/reduc_20170605_028.fits']
+    >>> for file_name in file_names:
+    ...     tag = file_name.split('/')[-1]
+    ...     target, xpos, ypos = logbook.search_for_image(tag)
+    ...     if target is None or xpos is None or ypos is None:
+    ...         continue
+    ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target, line_detection=False, atmospheric_lines=True)
+    ...     assert spectrum is not None
+    ...     assert os.path.isfile('tests/data/reduc_20170605_028_spectrum.fits')
+    >>> os.remove('tests/data/reduc_20170605_028_spectrum.fits')
+
     """
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTOR')
@@ -65,40 +92,8 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
 
 
 if __name__ == "__main__":
-    import os
-    from optparse import OptionParser
+    import doctest
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
 
-    parser = OptionParser()
-    parser.add_option("-d", "--debug", dest="debug", action="store_true",
-                      help="Enter debug mode (more verbose and plots).", default=False)
-    parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
-                      help="Enter verbose (print more stuff).", default=False)
-    parser.add_option("-o", "--output_directory", dest="output_directory", default="outputs/",
-                      help="Write results in given output directory (default: ./outputs/).")
-    (opts, args) = parser.parse_args()
-
-    parameters.VERBOSE = opts.verbose
-    if opts.debug:
-        parameters.DEBUG = True
-        parameters.VERBOSE = True
-
-    # filename = "../../CTIODataJune2017_reducedRed/data_05jun17/reduc_20170605_005.fits"
-    # filename = "notebooks/fits/trim_20170605_005.fits"
-    filename = "../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_005.fits"
-    guess = [745, 643]
-    target = "3C273"
-
-    # filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_028.fits"
-    # guess = [814, 585]
-    # target = "PNG321.0+3.9"
-    # filename="../CTIOAnaJun2017/ana_05jun17/OverScanRemove/trim_images/trim_20170605_026.fits"
-    # guess = [735, 645]
-    # target = "PNG321.0+3.9"
-    # filename="../CTIOAnaJun2017/ana_29may17/OverScanRemove/trim_images/trim_20170529_150.fits"
-    # guess = [720, 670]
-    # target = "HD185975"
-    # filename="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
-    # guess = [840, 530]
-    # target = "HD205905"
-
-    Spectractor(filename, opts.output_directory, guess, target)
+    doctest.testmod()
