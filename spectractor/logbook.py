@@ -19,7 +19,7 @@ class LogBook:
 
         Examples
         ----------
-        >>> logbook = LogBook('ctio_png+qso_jun2017.csv')
+        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
         >>> assert logbook.csvfile is not None
         >>> print(logbook.logbook)
         ctio_png+qso_jun2017.csv
@@ -56,7 +56,7 @@ class LogBook:
 
         Examples
         --------
-        >>> logbook = LogBook('ctio_png+qso_jun2017.csv')
+        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
         >>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
         >>> assert xpos is None
         >>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
