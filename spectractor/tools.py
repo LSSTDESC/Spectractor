@@ -460,4 +460,6 @@ def save_fits(file_name, header, data, overwrite=False):
     hdu = fits.PrimaryHDU()
     hdu.header = header
     hdu.data = data
+    output_directory = file_name.split('/')[0]
+    ensure_dir(output_directory)
     hdu.writeto(file_name, overwrite=overwrite)
