@@ -629,7 +629,7 @@ class Spectrum(object):
         Thor300
 
         Load a spectrum from a fits image file
-        >>> image = Image('notebooks/fits/trim_20170605_007.fits', target='3C273')
+        >>> image = Image('tests/data/reduc_20170605_028.fits', target='3C273')
         >>> s = Spectrum(image=image)
         >>> print(s.target.label)
         3C273
