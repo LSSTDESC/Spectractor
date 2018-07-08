@@ -22,7 +22,7 @@ class LogBook:
         >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
         >>> assert logbook.csvfile is not None
         >>> print(logbook.logbook)
-        ctio_png+qso_jun2017.csv
+        ./ctiofulllogbook_jun2017_v5.csv
 
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
