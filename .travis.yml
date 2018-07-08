@@ -34,11 +34,6 @@ install:
 install:
   - python setup.py install
 
-before_script: # configure a headless display to test plot generation
-- "export DISPLAY=:99.0"
-- "sh -e /etc/init.d/xvfb start"
-- sleep 3 # give xvfb some time to start
-
 script:
   - ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py
