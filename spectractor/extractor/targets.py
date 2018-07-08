@@ -132,11 +132,6 @@ class Target:
 if __name__ == "__main__":
     import os
     from optparse import OptionParser
-    import matplotlib as mpl
-
-    if os.environ.get('DISPLAY', '') == '':
-        print('no display found. Using non-interactive Agg backend')
-        mpl.use('Agg')
 
     parser = OptionParser()
     parser.add_option("-l", "--label", dest="label",

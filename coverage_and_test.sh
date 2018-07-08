@@ -9,7 +9,7 @@ do
     coverage run -a --source=spectractor $i
 done
 
-for i in spectractor/*/*.py
+for i in spectractor/extractor/*.py
 do
     coverage run -a --source=spectractor $i
 done
