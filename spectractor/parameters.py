@@ -5,14 +5,18 @@ import astropy.units as units
 from astropy import constants as const
 import os
 import matplotlib as mpl
-if os.environ.get('DISPLAY', '') == '':
-    print('no display found. Using non-interactive Agg backend')
-    mpl.use('Agg')
 
 # Paths
 mypath = os.path.dirname(__file__)
 HOLO_DIR = os.path.join(mypath, "extractor/dispersers/")
 THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
+
+# Plots
+DISPLAY = True
+if os.environ.get('DISPLAY', '') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
+    DISPLAY = False
 
 # CCD characteristics
 IMSIZE = 2048  # size of the image in pixel

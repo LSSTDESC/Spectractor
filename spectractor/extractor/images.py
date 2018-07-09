@@ -147,7 +147,7 @@ class Image(object):
         self.plot_image_simple(ax, data=data, scale=scale, title=title, units=units, plot_stats=plot_stats,
                                target_pixcoords=target_pixcoords)
         plt.legend()
-        plt.show()
+        if DISPLAY: plt.show()
 
 
 def find_target(image, guess, rotated=False):

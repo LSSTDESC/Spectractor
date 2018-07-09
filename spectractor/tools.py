@@ -1,5 +1,4 @@
 import os, sys
-import scipy
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting, Fittable2DModel, Parameter
