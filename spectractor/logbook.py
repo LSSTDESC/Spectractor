@@ -2,10 +2,10 @@ import sys
 import os
 from spectractor import parameters
 import csv
-# import matplotlib as mpl
-# if os.environ.get('DISPLAY', '') == '':
-#     print('no display found. Using non-interactive Agg backend')
-#     mpl.use('agg')
+import matplotlib as mpl
+if os.environ.get('DISPLAY', '') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('agg')
 
 import matplotlib.pyplot as plt
 
