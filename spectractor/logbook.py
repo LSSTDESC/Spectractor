@@ -59,12 +59,12 @@ class LogBook:
 
         Examples
         --------
-        #>>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-        #>>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
-        #>>> assert xpos is None
-        #>>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
-        #>>> print(target, xpos, ypos)
-        #PKS1510-089 830 590
+        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
+        >>> assert xpos is None
+        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
+        >>> print(target, xpos, ypos)
+        PKS1510-089 830 590
 
         """
         target = None
@@ -120,8 +120,8 @@ class LogBook:
 
         Examples
         --------
-        #>>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-        #>>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
+        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
         """
         print('start plot')
         dates = []
@@ -153,5 +153,5 @@ if __name__ == "__main__":
     import numpy as np
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
-    print('start tests logbook')
+
     doctest.testmod()
