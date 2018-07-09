@@ -620,7 +620,7 @@ class Spectrum(object):
         Examples
         --------
         Load a spectrum from a fits file
-        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> print(s.order)
         1
         >>> print(s.target.label)

@@ -44,7 +44,7 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target, line_detection=False, atmospheric_lines=True)
     ...     assert spectrum is not None
     ...     assert os.path.isfile('tests/data/reduc_20170605_028_spectrum.fits')
-    >>> os.remove('tests/data/reduc_20170605_028_spectrum.fits')
+    #>>> os.remove('tests/data/reduc_20170605_028_spectrum.fits')
 
     """
     my_logger = parameters.set_logger(__name__)
@@ -85,9 +85,8 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
     # Plot the spectrum
-    if parameters.VERBOSE:
-        if os.getenv("DISPLAY"):
-            spectrum.plot_spectrum(xlim=None, fit=True)
+    if parameters.VERBOSE and parameters.DISPLAY:
+        spectrum.plot_spectrum(xlim=None, fit=True)
     return spectrum
 
 
