@@ -133,14 +133,18 @@ class LogBook:
             dates.append(row['date'])
             for icol, col in enumerate(column_names):
                 cols[icol].append(float(row[col].replace(',', '.')))
+        print('star fig')
         fig, ax = plt.subplots(1, len(column_names), figsize=(5 * ncols, 8))
+        print('fig created')
         for icol, col in enumerate(column_names):
             ax[icol].plot(dates, cols[icol], 'b+')
             ax[icol].set_xlabel('Dates')
             ax[icol].set_ylabel(col)
         fig.autofmt_xdate()
         fig.tight_layout()
+        print('fig tight')
         if parameters.DISPLAY: plt.show()
+        print('after show')
 
 
 if __name__ == "__main__":
