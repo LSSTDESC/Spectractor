@@ -130,15 +130,8 @@ class Target:
 
 
 if __name__ == "__main__":
-    import os
-    from optparse import OptionParser
+    import doctest
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
 
-    parser = OptionParser()
-    parser.add_option("-l", "--label", dest="label",
-                      help="Label of the target.", default="HD111980")
-    (opts, args) = parser.parse_args()
-
-    print('Load information on target {}'.format(opts.label))
-    target = Target(opts.label)
-    print(target.coord)
-    target.plot_spectra()
+    doctest.testmod()

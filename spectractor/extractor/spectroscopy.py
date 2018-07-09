@@ -624,12 +624,15 @@ class Spectrum(object):
         >>> print(s.order)
         1
         >>> print(s.target.label)
-        HD185975
+        PNG321.0+3.9
         >>> print(s.disperser)
-        Thor300
+        HoloPhAg
 
         Load a spectrum from a fits image file
         >>> image = Image('tests/data/reduc_20170605_028.fits', target='3C273')
+            Downloading http://ned.ipac.caltech.edu/spc1/1992/1992ApJS...80..109B/PG_1226+023:S:B_V:bg1992.fits.gz [Done]
+            Downloading http://ned.ipac.caltech.edu/spc1/2009/2009A+A...495.1033B/3C_273:S:B:bcc2009.fits.gz [Done]
+            Downloading http://ned.ipac.caltech.edu/spc1/2009/2009A+A...495.1033B/3C_273:S:RI:bcc2009.fits.gz [Done]
         >>> s = Spectrum(image=image)
         >>> print(s.target.label)
         3C273
@@ -676,7 +679,7 @@ class Spectrum(object):
 
         Examples
         --------
-        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s.convert_from_ADUrate_to_flam()
         >>> assert np.max(s.data) < 1e-10
         >>> assert np.max(s.err) < 1e-10
@@ -696,7 +699,7 @@ class Spectrum(object):
 
         Examples
         --------
-        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s.convert_from_flam_to_ADUrate()
         >>> assert np.max(s.data) > 1e10
         >>> assert np.max(s.err) > 1e10
@@ -749,7 +752,7 @@ class Spectrum(object):
         --------
         >>> import matplotlib.pyplot as plt
         >>> f, ax = plt.subplots(1,1)
-        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s.plot_spectrum_simple(ax, xlim=[500,700], color='r', label='test')
         >>> if parameters.DISPLAY: plt.show()
         """
@@ -785,7 +788,7 @@ class Spectrum(object):
 
         Examples
         --------
-        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s.plot_spectrum(xlim=[500,700], fit=False)
         >>> if parameters.DISPLAY: plt.show()
         """
@@ -818,7 +821,7 @@ class Spectrum(object):
         Examples
         --------
         >>> import os
-        >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s.save_spectrum('./tests/test.fits')
         >>> assert os.path.isfile('./tests/test.fits')
 
@@ -846,9 +849,9 @@ class Spectrum(object):
         Examples
         --------
         >>> s = Spectrum()
-        >>> s.load_spectrum('notebooks/fits/reduc_20170528_060_spectrum.fits')
+        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
         >>> print(s.units)
-        ADU rate
+        ADU/s
         """
         if os.path.isfile(input_file_name):
             self.header, raw_data = load_fits(input_file_name)
