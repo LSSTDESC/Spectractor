@@ -18,7 +18,7 @@ def test_spectractor():
         if target is None or xpos is None or ypos is None:
             continue
         spectrum = Spectractor(file_name, './outputs/', [xpos, ypos], target,
-                               line_detection=False, atmospheric_lines=True)
+                               line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrum.fits')) is True
 
