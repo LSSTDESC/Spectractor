@@ -35,6 +35,7 @@ install:
   - python setup.py install
 
 script:
+  - echo $DISPLAY
   - ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py
 #- coverage run -a --source=spectractor extractor simulator fit
