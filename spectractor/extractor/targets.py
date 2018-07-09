@@ -126,7 +126,7 @@ class Target:
         plt.ylabel('Flux')
         plt.title(self.label)
         plt.legend()
-        plt.show()
+        if parameters.DISPLAY: plt.show()
 
 
 if __name__ == "__main__":

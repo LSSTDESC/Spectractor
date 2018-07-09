@@ -517,7 +517,7 @@ class Lines:
             # plt.errorbar(lambdas[index],spec[index],yerr=spec_err[index])
             # plt.plot(lambdas[bgd_index],spec[bgd_index],'r-')
             # plt.plot(lambdas[index],bgd(lambdas[index]),'b--')
-            # plt.show()
+            # if parameters.DISPLAY: plt.show()
             for n in range(bgd_npar):
                 guess[n] = getattr(bgd, bgd.param_names[BGD_ORDER - n]).value
                 b = abs(baseline_prior * guess[n])
@@ -549,7 +549,7 @@ class Lines:
             # plt.plot(lambdas[index],multigauss_and_bgd(lambdas[index],*popt),'b-')
             # plt.plot(lambdas[index],multigauss_and_bgd(lambdas[index],*guess),'g-')
             # plt.plot(lambdas[index],base_line,'r-')
-            # plt.show()
+            # if parameters.DISPLAY: plt.show()
             plot_line_subset = False
             for j in range(len(new_lines_list[k])):
                 line = new_lines_list[k][j]
@@ -751,7 +751,7 @@ class Spectrum(object):
         >>> f, ax = plt.subplots(1,1)
         >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
         >>> s.plot_spectrum_simple(ax, xlim=[500,700], color='r', label='test')
-        >>> plt.show()
+        >>> if parameters.DISPLAY: plt.show()
         """
         xs = self.lambdas
         if lambdas is not None:
@@ -787,7 +787,7 @@ class Spectrum(object):
         --------
         >>> s = Spectrum(file_name='notebooks/fits/reduc_20170528_060_spectrum.fits')
         >>> s.plot_spectrum(xlim=[500,700], fit=False)
-        >>> plt.show()
+        >>> if parameters.DISPLAY: plt.show()
         """
         fig = plt.figure(figsize=[12, 6])
         self.plot_spectrum_simple(plt.gca(), xlim=xlim)
@@ -803,7 +803,7 @@ class Spectrum(object):
         plt.legend(loc='best')
         if self.filters is not None:
             plt.gca().get_legend().set_title(self.filters)
-        plt.show()
+        if parameters.DISPLAY: plt.show()
 
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).
