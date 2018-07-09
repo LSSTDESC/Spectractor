@@ -5,7 +5,7 @@ import csv
 import matplotlib as mpl
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
-    mpl.use('Agg')
+    mpl.use('agg')
 
 import matplotlib.pyplot as plt
 
@@ -29,12 +29,14 @@ class LogBook:
         ./ctiofulllogbook_jun2017_v5.csv
 
         """
+        print('start init')
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.logbook = logbook
         if not os.path.isfile(logbook):
             self.my_logger.error('CSV logbook file {} not found.'.format(logbook))
             sys.exit()
         self.csvfile = open(self.logbook, 'rU', encoding='latin-1')
+        print(self.logbook)
         self.reader = csv.DictReader(self.csvfile, delimiter=';', dialect=csv.excel_tab)
 
     def search_for_image(self, filename):
@@ -68,6 +70,7 @@ class LogBook:
         PKS1510-089 830 590
 
         """
+        print('start search')
         target = None
         xpos = None
         ypos = None
@@ -102,6 +105,7 @@ class LogBook:
                     parameters.YWINDOW_ROT = int(row['Dy'])
                 xpos = int(row['Obj-posXpix'])
                 ypos = int(row['Obj-posYpix'])
+                print(xpos,ypos)
                 break
         self.csvfile.seek(0)
         if target is None and skip is False:
@@ -124,6 +128,7 @@ class LogBook:
         >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
         >>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
         """
+        print('start plot')
         dates = []
         cols = []
         ncols = len(column_names)
@@ -131,6 +136,7 @@ class LogBook:
             cols.append([])
         for row in self.reader:
             dates.append(row['date'])
+            print(row['date'])
             for icol, col in enumerate(column_names):
                 cols[icol].append(float(row[col].replace(',', '.')))
         print('star fig')

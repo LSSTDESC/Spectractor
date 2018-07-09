@@ -15,7 +15,7 @@ THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
 DISPLAY = True
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
-    mpl.use('Agg')
+    mpl.use('agg')
     DISPLAY = False
 print('display', DISPLAY)
 
