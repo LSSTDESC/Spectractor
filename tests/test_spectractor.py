@@ -5,13 +5,6 @@ from spectractor.extractor.extractor import Spectractor
 from spectractor.logbook import LogBook
 import os
 
-import os
-import matplotlib as mpl
-
-if os.environ.get('DISPLAY', '') == '':
-    print('no display found. Using non-interactive Agg backend')
-    mpl.use('Agg')
-
 
 def test_spectractor():
     file_names = ['./tests/data/reduc_20170605_028.fits']
