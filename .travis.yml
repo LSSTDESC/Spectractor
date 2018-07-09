@@ -35,7 +35,7 @@ install:
   - python setup.py install
 
 before_script:
-  - echo backend: agg > .matplotlibrc
+  - "echo backend: agg > .matplotlibrc"
 
 script:
   - ./coverage_and_test.sh
