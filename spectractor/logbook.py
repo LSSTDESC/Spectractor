@@ -29,14 +29,12 @@ class LogBook:
         ./ctiofulllogbook_jun2017_v5.csv
 
         """
-        print('start init')
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.logbook = logbook
         if not os.path.isfile(logbook):
             self.my_logger.error('CSV logbook file {} not found.'.format(logbook))
             sys.exit()
         self.csvfile = open(self.logbook, 'rU', encoding='latin-1')
-        print(self.logbook)
         self.reader = csv.DictReader(self.csvfile, delimiter=';', dialect=csv.excel_tab)
 
     def search_for_image(self, filename):
