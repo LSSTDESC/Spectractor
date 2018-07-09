@@ -59,12 +59,12 @@ class LogBook:
 
         Examples
         --------
-        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
-        >>> assert xpos is None
-        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
-        >>> print(target, xpos, ypos)
-        PKS1510-089 830 590
+        #>>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        #>>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
+        #>>> assert xpos is None
+        #>>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
+        #>>> print(target, xpos, ypos)
+        #PKS1510-089 830 590
 
         """
         target = None
