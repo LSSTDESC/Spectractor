@@ -14,10 +14,8 @@ THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
 # Plots
 DISPLAY = True
 if os.environ.get('DISPLAY', '') == '':
-    print('no display found. Using non-interactive Agg backend')
     mpl.use('agg')
     DISPLAY = False
-print('display', DISPLAY)
 
 # CCD characteristics
 IMSIZE = 2048  # size of the image in pixel

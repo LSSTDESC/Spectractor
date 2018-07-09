@@ -4,7 +4,6 @@ from spectractor import parameters
 import csv
 import matplotlib as mpl
 if os.environ.get('DISPLAY', '') == '':
-    print('no display found. Using non-interactive Agg backend')
     mpl.use('agg')
 
 import matplotlib.pyplot as plt
@@ -68,7 +67,6 @@ class LogBook:
         #PKS1510-089 830 590
 
         """
-        print('start search')
         target = None
         xpos = None
         ypos = None
@@ -103,7 +101,6 @@ class LogBook:
                     parameters.YWINDOW_ROT = int(row['Dy'])
                 xpos = int(row['Obj-posXpix'])
                 ypos = int(row['Obj-posYpix'])
-                print(xpos,ypos)
                 break
         self.csvfile.seek(0)
         if target is None and skip is False:
