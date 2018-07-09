@@ -2,10 +2,10 @@ import sys
 import os
 from spectractor import parameters
 import csv
-import matplotlib as mpl
-if os.environ.get('DISPLAY', '') == '':
-    print('no display found. Using non-interactive Agg backend')
-    mpl.use('agg')
+# import matplotlib as mpl
+# if os.environ.get('DISPLAY', '') == '':
+#     print('no display found. Using non-interactive Agg backend')
+#     mpl.use('agg')
 
 import matplotlib.pyplot as plt
 
@@ -123,8 +123,8 @@ class LogBook:
 
         Examples
         --------
-        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-        >>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
+        #>>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        #>>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
         """
         print('start plot')
         dates = []
@@ -156,5 +156,5 @@ if __name__ == "__main__":
     import numpy as np
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
-
+    print('start tests logbook')
     doctest.testmod()
