@@ -140,7 +140,7 @@ class LogBook:
             ax[icol].set_ylabel(col)
         fig.autofmt_xdate()
         fig.tight_layout()
-        plt.show()
+        if parameters.DISPLAY: plt.show()
 
 
 if __name__ == "__main__":

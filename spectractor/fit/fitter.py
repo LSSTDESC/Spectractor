@@ -21,7 +21,7 @@ class Extractor:
         self.pwv = 3
         self.aerosols = 0.03
         self.reso = 1.5
-        self.D = DISTANCE2CCD
+        self.D = parameters.DISTANCE2CCD
         self.shift = 0.
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D, self.shift])
         self.truth = None
@@ -58,7 +58,7 @@ class Extractor:
             plt.xlabel('$\lambda$ [nm]')
             plt.ylabel('Atmospheric transmission')
             plt.legend(loc='best')
-            plt.show()
+            if parameters.DISPLAY: plt.show()
 
     def get_truth(self):
         if 'A1' in list(self.spectrum.header.keys()):
@@ -161,7 +161,7 @@ class Extractor:
             plt.pause(1e-8)
             plt.close()
         else:
-            plt.show()
+            if parameters.DISPLAY: plt.show()
 
 
 class Extractor_MCMC(Extractor):
@@ -286,7 +286,7 @@ class Extractor_MCMC(Extractor):
         samples = samples[0]
         import corner
         tmp = corner.corner(samples, show_titles=True)  # labels=['A1', 'A2', 'PWV', 'VAOD'],
-        # plt.show()
+        # if parameters.DISPLAY: plt.show()
         pm.gelman_rubin(S)
 
     def run_minimisation(self):
@@ -340,7 +340,7 @@ class Extractor_MCMC(Extractor):
             ax[self.ndim].plot(steps, -2 * self.sampler.lnprobability[k, burnin:])
         ax[self.ndim].set_ylabel(r'$\chi^2$')
         ax[self.ndim].set_xlabel('Steps')
-        plt.show()
+        if parameters.DISPLAY: plt.show()
         print(("burn-in: {0}".format(burnin)))
         print(("thin: {0}".format(thin)))
         # print("flat chain shape: {0}".format(samples.shape))
@@ -356,7 +356,7 @@ class Extractor_MCMC(Extractor):
         #fig.tight_layout()
         print(self.sampler.acceptance_fraction)
         # print(self.sampler.acor)
-        plt.show()
+        if parameters.DISPLAY: plt.show()
         fig.savefig("triangle.png")
 
     def mcmc(self, chain):

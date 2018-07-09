@@ -121,7 +121,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
         plt.plot(x, or_fitted_model(x), 'r--',
                  label="model fitted w/ filtered data")
         plt.legend(loc=2, numpoints=1)
-        plt.show()
+        if parameters.DISPLAY: plt.show()
         '''
         return or_fitted_model
 

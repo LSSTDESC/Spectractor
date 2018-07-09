@@ -240,7 +240,7 @@ class Grating:
         plt.ylabel(r"Transmission")
         plt.grid()
         plt.legend(loc='best')
-        plt.show()
+        if parameters.DISPLAY: plt.show()
 
 
 class Hologram(Grating):

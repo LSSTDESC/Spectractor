@@ -818,4 +818,4 @@ if __name__ == "__main__":
     plt.legend()
     plt.xlabel('$\lambda$ [nm]')
     plt.ylabel('Transmission')
-    plt.show()
+    if parameters.DISPLAY: plt.show()

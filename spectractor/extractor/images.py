@@ -14,7 +14,7 @@ class Image(object):
             target:
             filename (:obj:`str`): path to the image
         """
-        self.my_logger = set_logger(self.__class__.__name__)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.filename = filename
         self.units = 'ADU'
         self.expo = -1
@@ -48,7 +48,7 @@ class Image(object):
         self.header, self.data = load_fits(file_name)
         extract_info_from_CTIO_header(self, self.header)
         self.header['LSHIFT'] = 0.
-        self.header['D2CCD'] = DISTANCE2CCD
+        self.header['D2CCD'] = parameters.DISTANCE2CCD
         IMSIZE = int(self.header['XLENGTH'])
         parameters.PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
         if self.header['YLENGTH'] != IMSIZE:
@@ -73,7 +73,7 @@ class Image(object):
         self.my_logger.info('\n\tImage saved in %s' % output_file_name)
 
     def build_gain_map(self):
-        l = IMSIZE
+        l = parameters.IMSIZE
         self.gain = np.zeros_like(self.data)
         # ampli 11
         self.gain[0:l // 2, 0:l // 2] = self.header['GTGAIN11']
@@ -147,7 +147,7 @@ class Image(object):
         self.plot_image_simple(ax, data=data, scale=scale, title=title, units=units, plot_stats=plot_stats,
                                target_pixcoords=target_pixcoords)
         plt.legend()
-        if DISPLAY: plt.show()
+        if parameters.DISPLAY: plt.show()
 
 
 def find_target(image, guess, rotated=False):
@@ -256,7 +256,7 @@ def find_target_1Dprofile(image, sub_image, guess, rotated=False):
         ax3.set_xlabel('Y [pixels]')
         ax3.legend(loc=1)
         f.tight_layout()
-        plt.show()
+        if parameters.DISPLAY: plt.show()
     return avX, avY
 
 
@@ -329,11 +329,12 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False):
         ax3.legend(loc=1)
 
         f.tight_layout()
-        plt.show()
+        if parameters.DISPLAY: plt.show()
     return new_avX, new_avY
 
 
-def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=YWINDOW, right_edge=IMSIZE - 200,
+def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters.YWINDOW,
+                                   right_edge=parameters.IMSIZE - 200,
                                    margin_cut=12):
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region
@@ -357,15 +358,16 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=YWINDOW, r
     theta_hist = []
     theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
     theta_median = np.median(theta_hist)
-    theta_critical = 180. * np.arctan(20. / IMSIZE) / np.pi
+    theta_critical = 180. * np.arctan(20. / parameters.IMSIZE) / np.pi
     image.header['THETAFIT'] = theta_median
     image.header.comments['THETAFIT'] = '[USED] rotation angle from the Hessian analysis'
     image.header['THETAINT'] = theta_guess
     image.header.comments['THETAINT'] = 'rotation angle interp from disperser scan'
     if abs(theta_median - theta_guess) > theta_critical:
         image.my_logger.warning(
-            '\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels over {:d} pixels:  {:.2f} vs {:.2f}'.format(
-                IMSIZE, theta_median, theta_guess))
+            '\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels over {:d} pixels:'
+            '  {:.2f} vs {:.2f}'.format(
+                parameters.IMSIZE, theta_median, theta_guess))
     if parameters.DEBUG:
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6))
         xindex = np.arange(data.shape[1])
@@ -381,7 +383,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=YWINDOW, r
         n, bins, patches = ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
         ax2.plot([theta_median, theta_median], [0, np.max(n)])
         ax2.set_xlabel("Rotation angles [degrees]")
-        plt.show()
+        if parameters.DISPLAY: plt.show()
     return theta_median
 
 
@@ -408,5 +410,5 @@ def turn_image(image):
                                           margin:-margin], scale="log", title='Turned image (log10 scale)',
                                 units=image.units, target_pixcoords=image.target_pixcoords_rotated)
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
-        plt.show()
+        if parameters.DISPLAY: plt.show()
 
