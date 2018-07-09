@@ -120,8 +120,8 @@ class LogBook:
 
         Examples
         --------
-        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-        >>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
+        #>>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        #>>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
         """
         dates = []
         cols = []
