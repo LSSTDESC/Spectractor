@@ -23,10 +23,10 @@ class LogBook:
 
         Examples
         ----------
-        #>>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-        #>>> assert logbook.csvfile is not None
-        #>>> print(logbook.logbook)
-        #./ctiofulllogbook_jun2017_v5.csv
+        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        >>> assert logbook.csvfile is not None
+        >>> print(logbook.logbook)
+        ./ctiofulllogbook_jun2017_v5.csv
 
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
@@ -60,12 +60,12 @@ class LogBook:
 
         Examples
         --------
-        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
-        >>> assert xpos is None
-        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
-        >>> print(target, xpos, ypos)
-        PKS1510-089 830 590
+        #>>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        #>>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
+        #>>> assert xpos is None
+        #>>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
+        #>>> print(target, xpos, ypos)
+        #PKS1510-089 830 590
 
         """
         print('start search')
