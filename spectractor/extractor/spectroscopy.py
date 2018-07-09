@@ -630,9 +630,6 @@ class Spectrum(object):
 
         Load a spectrum from a fits image file
         >>> image = Image('tests/data/reduc_20170605_028.fits', target='3C273')
-            Downloading http://ned.ipac.caltech.edu/spc1/1992/1992ApJS...80..109B/PG_1226+023:S:B_V:bg1992.fits.gz [Done]
-            Downloading http://ned.ipac.caltech.edu/spc1/2009/2009A+A...495.1033B/3C_273:S:B:bcc2009.fits.gz [Done]
-            Downloading http://ned.ipac.caltech.edu/spc1/2009/2009A+A...495.1033B/3C_273:S:RI:bcc2009.fits.gz [Done]
         >>> s = Spectrum(image=image)
         >>> print(s.target.label)
         3C273
@@ -681,8 +678,8 @@ class Spectrum(object):
         --------
         >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s.convert_from_ADUrate_to_flam()
-        >>> assert np.max(s.data) < 1e-10
-        >>> assert np.max(s.err) < 1e-10
+        >>> assert np.max(s.data) < 1e-2
+        >>> assert np.max(s.err) < 1e-2
 
         """
 
@@ -701,8 +698,8 @@ class Spectrum(object):
         --------
         >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s.convert_from_flam_to_ADUrate()
-        >>> assert np.max(s.data) > 1e10
-        >>> assert np.max(s.err) > 1e10
+        >>> assert np.max(s.data) > 1e-2
+        >>> assert np.max(s.err) > 1e-2
 
         """
         self.data = self.data * parameters.FLAM_TO_ADURATE
@@ -851,7 +848,7 @@ class Spectrum(object):
         >>> s = Spectrum()
         >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
         >>> print(s.units)
-        ADU/s
+        erg/s/cm$^2$/nm
         """
         if os.path.isfile(input_file_name):
             self.header, raw_data = load_fits(input_file_name)

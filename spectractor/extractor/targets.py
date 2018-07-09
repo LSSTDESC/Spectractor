@@ -73,7 +73,7 @@ class Target:
                 # Try with NED query
                 # print 'Loading target %s from NED...' % self.label
                 ned = Ned.query_object(self.label)
-                hdulists = Ned.get_spectra(self.label)
+                hdulists = Ned.get_spectra(self.label,show_progress=False)
                 self.redshift = ned['Redshift'][0]
                 self.emission_spectrum = True
                 self.hydrogen_only = False

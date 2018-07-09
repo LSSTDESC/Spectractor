@@ -38,10 +38,10 @@ before_script:
   - "echo backend: agg > matplotlibrc"
 
 script:
+  - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
   - ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py
 #- coverage run -a --source=spectractor extractor simulator fit
-#- nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --cover-package=spectractor
 
 after_success:
   - coveralls
