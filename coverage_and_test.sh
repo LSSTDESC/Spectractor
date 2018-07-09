@@ -4,6 +4,7 @@
 ## Launch it using ./coverage
 ## and open the html files under the folder htmlcov/
 ## Skip xpure.py as it is not really part of the pipeline
+echo $DISPLAY
 for i in spectractor/*.py
 do
     echo Testing $i...
