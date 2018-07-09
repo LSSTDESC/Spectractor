@@ -5,7 +5,33 @@ from scipy import ndimage
 from spectractor.tools import *
 
 
-def build_hologram(order0_position, order1_position, theta_tilt, lambda_plot=256000):
+def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=256000):
+    """Produce the interference pattern printed on a hologram, with two sources
+    located at order0_position and order1_position, with an angle theta_tilt with respect
+    to the X axis. For plotting reasons, the wavelength can be set very large with
+    the lambda_plot parameter.
+
+    Parameters
+    ----------
+    order0_position: list, [x0,y0]
+        List of the pixel coordinates of the order 0 source position (source A).
+    order1_position: list, [x1,y1]
+        List of the pixel coordinates of the order 1 source position (source B).
+    theta_tilt: float
+        Angle (in degree) to tilt the interference pattern with respect to X axis (default: 0)
+    lambda_plot: float
+        Wavelength to produce the interference pattern (default: 256000)
+
+    Returns
+    -------
+    hologram: 2D-array,
+        The hologram figure, of shape (IMSIZE,IMSIZE)
+
+    Examples
+    --------
+    >>> hologram = build_hologram([500,500],[800,500],theta_tilt=-1,lambda_plot=200000)
+    >>> assert np.all(np.isclose(hologram[:5,:5],np.zeros((5,5))))
+    """
     # wavelength in nm, hologram produced at 639nm
     # spherical wave centered in 0,0,0
     U = lambda x, y, z: parameters.np.exp(2j * parameters.np.pi * parameters.np.sqrt(x * x + y * y + z * z) * 1e6 / lambda_plot) / parameters.np.sqrt(
@@ -23,7 +49,36 @@ def build_hologram(order0_position, order1_position, theta_tilt, lambda_plot=256
     return rotated_holo
 
 
-def build_ronchi(x_center, theta_tilt, grooves=400):
+def build_ronchi(x_center, theta_tilt=0, grooves=400):
+    """Produce the Ronchi pattern (alternance of recatngular stripes of transparancy 0 and 1),
+    centered at x_center, with an angle theta_tilt with respect
+    to the X axis. Grooves parameter set the number of grooves per mm.
+
+    Parameters
+    ----------
+    x_center: float
+        Center pixel to start the figure with a black stripe.
+    theta_tilt: float
+        Angle (in degree) to tilt the interference pattern with respect to X axis (default: 0)
+    grooves: float
+        Number of grooves per mm (default: 400)
+
+    Returns
+    -------
+    hologram: 2D-array,
+        The hologram figure, of shape (IMSIZE,IMSIZE)
+
+    Examples
+    --------
+    >>> ronchi = build_ronchi(0,theta_tilt=0,grooves=400)
+    >>> print(ronchi[:5,:5])
+    [[0 1 0 0 1]
+     [0 1 0 0 1]
+     [0 1 0 0 1]
+     [0 1 0 0 1]
+     [0 1 0 0 1]]
+
+    """
     intensity = lambda x, y: 2 * parameters.np.sin(2 * parameters.np.pi * (x - x_center * parameters.PIXEL2MM) * 0.5 * grooves) ** 2
     xronchi = parameters.np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
     yronchi = parameters.np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
@@ -34,8 +89,23 @@ def build_ronchi(x_center, theta_tilt, grooves=400):
 
 
 def get_theta0(x0):
-    """ Return incident angle on grating in radians.
-    x0: the order 0 position in the full raw image."""
+    """ Return the incident angle on the disperser in radians, with respect to the disperser normal and the X axis.
+
+    Parameters
+    ----------
+    x0: float
+        The order 0 position in the full non-rotated image.
+
+    Returns
+    -------
+    theta0: float
+        The incident angle in radians
+
+    Examples
+    --------
+    >>> get_theta0((parameters.IMSIZE/2,parameters.IMSIZE/2))
+    0.0
+    """
     if isinstance(x0, (list, tuple, parameters.np.ndarray)):
         return (x0[0] - parameters.IMSIZE / 2) * parameters.PIXEL2ARCSEC * parameters.ARCSEC2RADIANS
     else:
@@ -43,13 +113,31 @@ def get_theta0(x0):
 
 
 def get_delta_pix_ortho(deltaX, x0, D=parameters.DISTANCE2CCD):
-    """ Return the distance in pixels between pixel x and
-    projected incident point on grating. D is in mm.
+    """ Subtract from the distance deltaX in pixels between a pixel x the order 0 the distance between
+    the projected incident point on the disperser and the order 0. In other words, the projection of the incident
+    angle theta0 from the disperser to the CCD is removed. The distance to the CCD D is in mm.
 
-    Args:
-        deltaX: the distance in pixels between order 0 and a spectrum pixel in the rotated image
-        x0: the order 0 position in the full raw image.
-        D: the distance between the CCD and the disperser in mm
+    Parameters
+    ----------
+    deltaX: float
+        The distance in pixels between the order 0 and a spectrum pixel in the rotated image.
+    x0: list, [x0,y0]
+        The order 0 position in the full non-rotated image.
+    D: float
+        The distance between the CCD and the disperser in mm.
+
+    Returns
+    -------
+    distance: float
+        The projected distance in pixels
+
+    Examples
+    --------
+    >>> delta, D = 500, 55
+    >>> get_delta_pix_ortho(delta, [parameters.IMSIZE/2,  parameters.IMSIZE/2], D=D)
+    500.0
+    >>> get_delta_pix_ortho(delta, [500,500], D=D)
+    497.66545567320992
     """
     theta0 = get_theta0(x0)
     deltaX0 = parameters.np.tan(theta0) * D / parameters.PIXEL2MM
@@ -57,28 +145,74 @@ def get_delta_pix_ortho(deltaX, x0, D=parameters.DISTANCE2CCD):
 
 
 def get_refraction_angle(deltaX, x0, D=parameters.DISTANCE2CCD):
-    """ Return the refraction angle from order 0 and x positions.
-    x0 is the order 0 position in the full raw image.
-    deltaX is the distance in pixels between order 0 and signal point 
-    in the rotated image."""
+    """ Return the refraction angle with respect to the disperser normal, using geometrical consideration.
+
+    Parameters
+    ----------
+    deltaX: float
+        The distance in pixels between the order 0 and a spectrum pixel in the rotated image.
+    x0: list, [x0,y0]
+        The order 0 position in the full non-rotated image.
+    D: float
+        The distance between the CCD and the disperser in mm.
+
+    Returns
+    -------
+    theta: float
+        The refraction angle in radians.
+
+    Examples
+    --------
+    >>> delta, D = 500, 55
+    >>> theta = get_refraction_angle(delta, [parameters.IMSIZE/2,  parameters.IMSIZE/2], D=D)
+    >>> assert np.isclose(theta, np.arctan2(delta*parameters.PIXEL2MM, D))
+    >>> theta = get_refraction_angle(delta, [500,500], D=D)
+    >>> print('{:.2f}'.format(theta))
+    0.21
+    """
     delta = get_delta_pix_ortho(deltaX, x0, D=D)
     theta = parameters.np.arctan2(delta * parameters.PIXEL2MM, D)
     return theta
 
 
 def get_N(deltaX, x0, D=parameters.DISTANCE2CCD, wavelength=656, order=1):
-    """ Return grooves per mm given the signal x position with 
-    its wavelength in mm, the distance to CCD in mm and the order number.
-    x0 is the order 0 position in the full raw image.
-    deltaX is the distance in pixels between order 0 and signal point 
-    in the rotated image."""
+    """ Return the grooves per mm number given the spectrum pixel x position with
+    its wavelength in mm, the distance to the CCD in mm and the order number. It
+    uses the disperser formula.
+
+    Parameters
+    ----------
+    deltaX: float
+        The distance in pixels between the order 0 and a spectrum pixel in the rotated image.
+    x0: list, [x0,y0]
+        The order 0 position in the full non-rotated image.
+    D: float
+        The distance between the CCD and the disperser in mm.
+    wavelength: float
+        The wavelength at pixel x in nm (default: 656).
+    order: int
+        The order of the spectrum (default: 1).
+
+    Returns
+    -------
+    theta: float
+        The number of grooves per mm.
+
+    Examples
+    --------
+    >>> delta, D, w = 500, 55, 600
+    >>> N = get_N(delta, [500,500], D=D, wavelength=w, order=1)
+    >>> print('{:.0f}'.format(N))
+    355
+    """
     theta = get_refraction_angle(deltaX, x0, D=D)
     theta0 = get_theta0(x0)
-    N = (parameters.np.sin(theta) - parameters.np.sin(theta0)) / (order * wavelength)
+    N = (parameters.np.sin(theta) - parameters.np.sin(theta0)) / (order * wavelength * 1e-6)
     return N
 
 
 def neutral_lines(x_center, y_center, theta_tilt):
+    """Return the nuetrla lines of an hologram."""
     xs = parameters.np.linspace(0, parameters.IMSIZE, 20)
     line1 = parameters.np.tan(theta_tilt * parameters.np.pi / 180) * (xs - x_center) + y_center
     line2 = parameters.np.tan((theta_tilt + 90) * parameters.np.pi / 180) * (xs - x_center) + y_center
@@ -86,6 +220,7 @@ def neutral_lines(x_center, y_center, theta_tilt):
 
 
 def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
+    """Return the order 0 and order 1 positions of an hologram."""
     # refraction angle between order 0 and order 1 at construction
     alpha = parameters.np.arcsin(N * parameters.LAMBDA_CONSTRUCTOR + parameters.np.sin(theta0))
     # distance between order 0 and order 1 in pixels
@@ -106,6 +241,7 @@ def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
 
 
 def find_order01_positions(holo_center, N_interp, theta_interp, verbose=True):
+    """Find the order 0 and order 1 positions of an hologram."""
     N = N_interp(holo_center)
     theta_tilt = theta_interp(holo_center)
     theta0 = 0
@@ -121,7 +257,35 @@ def find_order01_positions(holo_center, N_interp, theta_interp, verbose=True):
 
 
 class Grating:
+    """Generic class for dispersers."""
+
     def __init__(self, N, label="", D=parameters.DISTANCE2CCD, data_dir=parameters.HOLO_DIR, verbose=False):
+        """Initialize a standard grating object.
+
+        Parameters
+        ----------
+        N: float
+            The number of grooves per mm of the grating
+        label: str
+            String label for the grating (default: '')
+        D: float
+            The distance between the CCD and the disperser in mm.
+        data_dir: str
+            The directory where information about this disperser is stored. Must be in the form data_dir/label/...
+            (default: parameters.HOLO_DIR)
+        verbose: bool
+            Set to True to increase the verbosity of the initialisation (default: False)
+
+        Examples
+        --------
+        >>> g = Grating(400)
+        >>> print(g.N_input)
+        400
+        >>> g = Grating(400, label="Ron400", data_dir=parameters.HOLO_DIR)
+        >>> print(g.N_input)
+        400.869182487
+        >>> assert g.D is parameters.DISTANCE2CCD
+        """
         self.N_input = N
         self.N_err = 1
         self.D = D
@@ -134,9 +298,53 @@ class Grating:
         self.load_files(verbose=verbose)
 
     def N(self, x):
+        """Return the number of grooves per mm of the grating at position x.
+
+        Parameters
+        ----------
+        x: list [x,y]
+            The x,y pixel position.
+
+        Returns
+        -------
+        N: float
+            The number of grooves per mm at position x
+
+        Examples
+        --------
+        >>> g = Grating(400)
+        >>> g.N((500,500))
+        400
+        """
         return self.N_input
 
     def load_files(self, verbose=False):
+        """If they exists, load the files in data_dir/label/ to set the main
+        characteristics of the grating. Overrides the N input at initialisation.
+
+        Parameters
+        ----------
+        verbose: bool
+            Set to True to get more verbosity.
+
+        Examples
+        --------
+
+        The files exist:
+        >>> g = Grating(400, label='Ron400')
+        >>> g.N_input
+        400.86918248709316
+        >>> print(g.theta_tilt)
+        -0.277
+
+        The files do not exist:
+        >>> g = Grating(400, label='XXX')
+        >>> g.N_input
+        400
+        >>> print(g.theta_tilt)
+        0
+
+        """
         filename = self.data_dir + self.label + "/N.txt"
         if os.path.isfile(filename):
             a = parameters.np.loadtxt(filename)
@@ -157,30 +365,88 @@ class Grating:
             self.theta_tilt = float(lines[1].split(' ')[2])
         else:
             self.theta_tilt = 0
-            return
         if verbose:
             print('Grating plate center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
                 self.plate_center[0], self.plate_center[1], self.theta_tilt))
 
     def refraction_angle(self, deltaX, x0):
-        """ Refraction angle in radians. 
-        x0: the order 0 position on the full raw image.
-        deltaX: the distance in pixels between order 0 and signal point 
-        in the rotated image."""
+        """ Return the refraction angle with respect to the disperser normal, using geometrical consideration,
+        given the distance to order 0 in pixels.
+
+        Parameters
+        ----------
+        deltaX: float
+            The distance in pixels between the order 0 and a spectrum pixel in the rotated image.
+        x0: list, [x0,y0]
+            The order 0 position in the full non-rotated image.
+        D: float
+            The distance between the CCD and the disperser in mm.
+
+        Returns
+        -------
+        theta: float
+            The refraction angle in radians.
+
+        Examples
+        --------
+        >>> g = Grating(400)
+        >>> theta = g.refraction_angle(500, [parameters.IMSIZE/2,  parameters.IMSIZE/2])
+        >>> assert np.isclose(theta, np.arctan2(500*parameters.PIXEL2MM, parameters.DISTANCE2CCD))
+        """
         theta = get_refraction_angle(deltaX, x0, D=self.D)
         return theta
 
     def refraction_angle_lambda(self, lambdas, x0, order=1):
-        """ Return refraction angle in radians with lambda in mm. 
-        x0: the order 0 position on the full raw image."""
+        """ Return the refraction angle with respect to the disperser normal, using geometrical consideration,
+        given the wavelength in nm and the order of the spectrum.
+
+        Parameters
+        ----------
+        deltaX: float
+            The distance in pixels between the order 0 and a spectrum pixel in the rotated image.
+        x0: list, [x0,y0]
+            The order 0 position in the full non-rotated image.
+        D: float
+            The distance between the CCD and the disperser in mm.
+
+        Returns
+        -------
+        theta: float
+            The refraction angle in radians.
+
+        Examples
+        --------
+        >>> g = Grating(400)
+        >>> theta = g.refraction_angle(500, [parameters.IMSIZE/2,  parameters.IMSIZE/2])
+        >>> assert np.isclose(theta, np.arctan2(500*parameters.PIXEL2MM, parameters.DISTANCE2CCD))
+        """
         theta0 = get_theta0(x0)
-        return parameters.np.arcsin(order * lambdas * self.N(x0) + parameters.np.sin(theta0))
+        return np.arcsin(order * lambdas*1e-6 * self.N(x0) + np.sin(theta0))
 
     def grating_pixel_to_lambda(self, deltaX, x0, order=1):
-        """ Convert pixels into wavelength in nm.
-        x0: the order 0 position on the full raw image.
-        deltaX: the distance in pixels between order 0 and signal point 
-        in the rotated image."""
+        """ Convert pixels into wavelengths (in nm) with.
+
+        Parameters
+        ----------
+        deltaX: array, float
+            Pixel distance to order 0.
+        x0: float or [float, float]
+            Order 0 position detected in the non-rotated image.
+        order: int
+            Order of the spectrum (default: 1)
+
+        Examples
+        --------
+        >>> disperser = Grating(N=300, D=55)
+        >>> x0 = [800,800]
+        >>> deltaX = np.arange(0,1000,1).astype(float)
+        >>> lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, order=1)
+        >>> print(lambdas[:5])
+        [ 0.          1.45454532  2.90909063  4.36363511  5.81817793]
+        >>> pixels = disperser.grating_lambda_to_pixel(lambdas, x0, order=1)
+        >>> print(pixels[:5])
+        [ 0.  1.  2.  3.  4.]
+        """
         theta = self.refraction_angle(deltaX, x0)
         theta0 = get_theta0(x0)
         lambdas = (parameters.np.sin(theta) - parameters.np.sin(theta0)) / (order * self.N(x0))
@@ -188,14 +454,11 @@ class Grating:
 
     def grating_lambda_to_pixel(self, lambdas, x0, order=1):
         """ Convert wavelength in nm into pixel distance with order 0.
-        x0: the order 0 position on the full raw image.
-        deltaX: the distance in pixels between order 0 and signal point
-        in the rotated image.
 
         Parameters
         ----------
         lambdas: array, float
-            Wavelengths in nm
+            Wavelengths in nm.
         x0: float or [float, float]
             Order 0 position detected in the raw image.
         order: int
@@ -213,7 +476,7 @@ class Grating:
         >>> print(pixels[:5])
         [ 0.  1.  2.  3.  4.]
         """
-        lambdas = parameters.np.copy(lambdas) * 1e-6
+        lambdas = parameters.np.copy(lambdas)
         theta0 = get_theta0(x0)
         theta = self.refraction_angle_lambda(lambdas, x0, order=order)
         deltaX = self.D * (parameters.np.tan(theta) - parameters.np.tan(theta0)) / parameters.PIXEL2MM
@@ -232,6 +495,18 @@ class Grating:
         return res
 
     def plot_transmission(self, xlim=None):
+        """Plot the transmission of the grating with respect to the wavelength (in nm).
+
+        Parameters
+        ----------
+        xlim: [xmin,xmax], optional
+            List of the X axis extrema (default: None).
+
+        Examples
+        --------
+        >>> g = Grating(400, label='Ron400')
+        >>> g.plot_transmission(xlim=(400,800))
+        """
         wavelengths = parameters.np.linspace(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 100)
         if xlim is not None:
             wavelengths = parameters.np.linspace(xlim[0], xlim[1], 100)
@@ -245,7 +520,33 @@ class Grating:
 
 class Hologram(Grating):
 
-    def __init__(self, label, D=parameters.DISTANCE2CCD, lambda_plot=256000, data_dir=parameters.HOLO_DIR, verbose=False):
+    def __init__(self, label, D=parameters.DISTANCE2CCD, data_dir=parameters.HOLO_DIR, lambda_plot=256000, verbose=False):
+        """Initialize an Hologram object, given its label. Specification are loaded from text files
+        in data_dir/label/... Inherit from the Grating class.
+
+        Parameters
+        ----------
+        label: str
+            String label for the grating (default: '')
+        D: float
+            The distance between the CCD and the disperser in mm.
+        data_dir: str
+            The directory where information about this disperser is stored. Must be in the form data_dir/label/...
+            (default: parameters.HOLO_DIR)
+        lambda_plot: float, optional
+            Wavelength to plot the hologram pattern (default: 256000).
+        verbose: bool
+            Set to True to increase the verbosity of the initialisation (default: False)
+
+        Examples
+        --------
+        >>> h = Hologram(label="HoloPhP", data_dir=parameters.HOLO_DIR)
+        >>> h.label
+        'HoloPhP'
+        >>> h.N((500,500))
+        345.4794168822986
+
+        """
         Grating.__init__(self, parameters.GROOVES_PER_MM, D=D, label=label, data_dir=data_dir, verbose=False)
         self.holo_center = None  # center of symmetry of the hologram interferences in pixels
         self.plate_center = None  # center of the hologram plate
@@ -269,6 +570,29 @@ class Hologram(Grating):
         self.load_specs(verbose=verbose)
 
     def N(self, x):
+        """Return the number of grooves per mm of the grating at position x. If the position is inside
+        the data provided by the text files, this number is computed from an interpolation. If it lies outside,
+        it is computed from a 2D polynomial fit.
+
+        Parameters
+        ----------
+        x: list [x,y]
+            The x,y pixel position.
+
+        Returns
+        -------
+        N: float
+            The number of grooves per mm at position x
+
+        Examples
+        --------
+        >>> h = Hologram('HoloPhP')
+        >>> h.N((500,500))
+        345.4794168822986
+        >>> h.N((0,0))
+        283.56876727310373
+        """
+
         if x[0] < parameters.np.min(self.N_x) or x[0] > parameters.np.max(self.N_x) or x[1] < parameters.np.min(self.N_y) or x[1] > parameters.np.max(self.N_y):
             N = self.N_fit(x[0], x[1])
         else:
@@ -276,6 +600,36 @@ class Hologram(Grating):
         return N
 
     def load_specs(self, verbose=True):
+        """Load the files in data_dir/label/ to set the main
+        characteristics of the hologram. If they do not exist, default values are used.
+
+        Parameters
+        ----------
+        verbose: bool
+            Set to True to get more verbosity.
+
+        Examples
+        --------
+
+        The files exist:
+        >>> h = Hologram(label='HoloPhP')
+        >>> h.N((500,500))
+        345.4794168822986
+        >>> h.theta((500,500))
+        -1.3393287109201792
+        >>> h.holo_center
+        [856.004, 562.34]
+
+        The files do not exist:
+        >>> h = Hologram(label='XXX')
+        >>> h.N((500,500))
+        350
+        >>> h.theta((500,500))
+        0
+        >>> h.holo_center
+        [1024.0, 1024.0]
+
+        """
         if verbose:
             print('Load disperser {}:'.format(self.label))
             print('\tfrom {}'.format(self.data_dir + self.label))
