@@ -40,7 +40,7 @@ class Line:
         >>> print(l.emission)
         False
         """
-        self.my_logger = set_logger(self.__class__.__name__)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.wavelength = wavelength  # in nm
         self.label = label
         self.label_pos = label_pos
@@ -150,7 +150,7 @@ class Lines:
         >>> print([lines.lines[i].wavelength for i in range(5)])
         [393.366, 396.847, 686.719, 706.2, 762.1]
         """
-        self.my_logger = set_logger(self.__class__.__name__)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
         if redshift < 0:
             self.my_logger.warning(f'Redshift must be positive or null. Got {redshift}')
             sys.exit()
@@ -509,17 +509,17 @@ class Lines:
             bgd_index = index[:bgd_width] + index[-bgd_width:]
             try:
                 bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
-                                                 order=BGD_ORDER, sigma=2, niter=300)
+                                                 order=parameters.BGD_ORDER, sigma=2, niter=300)
             except:
                 bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
-                                                 order=BGD_ORDER, sigma=3, niter=300)
+                                                 order=parameters.BGD_ORDER, sigma=3, niter=300)
             # f = plt.figure()
             # plt.errorbar(lambdas[index],spec[index],yerr=spec_err[index])
             # plt.plot(lambdas[bgd_index],spec[bgd_index],'r-')
             # plt.plot(lambdas[index],bgd(lambdas[index]),'b--')
             # if parameters.DISPLAY: plt.show()
             for n in range(bgd_npar):
-                guess[n] = getattr(bgd, bgd.param_names[BGD_ORDER - n]).value
+                guess[n] = getattr(bgd, bgd.param_names[parameters.BGD_ORDER - n]).value
                 b = abs(baseline_prior * guess[n])
                 bounds[0][n] = guess[n] - b
                 bounds[1][n] = guess[n] + b
@@ -634,7 +634,7 @@ class Spectrum(object):
         >>> print(s.target.label)
         3C273
         """
-        self.my_logger = set_logger(self.__class__.__name__)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.target = target
         self.data = None
         self.err = None
@@ -683,7 +683,7 @@ class Spectrum(object):
 
         """
 
-        self.data = self.data / FLAM_TO_ADURATE
+        self.data = self.data / parameters.FLAM_TO_ADURATE
         self.data /= self.lambdas * self.lambdas_binwidths
         if self.err is not None:
             self.err = self.err / parameters.FLAM_TO_ADURATE
@@ -721,7 +721,7 @@ class Spectrum(object):
         >>> assert parameters.LAMBDA_MAX == parameters.FGB37['max']
 
         """
-        for f in FILTERS:
+        for f in parameters.FILTERS:
             if f['label'] == self.filter:
                 parameters.LAMBDA_MIN = f['min']
                 parameters.LAMBDA_MAX = f['max']
@@ -922,14 +922,14 @@ def calibrate_spectrum_with_lines(spectrum):
 
     """
     # Detect emission/absorption lines and calibrate pixel/lambda
-    D = DISTANCE2CCD - DISTANCE2CCD_ERR
+    D = parameters.DISTANCE2CCD - parameters.DISTANCE2CCD_ERR
     shifts = []
     counts = 0
-    D_step = DISTANCE2CCD_ERR / 4
+    D_step = parameters.DISTANCE2CCD_ERR / 4
     delta_pixels = spectrum.lambdas_indices - int(spectrum.target_pixcoords_rotated[0])
     lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels, spectrum.target_pixcoords,
                                                               order=spectrum.order)
-    while DISTANCE2CCD + 4 * DISTANCE2CCD_ERR > D > DISTANCE2CCD - 4 * DISTANCE2CCD_ERR and counts < 30:
+    while parameters.DISTANCE2CCD + 4 * parameters.DISTANCE2CCD_ERR > D > parameters.DISTANCE2CCD - 4 * parameters.DISTANCE2CCD_ERR and counts < 30:
         spectrum.disperser.D = D
         lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels,
                                                                   spectrum.target_pixcoords, order=spectrum.order)
@@ -940,15 +940,15 @@ def calibrate_spectrum_with_lines(spectrum):
         if abs(lambda_shift) < 0.1:
             break
         elif lambda_shift > 2:
-            D_step = DISTANCE2CCD_ERR
+            D_step = parameters.DISTANCE2CCD_ERR
         elif 0.5 < lambda_shift < 2:
-            D_step = DISTANCE2CCD_ERR / 4
+            D_step = parameters.DISTANCE2CCD_ERR / 4
         elif 0 < lambda_shift < 0.5:
-            D_step = DISTANCE2CCD_ERR / 10
+            D_step = parameters.DISTANCE2CCD_ERR / 10
         elif 0 > lambda_shift > -0.5:
-            D_step = -DISTANCE2CCD_ERR / 20
+            D_step = -parameters.DISTANCE2CCD_ERR / 20
         elif lambda_shift < -0.5:
-            D_step = -DISTANCE2CCD_ERR / 6
+            D_step = -parameters.DISTANCE2CCD_ERR / 6
         D += D_step
     shift = np.mean(lambdas_test - spectrum.lambdas)
     spectrum.lambdas = lambdas_test
@@ -957,7 +957,8 @@ def calibrate_spectrum_with_lines(spectrum):
     spectrum.my_logger.info(
         '\n\tWavelenght total shift: {:.2f}nm (after {:d} steps)'
         '\n\twith D = {:.2f} mm (DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
-            shift, len(shifts), D, DISTANCE2CCD, DISTANCE2CCD_ERR, (D - DISTANCE2CCD) / DISTANCE2CCD_ERR))
+            shift, len(shifts), D, parameters.DISTANCE2CCD, parameters.DISTANCE2CCD_ERR,
+            (D - parameters.DISTANCE2CCD) / parameters.DISTANCE2CCD_ERR))
     spectrum.header['LSHIFT'] = shift
     spectrum.header['D2CCD'] = D
     return D
