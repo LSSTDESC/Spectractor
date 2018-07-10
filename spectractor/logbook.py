@@ -116,7 +116,6 @@ class LogBook:
             cols.append([])
         for row in self.reader:
             dates.append(row['date'])
-            print(row['date'])
             for icol, col in enumerate(column_names):
                 cols[icol].append(float(row[col].replace(',', '.')))
         fig, ax = plt.subplots(1, len(column_names), figsize=(5 * ncols, 8))
