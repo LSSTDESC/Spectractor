@@ -2,6 +2,7 @@ from numpy.testing import run_module_suite
 import sys
 
 # Per-module accuracy, input correctness, and unit tests
+from tests.test_simulator import *
 from tests.test_extractor import *
 
 if __name__ == "__main__":

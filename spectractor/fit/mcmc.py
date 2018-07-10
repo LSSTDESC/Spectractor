@@ -18,7 +18,7 @@ class Chain(txttableclass):
         self.dim = 0
         self.gelman = 2.4
         self.read_covfile(covfile)
-        #self.load_image(filename, createit=True)
+        #self.load_image(file_name, createit=True)
         self.filename = filename
         self.best_chisq = 1e20
         self.best_key = -1
