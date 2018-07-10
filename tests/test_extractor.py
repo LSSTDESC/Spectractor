@@ -8,13 +8,14 @@ import os
 
 def test_logbook():
     logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-    #target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
-    #assert xpos is None
+    target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
+    assert xpos is None
     target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
     assert target == "PKS1510-089"
     assert xpos == 830
     assert ypos == 590
-    #logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
+    logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+    logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
 
 
 def test_extractor():
