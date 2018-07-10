@@ -35,6 +35,7 @@ install:
   - python setup.py install
 
 before_script:
+  - "export PYSYN_CDBS=tests/data/"
   - "echo backend: agg > matplotlibrc"
 
 script:
