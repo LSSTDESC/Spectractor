@@ -77,13 +77,13 @@ def multigauss_and_line(x, *params):
 
     Parameters
     ----------
-    x: 1D-array
+    x: array
         The x data values.
-    params: list of float parameters as described above.
+    *params: list of float parameters as described above.
 
     Returns
     -------
-    y: 1D-array
+    y: array
         The y profile values.
 
     Examples
@@ -109,9 +109,9 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
 
     Parameters
     ----------
-    x: 1D-array
+    x: array
         The x data values.
-    y: 1D-array
+    y: array
         The y data values.
     guess: list, [slope, intercept, amplitude, mean, sigma]
         List of first guessed values for the Gaussian fit (default: [0, 1, 10, 1000, 1]).
@@ -141,7 +141,33 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
     return popt, pcov
 
 
+# noinspection PyTypeChecker
 def multigauss_and_bgd(x, *params):
+    """Multiple Gaussian profile plus a polynomial background to data, using curve_fit.
+    The degree of the polynomial background is fixed by parameters.BGD_ORDER.
+    The order of the parameters is a first block BGD_ORDER+1 parameters (from high to low monomial terms,
+    same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    deviation.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    *params: list of float parameters as described above.
+
+    Returns
+    -------
+    y: array
+        The y profile values.
+
+    Examples
+    --------
+    >>> x = np.arange(600.,800.,1)
+    >>> input = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd(x, *input)
+    >>> print(y[0])
+    349.0
+    """
     bgd_nparams = parameters.BGD_NPARAMS
     out = np.polyval(params[0:bgd_nparams], x)
     for k in range((len(params) - bgd_nparams) // 3):
@@ -160,14 +186,16 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
 
     Parameters
     ----------
-    x: 1D-array
+    x: array
         The x data values.
-    y: 1D-array
+    y: array
         The y data values.
     guess: list, [BGD_ORDER+1 parameters, 3*number of Gaussian parameters]
         List of first guessed values for the Gaussian fit (default: [0, 1, 10, 1000, 1]).
     bounds: 2D-list
         List of boundaries for the parameters [[minima],[maxima]] (default: (-np.inf, np.inf)).
+    sigma: 1D-array, optional
+        The uncertainties on the y values (default: None).
 
     Returns
     -------
@@ -178,53 +206,110 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
 
     Examples
     --------
-    >>> import matplotlib.pyplot as plt
     >>> x = np.arange(600.,800.,1)
     >>> input = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *input)
     >>> print(y[0])
     349.0
-    >>> if parameters.DISPLAY: plt.plot(x,y)
+    >>> err = 0.1*np.sqrt(y)
     >>> bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
-    >>> popt, pcov = fit_multigauss_and_bgd(x, y, guess=(0,1,-1,1,10,640,3,20,760,5), bounds=bounds)
+    >>> popt, pcov = fit_multigauss_and_bgd(x, y, guess=(0,1,-1,1,10,640,3,20,760,5), bounds=bounds, sigma=err)
     >>> assert np.all(np.isclose(input,popt))
     >>> fit = multigauss_and_bgd(x, *popt)
-    >>> if parameters.DISPLAY: plt.plot(x,fit,'--')
-    >>> if parameters.DISPLAY: plt.show()
+
+    .. plot::
+
+        import matplotlib.pyplot as plt
+        plt.errorbar(x,y,yerr=err,linestyle='None')
+        plt.plot(x,fit,'r-')
+        plt.show()
     """
     maxfev = 1000000
     popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma)
     return popt, pcov
 
 
-def fit_line(x, y, guess=[1, 1], bounds=(-np.inf, np.inf), sigma=None):
-    popt, pcov = curve_fit(line, x, y, p0=guess, bounds=bounds, sigma=sigma)
-    return popt, pcov
+# noinspection PyTupleAssignmentBalance
+def fit_poly1d(x, y, order, w=None):
+    """Fit a 1D polynomial function to data. Use np.polyfit.
 
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    order: int
+        The degree of the polynomial function.
+    w: array, optional
+        Weights on the y data (default: None).
 
-def fit_bgd(x, y, guess=[1] * parameters.BGD_NPARAMS, bounds=(-np.inf, np.inf), sigma=None):
-    bgd = lambda x, *p: np.polyval(p, x)
-    popt, pcov = curve_fit(bgd, x, y, p0=guess, bounds=bounds, sigma=sigma)
-    return popt, pcov
+    Returns
+    -------
+    fit: list
+        The best fitting parameter values.
+    cov: 2D-array
+        The covariance matrix
+    model: array
+        The best fitting profile
 
-
-def fit_poly(x, y, degree, w=None):
+    Examples
+    --------
+    >>> x = np.arange(500., 1000., 1)
+    >>> p = [3,2,1,0]
+    >>> y = np.polyval(p, x)
+    >>> err = np.ones_like(y)
+    >>> fit, cov, model = fit_poly1d(x,y,order=3)
+    >>> assert np.all(np.isclose(p,fit,3))
+    >>> fit, cov2, model2 = fit_poly1d(x,y,order=3,w=err)
+    >>> assert np.all(np.isclose(p,fit,3))
+    """
     cov = -1
-    if len(x) > degree:
+    if len(x) > order:
         if w is None:
-            fit, cov = np.polyfit(x, y, degree, cov=True)
+            fit, cov = np.polyfit(x, y, order, cov=True)
         else:
-            fit, cov = np.polyfit(x, y, degree, cov=True, w=w)
+            fit, cov = np.polyfit(x, y, order, cov=True, w=w)
         model = lambda x: np.polyval(fit, x)
     else:
-        fit = [0] * (degree + 1)
+        fit = [0] * (order + 1)
         model = y
     return fit, cov, model
 
 
-def fit_poly2d(x, y, z, degree):
-    # Fit the data using astropy.modeling
-    p_init = models.Polynomial2D(degree=2)
+# noinspection PyTypeChecker,PyUnresolvedReferences
+def fit_poly2d(x, y, z, order):
+    """Fit a 2D polynomial function to data. Use astropy.modeling.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    z: array
+        The z data values.
+    order: int
+        The degree of the polynomial function.
+
+    Returns
+    -------
+    model: Astropy model
+        The best fitting astropy polynomial model
+
+    Examples
+    --------
+    >>> x, y = np.mgrid[:50,:50]
+    >>> z = x**2 + y**2 - 2*x*y
+    >>> fit = fit_poly2d(x, y, z, order=2)
+    >>> assert np.isclose(fit.c0_0.value, 0)
+    >>> assert np.isclose(fit.c1_0.value, 0)
+    >>> assert np.isclose(fit.c2_0.value, 1)
+    >>> assert np.isclose(fit.c0_1.value, 0)
+    >>> assert np.isclose(fit.c0_2.value, 1)
+    >>> assert np.isclose(fit.c1_1.value, -2)
+    """
+    p_init = models.Polynomial2D(degree=order)
     fit_p = fitting.LevMarLSQFitter()
     with warnings.catch_warnings():
         # Ignore model linearity warning from the fitter
@@ -234,6 +319,43 @@ def fit_poly2d(x, y, z, degree):
 
 
 def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
+    """Fit a 1D polynomial function to data. Use astropy.modeling.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    order: int
+        The degree of the polynomial function (default: 2).
+    sigma: float
+        Value of the sigma-clipping (default: 3.0).
+    niter: int
+        The number of iterations to converge (default: 3).
+
+    Returns
+    -------
+    model: Astropy model
+        The best fitting astropy model.
+
+    Examples
+    --------
+    >>> x = np.arange(500., 1000., 1)
+    >>> p = [3,2,1,0]
+    >>> y = np.polyval(p, x)
+    >>> y[::10] = 0.
+    >>> model = fit_poly1d_outlier_removal(x,y,order=3,sigma=3)
+    >>> print('{:.2f}'.format(model.c0.value))
+    0.00
+    >>> print('{:.2f}'.format(model.c1.value))
+    1.00
+    >>> print('{:.2f}'.format(model.c2.value))
+    2.00
+    >>> print('{:.2f}'.format(model.c3.value))
+    3.00
+
+    """
     gg_init = models.Polynomial1D(order)
     gg_init.c0.min = np.min(y)
     gg_init.c0.max = 2 * np.max(y)
@@ -260,6 +382,42 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
 
 
 def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
+    """Fit a 2D polynomial function to data. Use astropy.modeling.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    z: array
+        The z data values.
+    order: int
+        The degree of the polynomial function (default: 2).
+    sigma: float
+        Value of the sigma-clipping (default: 3.0).
+    niter: int
+        The number of iterations to converge (default: 30).
+
+    Returns
+    -------
+    model: Astropy model
+        The best fitting astropy model.
+
+    Examples
+    --------
+    >>> x, y = np.mgrid[:50,:50]
+    >>> z = x**2 + y**2 - 2*x*y
+    >>> z[::10,::10] = 0.
+    >>> fit = fit_poly2d_outlier_removal(x,y,z,order=2,sigma=3)
+    >>> assert np.isclose(fit.c0_0.value, 0)
+    >>> assert np.isclose(fit.c1_0.value, 0)
+    >>> assert np.isclose(fit.c2_0.value, 1)
+    >>> assert np.isclose(fit.c0_1.value, 0)
+    >>> assert np.isclose(fit.c0_2.value, 1)
+    >>> assert np.isclose(fit.c1_1.value, -2)
+
+    """
     gg_init = models.Polynomial2D(order)
     gg_init.c0_0.min = np.min(z)
     gg_init.c0_0.max = 2 * np.max(z)
@@ -595,3 +753,10 @@ def save_fits(file_name, header, data, overwrite=False):
     output_directory = file_name.split('/')[0]
     ensure_dir(output_directory)
     hdu.writeto(file_name, overwrite=overwrite)
+
+if __name__ == "__main__":
+    import doctest
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
+
+    doctest.testmod()

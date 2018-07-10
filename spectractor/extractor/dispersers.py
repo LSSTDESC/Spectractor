@@ -638,7 +638,7 @@ class Hologram(Grating):
             a = parameters.np.loadtxt(filename)
             self.N_x, self.N_y, self.N_data = a.T
             N_interp = interpolate.interp2d(self.N_x, self.N_y, self.N_data, kind='cubic')
-            self.N_fit = fit_poly2d(self.N_x, self.N_y, self.N_data, degree=2)
+            self.N_fit = fit_poly2d(self.N_x, self.N_y, self.N_data, order=2)
             self.N_interp = lambda x: float(N_interp(x[0], x[1]))
         else:
             self.is_hologram = False
