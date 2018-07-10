@@ -353,7 +353,7 @@ if __name__ == "__main__":
     filename = "../CTIOAnaJun2017/ana_29may17/OverScanRemove/trim_images/trim_20170529_150.fits"
     guess = [720, 670]
     target = "HD185975"
-    # filename="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
+    # file_name="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
     # guess = [840, 530]
     # target = "HD205905"
 

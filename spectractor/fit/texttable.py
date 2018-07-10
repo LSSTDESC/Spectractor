@@ -476,7 +476,7 @@ class txttableclass:
     def checktxttable4error(self):
         # some error checking...
         # if len(self.allrowkeys)==0:
-        #    print 'ERROR: no measurements found in '+self.filename 
+        #    print 'ERROR: no measurements found in '+self.file_name
         #    return(1)
         if not self.colsexist(self.cols):
             print('ERROR: something is wrong with the col definition in ' + self.filename)

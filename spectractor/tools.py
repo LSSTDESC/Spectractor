@@ -184,16 +184,16 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
         The y data values.
     guess: list, [BGD_ORDER+1 parameters, 3*number of Gaussian parameters]
         List of first guessed values for the Gaussian fit (default: [0, 1, 10, 1000, 1]).
-    bounds: 2D-list
+    bounds: array
         List of boundaries for the parameters [[minima],[maxima]] (default: (-np.inf, np.inf)).
-    sigma: 1D-array, optional
+    sigma: array, optional
         The uncertainties on the y values (default: None).
 
     Returns
     -------
-    popt: list
+    popt: array
         Best fitting parameters of curve_fit.
-    pcov: 2D-list
+    pcov: array
         Best fitting parameters covariance matrix from curve_fit.
 
     Examples

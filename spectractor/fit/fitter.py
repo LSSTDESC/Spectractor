@@ -311,8 +311,8 @@ class Extractor_MCMC(Extractor):
                           for i in range(self.ndim)]).T
         # Set up the backend
         # Don't forget to clear it in case the file already exists
-        # filename = "tutorial.h5"
-        # backend = emcee.backends.HDFBackend(filename)
+        # file_name = "tutorial.h5"
+        # backend = emcee.backends.HDFBackend(file_name)
         # backend.reset(self.nwalkers, self.ndim)
 
         nsamples = 2000
@@ -474,7 +474,7 @@ if __name__ == "__main__":
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
     filename = 'outputs/data_30may17/reduc_20170530_134_spectrum.fits'
 
-    # m = Extractor(filename,atmgrid_filename)
+    # m = Extractor(file_name,atmgrid_filename)
     # m.minimizer(live_fit=True)
     covfile = 'covariances/proposal.txt'
     m = Extractor_MCMC(filename, covfile, nchains=4, nsteps=10000, burnin=2000, nbins=10, exploration_time=500,

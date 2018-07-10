@@ -99,13 +99,11 @@ class Line:
         [ 0.  0.  0.  0.  0.]
 
         """
-        if use_fit and self.fit_gauss is not None :
-            sigma = self.fit_fwhm / 2.355
+        if use_fit and self.fit_gauss is not None:
             interp = interpolate.interp1d(self.fit_lambdas, self.fit_gauss, bounds_error=False, fill_value=0.)
             return interp(lambdas)
         else:
             return gauss(lambdas, A=A, x0=self.wavelength, sigma=sigma)
-
 
 
 class Lines:
@@ -495,7 +493,8 @@ class Lines:
                         new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][bgd_npar + 3 * (k + 1) + 1])
                 new_bounds_list[-1][1][bgd_npar + 3 * k + 1] = 0.5 * (
                         new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][bgd_npar + 3 * (
-                        k + 1) + 1]) + 1e-3  # last term is to avoid equalities between bounds in some pathological case
+                        k + 1) + 1]) + 1e-3  # last term is to avoid equalities
+                                             # between bounds in some pathological case
             # sort pixel indices and remove doublons
             new_index_list[-1] = sorted(list(set(new_index_list[-1])))
         # fit the line subsets and background
@@ -789,7 +788,7 @@ class Spectrum(object):
         >>> s.plot_spectrum(xlim=[500,700], fit=False)
         >>> if parameters.DISPLAY: plt.show()
         """
-        fig = plt.figure(figsize=[12, 6])
+        plt.figure(figsize=[12, 6])
         self.plot_spectrum_simple(plt.gca(), xlim=xlim)
         # if len(self.target.spectra)>0:
         #    for k in range(len(self.target.spectra)):
@@ -803,7 +802,8 @@ class Spectrum(object):
         plt.legend(loc='best')
         if self.filters is not None:
             plt.gca().get_legend().set_title(self.filters)
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).
@@ -929,7 +929,8 @@ def calibrate_spectrum_with_lines(spectrum):
     delta_pixels = spectrum.lambdas_indices - int(spectrum.target_pixcoords_rotated[0])
     lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels, spectrum.target_pixcoords,
                                                               order=spectrum.order)
-    while parameters.DISTANCE2CCD + 4 * parameters.DISTANCE2CCD_ERR > D > parameters.DISTANCE2CCD - 4 * parameters.DISTANCE2CCD_ERR and counts < 30:
+    while parameters.DISTANCE2CCD + 4 * parameters.DISTANCE2CCD_ERR > D > \
+            parameters.DISTANCE2CCD - 4 * parameters.DISTANCE2CCD_ERR and counts < 30:
         spectrum.disperser.D = D
         lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels,
                                                                   spectrum.target_pixcoords, order=spectrum.order)

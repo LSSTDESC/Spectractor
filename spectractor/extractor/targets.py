@@ -122,7 +122,7 @@ class Target:
                 # Try with NED query
                 # print 'Loading target %s from NED...' % self.label
                 ned = Ned.query_object(self.label)
-                hdulists = Ned.get_spectra(self.label,show_progress=False)
+                hdulists = Ned.get_spectra(self.label, show_progress=False)
                 self.redshift = ned['Redshift'][0]
                 self.emission_spectrum = True
                 self.hydrogen_only = False
@@ -196,7 +196,8 @@ class Target:
         plt.ylabel('Flux')
         plt.title(self.label)
         plt.legend()
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
 
 if __name__ == "__main__":
