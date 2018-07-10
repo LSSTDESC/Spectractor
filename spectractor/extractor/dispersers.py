@@ -13,10 +13,10 @@ def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=2
 
     Parameters
     ----------
-    order0_position: list, [x0,y0]
-        List of the pixel coordinates of the order 0 source position (source A).
-    order1_position: list, [x1,y1]
-        List of the pixel coordinates of the order 1 source position (source B).
+    order0_position: array
+        List [x0,y0] of the pixel coordinates of the order 0 source position (source A).
+    order1_position: array
+        List [x1,y1] of the pixel coordinates of the order 1 source position (source B).
     theta_tilt: float
         Angle (in degree) to tilt the interference pattern with respect to X axis (default: 0)
     lambda_plot: float
@@ -34,12 +34,12 @@ def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=2
     """
     # wavelength in nm, hologram produced at 639nm
     # spherical wave centered in 0,0,0
-    U = lambda x, y, z: parameters.np.exp(2j * parameters.np.pi * parameters.np.sqrt(x * x + y * y + z * z) * 1e6 / lambda_plot) / parameters.np.sqrt(
-        x * x + y * y + z * z)
+    U = lambda x, y, z: parameters.np.exp(2j * parameters.np.pi * parameters.np.sqrt(x * x + y * y + z * z) * 1e6 /
+                                          lambda_plot) / parameters.np.sqrt(x * x + y * y + z * z)
     # superposition of two spherical sources centered in order 0 and order 1 positions
     xA = [order0_position[0] * parameters.PIXEL2MM, order0_position[1] * parameters.PIXEL2MM]
     xB = [order1_position[0] * parameters.PIXEL2MM, order1_position[1] * parameters.PIXEL2MM]
-    A = lambda x, y: U(x - xA[0], y - xA[1], -parameters.DISTANCE2CCD) + U(x - xB[0], y - xB[1], -parameters.DISTANCE2CCD)
+    A = lambda x, y: U(x - xA[0], y - xA[1], -parameters.DISTANCE2CCD) + U(x-xB[0], y-xB[1], -parameters.DISTANCE2CCD)
     intensity = lambda x, y: parameters.np.abs(A(x, y)) ** 2
     xholo = parameters.np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
     yholo = parameters.np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
@@ -79,7 +79,8 @@ def build_ronchi(x_center, theta_tilt=0, grooves=400):
      [0 1 0 0 1]]
 
     """
-    intensity = lambda x, y: 2 * parameters.np.sin(2 * parameters.np.pi * (x - x_center * parameters.PIXEL2MM) * 0.5 * grooves) ** 2
+    intensity = lambda x, y: 2 * parameters.np.sin(2 * parameters.np.pi *
+                                                   (x-x_center * parameters.PIXEL2MM) * 0.5 * grooves) ** 2
     xronchi = parameters.np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
     yronchi = parameters.np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
     xxronchi, yyronchi = parameters.np.meshgrid(xronchi, yronchi)
@@ -93,7 +94,7 @@ def get_theta0(x0):
 
     Parameters
     ----------
-    x0: float
+    x0: float, tuple, list
         The order 0 position in the full non-rotated image.
 
     Returns
@@ -104,6 +105,8 @@ def get_theta0(x0):
     Examples
     --------
     >>> get_theta0((parameters.IMSIZE/2,parameters.IMSIZE/2))
+    0.0
+    >>> get_theta0(parameters.IMSIZE/2)
     0.0
     """
     if isinstance(x0, (list, tuple, parameters.np.ndarray)):
@@ -302,8 +305,8 @@ class Grating:
 
         Parameters
         ----------
-        x: list [x,y]
-            The x,y pixel position.
+        x: array
+            The [x,y] pixel position.
 
         Returns
         -------
@@ -377,10 +380,8 @@ class Grating:
         ----------
         deltaX: float
             The distance in pixels between the order 0 and a spectrum pixel in the rotated image.
-        x0: list, [x0,y0]
-            The order 0 position in the full non-rotated image.
-        D: float
-            The distance between the CCD and the disperser in mm.
+        x0: array
+            The order 0 position [x0,y0] in the full non-rotated image.
 
         Returns
         -------
@@ -402,12 +403,12 @@ class Grating:
 
         Parameters
         ----------
-        deltaX: float
+        lambdas: float, array
             The distance in pixels between the order 0 and a spectrum pixel in the rotated image.
-        x0: list, [x0,y0]
-            The order 0 position in the full non-rotated image.
-        D: float
-            The distance between the CCD and the disperser in mm.
+        x0: float, array
+            The order 0 pixel position [x0,y0] in the full non-rotated image.
+        order: int
+            The order of the spectrum.
 
         Returns
         -------
@@ -515,12 +516,14 @@ class Grating:
         plt.ylabel(r"Transmission")
         plt.grid()
         plt.legend(loc='best')
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
 
 class Hologram(Grating):
 
-    def __init__(self, label, D=parameters.DISTANCE2CCD, data_dir=parameters.HOLO_DIR, lambda_plot=256000, verbose=False):
+    def __init__(self, label, D=parameters.DISTANCE2CCD, data_dir=parameters.HOLO_DIR,
+                 lambda_plot=256000, verbose=False):
         """Initialize an Hologram object, given its label. Specification are loaded from text files
         in data_dir/label/... Inherit from the Grating class.
 
@@ -576,8 +579,8 @@ class Hologram(Grating):
 
         Parameters
         ----------
-        x: list [x,y]
-            The x,y pixel position.
+        x: float, array
+            The [x,y] pixel position on the CCD.
 
         Returns
         -------
@@ -593,7 +596,8 @@ class Hologram(Grating):
         283.56876727310373
         """
 
-        if x[0] < parameters.np.min(self.N_x) or x[0] > parameters.np.max(self.N_x) or x[1] < parameters.np.min(self.N_y) or x[1] > parameters.np.max(self.N_y):
+        if x[0] < parameters.np.min(self.N_x) or x[0] > parameters.np.max(self.N_x) \
+                or x[1] < parameters.np.min(self.N_y) or x[1] > parameters.np.max(self.N_y):
             N = self.N_fit(x[0], x[1])
         else:
             N = int(self.N_interp(x))
