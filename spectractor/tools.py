@@ -32,19 +32,110 @@ def parabola(x, a, b, c):
     return a * x * x + b * x + c
 
 
+# noinspection PyTypeChecker
 def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf)):
+    """Fit a Gaussian profile to data, using curve_fit. The mean guess value of the Gaussian
+    must not be far from the truth values. Boundaries helps a lot also.
+
+    Parameters
+    ----------
+    x: 1D-array
+        The x data values.
+    y: 1D-array
+        The y data values.
+    guess: list, [amplitude, mean, sigma]
+        List of first guessed values for the Gaussian fit (default: [10, 1000, 1]).
+    bounds: 2D-list
+        List of boundaries for the parameters [[minima],[maxima]] (default: (-np.inf, np.inf)).
+
+    Returns
+    -------
+    popt: list
+        Best fitting parameters of curve_fit.
+    pcov: 2D-list
+        Best fitting parameters covariance matrix from curve_fit.
+
+    Examples
+    --------
+    >>> x = np.arange(600.,800.,1)
+    >>> y = gauss(x, 10, 600, 10)
+    >>> print(y[0])
+    10.0
+    >>> popt, pcov = fit_gauss(x, y, guess=(3,630,3), bounds=((1,600,1),(100,800,100)))
+    >>> print(popt)
+    [  10.  600.   10.]
+    """
     popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds)
     return popt, pcov
 
 
 def multigauss_and_line(x, *params):
+    """Multiple Gaussian profile plus a straight line to data.
+    The order of the parameters is line slope, line intercept,
+    and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    deviation.
+
+    Parameters
+    ----------
+    x: 1D-array
+        The x data values.
+    params: list of float parameters as described above.
+
+    Returns
+    -------
+    y: 1D-array
+        The y profile values.
+
+    Examples
+    --------
+    >>> x = np.arange(600.,800.,1)
+    >>> y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)
+    >>> print(y[0])
+    610.0
+    """
     out = line(x, params[0], params[1])
     for k in range((len(params) - 2) // 3):
         out += gauss(x, *params[2 + 3 * k:2 + 3 * k + 3])
     return out
 
 
-def fit_multigauss_and_line(x, y, guess=[10, 1000, 1, 0, 0, 1], bounds=(-np.inf, np.inf)):
+# noinspection PyTypeChecker
+def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf)):
+    """Fit a multiple Gaussian profile plus a straight line to data, using curve_fit.
+    The mean guess value of the Gaussian must not be far from the truth values.
+    Boundaries helps a lot also. The order of the parameters is line slope, line intercept,
+    and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    deviation.
+
+    Parameters
+    ----------
+    x: 1D-array
+        The x data values.
+    y: 1D-array
+        The y data values.
+    guess: list, [slope, intercept, amplitude, mean, sigma]
+        List of first guessed values for the Gaussian fit (default: [0, 1, 10, 1000, 1]).
+    bounds: 2D-list
+        List of boundaries for the parameters [[minima],[maxima]] (default: (-np.inf, np.inf)).
+
+    Returns
+    -------
+    popt: list
+        Best fitting parameters of curve_fit.
+    pcov: 2D-list
+        Best fitting parameters covariance matrix from curve_fit.
+
+    Examples
+    --------
+    >>> x = np.arange(600.,800.,1)
+    >>> y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)
+    >>> print(y[0])
+    610.0
+    >>> bounds = ((-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,100,800,100,100,800,100))
+    >>> popt, pcov = fit_multigauss_and_line(x, y, guess=(0,1,3,630,3,3,770,3), bounds=bounds)
+    >>> print(popt)
+    [   1.   10.   20.  650.    3.   40.  750.   10.]
+    """
     maxfev = 100000
     popt, pcov = curve_fit(multigauss_and_line, x, y, p0=guess, bounds=bounds, maxfev=maxfev)
     return popt, pcov
@@ -58,7 +149,49 @@ def multigauss_and_bgd(x, *params):
     return out
 
 
-def fit_multigauss_and_bgd(x, y, guess=[10, 1000, 1, 0, 0, 1], bounds=(-np.inf, np.inf), sigma=None):
+# noinspection PyTypeChecker
+def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None):
+    """Fit a multiple Gaussian profile plus a polynomial background to data, using curve_fit.
+    The mean guess value of the Gaussian must not be far from the truth values.
+    Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.BGD_ORDER.
+    The order of the parameters is a first block BGD_ORDER+1 parameters (from high to low monomial terms,
+    same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    deviation.
+
+    Parameters
+    ----------
+    x: 1D-array
+        The x data values.
+    y: 1D-array
+        The y data values.
+    guess: list, [BGD_ORDER+1 parameters, 3*number of Gaussian parameters]
+        List of first guessed values for the Gaussian fit (default: [0, 1, 10, 1000, 1]).
+    bounds: 2D-list
+        List of boundaries for the parameters [[minima],[maxima]] (default: (-np.inf, np.inf)).
+
+    Returns
+    -------
+    popt: list
+        Best fitting parameters of curve_fit.
+    pcov: 2D-list
+        Best fitting parameters covariance matrix from curve_fit.
+
+    Examples
+    --------
+    >>> import matplotlib.pyplot as plt
+    >>> x = np.arange(600.,800.,1)
+    >>> input = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd(x, *input)
+    >>> print(y[0])
+    349.0
+    >>> if parameters.DISPLAY: plt.plot(x,y)
+    >>> bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
+    >>> popt, pcov = fit_multigauss_and_bgd(x, y, guess=(0,1,-1,1,10,640,3,20,760,5), bounds=bounds)
+    >>> assert np.all(np.isclose(input,popt))
+    >>> fit = multigauss_and_bgd(x, *popt)
+    >>> if parameters.DISPLAY: plt.plot(x,fit,'--')
+    >>> if parameters.DISPLAY: plt.show()
+    """
     maxfev = 1000000
     popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma)
     return popt, pcov
