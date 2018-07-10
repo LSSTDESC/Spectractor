@@ -20,16 +20,8 @@ def gauss(x, A, x0, sigma):
     return A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 
-def gauss_and_line(x, a, b, A, x0, sigma):
-    return gauss(x, A, x0, sigma) + line(x, a, b)
-
-
 def line(x, a, b):
     return a * x + b
-
-
-def parabola(x, a, b, c):
-    return a * x * x + b * x + c
 
 
 # noinspection PyTypeChecker
@@ -163,8 +155,8 @@ def multigauss_and_bgd(x, *params):
     Examples
     --------
     >>> x = np.arange(600.,800.,1)
-    >>> input = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
-    >>> y = multigauss_and_bgd(x, *input)
+    >>> p = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd(x, *p)
     >>> print(y[0])
     349.0
     """
@@ -207,14 +199,14 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     Examples
     --------
     >>> x = np.arange(600.,800.,1)
-    >>> input = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
-    >>> y = multigauss_and_bgd(x, *input)
+    >>> p = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd(x, *p)
     >>> print(y[0])
     349.0
-    >>> err = 0.1*np.sqrt(y)
+    >>> err = 0.1 * np.sqrt(y)
     >>> bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
     >>> popt, pcov = fit_multigauss_and_bgd(x, y, guess=(0,1,-1,1,10,640,3,20,760,5), bounds=bounds, sigma=err)
-    >>> assert np.all(np.isclose(input,popt))
+    >>> assert np.all(np.isclose(p,popt))
     >>> fit = multigauss_and_bgd(x, *popt)
 
     .. plot::
@@ -270,7 +262,7 @@ def fit_poly1d(x, y, order, w=None):
             fit, cov = np.polyfit(x, y, order, cov=True)
         else:
             fit, cov = np.polyfit(x, y, order, cov=True, w=w)
-        model = lambda x: np.polyval(fit, x)
+        model = lambda xx: np.polyval(fit, xx)
     else:
         fit = [0] * (order + 1)
         model = y
@@ -456,7 +448,8 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE: print(or_fitted_model)
+        if parameters.VERBOSE:
+            print(or_fitted_model)
         return or_fitted_model
 
 
@@ -477,7 +470,8 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bound
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE: print(or_fitted_model)
+        if parameters.VERBOSE:
+            print(or_fitted_model)
         return or_fitted_model
 
 
@@ -519,7 +513,7 @@ class Star2D(Fittable2DModel):
             -(1 / (2. * stddev ** 2)) * (x - x_mean) ** 2 - (1 / (2. * stddev ** 2)) * (y - y_mean) ** 2)
         d_stddev = amplitude * ((x - x_mean) ** 2 + (y - y_mean) ** 2) / (stddev ** 3) * np.exp(
             -(1 / (2. * stddev ** 2)) * (x - x_mean) ** 2 - (1 / (2. * stddev ** 2)) * (y - y_mean) ** 2)
-        d_saturation = np.zeros_like(x)
+        d_saturation = saturation * np.zeros_like(x)
         return [d_amplitude, d_x_mean, d_y_mean, d_stddev, d_saturation]
 
 
@@ -541,19 +535,59 @@ def fit_star2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds=
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE: print(or_fitted_model)
+        if parameters.VERBOSE:
+            print(or_fitted_model)
         return or_fitted_model
 
 
 def find_nearest(array, value):
+    """Find the nearest index and value in an array.
+
+    Parameters
+    ----------
+    array: array
+        The array to inspect.
+    value: float
+        The value to look for.
+
+    Returns
+    -------
+    index: int
+        The array index of the nearest value close to *value*
+    val: float
+        The value fo the array at index.
+
+    Examples
+    --------
+    >>> x = np.arange(0.,10.)
+    >>> idx, val = find_nearest(x, 3.3)
+    >>> print(idx, val)
+    3 3.0
+    """
     idx = (np.abs(array - value)).argmin()
     return idx, array[idx]
 
 
-def ensure_dir(f):
-    d = os.path.dirname(f)
-    if not os.path.exists(f):
-        os.makedirs(f)
+def ensure_dir(directory_name):
+    """Ensure that *directory_name* directory exists. If not, create it.
+
+    Parameters
+    ----------
+    directory_name: str
+        The directory name.
+
+    Examples
+    --------
+    >>> ensure_dir('tests')
+    >>> os.path.exists('tests')
+    True
+    >>> ensure_dir('tests/mytest')
+    >>> os.path.exists('tests/mytest')
+    True
+    >>> os.rmdir('./tests/mytest')
+    """
+    if not os.path.exists(directory_name):
+        os.makedirs(directory_name)
 
         
 def weighted_avg_and_std(values, weights):
@@ -590,7 +624,7 @@ def hessian_and_theta(data, margin_cut=1):
 
 
 def filter_stars_from_bgd(data, margin_cut=1):
-    lambda_plus, lambda_minus, theta = hessian_and_theta(np.copy(data), margin_cut=1)
+    lambda_plus, lambda_minus, theta = hessian_and_theta(np.copy(data), margin_cut=margin_cut)
     # thresholds
     lambda_threshold = np.median(lambda_minus) - 2 * np.std(lambda_minus)
     mask = np.where(lambda_minus < lambda_threshold)
@@ -599,6 +633,27 @@ def filter_stars_from_bgd(data, margin_cut=1):
 
 
 def fftconvolve_gaussian(array, reso):
+    """Convolve an 1D or 2D array with a Gaussian profile of given standard deviation.
+
+    Parameters
+    ----------
+    array: array
+        The array to convolve.
+    reso: float
+        The standard deviation of the Gaussian profile.
+
+    Returns
+    -------
+    convolved: array
+        The convolved array, same size and shape as input.
+
+    Examples
+    --------
+    >>> array = np.ones(20)
+    >>> output = fftconvolve_gaussian(array, 3)
+    >>> print(output[:3])
+    [ 0.5         0.63125312  0.74870357]
+    """
     if array.ndim == 2:
         kernel = gaussian(array.shape[1], reso)
         kernel /= np.sum(kernel)
@@ -613,55 +668,78 @@ def fftconvolve_gaussian(array, reso):
     return array
 
 
-def restrict_lambdas(lambdas):
-    lambdas_indices = \
-        np.where(np.logical_and(lambdas > parameters.LAMBDA_MIN, lambdas < parameters.LAMBDA_MAX))[0]
-    lambdas = lambdas[lambdas_indices]
-    return lambdas
+def formatting_numbers(value, error_high, error_low, std=None, label=None):
+    """Format a physical value and its uncertainties. Round the uncertainties
+    to the first significant digit, and do the same for the physical value.
 
+    Parameters
+    ----------
+    value: float
+        The physical value.
+    error_high: float
+        Upper uncertainty.
+    error_low: float
+        Lower uncertainty
+    std: float, optional
+        The RMS of the physical parameter (default: None).
+    label: str, optional
+        The name of the physical parameter to output (default: None).
 
-def formatting_numbers(value, errorhigh, errorlow, std=None, label=None):
-    str_value = ""
-    str_errorhigh = ""
-    str_errorlow = ""
+    Returns
+    -------
+    text: tuple
+        The formatted output strings inside a tuple.
+
+    Examples
+    --------
+    >>> text = formatting_numbers(3., 0.789, 0.500, std=0.45, label='test')
+    >>> print(text)
+    ('test', '3.0', '0.8', '0.5', '0.5')
+    >>> text = formatting_numbers(3., 0.07, 0.008, std=0.03, label='test')
+    >>> print(text)
+    ('test', '3.000', '0.07', '0.008', '0.03')
+    """
     str_std = ""
     out = []
-    if label is not None: out.append(label)
-    power10 = min(int(floor(np.log10(np.abs(errorhigh)))), int(floor(np.log10(np.abs(errorlow)))))
+    if label is not None:
+        out.append(label)
+    power10 = min(int(floor(np.log10(np.abs(error_high)))), int(floor(np.log10(np.abs(error_low)))))
     if np.isclose(0.0, float("%.*f" % (abs(power10), value))):
         str_value = "%.*f" % (abs(power10), 0)
-        str_errorhigh = "%.*f" % (abs(power10), errorhigh)
-        str_errorlow = "%.*f" % (abs(power10), errorlow)
+        str_error_high = "%.*f" % (abs(power10), error_high)
+        str_error_low = "%.*f" % (abs(power10), error_low)
         if std is not None:
             str_std = "%.*f" % (abs(power10), std)
     elif power10 > 0:
-        str_value = "%d" % value
-        str_errorhigh = "%d" % errorhigh
-        str_errorlow = "%d" % errorlow
+        str_value = f"{value:d}"
+        str_error_high = f"{error_high:d}"
+        str_error_low = f"{error_low:d}"
         if std is not None:
-            str_std = "%d" % std
+            str_std = f"{std:d}"
     else:
-        if int(floor(np.log10(np.abs(errorhigh)))) == int(floor(np.log10(np.abs(errorlow)))):
+        if int(floor(np.log10(np.abs(error_high)))) == int(floor(np.log10(np.abs(error_low)))):
             str_value = "%.*f" % (abs(power10), value)
-            str_errorhigh = "%.1g" % errorhigh
-            str_errorlow = "%.1g" % errorlow
+            str_error_high = f"{error_high:.1g}"
+            str_error_low = f"{error_low:.1g}"
             if std is not None:
-                str_std = "%.1g" % std
-        elif int(floor(np.log10(np.abs(errorhigh)))) > int(floor(np.log10(np.abs(errorlow)))):
+                str_std = f"{std:.1g}"
+        elif int(floor(np.log10(np.abs(error_high)))) > int(floor(np.log10(np.abs(error_low)))):
             str_value = "%.*f" % (abs(power10), value)
-            str_errorhigh = "%.2g" % errorhigh
-            str_errorlow = "%.1g" % errorlow
+            str_error_high = f"{error_high:.2g}"
+            str_error_low = f"{error_low:.1g}"
             if std is not None:
-                str_std = "%.2g" % std
+                str_std = f"{std:.2g}"
         else:
             str_value = "%.*f" % (abs(power10), value)
-            str_errorhigh = "%.1g" % errorhigh
-            str_errorlow = "%.2g" % errorlow
+            str_error_high = f"{error_high:.1g}"
+            str_error_low = f"{error_low:.2g}"
             if std is not None:
-                str_std = "%.2g" % std
-    out += [str_value, str_errorhigh]
-    if not np.isclose(errorhigh, errorlow): out += [str_errorlow]
-    if std is not None: out += [str_std]
+                str_std = f"{std:.2g}"
+    out += [str_value, str_error_high]
+    if not np.isclose(error_high, error_low):
+        out += [str_error_low]
+    if std is not None:
+        out += [str_std]
     out = tuple(out)
     return out
 
@@ -669,8 +747,6 @@ def formatting_numbers(value, errorhigh, errorlow, std=None, label=None):
 def pixel_rotation(x, y, theta, x0=0, y0=0):
     u = np.cos(theta) * (x - x0) + np.sin(theta) * (y - y0)
     v = -np.sin(theta) * (x - x0) + np.cos(theta) * (y - y0)
-    x = u + x0
-    y = v + y0
     return u, v
 
 
@@ -753,6 +829,7 @@ def save_fits(file_name, header, data, overwrite=False):
     output_directory = file_name.split('/')[0]
     ensure_dir(output_directory)
     hdu.writeto(file_name, overwrite=overwrite)
+
 
 if __name__ == "__main__":
     import doctest

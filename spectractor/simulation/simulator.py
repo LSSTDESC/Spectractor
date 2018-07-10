@@ -28,7 +28,7 @@ from spectractor.extractor.images import Image
 from spectractor.extractor.spectroscopy import Spectrum
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import Target
-from spectractor.tools import fftconvolve_gaussian, ensure_dir, restrict_lambdas
+from spectractor.tools import fftconvolve_gaussian, ensure_dir
 import spectractor.parameters as parameters
 
 import spectractor.simulation.libradtran as libradtran
