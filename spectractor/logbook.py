@@ -57,15 +57,6 @@ class LogBook:
         ypos: int
             the y position of the target (in pixel)
 
-        Examples
-        --------
-        #>>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-        #>>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
-        #>>> assert xpos is None
-        #>>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
-        #>>> print(target, xpos, ypos)
-        #PKS1510-089 830 590
-
         """
         target = None
         xpos = None
@@ -117,11 +108,6 @@ class LogBook:
         ----------
         column_names: list, str
             List of column names to plot versus time from the log book.
-
-        Examples
-        --------
-        #>>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-        #>>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
         """
         dates = []
         cols = []

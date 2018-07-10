@@ -6,7 +6,18 @@ from spectractor.logbook import LogBook
 import os
 
 
-def test_spectractor():
+def test_logbook():
+    logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+    target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
+    assert xpos is None
+    target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
+    assert target is "PKS1510-089"
+    assert xpos is 830
+    assert ypos is 590
+    logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
+
+
+def test_extractor():
     file_names = ['./tests/data/reduc_20170605_028.fits']
 
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
