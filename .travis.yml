@@ -5,7 +5,6 @@ addons: # for libradtran library
       packages:
         - gfortran
         - libgsl0-dev
-        - netcdf
 
 python:
   - "3.6"
@@ -44,6 +43,14 @@ before_script:
   - python --version
   - "export PYSYN_CDBS=tests/data/"
   - "echo backend: agg > matplotlibrc"
+  - "wget -L ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.6.1.tar.gz"
+  - "gzip -d netcdf-4.6.1.tar.gz"
+  - "tar -xvf netcdf-4.6.1.tar"
+  - "cd netcdf-4.6.1"
+  - "./configure"
+  - "make"
+  - "make install"
+  - "cd ../"
   - "wget -L http://www.libradtran.org/download/libRadtran-2.0.2.tar.gz"
   - "gzip -d libRadtran-2.0.2.tar.gz"
   - "tar -xvf libRadtran-2.0.2.tar"
