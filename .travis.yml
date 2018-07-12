@@ -47,11 +47,12 @@ before_script:
   - "make"
   - "make install"
   - "cd ../"
+  -
   - "wget -L http://www.libradtran.org/download/libRadtran-2.0.2.tar.gz"
   - "gzip -d libRadtran-2.0.2.tar.gz"
   - "tar -xf libRadtran-2.0.2.tar"
   - "cd libRadtran-2.0.2"
-  - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN"
+  - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN --with-libnetcdf=$TRAVIS_BUILD_DIR/NETCDF/"
   - "make uvspec"
   - "cd ../"
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
