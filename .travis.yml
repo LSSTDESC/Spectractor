@@ -1,5 +1,11 @@
 language: python
 
+cache:
+  directories:
+  - "$TRAVIS_BUILD_DIR/build/NETCDF/src"
+  - "$TRAVIS_BUILD_DIR/build/LIBRADTRAN/src"
+  - "$HOME/miniconda"
+
 addons: # for libradtran library
   apt:
       packages:
@@ -38,14 +44,15 @@ before_script:
   - "gzip -d netcdf-4.6.1.tar.gz"
   - "tar -xf netcdf-4.6.1.tar"
   - "cd netcdf-4.6.1"
-  - "./configure"
+  - "./configure  --prefix=/usr"
   - "make"
+  - "make install"
   - "cd ../"
   - "wget -L http://www.libradtran.org/download/libRadtran-2.0.2.tar.gz"
   - "gzip -d libRadtran-2.0.2.tar.gz"
   - "tar -xf libRadtran-2.0.2.tar"
   - "cd libRadtran-2.0.2"
-  - "./configure"
+  - "./configure  --prefix=/usr"
   - "make uvspec"
   - "cd ../"
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
@@ -56,6 +63,7 @@ script:
   - pip install numpy nose coloredlogs coverage coveralls
   - pip install -r requirements.txt
   - python setup.py build
+  - python setup.py install
   - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
   - ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py
