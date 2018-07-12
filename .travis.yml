@@ -41,6 +41,8 @@ install:
   - python setup.py install
 
 before_script:
+  - conda create -n py27 python=2.7 miniconda
+  - source activate py27
   - "export PYSYN_CDBS=tests/data/"
   - "echo backend: agg > matplotlibrc"
   - "wget -L http://www.libradtran.org/download/libRadtran-2.0.2.tar.gz"
@@ -51,6 +53,7 @@ before_script:
   - "make uvspec"
   - "cd ../"
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
+  - source activate
 
 script:
   - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
