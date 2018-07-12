@@ -37,14 +37,14 @@ install:
 before_script:
   - "export PYSYN_CDBS=tests/data/"
   - "echo backend: agg > matplotlibrc"
-  - "wget -o libradtran.tar.gz http://www.libradtran.org/download/libRadtran-2.0.2.tar.gz"
-  - "gzip -d libradtran.tar.gz"
-  - "tar -xvf libradtran.tar"
-  - "cd libradtran"
+  - "wget -L http://www.libradtran.org/download/libRadtran-2.0.2.tar.gz"
+  - "gzip -d libRadtran-2.0.2.tar.gz"
+  - "tar -xvf libRadtran-2.0.2.tar.gz"
+  - "cd libRadtran-2.0.2.tar.gz"
   - "./configure"
   - "make"
   - "cd ../"
-  - "export LIBRADTRANDIR=libradtran/"
+  - "export LIBRADTRANDIR=libRadtran-2.0.2/"
 
 script:
   - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
