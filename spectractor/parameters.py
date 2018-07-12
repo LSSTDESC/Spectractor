@@ -5,6 +5,7 @@ import astropy.units as units
 from astropy import constants as const
 import os
 import matplotlib as mpl
+logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 # Paths
 mypath = os.path.dirname(__file__)

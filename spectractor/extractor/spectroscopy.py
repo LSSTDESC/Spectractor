@@ -297,7 +297,7 @@ class Lines:
         overlap, a multi-gaussian fit is performed above a common polynomial background.
         The mean global shift (in nm) between the detected and tabulated lines is returned, considering
         only the lines with a signal-to-noise ratio above a threshold.
-        The order of the polynomial bakcground is set in parameters.py with BGD_ORDER.
+        The order of the polynomial background is set in parameters.py with BGD_ORDER.
 
         Parameters
         ----------
@@ -357,7 +357,7 @@ class Lines:
         if self.hydrogen_only:
             peak_look = 15
             bgd_width = 15
-        baseline_prior = 0.1  # *sigma gaussian prior on base line fit
+        baseline_prior = 0.00001  # *sigma gaussian prior on base line fit
 
         # initialisation
         lambda_shifts = []
