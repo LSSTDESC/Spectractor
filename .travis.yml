@@ -28,7 +28,7 @@ install:
   # Useful for debugging any issues with conda
   - conda info -a
 
-after_script:
+before_script:
   - conda create -n py27 python=2.7 pip
   - source activate py27
   - python --version
