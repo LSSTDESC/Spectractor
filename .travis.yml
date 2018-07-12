@@ -1,13 +1,12 @@
 language: python
 
-addons:
+addons: # for libradtran library
   apt:
       packages:
-        - gfortran 
+        - gfortran
         - libgsl0-dev
 
 python:
-  # We don't actually use the Travis Python, but this keeps it organized.
   - "3.6"
 
 install:
@@ -49,7 +48,7 @@ before_script:
   - "tar -xvf libRadtran-2.0.2.tar"
   - "cd libRadtran-2.0.2"
   - "./configure"
-  - "make"
+  - "make uvspec"
   - "cd ../"
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
 
