@@ -4,10 +4,16 @@ The goal of Spectractor is to extract spectra from CTIO images in order to test 
 
 ## Installation
 
-Spectractor is written in Python 2.7. It needs the numpy, scipy, astropy, astroquery, pysynphot modules for science computations, and also logging and coloredlogs. To install, just run
+Spectractor is written in Python 3.6. It needs the numpy, scipy, astropy, astroquery, pysynphot modules for science computations, and also logging and coloredlogs. To install, just run
 ```
-pip install .
+pip install -r requirements.txt .
 ```
+
+### External dependencies
+
+For the simulation of spectra, Spectractor needs the following external libraries:
+- libradtran, with netcdf and hdf5
+
 
 ## Basic usage
 
