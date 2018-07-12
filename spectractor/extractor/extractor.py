@@ -88,9 +88,9 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     return spectrum
 
 
-if __name__ == "__main__":
-    import doctest
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
-
-    doctest.testmod()
+# if __name__ == "__main__":
+#     import doctest
+#     if np.__version__ >= "1.14.0":
+#         np.set_printoptions(legacy="1.13")
+#
+#     doctest.testmod()
