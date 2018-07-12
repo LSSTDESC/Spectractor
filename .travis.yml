@@ -46,14 +46,14 @@ before_script:
   - "echo backend: agg > matplotlibrc"
   - "wget -L ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.6.1.tar.gz"
   - "gzip -d netcdf-4.6.1.tar.gz"
-  - "tar -xvf netcdf-4.6.1.tar"
+  - "tar -xf netcdf-4.6.1.tar"
   - "cd netcdf-4.6.1"
   - "./configure"
   - "make"
   - "cd ../"
   - "wget -L http://www.libradtran.org/download/libRadtran-2.0.2.tar.gz"
   - "gzip -d libRadtran-2.0.2.tar.gz"
-  - "tar -xvf libRadtran-2.0.2.tar"
+  - "tar -xf libRadtran-2.0.2.tar"
   - "cd libRadtran-2.0.2"
   - "./configure"
   - "make uvspec"
@@ -63,7 +63,7 @@ before_script:
   - python --version
 
 script:
-  - python setup.py install
+  - pip install .
   - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
   - ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py
