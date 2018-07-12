@@ -5,6 +5,7 @@ addons: # for libradtran library
       packages:
         - gfortran
         - libgsl0-dev
+        - libhdf5-dev
 
 python:
   - "3.6"
@@ -39,7 +40,7 @@ install:
   - pip install coloredlogs
 
 before_script:
-  - source ~/virtualenv/python2.7/bin/activate
+  - source activate py27
   - python --version
   - "export PYSYN_CDBS=tests/data/"
   - "echo backend: agg > matplotlibrc"
@@ -59,7 +60,7 @@ before_script:
   - "make uvspec"
   - "cd ../"
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
-  - source ~/virtualenv/python3.6/bin/activate
+  - source activate test-environment
   - python --version
 
 script:
