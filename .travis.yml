@@ -4,7 +4,6 @@ cache:
   directories:
   - "$TRAVIS_BUILD_DIR/build/NETCDF/src"
   - "$TRAVIS_BUILD_DIR/build/LIBRADTRAN/src"
-  - "$HOME/miniconda"
 
 addons: # for libradtran library
   apt:
@@ -44,7 +43,7 @@ before_script:
   - "gzip -d netcdf-4.6.1.tar.gz"
   - "tar -xf netcdf-4.6.1.tar"
   - "cd netcdf-4.6.1"
-  - "./configure  --prefix=/usr"
+  - "./configure  --prefix=$TRAVIS_BUILD_DIR/NETCDF"
   - "make"
   - "make install"
   - "cd ../"
@@ -52,7 +51,7 @@ before_script:
   - "gzip -d libRadtran-2.0.2.tar.gz"
   - "tar -xf libRadtran-2.0.2.tar"
   - "cd libRadtran-2.0.2"
-  - "./configure  --prefix=/usr"
+  - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN"
   - "make uvspec"
   - "cd ../"
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
