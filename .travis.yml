@@ -28,7 +28,7 @@ install:
   # Useful for debugging any issues with conda
   - conda info -a
 
-before_script:
+after_script:
   - conda create -n py27 python=2.7 pip
   - source activate py27
   - python --version
@@ -53,6 +53,7 @@ before_script:
   - python --version
 
 script:
+  - conda info -a
   - pip install numpy coloredlogs coverage
   - pip install -r requirements.txt
   - python setup.py install
