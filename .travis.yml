@@ -41,7 +41,7 @@ install:
   - python setup.py install
 
 before_script:
-  - conda create -n py27 python=2.7 miniconda
+  - conda create -n py27 python=2.7 anaconda
   - source activate py27
   - "export PYSYN_CDBS=tests/data/"
   - "echo backend: agg > matplotlibrc"
