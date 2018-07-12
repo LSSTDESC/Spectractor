@@ -40,7 +40,7 @@ before_script:
   - "wget -L http://www.libradtran.org/download/libRadtran-2.0.2.tar.gz"
   - "gzip -d libRadtran-2.0.2.tar.gz"
   - "tar -xvf libRadtran-2.0.2.tar.gz"
-  - "cd libRadtran-2.0.2.tar.gz"
+  - "cd libRadtran-2.0.2.tar"
   - "./configure"
   - "make"
   - "cd ../"
