@@ -5,6 +5,7 @@ addons: # for libradtran library
       packages:
         - gfortran
         - libgsl0-dev
+        - netcdf
 
 python:
   - "3.6"
@@ -38,9 +39,6 @@ install:
   - pip install scikit-image
   - pip install coloredlogs
 
-install:
-  - python setup.py install
-
 before_script:
   - source ~/virtualenv/python2.7/bin/activate
   - python --version
@@ -58,6 +56,7 @@ before_script:
   - python --version
 
 script:
+  - python setup.py install
   - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
   - ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py
