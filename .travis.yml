@@ -42,7 +42,7 @@ install:
   - python setup.py install
 
 before_script:
-  - source activate py27
+  - source ~/virtualenv/python2.7/bin/activate
   - python --version
   - "export PYSYN_CDBS=tests/data/"
   - "echo backend: agg > matplotlibrc"
@@ -54,7 +54,7 @@ before_script:
   - "make uvspec"
   - "cd ../"
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
-  - source activate test-environment
+  - source ~/virtualenv/python3.6/bin/activate
   - python --version
 
 script:
