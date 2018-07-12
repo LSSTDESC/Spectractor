@@ -290,7 +290,8 @@ class Lines:
                             xycoords='axes fraction', color=color, fontsize=fontsize)
         return ax
 
-    def detect_lines(self, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None, print_table=False):
+    def detect_lines(self, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None, print_table=False,
+                     xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
         """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
         around emission or absorption tabulated lines, and to select surrounding pixels
         to fit a (positive or negative) gaussian and a polynomial background. If several regions
@@ -314,6 +315,9 @@ class Lines:
             An Axes instance to over plot the result of the fit (default: None).
         print_table: bool, optional
             Print a table with the detected lines (default: False).
+        xlim: array, optional
+            (min, max) list limiting the wavelength interval where to detect spectral lines (default:
+            (parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
 
         Returns
         -------
@@ -353,7 +357,7 @@ class Lines:
         # main settings
         bgd_npar = parameters.BGD_NPARAMS
         peak_look = 7  # half range to look for local maximum in pixels
-        bgd_width = 7  # size of the peak sides to use to fit spectrum base line
+        bgd_width = 3  # size of the peak sides to use to fit spectrum base line
         if self.hydrogen_only:
             peak_look = 15
             bgd_width = 15
@@ -370,6 +374,8 @@ class Lines:
         for line in self.lines:
             # wavelength of the line: find the nearest pixel index
             line_wavelength = line.wavelength
+            if line_wavelength < xlim[0] or line_wavelength > xlim[1]:
+                continue
             line.fitted = True
             l_index, l_lambdas = find_nearest(lambdas, line_wavelength)
             # reject if pixel index is too close to image bounds
@@ -768,7 +774,7 @@ class Spectrum(object):
         if xlim is None:
             xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
         ax.set_xlim(xlim)
-        ax.set_ylim(0., np.max(self.data) * 1.2)
+        ax.set_ylim(0., np.nanmax(self.data) * 1.2)
         ax.set_xlabel('$\lambda$ [nm]')
         ax.set_ylabel('Flux [%s]' % self.units)
 
