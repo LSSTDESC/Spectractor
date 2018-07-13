@@ -643,6 +643,7 @@ class Spectrum(object):
         self.target = target
         self.data = None
         self.err = None
+        self.x0 = None
         self.lambdas = None
         self.lambdas_binwidths = None
         self.lambdas_indices = None
@@ -868,6 +869,10 @@ class Spectrum(object):
                 self.target = Target(self.header['TARGET'], verbose=parameters.VERBOSE)
             if self.header['UNIT2'] != "":
                 self.units = self.header['UNIT2']
+            if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
+                self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
+            self.my_logger.info('\n\tLoading disperser %s...' % self.disperser)
+            self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
@@ -927,19 +932,24 @@ def calibrate_spectrum_with_lines(spectrum):
         The new distance between the CCD and the disperser.
 
     """
+    # Convert wavelength array into original pixels
+    x0 = spectrum.x0
+    if x0 is None :
+        x0 = spectrum.target_pixcoords
+    D = parameters.DISTANCE2CCD
+    if spectrum.header['D2CCD'] != '':
+        D = spectrum.header['D2CCD']
+    spectrum.disperser.D = D
+    delta_pixels = spectrum.disperser.grating_lambda_to_pixel(spectrum.lambdas, x0=x0, order=spectrum.order)
     # Detect emission/absorption lines and calibrate pixel/lambda
-    D = parameters.DISTANCE2CCD - parameters.DISTANCE2CCD_ERR
     shifts = []
     counts = 0
+    D = parameters.DISTANCE2CCD - parameters.DISTANCE2CCD_ERR
     D_step = parameters.DISTANCE2CCD_ERR / 4
-    delta_pixels = spectrum.lambdas_indices - int(spectrum.target_pixcoords_rotated[0])
-    lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels, spectrum.target_pixcoords,
-                                                              order=spectrum.order)
     while parameters.DISTANCE2CCD + 4 * parameters.DISTANCE2CCD_ERR > D > \
             parameters.DISTANCE2CCD - 4 * parameters.DISTANCE2CCD_ERR and counts < 30:
         spectrum.disperser.D = D
-        lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels,
-                                                                  spectrum.target_pixcoords, order=spectrum.order)
+        lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels, x0=x0, order=spectrum.order)
         lambda_shift = spectrum.lines.detect_lines(lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None,
                                                    print_table=parameters.DEBUG)
         shifts.append(lambda_shift)
@@ -957,6 +967,7 @@ def calibrate_spectrum_with_lines(spectrum):
         elif lambda_shift < -0.5:
             D_step = -parameters.DISTANCE2CCD_ERR / 6
         D += D_step
+    lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels, x0=x0, order=spectrum.order)
     shift = np.mean(lambdas_test - spectrum.lambdas)
     spectrum.lambdas = lambdas_test
     lambda_shift = spectrum.lines.detect_lines(spectrum.lambdas, spectrum.data, spec_err=spectrum.err, ax=None,

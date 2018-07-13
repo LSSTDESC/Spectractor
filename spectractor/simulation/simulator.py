@@ -453,7 +453,6 @@ class SpectrumSimulation(Spectrum):
         self.lambdas = None
         self.data = None
         self.err = None
-        self.x0 = [spectrum.header['TARGETX'], spectrum.header['TARGETY']]
         self.model = lambda x: np.zeros_like(x)
 
     def simulate_without_atmosphere(self, lambdas):

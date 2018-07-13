@@ -308,8 +308,8 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False):
     dist = np.sqrt((new_avY - avY) ** 2 + (new_avX - avX) ** 2)
     if dist > mean_prior / 2:
         image.my_logger.warning(
-            '\n\tX=%.2f,Y=%.2f target position determination probably wrong: %.1f  pixels from profile detection (%d,%d)' % (
-                new_avX, new_avY, dist, avX, avY))
+            '\n\tX=%.2f,Y=%.2f target position determination probably wrong: %.1f '
+            'pixels from profile detection (%d,%d)' % (new_avX, new_avY, dist, avX, avY))
         # debugging plots
     if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
