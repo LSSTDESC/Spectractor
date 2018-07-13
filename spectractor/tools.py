@@ -711,11 +711,11 @@ def formatting_numbers(value, error_high, error_low, std=None, label=None):
         if std is not None:
             str_std = "%.*f" % (abs(power10), std)
     elif power10 > 0:
-        str_value = f"{value:d}"
-        str_error_high = f"{error_high:d}"
-        str_error_low = f"{error_low:d}"
+        str_value = f"{value:.0f}"
+        str_error_high = f"{error_high:.0f}"
+        str_error_low = f"{error_low:.0f}"
         if std is not None:
-            str_std = f"{std:d}"
+            str_std = f"{std:.0f}"
     else:
         if int(floor(np.log10(np.abs(error_high)))) == int(floor(np.log10(np.abs(error_low)))):
             str_value = "%.*f" % (abs(power10), value)
