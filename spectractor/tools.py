@@ -216,7 +216,7 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
         plt.plot(x,fit,'r-')
         plt.show()
     """
-    maxfev = 1000
+    maxfev = 100000
     popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma)
     return popt, pcov
 
