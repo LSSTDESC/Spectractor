@@ -48,7 +48,7 @@ before_script:
   - "make install"
   - "cd ../"
   - "echo $LD_LIBRARY_PATH"
-  - "export LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/NETCDF/lib/
+  - "export LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/NETCDF/lib/"
   - "wget -L http://www.libradtran.org/download/libRadtran-2.0.2.tar.gz"
   - "gzip -d libRadtran-2.0.2.tar.gz"
   - "tar -xf libRadtran-2.0.2.tar"
