@@ -34,16 +34,16 @@ def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=2
     """
     # wavelength in nm, hologram produced at 639nm
     # spherical wave centered in 0,0,0
-    U = lambda x, y, z: parameters.np.exp(2j * parameters.np.pi * parameters.np.sqrt(x * x + y * y + z * z) * 1e6 /
-                                          lambda_plot) / parameters.np.sqrt(x * x + y * y + z * z)
+    U = lambda x, y, z: np.exp(2j * np.pi * np.sqrt(x * x + y * y + z * z) * 1e6 /
+                                          lambda_plot) / np.sqrt(x * x + y * y + z * z)
     # superposition of two spherical sources centered in order 0 and order 1 positions
     xA = [order0_position[0] * parameters.PIXEL2MM, order0_position[1] * parameters.PIXEL2MM]
     xB = [order1_position[0] * parameters.PIXEL2MM, order1_position[1] * parameters.PIXEL2MM]
     A = lambda x, y: U(x - xA[0], y - xA[1], -parameters.DISTANCE2CCD) + U(x-xB[0], y-xB[1], -parameters.DISTANCE2CCD)
-    intensity = lambda x, y: parameters.np.abs(A(x, y)) ** 2
-    xholo = parameters.np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
-    yholo = parameters.np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
-    xxholo, yyholo = parameters.np.meshgrid(xholo, yholo)
+    intensity = lambda x, y: np.abs(A(x, y)) ** 2
+    xholo = np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
+    yholo = np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
+    xxholo, yyholo = np.meshgrid(xholo, yholo)
     holo = intensity(xxholo, yyholo)
     rotated_holo = ndimage.interpolation.rotate(holo, theta_tilt)
     return rotated_holo
@@ -79,11 +79,11 @@ def build_ronchi(x_center, theta_tilt=0, grooves=400):
      [0 1 0 0 1]]
 
     """
-    intensity = lambda x, y: 2 * parameters.np.sin(2 * parameters.np.pi *
+    intensity = lambda x, y: 2 * np.sin(2 * np.pi *
                                                    (x-x_center * parameters.PIXEL2MM) * 0.5 * grooves) ** 2
-    xronchi = parameters.np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
-    yronchi = parameters.np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
-    xxronchi, yyronchi = parameters.np.meshgrid(xronchi, yronchi)
+    xronchi = np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
+    yronchi = np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
+    xxronchi, yyronchi = np.meshgrid(xronchi, yronchi)
     ronchi = (intensity(xxronchi, yyronchi)).astype(int)
     rotated_ronchi = ndimage.interpolation.rotate(ronchi, theta_tilt)
     return rotated_ronchi
@@ -109,7 +109,7 @@ def get_theta0(x0):
     >>> get_theta0(parameters.IMSIZE/2)
     0.0
     """
-    if isinstance(x0, (list, tuple, parameters.np.ndarray)):
+    if isinstance(x0, (list, tuple, np.ndarray)):
         return (x0[0] - parameters.IMSIZE / 2) * parameters.PIXEL2ARCSEC * parameters.ARCSEC2RADIANS
     else:
         return (x0 - parameters.IMSIZE / 2) * parameters.PIXEL2ARCSEC * parameters.ARCSEC2RADIANS
@@ -143,7 +143,7 @@ def get_delta_pix_ortho(deltaX, x0, D=parameters.DISTANCE2CCD):
     497.66545567320992
     """
     theta0 = get_theta0(x0)
-    deltaX0 = parameters.np.tan(theta0) * D / parameters.PIXEL2MM
+    deltaX0 = np.tan(theta0) * D / parameters.PIXEL2MM
     return deltaX + deltaX0
 
 
@@ -174,7 +174,7 @@ def get_refraction_angle(deltaX, x0, D=parameters.DISTANCE2CCD):
     0.21
     """
     delta = get_delta_pix_ortho(deltaX, x0, D=D)
-    theta = parameters.np.arctan2(delta * parameters.PIXEL2MM, D)
+    theta = np.arctan2(delta * parameters.PIXEL2MM, D)
     return theta
 
 
@@ -210,32 +210,32 @@ def get_N(deltaX, x0, D=parameters.DISTANCE2CCD, wavelength=656, order=1):
     """
     theta = get_refraction_angle(deltaX, x0, D=D)
     theta0 = get_theta0(x0)
-    N = (parameters.np.sin(theta) - parameters.np.sin(theta0)) / (order * wavelength * 1e-6)
+    N = (np.sin(theta) - np.sin(theta0)) / (order * wavelength * 1e-6)
     return N
 
 
 def neutral_lines(x_center, y_center, theta_tilt):
     """Return the nuetrla lines of an hologram."""
-    xs = parameters.np.linspace(0, parameters.IMSIZE, 20)
-    line1 = parameters.np.tan(theta_tilt * parameters.np.pi / 180) * (xs - x_center) + y_center
-    line2 = parameters.np.tan((theta_tilt + 90) * parameters.np.pi / 180) * (xs - x_center) + y_center
+    xs = np.linspace(0, parameters.IMSIZE, 20)
+    line1 = np.tan(theta_tilt * np.pi / 180) * (xs - x_center) + y_center
+    line2 = np.tan((theta_tilt + 90) * np.pi / 180) * (xs - x_center) + y_center
     return xs, line1, line2
 
 
 def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
     """Return the order 0 and order 1 positions of an hologram."""
     # refraction angle between order 0 and order 1 at construction
-    alpha = parameters.np.arcsin(N * parameters.LAMBDA_CONSTRUCTOR + parameters.np.sin(theta0))
+    alpha = np.arcsin(N * parameters.LAMBDA_CONSTRUCTOR + np.sin(theta0))
     # distance between order 0 and order 1 in pixels
-    AB = (parameters.np.tan(alpha) - parameters.np.tan(theta0)) * parameters.DISTANCE2CCD / parameters.PIXEL2MM
+    AB = (np.tan(alpha) - np.tan(theta0)) * parameters.DISTANCE2CCD / parameters.PIXEL2MM
     # position of order 1 in pixels
     x_center = holo_center[0]
     y_center = holo_center[1]
-    order1_position = [0.5 * AB * parameters.np.cos(theta_tilt * parameters.np.pi / 180) + x_center,
-                       0.5 * AB * parameters.np.sin(theta_tilt * parameters.np.pi / 180) + y_center]
+    order1_position = [0.5 * AB * np.cos(theta_tilt * np.pi / 180) + x_center,
+                       0.5 * AB * np.sin(theta_tilt * np.pi / 180) + y_center]
     # position of order 0 in pixels
-    order0_position = [-0.5 * AB * parameters.np.cos(theta_tilt * parameters.np.pi / 180) + x_center,
-                       -0.5 * AB * parameters.np.sin(theta_tilt * parameters.np.pi / 180) + y_center]
+    order0_position = [-0.5 * AB * np.cos(theta_tilt * np.pi / 180) + x_center,
+                       -0.5 * AB * np.sin(theta_tilt * np.pi / 180) + y_center]
     if verbose:
         print('Order  0 position at x0 = %.1f and y0 = %.1f' % (order0_position[0], order0_position[1]))
         print('Order +1 position at x0 = %.1f and y0 = %.1f' % (order1_position[0], order1_position[1]))
@@ -251,7 +251,7 @@ def find_order01_positions(holo_center, N_interp, theta_interp, verbose=True):
     convergence = 0
     while abs(N - convergence) > 1e-6:
         order0_position, order1_position, AB = order01_positions(holo_center, N, theta_tilt, theta0, verbose=False)
-        convergence = parameters.np.copy(N)
+        convergence = np.copy(N)
         N = N_interp(order0_position)
         theta_tilt = theta_interp(order0_position)
         theta0 = get_theta0(order0_position)
@@ -293,6 +293,7 @@ class Grating:
         self.N_err = 1
         self.D = D
         self.label = label
+        self.full_name = label
         self.data_dir = data_dir
         self.plate_center = [0.5 * parameters.IMSIZE, 0.5 * parameters.IMSIZE]
         self.theta_tilt = 0
@@ -350,18 +351,23 @@ class Grating:
         """
         filename = self.data_dir + self.label + "/N.txt"
         if os.path.isfile(filename):
-            a = parameters.np.loadtxt(filename)
+            a = np.loadtxt(filename)
             self.N_input = a[0]
             self.N_err = a[1]
+        filename = self.data_dir + self.label + "/full_name.txt"
+        if os.path.isfile(filename):
+            with open(filename, 'r') as f:
+                for line in f:
+                    self.full_name = line.rstrip('\n')
         filename = self.data_dir + self.label + "/transmission.txt"
         if os.path.isfile(filename):
-            a = parameters.np.loadtxt(filename)
+            a = np.loadtxt(filename)
             l, t, e = a.T
             self.transmission = interpolate.interp1d(l, t, bounds_error=False, fill_value=0.)
             self.transmission_err = interpolate.interp1d(l, e, bounds_error=False, fill_value=0.)
         else:
-            self.transmission = lambda x: parameters.np.ones_like(x).astype(float)
-            self.transmission_err = lambda x: parameters.np.zeros_like(x).astype(float)
+            self.transmission = lambda x: np.ones_like(x).astype(float)
+            self.transmission_err = lambda x: np.zeros_like(x).astype(float)
         filename = self.data_dir + self.label + "/hologram_center.txt"
         if os.path.isfile(filename):
             lines = [ll.rstrip('\n') for ll in open(filename)]
@@ -450,7 +456,7 @@ class Grating:
         """
         theta = self.refraction_angle(deltaX, x0)
         theta0 = get_theta0(x0)
-        lambdas = (parameters.np.sin(theta) - parameters.np.sin(theta0)) / (order * self.N(x0))
+        lambdas = (np.sin(theta) - np.sin(theta0)) / (order * self.N(x0))
         return lambdas * 1e6
 
     def grating_lambda_to_pixel(self, lambdas, x0, order=1):
@@ -477,10 +483,10 @@ class Grating:
         >>> print(pixels[:5])
         [ 0.  1.  2.  3.  4.]
         """
-        lambdas = parameters.np.copy(lambdas)
+        lambdas = np.copy(lambdas)
         theta0 = get_theta0(x0)
         theta = self.refraction_angle_lambda(lambdas, x0, order=order)
-        deltaX = self.D * (parameters.np.tan(theta) - parameters.np.tan(theta0)) / parameters.PIXEL2MM
+        deltaX = self.D * (np.tan(theta) - np.tan(theta0)) / parameters.PIXEL2MM
         return deltaX
 
     def grating_resolution(self, deltaX, x0, order=1):
@@ -508,9 +514,9 @@ class Grating:
         >>> g = Grating(400, label='Ron400')
         >>> g.plot_transmission(xlim=(400,800))
         """
-        wavelengths = parameters.np.linspace(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 100)
+        wavelengths = np.linspace(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 100)
         if xlim is not None:
-            wavelengths = parameters.np.linspace(xlim[0], xlim[1], 100)
+            wavelengths = np.linspace(xlim[0], xlim[1], 100)
         plt.plot(wavelengths, self.transmission(wavelengths), 'b-', label=self.label)
         plt.xlabel(r"$\lambda$ [nm]")
         plt.ylabel(r"Transmission")
@@ -596,8 +602,8 @@ class Hologram(Grating):
         283.56876727310373
         """
 
-        if x[0] < parameters.np.min(self.N_x) or x[0] > parameters.np.max(self.N_x) \
-                or x[1] < parameters.np.min(self.N_y) or x[1] > parameters.np.max(self.N_y):
+        if x[0] < np.min(self.N_x) or x[0] > np.max(self.N_x) \
+                or x[1] < np.min(self.N_y) or x[1] > np.max(self.N_y):
             N = self.N_fit(x[0], x[1])
         else:
             N = int(self.N_interp(x))
@@ -639,18 +645,18 @@ class Hologram(Grating):
             print('\tfrom {}'.format(self.data_dir + self.label))
         filename = self.data_dir + self.label + "/hologram_grooves_per_mm.txt"
         if os.path.isfile(filename):
-            a = parameters.np.loadtxt(filename)
+            a = np.loadtxt(filename)
             self.N_x, self.N_y, self.N_data = a.T
             N_interp = interpolate.interp2d(self.N_x, self.N_y, self.N_data, kind='cubic')
             self.N_fit = fit_poly2d(self.N_x, self.N_y, self.N_data, order=2)
             self.N_interp = lambda x: float(N_interp(x[0], x[1]))
         else:
             self.is_hologram = False
-            self.N_x = parameters.np.arange(0, parameters.IMSIZE)
-            self.N_y = parameters.np.arange(0, parameters.IMSIZE)
+            self.N_x = np.arange(0, parameters.IMSIZE)
+            self.N_y = np.arange(0, parameters.IMSIZE)
             filename = self.data_dir + self.label + "/N.txt"
             if os.path.isfile(filename):
-                a = parameters.np.loadtxt(filename)
+                a = np.loadtxt(filename)
                 self.N_interp = lambda x: a[0]
                 self.N_fit = lambda x, y: a[0]
             else:
@@ -666,7 +672,7 @@ class Hologram(Grating):
             self.theta_tilt = 0
         filename = self.data_dir + self.label + "/hologram_rotation_angles.txt"
         if os.path.isfile(filename):
-            a = parameters.np.loadtxt(filename)
+            a = np.loadtxt(filename)
             self.theta_x, self.theta_y, self.theta_data = a.T
             theta_interp = interpolate.interp2d(self.theta_x, self.theta_y, self.theta_data, kind='cubic')
             self.theta = lambda x: float(theta_interp(x[0], x[1]))
