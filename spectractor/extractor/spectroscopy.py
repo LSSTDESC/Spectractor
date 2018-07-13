@@ -8,7 +8,7 @@ class Line:
     """Class modeling the emission or absorption lines."""
 
     def __init__(self, wavelength, label, atmospheric=False, emission=False, label_pos=[0.007, 0.02],
-                 width_bounds=[1, 7]):
+                 width_bounds=[1, 6]):
         """Class modeling the emission or absorption lines. lines attributes contains main spectral lines
         sorted in wavelength.
 
@@ -152,10 +152,10 @@ class Lines:
         if redshift < 0:
             self.my_logger.warning(f'Redshift must be positive or null. Got {redshift}')
             sys.exit()
-        HALPHA = Line(656.3, atmospheric=False, label=r'$H\alpha$', label_pos=[-0.016, 0.02])
-        HBETA = Line(486.3, atmospheric=False, label=r'$H\beta$', label_pos=[0.007, 0.02])
-        HGAMMA = Line(434.0, atmospheric=False, label=r'$H\gamma$', label_pos=[0.007, 0.02])
-        HDELTA = Line(410.2, atmospheric=False, label=r'$H\delta$', label_pos=[0.007, 0.02])
+        HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02])
+        HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02])
+        HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02])
+        HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02])
         OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
         CII1 = Line(723.5, atmospheric=False, label=r'$C_{II}$', label_pos=[0.005, 0.92])
         CII2 = Line(711.0, atmospheric=False, label=r'$C_{II}$', label_pos=[0.005, 0.02])
@@ -357,11 +357,11 @@ class Lines:
         # main settings
         bgd_npar = parameters.BGD_NPARAMS
         peak_look = 7  # half range to look for local maximum in pixels
-        bgd_width = 4  # size of the peak sides to use to fit spectrum base line
+        bgd_width = 10  # size of the peak sides to use to fit spectrum base line
         if self.hydrogen_only:
             peak_look = 15
             bgd_width = 15
-        baseline_prior = 0.00001  # *sigma gaussian prior on base line fit
+        baseline_prior = 0.0001  # *sigma gaussian prior on base line fit
 
         # initialisation
         lambda_shifts = []
@@ -417,7 +417,7 @@ class Lines:
             # around +/- 3*peak_look
             index_inf = peak_index - 1  # extrema on the left
             while index_inf > max(0, peak_index - 3 * peak_look):
-                test_index = list(range(index_inf, peak_index))
+                test_index = np.arange(index_inf, peak_index, 1).astype(int)
                 minm = argrelextrema(spec[test_index], bgd_strategy)
                 if len(minm[0]) > 0:
                     index_inf = index_inf + minm[0][0]
@@ -426,7 +426,7 @@ class Lines:
                     index_inf -= 1
             index_sup = peak_index + 1  # extrema on the right
             while index_sup < min(len(spec) - 1, peak_index + 3 * peak_look):
-                test_index = list(range(peak_index, index_sup))
+                test_index = np.arange(peak_index, index_sup, 1).astype(int)
                 minm = argrelextrema(spec[test_index], bgd_strategy)
                 if len(minm[0]) > 0:
                     index_sup = peak_index + minm[0][0]
@@ -435,7 +435,11 @@ class Lines:
                     index_sup += 1
             # pixel range to consider around the peak, adding bgd_width pixels
             # to fit for background around the peak
-            index = list(range(max(0, index_inf - bgd_width), min(len(lambdas), index_sup + bgd_width)))
+            index = list(np.arange(max(0, index_inf - bgd_width),
+                                   min(len(lambdas), index_sup + bgd_width), 1).astype(int))
+            # skip if data is masked with NaN
+            if np.any(np.isnan(spec[index])):
+                continue
             # first guess and bounds to fit the line properties and
             # the background with BGD_ORDER order polynom
             guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), lambdas[peak_index],
@@ -515,19 +519,33 @@ class Lines:
             guess = new_guess_list[k]
             bounds = new_bounds_list[k]
             bgd_index = index[:bgd_width] + index[-bgd_width:]
+            bgd_index = []
+            for i in index:
+                is_close_to_peak = False
+                for j in peak_index:
+                    if abs(i-j) < peak_look:
+                        is_close_to_peak = True
+                        break
+                if not is_close_to_peak:
+                    bgd_index.append(i)
             try:
-                bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
-                                                 order=parameters.BGD_ORDER, sigma=2, niter=300)
+                fit, cov, model = fit_poly1d(lambdas[bgd_index], spec[bgd_index],
+                                             order=parameters.BGD_ORDER,w = 1./spec_err[bgd_index])
+                #bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
+                #                                 order=parameters.BGD_ORDER, sigma=10, niter=5)
             except:
-                bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
-                                                 order=parameters.BGD_ORDER, sigma=3, niter=300)
+                fit, cov, model = fit_poly1d(lambdas[index], spec[index],
+                                             order=parameters.BGD_ORDER,w = 1./spec_err[index])
+                #bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
+                #                                 order=parameters.BGD_ORDER, sigma=3, niter=5)
             # f = plt.figure()
             # plt.errorbar(lambdas[index],spec[index],yerr=spec_err[index])
             # plt.plot(lambdas[bgd_index],spec[bgd_index],'r-')
             # plt.plot(lambdas[index],bgd(lambdas[index]),'b--')
             # if parameters.DISPLAY: plt.show()
             for n in range(bgd_npar):
-                guess[n] = getattr(bgd, bgd.param_names[parameters.BGD_ORDER - n]).value
+                #guess[n] = getattr(bgd, bgd.param_names[parameters.BGD_ORDER - n]).value
+                guess[n] = fit[n]
                 b = abs(baseline_prior * guess[n])
                 bounds[0][n] = guess[n] - b
                 bounds[1][n] = guess[n] + b
