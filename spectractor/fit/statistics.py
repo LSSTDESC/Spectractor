@@ -5,114 +5,6 @@ from scipy import interpolate
 from spectractor.tools import *
 
 
-class Parameter(object):
-    """Class to store parameter value, name and title"""
-
-    def __init__(self, value=None, label="", title=""):
-        self.label = label
-        self.title = title
-        self.value = value
-
-    def set(self, value):
-        self.value = value
-
-
-class FitParameter(object):
-    """Class to store parameter result from curve fitting"""
-
-    def __init__(self, value, cov=-1, chi2=-1, label="", title=""):
-        self.label = label
-        self.title = title
-        self.value = value
-        self.cov = cov
-        self.chi2 = chi2
-
-    def set(self, value, cov, chi2):
-        self.value = value
-        self.cov = cov
-        self.chi2 = chi2
-
-    def write(self):
-        txt = "%.3g %.3g %.3g " % (self.value, self.cov, self.chi2)
-        return txt
-
-    def read(self, words, start):
-        self.value = float(words[start])
-        self.cov = float(words[start + 1])
-        self.chi2 = float(words[start + 2])
-        return 3
-
-
-class ParameterList(object):
-    """Class to store 1D lists and their statistical properties"""
-
-    def __init__(self, label="", title=""):
-        self.data = []
-        self.label = label
-        self.title = title
-        self.mu = []
-        self.std = []
-        self.size = []
-        self.new_sample = True
-
-    def reset(self):
-        self.mu = []
-        self.std = []
-        self.size = []
-        self.data = []
-        self.new_sample = True
-
-    def set_stats(self, param):
-        if len(param.mu) != 0:
-            self.mu.append(param.mu[0])
-            self.std.append(param.std[0])
-            self.new_sample = True
-
-    def append(self, item):
-        if self.new_sample:
-            self.data.append([])
-            self.new_sample = False
-        self.data[-1].append(item)
-
-    def stats(self, weights=None, squared=False):
-        """Use to close data serie"""
-        if len(self.data) != 0:
-            if len(self.data[-1]) != 0:
-                self.size.append(len(self.data[-1]))
-                if weights is None:
-                    if squared:
-                        self.mu.append(np.sqrt(np.mean(np.array(self.data[-1]) ** 2)))
-                    else:
-                        self.mu.append(np.mean(self.data[-1]))
-                    self.std.append(np.std(self.data[-1]))
-                else:
-                    if squared:
-                        self.mu.append(np.average(np.array(self.data[-1]) ** 2, weights=weights))
-                    else:
-                        self.mu.append(np.average(self.data[-1], weights=weights))
-                    self.std.append(np.sqrt(np.average((self.data[-1] - self.mu[-1]) ** 2, weights=weights)))
-                self.new_sample = True
-
-    def write(self):
-        txt = "x x "
-        if len(self.mu) != 0:
-            txt = "%.3g %.3g " % (self.mu[0], self.std[0])
-        return txt
-
-    def write_header(self, tag=''):
-        txt = self.label + tag + "\t" + self.label + tag + "_std" + "\t"
-        return txt
-
-    def read(self, words, start):
-        if type(words[start]) is str:
-            self.mu.append(float(words[start]))
-            self.std.append(float(words[start + 1]))
-        else:
-            self.mu.append(words[start])
-            self.std.append(words[start + 1])
-        return 2
-
-
 class Axis(object):
     def __init__(self, axis, axisname):
         self.axisname = axisname
@@ -424,6 +316,8 @@ class Contours(Grid):
         plt.plot([self.pdfs[0].mean], [self.pdfs[1].mean], 'k*', markersize=10)
         if truth is not None:
             plt.plot([truth[0]], [truth[1]], 'ro', markersize=10)
+            plt.axhline(truth[1], color='r', linewidth=parameters.LINEWIDTH)
+            plt.axvline(truth[0], color='r', linewidth=parameters.LINEWIDTH)
         # set axes
         plt.xlim(self.axes[0].min, self.axes[0].max)
         plt.ylim(self.axes[1].min, self.axes[1].max)
@@ -556,7 +450,7 @@ class Likelihood(Grid):
                     # tick_params(axis='both', which='major')
                 if j == 0:
                     plt.ylabel(n1)
-                    plt.gca().axes.get_yaxis().set_label_coords(-0.4, 0.5)
+                    plt.gca().axes.get_yaxis().set_label_coords(-0.32, 0.5)
                 else:
                     plt.gca().axes.get_yaxis().set_ticklabels([])
         fig.tight_layout()
@@ -570,10 +464,12 @@ class Likelihood(Grid):
         cbar.ax.tick_params(labelsize=9)
         # plot the triangle
         fig.subplots_adjust(hspace=0, wspace=0)
-        plt.show()
-        if parameters.SAVE:
-            print('Save ' + parameters.PLOT_DIR + 'triangle_plot.eps')
-            fig.savefig(parameters.PLOT_DIR + 'triangle_plot.eps', bbox_inches='tight')
+        if parameters.DISPLAY:
+            plt.show()
+        #if parameters.SAVE:
+        #    print('Save ' + parameters.PLOT_DIR + 'triangle_plot.eps')
+        #    fig.savefig(parameters.PLOT_DIR + 'triangle_plot.eps', bbox_inches='tight')
+        return fig
 
     def max_likelihood_stats(self):
         self.getMaximum()
@@ -620,3 +516,5 @@ class Likelihood(Grid):
                 f = open(output, 'w')
                 f.write(txt + cov)
                 f.close()
+
+
