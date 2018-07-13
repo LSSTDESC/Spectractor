@@ -34,6 +34,7 @@ OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
 OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
 OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
 EPOCH = "J2000.0"
+TELESCOPE_TRANSMISSION_SYSTEMATICS = 0.005
 
 # Filters
 HALPHA_CENTER = 655.9e-6  # center of the filter in mm

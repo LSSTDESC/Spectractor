@@ -385,6 +385,7 @@ class TelescopeTransmission():
         throughput = Throughput()
         wl, trm, err = throughput.get_total_throughput()
         self.to = interp1d(wl, trm, kind='linear', bounds_error=False, fill_value=0.)
+        err = np.sqrt(err**2 + parameters.TELESCOPE_TRANSMISSION_SYSTEMATICS**2)
         self.to_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
 
         # Filter RG715
