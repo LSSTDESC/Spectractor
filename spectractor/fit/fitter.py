@@ -9,8 +9,8 @@ import corner
 
 # import pymc as pm
 import emcee
-from multiprocessing import Pool
 
+from spectractor.fit.statistics import *
 
 class Extractor:
 
@@ -33,7 +33,7 @@ class Extractor:
         self.model = None
         self.model_err = None
         self.model_noconv = None
-        self.labels = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso", r"$D_{CCD}$", r"$\alpha_{\mathrm{pix}}$"]
+        self.labels = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]"]
         self.bounds = ((0, 0, 0, 0, 0, 1, 50, -20), (2, 0.5, 800, 10, 1.0, 10, 60, 20))
         self.title = ""
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(filename)
@@ -109,6 +109,8 @@ class Extractor:
         ax.set_xlim((l[sub][0], l[sub][-1]))
         ax.set_ylim((0.9 * np.min(self.spectrum.data[sub]), 1.1 * np.max(self.spectrum.data[sub])))
         ax.set_xticks(ax2.get_xticks()[1:-1])
+        ax.get_yaxis().set_label_coords(-0.15, 0.6)
+        ax2.get_yaxis().set_label_coords(-0.15, 0.5)
 
     def plot_fit(self):
         fig = plt.figure(figsize=(12, 6))
@@ -117,7 +119,7 @@ class Extractor:
         ax3 = plt.subplot(121)
         A1, A2, ozone, pwv, aerosols, reso, D, shift = self.p
         self.title = 'A1={:.3f}, A2={:.3f}, PWV={:.3f}, OZ={:.3g}, ' \
-                     'VAOD={:.3f}, reso={:.2f}, D={:.2f}, shift={:.2f}'.format(A1, A2,
+                     'VAOD={:.3f},\n reso={:.2f}pix, D={:.2f}mm, shift={:.2f}pix'.format(A1, A2,
                                                                                pwv, ozone, aerosols, reso, D, shift)
         # main plot
         self.plot_spectrum_comparison_simple(ax3, title=self.title, size=0.8)
@@ -132,6 +134,9 @@ class Extractor:
             plt.close()
         else:
             if parameters.DISPLAY: plt.show()
+        figname = fit_workspace.filename.replace('.fits','_bestfit.pdf')
+        print(f'Save figure: {figname}')
+        fig.savefig(figname, dpi=100)
 
 
 class Extractor_MCMC(Extractor):
@@ -150,41 +155,9 @@ class Extractor_MCMC(Extractor):
         self.covfile = filename.replace('spectrum.fits', 'cov.txt')
         self.results = []
         self.results_err = []
-        for k in range(self.chains.dim):
-            self.results.append(ParameterList(self.chains.labels[k], self.chains.axis_names[k]))
-            self.results_err.append([])
-
-
-    def run_mcmc(self):
-        complete = self.chains.check_completness()
-        if not complete:
-            for k in range(self.nchains):
-                self.chains.chains.append(
-                    Chain(self.chains.chains_filename, self.covfile, nchain=k, nsteps=self.nsteps))
-            pool = Pool(processes=self.nchains)
-            try:
-                # Without the .get(9999), you can't interrupt this with Ctrl+C.
-                pool.map_async(self.mcmc, self.chains.chains).get(999999)
-                pool.close()
-                pool.join()
-                # to skip lines after the progress bars
-                print('\n' * self.nchains)
-            except KeyboardInterrupt:
-                pool.terminate()
-        self.likelihood = self.chains.chains_to_likelihood()
-        self.likelihood.stats(self.covfile)
-        # [self.results[i].append(self.likelihood.pdfs[i].mean) for i in range(self.chains.dim)]
-        # self.p = [self.likelihood.pdfs[i].mean for i in range(self.chains.dim)]
-        self.p = self.chains.best_row_params
-        self.simulate(*self.p)
-        # [self.results_err[i].append([self.likelihood.pdfs[i].error_high,
-        # self.likelihood.pdfs[i].error_low]) for i in range(self.chains.dim)]
-        # if(self.plot):
-        self.likelihood.triangle_plots()
-        self.plot_fit()
-        # if convergence_test :
-        self.chains.convergence_tests()
-        return self.likelihood
+        #for k in range(self.chains.dim):
+        #    self.results.append(ParameterList(self.chains.labels[k], self.chains.axis_names[k]))
+        #    self.results_err.append([])
 
 
 def simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift):
@@ -260,49 +233,75 @@ def run_emcee():
     # backend = emcee.backends.HDFBackend(file_name)
     # backend.reset(self.nwalkers, self.ndim)
     nwalkers = 5*fit_workspace.ndim
-    nsamples = 1000
+    nsamples = 2000
     sampler = emcee.EnsembleSampler(nwalkers, fit_workspace.ndim, lnprob, args=(), threads=4)
     for i, result in enumerate(sampler.sample(start, iterations=nsamples)):
         if (i + 1) % 100 == 0:
             print("{0:5.1%}".format(float(i) / nsamples))
     # self.sampler.run_mcmc(start, nsamples)
     # tau = sampler.get_autocorr_time()
-    burnin = 500  # int(nsamples / 2)
+    burnin = int(nsamples / 2)
     thin = int(nsamples / 4)
     # self.chains = self.sampler(discard=burnin, flat=True, thin=thin)
-    chains = sampler.chain[:, burnin:, :]  # .reshape((-1, self.ndim))
-    fit_workspace.p = [np.mean(sampler.flatchain[burnin:, i]) for i in range(fit_workspace.ndim)]
+    flat_chains = sampler.chain[:, burnin:, :].reshape((-1, fit_workspace.ndim))
+    fit_workspace.p = [np.mean(flat_chains[burnin:, i]) for i in range(fit_workspace.ndim)]
     print(fit_workspace.p)
+    # print("flat chain shape: {0}".format(samples.shape))
+    # print("flat log prob shape: {0}".format(log_prob_samples.shape))
+    # print("flat log prior shape: {0}".format(log_prior_samples.shape))
+    simulate(*fit_workspace.p)
+    fit_workspace.plot_fit()
+    '''
+    fig = corner.corner(flatchains, labels=fit_workspace.labels, truths=fit_workspace.truth,
+                        quantiles=[0.16, 0.5, 0.84], plot_contours=True,
+                        show_titles=True, label_kwargs={'fontsize':14}, title_kwargs={"fontsize": 14})
+    if parameters.DISPLAY:
+        plt.show()
+    '''
+    likelihood = chain2likelihood(flat_chains, nbins=20, labels=fit_workspace.labels, truth=fit_workspace.truth)
+    fig = likelihood.triangle_plots()
+    figname = fit_workspace.filename.replace('.fits','_triangle.pdf')
+    print(f'Save figure: {figname}')
+    fig.savefig(figname, dpi=100)
+    plot_convergence(sampler, nsamples, burnin, nwalkers)
+
+
+def plot_convergence(sampler, nsamples, burnin, nwalkers):
+    chains = sampler.chain[:, burnin:, :]  # .reshape((-1, self.ndim))
     fig, ax = plt.subplots(fit_workspace.ndim + 1, 1, figsize=(16, 8), sharex=True)
     steps = np.arange(0, nsamples - burnin)
     for i in range(fit_workspace.ndim):
         ax[i].set_ylabel(fit_workspace.labels[i])
         for k in range(nwalkers):
             ax[i].plot(steps, chains[k, :, i])
+            ax[i].get_yaxis().set_label_coords(-0.05, 0.5)
     for k in range(nwalkers):
         ax[fit_workspace.ndim].plot(steps, -2 * sampler.lnprobability[k, burnin:])
     ax[fit_workspace.ndim].set_ylabel(r'$\chi^2$')
     ax[fit_workspace.ndim].set_xlabel('Steps')
+    ax[fit_workspace.ndim].get_yaxis().set_label_coords(-0.05, 0.5)
     fig.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
     if parameters.DISPLAY:
         plt.show()
-    print(("burn-in: {0}".format(burnin)))
-    print(("thin: {0}".format(thin)))
-    # print("flat chain shape: {0}".format(samples.shape))
-    # print("flat log prob shape: {0}".format(log_prob_samples.shape))
-    # print("flat log prior shape: {0}".format(log_prior_samples.shape))
-    simulate(*fit_workspace.p)
-    fit_workspace.plot_fit()
-    fig = corner.corner(sampler.flatchain[burnin*nwalkers:, :], labels=fit_workspace.labels, truths=fit_workspace.truth,
-                        quantiles=[0.16, 0.5, 0.84],
-                        show_titles=True)
-    #fig.set_size_inches(5, 5)
-    #fig.tight_layout()
-    print(sampler.acceptance_fraction)
-    # print(self.sampler.acor)
-    if parameters.DISPLAY: plt.show()
-    fig.savefig("triangle.png")
+    figname = fit_workspace.filename.replace('.fits','_convergence.pdf')
+    print(f'Save figure: {figname}')
+    fig.savefig(figname, dpi=100)
+
+def chain2likelihood(flat_chains,nbins=15,labels=None,truth=None,pdfonly=False):
+    rangedim = range(flat_chains.shape[1])
+    centers = []
+    for i in rangedim:
+        centers.append(np.linspace(np.min(flat_chains[:,i]),np.max(flat_chains[:,i]),nbins-1))
+    likelihood = Likelihood(centers,labels=labels,axis_names=labels,truth=truth)
+    for i in rangedim:
+        likelihood.pdfs[i].fill_histogram(flat_chains[:,i],weights=None)
+        if not pdfonly :
+            for j in rangedim:
+                if(i != j) :
+                    likelihood.contours[i][j].fill_histogram(flat_chains[:,i],flat_chains[:,j],weights=None)
+    likelihood.stats()
+    return likelihood
 
 
 
