@@ -357,7 +357,7 @@ class Lines:
         # main settings
         bgd_npar = parameters.BGD_NPARAMS
         peak_look = 7  # half range to look for local maximum in pixels
-        bgd_width = 3  # size of the peak sides to use to fit spectrum base line
+        bgd_width = 4  # size of the peak sides to use to fit spectrum base line
         if self.hydrogen_only:
             peak_look = 15
             bgd_width = 15
@@ -388,7 +388,10 @@ class Lines:
             if not self.emission_spectrum or line.atmospheric:
                 line_strategy = np.less  # look for absorption line
                 bgd_strategy = np.greater
-            index = list(range(l_index - peak_look, l_index + peak_look))
+            index = np.arange(l_index - peak_look, l_index + peak_look, 1).astype(int)
+            # skip if data is masked with NaN
+            if np.any(np.isnan(spec[index])):
+                continue
             extrema = argrelextrema(spec[index], line_strategy)
             if len(extrema[0]) == 0:
                 continue
