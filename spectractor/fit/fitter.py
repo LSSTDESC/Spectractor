@@ -12,6 +12,7 @@ import emcee
 
 from spectractor.fit.statistics import *
 
+
 class Extractor:
 
     def __init__(self, filename, atmgrid_filename="", live_fit=False):
@@ -33,7 +34,8 @@ class Extractor:
         self.model = None
         self.model_err = None
         self.model_noconv = None
-        self.labels = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]"]
+        self.labels = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
+                       r"$\alpha_{\mathrm{pix}}$ [pix]"]
         self.bounds = ((0, 0, 0, 0, 0, 1, 50, -20), (2, 0.5, 800, 10, 1.0, 10, 60, 20))
         self.title = ""
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(filename)
@@ -47,7 +49,7 @@ class Extractor:
             self.use_grid = True
             self.atmosphere = AtmosphereGrid(filename, atmgrid_filename)
             if parameters.VERBOSE:
-                self.my_logger.info('\n\tUse atmospheric grid models from file %s. ' % atmgrid_filename)
+                self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_filename}. ')
         # self.p[0] *= np.max(self.spectrum.data) / np.max(self.simulation(self.A1,self.A2,self.ozone,self.pwv,self.aerosols,self.reso,self.shift))
         self.get_truth()
         # if 0. in self.spectrum.err:
@@ -120,7 +122,8 @@ class Extractor:
         A1, A2, ozone, pwv, aerosols, reso, D, shift = self.p
         self.title = 'A1={:.3f}, A2={:.3f}, PWV={:.3f}, OZ={:.3g}, ' \
                      'VAOD={:.3f},\n reso={:.2f}pix, D={:.2f}mm, shift={:.2f}pix'.format(A1, A2,
-                                                                               pwv, ozone, aerosols, reso, D, shift)
+                                                                                         pwv, ozone, aerosols, reso, D,
+                                                                                         shift)
         # main plot
         self.plot_spectrum_comparison_simple(ax3, title=self.title, size=0.8)
         # zoom O2
@@ -134,7 +137,7 @@ class Extractor:
             plt.close()
         else:
             if parameters.DISPLAY: plt.show()
-        figname = fit_workspace.filename.replace('.fits','_bestfit.pdf')
+        figname = fit_workspace.filename.replace('.fits', '_bestfit.pdf')
         print(f'Save figure: {figname}')
         fig.savefig(figname, dpi=100)
 
@@ -145,17 +148,17 @@ class Extractor_MCMC(Extractor):
                  atmgrid_filename="", live_fit=False):
         Extractor.__init__(self, filename, atmgrid_filename=atmgrid_filename, live_fit=live_fit)
         self.nwalkers = 5 * self.ndim
-        self.nchains = nchains
+        #self.nchains = nchains
         self.nsteps = nsteps
         self.covfile = covfile
         self.nbins = nbins
         self.burnin = burnin
         self.exploration_time = exploration_time
-        self.chains = Chains(filename, covfile, nchains, nsteps, burnin, nbins, truth=self.truth)
+        #self.chains = Chains(filename, covfile, nchains, nsteps, burnin, nbins, truth=self.truth)
         self.covfile = filename.replace('spectrum.fits', 'cov.txt')
-        self.results = []
-        self.results_err = []
-        #for k in range(self.chains.dim):
+        #self.results = []
+        #self.results_err = []
+        # for k in range(self.chains.dim):
         #    self.results.append(ParameterList(self.chains.labels[k], self.chains.axis_names[k]))
         #    self.results_err.append([])
 
@@ -171,7 +174,7 @@ def simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift):
     self.lambdas = self.disperser.grating_pixel_to_lambda(pixels, new_x0, order=1)
     '''
     lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift)
-    #if fit_workspace.live_fit:
+    # if fit_workspace.live_fit:
     #    fit_workspace.plot_fit()
     fit_workspace.model = model
     fit_workspace.model_err = model_err
@@ -213,9 +216,9 @@ def run_minimisation(fit_workspace):
     bounds = tuple([(fit_workspace.bounds[0][i], fit_workspace.bounds[1][i]) for i in range(fit_workspace.ndim)])
     nll = lambda p: -lnlike(p)
     result = minimize(nll, fit_workspace.p, method='L-BFGS-B',
-                         options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True, 'maxiter': 100000,
-                                  'maxls': 50, 'maxcor': 30},
-                         bounds=bounds)
+                      options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True, 'maxiter': 100000,
+                               'maxls': 50, 'maxcor': 30},
+                      bounds=bounds)
     fit_workspace.p = result['x']
     print(fit_workspace.p)
     fit_workspace.simulate(*fit_workspace.p)
@@ -223,18 +226,18 @@ def run_minimisation(fit_workspace):
 
 
 def run_emcee():
-    start = np.array([np.random.uniform(fit_workspace.p[i]-0.01*(fit_workspace.bounds[1][i]-fit_workspace.bounds[0][i]),
-                                        fit_workspace.p[i]+0.01*(fit_workspace.bounds[1][i]-fit_workspace.bounds[0][i]),
-                                        fit_workspace.nwalkers)
-                      for i in range(fit_workspace.ndim)]).T
+    start = np.array(
+        [np.random.uniform(fit_workspace.p[i] - 0.01 * (fit_workspace.bounds[1][i] - fit_workspace.bounds[0][i]),
+                           fit_workspace.p[i] + 0.01 * (fit_workspace.bounds[1][i] - fit_workspace.bounds[0][i]),
+                           fit_workspace.nwalkers)
+         for i in range(fit_workspace.ndim)]).T
     # Set up the backend
     # Don't forget to clear it in case the file already exists
     # file_name = "tutorial.h5"
     # backend = emcee.backends.HDFBackend(file_name)
     # backend.reset(self.nwalkers, self.ndim)
-    nwalkers = 5*fit_workspace.ndim
     nsamples = 2000
-    sampler = emcee.EnsembleSampler(nwalkers, fit_workspace.ndim, lnprob, args=(), threads=4)
+    sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob, args=(), threads=8)
     for i, result in enumerate(sampler.sample(start, iterations=nsamples)):
         if (i + 1) % 100 == 0:
             print("{0:5.1%}".format(float(i) / nsamples))
@@ -260,15 +263,15 @@ def run_emcee():
     '''
     likelihood = chain2likelihood(flat_chains, nbins=20, labels=fit_workspace.labels, truth=fit_workspace.truth)
     fig = likelihood.triangle_plots()
-    figname = fit_workspace.filename.replace('.fits','_triangle.pdf')
+    figname = fit_workspace.filename.replace('.fits', '_triangle.pdf')
     print(f'Save figure: {figname}')
     fig.savefig(figname, dpi=100)
-    plot_convergence(sampler, nsamples, burnin, nwalkers)
+    plot_convergence(sampler, nsamples, burnin, fit_workspace.nwalkers)
 
 
 def plot_convergence(sampler, nsamples, burnin, nwalkers):
     chains = sampler.chain[:, burnin:, :]  # .reshape((-1, self.ndim))
-    fig, ax = plt.subplots(fit_workspace.ndim + 1, 1, figsize=(16, 8), sharex=True)
+    fig, ax = plt.subplots(fit_workspace.ndim + 1, 1, figsize=(16, 8), sharex='True')
     steps = np.arange(0, nsamples - burnin)
     for i in range(fit_workspace.ndim):
         ax[i].set_ylabel(fit_workspace.labels[i])
@@ -284,25 +287,25 @@ def plot_convergence(sampler, nsamples, burnin, nwalkers):
     plt.subplots_adjust(wspace=0, hspace=0)
     if parameters.DISPLAY:
         plt.show()
-    figname = fit_workspace.filename.replace('.fits','_convergence.pdf')
+    figname = fit_workspace.filename.replace('.fits', '_convergence.pdf')
     print(f'Save figure: {figname}')
     fig.savefig(figname, dpi=100)
 
-def chain2likelihood(flat_chains,nbins=15,labels=None,truth=None,pdfonly=False):
+
+def chain2likelihood(flat_chains, nbins=15, labels=None, truth=None, pdfonly=False):
     rangedim = range(flat_chains.shape[1])
     centers = []
     for i in rangedim:
-        centers.append(np.linspace(np.min(flat_chains[:,i]),np.max(flat_chains[:,i]),nbins-1))
-    likelihood = Likelihood(centers,labels=labels,axis_names=labels,truth=truth)
+        centers.append(np.linspace(np.min(flat_chains[:, i]), np.max(flat_chains[:, i]), nbins - 1))
+    likelihood = Likelihood(centers, labels=labels, axis_names=labels, truth=truth)
     for i in rangedim:
-        likelihood.pdfs[i].fill_histogram(flat_chains[:,i],weights=None)
-        if not pdfonly :
+        likelihood.pdfs[i].fill_histogram(flat_chains[:, i], weights=None)
+        if not pdfonly:
             for j in rangedim:
-                if(i != j) :
-                    likelihood.contours[i][j].fill_histogram(flat_chains[:,i],flat_chains[:,j],weights=None)
+                if (i != j):
+                    likelihood.contours[i][j].fill_histogram(flat_chains[:, i], flat_chains[:, j], weights=None)
     likelihood.stats()
     return likelihood
-
 
 
 if __name__ == "__main__":
@@ -317,15 +320,15 @@ if __name__ == "__main__":
                       help="Write results in given output directory (default: ./outputs/).")
     (opts, args) = parser.parse_args()
 
-    parameters.VERBOSE = False
     filename = 'outputs/data_30may17/reduc_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-    filename = 'outputs/data_30may17/reduc_20170530_134_sim.fits'
+    filename = 'outputs/data_30may17/reduc_20170530_134_spectrum.fits'
 
     # m = Extractor(file_name,atmgrid_filename)
     # m.minimizer(live_fit=True)
     covfile = 'covariances/proposal.txt'
-    fit_workspace = Extractor_MCMC(filename, covfile, nchains=4, nsteps=10000, burnin=2000, nbins=10, exploration_time=500,
-                       atmgrid_filename=atmgrid_filename, live_fit=False)
-    #run_minimisation(m)
+    fit_workspace = Extractor_MCMC(filename, covfile, nchains=4, nsteps=10000, burnin=2000, nbins=10,
+                                   exploration_time=500,
+                                   atmgrid_filename=atmgrid_filename, live_fit=False)
+    # run_minimisation(m)
     run_emcee()
