@@ -338,8 +338,7 @@ class Contours(Grid):
 
 class Likelihood(Grid):
 
-    def __init__(self, ranges, labels=['Beta', 'Bbeta', 'Depth', 'Yasked', 'YBasked'],
-                 axis_names=["$\\beta_n$", "$\\beta_B$", "depth", "$Y_n$", "$Y_B$"], truth=None):
+    def __init__(self, ranges, labels=[], axis_names=[], truth=None):
         Grid.__init__(self, len(ranges), ranges, axis_names)
         self.ranges = ranges
         self.axes = [Axis(self.ranges[i], axis_names[i]) for i in self.rangedim]
@@ -352,7 +351,6 @@ class Likelihood(Grid):
             self.grid = np.zeros(list(map(len, ranges)))
         self.labels = labels
         self.best_chisq = 1e20
-        self.best_key = -1
         self.truth = truth
         self.cov_matrix = None
         self.rho_matrix = None
@@ -466,7 +464,7 @@ class Likelihood(Grid):
         fig.subplots_adjust(hspace=0, wspace=0)
         if parameters.DISPLAY:
             plt.show()
-        #if parameters.SAVE:
+        # if parameters.SAVE:
         #    print('Save ' + parameters.PLOT_DIR + 'triangle_plot.eps')
         #    fig.savefig(parameters.PLOT_DIR + 'triangle_plot.eps', bbox_inches='tight')
         return fig
@@ -516,5 +514,3 @@ class Likelihood(Grid):
                 f = open(output, 'w')
                 f.write(txt + cov)
                 f.close()
-
-

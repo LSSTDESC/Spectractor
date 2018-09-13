@@ -1,23 +1,22 @@
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from spectractor.simulation.simulator import *
-from spectractor.extractor.extractor import *
-from spectractor.fit.mcmc import *
-from spectractor import parameters
-
-from scipy.optimize import minimize
-import corner
-
-# import pymc as pm
-import emcee
-
 from spectractor.fit.statistics import *
 
+from scipy.optimize import minimize
 
-class Extractor:
+import emcee
 
-    def __init__(self, filename, atmgrid_filename="", live_fit=False):
+
+class FitWorkspace:
+
+    def __init__(self, filename, atmgrid_filename="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False):
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.filename = filename
+        self.ndim = 0
+        self.truth = None
+        self.verbose = verbose
+        self.plot = plot
         self.live_fit = live_fit
         self.A1 = 1.0
         self.A2 = 0.05
@@ -29,14 +28,24 @@ class Extractor:
         self.shift = 0.
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D, self.shift])
         self.ndim = len(self.p)
-        self.truth = None
         self.lambdas = None
         self.model = None
         self.model_err = None
         self.model_noconv = None
-        self.labels = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
-                       r"$\alpha_{\mathrm{pix}}$ [pix]"]
+        self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
+                             r"alpha_pix [pix]"]
+        self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
+                           r"$\alpha_{\mathrm{pix}}$ [pix]"]
         self.bounds = ((0, 0, 0, 0, 0, 1, 50, -20), (2, 0.5, 800, 10, 1.0, 10, 60, 20))
+        self.nwalkers = max(2 * self.ndim, nwalkers)
+        self.nsteps = nsteps
+        self.nbins = nbins
+        self.burnin = burnin
+        self.start = []
+        self.chains = np.array([[]])
+        self.lnprobs = np.array([[]])
+        self.flat_chains = np.array([[]])
+        self.valid_chains = [False] * self.nwalkers
         self.title = ""
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(filename)
         self.airmass = self.spectrum.header['AIRMASS']
@@ -50,12 +59,8 @@ class Extractor:
             self.atmosphere = AtmosphereGrid(filename, atmgrid_filename)
             if parameters.VERBOSE:
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_filename}. ')
-        # self.p[0] *= np.max(self.spectrum.data) / np.max(self.simulation(self.A1,self.A2,self.ozone,self.pwv,self.aerosols,self.reso,self.shift))
         self.get_truth()
-        # if 0. in self.spectrum.err:
-        #    self.spectrum.err = np.ones_like(self.spectrum.err)
         self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
-
         if parameters.DEBUG:
             for k in range(10):
                 atmo = self.atmosphere.simulate(300, k, 0.05)
@@ -64,7 +69,8 @@ class Extractor:
             plt.xlabel('$\lambda$ [nm]')
             plt.ylabel('Atmospheric transmission')
             plt.legend(loc='best')
-            if parameters.DISPLAY: plt.show()
+            if parameters.DISPLAY:
+                plt.show()
 
     def get_truth(self):
         if 'A1' in list(self.spectrum.header.keys()):
@@ -76,19 +82,200 @@ class Extractor:
             reso_truth = self.spectrum.header['RESO']
             D_truth = self.spectrum.header['D2CCD']
             shift_truth = self.spectrum.header['X0SHIFT']
-            self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth, reso_truth, D_truth, shift_truth)
+            self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth,
+                          reso_truth, D_truth, shift_truth)
         else:
             self.truth = None
 
+    def set_start(self):
+        self.start = np.array(
+            [np.random.uniform(self.p[i] - 0.02 * (self.bounds[1][i] - self.bounds[0][i]),
+                               self.p[i] + 0.02 * (self.bounds[1][i] - self.bounds[0][i]),
+                               self.nwalkers)
+             for i in range(self.ndim)]).T
+        return self.start
+
+    def build_flat_chains(self):
+        self.flat_chains = self.chains[self.valid_chains, self.burnin:, :].reshape((-1, self.ndim))
+        return self.flat_chains
+
+    def analyze_chains(self):
+        self.set_chain_validity()
+        self.convergence_tests()
+        self.build_flat_chains()
+        likelihood = self.chain2likelihood()
+        self.p = likelihood.mean_vec
+        simulate(*self.p)
+        self.plot_fit()
+        likelihood.triangle_plots()
+
+    def chain2likelihood(self, pdfonly=False, walker_index=-1):
+        if walker_index >= 0:
+            chains = self.chains[walker_index, self.burnin:, :]
+        else:
+            chains = self.flat_chains
+        rangedim = range(chains.shape[1])
+        centers = []
+        for i in rangedim:
+            centers.append(np.linspace(np.min(chains[:, i]), np.max(chains[:, i]), self.nbins - 1))
+        likelihood = Likelihood(centers, labels=self.input_labels, axis_names=self.axis_names, truth=self.truth)
+        if walker_index < 0:
+            for i in rangedim:
+                likelihood.pdfs[i].fill_histogram(chains[:, i], weights=None)
+                if not pdfonly:
+                    for j in rangedim:
+                        if i != j:
+                            likelihood.contours[i][j].fill_histogram(chains[:, i], chains[:, j], weights=None)
+            likelihood.stats()
+        return likelihood
+
+    def compute_local_acceptance_rate(self, start_index, last_index, walker_index):
+        frequences = []
+        test = -2 * self.lnprobs[walker_index, start_index]
+        counts = 1
+        for index in range(start_index + 1, last_index):
+            chi2 = -2 * self.lnprobs[walker_index, index]
+            if np.isclose(chi2, test):
+                counts += 1
+            else:
+                frequences.append(float(counts))
+                counts = 1
+                test = chi2
+        frequences.append(counts)
+        return 1.0 / np.mean(frequences)
+
+    def set_chain_validity(self):
+        nchains = [k for k in range(self.nwalkers)]
+        chisq_averages = []
+        chisq_std = []
+        for k in nchains:
+            chisqs = -2 * self.lnprobs[k, self.burnin:]
+            if np.mean(chisqs) < 1e5:
+                chisq_averages.append(np.mean(chisqs))
+                chisq_std.append(np.std(chisqs))
+        global_average = np.mean(chisq_averages)
+        global_std = np.mean(chisq_std)
+        self.valid_chains = [False] * self.nwalkers
+        for k in nchains:
+            chisqs = -2 * self.lnprobs[k, self.burnin:]
+            chisq_average = np.mean(chisqs)
+            chisq_std = np.std(chisqs)
+            if chisq_average > 3 * global_std + global_average:
+                self.valid_chains[k] = False
+            elif chisq_std < 0.1 * global_std:
+                self.valid_chains[k] = False
+            else:
+                self.valid_chains[k] = True
+        return self.valid_chains
+
+    def convergence_tests(self):
+        chains = self.chains[:, self.burnin:, :]  # .reshape((-1, self.ndim))
+        nchains = [k for k in range(self.nwalkers)]
+        fig, ax = plt.subplots(self.ndim + 1, 2, figsize=(16, 7), sharex='all')
+        fontsize = 8
+        steps = np.arange(self.burnin, self.nsteps)
+        # Chi2 vs Index
+        print("Chisq statistics:")
+        for k in nchains:
+            chisqs = -2 * self.lnprobs[k, self.burnin:]
+            text = f"\tWalker {k:d}: {float(np.mean(chisqs)):.3f} +/- {float(np.std(chisqs)):.3f}"
+            if not self.valid_chains[k]:
+                text += " -> excluded"
+                ax[self.ndim, 0].plot(steps, chisqs, c='0.5', linestyle='--')
+            else:
+                ax[self.ndim, 0].plot(steps, chisqs)
+            print(text)
+        global_average = np.mean(-2 * self.lnprobs[self.valid_chains, self.burnin:])
+        global_std = np.std(-2 * self.lnprobs[self.valid_chains, self.burnin:])
+        ax[self.ndim, 0].set_ylim([global_average - 5 * global_std, global_average + 5 * global_std])
+        # Parameter vs Index
+        print("Computing Parameter vs Index plots...")
+        for i in range(self.ndim):
+            ax[i, 0].set_ylabel(self.axis_names[i], fontsize=fontsize)
+            for k in nchains:
+                if self.valid_chains[k]:
+                    ax[i, 0].plot(steps, chains[k, :, i])
+                else:
+                    ax[i, 0].plot(steps, chains[k, :, i], c='0.5', linestyle='--')
+                ax[i, 0].get_yaxis().set_label_coords(-0.05, 0.5)
+        ax[self.ndim, 0].set_ylabel(r'$\chi^2$', fontsize=fontsize)
+        ax[self.ndim, 0].set_xlabel('Steps', fontsize=fontsize)
+        ax[self.ndim, 0].get_yaxis().set_label_coords(-0.05, 0.5)
+        # Acceptance rate vs Index
+        print("Computing acceptance rate...")
+        min_len = self.nsteps
+        window = 100
+        if min_len > window:
+            for k in nchains:
+                ARs = []
+                indices = []
+                for l in range(self.burnin + window, self.nsteps, window):
+                    ARs.append(self.compute_local_acceptance_rate(l - window, l, k))
+                    indices.append(l)
+                if self.valid_chains[k]:
+                    ax[self.ndim, 1].plot(indices, ARs, label=f'Walker {k:d}')
+                else:
+                    ax[self.ndim, 1].plot(indices, ARs, label=f'Walker {k:d}', c='gray', linestyle='--')
+                ax[self.ndim, 1].set_xlabel('Steps', fontsize=fontsize)
+                ax[self.ndim, 1].set_ylabel('Aceptance rate', fontsize=fontsize)
+                # ax[self.dim + 1, 2].legend(loc='upper left', ncol=2, fontsize=10)
+        # Parameter PDFs by chain
+        print("Computing chain by chain PDFs...")
+        for k in nchains:
+            likelihood = self.chain2likelihood(pdfonly=True, walker_index=k)
+            likelihood.stats(pdfonly=True, verbose=False)
+        # Gelman-Rubin test
+        if len(nchains) > 1:
+            step = max(1, (self.nsteps - self.burnin) // 20)
+            print(f'Gelman-Rubin tests (burnin={self.burnin:d}, step={step:d}, nsteps={self.nsteps:d}):')
+            for i in range(self.ndim):
+                Rs = []
+                lens = []
+                for l in range(self.burnin + step, self.nsteps, step):
+                    chain_averages = []
+                    chain_variances = []
+                    global_average = np.mean(self.chains[self.valid_chains, self.burnin:l, i])
+                    for k in nchains:
+                        if not self.valid_chains[k]:
+                            continue
+                        chain_averages.append(np.mean(self.chains[k, self.burnin:l, i]))
+                        chain_variances.append(np.var(self.chains[k, self.burnin:l, i], ddof=1))
+                    W = np.mean(chain_variances)
+                    B = 0
+                    for n in range(len(chain_averages)):
+                        B += (chain_averages[n] - global_average) ** 2
+                    B *= ((l + 1) / (len(chain_averages) - 1))
+                    R = (W * l / (l + 1) + B / (l + 1) * (len(chain_averages) + 1) / len(chain_averages)) / W
+                    Rs.append(R - 1)
+                    lens.append(l)
+                print(f'\t{self.input_labels[i]}: R-1 = {Rs[-1]:.3f} (l = {lens[-1] - 1:d})')
+                ax[i, 1].plot(lens, Rs, lw=2, label=self.axis_names[i])
+                ax[i, 1].axhline(0.03, c='k', linestyle='--')
+                ax[i, 1].set_xlabel('Walker length', fontsize=fontsize)
+                ax[i, 1].set_ylabel('$R-1$', fontsize=fontsize)
+                ax[i, 1].set_ylim(0, 0.6)
+                # ax[self.dim, 3].legend(loc='best', ncol=2, fontsize=10)
+        fig.tight_layout()
+        plt.subplots_adjust(hspace=0)
+        plt.show()
+        figure_name = self.filename.replace('.fits', '_convergence.pdf')
+        print(f'Save figure: {figure_name}')
+        fig.savefig(figure_name, dpi=100)
+
+    def print_settings(self):
+        print('************************************')
+        print(f"Input file: {self.filename}\nWalkers: {self.nwalkers}\t Steps: {self.nsteps}")
+        print('************************************')
+
     def plot_spectrum_comparison_simple(self, ax, title='', extent=None, size=0.4):
-        l = self.spectrum.lambdas
-        sub = np.where((l > parameters.LAMBDA_MIN) & (l < parameters.LAMBDA_MAX))
+        lambdas = self.spectrum.lambdas
+        sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))
         if extent is not None:
-            sub = np.where((l > extent[0]) & (l < extent[1]))
-        self.spectrum.plot_spectrum_simple(ax, lambdas=l)
-        p0 = ax.plot(l, self.model(l), label='model')
-        ax.fill_between(l, self.model(l) - self.model_err(l),
-                        self.model(l) + self.model_err(l), alpha=0.3, color=p0[0].get_color())
+            sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))
+        self.spectrum.plot_spectrum_simple(ax, lambdas=lambdas)
+        p0 = ax.plot(lambdas, self.model(lambdas), label='model')
+        ax.fill_between(lambdas, self.model(lambdas) - self.model_err(lambdas),
+                        self.model(lambdas) + self.model_err(lambdas), alpha=0.3, color=p0[0].get_color())
         # ax.plot(self.lambdas, self.model_noconv, label='before conv')
         if title != '':
             ax.set_title(title, fontsize=10)
@@ -96,19 +283,19 @@ class Extractor:
         divider = make_axes_locatable(ax)
         ax2 = divider.append_axes("bottom", size=size, pad=0)
         ax.figure.add_axes(ax2)
-        residuals = (self.spectrum.data - self.model(l)) / self.model(l)
-        residuals_err = self.spectrum.err / self.model(l)
-        ax2.errorbar(l, residuals, yerr=residuals_err, fmt='ro', markersize=2)
+        residuals = (self.spectrum.data - self.model(lambdas)) / self.model(lambdas)
+        residuals_err = self.spectrum.err / self.model(lambdas)
+        ax2.errorbar(lambdas, residuals, yerr=residuals_err, fmt='ro', markersize=2)
         ax2.axhline(0, color=p0[0].get_color())
         ax2.grid(True)
-        residuals_model = self.model_err(l) / self.model(l)
-        ax2.fill_between(l, -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
+        residuals_model = self.model_err(lambdas) / self.model(lambdas)
+        ax2.fill_between(lambdas, -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
         std = np.std(residuals[sub])
         ax2.set_ylim([-2. * std, 2. * std])
         ax2.set_xlabel(ax.get_xlabel())
         ax2.set_ylabel('(data-fit)/fit')
-        ax2.set_xlim((l[sub][0], l[sub][-1]))
-        ax.set_xlim((l[sub][0], l[sub][-1]))
+        ax2.set_xlim((lambdas[sub][0], lambdas[sub][-1]))
+        ax.set_xlim((lambdas[sub][0], lambdas[sub][-1]))
         ax.set_ylim((0.9 * np.min(self.spectrum.data[sub]), 1.1 * np.max(self.spectrum.data[sub])))
         ax.set_xticks(ax2.get_xticks()[1:-1])
         ax.get_yaxis().set_label_coords(-0.15, 0.6)
@@ -120,10 +307,8 @@ class Extractor:
         ax2 = plt.subplot(224)
         ax3 = plt.subplot(121)
         A1, A2, ozone, pwv, aerosols, reso, D, shift = self.p
-        self.title = 'A1={:.3f}, A2={:.3f}, PWV={:.3f}, OZ={:.3g}, ' \
-                     'VAOD={:.3f},\n reso={:.2f}pix, D={:.2f}mm, shift={:.2f}pix'.format(A1, A2,
-                                                                                         pwv, ozone, aerosols, reso, D,
-                                                                                         shift)
+        self.title = f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f},\n ' \
+                     f'reso={reso:.2f}pix, D={D:.2f}mm, shift={shift:.2f}pix '
         # main plot
         self.plot_spectrum_comparison_simple(ax3, title=self.title, size=0.8)
         # zoom O2
@@ -136,43 +321,14 @@ class Extractor:
             plt.pause(1e-8)
             plt.close()
         else:
-            if parameters.DISPLAY: plt.show()
+            if parameters.DISPLAY:
+                plt.show()
         figname = fit_workspace.filename.replace('.fits', '_bestfit.pdf')
         print(f'Save figure: {figname}')
         fig.savefig(figname, dpi=100)
 
 
-class Extractor_MCMC(Extractor):
-
-    def __init__(self, filename, covfile, nchains=1, nsteps=1000, burnin=100, nbins=10, exploration_time=100,
-                 atmgrid_filename="", live_fit=False):
-        Extractor.__init__(self, filename, atmgrid_filename=atmgrid_filename, live_fit=live_fit)
-        self.nwalkers = 5 * self.ndim
-        #self.nchains = nchains
-        self.nsteps = nsteps
-        self.covfile = covfile
-        self.nbins = nbins
-        self.burnin = burnin
-        self.exploration_time = exploration_time
-        #self.chains = Chains(filename, covfile, nchains, nsteps, burnin, nbins, truth=self.truth)
-        self.covfile = filename.replace('spectrum.fits', 'cov.txt')
-        #self.results = []
-        #self.results_err = []
-        # for k in range(self.chains.dim):
-        #    self.results.append(ParameterList(self.chains.labels[k], self.chains.axis_names[k]))
-        #    self.results_err.append([])
-
-
 def simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift):
-    '''
-    self.atmosphere.simulate(ozone, pwv, aerosols)
-    self.disperser.D = DISTANCE2CCD
-    pixels = self.disperser.grating_lambda_to_pixel(self.spectrum.lambdas, self.x0, order=1)
-    new_x0 = [ self.x0[0] - shift, self.x0[1] ]
-    pixels = pixels - shift
-    self.disperser.D = D
-    self.lambdas = self.disperser.grating_pixel_to_lambda(pixels, new_x0, order=1)
-    '''
     lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift)
     # if fit_workspace.live_fit:
     #    fit_workspace.plot_fit()
@@ -212,7 +368,13 @@ def lnprob(p):
     return lp + lnlike(p)
 
 
-def run_minimisation(fit_workspace):
+def sort_on_runtime(p, depth_index=5):
+    p = np.atleast_2d(p)
+    idx = np.argsort(p[:, depth_index])[::-1]
+    return p[idx], idx
+
+
+def run_minimisation():
     bounds = tuple([(fit_workspace.bounds[0][i], fit_workspace.bounds[1][i]) for i in range(fit_workspace.ndim)])
     nll = lambda p: -lnlike(p)
     result = minimize(nll, fit_workspace.p, method='L-BFGS-B',
@@ -221,91 +383,21 @@ def run_minimisation(fit_workspace):
                       bounds=bounds)
     fit_workspace.p = result['x']
     print(fit_workspace.p)
-    fit_workspace.simulate(*fit_workspace.p)
+    simulate(*fit_workspace.p)
     fit_workspace.plot_fit()
 
 
 def run_emcee():
-    start = np.array(
-        [np.random.uniform(fit_workspace.p[i] - 0.01 * (fit_workspace.bounds[1][i] - fit_workspace.bounds[0][i]),
-                           fit_workspace.p[i] + 0.01 * (fit_workspace.bounds[1][i] - fit_workspace.bounds[0][i]),
-                           fit_workspace.nwalkers)
-         for i in range(fit_workspace.ndim)]).T
-    # Set up the backend
-    # Don't forget to clear it in case the file already exists
-    # file_name = "tutorial.h5"
-    # backend = emcee.backends.HDFBackend(file_name)
-    # backend.reset(self.nwalkers, self.ndim)
-    nsamples = 2000
-    sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob, args=(), threads=8)
-    for i, result in enumerate(sampler.sample(start, iterations=nsamples)):
+    fit_workspace.print_settings()
+    nsamples = fit_workspace.nsteps
+    p0 = fit_workspace.set_start()
+    sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob, args=(), threads=8,
+                                    runtime_sortingfn=sort_on_runtime)
+    for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples), storechain=True)):
         if (i + 1) % 100 == 0:
             print("{0:5.1%}".format(float(i) / nsamples))
-    # self.sampler.run_mcmc(start, nsamples)
-    # tau = sampler.get_autocorr_time()
-    burnin = int(nsamples / 2)
-    thin = int(nsamples / 4)
-    # self.chains = self.sampler(discard=burnin, flat=True, thin=thin)
-    flat_chains = sampler.chain[:, burnin:, :].reshape((-1, fit_workspace.ndim))
-    fit_workspace.p = [np.mean(flat_chains[burnin:, i]) for i in range(fit_workspace.ndim)]
-    print(fit_workspace.p)
-    # print("flat chain shape: {0}".format(samples.shape))
-    # print("flat log prob shape: {0}".format(log_prob_samples.shape))
-    # print("flat log prior shape: {0}".format(log_prior_samples.shape))
-    simulate(*fit_workspace.p)
-    fit_workspace.plot_fit()
-    '''
-    fig = corner.corner(flatchains, labels=fit_workspace.labels, truths=fit_workspace.truth,
-                        quantiles=[0.16, 0.5, 0.84], plot_contours=True,
-                        show_titles=True, label_kwargs={'fontsize':14}, title_kwargs={"fontsize": 14})
-    if parameters.DISPLAY:
-        plt.show()
-    '''
-    likelihood = chain2likelihood(flat_chains, nbins=20, labels=fit_workspace.labels, truth=fit_workspace.truth)
-    fig = likelihood.triangle_plots()
-    figname = fit_workspace.filename.replace('.fits', '_triangle.pdf')
-    print(f'Save figure: {figname}')
-    fig.savefig(figname, dpi=100)
-    plot_convergence(sampler, nsamples, burnin, fit_workspace.nwalkers)
-
-
-def plot_convergence(sampler, nsamples, burnin, nwalkers):
-    chains = sampler.chain[:, burnin:, :]  # .reshape((-1, self.ndim))
-    fig, ax = plt.subplots(fit_workspace.ndim + 1, 1, figsize=(16, 8), sharex='True')
-    steps = np.arange(0, nsamples - burnin)
-    for i in range(fit_workspace.ndim):
-        ax[i].set_ylabel(fit_workspace.labels[i])
-        for k in range(nwalkers):
-            ax[i].plot(steps, chains[k, :, i])
-            ax[i].get_yaxis().set_label_coords(-0.05, 0.5)
-    for k in range(nwalkers):
-        ax[fit_workspace.ndim].plot(steps, -2 * sampler.lnprobability[k, burnin:])
-    ax[fit_workspace.ndim].set_ylabel(r'$\chi^2$')
-    ax[fit_workspace.ndim].set_xlabel('Steps')
-    ax[fit_workspace.ndim].get_yaxis().set_label_coords(-0.05, 0.5)
-    fig.tight_layout()
-    plt.subplots_adjust(wspace=0, hspace=0)
-    if parameters.DISPLAY:
-        plt.show()
-    figname = fit_workspace.filename.replace('.fits', '_convergence.pdf')
-    print(f'Save figure: {figname}')
-    fig.savefig(figname, dpi=100)
-
-
-def chain2likelihood(flat_chains, nbins=15, labels=None, truth=None, pdfonly=False):
-    rangedim = range(flat_chains.shape[1])
-    centers = []
-    for i in rangedim:
-        centers.append(np.linspace(np.min(flat_chains[:, i]), np.max(flat_chains[:, i]), nbins - 1))
-    likelihood = Likelihood(centers, labels=labels, axis_names=labels, truth=truth)
-    for i in rangedim:
-        likelihood.pdfs[i].fill_histogram(flat_chains[:, i], weights=None)
-        if not pdfonly:
-            for j in rangedim:
-                if (i != j):
-                    likelihood.contours[i][j].fill_histogram(flat_chains[:, i], flat_chains[:, j], weights=None)
-    likelihood.stats()
-    return likelihood
+    fit_workspace.chains = sampler.chain
+    fit_workspace.lnprobs = sampler.lnprobability
 
 
 if __name__ == "__main__":
@@ -322,13 +414,8 @@ if __name__ == "__main__":
 
     filename = 'outputs/data_30may17/reduc_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-    filename = 'outputs/data_30may17/reduc_20170530_134_spectrum.fits'
 
-    # m = Extractor(file_name,atmgrid_filename)
-    # m.minimizer(live_fit=True)
-    covfile = 'covariances/proposal.txt'
-    fit_workspace = Extractor_MCMC(filename, covfile, nchains=4, nsteps=10000, burnin=2000, nbins=10,
-                                   exploration_time=500,
-                                   atmgrid_filename=atmgrid_filename, live_fit=False)
-    # run_minimisation(m)
+    fit_workspace = FitWorkspace(filename, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000, burnin=10000,
+                                 nbins=10, verbose=0, plot=False, live_fit=False)
     run_emcee()
+    fit_workspace.analyze_chains()
