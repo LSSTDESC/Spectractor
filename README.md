@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/LSSTDESC/Spectractor.svg?branch=master)](https://travis-ci.org/LSSTDESC/Spectractor)
+[![Coverage Status](https://coveralls.io/repos/github/LSSTDESC/Spectractor/badge.svg?branch=master)](https://coveralls.io/github/LSSTDESC/Spectractor?branch=master)
 
 # Spectractor
 
