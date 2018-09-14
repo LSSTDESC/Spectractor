@@ -129,4 +129,4 @@ if __name__ == "__main__":
     throughput.PlotFGB()
     throughput.PlotThroughput()
     throughput.PlotMirror()
-    plt.show()
+    if parameters.DISPLAY: plt.show()

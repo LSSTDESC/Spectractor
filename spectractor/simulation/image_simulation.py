@@ -1,5 +1,5 @@
-from spectractor.pipeline.images import *
-from spectractor.pipeline.spectroscopy import *
+from spectractor.extractor.images import *
+from spectractor.extractor.spectroscopy import *
 from spectractor.simulation.simulator import *
 from spectractor import parameters
 import copy
@@ -12,7 +12,7 @@ class StarModel:
 
     def __init__(self, pixcoords, model, amplitude, target=None):
         """ [x0, y0] coords in pixels, sigma width in pixels, A height in image units"""
-        self.my_logger = set_logger(self.__class__.__name__)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.x0 = pixcoords[0]
         self.y0 = pixcoords[1]
         self.amplitude = amplitude
@@ -41,7 +41,7 @@ class StarModel:
         cb.locator = MaxNLocator(7, prune=None)
         cb.update_ticks()
         cb.set_label('Arbitrary units')  # ,fontsize=16)
-        plt.show()
+        if parameters.DISPLAY: plt.show()
 
 
 class StarFieldModel:
@@ -84,14 +84,14 @@ class StarFieldModel:
         # mask order0 and spectrum
         margin = 30
         for y in range(int(y0) - 100, int(y0) + 100):
-            for x in range(IMSIZE):
+            for x in range(parameters.IMSIZE):
                 u, v = pixel_rotation(x, y, base_image.disperser.theta([x0, y0]) * np.pi / 180., x0, y0)
                 if v < margin and v > -margin:
                     image_thresholded[y, x] = 0.
         # look for local maxima and create stars
         peak_positions = detect_peaks(image_thresholded)
-        for y in range(IMSIZE):
-            for x in range(IMSIZE):
+        for y in range(parameters.IMSIZE):
+            for x in range(parameters.IMSIZE):
                 if peak_positions[y, x]:
                     if np.sqrt((y - y0) ** 2 + (x - x0) ** 2) < 10 * base_image.target_star2D.fwhm:
                         continue  # no double star
@@ -106,16 +106,16 @@ class StarFieldModel:
             self.field = self.stars[0].model(x, y)
             for k in range(1, len(self.stars)):
                 left = max(0, int(self.pixcoords[0][k]) - window)
-                right = min(IMSIZE, int(self.pixcoords[0][k]) + window)
+                right = min(parameters.IMSIZE, int(self.pixcoords[0][k]) + window)
                 low = max(0, int(self.pixcoords[1][k]) - window)
-                up = min(IMSIZE, int(self.pixcoords[1][k]) + window)
+                up = min(parameters.IMSIZE, int(self.pixcoords[1][k]) + window)
                 yy, xx = np.mgrid[low:up, left:right]
                 self.field[low:up, left:right] += self.stars[k].model(xx, yy)
             self.field[self.saturated_pixels] += self.saturation
         return self.field
 
     def plot_model(self):
-        yy, xx = np.mgrid[0:IMSIZE:1, 0:IMSIZE:1]
+        yy, xx = np.mgrid[0:parameters.IMSIZE:1, 0:parameters.IMSIZE:1]
         starfield = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
         im = plt.imshow(starfield, origin='lower', cmap='jet')
@@ -129,13 +129,13 @@ class StarFieldModel:
         cb.locator = MaxNLocator(7, prune=None)
         cb.update_ticks()
         cb.set_label('Arbitrary units')  # ,fontsize=16)
-        plt.show()
+        if parameters.DISPLAY: plt.show()
 
 
 class BackgroundModel:
 
     def __init__(self, level, frame=None):
-        self.my_logger = set_logger(self.__class__.__name__)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.level = level
         if self.level <= 0:
             self.my_logger.warning('\n\tBackground level must be strictly positive.')
@@ -157,13 +157,13 @@ class BackgroundModel:
             xlim, ylim = self.frame
             bkgd[ylim:, :] = self.level / 100
             bkgd[:, xlim:] = self.level / 100
-            kernel = np.outer(gaussian(IMSIZE, 50), gaussian(IMSIZE, 50))
+            kernel = np.outer(gaussian(parameters.IMSIZE, 50), gaussian(parameters.IMSIZE, 50))
             bkgd = fftconvolve(bkgd, kernel, mode='same')
-            bkgd *= self.level / bkgd[IMSIZE / 2, IMSIZE / 2]
+            bkgd *= self.level / bkgd[parameters.IMSIZE / 2, parameters.IMSIZE / 2]
             return bkgd
 
     def plot_model(self):
-        yy, xx = np.mgrid[0:IMSIZE:1, 0:IMSIZE:1]
+        yy, xx = np.mgrid[0:parameters.IMSIZE:1, 0:parameters.IMSIZE:1]
         bkgd = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
         im = plt.imshow(bkgd, origin='lower', cmap='jet')
@@ -177,13 +177,13 @@ class BackgroundModel:
         cb.locator = MaxNLocator(7, prune=None)
         cb.update_ticks()
         cb.set_label('Arbitrary units')  # ,fontsize=16)
-        plt.show()
+        if parameters.DISPLAY: plt.show()
 
 
 class SpectrumModel:
 
     def __init__(self, base_image, spectrumsim, sigma, A1=1, A2=0, reso=None, rotation=False):
-        self.my_logger = set_logger(self.__class__.__name__)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.base_image = base_image
         self.spectrumsim = spectrumsim
         self.disperser = base_image.disperser
@@ -216,13 +216,13 @@ class SpectrumModel:
 class ImageModel(object, Image):
 
     def __init__(self, filename, target=""):
-        self.my_logger = set_logger(self.__class__.__name__)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
         Image.__init__(self, filename, target=target)
         self.true_lambdas = None
         self.true_spectrum = None
 
     def compute(self, star, background, spectrum, starfield=None):
-        yy, xx = np.mgrid[0:IMSIZE:1, 0:IMSIZE:1]
+        yy, xx = np.mgrid[0:parameters.IMSIZE:1, 0:parameters.IMSIZE:1]
         self.data = star.model(xx, yy) + background.model(xx, yy) + spectrum.model(xx, yy)
         self.true_lambdas = spectrum.true_lambdas
         self.true_spectrum = spectrum.true_spectrum
@@ -248,14 +248,14 @@ class ImageModel(object, Image):
         self.my_logger.info('\n\tImage saved in %s' % output_filename)
 
     def load_image(self, filename):
-        super(ImageModel, self).load(filename)
+        super(ImageModel, self).load_image(filename)
         hdu_list = fits.open(filename)
         self.true_lambdas, self.true_spectrum = hdu_list[1].data
 
 
 def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A1=1, A2=0, with_rotation=True,
              with_stars=True):
-    """ The basic use of the pipeline consists first to define: 
+    """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image, 
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
     - the rough position of the object in the image,
@@ -353,7 +353,7 @@ if __name__ == "__main__":
     filename = "../CTIOAnaJun2017/ana_29may17/OverScanRemove/trim_images/trim_20170529_150.fits"
     guess = [720, 670]
     target = "HD185975"
-    # filename="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
+    # file_name="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
     # guess = [840, 530]
     # target = "HD205905"
 
