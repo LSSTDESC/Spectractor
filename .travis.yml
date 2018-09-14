@@ -1,10 +1,23 @@
 language: python
+
+cache:
+  directories:
+  - "$TRAVIS_BUILD_DIR/build/NETCDF/src"
+  - "$TRAVIS_BUILD_DIR/build/LIBRADTRAN/src"
+
+addons: # for libradtran library
+  apt:
+      packages:
+        - gfortran
+        - libgsl0-dev
+        - libhdf5-dev
+
 python:
-  # We don't actually use the Travis Python, but this keeps it organized.
   - "3.6"
-    
+
 install:
   - sudo apt-get update
+  - sudo apt-get install gfortran
   # We do this conditionally because it saves us some downloading if the
   # version is the same.
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
@@ -20,19 +33,42 @@ install:
   # Useful for debugging any issues with conda
   - conda info -a
 
-  # Replace dep1 dep2 ... with your dependencies
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION pip
-  - source activate test-environment
+before_script:
+  - conda create -n py27 python=2.7 pip
+  - source activate py27
+  - python --version
+  - "export PYSYN_CDBS=tests/data/"
+  - "echo backend: agg > matplotlibrc"
+  - "wget -L ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.6.1.tar.gz"
+  - "gzip -d netcdf-4.6.1.tar.gz"
+  - "tar -xf netcdf-4.6.1.tar"
+  - "cd netcdf-4.6.1"
+  - "./configure  --prefix=$TRAVIS_BUILD_DIR/NETCDF"
+  - "make"
+  - "make install"
+  - "cd ../"
+  - "echo $LD_LIBRARY_PATH"
+  - "export LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/NETCDF/lib/"
+  - "wget -L http://www.libradtran.org/download/libRadtran-2.0.2.tar.gz"
+  - "gzip -d libRadtran-2.0.2.tar.gz"
+  - "tar -xf libRadtran-2.0.2.tar"
+  - "cd libRadtran-2.0.2"
+  - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN --with-libnetcdf=$TRAVIS_BUILD_DIR/NETCDF/"
+  - "make uvspec"
+  - "cd ../"
+  - "export LIBRADTRANDIR=libRadtran-2.0.2/"
+  - source activate
+  - python --version
 
-  - pip install numpy nose coveralls
-  - pip install matplotlib scipy
-  - pip install astropy astroquery
-  - pip install scikit-image
-  - pip install coloredlogs
 script:
-- python setup.py install
-- coverage run spectractor/*.py
-- coverage run --omit=spectractor/pipeline/pipeline.py spectractor/pipeline/*.py
-- nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker  --with-coverage --cover-package=spectractor
+  - pip install numpy nose coloredlogs coverage coveralls
+  - pip install -r requirements.txt
+  - python setup.py build
+  - python setup.py install
+  - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
+  - ./coverage_and_test.sh
+#- coverage run -a --source=spectractor spectractor/*.py
+#- coverage run -a --source=spectractor extractor simulator fit
+
 after_success:
-- coveralls
+  - coveralls

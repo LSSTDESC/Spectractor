@@ -4,11 +4,19 @@ import numpy as np
 import astropy.units as units
 from astropy import constants as const
 import os
+import matplotlib as mpl
+logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 # Paths
 mypath = os.path.dirname(__file__)
-HOLO_DIR = os.path.join(mypath, "pipeline/dispersers/")
+HOLO_DIR = os.path.join(mypath, "extractor/dispersers/")
 THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
+
+# Plots
+DISPLAY = True
+if os.environ.get('DISPLAY', '') == '':
+    mpl.use('agg')
+    DISPLAY = False
 
 # CCD characteristics
 IMSIZE = 2048  # size of the image in pixel
@@ -26,6 +34,7 @@ OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
 OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
 OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
 EPOCH = "J2000.0"
+TELESCOPE_TRANSMISSION_SYSTEMATICS = 0.005
 
 # Filters
 HALPHA_CENTER = 655.9e-6  # center of the filter in mm

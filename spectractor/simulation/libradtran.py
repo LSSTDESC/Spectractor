@@ -57,15 +57,13 @@ class Libradtran:
         f.close()
 
     def run(self, inp, out, path=''):
-        if parameters.DEBUG:
-            self.my_logger.info("Running uvspec with settings file: ", inp)
-            self.my_logger.info("Output to file                : ", out)
+        #self.my_logger.debug("Running uvspec with settings file: ", inp)
+        #self.my_logger.debug("Output to file                : ", out)
         if path != '':
             cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
         else:
             cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
-        if parameters.DEBUG:
-            self.my_logger.info("uvspec cmd: ", cmd)
+        #self.my_logger.debug("uvspec cmd: ", cmd)
         #        p   = call(cmd,shell=True,stdin=PIPE,stdout=PIPE)
         p = Popen(cmd, shell=True, stdout=PIPE)
         p.wait()
@@ -87,7 +85,7 @@ class Libradtran:
             print(' 5) pressure =', pressure)
             print('--------------------------------------------')
 
-        # build the part 1 of filename
+        # build the part 1 of file_name
         base_filename_part1 = self.Prog + '_' + parameters.OBS_NAME + '_' + self.equation_solver + '_'
 
         aerosol_string = '500 ' + str(aerosol)

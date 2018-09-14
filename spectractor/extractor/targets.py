@@ -16,10 +16,39 @@ if os.getenv("PYSYN_CDBS"):
 class Target:
 
     def __init__(self, label, verbose=False):
+        """Initialize Traget object.
+
+        Parameters
+        ----------
+        label: str
+            String label to name the target
+        verbose: book, optional
+            Set True to increase verbosity (default: False)
+
+        Examples
+        --------
+
+        Emission line object:
+        >>> t = Target('3C273')
+        >>> print(t.label)
+        3C273
+        >>> print(t.coord.dec)
+        2d03m08.598s
+        >>> print(t.emission_spectrum)
+        True
+
+        Standard star:
+        >>> t = Target('HD111980')
+        >>> print(t.label)
+        HD111980
+        >>> print(t.coord.dec)
+        -18d31m20.009s
+        >>> print(t.emission_spectrum)
+        False
+
+        """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.label = label
-        self.ra = None
-        self.dec = None
         self.coord = None
         self.type = None
         self.redshift = 0
@@ -32,17 +61,37 @@ class Target:
         self.load()
 
     def load(self):
+        """Load the coordinates of the target.
+
+        Examples
+        --------
+        >>> t = Target('3C273')
+        >>> print(t.coord.dec)
+        2d03m08.598s
+
+        """
         Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype')
         simbad = Simbad.query_object(self.label)
         if simbad is not None:
             if self.verbose:
-                print(simbad)
+                self.my_logger.info(f'\n\tSimbad: {simbad}')
             self.coord = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(units.hourangle, units.deg))
         else:
             self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
         self.load_spectra()
 
     def load_spectra(self):
+        """Load reference spectra from Pysynphot database or NED database.
+
+        Examples
+        --------
+        >>> t = Target('3C273')
+        >>> print(t.spectra[0][:4])
+        [  0.00000000e+00   2.50485769e-14   2.42380612e-14   2.40887886e-14]
+        >>> t = Target('HD111980')
+        >>> print(t.spectra[0][:4])
+        [  2.16890002e-13   2.66480010e-13   2.03540011e-13   2.38780004e-13]
+        """
         self.wavelengths = []  # in nm
         self.spectra = []
         # first try with pysynphot
@@ -73,7 +122,7 @@ class Target:
                 # Try with NED query
                 # print 'Loading target %s from NED...' % self.label
                 ned = Ned.query_object(self.label)
-                hdulists = Ned.get_spectra(self.label)
+                hdulists = Ned.get_spectra(self.label, show_progress=False)
                 self.redshift = ned['Redshift'][0]
                 self.emission_spectrum = True
                 self.hydrogen_only = False
@@ -110,6 +159,20 @@ class Target:
         self.build_sed()
 
     def build_sed(self, index=0):
+        """Interpolate the database reference spectra and return self.sed as a function of the wavelength.
+
+        Parameters
+        ----------
+        index: int
+            Index of the spectrum stored in the self.spectra list
+
+        Examples
+        --------
+        >>> t = Target('HD111980')
+        >>> t.build_sed(index=0)
+        >>> t.sed(550)
+        array(1.676051129017069e-11)
+        """
         if len(self.spectra) == 0:
             self.sed = lambda x: np.zeros_like(x)
         else:
@@ -117,6 +180,13 @@ class Target:
                                 fill_value=0.)
 
     def plot_spectra(self):
+        """ Plot the spectra stored in the self.spectra list.
+
+        Examples
+        --------
+        >>> t = Target('HD111980')
+        >>> t.plot_spectra()
+        """
         # target.load_spectra()  ## No global target object available  here (SDC)
         plt.figure()  # necessary to create a new plot (SDC)
         for isp, sp in enumerate(self.spectra):
@@ -126,19 +196,13 @@ class Target:
         plt.ylabel('Flux')
         plt.title(self.label)
         plt.legend()
-        plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
 
 if __name__ == "__main__":
-    import os
-    from optparse import OptionParser
+    import doctest
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
 
-    parser = OptionParser()
-    parser.add_option("-l", "--label", dest="label",
-                      help="Label of the target.", default="HD111980")
-    (opts, args) = parser.parse_args()
-
-    print('Load information on target {}'.format(opts.label))
-    target = Target(opts.label)
-    print(target.coord)
-    target.plot_spectra()
+    doctest.testmod()

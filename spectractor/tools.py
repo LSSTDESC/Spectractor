@@ -1,9 +1,10 @@
 import os, sys
-import scipy
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting, Fittable2DModel, Parameter
 from astropy.stats import sigma_clip
+from astropy.io import fits
+
 import warnings
 from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
@@ -11,7 +12,7 @@ from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 
 from skimage.feature import hessian_matrix
 
-from . import parameters
+from spectractor import parameters
 from math import floor
 
 
@@ -19,37 +20,146 @@ def gauss(x, A, x0, sigma):
     return A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 
-def gauss_and_line(x, a, b, A, x0, sigma):
-    return gauss(x, A, x0, sigma) + line(x, a, b)
-
-
 def line(x, a, b):
     return a * x + b
 
 
-def parabola(x, a, b, c):
-    return a * x * x + b * x + c
-
-
+# noinspection PyTypeChecker
 def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf)):
+    """Fit a Gaussian profile to data, using curve_fit. The mean guess value of the Gaussian
+    must not be far from the truth values. Boundaries helps a lot also.
+
+    Parameters
+    ----------
+    x: 1D-array
+        The x data values.
+    y: 1D-array
+        The y data values.
+    guess: list, [amplitude, mean, sigma]
+        List of first guessed values for the Gaussian fit (default: [10, 1000, 1]).
+    bounds: 2D-list
+        List of boundaries for the parameters [[minima],[maxima]] (default: (-np.inf, np.inf)).
+
+    Returns
+    -------
+    popt: list
+        Best fitting parameters of curve_fit.
+    pcov: 2D-list
+        Best fitting parameters covariance matrix from curve_fit.
+
+    Examples
+    --------
+    >>> x = np.arange(600.,800.,1)
+    >>> y = gauss(x, 10, 600, 10)
+    >>> print(y[0])
+    10.0
+    >>> popt, pcov = fit_gauss(x, y, guess=(3,630,3), bounds=((1,600,1),(100,800,100)))
+    >>> print(popt)
+    [  10.  600.   10.]
+    """
     popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds)
     return popt, pcov
 
 
 def multigauss_and_line(x, *params):
+    """Multiple Gaussian profile plus a straight line to data.
+    The order of the parameters is line slope, line intercept,
+    and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    deviation.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    *params: list of float parameters as described above.
+
+    Returns
+    -------
+    y: array
+        The y profile values.
+
+    Examples
+    --------
+    >>> x = np.arange(600.,800.,1)
+    >>> y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)
+    >>> print(y[0])
+    610.0
+    """
     out = line(x, params[0], params[1])
-    for k in range((len(params) - 2) / 3):
+    for k in range((len(params) - 2) // 3):
         out += gauss(x, *params[2 + 3 * k:2 + 3 * k + 3])
     return out
 
 
-def fit_multigauss_and_line(x, y, guess=[10, 1000, 1, 0, 0, 1], bounds=(-np.inf, np.inf)):
+# noinspection PyTypeChecker
+def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf)):
+    """Fit a multiple Gaussian profile plus a straight line to data, using curve_fit.
+    The mean guess value of the Gaussian must not be far from the truth values.
+    Boundaries helps a lot also. The order of the parameters is line slope, line intercept,
+    and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    deviation.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    guess: list, [slope, intercept, amplitude, mean, sigma]
+        List of first guessed values for the Gaussian fit (default: [0, 1, 10, 1000, 1]).
+    bounds: 2D-list
+        List of boundaries for the parameters [[minima],[maxima]] (default: (-np.inf, np.inf)).
+
+    Returns
+    -------
+    popt: list
+        Best fitting parameters of curve_fit.
+    pcov: 2D-list
+        Best fitting parameters covariance matrix from curve_fit.
+
+    Examples
+    --------
+    >>> x = np.arange(600.,800.,1)
+    >>> y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)
+    >>> print(y[0])
+    610.0
+    >>> bounds = ((-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,100,800,100,100,800,100))
+    >>> popt, pcov = fit_multigauss_and_line(x, y, guess=(0,1,3,630,3,3,770,3), bounds=bounds)
+    >>> print(popt)
+    [   1.   10.   20.  650.    3.   40.  750.   10.]
+    """
     maxfev = 100000
     popt, pcov = curve_fit(multigauss_and_line, x, y, p0=guess, bounds=bounds, maxfev=maxfev)
     return popt, pcov
 
 
+# noinspection PyTypeChecker
 def multigauss_and_bgd(x, *params):
+    """Multiple Gaussian profile plus a polynomial background to data, using curve_fit.
+    The degree of the polynomial background is fixed by parameters.BGD_ORDER.
+    The order of the parameters is a first block BGD_ORDER+1 parameters (from high to low monomial terms,
+    same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    deviation.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    *params: list of float parameters as described above.
+
+    Returns
+    -------
+    y: array
+        The y profile values.
+
+    Examples
+    --------
+    >>> x = np.arange(600.,800.,1)
+    >>> p = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd(x, *p)
+    >>> print(y[0])
+    349.0
+    """
     bgd_nparams = parameters.BGD_NPARAMS
     out = np.polyval(params[0:bgd_nparams], x)
     for k in range((len(params) - bgd_nparams) // 3):
@@ -57,40 +167,141 @@ def multigauss_and_bgd(x, *params):
     return out
 
 
-def fit_multigauss_and_bgd(x, y, guess=[10, 1000, 1, 0, 0, 1], bounds=(-np.inf, np.inf), sigma=None):
-    maxfev = 1000000
+# noinspection PyTypeChecker
+def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None):
+    """Fit a multiple Gaussian profile plus a polynomial background to data, using curve_fit.
+    The mean guess value of the Gaussian must not be far from the truth values.
+    Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.BGD_ORDER.
+    The order of the parameters is a first block BGD_ORDER+1 parameters (from high to low monomial terms,
+    same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    deviation.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    guess: list, [BGD_ORDER+1 parameters, 3*number of Gaussian parameters]
+        List of first guessed values for the Gaussian fit (default: [0, 1, 10, 1000, 1]).
+    bounds: array
+        List of boundaries for the parameters [[minima],[maxima]] (default: (-np.inf, np.inf)).
+    sigma: array, optional
+        The uncertainties on the y values (default: None).
+
+    Returns
+    -------
+    popt: array
+        Best fitting parameters of curve_fit.
+    pcov: array
+        Best fitting parameters covariance matrix from curve_fit.
+
+    Examples
+    --------
+    >>> x = np.arange(600.,800.,1)
+    >>> p = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd(x, *p)
+    >>> print(y[0])
+    349.0
+    >>> err = 0.1 * np.sqrt(y)
+    >>> bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
+    >>> popt, pcov = fit_multigauss_and_bgd(x, y, guess=(0,1,-1,1,10,640,3,20,760,5), bounds=bounds, sigma=err)
+    >>> assert np.all(np.isclose(p,popt))
+    >>> fit = multigauss_and_bgd(x, *popt)
+
+    .. plot::
+
+        import matplotlib.pyplot as plt
+        plt.errorbar(x,y,yerr=err,linestyle='None')
+        plt.plot(x,fit,'r-')
+        plt.show()
+    """
+    maxfev = 100000
     popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma)
     return popt, pcov
 
 
-def fit_line(x, y, guess=[1, 1], bounds=(-np.inf, np.inf), sigma=None):
-    popt, pcov = curve_fit(line, x, y, p0=guess, bounds=bounds, sigma=sigma)
-    return popt, pcov
+# noinspection PyTupleAssignmentBalance
+def fit_poly1d(x, y, order, w=None):
+    """Fit a 1D polynomial function to data. Use np.polyfit.
 
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    order: int
+        The degree of the polynomial function.
+    w: array, optional
+        Weights on the y data (default: None).
 
-def fit_bgd(x, y, guess=[1] * parameters.BGD_NPARAMS, bounds=(-np.inf, np.inf), sigma=None):
-    bgd = lambda x, *p: np.polyval(p, x)
-    popt, pcov = curve_fit(bgd, x, y, p0=guess, bounds=bounds, sigma=sigma)
-    return popt, pcov
+    Returns
+    -------
+    fit: list
+        The best fitting parameter values.
+    cov: 2D-array
+        The covariance matrix
+    model: array
+        The best fitting profile
 
-
-def fit_poly(x, y, degree, w=None):
+    Examples
+    --------
+    >>> x = np.arange(500., 1000., 1)
+    >>> p = [3,2,1,0]
+    >>> y = np.polyval(p, x)
+    >>> err = np.ones_like(y)
+    >>> fit, cov, model = fit_poly1d(x,y,order=3)
+    >>> assert np.all(np.isclose(p,fit,3))
+    >>> fit, cov2, model2 = fit_poly1d(x,y,order=3,w=err)
+    >>> assert np.all(np.isclose(p,fit,3))
+    """
     cov = -1
-    if len(x) > degree:
+    if len(x) > order:
         if w is None:
-            fit, cov = np.polyfit(x, y, degree, cov=True)
+            fit, cov = np.polyfit(x, y, order, cov=True)
         else:
-            fit, cov = np.polyfit(x, y, degree, cov=True, w=w)
-        model = lambda x: np.polyval(fit, x)
+            fit, cov = np.polyfit(x, y, order, cov=True, w=w)
+        model = lambda xx: np.polyval(fit, xx)
     else:
-        fit = [0] * (degree + 1)
+        fit = [0] * (order + 1)
         model = y
     return fit, cov, model
 
 
-def fit_poly2d(x, y, z, degree):
-    # Fit the data using astropy.modeling
-    p_init = models.Polynomial2D(degree=2)
+# noinspection PyTypeChecker,PyUnresolvedReferences
+def fit_poly2d(x, y, z, order):
+    """Fit a 2D polynomial function to data. Use astropy.modeling.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    z: array
+        The z data values.
+    order: int
+        The degree of the polynomial function.
+
+    Returns
+    -------
+    model: Astropy model
+        The best fitting astropy polynomial model
+
+    Examples
+    --------
+    >>> x, y = np.mgrid[:50,:50]
+    >>> z = x**2 + y**2 - 2*x*y
+    >>> fit = fit_poly2d(x, y, z, order=2)
+    >>> assert np.isclose(fit.c0_0.value, 0)
+    >>> assert np.isclose(fit.c1_0.value, 0)
+    >>> assert np.isclose(fit.c2_0.value, 1)
+    >>> assert np.isclose(fit.c0_1.value, 0)
+    >>> assert np.isclose(fit.c0_2.value, 1)
+    >>> assert np.isclose(fit.c1_1.value, -2)
+    """
+    p_init = models.Polynomial2D(degree=order)
     fit_p = fitting.LevMarLSQFitter()
     with warnings.catch_warnings():
         # Ignore model linearity warning from the fitter
@@ -100,6 +311,43 @@ def fit_poly2d(x, y, z, degree):
 
 
 def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
+    """Fit a 1D polynomial function to data. Use astropy.modeling.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    order: int
+        The degree of the polynomial function (default: 2).
+    sigma: float
+        Value of the sigma-clipping (default: 3.0).
+    niter: int
+        The number of iterations to converge (default: 3).
+
+    Returns
+    -------
+    model: Astropy model
+        The best fitting astropy model.
+
+    Examples
+    --------
+    >>> x = np.arange(500., 1000., 1)
+    >>> p = [3,2,1,0]
+    >>> y = np.polyval(p, x)
+    >>> y[::10] = 0.
+    >>> model = fit_poly1d_outlier_removal(x,y,order=3,sigma=3)
+    >>> print('{:.2f}'.format(model.c0.value))
+    0.00
+    >>> print('{:.2f}'.format(model.c1.value))
+    1.00
+    >>> print('{:.2f}'.format(model.c2.value))
+    2.00
+    >>> print('{:.2f}'.format(model.c3.value))
+    3.00
+
+    """
     gg_init = models.Polynomial1D(order)
     gg_init.c0.min = np.min(y)
     gg_init.c0.max = 2 * np.max(y)
@@ -120,12 +368,48 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
         plt.plot(x, or_fitted_model(x), 'r--',
                  label="model fitted w/ filtered data")
         plt.legend(loc=2, numpoints=1)
-        plt.show()
+        if parameters.DISPLAY: plt.show()
         '''
         return or_fitted_model
 
 
 def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
+    """Fit a 2D polynomial function to data. Use astropy.modeling.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    z: array
+        The z data values.
+    order: int
+        The degree of the polynomial function (default: 2).
+    sigma: float
+        Value of the sigma-clipping (default: 3.0).
+    niter: int
+        The number of iterations to converge (default: 30).
+
+    Returns
+    -------
+    model: Astropy model
+        The best fitting astropy model.
+
+    Examples
+    --------
+    >>> x, y = np.mgrid[:50,:50]
+    >>> z = x**2 + y**2 - 2*x*y
+    >>> z[::10,::10] = 0.
+    >>> fit = fit_poly2d_outlier_removal(x,y,z,order=2,sigma=3)
+    >>> assert np.isclose(fit.c0_0.value, 0)
+    >>> assert np.isclose(fit.c1_0.value, 0)
+    >>> assert np.isclose(fit.c2_0.value, 1)
+    >>> assert np.isclose(fit.c0_1.value, 0)
+    >>> assert np.isclose(fit.c0_2.value, 1)
+    >>> assert np.isclose(fit.c1_1.value, -2)
+
+    """
     gg_init = models.Polynomial2D(order)
     gg_init.c0_0.min = np.min(z)
     gg_init.c0_0.max = 2 * np.max(z)
@@ -164,7 +448,8 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE: print(or_fitted_model)
+        if parameters.VERBOSE:
+            print(or_fitted_model)
         return or_fitted_model
 
 
@@ -185,7 +470,8 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bound
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE: print(or_fitted_model)
+        if parameters.VERBOSE:
+            print(or_fitted_model)
         return or_fitted_model
 
 
@@ -227,7 +513,7 @@ class Star2D(Fittable2DModel):
             -(1 / (2. * stddev ** 2)) * (x - x_mean) ** 2 - (1 / (2. * stddev ** 2)) * (y - y_mean) ** 2)
         d_stddev = amplitude * ((x - x_mean) ** 2 + (y - y_mean) ** 2) / (stddev ** 3) * np.exp(
             -(1 / (2. * stddev ** 2)) * (x - x_mean) ** 2 - (1 / (2. * stddev ** 2)) * (y - y_mean) ** 2)
-        d_saturation = np.zeros_like(x)
+        d_saturation = saturation * np.zeros_like(x)
         return [d_amplitude, d_x_mean, d_y_mean, d_stddev, d_saturation]
 
 
@@ -249,19 +535,59 @@ def fit_star2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds=
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE: print(or_fitted_model)
+        if parameters.VERBOSE:
+            print(or_fitted_model)
         return or_fitted_model
 
 
 def find_nearest(array, value):
+    """Find the nearest index and value in an array.
+
+    Parameters
+    ----------
+    array: array
+        The array to inspect.
+    value: float
+        The value to look for.
+
+    Returns
+    -------
+    index: int
+        The array index of the nearest value close to *value*
+    val: float
+        The value fo the array at index.
+
+    Examples
+    --------
+    >>> x = np.arange(0.,10.)
+    >>> idx, val = find_nearest(x, 3.3)
+    >>> print(idx, val)
+    3 3.0
+    """
     idx = (np.abs(array - value)).argmin()
     return idx, array[idx]
 
 
-def ensure_dir(f):
-    d = os.path.dirname(f)
-    if not os.path.exists(f):
-        os.makedirs(f)
+def ensure_dir(directory_name):
+    """Ensure that *directory_name* directory exists. If not, create it.
+
+    Parameters
+    ----------
+    directory_name: str
+        The directory name.
+
+    Examples
+    --------
+    >>> ensure_dir('tests')
+    >>> os.path.exists('tests')
+    True
+    >>> ensure_dir('tests/mytest')
+    >>> os.path.exists('tests/mytest')
+    True
+    >>> os.rmdir('./tests/mytest')
+    """
+    if not os.path.exists(directory_name):
+        os.makedirs(directory_name)
 
         
 def weighted_avg_and_std(values, weights):
@@ -298,7 +624,7 @@ def hessian_and_theta(data, margin_cut=1):
 
 
 def filter_stars_from_bgd(data, margin_cut=1):
-    lambda_plus, lambda_minus, theta = hessian_and_theta(np.copy(data), margin_cut=1)
+    lambda_plus, lambda_minus, theta = hessian_and_theta(np.copy(data), margin_cut=margin_cut)
     # thresholds
     lambda_threshold = np.median(lambda_minus) - 2 * np.std(lambda_minus)
     mask = np.where(lambda_minus < lambda_threshold)
@@ -306,16 +632,28 @@ def filter_stars_from_bgd(data, margin_cut=1):
     return data
 
 
-def extract_info_from_CTIO_header(obj, header):
-    obj.date_obs = header['DATE-OBS']
-    obj.airmass = header['AIRMASS']
-    obj.expo = header['EXPTIME']
-    obj.filters = header['FILTERS']
-    obj.filter = header['FILTER1']
-    obj.disperser = header['FILTER2']
-
-
 def fftconvolve_gaussian(array, reso):
+    """Convolve an 1D or 2D array with a Gaussian profile of given standard deviation.
+
+    Parameters
+    ----------
+    array: array
+        The array to convolve.
+    reso: float
+        The standard deviation of the Gaussian profile.
+
+    Returns
+    -------
+    convolved: array
+        The convolved array, same size and shape as input.
+
+    Examples
+    --------
+    >>> array = np.ones(20)
+    >>> output = fftconvolve_gaussian(array, 3)
+    >>> print(output[:3])
+    [ 0.5         0.63125312  0.74870357]
+    """
     if array.ndim == 2:
         kernel = gaussian(array.shape[1], reso)
         kernel /= np.sum(kernel)
@@ -330,48 +668,78 @@ def fftconvolve_gaussian(array, reso):
     return array
 
 
-def formatting_numbers(value, errorhigh, errorlow, std=None, label=None):
-    str_value = ""
-    str_errorhigh = ""
-    str_errorlow = ""
+def formatting_numbers(value, error_high, error_low, std=None, label=None):
+    """Format a physical value and its uncertainties. Round the uncertainties
+    to the first significant digit, and do the same for the physical value.
+
+    Parameters
+    ----------
+    value: float
+        The physical value.
+    error_high: float
+        Upper uncertainty.
+    error_low: float
+        Lower uncertainty
+    std: float, optional
+        The RMS of the physical parameter (default: None).
+    label: str, optional
+        The name of the physical parameter to output (default: None).
+
+    Returns
+    -------
+    text: tuple
+        The formatted output strings inside a tuple.
+
+    Examples
+    --------
+    >>> text = formatting_numbers(3., 0.789, 0.500, std=0.45, label='test')
+    >>> print(text)
+    ('test', '3.0', '0.8', '0.5', '0.5')
+    >>> text = formatting_numbers(3., 0.07, 0.008, std=0.03, label='test')
+    >>> print(text)
+    ('test', '3.000', '0.07', '0.008', '0.03')
+    """
     str_std = ""
     out = []
-    if label is not None: out.append(label)
-    power10 = min(int(floor(np.log10(np.abs(errorhigh)))), int(floor(np.log10(np.abs(errorlow)))))
+    if label is not None:
+        out.append(label)
+    power10 = min(int(floor(np.log10(np.abs(error_high)))), int(floor(np.log10(np.abs(error_low)))))
     if np.isclose(0.0, float("%.*f" % (abs(power10), value))):
         str_value = "%.*f" % (abs(power10), 0)
-        str_errorhigh = "%.*f" % (abs(power10), errorhigh)
-        str_errorlow = "%.*f" % (abs(power10), errorlow)
+        str_error_high = "%.*f" % (abs(power10), error_high)
+        str_error_low = "%.*f" % (abs(power10), error_low)
         if std is not None:
             str_std = "%.*f" % (abs(power10), std)
     elif power10 > 0:
-        str_value = "%d" % value
-        str_errorhigh = "%d" % errorhigh
-        str_errorlow = "%d" % errorlow
+        str_value = f"{value:.0f}"
+        str_error_high = f"{error_high:.0f}"
+        str_error_low = f"{error_low:.0f}"
         if std is not None:
-            str_std = "%d" % std
+            str_std = f"{std:.0f}"
     else:
-        if int(floor(np.log10(np.abs(errorhigh)))) == int(floor(np.log10(np.abs(errorlow)))):
+        if int(floor(np.log10(np.abs(error_high)))) == int(floor(np.log10(np.abs(error_low)))):
             str_value = "%.*f" % (abs(power10), value)
-            str_errorhigh = "%.1g" % errorhigh
-            str_errorlow = "%.1g" % errorlow
+            str_error_high = f"{error_high:.1g}"
+            str_error_low = f"{error_low:.1g}"
             if std is not None:
-                str_std = "%.1g" % std
-        elif int(floor(np.log10(np.abs(errorhigh)))) > int(floor(np.log10(np.abs(errorlow)))):
+                str_std = f"{std:.1g}"
+        elif int(floor(np.log10(np.abs(error_high)))) > int(floor(np.log10(np.abs(error_low)))):
             str_value = "%.*f" % (abs(power10), value)
-            str_errorhigh = "%.2g" % errorhigh
-            str_errorlow = "%.1g" % errorlow
+            str_error_high = f"{error_high:.2g}"
+            str_error_low = f"{error_low:.1g}"
             if std is not None:
-                str_std = "%.2g" % std
+                str_std = f"{std:.2g}"
         else:
             str_value = "%.*f" % (abs(power10), value)
-            str_errorhigh = "%.1g" % errorhigh
-            str_errorlow = "%.2g" % errorlow
+            str_error_high = f"{error_high:.1g}"
+            str_error_low = f"{error_low:.2g}"
             if std is not None:
-                str_std = "%.2g" % std
-    out += [str_value, str_errorhigh]
-    if not np.isclose(errorhigh, errorlow): out += [str_errorlow]
-    if std is not None: out += [str_std]
+                str_std = f"{std:.2g}"
+    out += [str_value, str_error_high]
+    if not np.isclose(error_high, error_low):
+        out += [str_error_low]
+    if std is not None:
+        out += [str_std]
     out = tuple(out)
     return out
 
@@ -379,8 +747,6 @@ def formatting_numbers(value, errorhigh, errorlow, std=None, label=None):
 def pixel_rotation(x, y, theta, x0=0, y0=0):
     u = np.cos(theta) * (x - x0) + np.sin(theta) * (y - y0)
     v = -np.sin(theta) * (x - x0) + np.cos(theta) * (y - y0)
-    x = u + x0
-    y = v + y0
     return u, v
 
 
@@ -437,3 +803,37 @@ def clean_target_spikes(data, saturation):
         saturated_pixels = np.where(data >= saturation)
         delta = delta - len(saturated_pixels[0])
     return data
+
+
+def load_fits(file_name, hdu_index=0):
+    hdu_list = fits.open(file_name)
+    header = hdu_list[hdu_index].header
+    data = hdu_list[hdu_index].data
+    hdu_list.close()  # need to free allocation for file descripto
+    return header, data
+
+
+def extract_info_from_CTIO_header(obj, header):
+    obj.date_obs = header['DATE-OBS']
+    obj.airmass = header['AIRMASS']
+    obj.expo = header['EXPTIME']
+    obj.filters = header['FILTERS']
+    obj.filter = header['FILTER1']
+    obj.disperser = header['FILTER2']
+
+
+def save_fits(file_name, header, data, overwrite=False):
+    hdu = fits.PrimaryHDU()
+    hdu.header = header
+    hdu.data = data
+    output_directory = '/'.join(file_name.split('/')[:-1])
+    ensure_dir(output_directory)
+    hdu.writeto(file_name, overwrite=overwrite)
+
+
+if __name__ == "__main__":
+    import doctest
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
+
+    doctest.testmod()

@@ -1,12 +1,12 @@
 from spectractor import parameters
-from spectractor.pipeline.pipeline import Spectractor
+from spectractor.extractor.extractor import Spectractor
 from spectractor.logbook import LogBook
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument(dest="input", metavar='path', default=["notebooks/fits/trim_20170605_007.fits"],
+    parser.add_argument(dest="input", metavar='path', default=["tests/data/reduc_20170605_028.fits"],
                         help="Input fits file name. It can be a list separated by spaces, or it can use * as wildcard.",
                         nargs='*')
     parser.add_argument("-d", "--debug", dest="debug", action="store_true",
@@ -15,7 +15,7 @@ if __name__ == "__main__":
                         help="Enter verbose (print more stuff).", default=False)
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
                         help="Write results in given output directory (default: ./outputs/).")
-    parser.add_argument("-c", "--csv", dest="csv", default="ctiofulllogbook_jun2017_v4.csv",
+    parser.add_argument("-c", "--csv", dest="csv", default="ctiofulllogbook_jun2017_v5.csv",
                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
     args = parser.parse_args()
 

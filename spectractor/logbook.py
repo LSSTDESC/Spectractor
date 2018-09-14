@@ -1,13 +1,16 @@
 import sys
 import os
-import matplotlib.pyplot as plt
-import spectractor.parameters as parameters
+from spectractor import parameters
 import csv
+import matplotlib as mpl
+if os.environ.get('DISPLAY', '') == '':
+    mpl.use('agg')
+
+import matplotlib.pyplot as plt
 
 
-# noinspection PyShadowingNames
 class LogBook:
-    """Class to load and analyse observation logbook csv files."""
+    """Class to load_image and analyse observation logbook csv files."""
 
     def __init__(self, logbook="ctiofulllogbook_jun2017_v5.csv"):
         """Load and initialise the logbook
@@ -19,10 +22,10 @@ class LogBook:
 
         Examples
         ----------
-        >>> logbook = LogBook('ctio_png+qso_jun2017.csv')
+        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
         >>> assert logbook.csvfile is not None
         >>> print(logbook.logbook)
-        ctio_png+qso_jun2017.csv
+        ./ctiofulllogbook_jun2017_v5.csv
 
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
@@ -34,7 +37,7 @@ class LogBook:
         self.reader = csv.DictReader(self.csvfile, delimiter=';', dialect=csv.excel_tab)
 
     def search_for_image(self, filename):
-        """Look for an image file name in the logbook and load properties:
+        """Look for an image file name in the logbook and load_image properties:
         * Obj-posXpix and Obj-posYpix: the [x0,y0] guessed pixel position in the image
         * Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables
             in parameters.py
@@ -53,15 +56,6 @@ class LogBook:
             the x position of the target (in pixel)
         ypos: int
             the y position of the target (in pixel)
-
-        Examples
-        --------
-        >>> logbook = LogBook('ctio_png+qso_jun2017.csv')
-        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
-        >>> assert xpos is None
-        >>> target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
-        >>> print(target, xpos, ypos)
-        PKS1510-089 830 590
 
         """
         target = None
@@ -114,11 +108,6 @@ class LogBook:
         ----------
         column_names: list, str
             List of column names to plot versus time from the log book.
-
-        Examples
-        --------
-        >>> logbook = LogBook('ctio_png+qso_jun2017.csv')
-        >>> logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
         """
         dates = []
         cols = []
@@ -136,10 +125,13 @@ class LogBook:
             ax[icol].set_ylabel(col)
         fig.autofmt_xdate()
         fig.tight_layout()
-        plt.show()
+        if parameters.DISPLAY: plt.show()
 
 
 if __name__ == "__main__":
     import doctest
+    import numpy as np
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
