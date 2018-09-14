@@ -9,3 +9,5 @@
 *.csv
 *_lambdaplot256000.txt
 *.DS_Store
+*.xlsx
+.idea

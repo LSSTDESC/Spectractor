@@ -1,41 +1,61 @@
-# coding=utf-8
-from spectractor import *
-import parameters
+import sys
+import os
+from spectractor import parameters
 import csv
+import matplotlib as mpl
+if os.environ.get('DISPLAY', '') == '':
+    mpl.use('agg')
+
+import matplotlib.pyplot as plt
 
 
-# noinspection PyShadowingNames
 class LogBook:
-    """Class to load and analyse observation logbook csv files."""
+    """Class to load_image and analyse observation logbook csv files."""
 
     def __init__(self, logbook="ctiofulllogbook_jun2017_v5.csv"):
         """Load and initialise the logbook
 
-        Args:
-            logbook (str): path to the logbook. Must be a CSV file.
+        Parameters
+        ----------
+        logbook: str
+            Path to the logbook. Must be a CSV file.
+
+        Examples
+        ----------
+        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        >>> assert logbook.csvfile is not None
+        >>> print(logbook.logbook)
+        ./ctiofulllogbook_jun2017_v5.csv
+
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.logbook = logbook
         if not os.path.isfile(logbook):
             self.my_logger.error('CSV logbook file {} not found.'.format(logbook))
             sys.exit()
-        self.csvfile = open(self.logbook, 'rU')
+        self.csvfile = open(self.logbook, 'rU', encoding='latin-1')
         self.reader = csv.DictReader(self.csvfile, delimiter=';', dialect=csv.excel_tab)
 
     def search_for_image(self, filename):
-        """Look for an image file name in the logbook and load properties:
+        """Look for an image file name in the logbook and load_image properties:
         * Obj-posXpix and Obj-posYpix: the [x0,y0] guessed pixel position in the image
         * Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables
             in parameters.py
         * object: the name of the target
 
-        Args:
-            filename (str): the fits image file name (not the path, only the file name.)
+        Parameters
+        ----------
+        filename: str
+            the fits image file name (not the path, only the file name.)
 
-        Returns:
-            target: the name of the target
-            xpos: the x position of the target (in pixel)
-            ypos: the y position of the target (in pixel)
+        Returns
+        -------
+        target: str
+            the name of the target
+        xpos: int
+            the x position of the target (in pixel)
+        ypos: int
+            the y position of the target (in pixel)
 
         """
         target = None
@@ -83,6 +103,11 @@ class LogBook:
 
         Args:
             column_names: a list of the names of the columns to plot
+
+        Parameters
+        ----------
+        column_names: list, str
+            List of column names to plot versus time from the log book.
         """
         dates = []
         cols = []
@@ -100,18 +125,13 @@ class LogBook:
             ax[icol].set_ylabel(col)
         fig.autofmt_xdate()
         fig.tight_layout()
-        plt.show()
+        if parameters.DISPLAY: plt.show()
 
 
 if __name__ == "__main__":
-    from optparse import OptionParser
+    import doctest
+    import numpy as np
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
 
-    parser = OptionParser()
-    parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
-                      help="Enter verbose (print more stuff).", default=False)
-    (opts, args) = parser.parse_args()
-
-    parameters.VERBOSE = opts.verbose
-
-    logbook = LogBook()
-    logbook.plot_columns_vs_date(['Temperature', 'seeing', 'PWV (mm)'])
+    doctest.testmod()

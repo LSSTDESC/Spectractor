@@ -1,0 +1,11 @@
+numpy
+scipy
+matplotlib
+astropy
+astroquery
+coloredlogs
+scikit-image
+pysynphot
+emcee
+coverage
+coveralls
