@@ -7,10 +7,16 @@ The goal of Spectractor is to extract spectra from CTIO images in order to test 
 
 ## Installation
 
-Spectractor is written in Python 2.7. It needs the numpy, scipy, astropy, astroquery, pysynphot modules for science computations, and also logging and coloredlogs. To install, just run
+Spectractor is written in Python 3.6. It needs the numpy, scipy, astropy, astroquery, pysynphot modules for science computations, and also logging and coloredlogs. To install, just run
 ```
-pip install .
+pip install -r requirements.txt .
 ```
+
+### External dependencies
+
+For the simulation of spectra, Spectractor needs the following external libraries:
+- libradtran, with netcdf and hdf5
+
 
 ## Basic usage
 
@@ -38,7 +44,7 @@ Spectractor comes with two verbosity modes, ste in the `parameters.py` file:
 
 ### Plot an extracted spectrum
 
-To check a posteriori the quality of a spectrum, it is possible to load it via the `Spectrum` class and plot it:
+To check a posteriori the quality of a spectrum, it is possible to load_image it via the `Spectrum` class and plot it:
 ```
 spec = Spectrum('./outputs/trim_20170605_007_spectrum.fits')
 spec.plot_spectrum()
@@ -66,3 +72,45 @@ A tutorial Jupyter notebook is available in the `notebooks` folder.
 
 
 ## Description of the files and classes
+
+# Simulator
+
+- author : Sylvie Dagoret-Campagne
+- affiliation : LAL/CNRS/IN2P3
+- date : March 5th 2018
+- Project : DESC-LSST- Calibration
+- Group : PCWG
+
+
+Package to simulate standard Star spectrum for Auxiliary Telescope and Atmospheric calibration purpose
+
+
+- Simulator must be installed at the same level as Spectractor package
+- Simulator requires Spectractor tools
+
+
+## Simulator library
+
+Main user interface for simulating the observable spectra
+ 
+- **spectractorsim.py**
+
+## LibRadTran interfaces
+
+
+### For CTIO : **libsimulateTranspCTIOScattAbsAer.py**
+		
+### tool : **UVspec.py**					
+### deprecated : **libsimulateTranspLSSTScattAbsAer.py**
+
+
+## CTIO Transparencies
+
+- libCTIOTransm.py	
+
+
+### util
+
+
+git remote set-url origin git@github.com:LSSTDESC/Simulator.git
+
