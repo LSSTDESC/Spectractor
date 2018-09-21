@@ -142,8 +142,8 @@ class Image(object):
                        label='Target', linewidth=2)
 
     def plot_image(self, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                   target_pixcoords=None):
-        fig, ax = plt.subplots(1, 1, figsize=[9.3, 8])
+                   target_pixcoords=None,figsize=[9.3, 8]):
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
         self.plot_image_simple(ax, data=data, scale=scale, title=title, units=units, plot_stats=plot_stats,
                                target_pixcoords=target_pixcoords)
         plt.legend()
