@@ -107,7 +107,8 @@ class FitWorkspace:
         self.p = likelihood.mean_vec
         simulate(*self.p)
         self.plot_fit()
-        likelihood.triangle_plots()
+        figure_name = self.filename.replace('.fits', '_triangle.pdf')
+        likelihood.triangle_plots(output_filename=figure_name)
 
     def chain2likelihood(self, pdfonly=False, walker_index=-1):
         if walker_index >= 0:
