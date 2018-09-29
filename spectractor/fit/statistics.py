@@ -410,7 +410,7 @@ class Likelihood(Grid):
                             if j < i:
                                 self.contours[i][j].grid = self.grid
 
-    def triangle_plots(self):
+    def triangle_plots(self,output_filename=''):
         n = self.dim
         fig = plt.figure(1, figsize=(16, 9))
         if parameters.PAPER:
@@ -464,9 +464,9 @@ class Likelihood(Grid):
         fig.subplots_adjust(hspace=0, wspace=0)
         if parameters.DISPLAY:
             plt.show()
-        # if parameters.SAVE:
-        #    print('Save ' + parameters.PLOT_DIR + 'triangle_plot.eps')
-        #    fig.savefig(parameters.PLOT_DIR + 'triangle_plot.eps', bbox_inches='tight')
+        if output_filename != '':
+            print(f'Save figure: {output_filename}')
+            fig.savefig(output_filename, dpi=100, bbox_inches='tight')
         return fig
 
     def max_likelihood_stats(self):
