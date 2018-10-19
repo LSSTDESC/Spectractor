@@ -420,7 +420,6 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        print(fit.fit_info)
         return or_fitted_model
 
 
@@ -502,7 +501,7 @@ class Star2D(Fittable2DModel):
         rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
         rr_gg = rr/(gamma*gamma)
         a = amplitude * ( np.exp(-(rr / (2. * stddev * stddev))) + eta * (1 + rr_gg) ** (-alpha))
-        print(amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation)
+        # print(amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation)
         if isinstance(x, float) and isinstance(y, float):
             if a > saturation:
                 return saturation
