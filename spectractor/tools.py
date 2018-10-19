@@ -474,26 +474,297 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bound
             print(or_fitted_model)
         return or_fitted_model
 
+class Gaussian2D(Fittable2DModel):
+    r"""
+    Two dimensional Gaussian model.
+
+    Parameters
+    ----------
+    amplitude : float
+        Amplitude of the Gaussian.
+    x_mean : float
+        Mean of the Gaussian in x.
+    y_mean : float
+        Mean of the Gaussian in y.
+    x_stddev : float or None
+        Standard deviation of the Gaussian in x before rotating by theta. Must
+        be None if a covariance matrix (``cov_matrix``) is provided. If no
+        ``cov_matrix`` is given, ``None`` means the default value (1).
+    y_stddev : float or None
+        Standard deviation of the Gaussian in y before rotating by theta. Must
+        be None if a covariance matrix (``cov_matrix``) is provided. If no
+        ``cov_matrix`` is given, ``None`` means the default value (1).
+    theta : float, optional
+        Rotation angle in radians. The rotation angle increases
+        counterclockwise.  Must be None if a covariance matrix (``cov_matrix``)
+        is provided. If no ``cov_matrix`` is given, ``None`` means the default
+        value (0).
+    cov_matrix : ndarray, optional
+        A 2x2 covariance matrix. If specified, overrides the ``x_stddev``,
+        ``y_stddev``, and ``theta`` defaults.
+
+    Notes
+    -----
+    Model formula:
+
+        .. math::
+
+            f(x, y) = A e^{-a\left(x - x_{0}\right)^{2}  -b\left(x - x_{0}\right)
+            \left(y - y_{0}\right)  -c\left(y - y_{0}\right)^{2}}
+
+    Using the following definitions:
+
+        .. math::
+            a = \left(\frac{\cos^{2}{\left (\theta \right )}}{2 \sigma_{x}^{2}} +
+            \frac{\sin^{2}{\left (\theta \right )}}{2 \sigma_{y}^{2}}\right)
+
+            b = \left(\frac{\sin{\left (2 \theta \right )}}{2 \sigma_{x}^{2}} -
+            \frac{\sin{\left (2 \theta \right )}}{2 \sigma_{y}^{2}}\right)
+
+            c = \left(\frac{\sin^{2}{\left (\theta \right )}}{2 \sigma_{x}^{2}} +
+            \frac{\cos^{2}{\left (\theta \right )}}{2 \sigma_{y}^{2}}\right)
+
+    If using a ``cov_matrix``, the model is of the form:
+        .. math::
+            f(x, y) = A e^{-0.5 \left(\vec{x} - \vec{x}_{0}\right)^{T} \Sigma^{-1} \left(\vec{x} - \vec{x}_{0}\right)}
+
+    where :math:`\vec{x} = [x, y]`, :math:`\vec{x}_{0} = [x_{0}, y_{0}]`,
+    and :math:`\Sigma` is the covariance matrix:
+
+        .. math::
+            \Sigma = \left(\begin{array}{ccc}
+            \sigma_x^2               & \rho \sigma_x \sigma_y \\
+            \rho \sigma_x \sigma_y   & \sigma_y^2
+            \end{array}\right)
+
+    :math:`\rho` is the correlation between ``x`` and ``y``, which should
+    be between -1 and +1.  Positive correlation corresponds to a
+    ``theta`` in the range 0 to 90 degrees.  Negative correlation
+    corresponds to a ``theta`` in the range of 0 to -90 degrees.
+
+    See [1]_ for more details about the 2D Gaussian function.
+
+    See Also
+    --------
+    Gaussian1D, Box2D, Moffat2D
+
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Gaussian_function
+    """
+
+    amplitude = Parameter(default=1)
+    x_mean = Parameter(default=0)
+    y_mean = Parameter(default=0)
+    x_stddev = Parameter(default=1)
+    y_stddev = Parameter(default=1)
+    theta = Parameter(default=0.0)
+
+    def __init__(self, amplitude=amplitude.default, x_mean=x_mean.default,
+                 y_mean=y_mean.default, x_stddev=None, y_stddev=None,
+                 theta=None, cov_matrix=None, **kwargs):
+        # if cov_matrix is None:
+        #     if x_stddev is None:
+        #         x_stddev = self.__class__.x_stddev.default
+        #     if y_stddev is None:
+        #         y_stddev = self.__class__.y_stddev.default
+        #     if theta is None:
+        #         theta = self.__class__.theta.default
+        # else:
+        #     if x_stddev is not None or y_stddev is not None or theta is not None:
+        #         raise InputParameterError("Cannot specify both cov_matrix and "
+        #                                   "x/y_stddev/theta")
+        #     else:
+        #         # Compute principle coordinate system transformation
+        #         cov_matrix = np.array(cov_matrix)
+        #
+        #         if cov_matrix.shape != (2, 2):
+        #             # TODO: Maybe it should be possible for the covariance matrix
+        #             # to be some (x, y, ..., z, 2, 2) array to be broadcast with
+        #             # other parameters of shape (x, y, ..., z)
+        #             # But that's maybe a special case to work out if/when needed
+        #             raise ValueError("Covariance matrix must be 2x2")
+        #
+        #         eig_vals, eig_vecs = np.linalg.eig(cov_matrix)
+        #         x_stddev, y_stddev = np.sqrt(eig_vals)
+        #         y_vec = eig_vecs[:, 0]
+        #         theta = np.arctan2(y_vec[1], y_vec[0])
+        #
+        # # Ensure stddev makes sense if its bounds are not explicitly set.
+        # # stddev must be non-zero and positive.
+        # # TODO: Investigate why setting this in Parameter above causes
+        # #       convolution tests to hang.
+        # kwargs.setdefault('bounds', {})
+        # kwargs['bounds'].setdefault('x_stddev', (FLOAT_EPSILON, None))
+        # kwargs['bounds'].setdefault('y_stddev', (FLOAT_EPSILON, None))
+
+        super().__init__(
+            amplitude=amplitude, x_mean=x_mean, y_mean=y_mean,
+            x_stddev=x_stddev, y_stddev=y_stddev, theta=theta, **kwargs)
+
+    @property
+    def x_fwhm(self):
+        """Gaussian full width at half maximum in X."""
+        return self.x_stddev * gaussian_sigma_to_fwhm
+
+    @property
+    def y_fwhm(self):
+        """Gaussian full width at half maximum in Y."""
+        return self.y_stddev * gaussian_sigma_to_fwhm
+
+    def bounding_box(self, factor=5.5):
+        """
+        Tuple defining the default ``bounding_box`` limits in each dimension,
+        ``((y_low, y_high), (x_low, x_high))``
+
+        The default offset from the mean is 5.5-sigma, corresponding
+        to a relative error < 1e-7. The limits are adjusted for rotation.
+
+        Parameters
+        ----------
+        factor : float, optional
+            The multiple of `x_stddev` and `y_stddev` used to define the limits.
+            The default is 5.5.
+
+        Examples
+        --------
+        >>> from astropy.modeling.models import Gaussian2D
+        >>> model = Gaussian2D(x_mean=0, y_mean=0, x_stddev=1, y_stddev=2)
+        >>> model.bounding_box
+        ((-11.0, 11.0), (-5.5, 5.5))
+
+        This range can be set directly (see: `Model.bounding_box
+        <astropy.modeling.Model.bounding_box>`) or by using a different factor
+        like:
+
+        >>> model.bounding_box = model.bounding_box(factor=2)
+        >>> model.bounding_box
+        ((-4.0, 4.0), (-2.0, 2.0))
+        """
+
+        a = factor * self.x_stddev
+        b = factor * self.y_stddev
+        theta = self.theta.value
+        dx, dy = ellipse_extent(a, b, theta)
+
+        return ((self.y_mean - dy, self.y_mean + dy),
+                (self.x_mean - dx, self.x_mean + dx))
+
+    @staticmethod
+    def evaluate(x, y, amplitude, x_mean, y_mean, x_stddev, y_stddev, theta):
+        """Two dimensional Gaussian function"""
+        print(amplitude, x_mean, y_mean, x_stddev, y_stddev, theta)
+        cost2 = np.cos(theta) ** 2
+        sint2 = np.sin(theta) ** 2
+        sin2t = np.sin(2. * theta)
+        xstd2 = x_stddev ** 2
+        ystd2 = y_stddev ** 2
+        xdiff = x - x_mean
+        ydiff = y - y_mean
+        a = 0.5 * ((cost2 / xstd2) + (sint2 / ystd2))
+        b = 0.5 * ((sin2t / xstd2) - (sin2t / ystd2))
+        c = 0.5 * ((sint2 / xstd2) + (cost2 / ystd2))
+        return amplitude * np.exp(-((a * xdiff ** 2) + (b * xdiff * ydiff) +
+                                    (c * ydiff ** 2)))
+
+
+    @staticmethod
+    def fit_deriv(x, y, amplitude, x_mean, y_mean, x_stddev, y_stddev, theta):
+        """Two dimensional Gaussian function derivative with respect to parameters"""
+
+        cost = np.cos(theta)
+        sint = np.sin(theta)
+        cost2 = np.cos(theta) ** 2
+        sint2 = np.sin(theta) ** 2
+        cos2t = np.cos(2. * theta)
+        sin2t = np.sin(2. * theta)
+        xstd2 = x_stddev ** 2
+        ystd2 = y_stddev ** 2
+        xstd3 = x_stddev ** 3
+        ystd3 = y_stddev ** 3
+        xdiff = x - x_mean
+        ydiff = y - y_mean
+        xdiff2 = xdiff ** 2
+        ydiff2 = ydiff ** 2
+        a = 0.5 * ((cost2 / xstd2) + (sint2 / ystd2))
+        b = 0.5 * ((sin2t / xstd2) - (sin2t / ystd2))
+        c = 0.5 * ((sint2 / xstd2) + (cost2 / ystd2))
+        g = amplitude * np.exp(-((a * xdiff2) + (b * xdiff * ydiff) +
+                                 (c * ydiff2)))
+        da_dtheta = (sint * cost * ((1. / ystd2) - (1. / xstd2)))
+        da_dx_stddev = -cost2 / xstd3
+        da_dy_stddev = -sint2 / ystd3
+        db_dtheta = (cos2t / xstd2) - (cos2t / ystd2)
+        db_dx_stddev = -sin2t / xstd3
+        db_dy_stddev = sin2t / ystd3
+        dc_dtheta = -da_dtheta
+        dc_dx_stddev = -sint2 / xstd3
+        dc_dy_stddev = -cost2 / ystd3
+        dg_dA = g / amplitude
+        dg_dx_mean = g * ((2. * a * xdiff) + (b * ydiff))
+        dg_dy_mean = g * ((b * xdiff) + (2. * c * ydiff))
+        dg_dx_stddev = g * (-(da_dx_stddev * xdiff2 +
+                              db_dx_stddev * xdiff * ydiff +
+                              dc_dx_stddev * ydiff2))
+        dg_dy_stddev = g * (-(da_dy_stddev * xdiff2 +
+                              db_dy_stddev * xdiff * ydiff +
+                              dc_dy_stddev * ydiff2))
+        dg_dtheta = g * (-(da_dtheta * xdiff2 +
+                           db_dtheta * xdiff * ydiff +
+                           dc_dtheta * ydiff2))
+        return [dg_dA, dg_dx_mean, dg_dy_mean, dg_dx_stddev, dg_dy_stddev,
+                dg_dtheta]
+
+
+    @property
+    def input_units(self):
+        if self.x_mean.unit is None and self.y_mean.unit is None:
+            return None
+        else:
+            return {'x': self.x_mean.unit,
+                    'y': self.y_mean.unit}
+
+    def _parameter_units_for_data_units(self, inputs_unit, outputs_unit):
+        # Note that here we need to make sure that x and y are in the same
+        # units otherwise this can lead to issues since rotation is not well
+        # defined.
+        if inputs_unit['x'] != inputs_unit['y']:
+            raise UnitsError("Units of 'x' and 'y' inputs should match")
+        return OrderedDict([('x_mean', inputs_unit['x']),
+                            ('y_mean', inputs_unit['x']),
+                            ('x_stddev', inputs_unit['x']),
+                            ('y_stddev', inputs_unit['x']),
+                            ('theta', u.rad),
+                            ('amplitude', outputs_unit['z'])])
+
 
 class Star2D(Fittable2DModel):
+    inputs = ('x','y',)
+    outputs = ('z',)
+
     amplitude = Parameter('amplitude', default=1)
     x_mean = Parameter('x_mean', default=0)
     y_mean = Parameter('y_mean', default=0)
     stddev = Parameter('stddev', default=1)
+    eta = Parameter('eta', default=0.5)
+    alpha = Parameter('alpha', default=3)
+    gamma = Parameter('gamma', default=3)
     saturation = Parameter('saturation', default=1)
 
-    def __init__(self, amplitude=amplitude.default, x_mean=x_mean.default, y_mean=y_mean.default, stddev=stddev.default,
-                 saturation=saturation.default, **kwargs):
-        super(Fittable2DModel, self).__init__(**kwargs)
+    #def __init__(self, amplitude=amplitude.default, x_mean=x_mean.default, y_mean=y_mean.default, stddev=stddev.default,
+    #             eta=eta.default, alpha=alpha.default, gamma=gamma.default,saturation=saturation.default, **kwargs):
+    #    super(Fittable2DModel, self).__init__(**kwargs)
 
     @property
     def fwhm(self):
         return self.stddev / 2.335
 
     @staticmethod
-    def evaluate(x, y, amplitude, x_mean, y_mean, stddev, saturation):
-        a = amplitude * np.exp(
-            -(1 / (2. * stddev ** 2)) * (x - x_mean) ** 2 - (1 / (2. * stddev ** 2)) * (y - y_mean) ** 2)
+    def evaluate(x, y, amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation):
+        rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
+        rr_gg = rr/(gamma*gamma)
+        a = amplitude * ( np.exp(-(rr / (2. * stddev * stddev))) + eta * (1 + rr_gg) ** (-alpha))
+        print(amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation)
         if isinstance(x, float) and isinstance(y, float):
             if a > saturation:
                 return saturation
@@ -504,20 +775,53 @@ class Star2D(Fittable2DModel):
             return a
 
     @staticmethod
-    def fit_deriv(x, y, amplitude, x_mean, y_mean, stddev, saturation):
-        d_amplitude = np.exp(
-            -((1 / (2. * stddev ** 2)) * (x - x_mean) ** 2 + (1 / (2. * stddev ** 2)) * (y - y_mean) ** 2))
-        d_x_mean = - amplitude * (x - x_mean) / (stddev ** 2) * np.exp(
-            -(1 / (2. * stddev ** 2)) * (x - x_mean) ** 2 - (1 / (2. * stddev ** 2)) * (y - y_mean) ** 2)
-        d_y_mean = - amplitude * (y - y_mean) / (stddev ** 2) * np.exp(
-            -(1 / (2. * stddev ** 2)) * (x - x_mean) ** 2 - (1 / (2. * stddev ** 2)) * (y - y_mean) ** 2)
-        d_stddev = amplitude * ((x - x_mean) ** 2 + (y - y_mean) ** 2) / (stddev ** 3) * np.exp(
-            -(1 / (2. * stddev ** 2)) * (x - x_mean) ** 2 - (1 / (2. * stddev ** 2)) * (y - y_mean) ** 2)
-        d_saturation = saturation * np.zeros_like(x)
-        return [d_amplitude, d_x_mean, d_y_mean, d_stddev, d_saturation]
+    def fit_deriv(x, y, amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation):
+        rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
+        rr_gg = rr/(gamma*gamma)
+        d_amplitude_gauss = np.exp(-(rr / (2. * stddev * stddev)))
+        d_amplitude_moffat =  eta * (1 + rr_gg) ** (-alpha)
+        d_amplitude = d_amplitude_gauss + d_amplitude_moffat
+        d_x_mean = - amplitude * (x - x_mean) / (stddev * stddev) * d_amplitude_gauss \
+                   - amplitude * alpha * d_amplitude_moffat * (-2 * x + 2 * x_mean) / (gamma ** 2 * (1 + rr_gg))
+        d_y_mean = - amplitude * (y - y_mean) / (stddev * stddev) * d_amplitude_gauss \
+                   - amplitude * alpha * d_amplitude_moffat * (-2 * y + 2 * y_mean) / (gamma ** 2 * (1 + rr_gg))
+        d_stddev = amplitude * rr / (stddev ** 3) * d_amplitude_gauss
+        d_eta = amplitude * d_amplitude_moffat / eta
+        d_alpha = - amplitude * d_amplitude_moffat * np.log(1 + rr_gg)
+        d_gamma = 2 * amplitude * alpha * d_amplitude_moffat * (rr_gg / (gamma * (1 + rr_gg)))
+        d_saturation = saturation * np.ones_like(x)
+        return [d_amplitude, d_x_mean, d_y_mean, d_stddev, d_eta, d_alpha, d_gamma, d_saturation]
 
 
-def fit_star2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds=None):
+class LevMarLSQFitterWithNan(fitting.LevMarLSQFitter):
+
+    def objective_function(self, fps, *args):
+        """
+        Function to minimize.
+
+        Parameters
+        ----------
+        fps : list
+            parameters returned by the fitter
+        args : list
+            [model, [weights], [input coordinates]]
+        """
+
+        model = args[0]
+        weights = args[1]
+        fitting._fitter_to_model_params(model, fps)
+        meas = args[-1]
+        if weights is None:
+            a = np.ravel(model(*args[2: -1]) - meas)
+            a[np.isfinite(a)] = 0
+            return a
+        else:
+            a = np.ravel(weights * (model(*args[2: -1]) - meas))
+            a[~np.isfinite(a)] = 0
+            return a
+
+
+def fit_star2d_outlier_removal(x, y, z, sigma=5.0, niter=10, guess=None, bounds=None):
     """Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation"""
     gg_init = Star2D()
     if guess is not None:
@@ -527,7 +831,7 @@ def fit_star2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds=
         for ip, p in enumerate(gg_init.param_names):
             getattr(gg_init, p).min = bounds[0][ip]
             getattr(gg_init, p).max = bounds[1][ip]
-    gg_init.saturation.fixed = True
+    # gg_init.saturation.fixed = True
     with warnings.catch_warnings():
         # Ignore model linearity warning from the fitter
         warnings.simplefilter('ignore')
@@ -537,7 +841,31 @@ def fit_star2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds=
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
         if parameters.VERBOSE:
             print(or_fitted_model)
+            print(fit.fit_info)
         return or_fitted_model
+
+
+def fit_star2d(x, y, z, guess=None, bounds=None, sub_errors=None):
+    """Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation"""
+    gg_init = Star2D()
+    if guess is not None:
+        for ip, p in enumerate(gg_init.param_names):
+            getattr(gg_init, p).value = guess[ip]
+    if bounds is not None:
+        for ip, p in enumerate(gg_init.param_names):
+            getattr(gg_init, p).min = bounds[0][ip]
+            getattr(gg_init, p).max = bounds[1][ip]
+    # gg_init.saturation.fixed = True
+    with warnings.catch_warnings():
+        # Ignore model linearity warning from the fitter
+        warnings.simplefilter('ignore')
+        # fit = fitting.LevMarLSQFitter()
+        fit = LevMarLSQFitterWithNan()
+        fitted_model = fit(gg_init, x, y, z, acc=1e-20, epsilon=1e-20, weights=1./sub_errors)
+        if parameters.VERBOSE:
+            print(fitted_model)
+            print(fit.fit_info)
+        return fitted_model
 
 
 def find_nearest(array, value):
@@ -818,8 +1146,8 @@ def extract_info_from_CTIO_header(obj, header):
     obj.airmass = header['AIRMASS']
     obj.expo = header['EXPTIME']
     obj.filters = header['FILTERS']
-    obj.filter = header['FILTER1']
-    obj.disperser = header['FILTER2']
+    obj.filter_label = header['FILTER1']
+    obj.disperser_label = header['FILTER2']
 
 
 def save_fits(file_name, header, data, overwrite=False):
