@@ -33,6 +33,8 @@ class Image(object):
         self.target = None
         self.target_pixcoords = None
         self.target_pixcoords_rotated = None
+        self.target_bkgd2D = None
+        self.target_star2D = None
         if target != "":
             self.target = Target(target, verbose=parameters.VERBOSE)
             self.header['TARGET'] = self.target.label
@@ -153,6 +155,9 @@ class Image(object):
 
 
 def find_target(image, guess, rotated=False):
+    Dx = parameters.XWINDOW
+    Dy = parameters.YWINDOW
+    theX, theY = guess
     if rotated:
         angle = image.rotation_angle * np.pi / 180.
         rotmat = np.matrix([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
@@ -161,28 +166,21 @@ def find_target(image, guess, rotated=False):
         x0 = int(guess2[0, 0])
         y0 = int(guess2[0, 1])
         guess = [x0, y0]
-    print(guess)
-    sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated)
-    for i in range(2):
+        Dx = parameters.XWINDOW_ROT
+        Dy = parameters.YWINDOW_ROT
+    niter = 2
+    for i in range(niter):
+        sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
+                                                                 widths=[Dx, Dy])
         # find the target
-        saturated_pixels = np.where(sub_image >= image.saturation)
-        if len(saturated_pixels[0]) > 100:
-            avX, avY = find_target_2Dprofile(image, sub_image, guess, rotated, sub_errors=sub_errors)
-        else:
-            avX, avY = find_target_2Dprofile(image, sub_image, guess, rotated, sub_errors=sub_errors)
+        avX, avY = find_target_2Dprofile(image, sub_image, guess, rotated, sub_errors=sub_errors)
         # compute target position
         theX = x0 - Dx + avX
         theY = y0 - Dy + avY
         guess = [int(theX), int(theY)]
-        if rotated:
-            parameters.XWINDOW_ROT = Dx // 2
-            parameters.YWINDOW_ROT = Dy // 2
-        else:
-            parameters.XWINDOW = Dx // 2
-            parameters.YWINDOW = Dy // 2
-        sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated)
-        print(guess, avX, avY)
-    image.my_logger.info('\n\tX,Y target position in pixels: %.3f,%.3f' % (theX, theY))
+        Dx = Dx // (i+2)
+        Dy = Dy // (i+2)
+    image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
     else:
@@ -194,15 +192,11 @@ def find_target(image, guess, rotated=False):
     return [theX, theY]
 
 
-def find_target_init(image, guess, rotated=False):
-    x0 = guess[0]
-    y0 = guess[1]
-    Dx = parameters.XWINDOW
-    Dy = parameters.YWINDOW
+def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
+    x0, y0 = guess
+    Dx, Dy = widths
     sub_errors = None
     if rotated:
-        Dx = parameters.XWINDOW_ROT
-        Dy = parameters.YWINDOW_ROT
         sub_image = np.copy(image.data_rotated[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
         sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
     else:
@@ -290,24 +284,26 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
     XX = np.arange(NX)
     YY = np.arange(NY)
     Y, X = np.mgrid[:NY, :NX]
-    bkgd_2D = fit_poly2d_outlier_removal(X, Y, sub_image, order=2)
+    bkgd_2D = fit_poly2d_outlier_removal(X, Y, sub_image, order=2, sigma=3)
     image.target_bkgd2D = bkgd_2D
     sub_image_subtracted = sub_image - bkgd_2D(X, Y)
     # find a first guess of the target position
-    # avX,sigX = weighted_avg_and_std(X,(sub_image_subtracted)**4)
-    # avY,sigY = weighted_avg_and_std(Y,(sub_image_subtracted)**4)
     avX, sigX = weighted_avg_and_std(XX, np.sum(sub_image_subtracted, axis=0) ** 4)
     avY, sigY = weighted_avg_and_std(YY, np.sum(sub_image_subtracted, axis=1) ** 4)
     # fit a 2D star profile close to this position
     # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2D
     # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
-    guess = [np.max(sub_image_subtracted), avX, avY, 2, 0.9, 1, 2, image.saturation]
+    guess = [np.max(sub_image_subtracted), avX, avY, 2, 1, 1, 1, image.saturation]
+    if image.target_star2D is not None:
+        guess = fitting._model_to_fit_params(image.target_star2D)[0]
+        guess[1] = avX
+        guess[2] = avY
     mean_prior = 10  # in pixels
     # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf], [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] #for Moffat2D
     # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,0,0], [100*image.saturation,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] #for Gauss2D
     # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation], [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
-    bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2,
-               0, 0, 1, 0.9 * image.saturation],
+    bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 1,
+               0.001, 0, 1, 0.9 * image.saturation],
               [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 100, 10, 30, 1.1 * image.saturation]]
     saturated_pixels = np.where(sub_image >= image.saturation)
     if len(saturated_pixels[0]) > 0:
@@ -315,39 +311,34 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
             image.my_logger.info('\n\t%d saturated pixels: set saturation level to %d %s.' % (
                 len(saturated_pixels[0]), image.saturation, image.units))
         sub_image_subtracted[sub_image >= 0.9*image.saturation] = np.nan
-    #test = Star2D()
-    #sub_image_subtracted = test.evaluate(X, Y, *guess)
-    # guess = [np.max(sub_image_subtracted),avX-2,avY-2,1,1,1] #for Gauss2D
-    # guess = [np.max(sub_image_subtracted), avX-2, avY-2, 3, 0.5, 2, 3, image.saturation]
+        sub_image[sub_image >= 0.9 * image.saturation] = np.nan
     # fit
-    # star2D = fit_star2d(X, Y, sub_image_subtracted, guess=guess, bounds=bounds, sub_errors=sub_errors)
     star2D = fit_star2d_outlier_removal(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
-    # compute target positions
     new_avX = star2D.x_mean.value
     new_avY = star2D.y_mean.value
     image.target_star2D = star2D
-    ymax, xmax = np.unravel_index(sub_image_subtracted.argmax(), sub_image_subtracted.shape)
+    # check target positions
     dist = np.sqrt((new_avY - avY) ** 2 + (new_avX - avX) ** 2)
     if dist > mean_prior / 2:
         image.my_logger.warning(
-            '\n\tX=%.2f,Y=%.2f target position determination probably wrong: %.1f '
-            'pixels from profile detection (%d,%d)' % (new_avX, new_avY, dist, avX, avY))
-        # debugging plots
+            f'\n\tX={new_avX:.2f},Y={new_avY:.2f} target position determination probably wrong: '
+            f'{dist:.1f} pixels from profile detection ({avX:.2f},{avY:.2f})')
+    # debugging plots
     if parameters.DEBUG or True:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
-        vmin = np.nanmin(sub_image_subtracted)
-        vmax = np.nanmax(sub_image_subtracted)
-        image.plot_image_simple(ax1, data=sub_image_subtracted, scale="lin", title="", units=image.units,
+        vmin = 0 #np.nanmin(sub_image_subtracted)
+        vmax = np.nanmax(sub_image)
+        image.plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
                                 target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         # ax1.scatter([Dx],[Dy],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
         ax1.legend(loc=1)
 
         image.plot_image_simple(ax2, data=star2D(X, Y) + bkgd_2D(X, Y), scale="lin", title="",
-                                units='Background+Star2D (%s)' % image.units, vmin=vmin, vmax=vmax)
+                                units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
         # ax2.legend(loc=1)
 
-        image.plot_image_simple(ax3, data=sub_image_subtracted - star2D(X, Y), scale="lin", title="",
-                                units='Background+Star2D subtracted image (%s)' % image.units,
+        image.plot_image_simple(ax3, data=sub_image - star2D(X, Y) - bkgd_2D(X, Y), scale="lin", title="",
+                                units=f'Background+Star2D subtracted image\n({image.units})',
                                 target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         # ax3.scatter([guess[0]],[guess[1]],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
         ax3.legend(loc=1)
