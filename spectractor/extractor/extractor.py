@@ -1,4 +1,3 @@
-from spectractor.extractor.images import *
 from spectractor.extractor.spectroscopy import *
 from spectractor import parameters
 from spectractor.tools import ensure_dir
@@ -86,11 +85,3 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None, fit=True)
     return spectrum
-
-
-# if __name__ == "__main__":
-#     import doctest
-#     if np.__version__ >= "1.14.0":
-#         np.set_printoptions(legacy="1.13")
-#
-#     doctest.testmod()
