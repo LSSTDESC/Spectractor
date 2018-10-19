@@ -324,7 +324,7 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
             f'\n\tX={new_avX:.2f},Y={new_avY:.2f} target position determination probably wrong: '
             f'{dist:.1f} pixels from profile detection ({avX:.2f},{avY:.2f})')
     # debugging plots
-    if parameters.DEBUG or True:
+    if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
         vmin = 0 #np.nanmin(sub_image_subtracted)
         vmax = np.nanmax(sub_image)
