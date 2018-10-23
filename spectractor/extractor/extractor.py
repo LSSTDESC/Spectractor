@@ -72,11 +72,11 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     calibrate_spectrum(spectrum)
     if line_detection:
         my_logger.info('\n\tCalibrating order %d spectrum...' % spectrum.order)
-        try:
-            calibrate_spectrum_with_lines(spectrum)
-        except:
-            my_logger.warning('\n\tCalibration procedure with spectral features failed.')
-            spectrum.header['WARNINGS'] = 'Calibration procedure with spectral features failed.'
+        #try:
+        calibrate_spectrum_with_lines(spectrum)
+        #except:
+        #    my_logger.warning('\n\tCalibration procedure with spectral features failed.')
+        #    spectrum.header['WARNINGS'] = 'Calibration procedure with spectral features failed.'
     else:
         spectrum.header['WARNINGS'] = 'No calibration procedure with spectral features.'
     # Save the spectrum

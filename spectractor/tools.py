@@ -17,7 +17,14 @@ from math import floor
 
 
 def gauss(x, A, x0, sigma):
-    return A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+    return A * np.exp(-(x - x0)*(x - x0) / (2 * sigma * sigma))
+
+
+def gauss_jacobian(x, A, x0, sigma):
+    dA = np.exp(-(x - x0)*(x - x0) / (2 * sigma * sigma))
+    dx0 = - A * (x - x0) / (sigma * sigma) * dA
+    dsigma = A * (x-x0)*(x-x0) / (sigma ** 3) * dA
+    return [dA, dx0, dsigma]
 
 
 def line(x, a, b):
@@ -128,8 +135,8 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
     >>> print(popt)
     [   1.   10.   20.  650.    3.   40.  750.   10.]
     """
-    maxfev = 100000
-    popt, pcov = curve_fit(multigauss_and_line, x, y, p0=guess, bounds=bounds, maxfev=maxfev)
+    maxfev = 1000
+    popt, pcov = curve_fit(multigauss_and_line, x, y, p0=guess, bounds=bounds, maxfev=maxfev, absolute_sigma=True)
     return popt, pcov
 
 
@@ -165,6 +172,43 @@ def multigauss_and_bgd(x, *params):
     for k in range((len(params) - bgd_nparams) // 3):
         out += gauss(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
     return out
+
+
+# noinspection PyTypeChecker
+def multigauss_and_bgd_jacobian(x, *params):
+    """Jacobien of the multiple Gaussian profile plus a polynomial background to data, using curve_fit.
+    The degree of the polynomial background is fixed by parameters.BGD_ORDER.
+    The order of the parameters is a first block BGD_ORDER+1 parameters (from high to low monomial terms,
+    same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    deviation.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    *params: list of float parameters as described above.
+
+    Returns
+    -------
+    y: array
+        The jacobian values.
+
+    Examples
+    --------
+    >>> x = np.arange(600.,800.,1)
+    >>> p = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd_jacobian(x, *p)
+    >>> print(y[0])
+    349.0
+    """
+    bgd_nparams = parameters.BGD_NPARAMS
+    out = []
+    for k in range(bgd_nparams):
+        # out.append(params[k]*(parameters.BGD_ORDER-k)*x**(parameters.BGD_ORDER-(k+1)))
+        out.append(x ** (parameters.BGD_ORDER - k))
+    for k in range((len(params) - bgd_nparams) // 3):
+        out += gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
+    return np.array(out).T
 
 
 # noinspection PyTypeChecker
@@ -216,8 +260,10 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
         plt.plot(x,fit,'r-')
         plt.show()
     """
-    maxfev = 100000
-    popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma)
+    maxfev = 10000
+    popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma,
+                           absolute_sigma=True, method='trf', xtol=1e-4, ftol=1e-4, verbose=0,
+                           jac=multigauss_and_bgd_jacobian, x_scale='jac')
     return popt, pcov
 
 
