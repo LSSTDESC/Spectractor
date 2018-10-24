@@ -1018,42 +1018,58 @@ def calibrate_spectrum_with_lines(spectrum):
     shifts = []
     counts = 0
     D = parameters.DISTANCE2CCD  #- parameters.DISTANCE2CCD_ERR
-    D_step = parameters.DISTANCE2CCD_ERR / 4
+    D_err = parameters.DISTANCE2CCD_ERR
 
     def shift_minizer(params, spectrum, x0):
         spectrum.disperser.D = params[0]
         pixel_shift = params[1]
-        lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels+pixel_shift,
+        lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels-pixel_shift,
                                                                   x0=[x0[0]+pixel_shift, x0[1]], order=spectrum.order)
         chisq = spectrum.lines.detect_lines(lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None,
                                                     print_table=parameters.DEBUG)
-        print(params, lambdas_test[:3], delta_pixels[:3]+pixel_shift)
+        chisq += pixel_shift*pixel_shift
+        print(params, chisq)
+        spectrum.lambdas = lambdas_test
+        spectrum.plot_spectrum(live_fit=True)
         return chisq
-    res = opt.basinhopping(shift_minizer, np.array([D, 0]), niter=10, stepsize=0.1, T=0.1, interval=10,
-                           minimizer_kwargs={'method': 'L-BFGS-B', 'args': (spectrum, x0), 'options': {'maxiter': 5, 'gtol': 1e-2, 'ftol': 1e-2},
-                                             'bounds': ((D-5*parameters.DISTANCE2CCD_ERR,D+5*parameters.DISTANCE2CCD_ERR),(-2,2))})
-    print(res)
-    res = opt.minimize(shift_minizer, res.x, args=(spectrum, [x0[0]+res.x[1], x0[1]]), method='L-BFGS-B',
-                       options={'maxiter': 200, 'ftol': 1e-8, 'xtol': 1e-6},
+    #res = opt.basinhopping(shift_minizer, np.array([D, 0]), niter=10, stepsize=0.1, T=0.1, interval=10,
+    #                       minimizer_kwargs={'method': 'L-BFGS-B', 'args': (spectrum, x0), 'options': {'maxiter': 5, 'gtol': 1e-2, 'ftol': 1e-2},
+    #                                         'bounds': ((D-5*parameters.DISTANCE2CCD_ERR,D+5*parameters.DISTANCE2CCD_ERR),(-2,2))})
+    Ds = np.arange(D-5D_err, D+6D_err,D_err/2)
+    pixel_shifts = np.arange(-2,2.5,0.5)
+    chisq_grid = np.zeros((len(Ds),len(pixel_shifts)))
+    for i,D in enumerate(Ds):
+        for j,pixel_shift in enumerate(pixel_shifts):
+            chisq_grid[i, j] = shift_minizer([D ,pixel_shift], spectrum, x0)
+    imin, jmin = np.unravel_index(chisq_grid.argmin(), chisq_grid.shape)
+    D = Ds[imin]
+    pixel_shift = pixel_shifts[jmin]
+    start = np.array([D, pixel_shift])
+    print(start,chisq_grid.argmin(),imin,jmin)
+    fig = plt.figure()
+    im = plt.imshow(np.log10(chisq_grid), origin='lower')
+    c = plt.colorbar(im)
+    plt.xlabel('pixel shift')
+    plt.ylabel('D')
+    plt.show()
+
+    res = opt.minimize(shift_minizer, start, args=(spectrum, x0), method='L-BFGS-B',
+                       options={'maxiter': 200, 'ftol': 1e-4},
                        bounds=((D-5*parameters.DISTANCE2CCD_ERR,D+5*parameters.DISTANCE2CCD_ERR),(-2,2)))
     D = res.x[0]
     spectrum.disperser.D = D
     pixel_shift = res.x[1]
-    print(x0)
     x0 = [x0[0]+res.x[1], x0[1]]
     spectrum.x0 = x0
-    print(res, res.x[1], x0)
     # check success, xO ou D sur les bords du prior
-    print('refit',D,spectrum.disperser.D, pixel_shift, x0)
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels + pixel_shift, x0=x0, order=spectrum.order)
-    print(lambdas[:3], delta_pixels[:3]+pixel_shift, x0)
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.my_logger.info(
-        '\n\tWavelenght total shift: {:.2f}nm'
-        '\n\twith D = {:.2f} mm (default: DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
+        '\n\tOrder0 total shift: {:.2f}pix'
+        '\n\tD = {:.2f} mm (default: DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
             pixel_shift, D, parameters.DISTANCE2CCD, parameters.DISTANCE2CCD_ERR,
             (D - parameters.DISTANCE2CCD) / parameters.DISTANCE2CCD_ERR))
-    spectrum.header['LSHIFT'] = pixel_shift
+    spectrum.header['PIXSHIFT'] = pixel_shift
     spectrum.header['D2CCD'] = D
     return lambdas
 
