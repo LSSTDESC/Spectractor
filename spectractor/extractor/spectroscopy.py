@@ -9,7 +9,7 @@ class Line:
     """Class modeling the emission or absorption lines."""
 
     def __init__(self, wavelength, label, atmospheric=False, emission=False, label_pos=[0.007, 0.02],
-                 width_bounds=[1, 6]):
+                 width_bounds=[1, 6], use_for_calibration=False):
         """Class modeling the emission or absorption lines. lines attributes contains main spectral lines
         sorted in wavelength.
 
@@ -28,6 +28,8 @@ class Line:
             Position of the label in the plot with respect to the vertical lin (default: [0.007,0.02])
         width_bounds: [float, float]
             Minimum and maximum width (in nm) of the line for fitting procedures (default: [1,7])
+        use_for_calibration: bool
+            Use this line for the dispersion relation calibration, bright line recommended (default: False)
 
         Examples
         --------
@@ -51,6 +53,7 @@ class Line:
             self.emission = False
         self.width_bounds = width_bounds
         self.fitted = False
+        self.use_for_calibration = False
         self.high_snr = False
         self.fit_lambdas = None
         self.fit_gauss = None
@@ -155,8 +158,8 @@ class Lines:
         if redshift < 0:
             self.my_logger.warning(f'Redshift must be positive or null. Got {redshift}')
             sys.exit()
-        HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02])
-        HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02])
+        HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02], use_for_calibration=True)
+        HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
         HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02])
         HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02])
         OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
@@ -198,15 +201,15 @@ class Lines:
         FE3 = Line(438.355, atmospheric=True, label=r'$Fe$',
                      label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         CAII1 = Line(393.366, atmospheric=True, label=r'$Ca_{II}$',
-                     label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+                     label_pos=[0.007, 0.02], use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         CAII2 = Line(396.847, atmospheric=True, label=r'$Ca_{II}$',
-                     label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+                     label_pos=[0.007, 0.02], use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
-                  label_pos=[0.007, 0.02])  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
+                  label_pos=[0.007, 0.02], use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
         # O2_1 = Line( 760.6,atmospheric=True,label='',label_pos=[0.007,0.02]) # libradtran paper fig.3
         # O2_2 = Line( 763.2,atmospheric=True,label='$O_2$',label_pos=[0.007,0.02])  # libradtran paper fig.3
         O2B = Line(686.719, atmospheric=True, label=r'$O_2(B)$',
-                   label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+                   label_pos=[0.007, 0.02], use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         O2Y = Line(898.765, atmospheric=True, label=r'$O_2(Y)$',
                    label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         O2Z = Line(822.696, atmospheric=True, label=r'$O_2(Z)$',
@@ -621,23 +624,22 @@ class Lines:
                 if snr < snr_minlevel:
                     continue
                 line.high_snr = True
-                # wavelength shift between tabulate and observed lines
-                lambda_shifts.append(peak_pos - l)
-                snrs.append(snr)
+                if line.use_for_calibration:
+                    # wavelength shift between tabulate and observed lines
+                    lambda_shifts.append(peak_pos - l)
+                    snrs.append(snr)
         if ax is not None:
             self.plot_detected_lines(ax, print_table=True) #parameters.DEBUG)
             #ax.plot(lambdas[index], multigauss_and_bgd(lambdas[index], *popt), lw=2, color='b')
             #ax.plot(lambdas[index], np.polyval(popt[:bgd_npar], lambdas[index]), lw=2, color='b', linestyle='--')
-        global_chisq /= len(new_index_list)
+        global_chisq /= len(lambda_shifts)
         if len(lambda_shifts) > 0:
             shift = np.average(np.abs(lambda_shifts)**2, weights=np.array(snrs) ** 2)
             # if guess values on tabulated lines have not moved: penalize the chisq
-            if shift < 1e-2:
-                shift += len(lambda_shifts)**2
-            global_chisq += shift/len(lambda_shifts)
+            global_chisq += shift
             print(shift, global_chisq-shift/len(lambda_shifts), global_chisq, len(lambda_shifts))
         else:
-            global_chisq = 1e10
+            global_chisq = 2*len(parameters.LAMBDAS)
         return global_chisq
 
     def plot_detected_lines(self, ax=None, print_table=False):
@@ -662,7 +664,7 @@ class Lines:
                     rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength,
                                      FWHM, signal_level, line.fit_snr, line.fit_chisq))
                 j += 1
-        if print_table:
+        if print_table and len(rows) > 0:
             t = Table(rows=rows, names=('Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq'),
                       dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
             for col in t.colnames[1:-2]:
