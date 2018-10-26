@@ -53,7 +53,7 @@ class Line:
             self.emission = False
         self.width_bounds = width_bounds
         self.fitted = False
-        self.use_for_calibration = False
+        self.use_for_calibration = use_for_calibration
         self.high_snr = False
         self.fit_lambdas = None
         self.fit_gauss = None
@@ -195,17 +195,20 @@ class Lines:
         HEII4 = Line(856.7, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
         HI = Line(833.9, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
         FE1 = Line(382.044, atmospheric=True, label=r'$Fe$',
-                     label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+                   label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         FE2 = Line(430.790, atmospheric=True, label=r'$Fe$',
-                     label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+                   label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         FE3 = Line(438.355, atmospheric=True, label=r'$Fe$',
-                     label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+                   label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         CAII1 = Line(393.366, atmospheric=True, label=r'$Ca_{II}$',
-                     label_pos=[0.007, 0.02], use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+                     label_pos=[0.007, 0.02],
+                     use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         CAII2 = Line(396.847, atmospheric=True, label=r'$Ca_{II}$',
-                     label_pos=[0.007, 0.02], use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+                     label_pos=[0.007, 0.02],
+                     use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
         O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
-                  label_pos=[0.007, 0.02], use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
+                  label_pos=[0.007, 0.02],
+                  use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
         # O2_1 = Line( 760.6,atmospheric=True,label='',label_pos=[0.007,0.02]) # libradtran paper fig.3
         # O2_2 = Line( 763.2,atmospheric=True,label='$O_2$',label_pos=[0.007,0.02])  # libradtran paper fig.3
         O2B = Line(686.719, atmospheric=True, label=r'$O_2(B)$',
@@ -222,7 +225,8 @@ class Lines:
 
         self.lines = [HALPHA, HBETA, HGAMMA, HDELTA, O2, O2B, O2Y, O2Z, H2O_1, H2O_2, OIII, CII1, CII2, CIV, CII3,
                       CIII1, CIII2, CIII3, HEI1, HEI2, HEI3, HEI4, HEI5, HEI6, HEI7, HEI8, HEI9, HEI10, HEI11, HEI12,
-                      HEI13, OI, OII, HEII1, HEII2, HEII3, HEII4, CAII1, CAII2, FE1, FE2, FE3, HI, FEII1, FEII2, FEII3, FEII4]
+                      HEI13, OI, OII, HEII1, HEII2, HEII3, HEII4, CAII1, CAII2, FE1, FE2, FE3, HI, FEII1, FEII2, FEII3,
+                      FEII4]
         self.redshift = redshift
         self.atmospheric_lines = atmospheric_lines
         self.hydrogen_only = hydrogen_only
@@ -388,6 +392,7 @@ class Lines:
             # reset line fit attributes
             line.fitted = False
             line.fit_popt = None
+            line.high_snr = False
             # wavelength of the line: find the nearest pixel index
             line_wavelength = line.wavelength
             if line_wavelength < xlim[0] or line_wavelength > xlim[1]:
@@ -457,16 +462,18 @@ class Lines:
                 continue
             # first guess and bounds to fit the line properties and
             # the background with BGD_ORDER order polynom
-            #guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), lambdas[peak_index],
+            # guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), lambdas[peak_index],
             #                          0.5 * (line.width_bounds[0] + line.width_bounds[1])]
             guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), line_wavelength,
                                       0.5 * (line.width_bounds[0] + line.width_bounds[1])]
             if line_strategy == np.less:
                 guess[bgd_npar] = -0.5 * np.max(spec[index])  # look for abosrption under bgd
-            #bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), lambdas[index_inf], line.width_bounds[0]],
+            # bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), lambdas[index_inf], line.width_bounds[0]],
             #          [np.inf] * bgd_npar + [abs(np.max(spec[index])), lambdas[index_sup], line.width_bounds[1]]]
-            bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), line_wavelength-peak_look/2, line.width_bounds[0]],
-                      [np.inf] * bgd_npar + [abs(np.max(spec[index])), line_wavelength+peak_look/2, line.width_bounds[1]]]
+            bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), line_wavelength - peak_look / 2,
+                                              line.width_bounds[0]],
+                      [np.inf] * bgd_npar + [abs(np.max(spec[index])), line_wavelength + peak_look / 2,
+                                             line.width_bounds[1]]]
             # gaussian amplitude bounds depend if line is emission/absorption
             if line_strategy == np.less:
                 bounds[1][bgd_npar] = 0  # look for absorption under bgd
@@ -526,7 +533,7 @@ class Lines:
                 new_bounds_list[-1][1][bgd_npar + 3 * k + 1] = 0.5 * (
                         new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][bgd_npar + 3 * (
                         k + 1) + 1]) + 1e-3  # last term is to avoid equalities
-                                             # between bounds in some pathological case
+                # between bounds in some pathological case
             # sort pixel indices and remove doublons
             new_index_list[-1] = sorted(list(set(new_index_list[-1])))
         # fit the line subsets and background
@@ -542,20 +549,20 @@ class Lines:
             for i in index:
                 is_close_to_peak = False
                 for j in peak_index:
-                    if abs(i-j) < peak_look:
+                    if abs(i - j) < peak_look:
                         is_close_to_peak = True
                         break
                 if not is_close_to_peak:
                     bgd_index.append(i)
             try:
                 fit, cov, model = fit_poly1d(lambdas[bgd_index], spec[bgd_index],
-                                             order=parameters.BGD_ORDER, w = 1./spec_err[bgd_index])
-                #bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
+                                             order=parameters.BGD_ORDER, w=1. / spec_err[bgd_index])
+                # bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
                 #                                 order=parameters.BGD_ORDER, sigma=10, niter=5)
             except:
                 fit, cov, model = fit_poly1d(lambdas[index], spec[index],
-                                             order=parameters.BGD_ORDER, w = 1./spec_err[index])
-                #bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
+                                             order=parameters.BGD_ORDER, w=1. / spec_err[index])
+                # bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
                 #                                 order=parameters.BGD_ORDER, sigma=3, niter=5)
             # f = plt.figure()
             # plt.errorbar(lambdas[index],spec[index],yerr=spec_err[index])
@@ -563,7 +570,7 @@ class Lines:
             # plt.plot(lambdas[index],bgd(lambdas[index]),'b--')
             # if parameters.DISPLAY: plt.show()
             for n in range(bgd_npar):
-                #guess[n] = getattr(bgd, bgd.param_names[parameters.BGD_ORDER - n]).value
+                # guess[n] = getattr(bgd, bgd.param_names[parameters.BGD_ORDER - n]).value
                 guess[n] = fit[n]
                 b = abs(baseline_prior * guess[n])
                 bounds[0][n] = guess[n] - b
@@ -582,7 +589,6 @@ class Lines:
             if spec_err is not None:
                 sigma = spec_err[index]
             popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma)
-            print('yop',popt)
             # noise level defined as the std of the residuals if no error
             noise_level = np.std(spec[index] - multigauss_and_bgd(lambdas[index], *popt))
             # otherwise mean of error bars of bgd lateral bands
@@ -593,7 +599,7 @@ class Lines:
             chisq /= len(index)
             global_chisq += chisq
             if spec_err is not None:
-                noise_level = np.sqrt(np.mean(spec_err[index]**2))
+                noise_level = np.sqrt(np.mean(spec_err[index] ** 2))
             # f = plt.figure()
             # plt.errorbar(lambdas[index],spec[index],yerr=spec_err[index])
             # plt.plot(lambdas[bgd_index],spec[bgd_index])
@@ -610,7 +616,8 @@ class Lines:
                 FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
                 # SNR computation
                 # signal_level = popt[bgd_npar+3*j]
-                signal_level = popt[bgd_npar + 3 * j] #multigauss_and_bgd(peak_pos, *popt) - np.polyval(popt[:bgd_npar], peak_pos)
+                signal_level = popt[
+                    bgd_npar + 3 * j]  # multigauss_and_bgd(peak_pos, *popt) - np.polyval(popt[:bgd_npar], peak_pos)
                 snr = np.abs(signal_level / noise_level)
                 # save fit results
                 line.fitted = True
@@ -629,17 +636,17 @@ class Lines:
                     lambda_shifts.append(peak_pos - l)
                     snrs.append(snr)
         if ax is not None:
-            self.plot_detected_lines(ax, print_table=True) #parameters.DEBUG)
-            #ax.plot(lambdas[index], multigauss_and_bgd(lambdas[index], *popt), lw=2, color='b')
-            #ax.plot(lambdas[index], np.polyval(popt[:bgd_npar], lambdas[index]), lw=2, color='b', linestyle='--')
-        global_chisq /= len(lambda_shifts)
+            self.plot_detected_lines(ax, print_table=True)  # parameters.DEBUG)
+            # ax.plot(lambdas[index], multigauss_and_bgd(lambdas[index], *popt), lw=2, color='b')
+            # ax.plot(lambdas[index], np.polyval(popt[:bgd_npar], lambdas[index]), lw=2, color='b', linestyle='--')
         if len(lambda_shifts) > 0:
-            shift = np.average(np.abs(lambda_shifts)**2, weights=np.array(snrs) ** 2)
+            global_chisq /= len(lambda_shifts)
+            shift = np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2)
             # if guess values on tabulated lines have not moved: penalize the chisq
             global_chisq += shift
-            print(shift, global_chisq-shift/len(lambda_shifts), global_chisq, len(lambda_shifts))
+            print(shift, global_chisq - shift, global_chisq, len(lambda_shifts))
         else:
-            global_chisq = 2*len(parameters.LAMBDAS)
+            global_chisq = 2 * len(parameters.LAMBDAS)
         return global_chisq
 
     def plot_detected_lines(self, ax=None, print_table=False):
@@ -655,14 +662,15 @@ class Lines:
                     lambdas = np.copy(line.fit_lambdas)
                     if ax is not None:
                         ax.plot(lambdas, multigauss_and_bgd(lambdas, *line.fit_popt), lw=2, color='b')
-                        ax.plot(lambdas, np.polyval(line.fit_popt[0:bgd_npar], lambdas), lw=2, color='b', linestyle='--')
+                        ax.plot(lambdas, np.polyval(line.fit_popt[0:bgd_npar], lambdas), lw=2, color='b',
+                                linestyle='--')
                 popt = line.fit_popt
                 peak_pos = popt[bgd_npar + 3 * j + 1]
                 FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
                 signal_level = popt[bgd_npar + 3 * j]
                 if line.high_snr:
                     rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength,
-                                     FWHM, signal_level, line.fit_snr, line.fit_chisq))
+                                 FWHM, signal_level, line.fit_snr, line.fit_chisq))
                 j += 1
         if print_table and len(rows) > 0:
             t = Table(rows=rows, names=('Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq'),
@@ -835,7 +843,7 @@ class Spectrum(object):
         if lambdas is not None:
             xs = lambdas
         if label == '':
-            label = 'Order {:d} spectrum'.format(self.order)
+            label = f'Order {self.order:d} spectrum\nD={self.disperser.D:.2f}mm, x0={self.x0[0]:.2f}pix'
         if xs is None:
             xs = np.arange(self.data.shape[0])
         if self.err is not None:
@@ -849,17 +857,21 @@ class Spectrum(object):
         ax.set_xlim(xlim)
         ax.set_ylim(0., np.nanmax(self.data) * 1.2)
         ax.set_xlabel('$\lambda$ [nm]')
-        ax.set_ylabel('Flux [%s]' % self.units)
+        ax.set_ylabel(f'Flux [{self.units}]')
+        ax.set_title(self.target.label)
 
-    def plot_spectrum(self, xlim=None, fit=True):
+    def plot_spectrum(self, xlim=None, label='', live_fit=False):
         """Plot spectrum with emission and absorption lines.
 
         Parameters
         ----------
         xlim: list, optional
-            List of minimum and maximum abscisses
-        fit: bool, optional
-            If True lines are fitted (default: True).
+            List of minimum and maximum abscisses (default: None)
+        label: str, optional
+            Label for the plot legend (default: '')
+        live_fit: bool, optional
+            If True the spectrum is plotted in live during the fitting procedures
+            (default: False).
 
         Examples
         --------
@@ -868,13 +880,13 @@ class Spectrum(object):
         >>> if parameters.DISPLAY: plt.show()
         """
         plt.figure(figsize=[12, 6])
-        self.plot_spectrum_simple(plt.gca(), xlim=xlim)
+        self.plot_spectrum_simple(plt.gca(), xlim=xlim, label=label)
         # if len(self.target.spectra)>0:
         #    for k in range(len(self.target.spectra)):
         #        s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
         #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
-        if fit and self.lambdas is not None:
-            #self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
+        if self.lambdas is not None:
+            # self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
             #                        print_table=parameters.VERBOSE)
             self.lines.plot_detected_lines(plt.gca(), print_table=parameters.VERBOSE)
         if self.lambdas is not None and self.lines is not None:
@@ -883,7 +895,12 @@ class Spectrum(object):
         if self.filters is not None:
             plt.gca().get_legend().set_title(self.filters)
         if parameters.DISPLAY:
-            plt.show()
+            if live_fit:
+                plt.draw()
+                plt.pause(1e-8)
+                plt.close()
+            else:
+                plt.show()
 
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).
@@ -1007,47 +1024,53 @@ def calibrate_spectrum_with_lines(spectrum):
     """
     # Convert wavelength array into original pixels
     x0 = spectrum.x0
-    if x0 is None :
+    if x0 is None:
         x0 = spectrum.target_pixcoords
+        spectrum.x0 = x0
     D = parameters.DISTANCE2CCD
     if spectrum.header['D2CCD'] != '':
         D = spectrum.header['D2CCD']
     spectrum.disperser.D = D
     delta_pixels = spectrum.disperser.grating_lambda_to_pixel(spectrum.lambdas, x0=x0, order=spectrum.order)
     # Detect emission/absorption lines and calibrate pixel/lambda
-    shifts = []
-    counts = 0
-    D = parameters.DISTANCE2CCD  #- parameters.DISTANCE2CCD_ERR
+    D = parameters.DISTANCE2CCD  # - parameters.DISTANCE2CCD_ERR
     D_err = parameters.DISTANCE2CCD_ERR
+    print('uuuuu', x0, spectrum.x0)
 
     def shift_minizer(params, spectrum, x0):
         spectrum.disperser.D = params[0]
         pixel_shift = params[1]
-        lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels-pixel_shift,
-                                                                  x0=[x0[0]+pixel_shift, x0[1]], order=spectrum.order)
+        lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift,
+                                                                  x0=[x0[0] + pixel_shift, x0[1]], order=spectrum.order)
         chisq = spectrum.lines.detect_lines(lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None,
-                                                    print_table=parameters.DEBUG)
-        chisq += pixel_shift*pixel_shift
+                                            print_table=parameters.DEBUG)
+        chisq += pixel_shift * pixel_shift
         print(params, chisq)
         spectrum.lambdas = lambdas_test
-        spectrum.plot_spectrum(live_fit=True)
+        spectrum.plot_spectrum(live_fit=True,
+                               label=f'Order {spectrum.order:d} spectrum\nD={D:.2f}mm, shift={pixel_shift:.2f}pix')
         return chisq
-    #res = opt.basinhopping(shift_minizer, np.array([D, 0]), niter=10, stepsize=0.1, T=0.1, interval=10,
+
+    # res = opt.basinhopping(shift_minizer, np.array([D, 0]), niter=10, stepsize=0.1, T=0.1, interval=10,
     #                       minimizer_kwargs={'method': 'L-BFGS-B', 'args': (spectrum, x0), 'options': {'maxiter': 5, 'gtol': 1e-2, 'ftol': 1e-2},
     #                                         'bounds': ((D-5*parameters.DISTANCE2CCD_ERR,D+5*parameters.DISTANCE2CCD_ERR),(-2,2))})
-    Ds = np.arange(D-5D_err, D+6D_err,D_err/2)
-    pixel_shifts = np.arange(-2,2.5,0.5)
-    chisq_grid = np.zeros((len(Ds),len(pixel_shifts)))
-    for i,D in enumerate(Ds):
-        for j,pixel_shift in enumerate(pixel_shifts):
-            chisq_grid[i, j] = shift_minizer([D ,pixel_shift], spectrum, x0)
+    D_step = D_err/2
+    pixel_shift_step = 0.5
+    Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
+    pixel_shifts = np.arange(-2, 2.5, pixel_shift_step)
+    print(Ds, pixel_shifts)
+    chisq_grid = np.zeros((len(Ds), len(pixel_shifts)))
+    for i, D in enumerate(Ds):
+        for j, pixel_shift in enumerate(pixel_shifts):
+            chisq_grid[i, j] = shift_minizer([D, pixel_shift], spectrum, x0)
     imin, jmin = np.unravel_index(chisq_grid.argmin(), chisq_grid.shape)
     D = Ds[imin]
     pixel_shift = pixel_shifts[jmin]
     start = np.array([D, pixel_shift])
-    print(start,chisq_grid.argmin(),imin,jmin)
+    print(start, chisq_grid.argmin(), imin, jmin)
     fig = plt.figure()
-    im = plt.imshow(np.log10(chisq_grid), origin='lower')
+    im = plt.imshow(np.log10(chisq_grid), origin='lower',
+                    extent=(np.min(pixel_shifts), np.max(pixel_shifts)+pixel_shift_step, np.min(Ds), np.max(Ds)+D_step))
     c = plt.colorbar(im)
     plt.xlabel('pixel shift')
     plt.ylabel('D')
@@ -1055,11 +1078,12 @@ def calibrate_spectrum_with_lines(spectrum):
 
     res = opt.minimize(shift_minizer, start, args=(spectrum, x0), method='L-BFGS-B',
                        options={'maxiter': 200, 'ftol': 1e-4},
-                       bounds=((D-5*parameters.DISTANCE2CCD_ERR,D+5*parameters.DISTANCE2CCD_ERR),(-2,2)))
+                       bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
+    print(res)
     D = res.x[0]
     spectrum.disperser.D = D
     pixel_shift = res.x[1]
-    x0 = [x0[0]+res.x[1], x0[1]]
+    x0 = [x0[0] + res.x[1], x0[1]]
     spectrum.x0 = x0
     # check success, xO ou D sur les bords du prior
     lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift, x0=x0, order=spectrum.order)
@@ -1148,6 +1172,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=1
 
 if __name__ == "__main__":
     import doctest
+
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
 
