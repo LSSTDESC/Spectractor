@@ -147,12 +147,12 @@ class Lines:
         Redshift the hydrogen lines, the atmospheric lines stay unchanged:
         >>> lines = Lines(redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
-        [393.366, 396.847, 686.719, 762.1, 820.4]
+        [382.044, 393.366, 396.847, 430.79, 438.355]
 
         Redshift all the spectral lines, except the atmospheric lines:
         >>> lines = Lines(redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
-        [393.366, 396.847, 686.719, 706.2, 762.1]
+        [382.044, 393.366, 396.847, 430.79, 438.355]
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         if redshift < 0:
@@ -360,13 +360,13 @@ class Lines:
 
         Detect the lines
         >>> lines = Lines(hydrogen_only=True, atmospheric_lines=True, redshift=0, emission_spectrum=True)
-        >>> shift = lines.detect_lines(lambdas, spectrum, spectrum_err, print_table=False)
-        >>> print('{:.1f}'.format(shift))
+        >>> global_chisq = lines.detect_lines(lambdas, spectrum, spectrum_err)
+        >>> print('{:.1f}'.format(global_chisq))
         0.0
 
-        Plot the result, if fit=True the detect_lines algorithm is run.
+        Plot the result
         >>> spec.lines = lines
-        >>> spec.plot_spectrum(fit=True)
+        >>> spec.plot_spectrum()
         """
 
         # main settings
@@ -619,7 +619,7 @@ class Lines:
             # if guess values on tabulated lines have not moved: penalize the chisq
             global_chisq += shift
             self.my_logger.debug(f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}'
-                                 f'\nTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
+                                 f'\n\tTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
         else:
             global_chisq = 2 * len(parameters.LAMBDAS)
             self.my_logger.debug(
@@ -719,8 +719,10 @@ class Spectrum(object):
             self.expo = image.expo
             self.filters = image.filters
             self.filter = image.filter
+            self.disperser_label = image.disperser_label
             self.disperser = image.disperser
             self.target = image.target
+            self.x0 = image.target_pixcoords
             self.target_pixcoords = image.target_pixcoords
             self.target_pixcoords_rotated = image.target_pixcoords_rotated
             self.units = image.units
@@ -940,7 +942,7 @@ class Spectrum(object):
                 self.units = self.header['UNIT2']
             if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
-            self.my_logger.info('\n\tLoading disperser %s...' % self.disperser)
+            self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
         else:
@@ -1043,7 +1045,7 @@ def calibrate_spectrum_with_lines(spectrum):
     start = np.array([D, pixel_shift])
     if imin == 0 or imin == Ds.size or jmin == 0 or jmin == pixel_shifts.size:
         spectrum.my_logger.warning('\n\tMinimum chisq is on the edge of the exploration grid.')
-    if parameters.DEBUG:
+    if parameters.DEBUG and parameters.DISPLAY:
         im = plt.imshow(np.log10(chisq_grid), origin='lower',
                         extent=(
                         np.min(pixel_shifts) - pixel_shift_step / 2, np.max(pixel_shifts) + pixel_shift_step / 2,
