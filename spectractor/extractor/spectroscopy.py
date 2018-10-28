@@ -160,7 +160,7 @@ class Lines:
             sys.exit()
         HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02], use_for_calibration=True)
         HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
-        HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02])
+        HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=True)
         HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02])
         OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
         CII1 = Line(723.5, atmospheric=False, label=r'$C_{II}$', label_pos=[0.005, 0.88])
@@ -1077,7 +1077,7 @@ def calibrate_spectrum_with_lines(spectrum):
     plt.show()
 
     res = opt.minimize(shift_minizer, start, args=(spectrum, x0), method='L-BFGS-B',
-                       options={'maxiter': 200, 'ftol': 1e-4},
+                       options={'maxiter': 200, 'ftol': 1e-3},
                        bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
     print(res)
     D = res.x[0]
