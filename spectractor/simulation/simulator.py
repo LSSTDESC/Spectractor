@@ -25,7 +25,7 @@ from astropy.io import fits
 from scipy.interpolate import interp1d, RegularGridInterpolator
 
 from spectractor.extractor.images import Image
-from spectractor.extractor.spectroscopy import Spectrum
+from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import Target
 from spectractor.tools import fftconvolve_gaussian, ensure_dir

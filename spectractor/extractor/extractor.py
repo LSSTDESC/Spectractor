@@ -1,4 +1,4 @@
-from spectractor.extractor.spectroscopy import *
+from spectractor.extractor.spectrum import *
 from spectractor import parameters
 from spectractor.tools import ensure_dir
 
