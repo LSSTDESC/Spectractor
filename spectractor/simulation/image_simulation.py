@@ -1,5 +1,5 @@
 from spectractor.extractor.images import *
-from spectractor.extractor.spectroscopy import *
+from spectractor.extractor.spectrum import *
 from spectractor.simulation.simulator import *
 from spectractor import parameters
 import copy

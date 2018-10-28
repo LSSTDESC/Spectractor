@@ -7,6 +7,7 @@ from astroquery.ned import Ned
 from astroquery.simbad import Simbad
 from scipy.interpolate import interp1d
 
+from spectractor.tools import *
 from spectractor import parameters
 
 if os.getenv("PYSYN_CDBS"):
@@ -16,13 +17,13 @@ if os.getenv("PYSYN_CDBS"):
 class Target:
 
     def __init__(self, label, verbose=False):
-        """Initialize Traget object.
+        """Initialize Target class.
 
         Parameters
         ----------
         label: str
             String label to name the target
-        verbose: book, optional
+        verbose: bool, optional
             Set True to increase verbosity (default: False)
 
         Examples
@@ -49,15 +50,89 @@ class Target:
         """
         self.my_logger = parameters.set_logger(self.__class__.__name__)
         self.label = label
-        self.coord = None
         self.type = None
-        self.redshift = 0
         self.wavelengths = []
         self.spectra = []
         self.verbose = verbose
         self.emission_spectrum = False
         self.hydrogen_only = False
         self.sed = None
+        self.lines = None
+
+    def load(self):
+        pass
+
+
+class ArcLamp(Target):
+
+    def __init__(self, label, verbose=False):
+        """Initialize Star class.
+
+        Parameters
+        ----------
+        label: str
+            String label to name the target
+        verbose: bool, optional
+            Set True to increase verbosity (default: False)
+
+        Examples
+        --------
+
+        Mercury-Argon lamp:
+        >>> s = Star('3C273')
+        >>> print(s.label)
+        3C273
+        >>> print(s.coord.dec)
+        2d03m08.598s
+        >>> print(s.emission_spectrum)
+        True
+
+        """
+        Target.__init__(self, label, verbose=verbose)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
+
+    def load(self):
+        pass
+
+
+class Star(Target):
+
+    def __init__(self, label, verbose=False):
+        """Initialize Star class.
+
+        Parameters
+        ----------
+        label: str
+            String label to name the target
+        verbose: bool, optional
+            Set True to increase verbosity (default: False)
+
+        Examples
+        --------
+
+        Emission line object:
+        >>> s = Star('3C273')
+        >>> print(s.label)
+        3C273
+        >>> print(s.coord.dec)
+        2d03m08.598s
+        >>> print(s.emission_spectrum)
+        True
+
+        Standard star:
+        >>> s = Star('HD111980')
+        >>> print(s.label)
+        HD111980
+        >>> print(s.coord.dec)
+        -18d31m20.009s
+        >>> print(s.emission_spectrum)
+        False
+
+        """
+        Target.__init__(self, label, verbose=verbose)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.coord = None
+        self.redshift = 0
         self.load()
 
     def load(self):
@@ -65,8 +140,8 @@ class Target:
 
         Examples
         --------
-        >>> t = Target('3C273')
-        >>> print(t.coord.dec)
+        >>> s = Star('3C273')
+        >>> print(s.coord.dec)
         2d03m08.598s
 
         """
@@ -85,11 +160,11 @@ class Target:
 
         Examples
         --------
-        >>> t = Target('3C273')
-        >>> print(t.spectra[0][:4])
+        >>> s = Star('3C273')
+        >>> print(s.spectra[0][:4])
         [  0.00000000e+00   2.50485769e-14   2.42380612e-14   2.40887886e-14]
-        >>> t = Target('HD111980')
-        >>> print(t.spectra[0][:4])
+        >>> s = Star('HD111980')
+        >>> print(s.spectra[0][:4])
         [  2.16890002e-13   2.66480010e-13   2.03540011e-13   2.38780004e-13]
         """
         self.wavelengths = []  # in nm
@@ -105,6 +180,9 @@ class Target:
         if len(file_names) > 0:
             self.emission_spectrum = False
             self.hydrogen_only = True
+            self.lines = Lines(parameters.HYDROGEN_LINES+parameters.ATMOSPHERIC_LINES,
+                                   redshift=0., emission_spectrum=self.emission_spectrum,
+                                   hydrogen_only=self.hydrogen_only)
             for k, f in enumerate(file_names):
                 if '_mod_' in f:
                     continue
@@ -130,6 +208,9 @@ class Target:
                     self.hydrogen_only = True
                     parameters.LAMBDA_MIN *= 1 + self.redshift
                     parameters.LAMBDA_MAX *= 1 + self.redshift
+                self.lines = Lines(parameters.ATMOSPHERIC_LINES+parameters.ISM_LINES+parameters.HYDROGEN_LINES,
+                                   redshift=self.redshift, emission_spectrum=self.emission_spectrum,
+                                   hydrogen_only=self.hydrogen_only)
                 for k, h in enumerate(hdulists):
                     if h[0].header['NAXIS'] == 1:
                         self.spectra.append(h[0].data)
@@ -156,6 +237,9 @@ class Target:
                         self.wavelengths.append(waves)
             else:
                 self.emission_spectrum = True
+                self.lines = Lines(parameters.ATMOSPHERIC_LINES+parameters.ISM_LINES+parameters.HYDROGEN_LINES,
+                                   redshift=0., emission_spectrum=self.emission_spectrum,
+                                   hydrogen_only=self.hydrogen_only)
         self.build_sed()
 
     def build_sed(self, index=0):
@@ -168,9 +252,9 @@ class Target:
 
         Examples
         --------
-        >>> t = Target('HD111980')
-        >>> t.build_sed(index=0)
-        >>> t.sed(550)
+        >>> s = Star('HD111980')
+        >>> s.build_sed(index=0)
+        >>> s.sed(550)
         array(1.676051129017069e-11)
         """
         if len(self.spectra) == 0:
@@ -184,8 +268,8 @@ class Target:
 
         Examples
         --------
-        >>> t = Target('HD111980')
-        >>> t.plot_spectra()
+        >>> s = Star('HD111980')
+        >>> s.plot_spectra()
         """
         # target.load_spectra()  ## No global target object available  here (SDC)
         plt.figure()  # necessary to create a new plot (SDC)
