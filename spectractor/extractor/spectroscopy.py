@@ -307,7 +307,7 @@ class Lines:
                             xycoords='axes fraction', color=color, fontsize=fontsize)
         return ax
 
-    def detect_lines(self, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None, print_table=False,
+    def detect_lines(self, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
                      xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
         """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
         around emission or absorption tabulated lines, and to select surrounding pixels
@@ -330,8 +330,6 @@ class Lines:
             shift output and to print it in the outpur table (default: 3)
         ax: Axes, optional
             An Axes instance to over plot the result of the fit (default: None).
-        print_table: bool, optional
-            Print a table with the detected lines (default: False).
         xlim: array, optional
             (min, max) list limiting the wavelength interval where to detect spectral lines (default:
             (parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
@@ -531,13 +529,13 @@ class Lines:
                 new_bounds_list[-1][0][bgd_npar + 3 * (k + 1) + 1] = 0.5 * (
                         new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][bgd_npar + 3 * (k + 1) + 1])
                 new_bounds_list[-1][1][bgd_npar + 3 * k + 1] = 0.5 * (
-                        new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][bgd_npar + 3 * (
-                        k + 1) + 1]) + 1e-3  # last term is to avoid equalities
+                        new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][
+                    bgd_npar + 3 * (k + 1) + 1]) + 1e-3
+                # last term is to avoid equalities
                 # between bounds in some pathological case
             # sort pixel indices and remove doublons
             new_index_list[-1] = sorted(list(set(new_index_list[-1])))
         # fit the line subsets and background
-        rows = []
         global_chisq = 0
         for k in range(len(new_index_list)):
             # first guess for the base line with the lateral bands
@@ -554,21 +552,8 @@ class Lines:
                         break
                 if not is_close_to_peak:
                     bgd_index.append(i)
-            try:
-                fit, cov, model = fit_poly1d(lambdas[bgd_index], spec[bgd_index],
-                                             order=parameters.BGD_ORDER, w=1. / spec_err[bgd_index])
-                # bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
-                #                                 order=parameters.BGD_ORDER, sigma=10, niter=5)
-            except:
-                fit, cov, model = fit_poly1d(lambdas[index], spec[index],
-                                             order=parameters.BGD_ORDER, w=1. / spec_err[index])
-                # bgd = fit_poly1d_outlier_removal(lambdas[bgd_index], spec[bgd_index],
-                #                                 order=parameters.BGD_ORDER, sigma=3, niter=5)
-            # f = plt.figure()
-            # plt.errorbar(lambdas[index],spec[index],yerr=spec_err[index])
-            # plt.plot(lambdas[bgd_index],spec[bgd_index],'r-')
-            # plt.plot(lambdas[index],bgd(lambdas[index]),'b--')
-            # if parameters.DISPLAY: plt.show()
+            fit, cov, model = fit_poly1d(lambdas[bgd_index], spec[bgd_index],
+                                         order=parameters.BGD_ORDER, w=1. / spec_err[bgd_index])
             for n in range(bgd_npar):
                 # guess[n] = getattr(bgd, bgd.param_names[parameters.BGD_ORDER - n]).value
                 guess[n] = fit[n]
@@ -600,17 +585,8 @@ class Lines:
             global_chisq += chisq
             if spec_err is not None:
                 noise_level = np.sqrt(np.mean(spec_err[index] ** 2))
-            # f = plt.figure()
-            # plt.errorbar(lambdas[index],spec[index],yerr=spec_err[index])
-            # plt.plot(lambdas[bgd_index],spec[bgd_index])
-            # plt.plot(lambdas[index],np.polyval(popt[:bgd_npar],lambdas[index]),'b--')
-            # plt.plot(lambdas[index],multigauss_and_bgd(lambdas[index],*popt),'b-')
-            # plt.plot(lambdas[index],multigauss_and_bgd(lambdas[index],*guess),'g-')
-            # plt.plot(lambdas[index],base_line,'r-')
-            # if parameters.DISPLAY: plt.show()
             for j in range(len(new_lines_list[k])):
                 line = new_lines_list[k][j]
-                l = line.wavelength
                 peak_pos = popt[bgd_npar + 3 * j + 1]
                 # FWHM
                 FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
@@ -633,20 +609,21 @@ class Lines:
                 line.high_snr = True
                 if line.use_for_calibration:
                     # wavelength shift between tabulate and observed lines
-                    lambda_shifts.append(peak_pos - l)
+                    lambda_shifts.append(peak_pos - line.wavelength)
                     snrs.append(snr)
         if ax is not None:
-            self.plot_detected_lines(ax, print_table=True)  # parameters.DEBUG)
-            # ax.plot(lambdas[index], multigauss_and_bgd(lambdas[index], *popt), lw=2, color='b')
-            # ax.plot(lambdas[index], np.polyval(popt[:bgd_npar], lambdas[index]), lw=2, color='b', linestyle='--')
+            self.plot_detected_lines(ax, print_table=parameters.DEBUG)
         if len(lambda_shifts) > 0:
             global_chisq /= len(lambda_shifts)
             shift = np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2)
             # if guess values on tabulated lines have not moved: penalize the chisq
             global_chisq += shift
-            print(shift, global_chisq - shift, global_chisq, len(lambda_shifts))
+            self.my_logger.debug(f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}'
+                                 f'\nTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
         else:
             global_chisq = 2 * len(parameters.LAMBDAS)
+            self.my_logger.debug(
+                f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}\n\tTotal chisq: {global_chisq:.3f}')
         return global_chisq
 
     def plot_detected_lines(self, ax=None, print_table=False):
@@ -843,7 +820,9 @@ class Spectrum(object):
         if lambdas is not None:
             xs = lambdas
         if label == '':
-            label = f'Order {self.order:d} spectrum\nD={self.disperser.D:.2f}mm, x0={self.x0[0]:.2f}pix'
+            label = f'Order {self.order:d} spectrum\nD={self.disperser.D:.2f}mm'
+            if self.x0 is not None:
+                label += f', x0={self.x0[0]:.2f}pix'
         if xs is None:
             xs = np.arange(self.data.shape[0])
         if self.err is not None:
@@ -1035,51 +1014,57 @@ def calibrate_spectrum_with_lines(spectrum):
     # Detect emission/absorption lines and calibrate pixel/lambda
     D = parameters.DISTANCE2CCD  # - parameters.DISTANCE2CCD_ERR
     D_err = parameters.DISTANCE2CCD_ERR
-    print('uuuuu', x0, spectrum.x0)
 
-    def shift_minizer(params, spectrum, x0):
+    def shift_minimizer(params, spectrum, x0):
         spectrum.disperser.D = params[0]
         pixel_shift = params[1]
         lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift,
                                                                   x0=[x0[0] + pixel_shift, x0[1]], order=spectrum.order)
-        chisq = spectrum.lines.detect_lines(lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None,
-                                            print_table=parameters.DEBUG)
+        chisq = spectrum.lines.detect_lines(lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None)
         chisq += pixel_shift * pixel_shift
-        print(params, chisq)
-        spectrum.lambdas = lambdas_test
-        spectrum.plot_spectrum(live_fit=True,
-                               label=f'Order {spectrum.order:d} spectrum\nD={D:.2f}mm, shift={pixel_shift:.2f}pix')
+        if parameters.DEBUG:
+            spectrum.lambdas = lambdas_test
+            spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
+                                                        f'\nD={D:.2f}mm, shift={pixel_shift:.2f}pix')
         return chisq
 
-    # res = opt.basinhopping(shift_minizer, np.array([D, 0]), niter=10, stepsize=0.1, T=0.1, interval=10,
-    #                       minimizer_kwargs={'method': 'L-BFGS-B', 'args': (spectrum, x0), 'options': {'maxiter': 5, 'gtol': 1e-2, 'ftol': 1e-2},
-    #                                         'bounds': ((D-5*parameters.DISTANCE2CCD_ERR,D+5*parameters.DISTANCE2CCD_ERR),(-2,2))})
-    D_step = D_err/2
+    # grid exploration of the parameters
+    D_step = D_err / 2
     pixel_shift_step = 0.5
     Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
     pixel_shifts = np.arange(-2, 2.5, pixel_shift_step)
-    print(Ds, pixel_shifts)
     chisq_grid = np.zeros((len(Ds), len(pixel_shifts)))
     for i, D in enumerate(Ds):
         for j, pixel_shift in enumerate(pixel_shifts):
-            chisq_grid[i, j] = shift_minizer([D, pixel_shift], spectrum, x0)
+            chisq_grid[i, j] = shift_minimizer([D, pixel_shift], spectrum, x0)
     imin, jmin = np.unravel_index(chisq_grid.argmin(), chisq_grid.shape)
     D = Ds[imin]
     pixel_shift = pixel_shifts[jmin]
     start = np.array([D, pixel_shift])
-    print(start, chisq_grid.argmin(), imin, jmin)
-    fig = plt.figure()
-    im = plt.imshow(np.log10(chisq_grid), origin='lower',
-                    extent=(np.min(pixel_shifts), np.max(pixel_shifts)+pixel_shift_step, np.min(Ds), np.max(Ds)+D_step))
-    c = plt.colorbar(im)
-    plt.xlabel('pixel shift')
-    plt.ylabel('D')
-    plt.show()
-
-    res = opt.minimize(shift_minizer, start, args=(spectrum, x0), method='L-BFGS-B',
+    if imin == 0 or imin == Ds.size or jmin == 0 or jmin == pixel_shifts.size:
+        spectrum.my_logger.warning('\n\tMinimum chisq is on the edge of the exploration grid.')
+    if parameters.DEBUG:
+        im = plt.imshow(np.log10(chisq_grid), origin='lower',
+                        extent=(
+                        np.min(pixel_shifts) - pixel_shift_step / 2, np.max(pixel_shifts) + pixel_shift_step / 2,
+                        np.min(Ds) - D_step / 2, np.max(Ds) + D_step / 2))
+        plt.gca().scatter(pixel_shift, D, marker='o', s=100, edgecolors='k', facecolors='none',
+                          label='Minimum', linewidth=2)
+        c = plt.colorbar(im)
+        c.set_label('Log10(chisq)')
+        plt.xlabel('Pixel shift [pix]')
+        plt.ylabel('D [mm]')
+        plt.legend()
+        plt.show()
+    # now minimize around the global minimum found previously
+    res = opt.minimize(shift_minimizer, start, args=(spectrum, x0), method='L-BFGS-B',
                        options={'maxiter': 200, 'ftol': 1e-3},
                        bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
-    print(res)
+    if parameters.DEBUG:
+        print(res)
+    if not res.success:
+        spectrum.my_logger.warning('\n\tMinimizer failed.')
+        print(res)
     D = res.x[0]
     spectrum.disperser.D = D
     pixel_shift = res.x[1]
