@@ -284,7 +284,7 @@ def fit_poly1d(x, y, order, w=None):
 
     Returns
     -------
-    fit: list
+    fit: array
         The best fitting parameter values.
     cov: 2D-array
         The covariance matrix
@@ -310,7 +310,7 @@ def fit_poly1d(x, y, order, w=None):
             fit, cov = np.polyfit(x, y, order, cov=True, w=w)
         model = lambda xx: np.polyval(fit, xx)
     else:
-        fit = [0] * (order + 1)
+        fit = np.array([0] * (order + 1))
         model = y
     return fit, cov, model
 
