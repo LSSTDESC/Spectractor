@@ -3,7 +3,8 @@ from spectractor import parameters
 from spectractor.tools import ensure_dir
 
 
-def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=True, line_detection=True):
+def Spectractor(file_name, output_directory, guess, target, config='./config/ctio.ini',
+                atmospheric_lines=True, line_detection=True):
     """ Spectractor
     Main function to extract a spectrum from an image
 
@@ -17,6 +18,8 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
         [x0,y0] list of the guessed pixel positions of the target in the image (must be integers)
     target: str
         The name of the targeted object
+    config: str
+        The config file name
     atmospheric_lines: bool
         If True atmospheric lines are used in the calibration fit
     line_detection: bool
@@ -40,17 +43,21 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     ...     target, xpos, ypos = logbook.search_for_image(tag)
     ...     if target is None or xpos is None or ypos is None:
     ...         continue
-    ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target, line_detection=False, atmospheric_lines=True)
+    ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target, './config/ctio.ini')
     ...     assert spectrum is not None
     ...     assert os.path.isfile('tests/data/reduc_20170605_028_spectrum.fits')
     """
+
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTOR')
+    # Load config file
+    load_config(config)
     # Load reduced image
     image = Image(file_name, target=target)
     if parameters.DEBUG:
         image.plot_image(scale='log10', target_pixcoords=guess)
     # Set output path
+
     ensure_dir(output_directory)
     output_filename = file_name.split('/')[-1]
     output_filename = output_filename.replace('.fits', '_spectrum.fits')
@@ -72,11 +79,7 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     calibrate_spectrum(spectrum)
     if line_detection:
         my_logger.info('\n\tCalibrating order %d spectrum...' % spectrum.order)
-        #try:
         calibrate_spectrum_with_lines(spectrum)
-        #except:
-        #    my_logger.warning('\n\tCalibration procedure with spectral features failed.')
-        #    spectrum.header['WARNINGS'] = 'Calibration procedure with spectral features failed.'
     else:
         spectrum.header['WARNINGS'] = 'No calibration procedure with spectral features.'
     # Save the spectrum

@@ -1,5 +1,6 @@
 import configparser
 import os
+import sys
 import re
 import numpy as np
 import coloredlogs
@@ -12,6 +13,8 @@ logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 
 def load_config(config_filename):
+    if not os.path.isfile(config_filename):
+        sys.exit('Config file %s does not exist.' % config_filename)
     # Load the configuration file
     config = configparser.ConfigParser()
     config.read(config_filename)
@@ -93,8 +96,3 @@ def set_logger(logger):
         my_logger.setLevel(logging.DEBUG)
         coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.DEBUG)
     return my_logger
-
-
-if __name__ == "__main__":
-
-    load_config('../config/ctio.ini')
