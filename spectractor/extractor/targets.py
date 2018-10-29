@@ -99,7 +99,7 @@ class ArcLamp(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.lines = Lines(parameters.ARHG_LINES)
+        self.lines = Lines(HGAR_LINES)
 
     def load(self):
         pass

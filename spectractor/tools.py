@@ -920,7 +920,7 @@ def clean_target_spikes(data, saturation):
 
 def load_fits(file_name, hdu_index=0):
     hdu_list = fits.open(file_name)
-    header = hdu_list[hdu_index].header
+    header = hdu_list[0].header
     data = hdu_list[hdu_index].data
     hdu_list.close()  # need to free allocation for file descripto
     return header, data
