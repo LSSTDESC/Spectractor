@@ -1,6 +1,5 @@
 import scipy.optimize as opt
 
-from astropy.table import Table
 from scipy.signal import argrelextrema
 
 from spectractor.extractor.images import *
@@ -67,6 +66,7 @@ class Spectrum(object):
             self.disperser_label = image.disperser_label
             self.disperser = image.disperser
             self.target = image.target
+            self.lines = self.target.lines
             self.x0 = image.target_pixcoords
             self.target_pixcoords = image.target_pixcoords
             self.target_pixcoords_rotated = image.target_pixcoords_rotated
@@ -323,355 +323,325 @@ def calibrate_spectrum(spectrum, xlim=None):
     spectrum.convert_from_ADUrate_to_flam()
 
 
-    def detect_lines(self, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
-                     xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
-        """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
-        around emission or absorption tabulated lines, and to select surrounding pixels
-        to fit a (positive or negative) gaussian and a polynomial background. If several regions
-        overlap, a multi-gaussian fit is performed above a common polynomial background.
-        The mean global shift (in nm) between the detected and tabulated lines is returned, considering
-        only the lines with a signal-to-noise ratio above a threshold.
-        The order of the polynomial background is set in parameters.py with BGD_ORDER.
+def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
+                 xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
+    """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
+    around emission or absorption tabulated lines, and to select surrounding pixels
+    to fit a (positive or negative) gaussian and a polynomial background. If several regions
+    overlap, a multi-gaussian fit is performed above a common polynomial background.
+    The mean global shift (in nm) between the detected and tabulated lines is returned, considering
+    only the lines with a signal-to-noise ratio above a threshold.
+    The order of the polynomial background is set in parameters.py with BGD_ORDER.
 
-        Parameters
-        ----------
-        lambdas: float array
-            The wavelength array (in nm)
-        spec: float array
-            The spectrum amplitude array
-        spec_err: float array, optional
-            The spectrum amplitude uncertainty array (default: None)
-        snr_minlevel: float
-            The minimum signal over noise ratio to consider using a fitted line in the computation of the mean
-            shift output and to print it in the outpur table (default: 3)
-        ax: Axes, optional
-            An Axes instance to over plot the result of the fit (default: None).
-        xlim: array, optional
-            (min, max) list limiting the wavelength interval where to detect spectral lines (default:
-            (parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
+    Parameters
+    ----------
+    lines: Lines
+        The Lines object containing the line characteristics
+    lambdas: float array
+        The wavelength array (in nm)
+    spec: float array
+        The spectrum amplitude array
+    spec_err: float array, optional
+        The spectrum amplitude uncertainty array (default: None)
+    snr_minlevel: float
+        The minimum signal over noise ratio to consider using a fitted line in the computation of the mean
+        shift output and to print it in the outpur table (default: 3)
+    ax: Axes, optional
+        An Axes instance to over plot the result of the fit (default: None).
+    xlim: array, optional
+        (min, max) list limiting the wavelength interval where to detect spectral lines (default:
+        (parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
 
-        Returns
-        -------
-        shift: float
-            The mean shift (in nm) between the detected and tabulated lines
+    Returns
+    -------
+    shift: float
+        The mean shift (in nm) between the detected and tabulated lines
 
-        Examples
-        --------
+    Examples
+    --------
 
-        Creation of a mock spectrum with emission and absorption lines
-        >>> import numpy as np
-        >>> lambdas = np.arange(300,1000,1)
-        >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
-        >>> HALPHA = Line(656.3, atmospheric=False, label=r'$H\alpha$')
-        >>> HBETA = Line(486.3, atmospheric=False, label=r'$H\beta$')
-        >>> O2 = Line(762.1, atmospheric=True, label=r'$O_2$')
-        >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
-        >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
-        >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=3)
-        >>> spectrum_err = np.sqrt(spectrum)
-        >>> spec = Spectrum()
-        >>> spec.lambdas = lambdas
-        >>> spec.data = spectrum
-        >>> spec.err = spectrum_err
+    Creation of a mock spectrum with emission and absorption lines
+    >>> import numpy as np
+    >>> lambdas = np.arange(300,1000,1)
+    >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
+    >>> HALPHA = Line(656.3, atmospheric=False, label=r'$H\alpha$')
+    >>> HBETA = Line(486.3, atmospheric=False, label=r'$H\beta$')
+    >>> O2 = Line(762.1, atmospheric=True, label=r'$O_2$')
+    >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
+    >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
+    >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=3)
+    >>> spectrum_err = np.sqrt(spectrum)
+    >>> spec = Spectrum()
+    >>> spec.lambdas = lambdas
+    >>> spec.data = spectrum
+    >>> spec.err = spectrum_err
 
-        Detect the lines
-        >>> lines = Lines(hydrogen_only=True, atmospheric_lines=True, redshift=0, emission_spectrum=True)
-        >>> global_chisq = lines.detect_lines(lambdas, spectrum, spectrum_err)
-        >>> print('{:.1f}'.format(global_chisq))
-        0.0
+    Detect the lines
+    >>> lines = Lines(hydrogen_only=True, atmospheric_lines=True, redshift=0, emission_spectrum=True)
+    >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err)
+    >>> print('{:.1f}'.format(global_chisq))
+    0.0
 
-        Plot the result
-        >>> spec.lines = lines
-        >>> spec.plot_spectrum()
-        """
+    Plot the result
+    >>> spec.lines = lines
+    >>> spec.plot_spectrum()
+    """
 
-        # main settings
-        bgd_npar = parameters.BGD_NPARAMS
-        peak_look = 7  # half range to look for local maximum in pixels
-        bgd_width = 10  # size of the peak sides to use to fit spectrum base line
-        if self.hydrogen_only:
-            peak_look = 7
-            bgd_width = 15
-        baseline_prior = 1  # *sigma gaussian prior on base line fit
+    # main settings
+    bgd_npar = parameters.BGD_NPARAMS
+    peak_look = 7  # half range to look for local maximum in pixels
+    bgd_width = 10  # size of the peak sides to use to fit spectrum base line
+    if lines.hydrogen_only:
+        peak_look = 7
+        bgd_width = 15
+    baseline_prior = 1  # *sigma gaussian prior on base line fit
 
-        # initialisation
-        lambda_shifts = []
-        snrs = []
-        index_list = []
-        peak_index_list = []
-        guess_list = []
-        bounds_list = []
-        lines_list = []
-        for line in self.lines:
-            # reset line fit attributes
-            line.fitted = False
-            line.fit_popt = None
-            line.high_snr = False
-            # wavelength of the line: find the nearest pixel index
-            line_wavelength = line.wavelength
-            if line_wavelength < xlim[0] or line_wavelength > xlim[1]:
-                continue
-            l_index, l_lambdas = find_nearest(lambdas, line_wavelength)
-            # reject if pixel index is too close to image bounds
-            if l_index < peak_look or l_index > len(lambdas) - peak_look:
-                continue
-            # search for local extrema to detect emission or absorption line
-            # around pixel index +/- peak_look
-            line_strategy = np.greater  # look for emission line
-            bgd_strategy = np.less
-            if not self.emission_spectrum or line.atmospheric:
-                line_strategy = np.less  # look for absorption line
-                bgd_strategy = np.greater
-            index = np.arange(l_index - peak_look, l_index + peak_look, 1).astype(int)
-            # skip if data is masked with NaN
-            if np.any(np.isnan(spec[index])):
-                continue
-            extrema = argrelextrema(spec[index], line_strategy)
-            if len(extrema[0]) == 0:
-                continue
-            peak_index = index[0] + extrema[0][0]
-            # if several extrema, look for the greatest
-            if len(extrema[0]) > 1:
-                if line_strategy == np.greater:
-                    test = -1e20
-                    for m in extrema[0]:
-                        idx = index[0] + m
-                        if spec[idx] > test:
-                            peak_index = idx
-                            test = spec[idx]
-                elif line_strategy == np.less:
-                    test = 1e20
-                    for m in extrema[0]:
-                        idx = index[0] + m
-                        if spec[idx] < test:
-                            peak_index = idx
-                            test = spec[idx]
-            # search for first local minima around the local maximum
-            # or for first local maxima around the local minimum
-            # around +/- 3*peak_look
-            index_inf = peak_index - 1  # extrema on the left
-            while index_inf > max(0, peak_index - 3 * peak_look):
-                test_index = np.arange(index_inf, peak_index, 1).astype(int)
-                minm = argrelextrema(spec[test_index], bgd_strategy)
-                if len(minm[0]) > 0:
-                    index_inf = index_inf + minm[0][0]
-                    break
-                else:
-                    index_inf -= 1
-            index_sup = peak_index + 1  # extrema on the right
-            while index_sup < min(len(spec) - 1, peak_index + 3 * peak_look):
-                test_index = np.arange(peak_index, index_sup, 1).astype(int)
-                minm = argrelextrema(spec[test_index], bgd_strategy)
-                if len(minm[0]) > 0:
-                    index_sup = peak_index + minm[0][0]
-                    break
-                else:
-                    index_sup += 1
-            # pixel range to consider around the peak, adding bgd_width pixels
-            # to fit for background around the peak
-            index = list(np.arange(max(0, index_inf - bgd_width),
-                                   min(len(lambdas), index_sup + bgd_width), 1).astype(int))
-            # skip if data is masked with NaN
-            if np.any(np.isnan(spec[index])):
-                continue
-            # first guess and bounds to fit the line properties and
-            # the background with BGD_ORDER order polynom
-            # guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), lambdas[peak_index],
-            #                          0.5 * (line.width_bounds[0] + line.width_bounds[1])]
-            guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), line_wavelength,
-                                      0.5 * (line.width_bounds[0] + line.width_bounds[1])]
-            if line_strategy == np.less:
-                guess[bgd_npar] = -0.5 * np.max(spec[index])  # look for abosrption under bgd
-            # bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), lambdas[index_inf], line.width_bounds[0]],
-            #          [np.inf] * bgd_npar + [abs(np.max(spec[index])), lambdas[index_sup], line.width_bounds[1]]]
-            bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), line_wavelength - peak_look / 2,
-                                              line.width_bounds[0]],
-                      [np.inf] * bgd_npar + [abs(np.max(spec[index])), line_wavelength + peak_look / 2,
-                                             line.width_bounds[1]]]
-            # gaussian amplitude bounds depend if line is emission/absorption
-            if line_strategy == np.less:
-                bounds[1][bgd_npar] = 0  # look for absorption under bgd
-            else:
-                bounds[0][bgd_npar] = 0  # look for emission above bgd
-            peak_index_list.append(peak_index)
-            index_list.append(index)
-            lines_list.append(line)
-            guess_list.append(guess)
-            bounds_list.append(bounds)
-        # now gather lines together if pixel index ranges overlap
-        idx = 0
-        merges = [[0]]
-        while idx < len(index_list) - 1:
-            idx = merges[-1][-1]
-            if idx == len(index_list) - 1:
+    # initialisation
+    lambda_shifts = []
+    snrs = []
+    index_list = []
+    peak_index_list = []
+    guess_list = []
+    bounds_list = []
+    lines_list = []
+    for line in lines.lines:
+        # reset line fit attributes
+        line.fitted = False
+        line.fit_popt = None
+        line.high_snr = False
+        # wavelength of the line: find the nearest pixel index
+        line_wavelength = line.wavelength
+        if line_wavelength < xlim[0] or line_wavelength > xlim[1]:
+            continue
+        l_index, l_lambdas = find_nearest(lambdas, line_wavelength)
+        # reject if pixel index is too close to image bounds
+        if l_index < peak_look or l_index > len(lambdas) - peak_look:
+            continue
+        # search for local extrema to detect emission or absorption line
+        # around pixel index +/- peak_look
+        line_strategy = np.greater  # look for emission line
+        bgd_strategy = np.less
+        if not lines.emission_spectrum or line.atmospheric:
+            line_strategy = np.less  # look for absorption line
+            bgd_strategy = np.greater
+        index = np.arange(l_index - peak_look, l_index + peak_look, 1).astype(int)
+        # skip if data is masked with NaN
+        if np.any(np.isnan(spec[index])):
+            continue
+        extrema = argrelextrema(spec[index], line_strategy)
+        if len(extrema[0]) == 0:
+            continue
+        peak_index = index[0] + extrema[0][0]
+        # if several extrema, look for the greatest
+        if len(extrema[0]) > 1:
+            if line_strategy == np.greater:
+                test = -1e20
+                for m in extrema[0]:
+                    idx = index[0] + m
+                    if spec[idx] > test:
+                        peak_index = idx
+                        test = spec[idx]
+            elif line_strategy == np.less:
+                test = 1e20
+                for m in extrema[0]:
+                    idx = index[0] + m
+                    if spec[idx] < test:
+                        peak_index = idx
+                        test = spec[idx]
+        # search for first local minima around the local maximum
+        # or for first local maxima around the local minimum
+        # around +/- 3*peak_look
+        index_inf = peak_index - 1  # extrema on the left
+        while index_inf > max(0, peak_index - 3 * peak_look):
+            test_index = np.arange(index_inf, peak_index, 1).astype(int)
+            minm = argrelextrema(spec[test_index], bgd_strategy)
+            if len(minm[0]) > 0:
+                index_inf = index_inf + minm[0][0]
                 break
-            if index_list[idx][-1] > index_list[idx + 1][0]:
-                merges[-1].append(idx + 1)
             else:
-                merges.append([idx + 1])
-                idx += 1
-        # reorder merge list with respect to lambdas in guess list
-        new_merges = []
-        for merge in merges:
-            tmp_guess = [guess_list[i][bgd_npar + 1] for i in merge]
-            new_merges.append([x for _, x in sorted(zip(tmp_guess, merge))])
-        # reorder lists with merges
-        new_peak_index_list = []
-        new_index_list = []
-        new_guess_list = []
-        new_bounds_list = []
-        new_lines_list = []
-        for merge in new_merges:
-            new_peak_index_list.append([])
-            new_index_list.append([])
-            new_guess_list.append([])
-            new_bounds_list.append([[], []])
-            new_lines_list.append([])
-            for i in merge:
-                # add the bgd parameters
-                if i == merge[0]:
-                    new_guess_list[-1] += guess_list[i][:bgd_npar]
-                    new_bounds_list[-1][0] += bounds_list[i][0][:bgd_npar]
-                    new_bounds_list[-1][1] += bounds_list[i][1][:bgd_npar]
-                # add the gauss parameters
-                new_peak_index_list[-1].append(peak_index_list[i])
-                new_index_list[-1] += index_list[i]
-                new_guess_list[-1] += guess_list[i][bgd_npar:]
-                new_bounds_list[-1][0] += bounds_list[i][0][bgd_npar:]
-                new_bounds_list[-1][1] += bounds_list[i][1][bgd_npar:]
-                new_lines_list[-1].append(lines_list[i])
-            # set central peak bounds exactly between two close lines
-            for k in range(len(merge) - 1):
-                new_bounds_list[-1][0][bgd_npar + 3 * (k + 1) + 1] = 0.5 * (
-                        new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][bgd_npar + 3 * (k + 1) + 1])
-                new_bounds_list[-1][1][bgd_npar + 3 * k + 1] = 0.5 * (
-                        new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][
-                    bgd_npar + 3 * (k + 1) + 1]) + 1e-3
-                # last term is to avoid equalities
-                # between bounds in some pathological case
-            # sort pixel indices and remove doublons
-            new_index_list[-1] = sorted(list(set(new_index_list[-1])))
-        # fit the line subsets and background
-        global_chisq = 0
-        for k in range(len(new_index_list)):
-            # first guess for the base line with the lateral bands
-            peak_index = new_peak_index_list[k]
-            index = new_index_list[k]
-            guess = new_guess_list[k]
-            bounds = new_bounds_list[k]
-            bgd_index = []
-            for i in index:
-                is_close_to_peak = False
-                for j in peak_index:
-                    if abs(i - j) < peak_look:
-                        is_close_to_peak = True
-                        break
-                if not is_close_to_peak:
-                    bgd_index.append(i)
-            fit, cov, model = fit_poly1d(lambdas[bgd_index], spec[bgd_index],
-                                         order=parameters.BGD_ORDER, w=1. / spec_err[bgd_index])
-            for n in range(bgd_npar):
-                # guess[n] = getattr(bgd, bgd.param_names[parameters.BGD_ORDER - n]).value
-                guess[n] = fit[n]
-                b = abs(baseline_prior * guess[n])
-                bounds[0][n] = guess[n] - b
-                bounds[1][n] = guess[n] + b
-            for j in range(len(new_lines_list[k])):
-                idx = new_peak_index_list[k][j]
-                guess[bgd_npar + 3 * j] = np.sign(guess[bgd_npar + 3 * j]) * abs(
-                    spec[idx] - np.polyval(guess[:bgd_npar], lambdas[idx]))
-                if np.sign(guess[bgd_npar + 3 * j]) < 0:  # absorption
-                    bounds[0][bgd_npar + 3 * j] = 2 * guess[bgd_npar + 3 * j]
-                else:  # emission
-                    bounds[1][bgd_npar + 3 * j] = 2 * guess[bgd_npar + 3 * j]
-            # fit local extrema with a multigaussian + BGD_ORDER polynom
-            # account for the spectrum uncertainties if provided
-            sigma = None
-            if spec_err is not None:
-                sigma = spec_err[index]
-            popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma)
-            # noise level defined as the std of the residuals if no error
-            noise_level = np.std(spec[index] - multigauss_and_bgd(lambdas[index], *popt))
-            # otherwise mean of error bars of bgd lateral bands
-            if sigma is not None:
-                chisq = np.sum((multigauss_and_bgd(lambdas[index], *popt) - spec[index]) ** 2 / (sigma * sigma))
+                index_inf -= 1
+        index_sup = peak_index + 1  # extrema on the right
+        while index_sup < min(len(spec) - 1, peak_index + 3 * peak_look):
+            test_index = np.arange(peak_index, index_sup, 1).astype(int)
+            minm = argrelextrema(spec[test_index], bgd_strategy)
+            if len(minm[0]) > 0:
+                index_sup = peak_index + minm[0][0]
+                break
             else:
-                chisq = np.sum((multigauss_and_bgd(lambdas[index], *popt) - spec[index]) ** 2)
-            chisq /= len(index)
-            global_chisq += chisq
-            if spec_err is not None:
-                noise_level = np.sqrt(np.mean(spec_err[index] ** 2))
-            for j in range(len(new_lines_list[k])):
-                line = new_lines_list[k][j]
-                peak_pos = popt[bgd_npar + 3 * j + 1]
-                # FWHM
-                FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
-                # SNR computation
-                # signal_level = popt[bgd_npar+3*j]
-                signal_level = popt[
-                    bgd_npar + 3 * j]  # multigauss_and_bgd(peak_pos, *popt) - np.polyval(popt[:bgd_npar], peak_pos)
-                snr = np.abs(signal_level / noise_level)
-                # save fit results
-                line.fitted = True
-                line.fit_lambdas = lambdas[index]
-                line.fit_popt = popt
-                line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
-                line.fit_bgd = np.polyval(popt[:bgd_npar], lambdas[index])
-                line.fit_snr = snr
-                line.fit_chisq = chisq
-                line.fit_fwhm = FWHM
-                if snr < snr_minlevel:
-                    continue
-                line.high_snr = True
-                if line.use_for_calibration:
-                    # wavelength shift between tabulate and observed lines
-                    lambda_shifts.append(peak_pos - line.wavelength)
-                    snrs.append(snr)
-        if ax is not None:
-            self.plot_detected_lines(ax, print_table=parameters.DEBUG)
-        if len(lambda_shifts) > 0:
-            global_chisq /= len(lambda_shifts)
-            shift = np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2)
-            # if guess values on tabulated lines have not moved: penalize the chisq
-            global_chisq += shift
-            self.my_logger.debug(f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}'
-                                 f'\n\tTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
+                index_sup += 1
+        # pixel range to consider around the peak, adding bgd_width pixels
+        # to fit for background around the peak
+        index = list(np.arange(max(0, index_inf - bgd_width),
+                               min(len(lambdas), index_sup + bgd_width), 1).astype(int))
+        # skip if data is masked with NaN
+        if np.any(np.isnan(spec[index])):
+            continue
+        # first guess and bounds to fit the line properties and
+        # the background with BGD_ORDER order polynom
+        # guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), lambdas[peak_index],
+        #                          0.5 * (line.width_bounds[0] + line.width_bounds[1])]
+        guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), line_wavelength,
+                                  0.5 * (line.width_bounds[0] + line.width_bounds[1])]
+        if line_strategy == np.less:
+            guess[bgd_npar] = -0.5 * np.max(spec[index])  # look for abosrption under bgd
+        # bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), lambdas[index_inf], line.width_bounds[0]],
+        #          [np.inf] * bgd_npar + [abs(np.max(spec[index])), lambdas[index_sup], line.width_bounds[1]]]
+        bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), line_wavelength - peak_look / 2,
+                                          line.width_bounds[0]],
+                  [np.inf] * bgd_npar + [abs(np.max(spec[index])), line_wavelength + peak_look / 2,
+                                         line.width_bounds[1]]]
+        # gaussian amplitude bounds depend if line is emission/absorption
+        if line_strategy == np.less:
+            bounds[1][bgd_npar] = 0  # look for absorption under bgd
         else:
-            global_chisq = 2 * len(parameters.LAMBDAS)
-            self.my_logger.debug(
-                f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}\n\tTotal chisq: {global_chisq:.3f}')
-        return global_chisq
-
-    def plot_detected_lines(self, ax=None, print_table=False):
-        lambdas = np.zeros(1)
-        rows = []
-        j = 0
-        bgd_npar = parameters.BGD_NPARAMS
-        for line in self.lines:
-            if line.fitted is True:
-                # look for lines in subset fit
-                if lambdas.shape != line.fit_lambdas.shape or not np.allclose(lambdas, line.fit_lambdas, 1e-3):
-                    j = 0
-                    lambdas = np.copy(line.fit_lambdas)
-                    if ax is not None:
-                        ax.plot(lambdas, multigauss_and_bgd(lambdas, *line.fit_popt), lw=2, color='b')
-                        ax.plot(lambdas, np.polyval(line.fit_popt[0:bgd_npar], lambdas), lw=2, color='b',
-                                linestyle='--')
-                popt = line.fit_popt
-                peak_pos = popt[bgd_npar + 3 * j + 1]
-                FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
-                signal_level = popt[bgd_npar + 3 * j]
-                if line.high_snr:
-                    rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength,
-                                 FWHM, signal_level, line.fit_snr, line.fit_chisq))
-                j += 1
-        if print_table and len(rows) > 0:
-            t = Table(rows=rows, names=('Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq'),
-                      dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
-            for col in t.colnames[1:-2]:
-                t[col].unit = 'nm'
-            t[t.colnames[-1]].unit = 'reduced'
-            print(t)
+            bounds[0][bgd_npar] = 0  # look for emission above bgd
+        peak_index_list.append(peak_index)
+        index_list.append(index)
+        lines_list.append(line)
+        guess_list.append(guess)
+        bounds_list.append(bounds)
+    # now gather lines together if pixel index ranges overlap
+    idx = 0
+    merges = [[0]]
+    while idx < len(index_list) - 1:
+        idx = merges[-1][-1]
+        if idx == len(index_list) - 1:
+            break
+        if index_list[idx][-1] > index_list[idx + 1][0]:
+            merges[-1].append(idx + 1)
+        else:
+            merges.append([idx + 1])
+            idx += 1
+    # reorder merge list with respect to lambdas in guess list
+    new_merges = []
+    for merge in merges:
+        tmp_guess = [guess_list[i][bgd_npar + 1] for i in merge]
+        new_merges.append([x for _, x in sorted(zip(tmp_guess, merge))])
+    # reorder lists with merges
+    new_peak_index_list = []
+    new_index_list = []
+    new_guess_list = []
+    new_bounds_list = []
+    new_lines_list = []
+    for merge in new_merges:
+        new_peak_index_list.append([])
+        new_index_list.append([])
+        new_guess_list.append([])
+        new_bounds_list.append([[], []])
+        new_lines_list.append([])
+        for i in merge:
+            # add the bgd parameters
+            if i == merge[0]:
+                new_guess_list[-1] += guess_list[i][:bgd_npar]
+                new_bounds_list[-1][0] += bounds_list[i][0][:bgd_npar]
+                new_bounds_list[-1][1] += bounds_list[i][1][:bgd_npar]
+            # add the gauss parameters
+            new_peak_index_list[-1].append(peak_index_list[i])
+            new_index_list[-1] += index_list[i]
+            new_guess_list[-1] += guess_list[i][bgd_npar:]
+            new_bounds_list[-1][0] += bounds_list[i][0][bgd_npar:]
+            new_bounds_list[-1][1] += bounds_list[i][1][bgd_npar:]
+            new_lines_list[-1].append(lines_list[i])
+        # set central peak bounds exactly between two close lines
+        for k in range(len(merge) - 1):
+            new_bounds_list[-1][0][bgd_npar + 3 * (k + 1) + 1] = 0.5 * (
+                    new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][bgd_npar + 3 * (k + 1) + 1])
+            new_bounds_list[-1][1][bgd_npar + 3 * k + 1] = 0.5 * (
+                    new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][bgd_npar + 3 * (k + 1) + 1]) + 1e-3
+            # last term is to avoid equalities
+            # between bounds in some pathological case
+        # sort pixel indices and remove doublons
+        new_index_list[-1] = sorted(list(set(new_index_list[-1])))
+    # fit the line subsets and background
+    global_chisq = 0
+    for k in range(len(new_index_list)):
+        # first guess for the base line with the lateral bands
+        peak_index = new_peak_index_list[k]
+        index = new_index_list[k]
+        guess = new_guess_list[k]
+        bounds = new_bounds_list[k]
+        bgd_index = []
+        for i in index:
+            is_close_to_peak = False
+            for j in peak_index:
+                if abs(i - j) < peak_look:
+                    is_close_to_peak = True
+                    break
+            if not is_close_to_peak:
+                bgd_index.append(i)
+        fit, cov, model = fit_poly1d(lambdas[bgd_index], spec[bgd_index],
+                                     order=parameters.BGD_ORDER, w=1. / spec_err[bgd_index])
+        for n in range(bgd_npar):
+            # guess[n] = getattr(bgd, bgd.param_names[parameters.BGD_ORDER - n]).value
+            guess[n] = fit[n]
+            b = abs(baseline_prior * guess[n])
+            bounds[0][n] = guess[n] - b
+            bounds[1][n] = guess[n] + b
+        for j in range(len(new_lines_list[k])):
+            idx = new_peak_index_list[k][j]
+            guess[bgd_npar + 3 * j] = np.sign(guess[bgd_npar + 3 * j]) * abs(
+                spec[idx] - np.polyval(guess[:bgd_npar], lambdas[idx]))
+            if np.sign(guess[bgd_npar + 3 * j]) < 0:  # absorption
+                bounds[0][bgd_npar + 3 * j] = 2 * guess[bgd_npar + 3 * j]
+            else:  # emission
+                bounds[1][bgd_npar + 3 * j] = 2 * guess[bgd_npar + 3 * j]
+        # fit local extrema with a multigaussian + BGD_ORDER polynom
+        # account for the spectrum uncertainties if provided
+        sigma = None
+        if spec_err is not None:
+            sigma = spec_err[index]
+        popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma)
+        # noise level defined as the std of the residuals if no error
+        noise_level = np.std(spec[index] - multigauss_and_bgd(lambdas[index], *popt))
+        # otherwise mean of error bars of bgd lateral bands
+        if sigma is not None:
+            chisq = np.sum((multigauss_and_bgd(lambdas[index], *popt) - spec[index]) ** 2 / (sigma * sigma))
+        else:
+            chisq = np.sum((multigauss_and_bgd(lambdas[index], *popt) - spec[index]) ** 2)
+        chisq /= len(index)
+        global_chisq += chisq
+        if spec_err is not None:
+            noise_level = np.sqrt(np.mean(spec_err[index] ** 2))
+        for j in range(len(new_lines_list[k])):
+            line = new_lines_list[k][j]
+            peak_pos = popt[bgd_npar + 3 * j + 1]
+            # FWHM
+            FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
+            # SNR computation
+            # signal_level = popt[bgd_npar+3*j]
+            signal_level = popt[
+                bgd_npar + 3 * j]  # multigauss_and_bgd(peak_pos, *popt) - np.polyval(popt[:bgd_npar], peak_pos)
+            snr = np.abs(signal_level / noise_level)
+            # save fit results
+            line.fitted = True
+            line.fit_lambdas = lambdas[index]
+            line.fit_popt = popt
+            line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
+            line.fit_bgd = np.polyval(popt[:bgd_npar], lambdas[index])
+            line.fit_snr = snr
+            line.fit_chisq = chisq
+            line.fit_fwhm = FWHM
+            if snr < snr_minlevel:
+                continue
+            line.high_snr = True
+            if line.use_for_calibration:
+                # wavelength shift between tabulate and observed lines
+                lambda_shifts.append(peak_pos - line.wavelength)
+                snrs.append(snr)
+    if ax is not None:
+        lines.plot_detected_lines(ax, print_table=parameters.DEBUG)
+    if len(lambda_shifts) > 0:
+        global_chisq /= len(lambda_shifts)
+        shift = np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2)
+        # if guess values on tabulated lines have not moved: penalize the chisq
+        global_chisq += shift
+        lines.my_logger.debug(f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}'
+                             f'\n\tTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
+    else:
+        global_chisq = 2 * len(parameters.LAMBDAS)
+        lines.my_logger.debug(
+            f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}\n\tTotal chisq: {global_chisq:.3f}')
+    return global_chisq
 
 
 def calibrate_spectrum_with_lines(spectrum):
@@ -713,7 +683,7 @@ def calibrate_spectrum_with_lines(spectrum):
         pixel_shift = params[1]
         lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift,
                                                                   x0=[x0[0] + pixel_shift, x0[1]], order=spectrum.order)
-        chisq = spectrum.lines.detect_lines(lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None)
+        chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None)
         chisq += pixel_shift * pixel_shift
         if parameters.DEBUG:
             spectrum.lambdas = lambdas_test
