@@ -90,6 +90,39 @@ class ArcLamp(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.lines = Lines(parameters.ARHG_LINES)
+
+    def load(self):
+        pass
+
+class Monochromator(Target):
+
+    def __init__(self, label, verbose=False):
+        """Initialize Star class.
+
+        Parameters
+        ----------
+        label: str
+            String label to name the target
+        verbose: bool, optional
+            Set True to increase verbosity (default: False)
+
+        Examples
+        --------
+
+        Mercury-Argon lamp:
+        >>> s = Star('3C273')
+        >>> print(s.label)
+        3C273
+        >>> print(s.coord.dec)
+        2d03m08.598s
+        >>> print(s.emission_spectrum)
+        True
+
+        """
+        Target.__init__(self, label, verbose=verbose)
+        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.lines = Lines([])
 
     def load(self):
         pass
