@@ -74,7 +74,7 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     # Create Spectrum object
     spectrum = Spectrum(image=image)
     # Subtract background and bad pixels
-    extract_spectrum_from_image(image, spectrum)
+    extract_spectrum_from_image(image, spectrum, right_edge=parameters.CCD_IMSIZE-200)
     spectrum.atmospheric_lines = atmospheric_lines
     # Calibrate the spectrum
     calibrate_spectrum(spectrum)

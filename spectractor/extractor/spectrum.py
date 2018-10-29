@@ -748,7 +748,7 @@ def calibrate_spectrum_with_lines(spectrum):
     return lambdas
 
 
-def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=1800):
+def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=parameters.CCD_IMSIZE-200):
     """Extract the 1D spectrum from the image.
 
     Method : remove a uniform background estimated from the rectangular lateral bands
