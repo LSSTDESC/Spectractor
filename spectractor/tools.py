@@ -4,6 +4,7 @@ import numpy as np
 from astropy.modeling import models, fitting, Fittable2DModel, Parameter
 from astropy.stats import sigma_clip
 from astropy.io import fits
+from astropy.table import Table
 
 import warnings
 from scipy.signal import fftconvolve, gaussian
@@ -200,7 +201,7 @@ def multigauss_and_bgd_jacobian(x, *params):
     >>> p = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd_jacobian(x, *p)
     >>> print(y[0][0])
-    2.16000000e+008
+    216000000.0
     """
     bgd_nparams = parameters.BGD_NPARAMS
     out = []
@@ -1181,6 +1182,37 @@ class Lines:
                 ax.annotate(l.label, xy=(xpos, l.label_pos[1]), rotation=90, ha='left', va='bottom',
                             xycoords='axes fraction', color=color, fontsize=fontsize)
         return ax
+
+    def plot_detected_lines(self, ax=None, print_table=False):
+        lambdas = np.zeros(1)
+        rows = []
+        j = 0
+        bgd_npar = parameters.BGD_NPARAMS
+        for line in self.lines:
+            if line.fitted is True:
+                # look for lines in subset fit
+                if lambdas.shape != line.fit_lambdas.shape or not np.allclose(lambdas, line.fit_lambdas, 1e-3):
+                    j = 0
+                    lambdas = np.copy(line.fit_lambdas)
+                    if ax is not None:
+                        ax.plot(lambdas, multigauss_and_bgd(lambdas, *line.fit_popt), lw=2, color='b')
+                        ax.plot(lambdas, np.polyval(line.fit_popt[0:bgd_npar], lambdas), lw=2, color='b',
+                                linestyle='--')
+                popt = line.fit_popt
+                peak_pos = popt[bgd_npar + 3 * j + 1]
+                FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
+                signal_level = popt[bgd_npar + 3 * j]
+                if line.high_snr:
+                    rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength,
+                                 FWHM, signal_level, line.fit_snr, line.fit_chisq))
+                j += 1
+        if print_table and len(rows) > 0:
+            t = Table(rows=rows, names=('Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq'),
+                      dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
+            for col in t.colnames[1:-2]:
+                t[col].unit = 'nm'
+            t[t.colnames[-1]].unit = 'reduced'
+            print(t)
 
 
 if __name__ == "__main__":
