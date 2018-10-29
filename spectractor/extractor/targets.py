@@ -209,7 +209,6 @@ class Star(Target):
         >>> print(s.spectra[0][:4])
         [  2.16890002e-13   2.66480010e-13   2.03540011e-13   2.38780004e-13]
         """
-        print('googog')
         self.wavelengths = []  # in nm
         self.spectra = []
         # first try with pysynphot
@@ -226,7 +225,6 @@ class Star(Target):
             self.lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES,
                                    redshift=0., emission_spectrum=self.emission_spectrum,
                                    hydrogen_only=self.hydrogen_only)
-            print(self.lines)
             for k, f in enumerate(file_names):
                 if '_mod_' in f:
                     continue
