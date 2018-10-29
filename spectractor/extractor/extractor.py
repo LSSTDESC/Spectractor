@@ -1,4 +1,3 @@
-from spectractor.extractor.images import *
 from spectractor.extractor.spectroscopy import *
 from spectractor import parameters
 from spectractor.tools import ensure_dir
@@ -73,24 +72,16 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     calibrate_spectrum(spectrum)
     if line_detection:
         my_logger.info('\n\tCalibrating order %d spectrum...' % spectrum.order)
-        try:
-            calibrate_spectrum_with_lines(spectrum)
-        except:
-            my_logger.warning('\n\tCalibration procedure with spectral features failed.')
-            spectrum.header['WARNINGS'] = 'Calibration procedure with spectral features failed.'
+        #try:
+        calibrate_spectrum_with_lines(spectrum)
+        #except:
+        #    my_logger.warning('\n\tCalibration procedure with spectral features failed.')
+        #    spectrum.header['WARNINGS'] = 'Calibration procedure with spectral features failed.'
     else:
         spectrum.header['WARNINGS'] = 'No calibration procedure with spectral features.'
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
-        spectrum.plot_spectrum(xlim=None, fit=True)
+        spectrum.plot_spectrum(xlim=None)
     return spectrum
-
-
-# if __name__ == "__main__":
-#     import doctest
-#     if np.__version__ >= "1.14.0":
-#         np.set_printoptions(legacy="1.13")
-#
-#     doctest.testmod()
