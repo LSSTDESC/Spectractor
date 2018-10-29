@@ -24,6 +24,7 @@ class Image(object):
         self.disperser_label = None
         self.filter = None
         self.filters = None
+        self.header = None
         self.data = None
         self.data_rotated = None
         self.stat_errors = None
@@ -36,7 +37,8 @@ class Image(object):
         self.target_bkgd2D = None
         self.target_star2D = None
         if target != "":
-            self.target = Target(target, verbose=parameters.VERBOSE)
+            self.target = load_target(target, verbose=parameters.VERBOSE)
+            print(self.target.lines)
             self.header['TARGET'] = self.target.label
             self.header.comments['TARGET'] = 'object targeted in the image'
             self.header['REDSHIFT'] = self.target.redshift
@@ -121,8 +123,10 @@ class Image(object):
 
     def plot_image_simple(self, ax, data=None, scale="lin", title="", units="Image units", plot_stats=False,
                           target_pixcoords=None, vmin=None, vmax=None):
-        if data is None: data = np.copy(self.data)
-        if plot_stats: data = np.copy(self.stat_errors)
+        if data is None:
+            data = np.copy(self.data)
+        if plot_stats:
+            data = np.copy(self.stat_errors)
         if scale == "log" or scale == "log10":
             # removes the zeros and negative pixels first
             zeros = np.where(data <= 0)
@@ -140,13 +144,14 @@ class Image(object):
         cb.locator = MaxNLocator(7, prune=None)
         cb.update_ticks()
         cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
-        if title != "": ax.set_title(title)
+        if title != "":
+            ax.set_title(title)
         if target_pixcoords is not None:
             ax.scatter(target_pixcoords[0], target_pixcoords[1], marker='o', s=100, edgecolors='k', facecolors='none',
                        label='Target', linewidth=2)
 
     def plot_image(self, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                   target_pixcoords=None,figsize=[9.3, 8]):
+                   target_pixcoords=None, figsize=[9.3, 8]):
         fig, ax = plt.subplots(1, 1, figsize=figsize)
         self.plot_image_simple(ax, data=data, scale=scale, title=title, units=units, plot_stats=plot_stats,
                                target_pixcoords=target_pixcoords)
@@ -178,8 +183,8 @@ def find_target(image, guess, rotated=False):
         theX = x0 - Dx + avX
         theY = y0 - Dy + avY
         guess = [int(theX), int(theY)]
-        Dx = Dx // (i+2)
-        Dy = Dy // (i+2)
+        Dx = Dx // (i + 2)
+        Dy = Dy // (i + 2)
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
@@ -195,7 +200,6 @@ def find_target(image, guess, rotated=False):
 def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
     x0, y0 = guess
     Dx, Dy = widths
-    sub_errors = None
     if rotated:
         sub_image = np.copy(image.data_rotated[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
         sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
@@ -241,9 +245,6 @@ def find_target_1Dprofile(image, sub_image, guess, rotated=False):
     if profile_Y[int(avY)] < 0.8 * np.max(profile_Y):
         image.my_logger.warning('\n\tY position determination of the target probably wrong')
     if parameters.DEBUG:
-        profile_X_max = np.max(profile_X_raw) * 1.2
-        profile_Y_max = np.max(profile_Y_raw) * 1.2
-
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
         image.plot_image_simple(ax1, data=sub_image, scale="log", title="", units=image.units, plot_stats=False,
                                 target_pixcoords=[avX, avY])
@@ -310,7 +311,7 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         if parameters.DEBUG:
             image.my_logger.info('\n\t%d saturated pixels: set saturation level to %d %s.' % (
                 len(saturated_pixels[0]), image.saturation, image.units))
-        sub_image_subtracted[sub_image >= 0.9*image.saturation] = np.nan
+        sub_image_subtracted[sub_image >= 0.9 * image.saturation] = np.nan
         sub_image[sub_image >= 0.9 * image.saturation] = np.nan
     # fit
     star2D = fit_star2d_outlier_removal(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
@@ -326,7 +327,7 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
     # debugging plots
     if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
-        vmin = 0 #np.nanmin(sub_image_subtracted)
+        vmin = 0  # np.nanmin(sub_image_subtracted)
         vmax = np.nanmax(sub_image)
         image.plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
                                 target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
@@ -426,4 +427,3 @@ def turn_image(image):
                                 units=image.units, target_pixcoords=image.target_pixcoords_rotated)
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         if parameters.DISPLAY: plt.show()
-

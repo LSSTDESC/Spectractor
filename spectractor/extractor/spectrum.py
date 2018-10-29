@@ -377,7 +377,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
     >>> spec.err = spectrum_err
 
     Detect the lines
-    >>> lines = Lines(hydrogen_only=True, atmospheric_lines=True, redshift=0, emission_spectrum=True)
+    >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True, atmospheric_lines=True, redshift=0, emission_spectrum=True)
     >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err)
     >>> print('{:.1f}'.format(global_chisq))
     0.0

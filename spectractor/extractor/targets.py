@@ -1,17 +1,25 @@
-import os
 import matplotlib.pyplot as plt
-import numpy as np
 from astropy import units as units
 from astropy.coordinates import SkyCoord
 from astroquery.ned import Ned
 from astroquery.simbad import Simbad
-from scipy.interpolate import interp1d
 
-from spectractor.tools import *
-from spectractor import parameters
+from spectractor.extractor.spectroscopy import *
 
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
+
+
+def load_target(label, verbose=False):
+    if parameters.OBJECT_TYPE == 'STAR':
+        return Star(label, verbose)
+    elif parameters.OBJECT_TYPE == 'HG-AR':
+        return ArcLamp(label, verbose)
+    elif parameters.OBJECT_TYPE == 'MONOCHROMATOR':
+        return Monochromator(label, verbose)
+    else:
+        t = Target(label, verbose)
+        t.my_logger.error(f'\n\tUnknown parameters.OBJECT_TYPE: {parameters.OBJECT_TYPE}')
 
 
 class Target:
@@ -58,6 +66,8 @@ class Target:
         self.hydrogen_only = False
         self.sed = None
         self.lines = None
+        self.coord = None
+        self.redshift = 0
 
     def load(self):
         pass
@@ -94,6 +104,7 @@ class ArcLamp(Target):
 
     def load(self):
         pass
+
 
 class Monochromator(Target):
 
@@ -164,8 +175,6 @@ class Star(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = parameters.set_logger(self.__class__.__name__)
-        self.coord = None
-        self.redshift = 0
         self.load()
 
     def load(self):
@@ -200,6 +209,7 @@ class Star(Target):
         >>> print(s.spectra[0][:4])
         [  2.16890002e-13   2.66480010e-13   2.03540011e-13   2.38780004e-13]
         """
+        print('googog')
         self.wavelengths = []  # in nm
         self.spectra = []
         # first try with pysynphot
@@ -213,9 +223,10 @@ class Star(Target):
         if len(file_names) > 0:
             self.emission_spectrum = False
             self.hydrogen_only = True
-            self.lines = Lines(parameters.HYDROGEN_LINES+parameters.ATMOSPHERIC_LINES,
+            self.lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES,
                                    redshift=0., emission_spectrum=self.emission_spectrum,
                                    hydrogen_only=self.hydrogen_only)
+            print(self.lines)
             for k, f in enumerate(file_names):
                 if '_mod_' in f:
                     continue
@@ -241,7 +252,7 @@ class Star(Target):
                     self.hydrogen_only = True
                     parameters.LAMBDA_MIN *= 1 + self.redshift
                     parameters.LAMBDA_MAX *= 1 + self.redshift
-                self.lines = Lines(parameters.ATMOSPHERIC_LINES+parameters.ISM_LINES+parameters.HYDROGEN_LINES,
+                self.lines = Lines(ATMOSPHERIC_LINES+ISM_LINES+HYDROGEN_LINES,
                                    redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                    hydrogen_only=self.hydrogen_only)
                 for k, h in enumerate(hdulists):
@@ -270,7 +281,7 @@ class Star(Target):
                         self.wavelengths.append(waves)
             else:
                 self.emission_spectrum = True
-                self.lines = Lines(parameters.ATMOSPHERIC_LINES+parameters.ISM_LINES+parameters.HYDROGEN_LINES,
+                self.lines = Lines(ATMOSPHERIC_LINES+ISM_LINES+HYDROGEN_LINES,
                                    redshift=0., emission_spectrum=self.emission_spectrum,
                                    hydrogen_only=self.hydrogen_only)
         self.build_sed()
