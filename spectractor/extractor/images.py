@@ -38,7 +38,6 @@ class Image(object):
         self.target_star2D = None
         if target != "":
             self.target = load_target(target, verbose=parameters.VERBOSE)
-            print(self.target.lines)
             self.header['TARGET'] = self.target.label
             self.header.comments['TARGET'] = 'object targeted in the image'
             self.header['REDSHIFT'] = self.target.redshift
