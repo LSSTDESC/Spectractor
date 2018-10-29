@@ -4,7 +4,6 @@ import coloredlogs
 import logging
 import astropy.units as units
 from astropy import constants as const
-from spectractor.tools import Line
 import matplotlib as mpl
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
@@ -36,6 +35,7 @@ OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
 OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
 EPOCH = "J2000.0"
 TELESCOPE_TRANSMISSION_SYSTEMATICS = 0.005
+OBJECT_TYPE = 'STAR' # To choose between STAR, HG-AR, MONOCHROMATOR
 
 # Filters
 HALPHA_CENTER = 655.9e-6  # center of the filter in mm
@@ -96,76 +96,6 @@ VERBOSE = False
 DEBUG = False
 MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
 logging.basicConfig(format=MY_FORMAT, level=logging.WARNING)
-
-# Lines
-HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02], use_for_calibration=True)
-HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02])
-OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
-CII1 = Line(723.5, atmospheric=False, label=r'$C_{II}$', label_pos=[0.005, 0.88])
-CII2 = Line(711.0, atmospheric=False, label=r'$C_{II}$', label_pos=[0.005, 0.02])
-CIV = Line(706.0, atmospheric=False, label=r'$C_{IV}$', label_pos=[-0.016, 0.88])
-CII3 = Line(679.0, atmospheric=False, label=r'$C_{II}$', label_pos=[0.005, 0.02])
-CIII1 = Line(673.0, atmospheric=False, label=r'$C_{III}$', label_pos=[-0.016, 0.88])
-CIII2 = Line(570.0, atmospheric=False, label=r'$C_{III}$', label_pos=[0.007, 0.02])
-CIII3 = Line(970.5, atmospheric=False, label=r'$C_{III}$', label_pos=[0.007, 0.02])
-FEII1 = Line(463.8, atmospheric=False, label=r'$Fe_{II}$', label_pos=[-0.016, 0.02])
-FEII2 = Line(515.8, atmospheric=False, label=r'$Fe_{II}$', label_pos=[0.007, 0.02])
-FEII3 = Line(527.3, atmospheric=False, label=r'$Fe_{II}$', label_pos=[0.007, 0.02])
-FEII4 = Line(534.9, atmospheric=False, label=r'$Fe_{II}$', label_pos=[0.007, 0.02])
-HEI1 = Line(388.8, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI2 = Line(447.1, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI3 = Line(587.5, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI4 = Line(750.0, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI5 = Line(776.0, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI6 = Line(781.6, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI7 = Line(848.2, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI8 = Line(861.7, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI9 = Line(906.5, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI10 = Line(923.5, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI11 = Line(951.9, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI12 = Line(1023.5, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-HEI13 = Line(353.1, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-OI = Line(630.0, atmospheric=False, label=r'$O_{II}$', label_pos=[0.007, 0.02])
-OII = Line(732.5, atmospheric=False, label=r'$O_{II}$', label_pos=[0.007, 0.02])
-HEII1 = Line(468.6, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
-HEII2 = Line(611.8, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
-HEII3 = Line(617.1, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
-HEII4 = Line(856.7, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
-HI = Line(833.9, atmospheric=False, label=r'$H_{I}$', label_pos=[0.007, 0.02])
-FE1 = Line(382.044, atmospheric=True, label=r'$Fe$',
-           label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-FE2 = Line(430.790, atmospheric=True, label=r'$Fe$',
-           label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-FE3 = Line(438.355, atmospheric=True, label=r'$Fe$',
-           label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-CAII1 = Line(393.366, atmospheric=True, label=r'$Ca_{II}$',
-             label_pos=[0.007, 0.02],
-             use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-CAII2 = Line(396.847, atmospheric=True, label=r'$Ca_{II}$',
-             label_pos=[0.007, 0.02],
-             use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
-          label_pos=[0.007, 0.02],
-          use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
-# O2_1 = Line( 760.6,atmospheric=True,label='',label_pos=[0.007,0.02]) # libradtran paper fig.3
-# O2_2 = Line( 763.2,atmospheric=True,label='$O_2$',label_pos=[0.007,0.02])  # libradtran paper fig.3
-O2B = Line(686.719, atmospheric=True, label=r'$O_2(B)$',
-           label_pos=[0.007, 0.02], use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-O2Y = Line(898.765, atmospheric=True, label=r'$O_2(Y)$',
-           label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-O2Z = Line(822.696, atmospheric=True, label=r'$O_2(Z)$',
-           label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-# H2O = Line( 960,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(1,50))  #
-H2O_1 = Line(935, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
-             width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
-             width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2, CAII1, CAII2, FE1, FE2, FE3]
-HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA]
-ISM_LINES = [OIII, CII1, CII2, CIV, CII3, CIII1, CIII2, CIII3, HEI1, HEI2, HEI3, HEI4, HEI5, HEI6, HEI7, HEI8,
-             HEI9, HEI10, HEI11, HEI12, HEI13, OI, OII, HEII1, HEII2, HEII3, HEII4,  HI, FEII1, FEII2, FEII3, FEII4]
 
 
 
