@@ -202,9 +202,9 @@ def find_target(image, guess, rotated=False):
     theX, theY = guess
     if rotated:
         angle = image.rotation_angle * np.pi / 180.
-        rotmat = np.matrix([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
-        vec = np.array(image.target_pixcoords) - 0.5 * np.array(image.data.shape)
-        guess2 = np.dot(rotmat, vec) + 0.5 * np.array(image.data_rotated.shape)
+        rotmat = np.matrix([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
+        vec = np.array(image.target_pixcoords) - 0.5 * np.array(image.data.shape[::-1])
+        guess2 = np.dot(rotmat, vec) + 0.5 * np.array(image.data_rotated.shape[::-1])
         x0 = int(guess2[0, 0])
         y0 = int(guess2[0, 1])
         guess = [x0, y0]
@@ -410,7 +410,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     theta_mask[mask2] = np.nan
     theta_mask = theta_mask[2:-2,2:-2]
     theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
-    if parameters.OBS_OBJECT_TYPE == 'STAR':
+    if parameters.OBS_OBJECT_TYPE != 'STAR':
         pixels = np.where(~np.isnan(theta_mask))
         p = np.polyfit(pixels[1], pixels[0], deg=1)
         theta_median = np.arctan(p[0]) * 180/np.pi
