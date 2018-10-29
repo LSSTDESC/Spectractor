@@ -199,7 +199,7 @@ def multigauss_and_bgd_jacobian(x, *params):
     >>> p = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd_jacobian(x, *p)
     >>> print(y[0][0])
-    2.16000000e+008
+    216000000.0
     """
     bgd_nparams = parameters.BGD_NPARAMS
     out = []
