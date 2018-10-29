@@ -44,6 +44,8 @@ class LogBook:
 
         Returns
         -------
+        disperser_label: str
+            the name of the disperser
         target: str
             the name of the target
         xpos: int
@@ -52,6 +54,7 @@ class LogBook:
             the y position of the target (in pixel)
 
         """
+        disperser_label = None
         target = None
         xpos = None
         ypos = None
@@ -86,11 +89,12 @@ class LogBook:
                     parameters.YWINDOW_ROT = int(row['Dy'])
                 xpos = int(row['Obj-posXpix'])
                 ypos = int(row['Obj-posYpix'])
+                disperser_label = row['disperser']
                 break
         self.csvfile.seek(0)
         if target is None and skip is False:
             self.my_logger.error('Fits file %s not found in logbook %s.' % (filename, self.logbook))
-        return target, xpos, ypos
+        return disperser_label, target, xpos, ypos
 
     def plot_columns_vs_date(self, column_names):
         """Plot of the column property with respect to the dates.

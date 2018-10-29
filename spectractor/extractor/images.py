@@ -8,7 +8,7 @@ from spectractor.extractor.dispersers import *
 
 class Image(object):
 
-    def __init__(self, filename, target=""):
+    def __init__(self, filename, target="", disperser_label=""):
         """
         Args:
             target:
@@ -21,7 +21,7 @@ class Image(object):
         self.airmass = None
         self.date_obs = None
         self.disperser = None
-        self.disperser_label = None
+        self.disperser_label = disperser_label
         self.filter = None
         self.filters = None
         self.header = None
@@ -49,15 +49,26 @@ class Image(object):
         Args:
             file_name (:obj:`str`): path to the image
         """
-        self.my_logger.info('\n\tLoading image %s...' % file_name)
+        if parameters.OBS_NAME == 'CTIO':
+            self.load_CTIO_image(file_name)
+        elif parameters.OBS_NAME == 'LPNHE':
+            self.load_LPNHE_image(file_name)
+
+    def load_CTIO_image(self, file_name):
+        """
+        Args:
+            file_name (:obj:`str`): path to the image
+        """
+        self.my_logger.info('\n\tLoading CTIO image %s...' % file_name)
         self.header, self.data = load_fits(file_name)
         extract_info_from_CTIO_header(self, self.header)
         self.header['LSHIFT'] = 0.
         self.header['D2CCD'] = parameters.DISTANCE2CCD
-        IMSIZE = int(self.header['XLENGTH'])
+        parameters.CCD_IMSIZE = int(self.header['XLENGTH'])
         parameters.CCD_PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
-        if self.header['YLENGTH'] != IMSIZE:
-            self.my_logger.warning('\n\tImage rectangular: X=%d pix, Y=%d pix' % (IMSIZE, self.header['YLENGTH']))
+        if self.header['YLENGTH'] != parameters.CCD_IMSIZE:
+            self.my_logger.warning(
+                f'\n\tImage rectangular: X={parameters.CCD_IMSIZE:d} pix, Y={self.header["YLENGTH"]:d} pix')
         if self.header['YPIXSIZE'] != parameters.CCD_PIXEL2ARCSEC:
             self.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
                 parameters.CCD_PIXEL2ARCSEC, self.header['YPIXSIZE']))
@@ -72,6 +83,33 @@ class Image(object):
         self.convert_to_ADU_rate_units()
         self.compute_statistical_error()
         self.compute_parallactic_angle()
+
+    def load_LPNHE_image(self, file_name):
+        """
+        Args:
+            file_name (:obj:`str`): path to the image
+        """
+        self.my_logger.info('\n\tLoading LPNHE image %s...' % file_name)
+        self.header, data1 = load_fits(file_name, 15)
+        self.header, data2 = load_fits(file_name, 7)
+        data1 = data1.astype(np.float64)
+        data2 = data2.astype(np.float64)
+        self.data = np.concatenate((data1[10:-10, 10:-10], data2[10:-10, 10:-10]))
+        self.date_obs = self.header['DATE-OBS']
+        self.expo = float(self.header['EXPTIME'])
+        self.header['LSHIFT'] = 0.
+        self.header['D2CCD'] = parameters.DISTANCE2CCD
+        self.data = self.data.T
+        self.my_logger.info('\n\tImage loaded')
+        # Load the disperser
+        self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
+        self.disperser = Hologram(self.disperser_label, data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
+        # compute CCD gain map
+        self.gain = float(self.header['CCDGAIN']) * np.ones_like(self.data)
+        parameters.CCD_IMSIZE = self.data.shape[1]
+        print(parameters.CCD_IMSIZE)
+        self.convert_to_ADU_rate_units()
+        self.compute_statistical_error()
 
     def save_image(self, output_file_name, overwrite=False):
         save_fits(output_file_name, self.header, self.data, overwrite=overwrite)
@@ -90,7 +128,7 @@ class Image(object):
         self.gain[l // 2:l, l // 2:l] = self.header['GTGAIN22']
 
     def convert_to_ADU_rate_units(self):
-        self.data /= self.expo
+        self.data = self.data.astype(np.float64) / self.expo
         self.units = 'ADU/s'
 
     def convert_to_ADU_units(self):
@@ -370,9 +408,14 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     theta_guess = image.disperser.theta(image.target_pixcoords)
     mask2 = np.where(np.abs(theta - theta_guess) > deg_threshold)
     theta_mask[mask2] = np.nan
-    theta_hist = []
+    theta_mask = theta_mask[2:-2,2:-2]
     theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
-    theta_median = np.median(theta_hist)
+    if parameters.OBS_OBJECT_TYPE == 'STAR':
+        pixels = np.where(~np.isnan(theta_mask))
+        p = np.polyfit(pixels[1], pixels[0], deg=1)
+        theta_median = np.arctan(p[0]) * 180/np.pi
+    else:
+        theta_median = np.median(theta_hist)
     theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
     image.header['THETAFIT'] = theta_median
     image.header.comments['THETAFIT'] = '[USED] rotation angle from the Hessian analysis'
@@ -383,7 +426,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
             '\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels over {:d} pixels:'
             '  {:.2f} vs {:.2f}'.format(
                 parameters.CCD_IMSIZE, theta_median, theta_guess))
-    if parameters.DEBUG:
+    if parameters.DEBUG or True:
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6))
         xindex = np.arange(data.shape[1])
         x_new = np.linspace(xindex.min(), xindex.max(), 50)
@@ -403,8 +446,9 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
 
 
 def turn_image(image):
-    image.rotation_angle = compute_rotation_angle_hessian(image)
-    image.my_logger.info('\n\tRotate the image with angle theta=%.2f degree' % image.rotation_angle)
+    image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
+                                                          right_edge=parameters.CCD_IMSIZE - 200)
+    image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
     if not np.isnan(image.rotation_angle):
         image.data_rotated = ndimage.interpolation.rotate(image.data, image.rotation_angle,
@@ -414,15 +458,16 @@ def turn_image(image):
                                                                  prefilter=parameters.ROT_PREFILTER,
                                                                  order=parameters.ROT_ORDER)
     if parameters.DEBUG:
-        margin = 200
+        margin = 100
         y0 = int(image.target_pixcoords[1])
         f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
-        image.plot_image_simple(ax1, data=image.data[y0 - parameters.YWINDOW:y0 + parameters.YWINDOW, margin:-margin],
+        image.plot_image_simple(ax1, data=image.data[max(0,y0 - 2*parameters.YWINDOW):min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin],
                                 scale="log", title='Raw image (log10 scale)', units=image.units,
-                                target_pixcoords=(image.target_pixcoords[0] - margin, parameters.YWINDOW))
+                                target_pixcoords=(image.target_pixcoords[0] - margin, 2*parameters.YWINDOW))
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
-        image.plot_image_simple(ax2, data=image.data_rotated[y0 - parameters.YWINDOW:y0 + parameters.YWINDOW,
-                                          margin:-margin], scale="log", title='Turned image (log10 scale)',
+        image.plot_image_simple(ax2, data=image.data_rotated[max(0,y0 - 2*parameters.YWINDOW):
+                                                             min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin], scale="log", title='Turned image (log10 scale)',
                                 units=image.units, target_pixcoords=image.target_pixcoords_rotated)
-        ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
-        if parameters.DISPLAY: plt.show()
+        ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2*parameters.YWINDOW, 2*parameters.YWINDOW], 'k-')
+        if parameters.DISPLAY:
+            plt.show()
