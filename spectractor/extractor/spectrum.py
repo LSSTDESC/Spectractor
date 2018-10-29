@@ -515,6 +515,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
     # reorder merge list with respect to lambdas in guess list
     new_merges = []
     for merge in merges:
+        if len(guess_list) == 0:
+            continue
         tmp_guess = [guess_list[i][bgd_npar + 1] for i in merge]
         new_merges.append([x for _, x in sorted(zip(tmp_guess, merge))])
     # reorder lists with merges
