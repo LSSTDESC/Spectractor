@@ -362,7 +362,7 @@ class Lines:
         >>> lines = Lines(hydrogen_only=True, atmospheric_lines=True, redshift=0, emission_spectrum=True)
         >>> global_chisq = lines.detect_lines(lambdas, spectrum, spectrum_err)
         >>> print('{:.1f}'.format(global_chisq))
-        0.0
+        0.2
 
         Plot the result
         >>> spec.lines = lines
@@ -687,7 +687,7 @@ class Spectrum(object):
         1
         >>> print(s.target.label)
         PNG321.0+3.9
-        >>> print(s.disperser)
+        >>> print(s.disperser_label)
         HoloPhAg
 
         Load a spectrum from a fits image file
@@ -857,7 +857,7 @@ class Spectrum(object):
         Examples
         --------
         >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
-        >>> s.plot_spectrum(xlim=[500,700], fit=False)
+        >>> s.plot_spectrum(xlim=[500,700])
         >>> if parameters.DISPLAY: plt.show()
         """
         plt.figure(figsize=[12, 6])
