@@ -4,16 +4,13 @@ import astropy.units as units
 from astropy import constants as const
 import matplotlib as mpl
 
+# These parameters are the default values adapted to CTIO
+# To modify them, please create a new config file and load it.
+
 # Paths
 mypath = os.path.dirname(__file__)
 HOLO_DIR = os.path.join(mypath, "extractor/dispersers/")
 THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
-
-# Plots
-DISPLAY = True
-if os.environ.get('DISPLAY', '') == '':
-    mpl.use('agg')
-    DISPLAY = False
 
 # CCD characteristics
 CCD_IMSIZE = 2048  # size of the image in pixel
@@ -27,11 +24,11 @@ CCD_GAIN = 3.  # electronic gain : elec/ADU
 OBS_NAME = 'CTIO'
 OBS_ALTITUDE = 2.200  # CTIO altitude in k meters from astropy package (Cerro Pachon)
 OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
-OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
+OBS_DIAMETER = 0.9 * units.m   # Diameter of the telescope
 OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
 OBS_EPOCH = "J2000.0"
 OBS_TRANSMISSION_SYSTEMATICS = 0.005
-OBS_OBJECT_TYPE = 'STAR' # To choose between STAR, HG-AR, MONOCHROMATOR
+OBS_OBJECT_TYPE = 'STAR'  # To choose between STAR, HG-AR, MONOCHROMATOR
 
 # Filters
 HALPHA_CENTER = 655.9e-6  # center of the filter in mm
@@ -92,7 +89,8 @@ VERBOSE = False
 DEBUG = False
 MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
 
-if __name__ == "__main__":
-    import doctest
-
-    doctest.testmod()
+# Plots
+DISPLAY = True
+if os.environ.get('DISPLAY', '') == '':
+    mpl.use('agg')
+    DISPLAY = False

@@ -1,10 +1,5 @@
-import sys
 from spectractor.config import *
 import csv
-import matplotlib as mpl
-if os.environ.get('DISPLAY', '') == '':
-    mpl.use('agg')
-
 import matplotlib.pyplot as plt
 
 
@@ -124,7 +119,8 @@ class LogBook:
             ax[icol].set_ylabel(col)
         fig.autofmt_xdate()
         fig.tight_layout()
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
 
 if __name__ == "__main__":
