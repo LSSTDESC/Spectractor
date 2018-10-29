@@ -1,6 +1,5 @@
 import sys
-import os
-from spectractor import parameters
+from spectractor.config import *
 import csv
 import matplotlib as mpl
 if os.environ.get('DISPLAY', '') == '':
@@ -28,7 +27,7 @@ class LogBook:
         ./ctiofulllogbook_jun2017_v5.csv
 
         """
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.logbook = logbook
         if not os.path.isfile(logbook):
             self.my_logger.error('CSV logbook file {} not found.'.format(logbook))

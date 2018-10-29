@@ -14,7 +14,7 @@ class Image(object):
             target:
             filename (:obj:`str`): path to the image
         """
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.filename = filename
         self.units = 'ADU'
         self.expo = -1
@@ -55,12 +55,12 @@ class Image(object):
         self.header['LSHIFT'] = 0.
         self.header['D2CCD'] = parameters.DISTANCE2CCD
         IMSIZE = int(self.header['XLENGTH'])
-        parameters.PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
+        parameters.CCD_PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
         if self.header['YLENGTH'] != IMSIZE:
             self.my_logger.warning('\n\tImage rectangular: X=%d pix, Y=%d pix' % (IMSIZE, self.header['YLENGTH']))
-        if self.header['YPIXSIZE'] != parameters.PIXEL2ARCSEC:
+        if self.header['YPIXSIZE'] != parameters.CCD_PIXEL2ARCSEC:
             self.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
-                parameters.PIXEL2ARCSEC, self.header['YPIXSIZE']))
+                parameters.CCD_PIXEL2ARCSEC, self.header['YPIXSIZE']))
         self.coord = SkyCoord(self.header['RA'] + ' ' + self.header['DEC'], unit=(units.hourangle, units.deg),
                               obstime=self.header['DATE-OBS'])
         self.my_logger.info('\n\tImage loaded')
@@ -78,7 +78,7 @@ class Image(object):
         self.my_logger.info('\n\tImage saved in %s' % output_file_name)
 
     def build_gain_map(self):
-        l = parameters.IMSIZE
+        l = parameters.CCD_IMSIZE
         self.gain = np.zeros_like(self.data)
         # ampli 11
         self.gain[0:l // 2, 0:l // 2] = self.header['GTGAIN11']
@@ -205,7 +205,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     else:
         sub_image = np.copy(image.data[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
         sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-    image.saturation = parameters.MAXADU / image.expo
+    image.saturation = parameters.CCD_MAXADU / image.expo
     # sub_image = clean_target_spikes(sub_image, image.saturation)
     return sub_image, x0, y0, Dx, Dy, sub_errors
 
@@ -349,7 +349,7 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
 
 
 def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters.YWINDOW,
-                                   right_edge=parameters.IMSIZE - 200,
+                                   right_edge=parameters.CCD_IMSIZE - 200,
                                    margin_cut=12):
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region
@@ -373,7 +373,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     theta_hist = []
     theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
     theta_median = np.median(theta_hist)
-    theta_critical = 180. * np.arctan(20. / parameters.IMSIZE) / np.pi
+    theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
     image.header['THETAFIT'] = theta_median
     image.header.comments['THETAFIT'] = '[USED] rotation angle from the Hessian analysis'
     image.header['THETAINT'] = theta_guess
@@ -382,7 +382,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         image.my_logger.warning(
             '\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels over {:d} pixels:'
             '  {:.2f} vs {:.2f}'.format(
-                parameters.IMSIZE, theta_median, theta_guess))
+                parameters.CCD_IMSIZE, theta_median, theta_guess))
     if parameters.DEBUG:
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6))
         xindex = np.arange(data.shape[1])

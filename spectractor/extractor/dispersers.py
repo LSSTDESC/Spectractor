@@ -25,7 +25,7 @@ def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=2
     Returns
     -------
     hologram: 2D-array,
-        The hologram figure, of shape (IMSIZE,IMSIZE)
+        The hologram figure, of shape (CCD_IMSIZE,CCD_IMSIZE)
 
     Examples
     --------
@@ -37,12 +37,12 @@ def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=2
     U = lambda x, y, z: np.exp(2j * np.pi * np.sqrt(x * x + y * y + z * z) * 1e6 /
                                           lambda_plot) / np.sqrt(x * x + y * y + z * z)
     # superposition of two spherical sources centered in order 0 and order 1 positions
-    xA = [order0_position[0] * parameters.PIXEL2MM, order0_position[1] * parameters.PIXEL2MM]
-    xB = [order1_position[0] * parameters.PIXEL2MM, order1_position[1] * parameters.PIXEL2MM]
+    xA = [order0_position[0] * parameters.CCD_PIXEL2MM, order0_position[1] * parameters.CCD_PIXEL2MM]
+    xB = [order1_position[0] * parameters.CCD_PIXEL2MM, order1_position[1] * parameters.CCD_PIXEL2MM]
     A = lambda x, y: U(x - xA[0], y - xA[1], -parameters.DISTANCE2CCD) + U(x-xB[0], y-xB[1], -parameters.DISTANCE2CCD)
     intensity = lambda x, y: np.abs(A(x, y)) ** 2
-    xholo = np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
-    yholo = np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
+    xholo = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
+    yholo = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
     xxholo, yyholo = np.meshgrid(xholo, yholo)
     holo = intensity(xxholo, yyholo)
     rotated_holo = ndimage.interpolation.rotate(holo, theta_tilt)
@@ -66,7 +66,7 @@ def build_ronchi(x_center, theta_tilt=0, grooves=400):
     Returns
     -------
     hologram: 2D-array,
-        The hologram figure, of shape (IMSIZE,IMSIZE)
+        The hologram figure, of shape (CCD_IMSIZE,CCD_IMSIZE)
 
     Examples
     --------
@@ -80,9 +80,9 @@ def build_ronchi(x_center, theta_tilt=0, grooves=400):
 
     """
     intensity = lambda x, y: 2 * np.sin(2 * np.pi *
-                                                   (x-x_center * parameters.PIXEL2MM) * 0.5 * grooves) ** 2
-    xronchi = np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
-    yronchi = np.linspace(0, parameters.IMSIZE * parameters.PIXEL2MM, parameters.IMSIZE)
+                                        (x - x_center * parameters.CCD_PIXEL2MM) * 0.5 * grooves) ** 2
+    xronchi = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
+    yronchi = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
     xxronchi, yyronchi = np.meshgrid(xronchi, yronchi)
     ronchi = (intensity(xxronchi, yyronchi)).astype(int)
     rotated_ronchi = ndimage.interpolation.rotate(ronchi, theta_tilt)
@@ -104,15 +104,15 @@ def get_theta0(x0):
 
     Examples
     --------
-    >>> get_theta0((parameters.IMSIZE/2,parameters.IMSIZE/2))
+    >>> get_theta0((parameters.CCD_IMSIZE/2,parameters.CCD_IMSIZE/2))
     0.0
-    >>> get_theta0(parameters.IMSIZE/2)
+    >>> get_theta0(parameters.CCD_IMSIZE/2)
     0.0
     """
     if isinstance(x0, (list, tuple, np.ndarray)):
-        return (x0[0] - parameters.IMSIZE / 2) * parameters.PIXEL2ARCSEC * parameters.ARCSEC2RADIANS
+        return (x0[0] - parameters.CCD_IMSIZE / 2) * parameters.CCD_PIXEL2ARCSEC * parameters.CCD_ARCSEC2RADIANS
     else:
-        return (x0 - parameters.IMSIZE / 2) * parameters.PIXEL2ARCSEC * parameters.ARCSEC2RADIANS
+        return (x0 - parameters.CCD_IMSIZE / 2) * parameters.CCD_PIXEL2ARCSEC * parameters.CCD_ARCSEC2RADIANS
 
 
 def get_delta_pix_ortho(deltaX, x0, D=parameters.DISTANCE2CCD):
@@ -137,13 +137,13 @@ def get_delta_pix_ortho(deltaX, x0, D=parameters.DISTANCE2CCD):
     Examples
     --------
     >>> delta, D = 500, 55
-    >>> get_delta_pix_ortho(delta, [parameters.IMSIZE/2,  parameters.IMSIZE/2], D=D)
+    >>> get_delta_pix_ortho(delta, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2], D=D)
     500.0
     >>> get_delta_pix_ortho(delta, [500,500], D=D)
     497.66545567320992
     """
     theta0 = get_theta0(x0)
-    deltaX0 = np.tan(theta0) * D / parameters.PIXEL2MM
+    deltaX0 = np.tan(theta0) * D / parameters.CCD_PIXEL2MM
     return deltaX + deltaX0
 
 
@@ -167,14 +167,14 @@ def get_refraction_angle(deltaX, x0, D=parameters.DISTANCE2CCD):
     Examples
     --------
     >>> delta, D = 500, 55
-    >>> theta = get_refraction_angle(delta, [parameters.IMSIZE/2,  parameters.IMSIZE/2], D=D)
-    >>> assert np.isclose(theta, np.arctan2(delta*parameters.PIXEL2MM, D))
+    >>> theta = get_refraction_angle(delta, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2], D=D)
+    >>> assert np.isclose(theta, np.arctan2(delta*parameters.CCD_PIXEL2MM, D))
     >>> theta = get_refraction_angle(delta, [500,500], D=D)
     >>> print('{:.2f}'.format(theta))
     0.21
     """
     delta = get_delta_pix_ortho(deltaX, x0, D=D)
-    theta = np.arctan2(delta * parameters.PIXEL2MM, D)
+    theta = np.arctan2(delta * parameters.CCD_PIXEL2MM, D)
     return theta
 
 
@@ -216,7 +216,7 @@ def get_N(deltaX, x0, D=parameters.DISTANCE2CCD, wavelength=656, order=1):
 
 def neutral_lines(x_center, y_center, theta_tilt):
     """Return the nuetrla lines of an hologram."""
-    xs = np.linspace(0, parameters.IMSIZE, 20)
+    xs = np.linspace(0, parameters.CCD_IMSIZE, 20)
     line1 = np.tan(theta_tilt * np.pi / 180) * (xs - x_center) + y_center
     line2 = np.tan((theta_tilt + 90) * np.pi / 180) * (xs - x_center) + y_center
     return xs, line1, line2
@@ -227,7 +227,7 @@ def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
     # refraction angle between order 0 and order 1 at construction
     alpha = np.arcsin(N * parameters.LAMBDA_CONSTRUCTOR + np.sin(theta0))
     # distance between order 0 and order 1 in pixels
-    AB = (np.tan(alpha) - np.tan(theta0)) * parameters.DISTANCE2CCD / parameters.PIXEL2MM
+    AB = (np.tan(alpha) - np.tan(theta0)) * parameters.DISTANCE2CCD / parameters.CCD_PIXEL2MM
     # position of order 1 in pixels
     x_center = holo_center[0]
     y_center = holo_center[1]
@@ -239,7 +239,7 @@ def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
     if verbose:
         print('Order  0 position at x0 = %.1f and y0 = %.1f' % (order0_position[0], order0_position[1]))
         print('Order +1 position at x0 = %.1f and y0 = %.1f' % (order1_position[0], order1_position[1]))
-        print('Distance between the orders: %.2f pixels (%.2f mm)' % (AB, AB * parameters.PIXEL2MM))
+        print('Distance between the orders: %.2f pixels (%.2f mm)' % (AB, AB * parameters.CCD_PIXEL2MM))
     return order0_position, order1_position, AB
 
 
@@ -295,7 +295,7 @@ class Grating:
         self.label = label
         self.full_name = label
         self.data_dir = data_dir
-        self.plate_center = [0.5 * parameters.IMSIZE, 0.5 * parameters.IMSIZE]
+        self.plate_center = [0.5 * parameters.CCD_IMSIZE, 0.5 * parameters.CCD_IMSIZE]
         self.theta_tilt = 0
         self.transmission = None
         self.transmission_err = None
@@ -397,8 +397,8 @@ class Grating:
         Examples
         --------
         >>> g = Grating(400)
-        >>> theta = g.refraction_angle(500, [parameters.IMSIZE/2,  parameters.IMSIZE/2])
-        >>> assert np.isclose(theta, np.arctan2(500*parameters.PIXEL2MM, parameters.DISTANCE2CCD))
+        >>> theta = g.refraction_angle(500, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2])
+        >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, parameters.DISTANCE2CCD))
         """
         theta = get_refraction_angle(deltaX, x0, D=self.D)
         return theta
@@ -424,8 +424,8 @@ class Grating:
         Examples
         --------
         >>> g = Grating(400)
-        >>> theta = g.refraction_angle(500, [parameters.IMSIZE/2,  parameters.IMSIZE/2])
-        >>> assert np.isclose(theta, np.arctan2(500*parameters.PIXEL2MM, parameters.DISTANCE2CCD))
+        >>> theta = g.refraction_angle(500, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2])
+        >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, parameters.DISTANCE2CCD))
         """
         theta0 = get_theta0(x0)
         return np.arcsin(order * lambdas*1e-6 * self.N(x0) + np.sin(theta0))
@@ -486,7 +486,7 @@ class Grating:
         lambdas = np.copy(lambdas)
         theta0 = get_theta0(x0)
         theta = self.refraction_angle_lambda(lambdas, x0, order=order)
-        deltaX = self.D * (np.tan(theta) - np.tan(theta0)) / parameters.PIXEL2MM
+        deltaX = self.D * (np.tan(theta) - np.tan(theta0)) / parameters.CCD_PIXEL2MM
         return deltaX
 
     def grating_resolution(self, deltaX, x0, order=1):
@@ -495,10 +495,10 @@ class Grating:
         x0: the order 0 position on the full raw image.
         deltaX: the distance in pixels between order 0 and signal point 
         in the rotated image."""
-        delta = get_delta_pix_ortho(deltaX, x0, D=self.D) * parameters.PIXEL2MM
+        delta = get_delta_pix_ortho(deltaX, x0, D=self.D) * parameters.CCD_PIXEL2MM
         # theta = self.refraction_angle(x,x0,order=order)
-        # res = (np.cos(theta)**3*PIXEL2MM*1e6)/(order*self.N(x0)*self.D)
-        res = (self.D ** 2 / pow(self.D ** 2 + delta ** 2, 1.5)) * parameters.PIXEL2MM * 1e6 / (order * self.N(x0))
+        # res = (np.cos(theta)**3*CCD_PIXEL2MM*1e6)/(order*self.N(x0)*self.D)
+        res = (self.D ** 2 / pow(self.D ** 2 + delta ** 2, 1.5)) * parameters.CCD_PIXEL2MM * 1e6 / (order * self.N(x0))
         return res
 
     def plot_transmission(self, xlim=None):
@@ -652,8 +652,8 @@ class Hologram(Grating):
             self.N_interp = lambda x: float(N_interp(x[0], x[1]))
         else:
             self.is_hologram = False
-            self.N_x = np.arange(0, parameters.IMSIZE)
-            self.N_y = np.arange(0, parameters.IMSIZE)
+            self.N_x = np.arange(0, parameters.CCD_IMSIZE)
+            self.N_y = np.arange(0, parameters.CCD_IMSIZE)
             filename = self.data_dir + self.label + "/N.txt"
             if os.path.isfile(filename):
                 a = np.loadtxt(filename)
@@ -668,7 +668,7 @@ class Hologram(Grating):
             self.holo_center = list(map(float, lines[1].split(' ')[:2]))
             self.theta_tilt = float(lines[1].split(' ')[2])
         else:
-            self.holo_center = [0.5 * parameters.IMSIZE, 0.5 * parameters.IMSIZE]
+            self.holo_center = [0.5 * parameters.CCD_IMSIZE, 0.5 * parameters.CCD_IMSIZE]
             self.theta_tilt = 0
         filename = self.data_dir + self.label + "/hologram_rotation_angles.txt"
         if os.path.isfile(filename):
@@ -678,8 +678,8 @@ class Hologram(Grating):
             self.theta = lambda x: float(theta_interp(x[0], x[1]))
         else:
             self.theta = lambda x: self.theta_tilt
-        self.plate_center = [0.5 * parameters.IMSIZE + parameters.PLATE_CENTER_SHIFT_X / parameters.PIXEL2MM,
-                             0.5 * parameters.IMSIZE + parameters.PLATE_CENTER_SHIFT_Y / parameters.PIXEL2MM]
+        self.plate_center = [0.5 * parameters.CCD_IMSIZE + parameters.PLATE_CENTER_SHIFT_X / parameters.CCD_PIXEL2MM,
+                             0.5 * parameters.CCD_IMSIZE + parameters.PLATE_CENTER_SHIFT_Y / parameters.CCD_PIXEL2MM]
         self.x_lines, self.line1, self.line2 = neutral_lines(self.holo_center[0], self.holo_center[1], self.theta_tilt)
         if verbose:
             if self.is_hologram:

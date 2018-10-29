@@ -42,7 +42,7 @@ class Line:
         >>> print(l.emission)
         False
         """
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.wavelength = wavelength  # in nm
         self.label = label
         self.label_pos = label_pos
@@ -155,7 +155,7 @@ class Lines:
         >>> print([lines.lines[i].wavelength for i in range(5)])
         [382.044, 393.366, 396.847, 430.79, 438.355]
         """
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         if redshift < 0:
             self.my_logger.warning(f'Redshift must be positive or null. Got {redshift}')
             sys.exit()

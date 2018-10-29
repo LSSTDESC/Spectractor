@@ -11,7 +11,7 @@ class FitWorkspace:
 
     def __init__(self, filename, atmgrid_filename="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False):
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.filename = filename
         self.ndim = 0
         self.truth = None

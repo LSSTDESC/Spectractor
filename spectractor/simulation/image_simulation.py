@@ -12,7 +12,7 @@ class StarModel:
 
     def __init__(self, pixcoords, model, amplitude, target=None):
         """ [x0, y0] coords in pixels, sigma width in pixels, A height in image units"""
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.x0 = pixcoords[0]
         self.y0 = pixcoords[1]
         self.amplitude = amplitude
@@ -54,18 +54,18 @@ class StarFieldModel:
         x0, y0 = base_image.target_pixcoords
         '''
         result = Gaia.query_object_async(self.target.coord, 
-            width=IMSIZE*PIXEL2ARCSEC*units.arcsec/np.cos(self.target.coord.dec.radian), 
-            height=IMSIZE*PIXEL2ARCSEC*units.arcsec)
+            width=CCD_IMSIZE*CCD_PIXEL2ARCSEC*units.arcsec/np.cos(self.target.coord.dec.radian), 
+            height=CCD_IMSIZE*CCD_PIXEL2ARCSEC*units.arcsec)
         if parameters.DEBUG:
             print result.pprint()
         for o in result:
             if o['dist'] < 0.005 : continue
             radec = SkyCoord(ra=float(o['ra']),dec=float(o['dec']), frame='icrs', unit='deg')
-            y = int(y0 - (radec.dec.arcsec - self.target.coord.dec.arcsec)/PIXEL2ARCSEC)
-            x = int(x0 - (radec.ra.arcsec - self.target.coord.ra.arcsec)*np.cos(radec.dec.radian)/PIXEL2ARCSEC)
+            y = int(y0 - (radec.dec.arcsec - self.target.coord.dec.arcsec)/CCD_PIXEL2ARCSEC)
+            x = int(x0 - (radec.ra.arcsec - self.target.coord.ra.arcsec)*np.cos(radec.dec.radian)/CCD_PIXEL2ARCSEC)
             w = 10 # search windows in pixels
-            if x<w or x>IMSIZE-w: continue
-            if y<w or y>IMSIZE-w: continue
+            if x<w or x>CCD_IMSIZE-w: continue
+            if y<w or y>CCD_IMSIZE-w: continue
             sub =  base_image.data[y-w:y+w,x-w:x+w]
             A = np.max(sub) - np.min(sub)
             if A < threshold: continue
@@ -76,7 +76,7 @@ class StarFieldModel:
 '''
         # mask background, faint stars, and saturated pixels
         image_thresholded = np.copy(base_image.data)
-        self.saturation = 0.99 * parameters.MAXADU / base_image.expo
+        self.saturation = 0.99 * parameters.CCD_MAXADU / base_image.expo
         self.saturated_pixels = np.where(image_thresholded > self.saturation)
         image_thresholded[self.saturated_pixels] = 0.
         image_thresholded -= threshold
@@ -84,14 +84,14 @@ class StarFieldModel:
         # mask order0 and spectrum
         margin = 30
         for y in range(int(y0) - 100, int(y0) + 100):
-            for x in range(parameters.IMSIZE):
+            for x in range(parameters.CCD_IMSIZE):
                 u, v = pixel_rotation(x, y, base_image.disperser.theta([x0, y0]) * np.pi / 180., x0, y0)
                 if v < margin and v > -margin:
                     image_thresholded[y, x] = 0.
         # look for local maxima and create stars
         peak_positions = detect_peaks(image_thresholded)
-        for y in range(parameters.IMSIZE):
-            for x in range(parameters.IMSIZE):
+        for y in range(parameters.CCD_IMSIZE):
+            for x in range(parameters.CCD_IMSIZE):
                 if peak_positions[y, x]:
                     if np.sqrt((y - y0) ** 2 + (x - x0) ** 2) < 10 * base_image.target_star2D.fwhm:
                         continue  # no double star
@@ -106,16 +106,16 @@ class StarFieldModel:
             self.field = self.stars[0].model(x, y)
             for k in range(1, len(self.stars)):
                 left = max(0, int(self.pixcoords[0][k]) - window)
-                right = min(parameters.IMSIZE, int(self.pixcoords[0][k]) + window)
+                right = min(parameters.CCD_IMSIZE, int(self.pixcoords[0][k]) + window)
                 low = max(0, int(self.pixcoords[1][k]) - window)
-                up = min(parameters.IMSIZE, int(self.pixcoords[1][k]) + window)
+                up = min(parameters.CCD_IMSIZE, int(self.pixcoords[1][k]) + window)
                 yy, xx = np.mgrid[low:up, left:right]
                 self.field[low:up, left:right] += self.stars[k].model(xx, yy)
             self.field[self.saturated_pixels] += self.saturation
         return self.field
 
     def plot_model(self):
-        yy, xx = np.mgrid[0:parameters.IMSIZE:1, 0:parameters.IMSIZE:1]
+        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         starfield = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
         im = plt.imshow(starfield, origin='lower', cmap='jet')
@@ -135,7 +135,7 @@ class StarFieldModel:
 class BackgroundModel:
 
     def __init__(self, level, frame=None):
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.level = level
         if self.level <= 0:
             self.my_logger.warning('\n\tBackground level must be strictly positive.')
@@ -157,13 +157,13 @@ class BackgroundModel:
             xlim, ylim = self.frame
             bkgd[ylim:, :] = self.level / 100
             bkgd[:, xlim:] = self.level / 100
-            kernel = np.outer(gaussian(parameters.IMSIZE, 50), gaussian(parameters.IMSIZE, 50))
+            kernel = np.outer(gaussian(parameters.CCD_IMSIZE, 50), gaussian(parameters.CCD_IMSIZE, 50))
             bkgd = fftconvolve(bkgd, kernel, mode='same')
-            bkgd *= self.level / bkgd[parameters.IMSIZE / 2, parameters.IMSIZE / 2]
+            bkgd *= self.level / bkgd[parameters.CCD_IMSIZE / 2, parameters.CCD_IMSIZE / 2]
             return bkgd
 
     def plot_model(self):
-        yy, xx = np.mgrid[0:parameters.IMSIZE:1, 0:parameters.IMSIZE:1]
+        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         bkgd = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
         im = plt.imshow(bkgd, origin='lower', cmap='jet')
@@ -183,7 +183,7 @@ class BackgroundModel:
 class SpectrumModel:
 
     def __init__(self, base_image, spectrumsim, sigma, A1=1, A2=0, reso=None, rotation=False):
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.base_image = base_image
         self.spectrumsim = spectrumsim
         self.disperser = base_image.disperser
@@ -216,13 +216,13 @@ class SpectrumModel:
 class ImageModel(object, Image):
 
     def __init__(self, filename, target=""):
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         Image.__init__(self, filename, target=target)
         self.true_lambdas = None
         self.true_spectrum = None
 
     def compute(self, star, background, spectrum, starfield=None):
-        yy, xx = np.mgrid[0:parameters.IMSIZE:1, 0:parameters.IMSIZE:1]
+        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         self.data = star.model(xx, yy) + background.model(xx, yy) + spectrum.model(xx, yy)
         self.true_lambdas = spectrum.true_lambdas
         self.true_spectrum = spectrum.true_spectrum
@@ -269,7 +269,7 @@ def ImageSim(filename, outputdir, guess, target, pwv=5, ozone=300, aerosols=0, A
     - with_rotation: rotate the spectrum according to the disperser characteristics (True by default)
     - with_stars: include stars in the image field (True by default)
     """
-    my_logger = parameters.set_logger(__name__)
+    my_logger = set_logger(__name__)
     my_logger.info('\n\tStart IMAGE SIMULATOR')
     # Load reduced image
     image = ImageModel(filename, target=target)

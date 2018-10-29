@@ -1,11 +1,8 @@
 import numpy as np
 import os
-import coloredlogs
-import logging
 import astropy.units as units
 from astropy import constants as const
 import matplotlib as mpl
-logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 # Paths
 mypath = os.path.dirname(__file__)
@@ -19,23 +16,22 @@ if os.environ.get('DISPLAY', '') == '':
     DISPLAY = False
 
 # CCD characteristics
-IMSIZE = 2048  # size of the image in pixel
-PIXEL2MM = 24e-3  # pixel size in mm
-PIXEL2ARCSEC = 0.401  # pixel size in arcsec
-ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
-MAXADU = 60000  # approximate maximum ADU output of the CCD
-GAIN = 3.  # electronic gain : elec/ADU
+CCD_IMSIZE = 2048  # size of the image in pixel
+CCD_PIXEL2MM = 24e-3  # pixel size in mm
+CCD_PIXEL2ARCSEC = 0.401  # pixel size in arcsec
+CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
+CCD_MAXADU = 60000  # approximate maximum ADU output of the CCD
+CCD_GAIN = 3.  # electronic gain : elec/ADU
 
-# Observatory characteristics
+# Instrument characteristics
 OBS_NAME = 'CTIO'
 OBS_ALTITUDE = 2.200  # CTIO altitude in k meters from astropy package (Cerro Pachon)
-# LSST_Altitude = 2.750  # in k meters from astropy package (Cerro Pachon)
 OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
 OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
 OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
-EPOCH = "J2000.0"
-TELESCOPE_TRANSMISSION_SYSTEMATICS = 0.005
-OBJECT_TYPE = 'STAR' # To choose between STAR, HG-AR, MONOCHROMATOR
+OBS_EPOCH = "J2000.0"
+OBS_TRANSMISSION_SYSTEMATICS = 0.005
+OBS_OBJECT_TYPE = 'STAR' # To choose between STAR, HG-AR, MONOCHROMATOR
 
 # Filters
 HALPHA_CENTER = 655.9e-6  # center of the filter in mm
@@ -45,16 +41,6 @@ RG715 = {'label': 'RG715', 'min': 690, 'max': 1100}
 HALPHA_FILTER = {'label': 'Halfa', 'min': HALPHA_CENTER - 2 * HALPHA_WIDTH, 'max': HALPHA_CENTER + 2 * HALPHA_WIDTH}
 ZGUNN = {'label': 'Z-Gunn', 'min': 800, 'max': 1100}
 FILTERS = [RG715, FGB37, HALPHA_FILTER, ZGUNN]
-
-# Conversion factor
-# Units of SEDs in flam (erg/s/cm2/nm) :
-SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
-TIME_UNIT = 1 * units.s  # flux for 1 second
-hc = const.h * const.c  # h.c product of fontamental constants c and h
-wl_dwl_unit = units.nanometer ** 2  # lambda.dlambda  in wavelength in nm
-g_disperser_ronchi = 0.2  # theoretical gain for order+1 : 20%
-FLAM_TO_ADURATE = (
-    (OBS_SURFACE * SED_UNIT * TIME_UNIT * wl_dwl_unit / hc / GAIN * g_disperser_ronchi).decompose()).value
 
 # Making of the holograms
 DISTANCE2CCD = 55.45  # distance between hologram and CCD in mm
@@ -85,6 +71,16 @@ LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, 1)
 BGD_ORDER = 3  # order of the background polynome to fit
 BGD_NPARAMS = BGD_ORDER + 1  # number of unknown parameters for background
 
+# Conversion factor
+# Units of SEDs in flam (erg/s/cm2/nm) :
+SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
+TIME_UNIT = 1 * units.s  # flux for 1 second
+hc = const.h * const.c  # h.c product of fontamental constants c and h
+wl_dwl_unit = units.nanometer ** 2  # lambda.dlambda  in wavelength in nm
+g_disperser_ronchi = 0.2  # theoretical gain for order+1 : 20%
+FLAM_TO_ADURATE = (
+    (OBS_SURFACE * SED_UNIT * TIME_UNIT * wl_dwl_unit / hc / CCD_GAIN * g_disperser_ronchi).decompose()).value
+
 # Plotting
 PAPER = False
 LINEWIDTH = 2
@@ -95,47 +91,6 @@ SAVE = False
 VERBOSE = False
 DEBUG = False
 MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
-logging.basicConfig(format=MY_FORMAT, level=logging.WARNING)
-
-
-
-def set_logger(logger):
-    """Logger function for all classes.
-
-    Parameters
-    ----------
-    logger: str
-        Name of the class, usually self.__class__.__name__
-
-    Returns
-    -------
-    my_logger: logging
-        Logging object
-
-    Examples
-    --------
-    >>> class Test:
-    ...     def __init__(self):
-    ...         self.my_logger = set_logger(self.__class__.__name__)
-    ...     def log(self):
-    ...         self.my_logger.info('This info test function works.')
-    ...         self.my_logger.debug('This debug test function works.')
-    ...         self.my_logger.warning('This warning test function works.')
-    >>> test = Test()
-    >>> test.log()
-    """
-    my_logger = logging.getLogger(logger)
-    if VERBOSE > 0:
-        my_logger.setLevel(logging.INFO)
-        coloredlogs.install(fmt=MY_FORMAT, level=logging.INFO)
-    else:
-        my_logger.setLevel(logging.WARNING)
-        coloredlogs.install(fmt=MY_FORMAT, level=logging.WARNING)
-    if DEBUG:
-        my_logger.setLevel(logging.DEBUG)
-        coloredlogs.install(fmt=MY_FORMAT, level=logging.DEBUG)
-    return my_logger
-
 
 if __name__ == "__main__":
     import doctest
