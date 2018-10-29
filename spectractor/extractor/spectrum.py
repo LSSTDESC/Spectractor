@@ -40,7 +40,7 @@ class Spectrum(object):
         >>> print(s.target.label)
         3C273
         """
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.target = target
         self.data = None
         self.err = None
@@ -52,7 +52,7 @@ class Spectrum(object):
         self.filter = None
         self.filters = None
         self.units = 'ADU/s'
-        self.gain = parameters.GAIN
+        self.gain = parameters.CCD_GAIN
         if file_name != "":
             self.filename = file_name
             self.load_spectrum(file_name)

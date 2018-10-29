@@ -13,6 +13,7 @@ from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 from skimage.feature import hessian_matrix
 
 from spectractor import parameters
+from spectractor.config import *
 from math import floor
 
 

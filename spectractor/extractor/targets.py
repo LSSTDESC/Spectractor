@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-from astropy import units as units
 from astropy.coordinates import SkyCoord
 from astroquery.ned import Ned
 from astroquery.simbad import Simbad
@@ -11,15 +10,15 @@ if os.getenv("PYSYN_CDBS"):
 
 
 def load_target(label, verbose=False):
-    if parameters.OBJECT_TYPE == 'STAR':
+    if parameters.OBS_OBJECT_TYPE == 'STAR':
         return Star(label, verbose)
-    elif parameters.OBJECT_TYPE == 'HG-AR':
+    elif parameters.OBS_OBJECT_TYPE == 'HG-AR':
         return ArcLamp(label, verbose)
-    elif parameters.OBJECT_TYPE == 'MONOCHROMATOR':
+    elif parameters.OBS_OBJECT_TYPE == 'MONOCHROMATOR':
         return Monochromator(label, verbose)
     else:
         t = Target(label, verbose)
-        t.my_logger.error(f'\n\tUnknown parameters.OBJECT_TYPE: {parameters.OBJECT_TYPE}')
+        t.my_logger.error(f'\n\tUnknown parameters.OBS_OBJECT_TYPE: {parameters.OBS_OBJECT_TYPE}')
 
 
 class Target:
@@ -56,7 +55,7 @@ class Target:
         False
 
         """
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.label = label
         self.type = None
         self.wavelengths = []
@@ -99,7 +98,7 @@ class ArcLamp(Target):
 
         """
         Target.__init__(self, label, verbose=verbose)
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.lines = Lines(parameters.ARHG_LINES)
 
     def load(self):
@@ -132,7 +131,7 @@ class Monochromator(Target):
 
         """
         Target.__init__(self, label, verbose=verbose)
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.lines = Lines([])
 
     def load(self):
@@ -174,7 +173,7 @@ class Star(Target):
 
         """
         Target.__init__(self, label, verbose=verbose)
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.load()
 
     def load(self):
@@ -223,8 +222,8 @@ class Star(Target):
             self.emission_spectrum = False
             self.hydrogen_only = True
             self.lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES,
-                                   redshift=0., emission_spectrum=self.emission_spectrum,
-                                   hydrogen_only=self.hydrogen_only)
+                               redshift=0., emission_spectrum=self.emission_spectrum,
+                               hydrogen_only=self.hydrogen_only)
             for k, f in enumerate(file_names):
                 if '_mod_' in f:
                     continue

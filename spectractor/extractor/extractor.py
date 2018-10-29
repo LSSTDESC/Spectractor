@@ -44,7 +44,7 @@ def Spectractor(file_name, output_directory, guess, target, atmospheric_lines=Tr
     ...     assert spectrum is not None
     ...     assert os.path.isfile('tests/data/reduc_20170605_028_spectrum.fits')
     """
-    my_logger = parameters.set_logger(__name__)
+    my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTOR')
     # Load reduced image
     image = Image(file_name, target=target)

@@ -46,7 +46,7 @@ class Atmosphere(object):
     """
 
     def __init__(self, airmass, pressure, temperature):
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.airmass = airmass
         self.pressure = pressure
         self.temperature = temperature
@@ -102,7 +102,7 @@ class AtmosphereGrid(Atmosphere):
 
     def __init__(self, data_filename, filename="", airmass=1., pressure=800., temperature=10.):
         Atmosphere.__init__(self, airmass, pressure, temperature)
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.data_filename = data_filename
         # ------------------------------------------------------------------------
         # Definition of data format for the atmospheric grid
@@ -357,7 +357,7 @@ class TelescopeTransmission():
         file_name (:obj:`str`): path to the data file_name (for info only)
         """
 
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.filtername = filtername
         self.load_transmission()
 
@@ -386,7 +386,7 @@ class TelescopeTransmission():
         throughput = Throughput()
         wl, trm, err = throughput.get_total_throughput()
         self.to = interp1d(wl, trm, kind='linear', bounds_error=False, fill_value=0.)
-        err = np.sqrt(err**2 + parameters.TELESCOPE_TRANSMISSION_SYSTEMATICS**2)
+        err = np.sqrt(err ** 2 + parameters.OBS_TRANSMISSION_SYSTEMATICS ** 2)
         self.to_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
 
         # Filter RG715
@@ -448,7 +448,7 @@ class SpectrumSimulation(Spectrum):
         Spectrum.__init__(self)
         for k, v in list(spectrum.__dict__.items()):
             self.__dict__[k] = copy.copy(v)
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.disperser = disperser
         self.telescope = telescope
         self.atmosphere = atmosphere
@@ -472,7 +472,7 @@ class SpectrumSimulation(Spectrum):
         return self.data, self.err
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0., D=parameters.DISTANCE2CCD, shift=0.):
-        pixels = np.arange(0,parameters.IMSIZE) - self.x0[0] - shift
+        pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0] - shift
         new_x0 = [self.x0[0] - shift, self.x0[1]]
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(pixels, x0=new_x0, order=1)
@@ -493,7 +493,7 @@ class SpectrumSimulation(Spectrum):
             self.err = self.model_err(lambdas)
         # now we include effects related to the wrong extraction of the spectrum:
         # wrong estimation of the order 0 position and wrong DISTANCE2CCD
-        pixels = np.arange(0,parameters.IMSIZE) - self.x0[0]
+        pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0]
         self.disperser.D = parameters.DISTANCE2CCD
         self.lambdas = self.disperser.grating_pixel_to_lambda(pixels, self.x0, order=1)
         self.model = interp1d(self.lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
@@ -514,7 +514,7 @@ class SpectrumSimGrid():
         Args:
             filename (:obj:`str`): path to the image
         """
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
 
         self.spectrum = spectrum
         self.header = spectrum.header
@@ -594,7 +594,7 @@ def SimulatorInit(filename):
     Args:
         filename (:obj:`str`): file_name of the image (data)
     """
-    my_logger = parameters.set_logger(__name__)
+    my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SIMULATOR initialisation')
     # Load data spectrum
     try:
@@ -657,7 +657,7 @@ def SimulatorCore(spectrum, telescope, disperser, target, airmass=1.0, pressure=
         aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth        
         reso (:obj:`float`): width of gaussian in nm to convolve with spectrum
     """
-    my_logger = parameters.set_logger(__name__)
+    my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SIMULATOR core program')
     # SIMULATE ATMOSPHERE
     # -------------------
@@ -685,7 +685,7 @@ def SimulatorSimGrid(filename, outputdir, pwv_grid=[0,10,5], ozone_grid=[100,700
         outputdir (:obj:`str`): path to the output directory
         
     """
-    my_logger = parameters.set_logger(__name__)
+    my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SIMULATORGRID')
     # Initialisation
     spectrum, telescope, disperser, target = SimulatorInit(filename)
@@ -749,7 +749,7 @@ def Simulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A1=1., A2
         aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth        
         reso (:obj:`float`): width of gaussian in nm to convolve with spectrum
     """
-    my_logger = parameters.set_logger(__name__)
+    my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTORSIM')
     # Initialisation
     spectrum, telescope, disperser, target = SimulatorInit(filename)
