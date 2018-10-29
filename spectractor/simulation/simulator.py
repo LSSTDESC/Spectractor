@@ -200,7 +200,8 @@ class AtmosphereGrid(Atmosphere):
         plt.title(" Atmospheric variations")
         cbar = plt.colorbar(img)
         cbar.set_label('Atmospheric transmission')
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
     def save_file(self, filename=""):
 
