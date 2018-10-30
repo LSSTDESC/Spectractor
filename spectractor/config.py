@@ -49,9 +49,9 @@ def load_config(config_filename):
     parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * parameters.TIME_UNIT
                                    * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN
                                    * parameters.g_disperser_ronchi).decompose()).value
-    parameters.BGD_NPARAMS = parameters.BGD_ORDER + 1
+    parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
 
-    if parameters.DEBUG:
+    if parameters.VERBOSE:
         for section in config.sections():
             print("Section: %s" % section)
             for options in config.options(section):

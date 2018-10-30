@@ -53,6 +53,12 @@ class Image(object):
             self.load_CTIO_image(file_name)
         elif parameters.OBS_NAME == 'LPNHE':
             self.load_LPNHE_image(file_name)
+        # Load the disperser
+        self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
+        self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
+                                  data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
+        self.convert_to_ADU_rate_units()
+        self.compute_statistical_error()
 
     def load_CTIO_image(self, file_name):
         """
@@ -75,13 +81,8 @@ class Image(object):
         self.coord = SkyCoord(self.header['RA'] + ' ' + self.header['DEC'], unit=(units.hourangle, units.deg),
                               obstime=self.header['DATE-OBS'])
         self.my_logger.info('\n\tImage loaded')
-        # Load the disperser
-        self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
-        self.disperser = Hologram(self.disperser_label, data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
         # compute CCD gain map
         self.build_gain_map()
-        self.convert_to_ADU_rate_units()
-        self.compute_statistical_error()
         self.compute_parallactic_angle()
 
     def load_LPNHE_image(self, file_name):
@@ -101,15 +102,9 @@ class Image(object):
         self.header['D2CCD'] = parameters.DISTANCE2CCD
         self.data = self.data.T
         self.my_logger.info('\n\tImage loaded')
-        # Load the disperser
-        self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
-        self.disperser = Hologram(self.disperser_label, data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
         # compute CCD gain map
         self.gain = float(self.header['CCDGAIN']) * np.ones_like(self.data)
         parameters.CCD_IMSIZE = self.data.shape[1]
-        print(parameters.CCD_IMSIZE)
-        self.convert_to_ADU_rate_units()
-        self.compute_statistical_error()
 
     def save_image(self, output_file_name, overwrite=False):
         save_fits(output_file_name, self.header, self.data, overwrite=overwrite)
@@ -159,7 +154,7 @@ class Image(object):
         return self.parallactic_angle
 
     def plot_image_simple(self, ax, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                          target_pixcoords=None, vmin=None, vmax=None):
+                          target_pixcoords=None, vmin=None, vmax=None, aspect=None):
         if data is None:
             data = np.copy(self.data)
         if plot_stats:
@@ -171,7 +166,7 @@ class Image(object):
             data[zeros] = min_noz
             # apply log
             data = np.log10(data)
-        im = ax.imshow(data, origin='lower', cmap='jet', vmin=vmin, vmax=vmax)
+        im = ax.imshow(data, origin='lower', cmap='jet', vmin=vmin, vmax=vmax, aspect=aspect)
         ax.grid(color='white', ls='solid')
         ax.grid(True)
         ax.set_xlabel('X [pixels]')
@@ -188,12 +183,13 @@ class Image(object):
                        label='Target', linewidth=2)
 
     def plot_image(self, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                   target_pixcoords=None, figsize=[9.3, 8]):
+                   target_pixcoords=None, figsize=[9.3, 8], aspect=None):
         fig, ax = plt.subplots(1, 1, figsize=figsize)
         self.plot_image_simple(ax, data=data, scale=scale, title=title, units=units, plot_stats=plot_stats,
-                               target_pixcoords=target_pixcoords)
+                               target_pixcoords=target_pixcoords, aspect=aspect)
         plt.legend()
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
 
 def find_target(image, guess, rotated=False):
@@ -426,7 +422,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
             '\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels over {:d} pixels:'
             '  {:.2f} vs {:.2f}'.format(
                 parameters.CCD_IMSIZE, theta_median, theta_guess))
-    if parameters.DEBUG or True:
+    if parameters.DEBUG:
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6))
         xindex = np.arange(data.shape[1])
         x_new = np.linspace(xindex.min(), xindex.max(), 50)
@@ -463,11 +459,12 @@ def turn_image(image):
         f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
         image.plot_image_simple(ax1, data=image.data[max(0,y0 - 2*parameters.YWINDOW):min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin],
                                 scale="log", title='Raw image (log10 scale)', units=image.units,
-                                target_pixcoords=(image.target_pixcoords[0] - margin, 2*parameters.YWINDOW))
+                                target_pixcoords=(image.target_pixcoords[0] - margin, 2*parameters.YWINDOW), aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         image.plot_image_simple(ax2, data=image.data_rotated[max(0,y0 - 2*parameters.YWINDOW):
                                                              min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin], scale="log", title='Turned image (log10 scale)',
-                                units=image.units, target_pixcoords=image.target_pixcoords_rotated)
+                                units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2*parameters.YWINDOW, 2*parameters.YWINDOW], 'k-')
+        f.tight_layout()
         if parameters.DISPLAY:
             plt.show()
