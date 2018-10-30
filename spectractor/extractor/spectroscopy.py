@@ -8,7 +8,7 @@ class Line:
     """Class modeling the emission or absorption lines."""
 
     def __init__(self, wavelength, label, atmospheric=False, emission=False, label_pos=[0.007, 0.02],
-                 width_bounds=[1, 6], use_for_calibration=False):
+                 width_bounds=[0.5, 6], use_for_calibration=False):
         """Class modeling the emission or absorption lines. lines attributes contains main spectral lines
         sorted in wavelength.
 
@@ -229,7 +229,7 @@ class Lines:
         """
         xlim = ax.get_xlim()
         for l in self.lines:
-            if l.fitted and not l.high_snr:
+            if not l.fitted or not l.high_snr:
                 continue
             color = color_atomic
             if l.atmospheric:
@@ -245,7 +245,7 @@ class Lines:
         lambdas = np.zeros(1)
         rows = []
         j = 0
-        bgd_npar = parameters.BGD_NPARAMS
+        bgd_npar = parameters.CALIB_BGD_NPARAMS
         for line in self.lines:
             if line.fitted is True:
                 # look for lines in subset fit
@@ -267,7 +267,7 @@ class Lines:
         if print_table and len(rows) > 0:
             t = Table(rows=rows, names=('Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq'),
                       dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
-            for col in t.colnames[1:-2]:
+            for col in t.colnames[1:-3]:
                 t[col].unit = 'nm'
             t[t.colnames[-1]].unit = 'reduced'
             print(t)
@@ -354,13 +354,13 @@ HG2 = Line(296.728, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
 HG3 = Line(302.150, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
 HG4 = Line(313.155, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
 HG5 = Line(334.148, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
-HG6 = Line(365.015, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
-HG7 = Line(404.656, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
-HG8 = Line(407.783, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
+HG6 = Line(365.015, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HG7 = Line(404.656, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HG8 = Line(407.783, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HG9 = Line(435.833, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
-HG10 = Line(546.074, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
-HG11 = Line(576.960, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
-HG12 = Line(579.066, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
+HG10 = Line(546.074, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HG11 = Line(576.960, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HG12 = Line(579.066, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
 AR1 = Line(696.543, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR2 = Line(706.722, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR3 = Line(714.704, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])

@@ -50,10 +50,11 @@ PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x
 PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
 
 # Search windows in images
-XWINDOW = 100  # window x size to search for the targetted object
-YWINDOW = 100  # window y size to search for the targetted object
-XWINDOW_ROT = 50  # window x size to search for the targetted object
-YWINDOW_ROT = 50  # window y size to search for the targetted object
+XWINDOW = 100  # window x size to search for the targeted object
+YWINDOW = 100  # window y size to search for the targeted object
+XWINDOW_ROT = 50   # window x size to search for the targeted object
+YWINDOW_ROT = 50   # window y size to search for the targeted object
+PIXSHIFT_PRIOR = 2 # prior on the reliability of the centroid estimate in pixels
 
 # Rotation parameters
 ROT_PREFILTER = True  # must be set to true, otherwise create residuals and correlated noise
@@ -61,12 +62,19 @@ ROT_ORDER = 5  # must be above 3
 
 # Range for spectrum
 LAMBDA_MIN = 350  # minimum wavelength for spectrum extraction (in nm)
-LAMBDA_MAX = 1100  # maxnimum wavelength for spectrum extraction (in nm)
+LAMBDA_MAX = 1100  # maximum wavelength for spectrum extraction (in nm)
 LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, 1)
 
+# background subtraction parameters
+PIXWIDTH_SIGNAL = 10 # half transverse width of the signal rectangular window in pixels
+PIXDIST_BACKGROUND = 20 # distance from dispersion axis to analyse the background in pixels
+PIXWIDTH_BACKGROUND = 10 # transverse width of the background rectangular window in pixels
+
 # Detection line algorithm
-BGD_ORDER = 3  # order of the background polynome to fit
-BGD_NPARAMS = BGD_ORDER + 1  # number of unknown parameters for background
+CALIB_BGD_ORDER = 3  # order of the background polynome to fit
+CALIB_BGD_NPARAMS = CALIB_BGD_ORDER + 1  # number of unknown parameters for background
+CALIB_PEAK_WIDTH = 7  # half range to look for local extrema in pixels around tabulated line values
+CALIB_BGD_WIDTH = 10  # size of the peak sides to use to fit spectrum base line
 
 # Conversion factor
 # Units of SEDs in flam (erg/s/cm2/nm) :

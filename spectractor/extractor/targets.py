@@ -99,7 +99,8 @@ class ArcLamp(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.lines = Lines(HGAR_LINES)
+        self.emission_spectrum = True
+        self.lines = Lines(HGAR_LINES, emission_spectrum=True)
 
     def load(self):
         pass
@@ -132,7 +133,8 @@ class Monochromator(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.lines = Lines([])
+        self.emission_spectrum = True
+        self.lines = Lines([], emission_spectrum=True)
 
     def load(self):
         pass

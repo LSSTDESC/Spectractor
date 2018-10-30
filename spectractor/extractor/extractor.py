@@ -62,6 +62,7 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     ensure_dir(output_directory)
     output_filename = file_name.split('/')[-1]
     output_filename = output_filename.replace('.fits', '_spectrum.fits')
+    output_filename = output_filename.replace('.fz', '_spectrum.fits')
     output_filename = os.path.join(output_directory, output_filename)
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
@@ -74,7 +75,10 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     # Create Spectrum object
     spectrum = Spectrum(image=image)
     # Subtract background and bad pixels
-    extract_spectrum_from_image(image, spectrum, right_edge=parameters.CCD_IMSIZE-200)
+    extract_spectrum_from_image(image, spectrum, w=parameters.PIXWIDTH_SIGNAL,
+                                ws = (parameters.PIXDIST_BACKGROUND,
+                                      parameters.PIXDIST_BACKGROUND+parameters.PIXWIDTH_BACKGROUND),
+                                right_edge=parameters.CCD_IMSIZE-200)
     spectrum.atmospheric_lines = atmospheric_lines
     # Calibrate the spectrum
     calibrate_spectrum(spectrum)
