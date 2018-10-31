@@ -242,6 +242,7 @@ class Libradtran:
             output_filename = os.path.join(input_directory, base_filename + '.OUT')
 
             self.write_input(input_filename)
+            print(input_filename, output_filename)
             self.run(input_filename, output_filename, path=self.libradtran_path)
 
         return output_filename
