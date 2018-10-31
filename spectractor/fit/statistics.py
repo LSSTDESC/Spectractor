@@ -15,6 +15,7 @@ class Axis(object):
         self.step = 0
         self.set_axis(axis)
         self.size = len(axis)
+        self.txt = ''
 
     def getAxisVal(self, index):
         return self.axis[index]
@@ -68,7 +69,7 @@ class Grid:
         return [self.getAxisIndex(i, values[i]) for i in self.rangedim]
 
     def getMaximum(self):
-        self.max = max(self.grid.flatten())
+        self.max = np.max(self.grid.flatten())
         self.max_index = np.argmax(self.grid)
         return self.max
 
@@ -216,11 +217,12 @@ class PDF(Grid):
         for xindex, x in enumerate(self.axe.axis):
             xxprod[xindex] = self.grid[xindex] * (x - self.mean) ** 2
         self.variance = np.trapz(xxprod, self.axe.axis)
-        txt = "\t%s: %s +%s -%s (std: %s)" % formatting_numbers(self.mean, self.error_high, self.error_low,
+        txt = "%s: %s +%s -%s (std: %s)" % formatting_numbers(self.mean, self.error_high, self.error_low,
                                                                 std=np.sqrt(self.variance), label=self.label)
         self.title = '$%s^{+%s}_{-%s}$' % formatting_numbers(self.mean, self.error_high, self.error_low)
+        self.txt = txt
         if verbose:
-            print(txt)
+            print('\t'+txt)
 
 
 class Contours(Grid):
@@ -462,7 +464,7 @@ class Likelihood(Grid):
         cbar.ax.tick_params(labelsize=9)
         # plot the triangle
         fig.subplots_adjust(hspace=0, wspace=0)
-        if parameters.DISPLAY:
+        if parameters.DISPLAY and parameters.VERBOSE:
             plt.show()
         if output_filename != '':
             print(f'Save figure: {output_filename}')
@@ -478,7 +480,7 @@ class Likelihood(Grid):
             print("\t" + self.labels[i] + ": " + str(self.getAxisVal(i, self.max_index)))
 
     def stats(self, output='', pdfonly=False, verbose=True):
-        # self.max_likelihood_stats()
+        #self.max_likelihood_stats()
         if verbose:
             print('Marginalised best fit values (Mean and MCI):')
         self.mean_vec = np.zeros(self.dim)
@@ -505,12 +507,9 @@ class Likelihood(Grid):
             if output is not '':
                 txt = ''
                 for i in self.rangedim:
-                    txt += 'Parameter ' + self.labels[i] + ' ' + self.axis_names[i] + ' ' + str(
-                        self.pdfs[i].max_pdf) + '\n'
-                    if self.labels[i] == 'Depth' and self.cov_matrix[i][i] > 20 * 20:
-                        print('Warning! Depth covariance above 15 pixels. '
-                              'Reduce this to have a correct sampling inside depth prior.')
+                    txt += f'{self.pdfs[i].txt}\n'
                 cov = '\n'.join([''.join(['\t{0:8.6f}'.format(item) for item in row]) for row in self.cov_matrix])
+                print(f'Save best fit parameters in {output}')
                 f = open(output, 'w')
                 f.write(txt + cov)
                 f.close()
