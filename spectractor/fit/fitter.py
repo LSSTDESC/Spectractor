@@ -2,6 +2,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from spectractor.simulation.simulator import *
 from spectractor.fit.statistics import *
 
+from spectractor.parameters import FIT_WORKSPACE as fit_workspace
+
 from scipy.optimize import minimize
 
 import emcee
@@ -110,6 +112,9 @@ class FitWorkspace:
         figure_name = self.filename.replace('.fits', '_triangle.pdf')
         likelihood.triangle_plots(output_filename=figure_name)
 
+    def save_bestfit_parameters(self, likelihood):
+        pass
+
     def chain2likelihood(self, pdfonly=False, walker_index=-1):
         if walker_index >= 0:
             chains = self.chains[walker_index, self.burnin:, :]
@@ -127,7 +132,8 @@ class FitWorkspace:
                     for j in rangedim:
                         if i != j:
                             likelihood.contours[i][j].fill_histogram(chains[:, i], chains[:, j], weights=None)
-            likelihood.stats()
+            output_file = self.filename.replace('.fits', '_bestfit.txt')
+            likelihood.stats(output=output_file)
         return likelihood
 
     def compute_local_acceptance_rate(self, start_index, last_index, walker_index):
@@ -228,6 +234,7 @@ class FitWorkspace:
         # Gelman-Rubin test
         if len(nchains) > 1:
             step = max(1, (self.nsteps - self.burnin) // 20)
+            gelman_rubins = []
             print(f'Gelman-Rubin tests (burnin={self.burnin:d}, step={step:d}, nsteps={self.nsteps:d}):')
             for i in range(self.ndim):
                 Rs = []
@@ -249,6 +256,7 @@ class FitWorkspace:
                     R = (W * l / (l + 1) + B / (l + 1) * (len(chain_averages) + 1) / len(chain_averages)) / W
                     Rs.append(R - 1)
                     lens.append(l)
+                gelman_rubins.append(Rs[-1])
                 print(f'\t{self.input_labels[i]}: R-1 = {Rs[-1]:.3f} (l = {lens[-1] - 1:d})')
                 ax[i, 1].plot(lens, Rs, lw=2, label=self.axis_names[i])
                 ax[i, 1].axhline(0.03, c='k', linestyle='--')
@@ -258,10 +266,19 @@ class FitWorkspace:
                 # ax[self.dim, 3].legend(loc='best', ncol=2, fontsize=10)
         fig.tight_layout()
         plt.subplots_adjust(hspace=0)
-        plt.show()
+        if parameters.DISPLAY and parameters.VERBOSE:
+            plt.show()
         figure_name = self.filename.replace('.fits', '_convergence.pdf')
         print(f'Save figure: {figure_name}')
         fig.savefig(figure_name, dpi=100)
+        output_file = self.filename.replace('.fits', '_convergence.txt')
+        print(f'Save: {output_file}')
+        txt = ''
+        for i in range(self.ndim):
+            txt += f'{self.input_labels[i]} {gelman_rubins[i]}\n'
+        f = open(output_file, 'w')
+        f.write(txt)
+        f.close()
 
     def print_settings(self):
         print('************************************')
@@ -322,7 +339,7 @@ class FitWorkspace:
             plt.pause(1e-8)
             plt.close()
         else:
-            if parameters.DISPLAY:
+            if parameters.DISPLAY and parameters.VERBOSE:
                 plt.show()
         figname = fit_workspace.filename.replace('.fits', '_bestfit.pdf')
         print(f'Save figure: {figname}')
@@ -388,7 +405,9 @@ def run_minimisation():
     fit_workspace.plot_fit()
 
 
-def run_emcee():
+def run_emcee(w):
+    global fit_workspace
+    fit_workspace = w
     fit_workspace.print_settings()
     nsamples = fit_workspace.nsteps
     p0 = fit_workspace.set_start()

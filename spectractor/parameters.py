@@ -84,6 +84,9 @@ LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, 1)
 BGD_ORDER = 3  # order of the background polynome to fit
 BGD_NPARAMS = BGD_ORDER + 1  # number of unknown parameters for background
 
+# fit workspace
+FIT_WORKSPACE = None
+
 # Plotting
 PAPER = False
 LINEWIDTH = 2
