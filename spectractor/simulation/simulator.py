@@ -714,7 +714,7 @@ def SimulatorSimGrid(filename, outputdir, pwv_grid=[0,10,5], ozone_grid=[100,700
     else:
         atmgrid = atm.compute()
         header = atm.save_file(filename=output_atmfilename)
-        libradtran.clean_simulation_directory()
+        #libradtran.clean_simulation_directory()
     if parameters.VERBOSE:
         infostring = '\n\t ========= Atmospheric simulation :  ==============='
         my_logger.info(infostring)
