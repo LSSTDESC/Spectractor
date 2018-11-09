@@ -57,14 +57,10 @@ class Libradtran:
         f.close()
 
     def run(self, inp, out, path=''):
-        #self.my_logger.debug("Running uvspec with settings file: ", inp)
-        #self.my_logger.debug("Output to file                : ", out)
         if path != '':
             cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
         else:
             cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
-        #self.my_logger.debug("uvspec cmd: ", cmd)
-        #        p   = call(cmd,shell=True,stdin=PIPE,stdout=PIPE)
         p = Popen(cmd, shell=True, stdout=PIPE)
         p.wait()
 
@@ -93,23 +89,16 @@ class Libradtran:
         aerosol_index = int(aerosol * 100.)
 
         # Set up type of run
-        runtype = 'aerosol_special'  # 'no_scattering' #aerosol_special #aerosol_default# #'clearsky'#
-
         if self.proc == 'sc':
             runtype = 'no_absorption'
-            outtext = 'no_absorption'
         elif self.proc == 'ab':
             runtype = 'no_scattering'
-            outtext = 'no_scattering'
         elif self.proc == 'ae':
             runtype = 'aerosol_default'
-            outtext = 'aerosol_default'
         elif self.proc == 'as':
             runtype = 'aerosol_special'
-            outtext = 'aerosol_special'
         else:
-            runtype == 'clearsky'
-            outtext = 'clearsky'
+            runtype = 'clearsky'
 
         #   Selection of RTE equation solver
         if self.equation_solver == 'pp':  # parallel plan
@@ -159,7 +148,7 @@ class Libradtran:
             atmkey = atmosphere_map[atmosphere]
 
             # manage settings and output directories
-            topdir = self.simulation_directory + '/' + self.equation_solver + '/' + atmkey + '/' + self.proc + '/' + self.Mod
+            topdir = f'{self.simulation_directory}/{self.equation_solver}/{atmkey}/{self.proc}/{self.Mod}'
             ensure_dir(topdir)
             input_directory = topdir + '/' + 'in'
             ensure_dir(input_directory)
@@ -182,11 +171,8 @@ class Libradtran:
             oz_str = 'O3 ' + str(ozone) + ' DU'
             ozone_index = int(ozone / 10.)
 
-            base_filename = base_filename_part1 + atmkey + '_' + self.proc + '_' + self.Mod + '_z' + \
-                            str(airmass_index) + '_pwv' + str(pwv_index) + '_oz' + str(ozone_index) + \
-                            '_aer' + str(aerosol_index)
-
-            verbose = parameters.DEBUG
+            base_filename = f'{base_filename_part1}{atmkey}_{self.proc}_{self.Mod}_z{airmass_index}' \
+                            f'_pwv{pwv_index}_oz{ozone_index}_aer{aerosol_index}'
 
             self.settings["data_files_path"] = self.libradtran_path + 'data'
 
@@ -232,11 +218,7 @@ class Libradtran:
             self.settings["phi0"] = '0'
             self.settings["wavelength"] = '250.0 1200.0'
             self.settings["output_quantity"] = 'reflectivity'  # 'transmittance' #
-            #       self.settings["verbose"] = ''
             self.settings["quiet"] = ''
-
-            if "output_quantity" in list(self.settings.keys()):
-                outtextfinal = outtext + '_' + self.settings["output_quantity"]
 
             input_filename = os.path.join(input_directory, base_filename + '.INP')
             output_filename = os.path.join(input_directory, base_filename + '.OUT')
