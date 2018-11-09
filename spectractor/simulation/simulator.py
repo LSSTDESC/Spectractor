@@ -9,9 +9,9 @@ Collaboration : DESC-LSST
 Purpose : Simulate a series of spectra for each experimental spectra measured by auxiliary telescope.
 Structure in parallel to Spectractor.
 For each experimental spectra a fits file image is generated which holds all possible auxiliary telescope spectra
-corresponding to different conditions in aerosols, pwv, and ozone. 
+corresponding to different conditions in aerosols, pwv, and ozone.
 
-creation date : April 18th 
+creation date : April 18th
 Last update : July 2018
 
 """
@@ -37,12 +37,12 @@ from spectractor.simulation.throughput import Throughput
 
 class Atmosphere(object):
     """
-    Atmosphere(): 
+    Atmosphere():
         class to simulate an atmospheric transmission calling libradtran
     Args:
         airmass (:obj:`float`): airmass of the target
-        pressure (:obj:`float`): pressure of the atmosphere 
-        temperature (:obj:`float`): temperature of the atmosphere 
+        pressure (:obj:`float`): pressure of the atmosphere
+        temperature (:obj:`float`): temperature of the atmosphere
     """
 
     def __init__(self, airmass, pressure, temperature):
@@ -90,13 +90,13 @@ class Atmosphere(object):
 # ----------------------------------------------------------------------------------
 class AtmosphereGrid(Atmosphere):
     """
-    Atmosphere(): 
+    Atmosphere():
         class to simulate series of atmospheres calling libradtran
     Args:
         airmass (:obj:`float`): airmass of the target
-        pressure (:obj:`float`): pressure of the atmosphere 
-        temperature (:obj:`float`): temperature of the atmosphere 
-        filenamedata (:obj:`strt`): XXXXXXXXXX    
+        pressure (:obj:`float`): pressure of the atmosphere
+        temperature (:obj:`float`): temperature of the atmosphere
+        filenamedata (:obj:`strt`): XXXXXXXXXX
         filename (:obj:`strt`): atmospheric grid file name to load_image
     """
 
@@ -347,7 +347,7 @@ class TelescopeTransmission():
     - throughput
     - QE
     - Filter
-    
+
     """
 
     # ---------------------------------------------------------------------------
@@ -366,22 +366,22 @@ class TelescopeTransmission():
         """
         load_transmission(self) :
             load_image the telescope transmission
-            return the total telescope transmission, disperser excluded, 
+            return the total telescope transmission, disperser excluded,
                 as a fnction of the wavelength in Angstrom
         """
 
         '''
         # QE
         wl,qe=ctio.get_quantum_efficiency(datapath)
-        self.qe=interp1d(wl,qe,kind='linear',bounds_error=False,fill_value=0.) 
-        
+        self.qe=interp1d(wl,qe,kind='linear',bounds_error=False,fill_value=0.)
+
         #  Throughput
         wl,trt=ctio.get_telescope_throughput(datapath)
         self.to=interp1d(wl,trt,kind='linear',bounds_error=False,fill_value=0.)
-        
-        # Mirrors 
+
+        # Mirrors
         wl,trm=ctio.get_mirror_reflectivity(datapath)
-        self.tm=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.) 
+        self.tm=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.)
         '''
         throughput = Throughput()
         wl, trm, err = throughput.get_total_throughput()
@@ -588,7 +588,7 @@ class SpectrumSimGrid():
 
 def SimulatorInit(filename):
     """ SimulatorInit
-    Main function to simulate several spectra 
+    Main function to simulate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
 
     Args:
@@ -640,7 +640,7 @@ def SimulatorInit(filename):
 def SimulatorCore(spectrum, telescope, disperser, target, airmass=1.0, pressure=800, temperature=10,
                   pwv=5, ozone=300, aerosols=0.05, A1=1.0, A2=0., reso=0, D=parameters.DISTANCE2CCD, shift=0.):
     """ SimulatorCore
-    Main function to simulate several spectra 
+    Main function to simulate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
 
     Args:
@@ -654,7 +654,7 @@ def SimulatorCore(spectrum, telescope, disperser, target, airmass=1.0, pressure=
         temperature (:obj:`float`): temperature in celsius
         pwv (:obj:`float`): pressure water vapor
         ozone (:obj:`float`): ozone quantity
-        aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth        
+        aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth
         reso (:obj:`float`): width of gaussian in nm to convolve with spectrum
     """
     my_logger = parameters.set_logger(__name__)
@@ -677,13 +677,13 @@ def SimulatorCore(spectrum, telescope, disperser, target, airmass=1.0, pressure=
 def SimulatorSimGrid(filename, outputdir, pwv_grid=[0,10,5], ozone_grid=[100,700,7], aerosol_grid=[0,0.1,5],
                      A1=1., A2=0., reso=None, D=parameters.DISTANCE2CCD, shift=0.):
     """ SimulatorSimGrid
-    Main function to simulate several spectra 
+    Main function to simulate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
 
     Args:
         filename (:obj:`str`): file_name of the image (data)
         outputdir (:obj:`str`): path to the output directory
-        
+
     """
     my_logger = parameters.set_logger(__name__)
     my_logger.info('\n\tStart SIMULATORGRID')
@@ -714,14 +714,14 @@ def SimulatorSimGrid(filename, outputdir, pwv_grid=[0,10,5], ozone_grid=[100,700
     else:
         atmgrid = atm.compute()
         header = atm.save_file(filename=output_atmfilename)
-        libradtran.clean_simulation_directory()
+        #libradtran.clean_simulation_directory()
     if parameters.VERBOSE:
         infostring = '\n\t ========= Atmospheric simulation :  ==============='
         my_logger.info(infostring)
         atm.plot_transmission()  # plot all atm transp profiles
         atm.plot_transm_img()  # plot 2D image summary of atm simulations
 
-    # SPECTRA-GRID  
+    # SPECTRA-GRID
     # -------------
     # in any case we re-calculate the spectra in case of change of transmission function
     spectra = SpectrumSimGrid(spectrum, atm, telescope, disperser, target, header)
@@ -738,7 +738,7 @@ def SimulatorSimGrid(filename, outputdir, pwv_grid=[0,10,5], ozone_grid=[100,700
 def Simulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A1=1., A2=0.,
               reso=None, D=parameters.DISTANCE2CCD, shift=0.):
     """ Simulator
-    Main function to simulate several spectra 
+    Main function to simulate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
 
     Args:
@@ -746,7 +746,7 @@ def Simulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A1=1., A2
         outputdir (:obj:`str`): path to the output directory
         pwv (:obj:`float`): pressure water vapor
         ozone (:obj:`float`): ozone quantity
-        aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth        
+        aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth
         reso (:obj:`float`): width of gaussian in nm to convolve with spectrum
     """
     my_logger = parameters.set_logger(__name__)
