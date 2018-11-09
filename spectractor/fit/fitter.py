@@ -412,17 +412,24 @@ def run_emcee(w):
     fit_workspace.print_settings()
     nsamples = fit_workspace.nsteps
     p0 = fit_workspace.set_start()
-    pool = MPIPool(loadbalance=True, debug=True)
-    if not pool.is_master():
-        pool.wait()
-        sys.exit(0)
-    sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob, args=(), pool=pool,
-                                    runtime_sortingfn=sort_on_runtime)
-    for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples), storechain=True)):
-        if pool.is_master():
-            if (i + 1) % 100 == 0:
+    try:
+        pool = MPIPool(loadbalance=True, debug=False)
+        if not pool.is_master():
+            pool.wait()
+            sys.exit(0)
+        sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob, args=(), pool=pool,
+                                        runtime_sortingfn=sort_on_runtime)
+        for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples), storechain=True)):
+            if pool.is_master():
+                if (i + 1) % 100 == 0:
+                    print("{0:5.1%}".format(float(i) / nsamples))
+        pool.close()
+    except ValueError:
+        sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob, args=(), threads=8,
+                                        runtime_sortingfn=sort_on_runtime)
+        for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples), storechain=True)):
+             if (i + 1) % 100 == 0:
                 print("{0:5.1%}".format(float(i) / nsamples))
-    pool.close()
     fit_workspace.chains = sampler.chain
     fit_workspace.lnprobs = sampler.lnprobability
 
