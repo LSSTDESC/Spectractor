@@ -475,7 +475,56 @@ def tied_circular_gauss2d(g1):
 
 
 def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds=None, circular=False):
-    """Gauss2D parameters: amplitude, x_mean,y_mean,x_stddev, y_stddev,theta"""
+    """Fit an astropy Gaussian 2D model with parameters :
+        amplitude, x_mean,y_mean,x_stddev, y_stddev,theta
+    using outlier removal methods.
+
+    Parameters
+    ----------
+    x: np.array
+        2D array of the x coordinates from meshgrid.
+    y: np.array
+        2D array of the y coordinates from meshgrid.
+    z: np.array
+        the 2D array image.
+    sigma: float
+        value of sigma for the sigma rejection of outliers (default: 3)
+    niter: int
+        maximum number of iterations for the outlier detection (default: 50)
+    guess: list, optional
+        List containing a first guess for the PSF parameters (default: None).
+    bounds: list, optional
+        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
+    circular
+
+    Returns
+    -------
+    fitted_model: Fittable
+        Astropy Gauss2D model
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> from astropy.modeling import models
+    >>> X, Y = np.mgrid[:50,:50]
+    >>> PSF = models.Gaussian2D()
+    >>> p = (50, 25, 25, 5, 5, 0)
+    >>> Z = PSF.evaluate(X, Y, *p)
+    >>> plt.imshow(Z, origin='loxer') #doctest: +ELLIPSIS
+    <matplotlib.image.AxesImage object at 0x...>
+    >>> plt.show()
+    >>> guess = (45, 20, 20, 7, 7, 0)
+    >>> bounds = ((1, 10, 10, 1, 1, -90), (100, 40, 40, 10, 10, 90))
+    >>> fit = fit_gauss2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, circular=True)
+    >>> res = [getattr(fit, p).value for p in fit.param_names]
+    >>> print(res)
+    [50.0, 25.0, 25.0, 5.0, 5.0, 0.0]
+    >>> plt.imshow(Z-fit(X, Y), origin='loxer') #doctest: +ELLIPSIS
+    <matplotlib.image.AxesImage object at 0x...>
+    >>> plt.show()
+
+    """
     gg_init = models.Gaussian2D()
     if guess is not None:
         for ip, p in enumerate(gg_init.param_names):
@@ -496,6 +545,8 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
         if parameters.VERBOSE:
             print(or_fitted_model)
+        if parameters.VERBOSE:
+            print(fit.fit_info)
         return or_fitted_model
 
 
