@@ -497,6 +497,11 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
         2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
     circular
 
+    Returns
+    -------
+    fitted_model: Fittable
+        Astropy Gauss2D model
+
     Examples
     --------
     >>> import numpy as np
@@ -506,12 +511,18 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
     >>> PSF = models.Gaussian2D()
     >>> p = (50, 25, 25, 5, 5, 0)
     >>> Z = PSF.evaluate(X, Y, *p)
+    >>> plt.imshow(Z, origin='loxer') #doctest: +ELLIPSIS
+    <matplotlib.image.AxesImage object at 0x...>
+    >>> plt.show()
     >>> guess = (45, 20, 20, 7, 7, 0)
     >>> bounds = ((1, 10, 10, 1, 1, -90), (100, 40, 40, 10, 10, 90))
     >>> fit = fit_gauss2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, circular=True)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
     >>> print(res)
     [50.0, 25.0, 25.0, 5.0, 5.0, 0.0]
+    >>> plt.imshow(Z-fit(X, Y), origin='loxer') #doctest: +ELLIPSIS
+    <matplotlib.image.AxesImage object at 0x...>
+    >>> plt.show()
 
     """
     gg_init = models.Gaussian2D()
