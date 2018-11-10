@@ -127,5 +127,9 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
 
     minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, args=(x, y, z, sub_errors))
     res = basinhopping(psf_minimizer, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
+    if parameters.VERBOSE:
+        print(res.x)
+    if parameters.DEBUG:
+        print(res)
     return res.x
 

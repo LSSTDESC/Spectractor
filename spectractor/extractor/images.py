@@ -350,13 +350,8 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         sub_image_subtracted[sub_image >= 0.9 * image.saturation] = np.nan
         sub_image[sub_image >= 0.9 * image.saturation] = np.nan
     # fit
-    star2D = fit_PSF2D_outlier_removal(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
-    print(star2D.x_mean.value, star2D.y_mean.value)
-    for p in star2D.param_names:
-        print(p, getattr(star2D, p).value)
     bounds = list(np.array(bounds).T)
     res = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
-    print(res)
     new_avX = res[1]
     new_avY = res[2]
     star2D = PSF2D(*res)
@@ -374,17 +369,13 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         vmax = np.nanmax(sub_image)
         image.plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
                                 target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
-        # ax1.scatter([Dx],[Dy],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
         ax1.legend(loc=1)
 
         image.plot_image_simple(ax2, data=star2D(X, Y) + bkgd_2D(X, Y), scale="lin", title="",
                                 units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
-        # ax2.legend(loc=1)
-
         image.plot_image_simple(ax3, data=sub_image - star2D(X, Y) - bkgd_2D(X, Y), scale="lin", title="",
                                 units=f'Background+Star2D subtracted image\n({image.units})',
                                 target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
-        # ax3.scatter([guess[0]],[guess[1]],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
         ax3.legend(loc=1)
 
         f.tight_layout()
