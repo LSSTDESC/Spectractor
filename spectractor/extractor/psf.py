@@ -53,7 +53,7 @@ class PSF2D(Fittable2DModel):
         d_eta = amplitude * d_amplitude_moffat / eta
         d_alpha = - amplitude * d_amplitude_moffat * np.log(1 + rr_gg)
         d_gamma = 2 * amplitude * alpha * d_amplitude_moffat * (rr_gg / (gamma * (1 + rr_gg)))
-        d_saturation = saturation * np.ones_like(x)
+        d_saturation = saturation * np.zeros_like(x)
         return [d_amplitude, d_x_mean, d_y_mean, d_stddev, d_eta, d_alpha, d_gamma, d_saturation]
 
 
@@ -83,24 +83,49 @@ def fit_PSF2D_outlier_removal(x, y, z, sigma=5.0, niter=10, guess=None, bounds=N
 
 
 def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
-    """Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation"""
-    gg_init = PSF2D()
-    if guess is not None:
-        for ip, p in enumerate(gg_init.param_names):
-            getattr(gg_init, p).value = guess[ip]
-    if bounds is not None:
-        for ip, p in enumerate(gg_init.param_names):
-            getattr(gg_init, p).min = bounds[0][ip]
-            getattr(gg_init, p).max = bounds[1][ip]
-    # gg_init.saturation.fixed = True
-    with warnings.catch_warnings():
-        # Ignore model linearity warning from the fitter
-        warnings.simplefilter('ignore')
-        # fit = fitting.LevMarLSQFitter()
-        fit = LevMarLSQFitterWithNan()
-        fitted_model = fit(gg_init, x, y, z, acc=1e-20, epsilon=1e-20, weights=1./sub_errors)
-        if parameters.VERBOSE:
-            print(fitted_model)
-        if parameters.DEBUG:
-            print(fit.fit_info)
-        return fitted_model
+    """Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation
+
+    Parameters
+    ----------
+    x: np.array
+        2D array of the x coordinates from meshgrid.
+    y: np.array
+        2D array of the y coordinates from meshgrid.
+    z: np.array
+        the 2D array image.
+    guess: list, optional
+        List containing a first guess for the PSF parameters (default: None).
+    bounds: list, optional
+        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
+    sub_errors: np.array
+        the 2D array uncertainties.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> X, Y = np.mgrid[:50,:50]
+    >>> PSF = PSF2D()
+    >>> p = (50, 25, 25, 5, 1, 1, 5, 200)
+    >>> Z = PSF.evaluate(X, Y, *p)
+    >>> Z_err = np.sqrt(Z)/10.
+    >>> guess = (50, 20, 20, 3, 0.5, 1.2, 2.2, 300)
+    >>> bounds = ((1, 200), (10, 40), (10, 40), (1, 10), (0.5, 2), (0.5, 5), (0.5, 10), (0, 400))
+    >>> res = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, sub_errors=Z_err)
+    >>> print(res)
+    (50, 25, 25, 5, 1, 2, 4, 100)
+    """
+    from scipy.optimize import basinhopping
+
+    def psf_minimizer(params, x, y, z, z_err=None):
+        PSF = PSF2D()
+        model = PSF.evaluate(x, y, *params)
+        if z_err is None:
+            return np.nansum((model-z)**2)
+        else:
+            return np.nansum(((model-z)/z_err)**2)
+
+    minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, args=(x, y, z, sub_errors))
+    res = basinhopping(psf_minimizer, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
+    return res.x
+
