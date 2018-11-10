@@ -350,7 +350,8 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         sub_image_subtracted[sub_image >= 0.9 * image.saturation] = np.nan
         sub_image[sub_image >= 0.9 * image.saturation] = np.nan
     # fit
-    star2D = fit_PSF2D_outlier_removal(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
+    bounds = list(np.array(bounds).T)
+    star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     new_avX = star2D.x_mean.value
     new_avY = star2D.y_mean.value
     image.target_star2D = star2D
@@ -358,8 +359,8 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
     dist = np.sqrt((new_avY - avY) ** 2 + (new_avX - avX) ** 2)
     if dist > mean_prior / 2:
         image.my_logger.warning(
-            f'\n\tX={new_avX:.2f},Y={new_avY:.2f} target position determination probably wrong: '
-            f'{dist:.1f} pixels from profile detection ({avX:.2f},{avY:.2f})')
+            f'\n\tX={new_avX:.2f}, Y={new_avY:.2f} target position determination probably wrong: '
+            f'{dist:.1f} pixels from profile detection ({avX:.2f}, {avY:.2f})')
     # debugging plots
     if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
@@ -367,17 +368,13 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         vmax = np.nanmax(sub_image)
         image.plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
                                 target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
-        # ax1.scatter([Dx],[Dy],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
         ax1.legend(loc=1)
 
         image.plot_image_simple(ax2, data=star2D(X, Y) + bkgd_2D(X, Y), scale="lin", title="",
                                 units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
-        # ax2.legend(loc=1)
-
         image.plot_image_simple(ax3, data=sub_image - star2D(X, Y) - bkgd_2D(X, Y), scale="lin", title="",
                                 units=f'Background+Star2D subtracted image\n({image.units})',
                                 target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
-        # ax3.scatter([guess[0]],[guess[1]],marker='o',s=100,facecolors='none',edgecolors='w',label='old')
         ax3.legend(loc=1)
 
         f.tight_layout()
