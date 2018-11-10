@@ -1,11 +1,5 @@
-import sys
-import os
-from spectractor import parameters
+from spectractor.config import *
 import csv
-import matplotlib as mpl
-if os.environ.get('DISPLAY', '') == '':
-    mpl.use('agg')
-
 import matplotlib.pyplot as plt
 
 
@@ -28,7 +22,7 @@ class LogBook:
         ./ctiofulllogbook_jun2017_v5.csv
 
         """
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.logbook = logbook
         if not os.path.isfile(logbook):
             self.my_logger.error('CSV logbook file {} not found.'.format(logbook))
@@ -50,6 +44,8 @@ class LogBook:
 
         Returns
         -------
+        disperser_label: str
+            the name of the disperser
         target: str
             the name of the target
         xpos: int
@@ -58,6 +54,7 @@ class LogBook:
             the y position of the target (in pixel)
 
         """
+        disperser_label = None
         target = None
         xpos = None
         ypos = None
@@ -92,11 +89,12 @@ class LogBook:
                     parameters.YWINDOW_ROT = int(row['Dy'])
                 xpos = int(row['Obj-posXpix'])
                 ypos = int(row['Obj-posYpix'])
+                disperser_label = row['disperser']
                 break
         self.csvfile.seek(0)
         if target is None and skip is False:
             self.my_logger.error('Fits file %s not found in logbook %s.' % (filename, self.logbook))
-        return target, xpos, ypos
+        return disperser_label, target, xpos, ypos
 
     def plot_columns_vs_date(self, column_names):
         """Plot of the column property with respect to the dates.
@@ -125,7 +123,8 @@ class LogBook:
             ax[icol].set_ylabel(col)
         fig.autofmt_xdate()
         fig.tight_layout()
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
 
 if __name__ == "__main__":
