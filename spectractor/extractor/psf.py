@@ -1,10 +1,58 @@
 import warnings
+import sys
 import numpy as np
-from scipy.optimize import basinhopping
-from astropy.modeling import fitting, Fittable2DModel, Parameter
+from scipy.optimize import basinhopping, minimize
+from astropy.modeling import fitting, Fittable1DModel, Fittable2DModel, Parameter
 from astropy.stats import sigma_clip
 from spectractor.tools import LevMarLSQFitterWithNan
 from spectractor import parameters
+
+
+class PSF1D(Fittable1DModel):
+    inputs = ('x', )
+    outputs = ('z', )
+
+    amplitude = Parameter('amplitude', default=1)
+    x_mean = Parameter('x_mean', default=0)
+    stddev = Parameter('stddev', default=1)
+    eta = Parameter('eta', default=0.5)
+    alpha = Parameter('alpha', default=3)
+    gamma = Parameter('gamma', default=3)
+    saturation = Parameter('saturation', default=1)
+
+    @property
+    def fwhm(self):
+        return self.stddev / 2.335
+
+    @staticmethod
+    def evaluate(x, amplitude, x_mean, stddev, eta, alpha, gamma, saturation):
+        rr = (x - x_mean) ** 2
+        rr_gg = rr/(gamma*gamma)
+        a = amplitude * (np.exp(-(rr / (2. * stddev * stddev))) + eta * (1 + rr_gg) ** (-alpha))
+        if isinstance(x, float):
+            if a > saturation:
+                return saturation
+            else:
+                return a
+        else:
+            a[np.where(a >= saturation)] = saturation
+            return a
+
+    @staticmethod
+    def fit_deriv(x, amplitude, x_mean, stddev, eta, alpha, gamma, saturation):
+        rr = (x - x_mean) ** 2
+        rr_gg = rr/(gamma*gamma)
+        d_amplitude_gauss = np.exp(-(rr / (2. * stddev * stddev)))
+        d_amplitude_moffat = eta * (1 + rr_gg) ** (-alpha)
+        d_amplitude = d_amplitude_gauss + d_amplitude_moffat
+        d_x_mean = - amplitude * (x - x_mean) / (stddev * stddev) * d_amplitude_gauss \
+                   - amplitude * alpha * d_amplitude_moffat * (-2 * x + 2 * x_mean) / (gamma ** 2 * (1 + rr_gg))
+        d_stddev = amplitude * rr / (stddev ** 3) * d_amplitude_gauss
+        d_eta = amplitude * d_amplitude_moffat / eta
+        d_alpha = - amplitude * d_amplitude_moffat * np.log(1 + rr_gg)
+        d_gamma = 2 * amplitude * alpha * d_amplitude_moffat * (rr_gg / (gamma * (1 + rr_gg)))
+        d_saturation = saturation * np.zeros_like(x)
+        return [d_amplitude, d_x_mean, d_stddev, d_eta, d_alpha, d_gamma, d_saturation]
 
 
 class PSF2D(Fittable2DModel):
@@ -115,12 +163,12 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
     >>> import numpy as np
     >>> X, Y = np.mgrid[:50,:50]
     >>> PSF = PSF2D()
-    >>> p = (50, 25, 25, 5, 1, 1, 5, 200)
+    >>> p = (50, 25, 25, 5, 1, 1, 5, 60)
     >>> Z = PSF.evaluate(X, Y, *p)
     >>> Z_err = np.sqrt(Z)/10.
 
     Prepare the fit:
-    >>> guess = (50, 20, 20, 3, 0.5, 1.2, 2.2, 300)
+    >>> guess = (50, 20, 20, 3, 0.5, 1.2, 2.2, 50)
     >>> bounds = ((1, 200), (10, 40), (10, 40), (1, 10), (0.5, 2), (0.5, 5), (0.5, 10), (0, 400))
 
     Fit with error bars:
@@ -134,13 +182,13 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
     >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
     """
 
-    def psf_minimizer(params, x, y, z, z_err=None):
-        PSF = PSF2D()
-        model = PSF.evaluate(x, y, *params)
-        if z_err is None:
-            return np.nansum((model-z)**2)
+    def psf_minimizer(params, xx, yy, zz, zz_err=None):
+        psf = PSF2D()
+        model = psf.evaluate(xx, yy, *params)
+        if zz_err is None:
+            return np.nansum((model-zz)**2)
         else:
-            return np.nansum(((model-z)/z_err)**2)
+            return np.nansum(((model-zz)/zz_err)**2)
 
     minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, args=(x, y, z, sub_errors))
     res = basinhopping(psf_minimizer, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
@@ -151,3 +199,77 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
         print(res)
     return PSF
 
+
+def fit_PSF1D(x, y, guess=None, bounds=None, sub_errors=None, method='minimize'):
+    """Fit a PSF 1D model with parameters :
+        amplitude, x_mean, stddev, eta, alpha, gamma, saturation
+    using basin hopping global minimization method.
+
+    Parameters
+    ----------
+    x: np.array
+        1D array of the x coordinates.
+    y: np.array
+        the 1D array profile.
+    guess: array_like, optional
+        list containing a first guess for the PSF parameters (default: None).
+    bounds: list, optional
+        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
+    sub_errors: np.array
+        the 1D array uncertainties.
+    method: str, optional
+        method to use for the minimisation: choose between minimize and basinhopping.
+
+    Returns
+    -------
+    fitted_model: Fittable1DModel
+        the PSF1D fitted model.
+
+    Examples
+    --------
+
+    Create the model:
+    >>> import numpy as np
+    >>> X = np.arange(0, 50)
+    >>> PSF = PSF1D()
+    >>> p = (50, 25, 5, 1, 1, 5, 60)
+    >>> Y = PSF.evaluate(X, *p)
+    >>> Y_err = np.sqrt(Y)/10.
+
+    Prepare the fit:
+    >>> guess = (30, 10, 3, 0.5, 1.2, 2.2, 20)
+    >>> bounds = ((1, 200), (10, 40), (1, 10), (0.5, 2), (0.5, 5), (0.5, 10), (0, 400))
+
+    Fit with error bars:
+    >>> model = fit_PSF1D(X, Y, guess=guess, bounds=bounds, sub_errors=Y_err)
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
+    Fit without error bars:
+    >>> model = fit_PSF1D(X, Y, guess=guess, bounds=bounds, sub_errors=None)
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+    """
+
+    def psf_minimizer(params, xx, yy, yy_err=None):
+        psf = PSF1D()
+        model = psf.evaluate(xx, *params)
+        if yy_err is None:
+            return np.nansum((model-yy)**2)
+        else:
+            return np.nansum(((model-yy)/yy_err)**2)
+
+    if method == 'minimize':
+        res = minimize(psf_minimizer, guess, method="L-BFGS-B", bounds=bounds, args=(x, y, sub_errors))
+    elif method == 'basinhopping':
+        minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, args=(x, y, sub_errors))
+        res = basinhopping(psf_minimizer, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
+    else:
+        print(f'fit_PSF1D: unknown method {method}.')
+        sys.exit()
+    PSF = PSF1D(*res.x)
+    if parameters.VERBOSE:
+        print(PSF)
+    if parameters.DEBUG:
+        print(res)
+    return PSF
