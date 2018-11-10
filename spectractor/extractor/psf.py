@@ -10,7 +10,7 @@ from spectractor import parameters
 
 class PSF1D(Fittable1DModel):
     inputs = ('x', )
-    outputs = ('z', )
+    outputs = ('y', )
 
     amplitude = Parameter('amplitude', default=1)
     x_mean = Parameter('x_mean', default=0)
