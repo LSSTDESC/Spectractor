@@ -3,6 +3,7 @@ from matplotlib import cm
 from matplotlib.ticker import MaxNLocator
 
 from spectractor.extractor.targets import *
+from spectractor.extractor.psf import *
 from spectractor.extractor.dispersers import *
 
 
@@ -24,10 +25,13 @@ class Image(object):
         self.disperser_label = None
         self.filter = None
         self.filters = None
+        self.header = None
         self.data = None
         self.data_rotated = None
+        self.gain = None
         self.stat_errors = None
         self.stat_errors_rotated = None
+        self.parallactic_angle = None
         self.load_image(filename)
         # Load the target if given
         self.target = None
@@ -77,16 +81,16 @@ class Image(object):
         self.my_logger.info('\n\tImage saved in %s' % output_file_name)
 
     def build_gain_map(self):
-        l = parameters.IMSIZE
+        size = parameters.IMSIZE
         self.gain = np.zeros_like(self.data)
         # ampli 11
-        self.gain[0:l // 2, 0:l // 2] = self.header['GTGAIN11']
+        self.gain[0:size // 2, 0:size // 2] = self.header['GTGAIN11']
         # ampli 12
-        self.gain[0:l // 2, l // 2:l] = self.header['GTGAIN12']
+        self.gain[0:size // 2, size // 2:size] = self.header['GTGAIN12']
         # ampli 21
-        self.gain[l // 2:l, 0:l] = self.header['GTGAIN21']
+        self.gain[size // 2:size, 0:size] = self.header['GTGAIN21']
         # ampli 22
-        self.gain[l // 2:l, l // 2:l] = self.header['GTGAIN22']
+        self.gain[size // 2:size, size // 2:size] = self.header['GTGAIN22']
 
     def convert_to_ADU_rate_units(self):
         self.data /= self.expo
@@ -121,8 +125,10 @@ class Image(object):
 
     def plot_image_simple(self, ax, data=None, scale="lin", title="", units="Image units", plot_stats=False,
                           target_pixcoords=None, vmin=None, vmax=None):
-        if data is None: data = np.copy(self.data)
-        if plot_stats: data = np.copy(self.stat_errors)
+        if data is None:
+            data = np.copy(self.data)
+        if plot_stats:
+            data = np.copy(self.stat_errors)
         if scale == "log" or scale == "log10":
             # removes the zeros and negative pixels first
             zeros = np.where(data <= 0)
@@ -140,18 +146,20 @@ class Image(object):
         cb.locator = MaxNLocator(7, prune=None)
         cb.update_ticks()
         cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
-        if title != "": ax.set_title(title)
+        if title != "":
+            ax.set_title(title)
         if target_pixcoords is not None:
             ax.scatter(target_pixcoords[0], target_pixcoords[1], marker='o', s=100, edgecolors='k', facecolors='none',
                        label='Target', linewidth=2)
 
     def plot_image(self, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                   target_pixcoords=None,figsize=[9.3, 8]):
+                   target_pixcoords=None, figsize=[9.3, 8]):
         fig, ax = plt.subplots(1, 1, figsize=figsize)
         self.plot_image_simple(ax, data=data, scale=scale, title=title, units=units, plot_stats=plot_stats,
                                target_pixcoords=target_pixcoords)
         plt.legend()
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
 
 def find_target(image, guess, rotated=False):
@@ -178,8 +186,8 @@ def find_target(image, guess, rotated=False):
         theX = x0 - Dx + avX
         theY = y0 - Dy + avY
         guess = [int(theX), int(theY)]
-        Dx = Dx // (i+2)
-        Dy = Dy // (i+2)
+        Dx = Dx // (i + 2)
+        Dy = Dy // (i + 2)
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
@@ -195,7 +203,6 @@ def find_target(image, guess, rotated=False):
 def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
     x0, y0 = guess
     Dx, Dy = widths
-    sub_errors = None
     if rotated:
         sub_image = np.copy(image.data_rotated[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
         sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
@@ -241,31 +248,25 @@ def find_target_1Dprofile(image, sub_image, guess, rotated=False):
     if profile_Y[int(avY)] < 0.8 * np.max(profile_Y):
         image.my_logger.warning('\n\tY position determination of the target probably wrong')
     if parameters.DEBUG:
-        profile_X_max = np.max(profile_X_raw) * 1.2
-        profile_Y_max = np.max(profile_Y_raw) * 1.2
-
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
         image.plot_image_simple(ax1, data=sub_image, scale="log", title="", units=image.units, plot_stats=False,
                                 target_pixcoords=[avX, avY])
         ax1.legend(loc=1)
-
         ax2.plot(X, profile_X_raw, 'r-', lw=2)
         ax2.plot(X, bkgd_X(X), 'g--', lw=2, label='bkgd')
-        # ax2.axvline(guess[0],color='y',linestyle='-',label='old',lw=2)
         ax2.axvline(avX, color='b', linestyle='-', label='new', lw=2)
         ax2.grid(True)
         ax2.set_xlabel('X [pixels]')
         ax2.legend(loc=1)
-
         ax3.plot(Y, profile_Y_raw, 'r-', lw=2)
         ax3.plot(Y, bkgd_Y(Y), 'g--', lw=2, label='bkgd')
-        # ax3.axvline(guess[1],color='y',linestyle='-',label='old',lw=2)
         ax3.axvline(avY, color='b', linestyle='-', label='new', lw=2)
         ax3.grid(True)
         ax3.set_xlabel('Y [pixels]')
         ax3.legend(loc=1)
         f.tight_layout()
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
     return avX, avY
 
 
@@ -299,9 +300,12 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         guess[1] = avX
         guess[2] = avY
     mean_prior = 10  # in pixels
-    # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf], [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] #for Moffat2D
-    # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,0,0], [100*image.saturation,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] #for Gauss2D
-    # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation], [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
+    # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf],
+    # [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] #for Moffat2D
+    # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,0,0],
+    # [100*image.saturation,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] #for Gauss2D
+    # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation],
+    # [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
     bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 1,
                0.001, 0, 1, 0.9 * image.saturation],
               [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 100, 10, 30, 1.1 * image.saturation]]
@@ -310,10 +314,10 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         if parameters.DEBUG:
             image.my_logger.info('\n\t%d saturated pixels: set saturation level to %d %s.' % (
                 len(saturated_pixels[0]), image.saturation, image.units))
-        sub_image_subtracted[sub_image >= 0.9*image.saturation] = np.nan
+        sub_image_subtracted[sub_image >= 0.9 * image.saturation] = np.nan
         sub_image[sub_image >= 0.9 * image.saturation] = np.nan
     # fit
-    star2D = fit_star2d_outlier_removal(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
+    star2D = fit_PSF2D_outlier_removal(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     new_avX = star2D.x_mean.value
     new_avY = star2D.y_mean.value
     image.target_star2D = star2D
@@ -326,7 +330,7 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
     # debugging plots
     if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
-        vmin = 0 #np.nanmin(sub_image_subtracted)
+        vmin = 0
         vmax = np.nanmax(sub_image)
         image.plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
                                 target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
@@ -344,7 +348,8 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         ax3.legend(loc=1)
 
         f.tight_layout()
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
     return new_avX, new_avY
 
 
@@ -370,9 +375,8 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     theta_guess = image.disperser.theta(image.target_pixcoords)
     mask2 = np.where(np.abs(theta - theta_guess) > deg_threshold)
     theta_mask[mask2] = np.nan
-    theta_hist = []
     theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
-    theta_median = np.median(theta_hist)
+    theta_median = float(np.median(theta_hist))
     theta_critical = 180. * np.arctan(20. / parameters.IMSIZE) / np.pi
     image.header['THETAFIT'] = theta_median
     image.header.comments['THETAFIT'] = '[USED] rotation angle from the Hessian analysis'
@@ -389,7 +393,6 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         x_new = np.linspace(xindex.min(), xindex.max(), 50)
         y_new = width_cut + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
         ax1.imshow(theta_mask, origin='lower', cmap=cm.brg, aspect='auto', vmin=-deg_threshold, vmax=deg_threshold)
-        # ax1.imshow(np.log10(data),origin='lower',cmap="jet",aspect='auto')
         ax1.plot(x_new, y_new, 'b-')
         ax1.set_ylim(0, 2 * width_cut)
         ax1.set_xlabel('X [pixels]')
@@ -398,7 +401,8 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         n, bins, patches = ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
         ax2.plot([theta_median, theta_median], [0, np.max(n)])
         ax2.set_xlabel("Rotation angles [degrees]")
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
     return theta_median
 
 
@@ -425,5 +429,5 @@ def turn_image(image):
                                           margin:-margin], scale="log", title='Turned image (log10 scale)',
                                 units=image.units, target_pixcoords=image.target_pixcoords_rotated)
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
-        if parameters.DISPLAY: plt.show()
-
+        if parameters.DISPLAY:
+            plt.show()
