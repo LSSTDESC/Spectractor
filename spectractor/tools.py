@@ -11,7 +11,7 @@ from scipy.ndimage.filters import maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 
 from skimage.feature import hessian_matrix
-
+from spectractor.config import *
 from spectractor import parameters
 from math import floor
 
@@ -143,8 +143,8 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
 # noinspection PyTypeChecker
 def multigauss_and_bgd(x, *params):
     """Multiple Gaussian profile plus a polynomial background to data, using curve_fit.
-    The degree of the polynomial background is fixed by parameters.BGD_ORDER.
-    The order of the parameters is a first block BGD_ORDER+1 parameters (from high to low monomial terms,
+    The degree of the polynomial background is fixed by parameters.CALIB_BGD_ORDER.
+    The order of the parameters is a first block CALIB_BGD_ORDER+1 parameters (from high to low monomial terms,
     same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
     deviation.
 
@@ -167,7 +167,7 @@ def multigauss_and_bgd(x, *params):
     >>> print(y[0])
     349.0
     """
-    bgd_nparams = parameters.BGD_NPARAMS
+    bgd_nparams = parameters.CALIB_BGD_NPARAMS
     out = np.polyval(params[0:bgd_nparams], x)
     for k in range((len(params) - bgd_nparams) // 3):
         out += gauss(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
@@ -177,8 +177,8 @@ def multigauss_and_bgd(x, *params):
 # noinspection PyTypeChecker
 def multigauss_and_bgd_jacobian(x, *params):
     """Jacobien of the multiple Gaussian profile plus a polynomial background to data, using curve_fit.
-    The degree of the polynomial background is fixed by parameters.BGD_ORDER.
-    The order of the parameters is a first block BGD_ORDER+1 parameters (from high to low monomial terms,
+    The degree of the polynomial background is fixed by parameters.CALIB_BGD_ORDER.
+    The order of the parameters is a first block CALIB_BGD_ORDER+1 parameters (from high to low monomial terms,
     same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
     deviation.
 
@@ -201,11 +201,11 @@ def multigauss_and_bgd_jacobian(x, *params):
     >>> print(y[0][0])
     216000000.0
     """
-    bgd_nparams = parameters.BGD_NPARAMS
+    bgd_nparams = parameters.CALIB_BGD_NPARAMS
     out = []
     for k in range(bgd_nparams):
-        # out.append(params[k]*(parameters.BGD_ORDER-k)*x**(parameters.BGD_ORDER-(k+1)))
-        out.append(x ** (parameters.BGD_ORDER - k))
+        # out.append(params[k]*(parameters.CALIB_BGD_ORDER-k)*x**(parameters.CALIB_BGD_ORDER-(k+1)))
+        out.append(x ** (parameters.CALIB_BGD_ORDER - k))
     for k in range((len(params) - bgd_nparams) // 3):
         out += gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
     return np.array(out).T
@@ -215,8 +215,8 @@ def multigauss_and_bgd_jacobian(x, *params):
 def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None):
     """Fit a multiple Gaussian profile plus a polynomial background to data, using curve_fit.
     The mean guess value of the Gaussian must not be far from the truth values.
-    Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.BGD_ORDER.
-    The order of the parameters is a first block BGD_ORDER+1 parameters (from high to low monomial terms,
+    Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.CALIB_BGD_ORDER.
+    The order of the parameters is a first block CALIB_BGD_ORDER+1 parameters (from high to low monomial terms,
     same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
     deviation.
 
@@ -226,7 +226,7 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
         The x data values.
     y: array
         The y data values.
-    guess: list, [BGD_ORDER+1 parameters, 3*number of Gaussian parameters]
+    guess: list, [CALIB_BGD_ORDER+1 parameters, 3*number of Gaussian parameters]
         List of first guessed values for the Gaussian fit (default: [0, 1, 10, 1000, 1]).
     bounds: array
         List of boundaries for the parameters [[minima],[maxima]] (default: (-np.inf, np.inf)).
@@ -816,7 +816,7 @@ def clean_target_spikes(data, saturation):
 
 def load_fits(file_name, hdu_index=0):
     hdu_list = fits.open(file_name)
-    header = hdu_list[hdu_index].header
+    header = hdu_list[0].header
     data = hdu_list[hdu_index].data
     hdu_list.close()  # need to free allocation for file descripto
     return header, data
