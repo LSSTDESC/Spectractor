@@ -1,5 +1,6 @@
 import warnings
 import numpy as np
+from scipy.optimize import basinhopping
 from astropy.modeling import fitting, Fittable2DModel, Parameter
 from astropy.stats import sigma_clip
 from spectractor.tools import LevMarLSQFitterWithNan
@@ -67,11 +68,11 @@ def fit_PSF2D_outlier_removal(x, y, z, sigma=5.0, niter=10, guess=None, bounds=N
         for ip, p in enumerate(gg_init.param_names):
             getattr(gg_init, p).min = bounds[0][ip]
             getattr(gg_init, p).max = bounds[1][ip]
-    # gg_init.saturation.fixed = True
+    gg_init.saturation.fixed = True
     with warnings.catch_warnings():
         # Ignore model linearity warning from the fitter
         warnings.simplefilter('ignore')
-        fit = fitting.LevMarLSQFitter()
+        fit = LevMarLSQFitterWithNan()
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
@@ -83,7 +84,9 @@ def fit_PSF2D_outlier_removal(x, y, z, sigma=5.0, niter=10, guess=None, bounds=N
 
 
 def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
-    """Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation
+    """Fit a PSF 2D model with parameters :
+        amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
+    using basin hopping global minimization method.
 
     Parameters
     ----------
@@ -100,22 +103,36 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
     sub_errors: np.array
         the 2D array uncertainties.
 
+    Returns
+    -------
+    fitted_model: Fittable2DModel
+        the PSF2D fitted model.
+
     Examples
     --------
+
+    Create the model:
     >>> import numpy as np
-    >>> import matplotlib.pyplot as plt
     >>> X, Y = np.mgrid[:50,:50]
     >>> PSF = PSF2D()
     >>> p = (50, 25, 25, 5, 1, 1, 5, 200)
     >>> Z = PSF.evaluate(X, Y, *p)
     >>> Z_err = np.sqrt(Z)/10.
+
+    Prepare the fit:
     >>> guess = (50, 20, 20, 3, 0.5, 1.2, 2.2, 300)
     >>> bounds = ((1, 200), (10, 40), (10, 40), (1, 10), (0.5, 2), (0.5, 5), (0.5, 10), (0, 400))
-    >>> res = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, sub_errors=Z_err)
-    >>> print(res)
-    (50, 25, 25, 5, 1, 2, 4, 100)
+
+    Fit with error bars:
+    >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, sub_errors=Z_err)
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
+    Fit without error bars:
+    >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, sub_errors=None)
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
     """
-    from scipy.optimize import basinhopping
 
     def psf_minimizer(params, x, y, z, z_err=None):
         PSF = PSF2D()
@@ -127,9 +144,10 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
 
     minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, args=(x, y, z, sub_errors))
     res = basinhopping(psf_minimizer, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
+    PSF = PSF2D(*res.x)
     if parameters.VERBOSE:
-        print(res.x)
+        print(PSF)
     if parameters.DEBUG:
         print(res)
-    return res.x
+    return PSF
 

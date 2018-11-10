@@ -351,17 +351,16 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         sub_image[sub_image >= 0.9 * image.saturation] = np.nan
     # fit
     bounds = list(np.array(bounds).T)
-    res = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
-    new_avX = res[1]
-    new_avY = res[2]
-    star2D = PSF2D(*res)
+    star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
+    new_avX = star2D.x_mean.value
+    new_avY = star2D.y_mean.value
     image.target_star2D = star2D
     # check target positions
     dist = np.sqrt((new_avY - avY) ** 2 + (new_avX - avX) ** 2)
     if dist > mean_prior / 2:
         image.my_logger.warning(
-            f'\n\tX={new_avX:.2f},Y={new_avY:.2f} target position determination probably wrong: '
-            f'{dist:.1f} pixels from profile detection ({avX:.2f},{avY:.2f})')
+            f'\n\tX={new_avX:.2f}, Y={new_avY:.2f} target position determination probably wrong: '
+            f'{dist:.1f} pixels from profile detection ({avX:.2f}, {avY:.2f})')
     # debugging plots
     if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
