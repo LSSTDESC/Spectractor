@@ -472,8 +472,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
                 break
             else:
                 index_sup += 1
-        index_sup = max(index_sup, peak_index+peak_width)
-        index_inf = min(index_inf, peak_index-peak_width)
+        index_sup = max(index_sup, peak_index + peak_width)
+        index_inf = min(index_inf, peak_index - peak_width)
         # pixel range to consider around the peak, adding bgd_width pixels
         # to fit for background around the peak
         index = list(np.arange(max(0, index_inf - bgd_width),
@@ -586,11 +586,11 @@ def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
         else:
             fit, cov, model = fit_poly1d(lambdas[index], spec[index],
                                          order=parameters.CALIB_BGD_ORDER, w=1. / spec_err[index])
-        #fig = plt.figure()
-        #plt.plot(lambdas[index], spec[index])
-        #plt.plot(lambdas[bgd_index], spec[bgd_index], 'ro')
-        #plt.plot(lambdas[index], np.polyval(fit, lambdas[index]), 'b--')
-        #plt.show()
+        # fig = plt.figure()
+        # plt.plot(lambdas[index], spec[index])
+        # plt.plot(lambdas[bgd_index], spec[bgd_index], 'ro')
+        # plt.plot(lambdas[index], np.polyval(fit, lambdas[index]), 'b--')
+        # plt.show()
         for n in range(bgd_npar):
             # guess[n] = getattr(bgd, bgd.param_names[parameters.CALIB_BGD_ORDER - n]).value
             guess[n] = fit[n]
@@ -656,7 +656,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
         # if guess values on tabulated lines have not moved: penalize the chisq
         global_chisq += shift
         lines.my_logger.debug(f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}'
-                             f'\n\tTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
+                              f'\n\tTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
     else:
         global_chisq = 2 * len(parameters.LAMBDAS)
         lines.my_logger.debug(
@@ -704,7 +704,7 @@ def calibrate_spectrum_with_lines(spectrum):
         lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift,
                                                                   x0=[x0[0] + pixel_shift, x0[1]], order=spectrum.order)
         chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None)
-        chisq += (pixel_shift * pixel_shift) / (parameters.PIXSHIFT_PRIOR/2)**2
+        chisq += (pixel_shift * pixel_shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG:
             spectrum.lambdas = lambdas_test
             spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
@@ -716,7 +716,7 @@ def calibrate_spectrum_with_lines(spectrum):
     pixel_shift_step = 0.5
     pixel_shift_prior = parameters.PIXSHIFT_PRIOR
     Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
-    pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior+pixel_shift_step, pixel_shift_step)
+    pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
     chisq_grid = np.zeros((len(Ds), len(pixel_shifts)))
     for i, D in enumerate(Ds):
         for j, pixel_shift in enumerate(pixel_shifts):
@@ -730,8 +730,8 @@ def calibrate_spectrum_with_lines(spectrum):
     if parameters.DEBUG and parameters.DISPLAY:
         im = plt.imshow(np.log10(chisq_grid), origin='lower', aspect='auto',
                         extent=(
-                        np.min(pixel_shifts) - pixel_shift_step / 2, np.max(pixel_shifts) + pixel_shift_step / 2,
-                        np.min(Ds) - D_step / 2, np.max(Ds) + D_step / 2))
+                            np.min(pixel_shifts) - pixel_shift_step / 2, np.max(pixel_shifts) + pixel_shift_step / 2,
+                            np.min(Ds) - D_step / 2, np.max(Ds) + D_step / 2))
         plt.gca().scatter(pixel_shift, D, marker='o', s=100, edgecolors='k', facecolors='none',
                           label='Minimum', linewidth=2)
         c = plt.colorbar(im)
@@ -767,7 +767,7 @@ def calibrate_spectrum_with_lines(spectrum):
     return lambdas
 
 
-def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=parameters.CCD_IMSIZE-200):
+def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=parameters.CCD_IMSIZE - 200):
     """Extract the 1D spectrum from the image.
 
     Method : remove a uniform background estimated from the rectangular lateral bands
@@ -807,23 +807,65 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     err = np.copy(image.stat_errors_rotated)[:, 0:right_edge]
     # Lateral bands to remove sky background
     Ny, Nx = data.shape
+    x0 = int(image.target_pixcoords_rotated[0])
     y0 = int(image.target_pixcoords_rotated[1])
     ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
-    spectrum2DUp = np.copy(data[y0 + ws[0]:ymax, :])
+    # Create spectrogram
+    data = data[ymin:ymax, :]
+    err = err[ymin:ymax, :]
+    Ny, Nx = data.shape
+    middle = Ny // 2
+    print(middle, ymin, ymin - ws[0])
+    # Clean stars on lateral bands
+    spectrum2DUp = np.copy(data[middle + ws[0]:Ny, :])
     spectrum2DUp = filter_stars_from_bgd(spectrum2DUp, margin_cut=1)
-    err_spectrum2DUp = np.copy(err[y0 + ws[0]:ymax, :])
+    err_spectrum2DUp = np.copy(err[middle + ws[0]:Ny, :])
     err_spectrum2DUp = filter_stars_from_bgd(err_spectrum2DUp, margin_cut=1)
-    xprofileUp = np.nanmedian(spectrum2DUp, axis=0)
-    xprofileUp_err = np.sqrt(np.nanmean(err_spectrum2DUp ** 2, axis=0))
-    spectrum2DDown = np.copy(data[ymin:y0 - ws[0], :])
+    # xprofileUp = np.nanmedian(spectrum2DUp, axis=0)
+    # xprofileUp_err = np.sqrt(np.nanmean(err_spectrum2DUp ** 2, axis=0))
+    spectrum2DDown = np.copy(data[0:middle - ws[0], :])
     spectrum2DDown = filter_stars_from_bgd(spectrum2DDown, margin_cut=1)
-    err_spectrum2DDown = np.copy(err[ymin:y0 - ws[0], :])
+    err_spectrum2DDown = np.copy(err[0:middle - ws[0], :])
     err_spectrum2DDown = filter_stars_from_bgd(err_spectrum2DDown, margin_cut=1)
-    xprofileDown = np.nanmedian(spectrum2DDown, axis=0)
-    xprofileDown_err = np.sqrt(np.nanmean(err_spectrum2DDown ** 2, axis=0))
-    # Sum rotated image profile along y axis
-    # Subtract mean lateral profile
+    # xprofileDown = np.nanmedian(spectrum2DDown, axis=0)
+    # xprofileDown_err = np.sqrt(np.nanmean(err_spectrum2DDown ** 2, axis=0))
+    data[0:middle - ws[0], :] = spectrum2DDown
+    err[0:middle - ws[0], :] = err_spectrum2DDown
+    data[middle + ws[0]:Ny, :] = spectrum2DUp
+    err[middle + ws[0]:Ny, :] = err_spectrum2DUp
+    # Fit rotated image profile along y axis
+    # Subtract mean lateral profile with line profile
+    y = data[:, x0 + 300]
+    guess = (np.max(y) - np.mean(y), middle, np.std(y), 0.1, 2, np.std(y), image.saturation)
+    bounds = ((0, 2*np.abs(np.max(y))), (0, Ny), (0, Ny), (0, 100), (0, 20), (0, Ny), (0, 2*image.saturation))
+    for x in np.arange(x0 + 300, Nx):
+        index = np.arange(Ny)
+        bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
+        y = data[bgd_index, x]
+        y_err = err[bgd_index, x]
+        bgd_fit = fit_poly1d_outlier_removal(bgd_index, y, order=1)
+        fit, outliers = fit_PSF1D_outlier_removal(index, data[:, x] - bgd_fit(index), sub_errors=err[:, x],
+                                                  guess=guess, bounds=bounds, sigma=5, niter=3)
+        guess = [getattr(fit, p).value for p in fit.param_names]
+        if parameters.DEBUG or True:
+            plt.figure(figsize=(6, 6))
+            plt.errorbar(np.arange(Ny), data[:, x], yerr=err[:, x], fmt='ro',
+                         label="bgd data")
+            plt.errorbar(bgd_index, y, yerr=y_err, fmt='bo', label="original data")
+            plt.errorbar(outliers, data[outliers, x], yerr=err[outliers, x], fmt='go', label="outliers")
+            plt.plot(bgd_index, bgd_fit(bgd_index), 'b--',
+                     label="fitted bgd")
+            plt.plot(index, fit(index) + bgd_fit(index), 'b-',
+                     label="fitted profile")
+            plt.legend(loc=2, numpoints=1)
+            plt.title(f'x={x}')
+            if parameters.DISPLAY:
+                plt.draw()
+                plt.pause(1e-8)
+                plt.close()
+                # plt.show()
+
     xprofile_background = 0.5 * (xprofileUp + xprofileDown)
     xprofile_background_err = np.sqrt(0.5 * (xprofileUp_err ** 2 + xprofileDown_err ** 2))
     spectrum2D = np.copy(data[y0 - w:y0 + w, :])
@@ -835,7 +877,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.data = xprofile
     spectrum.err = xprofile_err
     if parameters.DEBUG:
-        fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12,6))
+        fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12, 6))
         image.plot_image_simple(ax[1], data=spectrum2D,
                                 scale="log", title='', units=image.units,
                                 target_pixcoords=(image.target_pixcoords_rotated[0], w), aspect='auto')

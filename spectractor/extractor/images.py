@@ -32,6 +32,7 @@ class Image(object):
         self.stat_errors = None
         self.stat_errors_rotated = None
         self.parallactic_angle = None
+        self.saturation = None
         self.load_image(filename)
         # Load the target if given
         self.target = None
@@ -451,9 +452,9 @@ def turn_image(image):
         image.data_rotated = ndimage.interpolation.rotate(image.data, image.rotation_angle,
                                                           prefilter=parameters.ROT_PREFILTER,
                                                           order=parameters.ROT_ORDER)
-        image.stat_errors_rotated = ndimage.interpolation.rotate(image.stat_errors, image.rotation_angle,
+        image.stat_errors_rotated = np.sqrt(np.abs(ndimage.interpolation.rotate(image.stat_errors**2, image.rotation_angle,
                                                                  prefilter=parameters.ROT_PREFILTER,
-                                                                 order=parameters.ROT_ORDER)
+                                                                 order=parameters.ROT_ORDER)))
     if parameters.DEBUG:
         margin = 100
         y0 = int(image.target_pixcoords[1])

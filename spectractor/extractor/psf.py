@@ -6,11 +6,12 @@ from astropy.modeling import fitting, Fittable1DModel, Fittable2DModel, Paramete
 from astropy.stats import sigma_clip
 from spectractor.tools import LevMarLSQFitterWithNan
 from spectractor import parameters
+from spectractor.config import set_logger
 
 
 class PSF1D(Fittable1DModel):
-    inputs = ('x', )
-    outputs = ('y', )
+    inputs = ('x',)
+    outputs = ('y',)
 
     amplitude = Parameter('amplitude', default=1)
     x_mean = Parameter('x_mean', default=0)
@@ -27,7 +28,7 @@ class PSF1D(Fittable1DModel):
     @staticmethod
     def evaluate(x, amplitude, x_mean, stddev, eta, alpha, gamma, saturation):
         rr = (x - x_mean) ** 2
-        rr_gg = rr/(gamma*gamma)
+        rr_gg = rr / (gamma * gamma)
         a = amplitude * (np.exp(-(rr / (2. * stddev * stddev))) + eta * (1 + rr_gg) ** (-alpha))
         if isinstance(x, float):
             if a > saturation:
@@ -41,7 +42,7 @@ class PSF1D(Fittable1DModel):
     @staticmethod
     def fit_deriv(x, amplitude, x_mean, stddev, eta, alpha, gamma, saturation):
         rr = (x - x_mean) ** 2
-        rr_gg = rr/(gamma*gamma)
+        rr_gg = rr / (gamma * gamma)
         d_amplitude_gauss = np.exp(-(rr / (2. * stddev * stddev)))
         d_amplitude_moffat = eta * (1 + rr_gg) ** (-alpha)
         d_amplitude = d_amplitude_gauss + d_amplitude_moffat
@@ -56,8 +57,8 @@ class PSF1D(Fittable1DModel):
 
 
 class PSF2D(Fittable2DModel):
-    inputs = ('x', 'y', )
-    outputs = ('z', )
+    inputs = ('x', 'y',)
+    outputs = ('z',)
 
     amplitude = Parameter('amplitude', default=1)
     x_mean = Parameter('x_mean', default=0)
@@ -75,7 +76,7 @@ class PSF2D(Fittable2DModel):
     @staticmethod
     def evaluate(x, y, amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation):
         rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
-        rr_gg = rr/(gamma*gamma)
+        rr_gg = rr / (gamma * gamma)
         a = amplitude * (np.exp(-(rr / (2. * stddev * stddev))) + eta * (1 + rr_gg) ** (-alpha))
         # print(amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation)
         if isinstance(x, float) and isinstance(y, float):
@@ -90,7 +91,7 @@ class PSF2D(Fittable2DModel):
     @staticmethod
     def fit_deriv(x, y, amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation):
         rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
-        rr_gg = rr/(gamma*gamma)
+        rr_gg = rr / (gamma * gamma)
         d_amplitude_gauss = np.exp(-(rr / (2. * stddev * stddev)))
         d_amplitude_moffat = eta * (1 + rr_gg) ** (-alpha)
         d_amplitude = d_amplitude_gauss + d_amplitude_moffat
@@ -153,7 +154,7 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
 
     Returns
     -------
-    fitted_model: Fittable2DModel
+    fitted_model: PSF2D
         the PSF2D fitted model.
 
     Examples
@@ -186,9 +187,9 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
         psf = PSF2D()
         model = psf.evaluate(xx, yy, *params)
         if zz_err is None:
-            return np.nansum((model-zz)**2)
+            return np.nansum((model - zz) ** 2)
         else:
-            return np.nansum(((model-zz)/zz_err)**2)
+            return np.nansum(((model - zz) / zz_err) ** 2)
 
     minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, args=(x, y, z, sub_errors))
     res = basinhopping(psf_minimizer, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
@@ -198,6 +199,14 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None):
     if parameters.DEBUG:
         print(res)
     return PSF
+
+
+def psf_chisq(params, model, xx, yy, yy_err=None):
+    mod = model.evaluate(xx, *params)
+    if yy_err is None:
+        return np.nansum((mod - yy) ** 2)
+    else:
+        return np.nansum(((mod - yy) / yy_err) ** 2)
 
 
 def fit_PSF1D(x, y, guess=None, bounds=None, sub_errors=None, method='minimize'):
@@ -222,7 +231,7 @@ def fit_PSF1D(x, y, guess=None, bounds=None, sub_errors=None, method='minimize')
 
     Returns
     -------
-    fitted_model: Fittable1DModel
+    fitted_model: PSF1D
         the PSF1D fitted model.
 
     Examples
@@ -250,20 +259,12 @@ def fit_PSF1D(x, y, guess=None, bounds=None, sub_errors=None, method='minimize')
     >>> res = [getattr(model, p).value for p in model.param_names]
     >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
     """
-
-    def psf_minimizer(params, xx, yy, yy_err=None):
-        psf = PSF1D()
-        model = psf.evaluate(xx, *params)
-        if yy_err is None:
-            return np.nansum((model-yy)**2)
-        else:
-            return np.nansum(((model-yy)/yy_err)**2)
-
+    model = PSF1D()
     if method == 'minimize':
-        res = minimize(psf_minimizer, guess, method="L-BFGS-B", bounds=bounds, args=(x, y, sub_errors))
+        res = minimize(psf_chisq, guess, method="L-BFGS-B", bounds=bounds, args=(model, x, y, sub_errors))
     elif method == 'basinhopping':
-        minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, args=(x, y, sub_errors))
-        res = basinhopping(psf_minimizer, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
+        minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, args=(model, x, y, sub_errors))
+        res = basinhopping(psf_chisq, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
     else:
         print(f'fit_PSF1D: unknown method {method}.')
         sys.exit()
@@ -273,3 +274,67 @@ def fit_PSF1D(x, y, guess=None, bounds=None, sub_errors=None, method='minimize')
     if parameters.DEBUG:
         print(res)
     return PSF
+
+
+def fit_PSF1D_outlier_removal(x, y, sub_errors=None, sigma=3.0, niter=3, guess=None, bounds=None, method='minimize'):
+    """Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation"""
+    # gg_init = PSF1D()
+    # if guess is not None:
+    #     for ip, p in enumerate(gg_init.param_names):
+    #         getattr(gg_init, p).value = guess[ip]
+    # if bounds is not None:
+    #     for ip, p in enumerate(gg_init.param_names):
+    #         getattr(gg_init, p).min = bounds[0][ip]
+    #         getattr(gg_init, p).max = bounds[1][ip]
+    # gg_init.saturation.fixed = True
+    # with warnings.catch_warnings():
+    #     # Ignore model linearity warning from the fitter
+    #     warnings.simplefilter('ignore')
+    #     fit = LevMarLSQFitterWithNan()
+    #     or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+    #     # get fitted model and filtered data
+    #     filtered_data, or_fitted_model = or_fit(gg_init, x, y)
+    #     if parameters.VERBOSE:
+    #         print(or_fitted_model)
+    #     if parameters.DEBUG:
+    #         print(fit.fit_info)
+    #     return or_fitted_model
+    my_logger = set_logger(__name__)
+    indices = np.mgrid[:x.shape[0]]
+    outliers = np.array([])
+    model = PSF1D()
+    for step in range(niter):
+        # first fit
+        if sub_errors is None:
+            err = None
+        else:
+            err = sub_errors[indices]
+        if method == 'minimize':
+            # TODO: add jacobian
+            res = minimize(psf_chisq, guess, method="L-BFGS-B", bounds=bounds, jac=model.fit_deriv,
+                           args=(model, x[indices], y[indices], err))
+        elif method == 'basinhopping':
+            minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds,
+                                    args=(model, x[indices], y[indices], err))
+            res = basinhopping(psf_chisq, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
+        else:
+            my_logger.error(f'\n\tUnknown method {method}.')
+            sys.exit()
+        if parameters.DEBUG:
+            my_logger.debug(f'\n\tniter={step}\n{res}')
+        # update the model and the guess
+        for ip, p in enumerate(model.param_names):
+            setattr(model, p, res.x[ip])
+        guess = res.x
+        # remove outliers
+        if sub_errors is not None:
+            outliers = np.where(np.abs(model(x) - y) / sub_errors > sigma)[0]
+        else:
+            std = np.std(model(x) - y)
+            outliers = np.where(np.abs(model(x) - y) / std > sigma)[0]
+        if len(outliers) > 0:
+            print(outliers)
+            indices = [i for i in range(x.shape[0]) if i not in outliers]
+    if parameters.VERBOSE:
+        my_logger.info(f'\n\tPSF best fitting parameters:\n{model}')
+    return model, outliers
