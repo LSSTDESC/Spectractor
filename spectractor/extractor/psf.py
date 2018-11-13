@@ -1,7 +1,8 @@
 import warnings
 import sys
 import numpy as np
-from scipy.optimize import basinhopping, minimize
+from scipy.optimize import basinhopping, minimize, newton
+from scipy.integrate import quad
 from astropy.modeling import fitting, Fittable1DModel, Fittable2DModel, Parameter
 from astropy.stats import sigma_clip
 from spectractor.tools import LevMarLSQFitterWithNan
@@ -21,9 +22,28 @@ class PSF1D(Fittable1DModel):
     gamma = Parameter('gamma', default=3)
     saturation = Parameter('saturation', default=1)
 
-    @property
     def fwhm(self):
-        return self.stddev / 2.335
+        """
+        Compute the full width half maximum of the PSF1D model.
+
+        Returns
+        -------
+        FWHM: float
+            The full width half maximum of the PSF1D model.
+
+        Examples
+        --------
+        >>> p = [1,0,2,2,2,2,10]
+        >>> PSF = PSF1D(*p)
+        >>> fwhm = PSF.fwhm()
+        >>> assert np.isclose(fwhm, 3.1409218870190476)
+
+        """
+        eq = lambda x, *args: self.evaluate(x, *args) - 0.5*(self.amplitude_gauss+self.amplitude_moffat)
+        fwhm = 2*newton(eq, self.x_mean+self.gamma,
+                        args=(self.amplitude_gauss, self.x_mean, self.stddev,
+                           self.amplitude_moffat, self.alpha, self.gamma, self.saturation))
+        return fwhm
 
     @staticmethod
     def evaluate(x, amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation):
@@ -52,6 +72,29 @@ class PSF1D(Fittable1DModel):
         d_gamma = 2 * amplitude_moffat * alpha * d_amplitude_moffat * (rr_gg / (gamma * (1 + rr_gg)))
         d_saturation = saturation * np.zeros_like(x)
         return np.array([d_amplitude_gauss, d_x_mean, d_stddev, d_amplitude_moffat, d_alpha, d_gamma, d_saturation])
+
+    def integral(self):
+        """
+        Compute the wide integral of the PSF1D model. Bounds are -5*FWHM and +5*FWHM.
+
+        Returns
+        -------
+        result: float
+            The integral of the PSF1D model.
+
+        Examples
+        --------
+        >>> p = [1,0,2,2,2,2,10]
+        >>> PSF = PSF1D(*p)
+        >>> i = PSF.integral()
+        >>> assert np.isclose(i, 11.291039428010016)
+
+        """
+        fwhm = self.fwhm()
+        i = quad(self.evaluate, self.x_mean-5*fwhm, self.x_mean+5*fwhm,
+                 args=(self.amplitude_gauss, self.x_mean, self.stddev,
+                       self.amplitude_moffat, self.alpha, self.gamma, self.saturation))
+        return i[0]
 
 
 class PSF2D(Fittable2DModel):
