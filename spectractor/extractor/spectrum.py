@@ -834,30 +834,101 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     err[0:middle - ws[0], :] = err_spectrum2DDown
     data[middle + ws[0]:Ny, :] = spectrum2DUp
     err[middle + ws[0]:Ny, :] = err_spectrum2DUp
+    # Roughly estimates the wavelengths
+    #lambdas = image.disperser.grating_pixel_to_lambdas(np.arange(Nx)-x0, x0=image.target_pixcoords_rotated)
+    #pixel_start = lambdas[np.isclose(lambdas, 200, 0.5)]
+    #print(pixel_start)
     # Fit rotated image profile along y axis
     # Subtract mean lateral profile with line profile
-    y = data[:, x0 + 300]
-    guess = (np.max(y) - np.mean(y), middle, np.std(y), 0.1, 2, np.std(y), image.saturation)
-    bounds = ((0, 2*np.abs(np.max(y))), (0, Ny), (0, Ny), (0, 100), (0, 20), (0, Ny), (0, 2*image.saturation))
-    for x in np.arange(x0 + 300, Nx):
-        index = np.arange(Ny)
-        bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
-        y = data[bgd_index, x]
-        y_err = err[bgd_index, x]
-        bgd_fit = fit_poly1d_outlier_removal(bgd_index, y, order=1)
-        fit, outliers = fit_PSF1D_outlier_removal(index, data[:, x] - bgd_fit(index), sub_errors=err[:, x],
-                                                  guess=guess, bounds=bounds, sigma=5, niter=3)
+    index = np.arange(Ny)
+    bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
+    y = data[:, x0 + 200]
+    guess = [np.nanmax(y) - np.nanmean(y), middle, 2, 0.1, 2, 2, image.saturation]
+    maxi = np.abs(np.nanmax(y))
+    bounds = [(-2*maxi, 2*maxi), (middle - w, middle + w), (0.1, Ny),
+              (0.1*maxi, 2*maxi), (1, 20), (1, Ny), (0, 2*image.saturation)]
+    outliers = []
+    for x in np.arange(x0 + 200, Nx):
+        # fit the background with a polynomial function
+        y = data[:, x]
+        bgd = data[bgd_index, x]
+        bgd_err = err[bgd_index, x]
+        bgd_fit = fit_poly1d_outlier_removal(bgd_index, bgd, order=1)
+        signal = y - bgd_fit(index)
+        # in case guess amplitude is too low
+        print(guess[0], np.nanstd(bgd))
+        pdf = np.abs(signal) / np.nansum(np.abs(signal))
+        mean = np.nansum(pdf*index)
+        std = np.sqrt(np.nansum(pdf*(index-mean)**2))
+        maxi = np.abs(np.nanmax(signal))
+        if guess[0] + guess[3] < 3 * np.nanstd(bgd):
+            print('goooooooooo', maxi, maxi-np.nanmean(bgd), std, mean, pdf*(index-mean)**2, pdf)
+            guess = [0.1*maxi, mean, std, 0.9*maxi, 2, std, image.saturation]
+            bounds[0] = (-2*maxi, 2*maxi)
+            bounds[3] = (np.nanstd(bgd), 2 * maxi)
+        # maxi = np.abs(np.nanmax(signal))
+        # guess[0] = maxi
+        # guess[3] = maxi
+        print('first guess:', guess, maxi)
+        from astropy.modeling.models import Gaussian1D
+        PSF_guess = PSF1D(*guess)
+        #fit = fit_PSF1D(index, signal, sub_errors=err[:, x], guess=guess, bounds=bounds, method='minimize')
+        #guess = [getattr(fit, p).value for p in fit.param_names]
+        # fit with outlier removal to clean background stars
+        print('guess', guess, bounds[0])
+        PSF_guess_2 = PSF1D(*guess)
+        fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x],
+                                                  guess=guess, bounds=bounds, sigma=5, niter=2)
+        # test if 3 consecutive pixels are in the outlier list
+        test = 0
+        consecutive_outliers = False
+        for o in range(1,len(outliers)):
+            t = outliers[o] - outliers[o-1]
+            if t == 1:
+                test += t
+            else:
+                test = 0
+            if test > 1:
+                consecutive_outliers = True
+                break
+        # test if the fit has badly fitted the two highest data points
+        test = np.copy(signal - fit(index))
+        max_badfit = False
+        if test.argmax() in outliers:
+            test[test.argmax()] = 0
+            if test.argmax() in outliers:
+                max_badfit = True
+        # if there are consecutive outliers or max is badly fitted, re-estimate the guess and refit
+        if consecutive_outliers or max_badfit:
+            if guess[0] < 0: # defocus
+                guess = [-0.1 * maxi, middle, 0.2, 0.9 * maxi, 2, std, image.saturation]
+            else:
+                guess = [0.1*maxi, middle, std, 0.9*maxi, 2, std, image.saturation]
+            bounds[0] = (-2*maxi, 2*maxi)
+            bounds[3] = (np.nanstd(bgd), 2 * maxi)
+            fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x],
+                                                      guess=guess, bounds=bounds, sigma=5, niter=2)
         guess = [getattr(fit, p).value for p in fit.param_names]
+        print('fit result: ', guess)
         if parameters.DEBUG or True:
             plt.figure(figsize=(6, 6))
-            plt.errorbar(np.arange(Ny), data[:, x], yerr=err[:, x], fmt='ro',
+            plt.errorbar(np.arange(Ny), y, yerr=err[:, x], fmt='ro',
                          label="bgd data")
-            plt.errorbar(bgd_index, y, yerr=y_err, fmt='bo', label="original data")
+            plt.errorbar(bgd_index, bgd, yerr=bgd_err, fmt='bo', label="original data")
             plt.errorbar(outliers, data[outliers, x], yerr=err[outliers, x], fmt='go', label="outliers")
             plt.plot(bgd_index, bgd_fit(bgd_index), 'b--',
                      label="fitted bgd")
+            plt.plot(index, PSF_guess(index) + bgd_fit(index), 'k--',
+                     label="guessed profile")
+            plt.plot(index, PSF_guess_2(index) + bgd_fit(index), 'k-',
+                     label="2nd guessed profile")
             plt.plot(index, fit(index) + bgd_fit(index), 'b-',
                      label="fitted profile")
+            ylim = plt.gca().get_ylim()
+            PSF_gauss = Gaussian1D(*guess[:3])
+            plt.plot(index, PSF_gauss(index) + bgd_fit(index), 'b+',
+                     label="fitted profile")
+            plt.gca().set_ylim(ylim)
             plt.legend(loc=2, numpoints=1)
             plt.title(f'x={x}')
             if parameters.DISPLAY:
