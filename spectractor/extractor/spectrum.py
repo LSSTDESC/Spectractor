@@ -1,4 +1,5 @@
 import scipy.optimize as opt
+from astropy.modeling.models import Gaussian1D
 
 from scipy.signal import argrelextrema
 
@@ -848,6 +849,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     bounds = [(-2*maxi, 2*maxi), (middle - w, middle + w), (0.1, Ny),
               (0.1*maxi, 2*maxi), (1, 20), (1, Ny), (0, 2*image.saturation)]
     outliers = []
+    PSF_params = []
+    flux = []
     for x in np.arange(x0 + 200, Nx):
         # fit the background with a polynomial function
         y = data[:, x]
@@ -856,27 +859,16 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         bgd_fit = fit_poly1d_outlier_removal(bgd_index, bgd, order=1)
         signal = y - bgd_fit(index)
         # in case guess amplitude is too low
-        print(guess[0], np.nanstd(bgd))
         pdf = np.abs(signal) / np.nansum(np.abs(signal))
         mean = np.nansum(pdf*index)
         std = np.sqrt(np.nansum(pdf*(index-mean)**2))
         maxi = np.abs(np.nanmax(signal))
         if guess[0] + guess[3] < 3 * np.nanstd(bgd):
-            print('goooooooooo', maxi, maxi-np.nanmean(bgd), std, mean, pdf*(index-mean)**2, pdf)
             guess = [0.1*maxi, mean, std, 0.9*maxi, 2, std, image.saturation]
             bounds[0] = (-2*maxi, 2*maxi)
             bounds[3] = (np.nanstd(bgd), 2 * maxi)
-        # maxi = np.abs(np.nanmax(signal))
-        # guess[0] = maxi
-        # guess[3] = maxi
-        print('first guess:', guess, maxi)
-        from astropy.modeling.models import Gaussian1D
         PSF_guess = PSF1D(*guess)
-        #fit = fit_PSF1D(index, signal, sub_errors=err[:, x], guess=guess, bounds=bounds, method='minimize')
-        #guess = [getattr(fit, p).value for p in fit.param_names]
         # fit with outlier removal to clean background stars
-        print('guess', guess, bounds[0])
-        PSF_guess_2 = PSF1D(*guess)
         fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x],
                                                   guess=guess, bounds=bounds, sigma=5, niter=2)
         # test if 3 consecutive pixels are in the outlier list
@@ -909,8 +901,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
             fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x],
                                                       guess=guess, bounds=bounds, sigma=5, niter=2)
         guess = [getattr(fit, p).value for p in fit.param_names]
-        print('fit result: ', guess)
-        if parameters.DEBUG or True:
+        PSF_params.append(guess)
+        if parameters.DEBUG:
             plt.figure(figsize=(6, 6))
             plt.errorbar(np.arange(Ny), y, yerr=err[:, x], fmt='ro',
                          label="bgd data")
@@ -920,8 +912,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                      label="fitted bgd")
             plt.plot(index, PSF_guess(index) + bgd_fit(index), 'k--',
                      label="guessed profile")
-            plt.plot(index, PSF_guess_2(index) + bgd_fit(index), 'k-',
-                     label="2nd guessed profile")
             plt.plot(index, fit(index) + bgd_fit(index), 'b-',
                      label="fitted profile")
             ylim = plt.gca().get_ylim()
