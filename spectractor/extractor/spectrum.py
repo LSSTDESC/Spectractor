@@ -281,7 +281,7 @@ class Spectrum(object):
                 self.err = raw_data[2]
             extract_info_from_CTIO_header(self, self.header)
             if self.header['TARGET'] != "":
-                self.target = Target(self.header['TARGET'], verbose=parameters.VERBOSE)
+                self.target = load_target(self.header['TARGET'], verbose=parameters.VERBOSE)
             if self.header['UNIT2'] != "":
                 self.units = self.header['UNIT2']
             if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
@@ -812,46 +812,45 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     y0 = int(image.target_pixcoords_rotated[1])
     ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
+    # Roughly estimates the wavelengths and set start 50 nm before parameters.LAMBDA_MIN
+    # and end 50 nm after parameters.LAMBDA_MAX
+    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx)-x0, x0=image.target_pixcoords_rotated)
+    pixel_start = int(np.argmin(np.abs(lambdas-(parameters.LAMBDA_MIN-50))))
+    pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas-(parameters.LAMBDA_MAX+50)))))
     # Create spectrogram
-    data = data[ymin:ymax, :]
-    err = err[ymin:ymax, :]
+    data = data[ymin:ymax, pixel_start:pixel_end]
+    err = err[ymin:ymax, pixel_start:pixel_end]
     Ny, Nx = data.shape
     middle = Ny // 2
-    print(middle, ymin, ymin - ws[0])
     # Clean stars on lateral bands
-    spectrum2DUp = np.copy(data[middle + ws[0]:Ny, :])
-    spectrum2DUp = filter_stars_from_bgd(spectrum2DUp, margin_cut=1)
-    err_spectrum2DUp = np.copy(err[middle + ws[0]:Ny, :])
-    err_spectrum2DUp = filter_stars_from_bgd(err_spectrum2DUp, margin_cut=1)
-    # xprofileUp = np.nanmedian(spectrum2DUp, axis=0)
-    # xprofileUp_err = np.sqrt(np.nanmean(err_spectrum2DUp ** 2, axis=0))
-    spectrum2DDown = np.copy(data[0:middle - ws[0], :])
-    spectrum2DDown = filter_stars_from_bgd(spectrum2DDown, margin_cut=1)
-    err_spectrum2DDown = np.copy(err[0:middle - ws[0], :])
-    err_spectrum2DDown = filter_stars_from_bgd(err_spectrum2DDown, margin_cut=1)
-    # xprofileDown = np.nanmedian(spectrum2DDown, axis=0)
-    # xprofileDown_err = np.sqrt(np.nanmean(err_spectrum2DDown ** 2, axis=0))
-    data[0:middle - ws[0], :] = spectrum2DDown
-    err[0:middle - ws[0], :] = err_spectrum2DDown
-    data[middle + ws[0]:Ny, :] = spectrum2DUp
-    err[middle + ws[0]:Ny, :] = err_spectrum2DUp
-    # Roughly estimates the wavelengths
-    #lambdas = image.disperser.grating_pixel_to_lambdas(np.arange(Nx)-x0, x0=image.target_pixcoords_rotated)
-    #pixel_start = lambdas[np.isclose(lambdas, 200, 0.5)]
-    #print(pixel_start)
+    # spectrum2DUp = np.copy(data[middle + ws[0]:Ny, :])
+    # spectrum2DUp = filter_stars_from_bgd(spectrum2DUp, margin_cut=1)
+    # err_spectrum2DUp = np.copy(err[middle + ws[0]:Ny, :])
+    # err_spectrum2DUp = filter_stars_from_bgd(err_spectrum2DUp, margin_cut=1)
+    # spectrum2DDown = np.copy(data[0:middle - ws[0], :])
+    # spectrum2DDown = filter_stars_from_bgd(spectrum2DDown, margin_cut=1)
+    # err_spectrum2DDown = np.copy(err[0:middle - ws[0], :])
+    # err_spectrum2DDown = filter_stars_from_bgd(err_spectrum2DDown, margin_cut=1)
+    # data[0:middle - ws[0], :] = spectrum2DDown
+    # err[0:middle - ws[0], :] = err_spectrum2DDown
+    # data[middle + ws[0]:Ny, :] = spectrum2DUp
+    # err[middle + ws[0]:Ny, :] = err_spectrum2DUp
     # Fit rotated image profile along y axis
     # Subtract mean lateral profile with line profile
     index = np.arange(Ny)
     bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
-    y = data[:, x0 + 200]
+    y = data[:, 0]
     guess = [np.nanmax(y) - np.nanmean(y), middle, 2, 0.1, 2, 2, image.saturation]
     maxi = np.abs(np.nanmax(y))
-    bounds = [(-2*maxi, 2*maxi), (middle - w, middle + w), (0.1, Ny),
-              (0.1*maxi, 2*maxi), (1, 20), (1, Ny), (0, 2*image.saturation)]
-    outliers = []
+    bounds = [(-maxi, 2*maxi), (middle - w, middle + w), (0.1, Ny),
+              (0.1*maxi, 2*maxi), (1, 10), (1, Ny), (0, 2*image.saturation)]
     PSF_params = []
     flux = []
-    for x in np.arange(x0 + 200, Nx):
+    flux_integral = []
+    flux_err = []
+    fwhms = []
+    pixels = np.arange(0, Nx)
+    for x in pixels:
         # fit the background with a polynomial function
         y = data[:, x]
         bgd = data[bgd_index, x]
@@ -865,11 +864,11 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         maxi = np.abs(np.nanmax(signal))
         if guess[0] + guess[3] < 3 * np.nanstd(bgd):
             guess = [0.1*maxi, mean, std, 0.9*maxi, 2, std, image.saturation]
-            bounds[0] = (-2*maxi, 2*maxi)
+            bounds[0] = (-maxi, 2*maxi)
             bounds[3] = (np.nanstd(bgd), 2 * maxi)
         PSF_guess = PSF1D(*guess)
         # fit with outlier removal to clean background stars
-        fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x],
+        fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
                                                   guess=guess, bounds=bounds, sigma=5, niter=2)
         # test if 3 consecutive pixels are in the outlier list
         test = 0
@@ -893,16 +892,22 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         # if there are consecutive outliers or max is badly fitted, re-estimate the guess and refit
         if consecutive_outliers or max_badfit:
             if guess[0] < 0: # defocus
-                guess = [-0.1 * maxi, middle, 0.2, 0.9 * maxi, 2, std, image.saturation]
+                guess = [-0.1 * maxi, middle, 0.2, 0.9 * maxi, guess[4], guess[5], image.saturation]
             else:
-                guess = [0.1*maxi, middle, std, 0.9*maxi, 2, std, image.saturation]
-            bounds[0] = (-2*maxi, 2*maxi)
+                guess = [0.1*maxi, middle, std, 0.9*maxi, guess[4], guess[5], image.saturation]
+            bounds[0] = (-maxi, 2*maxi)
             bounds[3] = (np.nanstd(bgd), 2 * maxi)
             fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x],
                                                       guess=guess, bounds=bounds, sigma=5, niter=2)
         guess = [getattr(fit, p).value for p in fit.param_names]
+        # compute the flux
+        fwhm = fit.fwhm(x_array=index)
         PSF_params.append(guess)
-        if parameters.DEBUG:
+        flux_integral.append(fit.integrate(bounds=(-10*fwhm+guess[1],10*fwhm+guess[1]), x_array=index))
+        flux_err.append(np.sqrt(np.sum(err[:, x] ** 2)))
+        flux.append(np.sum(signal))
+        fwhms.append(fwhm)
+        if parameters.DEBUG or True:
             plt.figure(figsize=(6, 6))
             plt.errorbar(np.arange(Ny), y, yerr=err[:, x], fmt='ro',
                          label="bgd data")
@@ -927,27 +932,43 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                 plt.close()
                 # plt.show()
 
-    xprofile_background = 0.5 * (xprofileUp + xprofileDown)
-    xprofile_background_err = np.sqrt(0.5 * (xprofileUp_err ** 2 + xprofileDown_err ** 2))
-    spectrum2D = np.copy(data[y0 - w:y0 + w, :])
-    xprofile = np.sum(spectrum2D, axis=0) - 2 * w * xprofile_background
+    #xprofile_background = 0.5 * (xprofileUp + xprofileDown)
+    #xprofile_background_err = np.sqrt(0.5 * (xprofileUp_err ** 2 + xprofileDown_err ** 2))
+    #spectrum2D = np.copy(data[y0 - w:y0 + w, :])
+    #xprofile = np.sum(spectrum2D, axis=0) - 2 * w * xprofile_background
     # Sum uncertainties in quadrature
-    err2D = np.copy(err[y0 - w:y0 + w, :])
-    xprofile_err = np.sqrt(np.sum(err2D ** 2, axis=0) + (2 * w * xprofile_background_err) ** 2)
+    #err2D = np.copy(err[y0 - w:y0 + w, :])
+    #xprofile_err = np.sqrt(np.sum(err2D ** 2, axis=0)) #+ (2 * w * xprofile_background_err) ** 2)
     # Fill spectrum object
-    spectrum.data = xprofile
-    spectrum.err = xprofile_err
-    if parameters.DEBUG:
-        fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12, 6))
-        image.plot_image_simple(ax[1], data=spectrum2D,
-                                scale="log", title='', units=image.units,
-                                target_pixcoords=(image.target_pixcoords_rotated[0], w), aspect='auto')
+    spectrum.data = np.array(flux)
+    spectrum.err = np.array(flux_err)
+    fwhms = np.array(fwhms)
+    for x in pixels:
+        print(x, fwhms[x], PSF_params[x])
+    if parameters.DEBUG or True:
+        fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
+        image.plot_image_simple(ax[2], data=data,
+                                scale="log", title='', units=image.units, aspect='auto')
+        centers = np.array(PSF_params).T[1]
+        ax[2].plot(pixels, centers, label='fitted spectrum centers')
+        ax[2].plot(pixels, centers+fwhms, 'k-', label='fitted FWHM')
+        ax[2].plot(pixels, centers-fwhms, 'k-')
+        ax[2].set_ylim(0, Ny)
+        ax[2].set_xlim(0, Nx)
+        ax[2].legend(loc='best')
         spectrum.plot_spectrum_simple(ax[0])
+        ax[0].plot(pixels, flux_integral, 'k-')
+        ax[1].plot(pixels, (np.array(flux) - np.array(flux_integral))/np.array(flux), label='(integral-data)/data')
+        ax[1].legend()
+        ax[1].set_ylim(-1, 1)
+        ax[1].set_ylabel('Relative difference')
         fig.tight_layout()
         fig.subplots_adjust(hspace=0)
         pos0 = ax[0].get_position()
         pos1 = ax[1].get_position()
-        ax[0].set_position([pos1.x0, pos0.y0, pos1.width, pos0.height])
+        pos2 = ax[2].get_position()
+        ax[0].set_position([pos2.x0, pos0.y0, pos2.width, pos0.height])
+        ax[1].set_position([pos2.x0, pos1.y0, pos2.width, pos1.height])
         if parameters.DISPLAY:
             plt.show()
     return spectrum

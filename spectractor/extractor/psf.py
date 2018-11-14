@@ -2,10 +2,11 @@ import warnings
 import sys
 import numpy as np
 from scipy.optimize import basinhopping, minimize, newton
+from scipy.interpolate import interp1d
 from scipy.integrate import quad
 from astropy.modeling import fitting, Fittable1DModel, Fittable2DModel, Parameter
 from astropy.stats import sigma_clip
-from spectractor.tools import LevMarLSQFitterWithNan
+from spectractor.tools import LevMarLSQFitterWithNan, dichotomie
 from spectractor import parameters
 from spectractor.config import set_logger
 
@@ -22,9 +23,15 @@ class PSF1D(Fittable1DModel):
     gamma = Parameter('gamma', default=3)
     saturation = Parameter('saturation', default=1)
 
-    def fwhm(self):
+    def fwhm(self, x_array=None):
         """
-        Compute the full width half maximum of the PSF1D model.
+        Compute the full width half maximum of the PSF1D model with a dichotomie method.
+
+        Parameters
+        ----------
+        x_array: array_like, optional
+            An abscisse array is one wants to find FWHM on the interpolated PSF1D model
+            (to smooth the spikes from spurious parameter sets).
 
         Returns
         -------
@@ -33,24 +40,55 @@ class PSF1D(Fittable1DModel):
 
         Examples
         --------
+        >>> x = np.arange(0, 60, 1)
         >>> p = [1,0,2,2,2,2,10]
+        >>> p = [85.49346728551264, 30.268545098656425, 0.1000081365214878, 78.86241320258193, 1.9224025489918213, 2.5831399571152724, 1000.0]
+        >>> p = [-5.218853091607975, 29.675675794587033, 0.13516328216827533, 4.49492530126451, 2.3263056649149676, 5.765423568033551, 1000.0]
+        >>> p = [-4.405886351577906, 29.47427590726154, 0.1, 4.024499544481911, 10.0, 21.594742176275, 1000.0]
         >>> PSF = PSF1D(*p)
-        >>> fwhm = PSF.fwhm()
+        >>> a, b =  p[1], p[1]+3*max(p[-2], p[2])
+        >>> fwhm = PSF.fwhm(x_array=None)
+        >>> interp = PSF.interpolation(x)
+        >>> maximum = np.max(interp(x))
+        >>> print(maximum)
         >>> assert np.isclose(fwhm, 3.1409218870190476)
-
+        >>> fwhm = PSF.fwhm(x_array=x)
+        >>> assert np.isclose(fwhm, 3.254769802093506)
+        >>> print(fwhm)
+        >>> import matplotlib.pyplot as plt
+        >>> x = np.arange(0, 60, 0.01)
+        >>> plt.plot(x, PSF.evaluate(x, *p))
+        >>> plt.show()
         """
-        eq = lambda x, *args: self.evaluate(x, *args) - 0.5*(self.amplitude_gauss+self.amplitude_moffat)
-        fwhm = 2*newton(eq, self.x_mean+self.gamma,
-                        args=(self.amplitude_gauss, self.x_mean, self.stddev,
-                           self.amplitude_moffat, self.alpha, self.gamma, self.saturation))
-        return fwhm
+        params = [getattr(self, p).value for p in self.param_names]
+        interp = None
+        if x_array is not None:
+            interp = self.interpolation(x_array)
+            values = self.evaluate(x_array, *params)
+            maximum = np.max(values)
+            imax = np.argmax(values)
+            a = imax+np.argmin(np.abs(values[imax:]-0.95*maximum))
+            b = imax+np.argmin(np.abs(values[imax:]-0.05*maximum))
+
+            def eq(x):
+                return interp(x) - 0.5 * maximum
+        else:
+            maximum = 0.5 * (self.amplitude_gauss.value + self.amplitude_moffat.value)
+            a = self.x_mean.value
+            b = self.x_mean.value + 3 * max(self.gamma.value, self.stddev.value)
+
+            def eq(x):
+                return self.evaluate(x, *params) - 0.5 * maximum
+        res = dichotomie(eq, a, b, 1e-2)
+        # res = newton()
+        return abs(2 * (res - self.x_mean.value))
 
     @staticmethod
     def evaluate(x, amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation):
-        rr = (x - x_mean) ** 2
+        rr = (x - x_mean) * (x - x_mean)
         rr_gg = rr / (gamma * gamma)
         a = amplitude_gauss * np.exp(-(rr / (2. * stddev * stddev))) + amplitude_moffat * (1 + rr_gg) ** (-alpha)
-        if isinstance(x, float):
+        if isinstance(x, float) or isinstance(x, int):
             if a > saturation:
                 return saturation
             else:
@@ -66,16 +104,59 @@ class PSF1D(Fittable1DModel):
         d_amplitude_gauss = np.exp(-(rr / (2. * stddev * stddev)))
         d_amplitude_moffat = (1 + rr_gg) ** (-alpha)
         d_x_mean = amplitude_gauss * (x - x_mean) / (stddev * stddev) * d_amplitude_gauss \
-                   - amplitude_moffat * alpha * d_amplitude_moffat * (-2 * x + 2 * x_mean) / (gamma * gamma * (1 + rr_gg))
+                   - amplitude_moffat * alpha * d_amplitude_moffat * (-2 * x + 2 * x_mean) / (
+                           gamma * gamma * (1 + rr_gg))
         d_stddev = amplitude_gauss * rr / (stddev ** 3) * d_amplitude_gauss
         d_alpha = - amplitude_moffat * d_amplitude_moffat * np.log(1 + rr_gg)
         d_gamma = 2 * amplitude_moffat * alpha * d_amplitude_moffat * (rr_gg / (gamma * (1 + rr_gg)))
         d_saturation = saturation * np.zeros_like(x)
         return np.array([d_amplitude_gauss, d_x_mean, d_stddev, d_amplitude_moffat, d_alpha, d_gamma, d_saturation])
 
-    def integral(self):
+    @staticmethod
+    def deriv(x, amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation):
+        rr = (x - x_mean) * (x - x_mean)
+        rr_gg = rr / (gamma * gamma)
+        d_amplitude_gauss = np.exp(-(rr / (2. * stddev * stddev)))
+        d_gauss = - amplitude_gauss * (x - x_mean) / (stddev * stddev) * d_amplitude_gauss
+        d_moffat = - amplitude_moffat * alpha * 2 * (x - x_mean) / (gamma * gamma * (1 + rr_gg) ** (alpha + 1))
+        return d_gauss + d_moffat
+
+    def interpolation(self, x_array):
         """
-        Compute the wide integral of the PSF1D model. Bounds are -5*FWHM and +5*FWHM.
+
+        Parameters
+        ----------
+        x_array: array_like
+            The abscisse array to interpolate the model.
+
+        Returns
+        -------
+        interp: callable
+            Function corresponding to the interpolated model on the x_array array.
+
+        Examples
+        --------
+        >>> x = np.arange(0, 60, 1)
+        >>> p = [1,0,2,2,2,2,10]
+        >>> PSF = PSF1D(*p)
+        >>> interp = PSF.interpolation(x)
+        >>> assert np.isclose(interp(p[1]), PSF.evaluate(p[1], *p))
+
+        """
+        params = [getattr(self, p).value for p in self.param_names]
+        return interp1d(x_array, self.evaluate(x_array, *params), fill_value=0, bounds_error=False)
+
+    def integrate(self, bounds=(-np.inf, np.inf), x_array=None):
+        """
+        Compute the integral of the PSF1D model. Bounds are -np.inf, np.inf by default, or provided
+        if no x_array is provided. Otherwise the bounds comes from x_array edges.
+
+        Parameters
+        ----------
+        x_array: array_like, optional
+            If not None, the interpoalted PSF1D modelis used for integration (default: None).
+        bounds: array_like, optional
+            The bounds of the integral (default bounds=(-np.inf, np.inf)).
 
         Returns
         -------
@@ -85,16 +166,21 @@ class PSF1D(Fittable1DModel):
         Examples
         --------
         >>> p = [1,0,2,2,2,2,10]
+        >>> p = [1.063893228370861, 30.93544017221439, 4.997162674623763, 17.289982754690595, 3.675061000017331, 3.7228091360778266, 1001.2366010681651]
         >>> PSF = PSF1D(*p)
-        >>> i = PSF.integral()
-        >>> assert np.isclose(i, 11.291039428010016)
+        >>> i = PSF.integrate()
+        >>> assert np.isclose(i, 11.296441856441588)
+        >>> i = PSF.integrate(bounds=(-30,30))
+        >>> assert np.isclose(i, 11.296152929950493)
 
         """
-        fwhm = self.fwhm()
-        i = quad(self.evaluate, self.x_mean-5*fwhm, self.x_mean+5*fwhm,
-                 args=(self.amplitude_gauss, self.x_mean, self.stddev,
-                       self.amplitude_moffat, self.alpha, self.gamma, self.saturation))
-        return i[0]
+        params = [getattr(self, p).value for p in self.param_names]
+        if x_array is None:
+            i = quad(self.evaluate, bounds[0], bounds[1], limit=200,
+                     args=params)
+            return i[0]
+        else:
+            return np.trapz(self.evaluate(x_array, *params), x_array)
 
 
 class PSF2D(Fittable2DModel):
@@ -255,19 +341,24 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None, method='minimiz
                        args=(model, x, y, z, sub_errors), jac=PSF2D_chisq_jac)
     elif method == 'basinhopping':
         minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, jac=PSF2D_chisq_jac,
-                            args=(model, x, y, z, sub_errors))
+                                args=(model, x, y, z, sub_errors))
         res = basinhopping(PSF2D_chisq, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
     else:
         my_logger.error(f'\n\tUnknown method {method}.')
         sys.exit()
     my_logger.debug(f'\n{res}')
     PSF = PSF2D(*res.x)
-    my_logger.info(f'\n\tPSF best fitting parameters:\n{PSF}')
+    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
     return PSF
 
 
 def PSF1D_chisq(params, model, xx, yy, yy_err=None):
-    diff = model.evaluate(xx, *params) - yy
+    m = model.evaluate(xx, *params)
+    # if len(m) == 0:
+    #    return 1e20
+    if np.any(m < 0) or np.any(m > 1.2 * np.max(yy)):
+        return 1e20
+    diff = m - yy
     if yy_err is None:
         return np.nansum(diff * diff)
     else:
@@ -354,7 +445,7 @@ def fit_PSF1D(x, y, guess=None, bounds=None, sub_errors=None, method='minimize')
         sys.exit()
     my_logger.debug(f'\n{res}')
     PSF = PSF1D(*res.x)
-    my_logger.info(f'\n\tPSF best fitting parameters:\n{PSF}')
+    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
     return PSF
 
 
@@ -376,10 +467,9 @@ def fit_PSF1D_outlier_removal(x, y, sub_errors=None, sigma=3.0, niter=3, guess=N
             res = minimize(PSF1D_chisq, guess, method="L-BFGS-B", bounds=bounds, jac=PSF1D_chisq_jac,
                            args=(model, x[indices], y[indices], err))
         elif method == 'basinhopping':
-            # TODO: add jacobian
-            minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds,
+            minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, jac=PSF1D_chisq_jac,
                                     args=(model, x[indices], y[indices], err))
-            res = basinhopping(PSF1D_chisq, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
+            res = basinhopping(PSF1D_chisq, guess, T=0.2, niter=5, minimizer_kwargs=minimizer_kwargs)
         else:
             my_logger.error(f'\n\tUnknown method {method}.')
             sys.exit()
@@ -390,12 +480,16 @@ def fit_PSF1D_outlier_removal(x, y, sub_errors=None, sigma=3.0, niter=3, guess=N
             setattr(model, p, res.x[ip])
         guess = res.x
         # remove outliers
+        indices_no_nan = ~np.isnan(y)
+        diff = model(x[indices_no_nan]) - y[indices_no_nan]
         if sub_errors is not None:
-            outliers = np.where(np.abs(model(x) - y) / sub_errors > sigma)[0]
+            outliers = np.where(np.abs(diff) / sub_errors[indices_no_nan] > sigma)[0]
         else:
-            std = np.std(model(x) - y)
-            outliers = np.where(np.abs(model(x) - y) / std > sigma)[0]
+            std = np.std(diff)
+            outliers = np.where(np.abs(diff) / std > sigma)[0]
         if len(outliers) > 0:
             indices = [i for i in range(x.shape[0]) if i not in outliers]
-    my_logger.info(f'\n\tPSF best fitting parameters:\n{model}')
+        else:
+            break
+    my_logger.debug(f'\n\tPSF best fitting parameters:\n{model}')
     return model, outliers
