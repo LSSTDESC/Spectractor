@@ -901,9 +901,55 @@ def save_fits(file_name, header, data, overwrite=False):
     hdu.writeto(file_name, overwrite=overwrite)
 
 
+def dichotomie(f, a, b, epsilon):
+    """
+    Dichotomie method to find a function root.
+
+    Parameters
+    ----------
+    f: callable
+        The function
+    a: float
+        Left bound to the expected root
+    b: float
+        Right bound to the expected root
+    epsilon: float
+        Precision
+
+    Returns
+    -------
+    root: float
+        The root of the function.
+
+    Examples
+    --------
+
+    Search for the Gaussian FWHM:
+    >>> p = [1,0,1]
+    >>> xx = np.arange(-10,10,0.1)
+    >>> PSF = gauss(xx, *p)
+    >>> def eq(x):
+    ...     return np.interp(x, xx, PSF) - 0.5
+    >>> root = dichotomie(eq, 0, 10, 1e-6)
+    >>> assert np.isclose(2*root, 2.355*p[2], 1e-3)
+    """
+    x = 0.5 * (a + b)
+    N = 1
+    while b - a > epsilon and N < 100:
+        x = 0.5 * (a + b)
+        if f(x) * f(a) > 0:
+            a = x
+        else:
+            b = x
+        N += 1
+    return x
+
+
+
 if __name__ == "__main__":
     import doctest
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
+
