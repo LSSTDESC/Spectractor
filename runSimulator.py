@@ -27,8 +27,8 @@ if __name__ == "__main__":
     file_names = args.input
 
     for file_name in file_names:
-        spectrum_simulation = Simulator(file_name, pwv=3, ozone=350, aerosols=0.02,
-                                        A1=1.1, A2=0.1, reso=2, D=56, shift=-3)
+        spectrum_simulation = Simulator(file_name, pwv=3.1, ozone=387, aerosols=0.091,
+                                        A1=1.1, A2=0.15, reso=2.5, D=55.26, shift=-0.2)
         atmgrid = AtmosphereGrid(file_name)
         atm = Atmosphere(atmgrid.airmass, atmgrid.pressure, atmgrid.temperature)
         SimulatorSimGrid(file_name, args.output_directory)
