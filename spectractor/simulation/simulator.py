@@ -29,6 +29,7 @@ from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import Target
 from spectractor.tools import fftconvolve_gaussian, ensure_dir
+from spectractor.config import set_logger
 import spectractor.parameters as parameters
 
 import spectractor.simulation.libradtran as libradtran
@@ -478,6 +479,7 @@ class SpectrumSimulation(Spectrum):
         lambdas = self.disperser.grating_pixel_to_lambda(pixels, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
+        # np.savetxt('atmospheric_transmission_20170530_130.txt', np.array([lambdas, atmospheric_transmission(lambdas)]).T)
         self.data *= A1 * atmospheric_transmission(lambdas)
         self.err *= A1 * atmospheric_transmission(lambdas)
         # Now add the systematics

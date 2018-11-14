@@ -17,12 +17,13 @@ from subprocess import Popen, PIPE
 
 from spectractor.tools import ensure_dir
 import spectractor.parameters as parameters
+from spectractor.config import set_logger
 
 
 class Libradtran:
 
     def __init__(self, home=''):
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         if home == '':
             self.home = os.environ['HOME']
         else:
