@@ -221,6 +221,7 @@ class PDF(Grid):
                                                                 std=np.sqrt(self.variance), label=self.label)
         self.title = '$%s^{+%s}_{-%s}$' % formatting_numbers(self.mean, self.error_high, self.error_low)
         self.txt = txt
+        self.txt_long = f"{self.label}: {self.mean} +{self.error_high} -{self.error_low} (std: {np.sqrt(self.variance)})"
         if verbose:
             print('\t'+txt)
 
@@ -507,7 +508,7 @@ class Likelihood(Grid):
             if output is not '':
                 txt = ''
                 for i in self.rangedim:
-                    txt += f'{self.pdfs[i].txt}\n'
+                    txt += f'{self.pdfs[i].txt_long}\n'
                 cov = '\n'.join([''.join(['\t{0:8.6f}'.format(item) for item in row]) for row in self.cov_matrix])
                 print(f'Save best fit parameters in {output}')
                 f = open(output, 'w')
