@@ -473,7 +473,7 @@ class SpectrumSimulation(Spectrum):
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0., D=parameters.DISTANCE2CCD, shift=0.):
         pixels = np.arange(0,parameters.IMSIZE) - self.x0[0] - shift
-        new_x0 = [self.x0[0] - shift, self.x0[1]]
+        new_x0 = [self.x0[0] + shift, self.x0[1]]
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(pixels, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
