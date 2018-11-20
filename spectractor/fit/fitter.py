@@ -2,8 +2,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from spectractor.simulation.simulator import *
 from spectractor.fit.statistics import *
 
-from spectractor.parameters import FIT_WORKSPACE as fit_workspace
-
 from scipy.optimize import minimize
 
 import emcee
@@ -12,10 +10,10 @@ from emcee.utils import MPIPool
 
 class FitWorkspace:
 
-    def __init__(self, filename, atmgrid_filename="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+    def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False):
         self.my_logger = parameters.set_logger(self.__class__.__name__)
-        self.filename = filename
+        self.filename = file_name
         self.ndim = 0
         self.truth = None
         self.verbose = verbose
@@ -39,7 +37,7 @@ class FitWorkspace:
                              r"alpha_pix [pix]"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]"]
-        self.bounds = ((0, 0, 0, 0, 0, 1, 50, -20), (2, 0.5, 800, 10, 1.0, 10, 60, 20))
+        self.bounds = ((0, 0, 0, 0, 0, 1, 50, -0.1), (2, 0.5, 800, 10, 1.0, 10, 60, 0.1))
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.nsteps = nsteps
         self.nbins = nbins
@@ -50,18 +48,18 @@ class FitWorkspace:
         self.flat_chains = np.array([[]])
         self.valid_chains = [False] * self.nwalkers
         self.title = ""
-        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(filename)
+        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
         self.airmass = self.spectrum.header['AIRMASS']
         self.pressure = self.spectrum.header['OUTPRESS']
         self.temperature = self.spectrum.header['OUTTEMP']
         self.use_grid = False
-        if atmgrid_filename == "":
+        if atmgrid_file_name == "":
             self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
         else:
             self.use_grid = True
-            self.atmosphere = AtmosphereGrid(filename, atmgrid_filename)
+            self.atmosphere = AtmosphereGrid(file_name, atmgrid_file_name)
             if parameters.VERBOSE:
-                self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_filename}. ')
+                self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
         self.get_truth()
         self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
         if parameters.DEBUG:
@@ -358,10 +356,10 @@ def simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift):
 
 def chisq(p):
     model, err = simulate(*p)
-    chisq = np.sum((model - fit_workspace.spectrum.data) ** 2 / (err ** 2 + fit_workspace.spectrum.err ** 2))
+    chisquare = np.sum((model - fit_workspace.spectrum.data) ** 2 / (err ** 2 + fit_workspace.spectrum.err ** 2))
     # chisq /= self.spectrum.data.size
     # print '\tReduced chisq =',chisq/self.spectrum.data.size
-    return chisq
+    return chisquare
 
 
 def lnprior(p, bounds):
@@ -428,7 +426,7 @@ def run_emcee(w):
         sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob, args=(), threads=8,
                                         runtime_sortingfn=sort_on_runtime)
         for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples), storechain=True)):
-             if (i + 1) % 100 == 0:
+            if (i + 1) % 100 == 0:
                 print("{0:5.1%}".format(float(i) / nsamples))
     fit_workspace.chains = sampler.chain
     fit_workspace.lnprobs = sampler.lnprobability
@@ -449,7 +447,7 @@ if __name__ == "__main__":
     filename = 'outputs/data_30may17/reduc_20170530_130_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-    fit_workspace = FitWorkspace(filename, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000, burnin=10000,
+    fit_workspace = FitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nwalkers=28, nsteps=20000, burnin=10000,
                                  nbins=10, verbose=0, plot=False, live_fit=False)
-    run_emcee()
+    run_emcee(fit_workspace)
     fit_workspace.analyze_chains()

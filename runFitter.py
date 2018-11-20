@@ -29,7 +29,7 @@ if __name__ == "__main__":
     for file_name in file_names:
         atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-        fit_workspace = FitWorkspace(file_name, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=2000,
+        fit_workspace = FitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nwalkers=28, nsteps=2000,
                                      burnin=1000,
                                      nbins=10, verbose=0, plot=False, live_fit=False)
         run_emcee(fit_workspace)

@@ -765,7 +765,7 @@ def fftconvolve_gaussian(array, reso):
     >>> array = np.ones(20)
     >>> output = fftconvolve_gaussian(array, 3)
     >>> print(output[:3])
-    [ 0.5         0.63125312  0.74870357]
+    [0.5        0.63125312 0.74870357]
     """
     if array.ndim == 2:
         kernel = gaussian(array.shape[1], reso)
