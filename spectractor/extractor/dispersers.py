@@ -436,7 +436,7 @@ class Grating:
         Parameters
         ----------
         deltaX: array, float
-            Pixel distance to order 0.
+            Pixel distances to order 0.
         x0: float or [float, float]
             Order 0 position detected in the non-rotated image.
         order: int
