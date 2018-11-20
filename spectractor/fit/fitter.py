@@ -342,9 +342,9 @@ class FitWorkspace:
         else:
             if parameters.DISPLAY and parameters.VERBOSE:
                 plt.show()
-        figname = fit_workspace.filename.replace('.fits', '_bestfit.pdf')
-        print(f'Save figure: {figname}')
-        fig.savefig(figname, dpi=100)
+            figname = fit_workspace.filename.replace('.fits', '_bestfit.pdf')
+            print(f'Save figure: {figname}')
+            fig.savefig(figname, dpi=100)
 
 
 def simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift):
