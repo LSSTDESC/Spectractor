@@ -822,7 +822,7 @@ class Spectrum(object):
         if lambdas is not None:
             xs = lambdas
         if label == '':
-            label = f'Order {self.order:d} spectrum\nD={self.disperser.D:.2f}mm'
+            label = f'Order {self.order:d} spectrum {self.disperser_label}\nD={self.disperser.D:.2f}mm'
             if self.x0 is not None:
                 label += f', x0={self.x0[0]:.2f}pix'
         if xs is None:
