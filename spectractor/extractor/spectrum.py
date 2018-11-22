@@ -6,7 +6,7 @@ from scipy.signal import argrelextrema
 from spectractor.extractor.images import *
 
 
-class Spectrum(object):
+class Spectrum:
 
     def __init__(self, file_name="", image=None, order=1, target=None):
         """ Spectrum class used to store information and methods
@@ -291,6 +291,68 @@ class Spectrum(object):
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
+
+
+class Spectrogram(Spectrum):
+
+    def __init__(self, file_name="", image=None, order=1, target=None):
+        Spectrum.__init__(self, file_name=file_name, image=image, order=order, target=target)
+        # self.PSF_params = PSF_params
+        self.PSF1D = PSF1D()
+        self.polynomial_orders = {key:4 for key in self.PSF1D.param_names}
+        self.polynomial_orders['saturation'] = 0
+
+    def model(self, Nx, Ny, params):
+        """
+
+        Parameters
+        ----------
+        Nx: int
+            Size in x direction
+        Ny: int
+            Size in y direction
+        params: array_like
+            Parameter array of the model, in the form:
+                * Nx first parameters are amplitudes for the Moffat transverse profiles
+                * next parameters are polynomial coefficients for all the PSF1D parameters
+                in the same order as in PSF1D definition, except amplitude_moffat
+
+        Returns
+        -------
+        output: array
+            A 2D array with the model
+
+        Examples
+        --------
+        >>> Nx = 100
+        >>> Ny = 20
+        >>> params = [i for i in range(Nx)] + [0, 0, 0, 0, 10]*5 + [80]
+        >>> s = Spectrogram()
+        >>> output = s.model(Nx, Ny, params)
+        >>> print(output)
+        >>> import matplotlib.pyplot as plt
+        >>> im = plt.imshow(output, origin='lower')
+        >>> plt.colorbar(im)
+        >>> plt.show()
+
+        """
+        pixels = np.arange(Nx).astype(int)
+        PSF_params = []
+        shift = 0
+        for k,name in enumerate(self.PSF1D.param_names):
+            print(k, name, params[Nx+shift:Nx+shift+self.polynomial_orders[name]+1])
+            if name == 'amplitude_moffat':
+                PSF_params.append(params[:Nx])
+            else:
+                PSF_params.append(np.polyval(params[Nx+shift:Nx+shift+self.polynomial_orders[name]+1], pixels))
+                shift = shift+self.polynomial_orders[name]+1
+        PSF_params = np.array(PSF_params).T
+        print(PSF_params)
+        y = np.arange(Ny)
+        output = np.zeros((Ny,Nx))
+        for x in pixels:
+            output[:, x] = PSF1D.evaluate(y, *PSF_params[x])
+        return output
 
 
 def calibrate_spectrum(spectrum, xlim=None):
@@ -849,7 +911,12 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     flux_integral = []
     flux_err = []
     fwhms = []
-    pixels = np.arange(0, Nx)
+    # set the pixel array where to fit the transverse profile
+    # 50 steps starting from the middle to the edges
+    pixels = np.arange(0, Nx, Nx//50)
+    #print(pixels[len(pixels)//2:])
+    #print(pixels[len(pixels)//2-1::-1])
+    #pixels = np.concatenate([pixels[len(pixels)//2:], pixels[len(pixels)//2-1::-1]]).astype(int)
     for x in pixels:
         # fit the background with a polynomial function
         y = data[:, x]
@@ -943,20 +1010,21 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.data = np.array(flux)
     spectrum.err = np.array(flux_err)
     fwhms = np.array(fwhms)
-    for x in pixels:
-        print(x, fwhms[x], PSF_params[x])
+    PSF_params = np.array(PSF_params).T
+    #for x in pixels:
+    #    print(x, fwhms[x], PSF_params[x])
     if parameters.DEBUG or True:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         image.plot_image_simple(ax[2], data=data,
                                 scale="log", title='', units=image.units, aspect='auto')
-        centers = np.array(PSF_params).T[1]
+        centers = PSF_params[1]
         ax[2].plot(pixels, centers, label='fitted spectrum centers')
         ax[2].plot(pixels, centers+fwhms, 'k-', label='fitted FWHM')
         ax[2].plot(pixels, centers-fwhms, 'k-')
         ax[2].set_ylim(0, Ny)
         ax[2].set_xlim(0, Nx)
         ax[2].legend(loc='best')
-        spectrum.plot_spectrum_simple(ax[0])
+        spectrum.plot_spectrum_simple(ax[0], lambdas=pixels)
         ax[0].plot(pixels, flux_integral, 'k-')
         ax[1].plot(pixels, (np.array(flux) - np.array(flux_integral))/np.array(flux), label='(integral-data)/data')
         ax[1].legend()
@@ -971,13 +1039,14 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[1].set_position([pos2.x0, pos1.y0, pos2.width, pos1.height])
         if parameters.DISPLAY:
             plt.show()
+    if parameters.DEBUG or True:
+        fig = plt.figure()
+        test = PSF1D()
+        for i in range(1,PSF_params.shape[0]-1):
+            p = plt.plot(pixels, PSF_params[i], label=test.param_names[i])
+            fit, cov, model = fit_poly1d(pixels, PSF_params[i], order=4)
+            plt.plot(pixels, model, label=test.param_names[i], color=p[0].get_color())
+        plt.legend()
+        plt.show()
     return spectrum
 
-
-if __name__ == "__main__":
-    import doctest
-
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
-
-    doctest.testmod()

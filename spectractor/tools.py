@@ -318,7 +318,7 @@ def fit_poly1d(x, y, order, w=None):
             fit, cov = np.polyfit(x, y, order, cov=True)
         else:
             fit, cov = np.polyfit(x, y, order, cov=True, w=w)
-        model = lambda xx: np.polyval(fit, xx)
+        model = np.polyval(fit, x)
     else:
         fit = np.array([0] * (order + 1))
         model = y
