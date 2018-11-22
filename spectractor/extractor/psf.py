@@ -354,8 +354,8 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None, method='minimiz
 
 def PSF1D_chisq(params, model, xx, yy, yy_err=None):
     m = model.evaluate(xx, *params)
-    # if len(m) == 0:
-    #    return 1e20
+    if len(m) == 0 or len(yy) == 0:
+        return 1e20
     if np.any(m < 0) or np.any(m > 1.2 * np.max(yy)):
         return 1e20
     diff = m - yy
