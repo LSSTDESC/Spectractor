@@ -302,8 +302,9 @@ class Spectrogram(Spectrum):
         self.polynomial_orders = {key:4 for key in self.PSF1D.param_names}
         self.polynomial_orders['saturation'] = 0
 
-    def model(self, Nx, Ny, params):
+    def simulate(self, Nx, Ny, params):
         """
+        Simulate a 2D spectrogram of size Nx times Ny.
 
         Parameters
         ----------
@@ -347,7 +348,6 @@ class Spectrogram(Spectrum):
                 PSF_params.append(np.polyval(params[Nx+shift:Nx+shift+self.polynomial_orders[name]+1], pixels))
                 shift = shift+self.polynomial_orders[name]+1
         PSF_params = np.array(PSF_params).T
-        print(PSF_params)
         y = np.arange(Ny)
         output = np.zeros((Ny,Nx))
         for x in pixels:
