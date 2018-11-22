@@ -329,7 +329,7 @@ class Spectrogram(Spectrum):
         >>> Ny = 20
         >>> params = [i for i in range(Nx)] + [0, 0, 0, 0, 10]*5 + [80]
         >>> s = Spectrogram()
-        >>> output = s.model(Nx, Ny, params)
+        >>> output = s.simulate(Nx, Ny, params)
         >>> print(output)
         >>> import matplotlib.pyplot as plt
         >>> im = plt.imshow(output, origin='lower')
