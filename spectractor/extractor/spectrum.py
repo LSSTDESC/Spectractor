@@ -904,7 +904,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     y = data[:, 0]
     guess = [np.nanmax(y) - np.nanmean(y), middle, 2, 2, 0.1, 2, image.saturation]
     maxi = np.abs(np.nanmax(y))
-    bounds = [ (0.1*maxi, 10*maxi), (middle - w, middle + w), (1, 10), (1, Ny), (-10, 200), (0.1, Ny),
+    bounds = [ (0.1*maxi, 10*maxi), (middle - w, middle + w), (1, 10), (1, Ny), (-1, 200), (0.1, Ny),
              (0, 2*image.saturation)]
     PSF_params = []
     flux = []
@@ -914,9 +914,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # set the pixel array where to fit the transverse profile
     # 50 steps starting from the middle to the edges
     pixels = np.arange(0, Nx, Nx//50)
-    #print(pixels[len(pixels)//2:])
-    #print(pixels[len(pixels)//2-1::-1])
-    #pixels = np.concatenate([pixels[len(pixels)//2:], pixels[len(pixels)//2-1::-1]]).astype(int)
     for x in pixels:
         # fit the background with a polynomial function
         y = data[:, x]
@@ -997,7 +994,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                 plt.draw()
                 plt.pause(1e-8)
                 plt.close()
-                # plt.show()
 
     #xprofile_background = 0.5 * (xprofileUp + xprofileDown)
     #xprofile_background_err = np.sqrt(0.5 * (xprofileUp_err ** 2 + xprofileDown_err ** 2))
@@ -1011,8 +1007,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.err = np.array(flux_err)
     fwhms = np.array(fwhms)
     PSF_params = np.array(PSF_params).T
-    #for x in pixels:
-    #    print(x, fwhms[x], PSF_params[x])
     if parameters.DEBUG or True:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         image.plot_image_simple(ax[2], data=data,
@@ -1040,19 +1034,34 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         if parameters.DISPLAY:
             plt.show()
     if parameters.DEBUG or True:
-        fig, ax = plt.subplots(2, 1, sharex='all')
+        fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12, 6))
         test = PSF1D()
-        test2 = PSF2D()
         PSF_models = []
-        for i in range(0,PSF_params.shape[0]):
+        all_pixels = np.arange(Nx)
+        for i in range(PSF_params.shape[0]):
             fit, cov, model = fit_poly1d(pixels, PSF_params[i], order=4)
-            PSF_models.append(model)
-        for i in range(1,PSF_params.shape[0]-1):
-            p = ax[0].plot(pixels, PSF_params[i], label=test.param_names[i])
-            ax[0].plot(pixels, PSF_models[i], label=test.param_names[i], color=p[0].get_color())
-        for x in pixels[::10]:
-            pass
+            PSF_models.append(np.polyval(fit, all_pixels))
+        for i in range(2, PSF_params.shape[0]-1):
+            p = ax[0].plot(pixels, PSF_params[i], label=test.param_names[i], marker='o', linestyle='none')
+            ax[0].plot(all_pixels, PSF_models[i], color=p[0].get_color())
+        img = np.zeros_like(data)
+        yy, xx = np.mgrid[:Ny,:Nx]
+        print('x', test.param_names)
+        for x in pixels[::5]:
+            params = [PSF_models[p][x] for p in range(len(PSF_params))]
+            print(x,params)
+            psf = PSF2D.evaluate(xx, yy, 1, x, Ny//2, *params[2:])
+            psf /= np.max(psf)
+            img += psf
+        ax[1].imshow(img, origin='lower')
+        ax[1].set_xlabel('X [pixels]')
+        ax[1].set_ylabel('Y [pixels]')
+        ax[0].set_ylabel('PSF1D parameters')
+        ax[1].legend(title='PSF(x)')
         ax[0].legend()
-        plt.show()
+        fig.tight_layout()
+        fig.subplots_adjust(hspace=0)
+        if parameters.DISPLAY:
+            plt.show()
     return spectrum
 
