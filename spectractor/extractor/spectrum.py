@@ -1,5 +1,5 @@
 import scipy.optimize as opt
-from astropy.modeling.models import Gaussian1D
+from astropy.modeling.models import Gaussian1D, Moffat1D
 
 from scipy.signal import argrelextrema
 
@@ -902,10 +902,10 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     index = np.arange(Ny)
     bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
     y = data[:, 0]
-    guess = [np.nanmax(y) - np.nanmean(y), middle, 2, 0.1, 2, 2, image.saturation]
+    guess = [np.nanmax(y) - np.nanmean(y), middle, 2, 2, 0.1, 2, image.saturation]
     maxi = np.abs(np.nanmax(y))
-    bounds = [(-maxi, 2*maxi), (middle - w, middle + w), (0.1, Ny),
-              (0.1*maxi, 2*maxi), (1, 10), (1, Ny), (0, 2*image.saturation)]
+    bounds = [ (0.1*maxi, 10*maxi), (middle - w, middle + w), (1, 10), (1, Ny), (-10, 200), (0.1, Ny),
+             (0, 2*image.saturation)]
     PSF_params = []
     flux = []
     flux_integral = []
@@ -929,10 +929,10 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         mean = np.nansum(pdf*index)
         std = np.sqrt(np.nansum(pdf*(index-mean)**2))
         maxi = np.abs(np.nanmax(signal))
-        if guess[0] + guess[3] < 3 * np.nanstd(bgd):
-            guess = [0.1*maxi, mean, std, 0.9*maxi, 2, std, image.saturation]
-            bounds[0] = (-maxi, 2*maxi)
-            bounds[3] = (np.nanstd(bgd), 2 * maxi)
+        if guess[0]*(1+ guess[4]) < 3 * np.nanstd(bgd):
+            guess = [0.9*maxi, mean, 2, std, 0.1*maxi, std, image.saturation]
+            bounds[0] = (np.nanstd(bgd), 3*maxi)
+            # bounds[4] = (np.nanstd(bgd), 2 * maxi)
         PSF_guess = PSF1D(*guess)
         # fit with outlier removal to clean background stars
         fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
@@ -959,11 +959,11 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         # if there are consecutive outliers or max is badly fitted, re-estimate the guess and refit
         if consecutive_outliers or max_badfit:
             if guess[0] < 0: # defocus
-                guess = [-0.1 * maxi, middle, 0.2, 0.9 * maxi, guess[4], guess[5], image.saturation]
+                guess = [0.9*maxi, middle, guess[2], guess[3], -0.1, 0.2, image.saturation]
             else:
-                guess = [0.1*maxi, middle, std, 0.9*maxi, guess[4], guess[5], image.saturation]
-            bounds[0] = (-maxi, 2*maxi)
-            bounds[3] = (np.nanstd(bgd), 2 * maxi)
+                guess = [0.9*maxi, middle, guess[2], guess[3], 0.1, std, image.saturation]
+            bounds[0] = (np.nanstd(bgd), 3*maxi)
+            # bounds[3] = (np.nanstd(bgd), 2 * maxi)
             fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x],
                                                       guess=guess, bounds=bounds, sigma=5, niter=2)
         guess = [getattr(fit, p).value for p in fit.param_names]
@@ -987,9 +987,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
             plt.plot(index, fit(index) + bgd_fit(index), 'b-',
                      label="fitted profile")
             ylim = plt.gca().get_ylim()
-            PSF_gauss = Gaussian1D(*guess[:3])
-            plt.plot(index, PSF_gauss(index) + bgd_fit(index), 'b+',
-                     label="fitted profile")
+            PSF_moffat = Moffat1D(*guess[:4])
+            plt.plot(index, PSF_moffat(index) + bgd_fit(index), 'b+',
+                     label="fitted moffat")
             plt.gca().set_ylim(ylim)
             plt.legend(loc=2, numpoints=1)
             plt.title(f'x={x}')
@@ -1040,13 +1040,19 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         if parameters.DISPLAY:
             plt.show()
     if parameters.DEBUG or True:
-        fig = plt.figure()
+        fig, ax = plt.subplots(2, 1, sharex='all')
         test = PSF1D()
-        for i in range(1,PSF_params.shape[0]-1):
-            p = plt.plot(pixels, PSF_params[i], label=test.param_names[i])
+        test2 = PSF2D()
+        PSF_models = []
+        for i in range(0,PSF_params.shape[0]):
             fit, cov, model = fit_poly1d(pixels, PSF_params[i], order=4)
-            plt.plot(pixels, model, label=test.param_names[i], color=p[0].get_color())
-        plt.legend()
+            PSF_models.append(model)
+        for i in range(1,PSF_params.shape[0]-1):
+            p = ax[0].plot(pixels, PSF_params[i], label=test.param_names[i])
+            ax[0].plot(pixels, PSF_models[i], label=test.param_names[i], color=p[0].get_color())
+        for x in pixels[::10]:
+            pass
+        ax[0].legend()
         plt.show()
     return spectrum
 

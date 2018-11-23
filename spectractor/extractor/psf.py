@@ -15,12 +15,12 @@ class PSF1D(Fittable1DModel):
     inputs = ('x',)
     outputs = ('y',)
 
-    amplitude_gauss = Parameter('amplitude_gauss', default=1)
-    x_mean = Parameter('x_mean', default=0)
-    stddev = Parameter('stddev', default=1)
     amplitude_moffat = Parameter('amplitude_moffat', default=0.5)
+    x_mean = Parameter('x_mean', default=0)
     alpha = Parameter('alpha', default=3)
     gamma = Parameter('gamma', default=3)
+    eta_gauss = Parameter('eta_gauss', default=1)
+    stddev = Parameter('stddev', default=1)
     saturation = Parameter('saturation', default=1)
 
     def fwhm(self, x_array=None):
@@ -41,20 +41,15 @@ class PSF1D(Fittable1DModel):
         Examples
         --------
         >>> x = np.arange(0, 60, 1)
-        >>> p = [1,0,2,2,2,2,10]
-        >>> p = [85.49346728551264, 30.268545098656425, 0.1000081365214878, 78.86241320258193, 1.9224025489918213, 2.5831399571152724, 1000.0]
-        >>> p = [-5.218853091607975, 29.675675794587033, 0.13516328216827533, 4.49492530126451, 2.3263056649149676, 5.765423568033551, 1000.0]
-        >>> p = [-4.405886351577906, 29.47427590726154, 0.1, 4.024499544481911, 10.0, 21.594742176275, 1000.0]
+        >>> p = [2,30,2,4,-0.4,1,10]
         >>> PSF = PSF1D(*p)
-        >>> a, b =  p[1], p[1]+3*max(p[-2], p[2])
+        >>> a, b =  p[1], p[1]+3*max(p[-2], p[3])
         >>> fwhm = PSF.fwhm(x_array=None)
-        >>> interp = PSF.interpolation(x)
-        >>> maximum = np.max(interp(x))
-        >>> print(maximum)
-        >>> assert np.isclose(fwhm, 3.1409218870190476)
+        >>> assert np.isclose(fwhm, 7.25390625)
         >>> fwhm = PSF.fwhm(x_array=x)
-        >>> assert np.isclose(fwhm, 3.254769802093506)
+        >>> assert np.isclose(fwhm, 7.083984375)
         >>> print(fwhm)
+        7.083984375
         >>> import matplotlib.pyplot as plt
         >>> x = np.arange(0, 60, 0.01)
         >>> plt.plot(x, PSF.evaluate(x, *p))
@@ -67,13 +62,13 @@ class PSF1D(Fittable1DModel):
             values = self.evaluate(x_array, *params)
             maximum = np.max(values)
             imax = np.argmax(values)
-            a = imax+np.argmin(np.abs(values[imax:]-0.95*maximum))
-            b = imax+np.argmin(np.abs(values[imax:]-0.05*maximum))
+            a = imax + np.argmin(np.abs(values[imax:] - 0.95 * maximum))
+            b = imax + np.argmin(np.abs(values[imax:] - 0.05 * maximum))
 
             def eq(x):
                 return interp(x) - 0.5 * maximum
         else:
-            maximum = 0.5 * (self.amplitude_gauss.value + self.amplitude_moffat.value)
+            maximum = self.amplitude_moffat.value * ( 1+self.eta_gauss.value )
             a = self.x_mean.value
             b = self.x_mean.value + 3 * max(self.gamma.value, self.stddev.value)
 
@@ -84,42 +79,47 @@ class PSF1D(Fittable1DModel):
         return abs(2 * (res - self.x_mean.value))
 
     @staticmethod
-    def evaluate(x, amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation):
+    def evaluate(x, amplitude_moffat, x_mean, alpha, gamma, eta_gauss, stddev, saturation):
         rr = (x - x_mean) * (x - x_mean)
         rr_gg = rr / (gamma * gamma)
-        a = amplitude_gauss * np.exp(-(rr / (2. * stddev * stddev))) + amplitude_moffat * (1 + rr_gg) ** (-alpha)
+        a = amplitude_moffat * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
         if isinstance(x, float) or isinstance(x, int):
             if a > saturation:
                 return saturation
+            elif a < 0.:
+                return 0.
             else:
                 return a
         else:
             a[np.where(a >= saturation)] = saturation
+            a[np.where(a < 0.)] = 0.
             return a
 
     @staticmethod
-    def fit_deriv(x, amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation):
+    def fit_deriv(x, amplitude_moffat, x_mean, alpha, gamma, eta_gauss, stddev, saturation):
         rr = (x - x_mean) * (x - x_mean)
         rr_gg = rr / (gamma * gamma)
-        d_amplitude_gauss = np.exp(-(rr / (2. * stddev * stddev)))
-        d_amplitude_moffat = (1 + rr_gg) ** (-alpha)
-        d_x_mean = amplitude_gauss * (x - x_mean) / (stddev * stddev) * d_amplitude_gauss \
-                   - amplitude_moffat * alpha * d_amplitude_moffat * (-2 * x + 2 * x_mean) / (
-                           gamma * gamma * (1 + rr_gg))
-        d_stddev = amplitude_gauss * rr / (stddev ** 3) * d_amplitude_gauss
-        d_alpha = - amplitude_moffat * d_amplitude_moffat * np.log(1 + rr_gg)
-        d_gamma = 2 * amplitude_moffat * alpha * d_amplitude_moffat * (rr_gg / (gamma * (1 + rr_gg)))
+        gauss_norm = np.exp(-(rr / (2. * stddev * stddev)))
+        d_eta_gauss = amplitude_moffat * gauss_norm
+        moffat_norm = (1 + rr_gg) ** (-alpha)
+        d_amplitude_moffat = moffat_norm + eta_gauss * gauss_norm
+        d_x_mean = amplitude_moffat * (eta_gauss * (x - x_mean) / (stddev * stddev) * gauss_norm
+                                       - alpha * moffat_norm * (-2 * x + 2 * x_mean) / (
+                                               gamma * gamma * (1 + rr_gg)))
+        d_stddev = amplitude_moffat * eta_gauss * rr / (stddev ** 3) * gauss_norm
+        d_alpha = - amplitude_moffat * moffat_norm * np.log(1 + rr_gg)
+        d_gamma = 2 * amplitude_moffat * alpha * moffat_norm * (rr_gg / (gamma * (1 + rr_gg)))
         d_saturation = saturation * np.zeros_like(x)
-        return np.array([d_amplitude_gauss, d_x_mean, d_stddev, d_amplitude_moffat, d_alpha, d_gamma, d_saturation])
+        return np.array([d_amplitude_moffat, d_x_mean, d_alpha, d_gamma, d_eta_gauss, d_stddev, d_saturation])
 
     @staticmethod
-    def deriv(x, amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation):
+    def deriv(x, amplitude_moffat, x_mean, alpha, gamma, eta_gauss, stddev, saturation):
         rr = (x - x_mean) * (x - x_mean)
         rr_gg = rr / (gamma * gamma)
-        d_amplitude_gauss = np.exp(-(rr / (2. * stddev * stddev)))
-        d_gauss = - amplitude_gauss * (x - x_mean) / (stddev * stddev) * d_amplitude_gauss
-        d_moffat = - amplitude_moffat * alpha * 2 * (x - x_mean) / (gamma * gamma * (1 + rr_gg) ** (alpha + 1))
-        return d_gauss + d_moffat
+        d_eta_gauss = np.exp(-(rr / (2. * stddev * stddev)))
+        d_gauss = - eta_gauss * (x - x_mean) / (stddev * stddev) * d_eta_gauss
+        d_moffat = -  alpha * 2 * (x - x_mean) / (gamma * gamma * (1 + rr_gg) ** (alpha + 1))
+        return amplitude_moffat * (d_gauss + d_moffat)
 
     def interpolation(self, x_array):
         """
@@ -137,7 +137,7 @@ class PSF1D(Fittable1DModel):
         Examples
         --------
         >>> x = np.arange(0, 60, 1)
-        >>> p = [1,0,2,2,2,2,10]
+        >>> p = [2,0,2,2,1,2,10]
         >>> PSF = PSF1D(*p)
         >>> interp = PSF.interpolation(x)
         >>> assert np.isclose(interp(p[1]), PSF.evaluate(p[1], *p))
@@ -165,19 +165,24 @@ class PSF1D(Fittable1DModel):
 
         Examples
         --------
-        >>> p = [1,0,2,2,2,2,10]
-        >>> p = [1.063893228370861, 30.93544017221439, 4.997162674623763, 17.289982754690595, 3.675061000017331, 3.7228091360778266, 1001.2366010681651]
+        >>> x = np.arange(0, 60, 1)
+        >>> p = [2,30,2,4,-0.5,1,10]
         >>> PSF = PSF1D(*p)
         >>> i = PSF.integrate()
-        >>> assert np.isclose(i, 11.296441856441588)
-        >>> i = PSF.integrate(bounds=(-30,30))
-        >>> assert np.isclose(i, 11.296152929950493)
+        >>> assert np.isclose(i, 10.059742339728174)
+        >>> i = PSF.integrate(bounds=(0,60), x_array=x)
+        >>> assert np.isclose(i, 10.046698028728645)
+
+        >>> import matplotlib.pyplot as plt
+        >>> xx = np.arange(0, 60, 0.01)
+        >>> plt.plot(xx, PSF.evaluate(xx, *p))
+        >>> plt.plot(x, PSF.evaluate(x, *p))
+        >>> plt.show()
 
         """
         params = [getattr(self, p).value for p in self.param_names]
         if x_array is None:
-            i = quad(self.evaluate, bounds[0], bounds[1], limit=200,
-                     args=params)
+            i = quad(self.evaluate, bounds[0], bounds[1], args=tuple(params), limit=200)
             return i[0]
         else:
             return np.trapz(self.evaluate(x_array, *params), x_array)
@@ -186,52 +191,50 @@ class PSF1D(Fittable1DModel):
 class PSF2D(Fittable2DModel):
     inputs = ('x', 'y',)
     outputs = ('z',)
-    # TODO: decouple the two amplitudes to be able to fit defocused object
+
     amplitude = Parameter('amplitude', default=1)
     x_mean = Parameter('x_mean', default=0)
     y_mean = Parameter('y_mean', default=0)
-    stddev = Parameter('stddev', default=1)
-    eta = Parameter('eta', default=0.5)
     alpha = Parameter('alpha', default=3)
     gamma = Parameter('gamma', default=3)
+    eta_gauss = Parameter('eta_gauss', default=0.5)
+    stddev = Parameter('stddev', default=1)
     saturation = Parameter('saturation', default=1)
 
-    @property
-    def fwhm(self):
-        return self.stddev / 2.335
-
     @staticmethod
-    def evaluate(x, y, amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation):
+    def evaluate(x, y, amplitude, x_mean, y_mean, alpha, gamma, eta_gauss, stddev, saturation):
         rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
         rr_gg = rr / (gamma * gamma)
-        a = amplitude * (np.exp(-(rr / (2. * stddev * stddev))) + eta * (1 + rr_gg) ** (-alpha))
-        # print(amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation)
+        a = amplitude * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
         if isinstance(x, float) and isinstance(y, float):
             if a > saturation:
                 return saturation
+            elif a < 0.:
+                return 0.
             else:
                 return a
         else:
             a[np.where(a >= saturation)] = saturation
+            a[np.where(a < 0.)] = 0.
             return a
 
     @staticmethod
-    def fit_deriv(x, y, amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation):
+    def fit_deriv(x, y, amplitude, x_mean, y_mean, alpha, gamma, eta_gauss, stddev, saturation):
         rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
         rr_gg = rr / (gamma * gamma)
-        d_amplitude_gauss = np.exp(-(rr / (2. * stddev * stddev)))
-        d_amplitude_moffat = eta * (1 + rr_gg) ** (-alpha)
-        d_amplitude = d_amplitude_gauss + d_amplitude_moffat
-        d_x_mean = amplitude * (x - x_mean) / (stddev * stddev) * d_amplitude_gauss \
-                   - amplitude * alpha * d_amplitude_moffat * (-2 * x + 2 * x_mean) / (gamma ** 2 * (1 + rr_gg))
-        d_y_mean = amplitude * (y - y_mean) / (stddev * stddev) * d_amplitude_gauss \
-                   - amplitude * alpha * d_amplitude_moffat * (-2 * y + 2 * y_mean) / (gamma ** 2 * (1 + rr_gg))
-        d_stddev = amplitude * rr / (stddev ** 3) * d_amplitude_gauss
-        d_eta = amplitude * d_amplitude_moffat / eta
-        d_alpha = - amplitude * d_amplitude_moffat * np.log(1 + rr_gg)
-        d_gamma = 2 * amplitude * alpha * d_amplitude_moffat * (rr_gg / (gamma * (1 + rr_gg)))
+        gauss_norm = np.exp(-(rr / (2. * stddev * stddev)))
+        d_eta_gauss = amplitude * gauss_norm
+        moffat_norm = (1 + rr_gg) ** (-alpha)
+        d_amplitude = moffat_norm + eta_gauss * gauss_norm
+        d_x_mean = amplitude * eta_gauss * (x - x_mean) / (stddev * stddev) * gauss_norm \
+                   - amplitude * alpha * moffat_norm * (-2 * x + 2 * x_mean) / (gamma ** 2 * (1 + rr_gg))
+        d_y_mean = amplitude * eta_gauss * (y - y_mean) / (stddev * stddev) * gauss_norm \
+                   - amplitude * alpha * moffat_norm * (-2 * y + 2 * y_mean) / (gamma ** 2 * (1 + rr_gg))
+        d_stddev = amplitude * eta_gauss * rr / (stddev ** 3) * gauss_norm
+        d_alpha = - amplitude * moffat_norm * np.log(1 + rr_gg)
+        d_gamma = 2 * amplitude * alpha * moffat_norm * (rr_gg / (gamma * (1 + rr_gg)))
         d_saturation = saturation * np.zeros_like(x)
-        return [d_amplitude, d_x_mean, d_y_mean, d_stddev, d_eta, d_alpha, d_gamma, d_saturation]
+        return [d_amplitude, d_x_mean, d_y_mean, d_alpha, d_gamma, d_eta_gauss, d_stddev, d_saturation]
 
 
 def PSF2D_chisq(params, model, xx, yy, zz, zz_err=None):
@@ -309,13 +312,13 @@ def fit_PSF2D(x, y, z, guess=None, bounds=None, sub_errors=None, method='minimiz
     >>> import numpy as np
     >>> X, Y = np.mgrid[:50,:50]
     >>> PSF = PSF2D()
-    >>> p = (50, 25, 25, 5, 1, 1, 5, 60)
+    >>> p = (50, 25, 25, 1, 5, -0.4, 1, 60)
     >>> Z = PSF.evaluate(X, Y, *p)
     >>> Z_err = np.sqrt(Z)/10.
 
     Prepare the fit:
-    >>> guess = (50, 20, 20, 3, 0.5, 1.2, 2.2, 60)
-    >>> bounds = ((1, 200), (10, 40), (10, 40), (1, 10), (0.5, 2), (0.5, 5), (0.5, 10), (0, 400))
+    >>> guess = (52, 22, 22, 1.2, 3.2, -0.1, 2, 60)
+    >>> bounds = ((1, 200), (10, 40), (10, 40), (0.5, 5), (0.5, 10), (-100, 200), (0.01, 10), (0, 400))
 
     Fit with error bars:
     >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, sub_errors=Z_err)
@@ -356,7 +359,7 @@ def PSF1D_chisq(params, model, xx, yy, yy_err=None):
     m = model.evaluate(xx, *params)
     if len(m) == 0 or len(yy) == 0:
         return 1e20
-    if np.any(m < 0) or np.any(m > 1.2 * np.max(yy)):
+    if np.any(m < 0) or np.any(m > 1.5 * np.max(yy)) or np.max(m) < 0.5*np.max(yy):
         return 1e20
     diff = m - yy
     if yy_err is None:
@@ -407,13 +410,13 @@ def fit_PSF1D(x, y, guess=None, bounds=None, sub_errors=None, method='minimize')
     >>> import numpy as np
     >>> X = np.arange(0, 50)
     >>> PSF = PSF1D()
-    >>> p = (-10, 25, 5, 50, 1, 5, 60)
+    >>> p = (50, 25, 1, 5, -0.2, 1, 60)
     >>> Y = PSF.evaluate(X, *p)
     >>> Y_err = np.sqrt(Y)/10.
 
     Prepare the fit:
-    >>> guess = (-5, 20, 4, 60, 1.2, 3.2, 60)
-    >>> bounds = ((-100, 100), (10, 40), (1, 10), (0, 200), (0.5, 5), (0.5, 10), (0, 400))
+    >>> guess = (60, 20, 1.2, 3.2, -0.1, 2,  60)
+    >>> bounds = ((0, 200), (10, 40), (0.5, 5), (0.5, 10), (-10, 200), (0.01, 10), (0, 400))
 
     Fit with error bars:
     >>> model = fit_PSF1D(X, Y, guess=guess, bounds=bounds, sub_errors=Y_err)

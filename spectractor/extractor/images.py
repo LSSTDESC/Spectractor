@@ -328,7 +328,7 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
     # fit a 2D star profile close to this position
     # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2D
     # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
-    guess = [np.max(sub_image_subtracted), avX, avY, 2, 1, 1, 1, image.saturation]
+    guess = [np.max(sub_image_subtracted), avX, avY, 1, 1, 0.1, 2, image.saturation]
     if image.target_star2D is not None:
         guess = fitting._model_to_fit_params(image.target_star2D)[0]
         guess[1] = avX
@@ -340,9 +340,9 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
     # [100*image.saturation,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] #for Gauss2D
     # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation],
     # [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
-    bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 1,
-               0.001, 0, 1, 0.9 * image.saturation],
-              [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 100, 10, 30, 1.1 * image.saturation]]
+    bounds = [[0.1 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 0, 1, -100, 1,
+               0.9 * image.saturation],
+              [10 * image.saturation, avX + mean_prior, avY + mean_prior, 10, 30, 200, 15, 1.1 * image.saturation]]
     saturated_pixels = np.where(sub_image >= image.saturation)
     if len(saturated_pixels[0]) > 0:
         if parameters.DEBUG:
@@ -363,7 +363,7 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
             f'\n\tX={new_avX:.2f}, Y={new_avY:.2f} target position determination probably wrong: '
             f'{dist:.1f} pixels from profile detection ({avX:.2f}, {avY:.2f})')
     # debugging plots
-    if parameters.DEBUG:
+    if parameters.DEBUG or True:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
         vmin = 0
         vmax = np.nanmax(sub_image)
