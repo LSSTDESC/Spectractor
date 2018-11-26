@@ -304,7 +304,7 @@ class ChromaticPSF:
         return output
 
 
-def test_params(Nx):
+def test_params(Nx, Ny):
     """
     A set of parameters to define a test spectrogram
 
@@ -312,6 +312,8 @@ def test_params(Nx):
     ----------
     Nx: int
         The size of the spectrogram along the dispersion direction.
+    Ny: int
+        The size of the spectrogram along the transverse direction.
 
     Returns
     -------
@@ -322,12 +324,13 @@ def test_params(Nx):
     --------
     >>> s = ChromaticPSF()
     >>> Nx = 5
-    >>> params = test_params(Nx)
+    >>> Ny = 4
+    >>> params = test_params(Nx, Ny)
     >>> print(params)
-    [0, 10, 20, 30, 40, 0, 0, 0, 0, 10, 0, 0, 0, 0, 2, 0, 0, 0, 0, 5, 0, 0, 0, -0.02, 1, 0, 0, 0, 0, 2, 800]
+    [0, 10, 20, 30, 40, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 5, 0, 0, 0, -0.02, 1, 0, 0, 0, 0, 2, 800]
     """
     params = [10 * i for i in range(Nx)]
-    params += [0, 0, 0, 0, 10]  # y mean
+    params += [0, 0, 0, 0, Ny/2]  # y mean
     params += [0, 0, 0, 0, 2]  # alpha
     params += [0, 0, 0, 0, 5]  # gamma
     params += [0, 0, 0, -0.02, 1]  # eta_gauss
@@ -336,7 +339,65 @@ def test_params(Nx):
     return params
 
 
-def fit_transverse_profile(data, err, w, ws, saturation):
+def fit_transverse_profile(data, err, w, ws, saturation=None, live_fit=False):
+    """
+    Fit the transverse profile of a 2D data image with a PSF1D profile.
+    Loop is done on the x-axis direction, with 50 steps only to save time.
+    An order 1 polynomial function is fitted to subtract the background for each pixel
+    with a 3*sigma outlier removal procedure to remove background stars.
+    
+    Parameters
+    ----------
+    data: array
+        The 2D array image. The transverse profile is fitted on the y direction for 50 pixels along the x direction.
+    err: array 
+        The uncertainties related to the data array.
+    w: int
+        Half width of central region where the spectrum is extracted and summed (default: 10)
+    ws: [int,int]
+        up/down region extension where the sky background is estimated (default: [20,30])
+    saturation: float, optional
+        The saturation level of the image. Default is set to twice the maximum of the data array and has no effect.
+    live_fit: bool, optional
+        If True, the transverse profilt fit is plotted in live accross the loop (default: False).
+
+    Returns
+    -------
+    PSF_params: array
+        The PSF1D best fit parameters along the x direction
+    flux: array
+        The sum of the pixel values along the y direction after background subtraction.
+    flux_integral: array
+        The integral of the fitted PSF1D profile.
+    flux_err: array
+        The uncertainty on the flux estimate, summing the square of the uncertainties along the y direction.
+    fwhms: array
+        The full width half maximum of the fitted PSF1D profile.
+    pixels: array
+        The pixel indices where the profile has been evaluated.
+
+    Examples
+    --------
+
+    # Build a mock spectrogram with random Poisson noise:
+    >>> Nx = 100
+    >>> Ny = 100
+    >>> s = ChromaticPSF()
+    >>> params = test_params(Nx, Ny)
+    >>> data = s.evaluate(Nx, Ny, params)
+    >>> data = np.random.poisson(data)
+    >>> data_errors = np.sqrt(data+1)
+
+    # Fit the transverse profile:
+    >>> import spectractor.parameters as parameters
+    >>> parameters.DEBUG = True
+    >>> PSF_params, flux, flux_integral, flux_err, fwhms, pixels = \
+    fit_transverse_profile(data, data_errors, w=20, ws=[30,50], saturation=None, live_fit=True)
+    >>> assert(np.all(np.isclose(pixels[:5], [0,  2,  4,  6,  8 ], rtol=1e-3)))
+
+    """
+    if saturation is None:
+        saturation = 2*np.max(data)
     Ny, Nx = data.shape
     middle = Ny // 2
     index = np.arange(Ny)
@@ -345,7 +406,7 @@ def fit_transverse_profile(data, err, w, ws, saturation):
     y = data[:, 0]
     guess = [np.nanmax(y) - np.nanmean(y), middle, 2, 2, 0.1, 2, saturation]
     maxi = np.abs(np.nanmax(y))
-    bounds = [(0.1 * maxi, 10 * maxi), (middle - w, middle + w), (1, 10), (1, Ny), (-1, 200), (0.1, Ny),
+    bounds = [(0.1 * maxi, 10 * maxi), (middle - w, middle + w), (1, 10), (1, w), (-1, 2), (0.1, w),
               (0, 2 * saturation)]
     PSF_params = []
     flux = []
@@ -360,7 +421,7 @@ def fit_transverse_profile(data, err, w, ws, saturation):
         y = data[:, x]
         bgd = data[bgd_index, x]
         bgd_err = err[bgd_index, x]
-        bgd_fit = fit_poly1d_outlier_removal(bgd_index, bgd, order=1)
+        bgd_fit = fit_poly1d_outlier_removal(bgd_index, bgd, order=1, sigma=3.0, niter=2)
         signal = y - bgd_fit(index)
         # in case guess amplitude is too low
         pdf = np.abs(signal) / np.nansum(np.abs(signal))
@@ -368,13 +429,16 @@ def fit_transverse_profile(data, err, w, ws, saturation):
         std = np.sqrt(np.nansum(pdf * (index - mean) ** 2))
         maxi = np.abs(np.nanmax(signal))
         if guess[0] * (1 + guess[4]) < 3 * np.nanstd(bgd):
-            guess = [0.9 * maxi, mean, 2, std, 0.1 * maxi, std, saturation]
+            guess = [0.9 * maxi, mean, 2, std, 0.1, std, saturation]
             bounds[0] = (np.nanstd(bgd), 3 * maxi)
-            # bounds[4] = (np.nanstd(bgd), 2 * maxi)
+        if guess[0] * (1 + guess[4]) > 1.2 * maxi:
+            guess = [0.9 * maxi, mean, 2, std, 0.1, std, saturation]
+            bounds[0] = (np.nanstd(bgd), 3 * maxi)
         PSF_guess = PSF1D(*guess)
         # fit with outlier removal to clean background stars
         fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
-                                                  guess=guess, bounds=bounds, sigma=5, niter=2)
+                                                  guess=guess, bounds=bounds, sigma=5, niter=2,
+                                                  niter_basinhopping=5, T_basinhopping=0.5)
         # test if 3 consecutive pixels are in the outlier list
         test = 0
         consecutive_outliers = False
@@ -390,29 +454,32 @@ def fit_transverse_profile(data, err, w, ws, saturation):
         # test if the fit has badly fitted the two highest data points
         test = np.copy(signal - fit(index))
         max_badfit = False
-        if test.argmax() in outliers:
-            test[test.argmax()] = 0
+        max_index = test.argmax()
+        if max_index in outliers:
+            test[max_index] = 0
             if test.argmax() in outliers:
                 max_badfit = True
         # if there are consecutive outliers or max is badly fitted, re-estimate the guess and refit
         if consecutive_outliers or max_badfit:
-            if guess[0] < 0:  # defocus
-                guess = [0.9 * maxi, middle, guess[2], guess[3], -0.1, 0.2, saturation]
-            else:
-                guess = [0.9 * maxi, middle, guess[2], guess[3], 0.1, std, saturation]
+            tmp_guess = [getattr(fit, p).value for p in fit.param_names]
+            #if guess[4] < 0 or fit.evaluate(float(max_index), *tmp_guess) > signal[max_index]:  # defocus
+            guess = [0.9 * maxi, middle, guess[2], guess[3], -0.1, std/2, saturation]
+            #else:
+            #    guess = [0.9 * maxi, middle, guess[2], guess[3], 0.1, std, saturation]
             bounds[0] = (np.nanstd(bgd), 3 * maxi)
             # bounds[3] = (np.nanstd(bgd), 2 * maxi)
-            fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x],
-                                                      guess=guess, bounds=bounds, sigma=5, niter=2)
-        guess = [getattr(fit, p).value for p in fit.param_names]
+            fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
+                                                      guess=guess, bounds=bounds, sigma=5, niter=2,
+                                                      niter_basinhopping=20, T_basinhopping=0.5)
         # compute the flux
+        guess = [getattr(fit, p).value for p in fit.param_names]
         fwhm = fit.fwhm(x_array=index)
         PSF_params.append(guess)
         flux_integral.append(fit.integrate(bounds=(-10 * fwhm + guess[1], 10 * fwhm + guess[1]), x_array=index))
         flux_err.append(np.sqrt(np.sum(err[:, x] ** 2)))
         flux.append(np.sum(signal))
         fwhms.append(fwhm)
-        if parameters.DEBUG or True:
+        if live_fit:
             plt.figure(figsize=(6, 6))
             plt.errorbar(np.arange(Ny), y, yerr=err[:, x], fmt='ro',
                          label="bgd data")
@@ -436,6 +503,9 @@ def fit_transverse_profile(data, err, w, ws, saturation):
                 plt.pause(1e-8)
                 plt.close()
     # End of loop, prepare the outputs
+    flux = np.array(flux)
+    flux_integral = np.array(flux_integral)
+    flux_err = np.array(flux_err)
     fwhms = np.array(fwhms)
     PSF_params = np.array(PSF_params).T
     # Summary plot
@@ -450,7 +520,7 @@ def fit_transverse_profile(data, err, w, ws, saturation):
         for i in range(2, PSF_params.shape[0] - 1):
             p = ax[0].plot(pixels, PSF_params[i], label=test.param_names[i], marker='o', linestyle='none')
             ax[0].plot(all_pixels, PSF_models[i], color=p[0].get_color())
-        img = np.zeros_like(data)
+        img = np.zeros_like(data).astype(float)
         yy, xx = np.mgrid[:Ny, :Nx]
         print('x', test.param_names)
         for x in pixels[::5]:
@@ -764,7 +834,8 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
     return PSF
 
 
-def fit_PSF1D_outlier_removal(x, y, sub_errors=None, sigma=3.0, niter=3, guess=None, bounds=None, method='minimize'):
+def fit_PSF1D_outlier_removal(x, y, sub_errors=None, sigma=3.0, niter=3, guess=None, bounds=None, method='minimize',
+                              niter_basinhopping=5, T_basinhopping=0.2):
     """Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation"""
 
     my_logger = set_logger(__name__)
@@ -784,7 +855,8 @@ def fit_PSF1D_outlier_removal(x, y, sub_errors=None, sigma=3.0, niter=3, guess=N
         elif method == 'basinhopping':
             minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, jac=PSF1D_chisq_jac,
                                     args=(model, x[indices], y[indices], err))
-            res = basinhopping(PSF1D_chisq, guess, T=0.2, niter=5, minimizer_kwargs=minimizer_kwargs)
+            res = basinhopping(PSF1D_chisq, guess, T=T_basinhopping, niter=niter_basinhopping,
+                               minimizer_kwargs=minimizer_kwargs)
         else:
             my_logger.error(f'\n\tUnknown method {method}.')
             sys.exit()
