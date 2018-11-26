@@ -39,7 +39,7 @@ from spectractor.simulation.throughput import Throughput
 class Atmosphere(object):
     """
     Atmosphere():
-        class to simulate an atmospheric transmission calling libradtran
+        class to evaluate an atmospheric transmission calling libradtran
     Args:
         airmass (:obj:`float`): airmass of the target
         pressure (:obj:`float`): pressure of the atmosphere
@@ -92,7 +92,7 @@ class Atmosphere(object):
 class AtmosphereGrid(Atmosphere):
     """
     Atmosphere():
-        class to simulate series of atmospheres calling libradtran
+        class to evaluate series of atmospheres calling libradtran
     Args:
         airmass (:obj:`float`): airmass of the target
         pressure (:obj:`float`): pressure of the atmosphere
@@ -478,7 +478,7 @@ class SpectrumSimulation(Spectrum):
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(pixels, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
-        atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
+        atmospheric_transmission = self.atmosphere.evaluate(ozone, pwv, aerosols)
         # np.savetxt('atmospheric_transmission_20170530_130.txt', np.array([lambdas, atmospheric_transmission(lambdas)]).T)
         self.data *= A1 * atmospheric_transmission(lambdas)
         self.err *= A1 * atmospheric_transmission(lambdas)
@@ -590,7 +590,7 @@ class SpectrumSimGrid():
 
 def SimulatorInit(filename):
     """ SimulatorInit
-    Main function to simulate several spectra
+    Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
 
     Args:
@@ -642,7 +642,7 @@ def SimulatorInit(filename):
 def SimulatorCore(spectrum, telescope, disperser, target, airmass=1.0, pressure=800, temperature=10,
                   pwv=5, ozone=300, aerosols=0.05, A1=1.0, A2=0., reso=0, D=parameters.DISTANCE2CCD, shift=0.):
     """ SimulatorCore
-    Main function to simulate several spectra
+    Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
 
     Args:
@@ -679,7 +679,7 @@ def SimulatorCore(spectrum, telescope, disperser, target, airmass=1.0, pressure=
 def SimulatorSimGrid(filename, outputdir, pwv_grid=[0,10,5], ozone_grid=[100,700,7], aerosol_grid=[0,0.1,5],
                      A1=1., A2=0., reso=None, D=parameters.DISTANCE2CCD, shift=0.):
     """ SimulatorSimGrid
-    Main function to simulate several spectra
+    Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
 
     Args:
@@ -740,7 +740,7 @@ def SimulatorSimGrid(filename, outputdir, pwv_grid=[0,10,5], ozone_grid=[100,700
 def Simulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A1=1., A2=0.,
               reso=None, D=parameters.DISTANCE2CCD, shift=0.):
     """ Simulator
-    Main function to simulate several spectra
+    Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
 
     Args:

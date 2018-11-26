@@ -1,5 +1,4 @@
 import scipy.optimize as opt
-from astropy.modeling.models import Gaussian1D, Moffat1D
 
 from scipy.signal import argrelextrema
 
@@ -206,10 +205,10 @@ class Spectrum:
         """
         plt.figure(figsize=[12, 6])
         self.plot_spectrum_simple(plt.gca(), xlim=xlim, label=label)
-        # if len(self.target.spectra)>0:
-        #    for k in range(len(self.target.spectra)):
-        #        s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
-        #        plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
+        if len(self.target.spectra)>0:
+            for k in range(len(self.target.spectra)):
+                s = self.target.spectra[k] #/np.max(self.target.spectra[k])*np.max(self.data)
+                plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
         if self.lambdas is not None:
             # self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
             #                        print_table=parameters.VERBOSE)
@@ -292,67 +291,6 @@ class Spectrum:
         else:
             self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
 
-
-class Spectrogram(Spectrum):
-
-    def __init__(self, file_name="", image=None, order=1, target=None):
-        Spectrum.__init__(self, file_name=file_name, image=image, order=order, target=target)
-        # self.PSF_params = PSF_params
-        self.PSF1D = PSF1D()
-        self.polynomial_orders = {key:4 for key in self.PSF1D.param_names}
-        self.polynomial_orders['saturation'] = 0
-
-    def simulate(self, Nx, Ny, params):
-        """
-        Simulate a 2D spectrogram of size Nx times Ny.
-
-        Parameters
-        ----------
-        Nx: int
-            Size in x direction
-        Ny: int
-            Size in y direction
-        params: array_like
-            Parameter array of the model, in the form:
-                * Nx first parameters are amplitudes for the Moffat transverse profiles
-                * next parameters are polynomial coefficients for all the PSF1D parameters
-                in the same order as in PSF1D definition, except amplitude_moffat
-
-        Returns
-        -------
-        output: array
-            A 2D array with the model
-
-        Examples
-        --------
-        >>> Nx = 100
-        >>> Ny = 20
-        >>> params = [i for i in range(Nx)] + [0, 0, 0, 0, 10]*5 + [80]
-        >>> s = Spectrogram()
-        >>> output = s.simulate(Nx, Ny, params)
-        >>> print(output)
-        >>> import matplotlib.pyplot as plt
-        >>> im = plt.imshow(output, origin='lower')
-        >>> plt.colorbar(im)
-        >>> plt.show()
-
-        """
-        pixels = np.arange(Nx).astype(int)
-        PSF_params = []
-        shift = 0
-        for k,name in enumerate(self.PSF1D.param_names):
-            print(k, name, params[Nx+shift:Nx+shift+self.polynomial_orders[name]+1])
-            if name == 'amplitude_moffat':
-                PSF_params.append(params[:Nx])
-            else:
-                PSF_params.append(np.polyval(params[Nx+shift:Nx+shift+self.polynomial_orders[name]+1], pixels))
-                shift = shift+self.polynomial_orders[name]+1
-        PSF_params = np.array(PSF_params).T
-        y = np.arange(Ny)
-        output = np.zeros((Ny,Nx))
-        for x in pixels:
-            output[:, x] = PSF1D.evaluate(y, *PSF_params[x])
-        return output
 
 
 def calibrate_spectrum(spectrum, xlim=None):
@@ -883,130 +821,12 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     data = data[ymin:ymax, pixel_start:pixel_end]
     err = err[ymin:ymax, pixel_start:pixel_end]
     Ny, Nx = data.shape
-    middle = Ny // 2
-    # Clean stars on lateral bands
-    # spectrum2DUp = np.copy(data[middle + ws[0]:Ny, :])
-    # spectrum2DUp = filter_stars_from_bgd(spectrum2DUp, margin_cut=1)
-    # err_spectrum2DUp = np.copy(err[middle + ws[0]:Ny, :])
-    # err_spectrum2DUp = filter_stars_from_bgd(err_spectrum2DUp, margin_cut=1)
-    # spectrum2DDown = np.copy(data[0:middle - ws[0], :])
-    # spectrum2DDown = filter_stars_from_bgd(spectrum2DDown, margin_cut=1)
-    # err_spectrum2DDown = np.copy(err[0:middle - ws[0], :])
-    # err_spectrum2DDown = filter_stars_from_bgd(err_spectrum2DDown, margin_cut=1)
-    # data[0:middle - ws[0], :] = spectrum2DDown
-    # err[0:middle - ws[0], :] = err_spectrum2DDown
-    # data[middle + ws[0]:Ny, :] = spectrum2DUp
-    # err[middle + ws[0]:Ny, :] = err_spectrum2DUp
-    # Fit rotated image profile along y axis
-    # Subtract mean lateral profile with line profile
-    index = np.arange(Ny)
-    bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
-    y = data[:, 0]
-    guess = [np.nanmax(y) - np.nanmean(y), middle, 2, 2, 0.1, 2, image.saturation]
-    maxi = np.abs(np.nanmax(y))
-    bounds = [ (0.1*maxi, 10*maxi), (middle - w, middle + w), (1, 10), (1, Ny), (-1, 200), (0.1, Ny),
-             (0, 2*image.saturation)]
-    PSF_params = []
-    flux = []
-    flux_integral = []
-    flux_err = []
-    fwhms = []
-    # set the pixel array where to fit the transverse profile
-    # 50 steps starting from the middle to the edges
-    pixels = np.arange(0, Nx, Nx//50)
-    for x in pixels:
-        # fit the background with a polynomial function
-        y = data[:, x]
-        bgd = data[bgd_index, x]
-        bgd_err = err[bgd_index, x]
-        bgd_fit = fit_poly1d_outlier_removal(bgd_index, bgd, order=1)
-        signal = y - bgd_fit(index)
-        # in case guess amplitude is too low
-        pdf = np.abs(signal) / np.nansum(np.abs(signal))
-        mean = np.nansum(pdf*index)
-        std = np.sqrt(np.nansum(pdf*(index-mean)**2))
-        maxi = np.abs(np.nanmax(signal))
-        if guess[0]*(1+ guess[4]) < 3 * np.nanstd(bgd):
-            guess = [0.9*maxi, mean, 2, std, 0.1*maxi, std, image.saturation]
-            bounds[0] = (np.nanstd(bgd), 3*maxi)
-            # bounds[4] = (np.nanstd(bgd), 2 * maxi)
-        PSF_guess = PSF1D(*guess)
-        # fit with outlier removal to clean background stars
-        fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
-                                                  guess=guess, bounds=bounds, sigma=5, niter=2)
-        # test if 3 consecutive pixels are in the outlier list
-        test = 0
-        consecutive_outliers = False
-        for o in range(1,len(outliers)):
-            t = outliers[o] - outliers[o-1]
-            if t == 1:
-                test += t
-            else:
-                test = 0
-            if test > 1:
-                consecutive_outliers = True
-                break
-        # test if the fit has badly fitted the two highest data points
-        test = np.copy(signal - fit(index))
-        max_badfit = False
-        if test.argmax() in outliers:
-            test[test.argmax()] = 0
-            if test.argmax() in outliers:
-                max_badfit = True
-        # if there are consecutive outliers or max is badly fitted, re-estimate the guess and refit
-        if consecutive_outliers or max_badfit:
-            if guess[0] < 0: # defocus
-                guess = [0.9*maxi, middle, guess[2], guess[3], -0.1, 0.2, image.saturation]
-            else:
-                guess = [0.9*maxi, middle, guess[2], guess[3], 0.1, std, image.saturation]
-            bounds[0] = (np.nanstd(bgd), 3*maxi)
-            # bounds[3] = (np.nanstd(bgd), 2 * maxi)
-            fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x],
-                                                      guess=guess, bounds=bounds, sigma=5, niter=2)
-        guess = [getattr(fit, p).value for p in fit.param_names]
-        # compute the flux
-        fwhm = fit.fwhm(x_array=index)
-        PSF_params.append(guess)
-        flux_integral.append(fit.integrate(bounds=(-10*fwhm+guess[1],10*fwhm+guess[1]), x_array=index))
-        flux_err.append(np.sqrt(np.sum(err[:, x] ** 2)))
-        flux.append(np.sum(signal))
-        fwhms.append(fwhm)
-        if parameters.DEBUG or True:
-            plt.figure(figsize=(6, 6))
-            plt.errorbar(np.arange(Ny), y, yerr=err[:, x], fmt='ro',
-                         label="bgd data")
-            plt.errorbar(bgd_index, bgd, yerr=bgd_err, fmt='bo', label="original data")
-            plt.errorbar(outliers, data[outliers, x], yerr=err[outliers, x], fmt='go', label="outliers")
-            plt.plot(bgd_index, bgd_fit(bgd_index), 'b--',
-                     label="fitted bgd")
-            plt.plot(index, PSF_guess(index) + bgd_fit(index), 'k--',
-                     label="guessed profile")
-            plt.plot(index, fit(index) + bgd_fit(index), 'b-',
-                     label="fitted profile")
-            ylim = plt.gca().get_ylim()
-            PSF_moffat = Moffat1D(*guess[:4])
-            plt.plot(index, PSF_moffat(index) + bgd_fit(index), 'b+',
-                     label="fitted moffat")
-            plt.gca().set_ylim(ylim)
-            plt.legend(loc=2, numpoints=1)
-            plt.title(f'x={x}')
-            if parameters.DISPLAY:
-                plt.draw()
-                plt.pause(1e-8)
-                plt.close()
-
-    #xprofile_background = 0.5 * (xprofileUp + xprofileDown)
-    #xprofile_background_err = np.sqrt(0.5 * (xprofileUp_err ** 2 + xprofileDown_err ** 2))
-    #spectrum2D = np.copy(data[y0 - w:y0 + w, :])
-    #xprofile = np.sum(spectrum2D, axis=0) - 2 * w * xprofile_background
-    # Sum uncertainties in quadrature
-    #err2D = np.copy(err[y0 - w:y0 + w, :])
-    #xprofile_err = np.sqrt(np.sum(err2D ** 2, axis=0)) #+ (2 * w * xprofile_background_err) ** 2)
+    # Fit the transverse profile
+    PSF_params, flux, flux_integral, flux_err, fwhms, pixels = fit_transverse_profile(data, err, w, ws, image.saturation)
     # Fill spectrum object
     spectrum.data = np.array(flux)
     spectrum.err = np.array(flux_err)
-    fwhms = np.array(fwhms)
-    PSF_params = np.array(PSF_params).T
+    # Summary plot
     if parameters.DEBUG or True:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         image.plot_image_simple(ax[2], data=data,
@@ -1031,36 +851,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         pos2 = ax[2].get_position()
         ax[0].set_position([pos2.x0, pos0.y0, pos2.width, pos0.height])
         ax[1].set_position([pos2.x0, pos1.y0, pos2.width, pos1.height])
-        if parameters.DISPLAY:
-            plt.show()
-    if parameters.DEBUG or True:
-        fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12, 6))
-        test = PSF1D()
-        PSF_models = []
-        all_pixels = np.arange(Nx)
-        for i in range(PSF_params.shape[0]):
-            fit, cov, model = fit_poly1d(pixels, PSF_params[i], order=4)
-            PSF_models.append(np.polyval(fit, all_pixels))
-        for i in range(2, PSF_params.shape[0]-1):
-            p = ax[0].plot(pixels, PSF_params[i], label=test.param_names[i], marker='o', linestyle='none')
-            ax[0].plot(all_pixels, PSF_models[i], color=p[0].get_color())
-        img = np.zeros_like(data)
-        yy, xx = np.mgrid[:Ny,:Nx]
-        print('x', test.param_names)
-        for x in pixels[::5]:
-            params = [PSF_models[p][x] for p in range(len(PSF_params))]
-            print(x,params)
-            psf = PSF2D.evaluate(xx, yy, 1, x, Ny//2, *params[2:])
-            psf /= np.max(psf)
-            img += psf
-        ax[1].imshow(img, origin='lower')
-        ax[1].set_xlabel('X [pixels]')
-        ax[1].set_ylabel('Y [pixels]')
-        ax[0].set_ylabel('PSF1D parameters')
-        ax[1].legend(title='PSF(x)')
-        ax[0].legend()
-        fig.tight_layout()
-        fig.subplots_adjust(hspace=0)
         if parameters.DISPLAY:
             plt.show()
     return spectrum
