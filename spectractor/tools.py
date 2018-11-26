@@ -582,6 +582,28 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bound
         return or_fitted_model
 
 
+def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=50, guess=None, bounds=None):
+    """Moffat1D parameters: amplitude, x_mean, gamma, alpha"""
+    gg_init = models.Moffat1D()
+    if guess is not None:
+        for ip, p in enumerate(gg_init.param_names):
+            getattr(gg_init, p).value = guess[ip]
+    if bounds is not None:
+        for ip, p in enumerate(gg_init.param_names):
+            getattr(gg_init, p).min = bounds[0][ip]
+            getattr(gg_init, p).max = bounds[1][ip]
+    with warnings.catch_warnings():
+        # Ignore model linearity warning from the fitter
+        warnings.simplefilter('ignore')
+        fit = fitting.LevMarLSQFitter()
+        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+        # get fitted model and filtered data
+        filtered_data, or_fitted_model = or_fit(gg_init, x, y)
+        if parameters.VERBOSE:
+            print(or_fitted_model)
+        return or_fitted_model
+
+
 class LevMarLSQFitterWithNan(fitting.LevMarLSQFitter):
 
     def objective_function(self, fps, *args):
