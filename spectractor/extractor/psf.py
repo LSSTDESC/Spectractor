@@ -355,7 +355,7 @@ def fit_transverse_profile(data, err, w, ws, saturation=None, npixels=50, live_f
     w: int
         Half width of central region where the spectrum is extracted and summed (default: 10)
     ws: list
-        up/down region extension where the sky background is estimated (default: [20,30])
+        up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
     saturation: float, optional
         The saturation level of the image. Default is set to twice the maximum of the data array and has no effect.
     npixels: int, optional

@@ -792,8 +792,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         Spectrum object to store new wavelengths, data and error arrays
     w: int
         Half width of central region where the spectrum is extracted and summed (default: 10)
-    ws: [int,int]
-        up/down region extension where the sky background is estimated (default: [20,30])
+    ws: list
+        up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
     right_edge: int
         Right-hand pixel position above which no pixel should be used (default: 1800)
     """
