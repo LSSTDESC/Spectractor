@@ -1,6 +1,6 @@
 ################################################################
 #
-# Script to simulate air transparency with LibRadTran
+# Script to evaluate air transparency with LibRadTran
 # With a pure absorbing atmosphere
 # Here we vary PWV
 # author: sylvielsstfr, jeremy.neveu
@@ -74,7 +74,7 @@ class Libradtran:
 
         if parameters.DEBUG:
             print('--------------------------------------------')
-            print('simulate')
+            print('evaluate')
             print(' 1) airmass = ', airmass)
             print(' 2) pwv = ', pwv)
             print(' 3) ozone = ', ozone)
