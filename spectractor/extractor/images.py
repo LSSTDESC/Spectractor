@@ -340,9 +340,9 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
     # [100*image.saturation,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] #for Gauss2D
     # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation],
     # [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
-    bounds = [[0.1 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 0, 1, -100, 1,
+    bounds = [[0.1 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 1, 0, -100, 1,
                0.9 * image.saturation],
-              [10 * image.saturation, avX + mean_prior, avY + mean_prior, 10, 30, 200, 15, 1.1 * image.saturation]]
+              [10 * image.saturation, avX + mean_prior, avY + mean_prior, 30, 10, 200, 15, 1.1 * image.saturation]]
     saturated_pixels = np.where(sub_image >= image.saturation)
     if len(saturated_pixels[0]) > 0:
         if parameters.DEBUG:
