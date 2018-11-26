@@ -339,25 +339,27 @@ def test_params(Nx, Ny):
     return params
 
 
-def fit_transverse_profile(data, err, w, ws, saturation=None, live_fit=False):
+def fit_transverse_profile(data, err, w, ws, saturation=None, npixels=50, live_fit=False):
     """
     Fit the transverse profile of a 2D data image with a PSF1D profile.
-    Loop is done on the x-axis direction, with 50 steps only to save time.
+    Loop is done on the x-axis direction, with npixels steps only to save time.
     An order 1 polynomial function is fitted to subtract the background for each pixel
     with a 3*sigma outlier removal procedure to remove background stars.
     
     Parameters
     ----------
     data: array
-        The 2D array image. The transverse profile is fitted on the y direction for 50 pixels along the x direction.
+        The 2D array image. The transverse profile is fitted on the y direction for npixels pixels along the x direction.
     err: array 
         The uncertainties related to the data array.
     w: int
         Half width of central region where the spectrum is extracted and summed (default: 10)
-    ws: [int,int]
+    ws: list
         up/down region extension where the sky background is estimated (default: [20,30])
     saturation: float, optional
         The saturation level of the image. Default is set to twice the maximum of the data array and has no effect.
+    npixels: int, optional
+        The number of transverse profiles to fit along the x direction (default: 50).
     live_fit: bool, optional
         If True, the transverse profilt fit is plotted in live accross the loop (default: False).
 
@@ -392,8 +394,8 @@ def fit_transverse_profile(data, err, w, ws, saturation=None, live_fit=False):
     >>> import spectractor.parameters as parameters
     >>> parameters.DEBUG = True
     >>> PSF_params, flux, flux_integral, flux_err, fwhms, pixels = \
-    fit_transverse_profile(data, data_errors, w=20, ws=[30,50], saturation=None, live_fit=True)
-    >>> assert(np.all(np.isclose(pixels[:5], [0,  2,  4,  6,  8 ], rtol=1e-3)))
+    fit_transverse_profile(data, data_errors, w=20, ws=[30,50], saturation=None, npixels=50, live_fit=True)
+    >>> assert(np.all(np.isclose(pixels[:5], np.arange(0, Nx, Nx//50)[:5], rtol=1e-3)))
 
     """
     if saturation is None:
@@ -415,7 +417,7 @@ def fit_transverse_profile(data, err, w, ws, saturation=None, live_fit=False):
     fwhms = []
     # set the pixel array where to fit the transverse profile
     # 50 steps starting from the middle to the edges
-    pixels = np.arange(0, Nx, Nx // 50)
+    pixels = np.arange(0, Nx, Nx // npixels)
     for x in pixels:
         # fit the background with a polynomial function
         y = data[:, x]
@@ -461,10 +463,10 @@ def fit_transverse_profile(data, err, w, ws, saturation=None, live_fit=False):
                 max_badfit = True
         # if there are consecutive outliers or max is badly fitted, re-estimate the guess and refit
         if consecutive_outliers or max_badfit:
-            tmp_guess = [getattr(fit, p).value for p in fit.param_names]
-            #if guess[4] < 0 or fit.evaluate(float(max_index), *tmp_guess) > signal[max_index]:  # defocus
+            # tmp_guess = [getattr(fit, p).value for p in fit.param_names]
+            # if guess[4] < 0 or fit.evaluate(float(max_index), *tmp_guess) > signal[max_index]:  # defocus
             guess = [0.9 * maxi, middle, guess[2], guess[3], -0.1, std/2, saturation]
-            #else:
+            # else:
             #    guess = [0.9 * maxi, middle, guess[2], guess[3], 0.1, std, saturation]
             bounds[0] = (np.nanstd(bgd), 3 * maxi)
             # bounds[3] = (np.nanstd(bgd), 2 * maxi)
@@ -522,10 +524,9 @@ def fit_transverse_profile(data, err, w, ws, saturation=None, live_fit=False):
             ax[0].plot(all_pixels, PSF_models[i], color=p[0].get_color())
         img = np.zeros_like(data).astype(float)
         yy, xx = np.mgrid[:Ny, :Nx]
-        print('x', test.param_names)
+        # print('x', test.param_names)
         for x in pixels[::5]:
             params = [PSF_models[p][x] for p in range(len(PSF_params))]
-            print(x, params)
             psf = PSF2D.evaluate(xx, yy, 1, x, Ny // 2, *params[2:])
             psf /= np.max(psf)
             img += psf

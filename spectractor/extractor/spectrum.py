@@ -823,7 +823,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     Ny, Nx = data.shape
     # Fit the transverse profile
     PSF_params, flux, flux_integral, flux_err, fwhms, pixels = \
-        fit_transverse_profile(data, err, w, ws, saturation=image.saturation, live_fit=(parameters.DEBUG or True))
+        fit_transverse_profile(data, err, w, ws, saturation=image.saturation, npixels=50, live_fit=(parameters.DEBUG or True))
     # Fill spectrum object
     spectrum.data = np.array(flux)
     spectrum.err = np.array(flux_err)
