@@ -297,7 +297,9 @@ class ChromaticPSF:
         """
         nparams = PSF_params.shape[0]
         test = PSF1D()
-        all_pixels = np.arange(0, Nx)
+        # all_pixels = np.arange(0, Nx)
+        pixels = np.array(pixels) / Nx
+        all_pixels = np.linspace(0, 1, Nx)
         chromatic_psf_params = np.array([])
         for i in range(0, nparams):
             if test.param_names[i] is 'amplitude_moffat':
@@ -397,7 +399,8 @@ class ChromaticPSF:
         >>> plt.show()
 
         """
-        pixels = np.arange(Nx).astype(int)
+        # pixels = np.arange(Nx).astype(int)
+        pixels = np.linspace(0, 1, Nx)
         PSF_params = []
         shift = 0
         for k, name in enumerate(self.PSF1D.param_names):
@@ -409,8 +412,9 @@ class ChromaticPSF:
         PSF_params = np.array(PSF_params).T
         y = np.arange(Ny)
         output = np.zeros((Ny, Nx))
-        for x in pixels:
-            output[:, x] = PSF1D.evaluate(y, *PSF_params[x])
+        #for x in pixels:
+        for k in range(Nx):
+            output[:, k] = PSF1D.evaluate(y, *PSF_params[k])
         return output
 
     def test_params(self, Nx, Ny):
@@ -436,14 +440,14 @@ class ChromaticPSF:
         >>> Ny = 4
         >>> params = s.test_params(Nx, Ny)
         >>> print(params)
-        [0, 100, 200, 300, 400, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 2, 0, 0, 0, -0.008, 1, 0, 0, 0, 0, 2, 8000]
+        [0, 100, 200, 300, 400, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 2, 0, 0, 0, -0.8, 1, 0, 0, 0, 0, 2, 8000]
         """
         params = [100 * i for i in range(Nx)]
-        params += [0, 0, 0, 0, Ny/2]  # y mean
-        params += [0, 0, 0, 0, 5]  # gamma
-        params += [0, 0, 0, 0, 2]  # alpha
-        params += [0, 0, 0, -0.008, 0]  # eta_gauss
-        params += [0, 0, 0, 0, 2]  # stddev
+        params += [0] * (self.polynomial_orders['x_mean']-1) + [0, Ny/2]  # y mean
+        params += [0] * (self.polynomial_orders['gamma']-1) + [ 0, 5]  # gamma
+        params += [0] * (self.polynomial_orders['alpha']-1) + [ 0, 2]  # alpha
+        params += [0] * (self.polynomial_orders['eta_gauss']-1) + [ -0.8, 0]  # eta_gauss
+        params += [0] * (self.polynomial_orders['stddev']-1) + [ 0, 2]  # stddev
         params += [8000]  # saturation
         return params
 
@@ -606,7 +610,7 @@ def fit_transverse_profile(data, err, w, ws, saturation=None, npixels=50, live_f
         flux_err.append(np.sqrt(np.sum(err[:, x] ** 2)))
         flux.append(np.sum(signal))
         fwhms.append(fwhm)
-        if live_fit or True:
+        if live_fit:
             plt.figure(figsize=(6, 6))
             plt.errorbar(np.arange(Ny), y, yerr=err[:, x], fmt='ro',
                          label="bgd data")
@@ -711,8 +715,7 @@ def fit_chromatic_psf(Nx, Ny, data, guess, bounds=None, data_errors=None, ):
     >>> params = s.test_params(Nx, Ny)
     >>> saturation = params[-1]
     >>> data = s.evaluate(Nx, Ny, params)
-
-    # >>> data = np.random.poisson(data)
+    >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
     # Estimate the first guess values
@@ -723,24 +726,26 @@ def fit_chromatic_psf(Nx, Ny, data, guess, bounds=None, data_errors=None, ):
 
     # Set bounds
     >>> bounds = s.set_bounds(data, saturation=saturation)
-    >>> print(bounds, np.array(bounds).shape)
 
     # Fit the data:
     >>> p = fit_chromatic_psf(Nx, Ny, data, guess, bounds=bounds, data_errors=data_errors)
     >>> fit = s.evaluate(Nx, Ny, p)
+    >>> print(guess)
     >>> print(p, np.array(p).shape)
 
     # Plot data, best fit model and residuals:
     >>> import matplotlib.pyplot as plt
-    >>> fig, ax = plt.subplots(4, 1, sharex='all')
+    >>> fig, ax = plt.subplots(5, 1, sharex='all')
     >>> im0 = ax[0].imshow(data, origin='lower', aspect='auto')
     >>> plt.colorbar(im0, ax=ax[0])
     >>> im1 = ax[1].imshow(im_guess, origin='lower', aspect='auto')
     >>> plt.colorbar(im1, ax=ax[1])
-    >>> im2 = ax[2].imshow(fit, origin='lower', aspect='auto')
+    >>> im2 = ax[2].imshow((data-im_guess)/data_errors, origin='lower', aspect='auto')
     >>> plt.colorbar(im2, ax=ax[2])
-    >>> im3 = ax[3].imshow((data-fit)/data_errors, origin='lower', aspect='auto')
+    >>> im3 = ax[3].imshow(fit, origin='lower', aspect='auto')
     >>> plt.colorbar(im3, ax=ax[3])
+    >>> im4 = ax[4].imshow((data-fit)/data_errors, origin='lower', aspect='auto')
+    >>> plt.colorbar(im4, ax=ax[4])
     >>> plt.show()
     """
     my_logger = set_logger(__name__)
@@ -754,11 +759,14 @@ def fit_chromatic_psf(Nx, Ny, data, guess, bounds=None, data_errors=None, ):
         else:
             return np.nansum(((mod - zz) / zz_err) ** 2)
 
-    # TODO: add jacobian
-    # TODO: test methods: Nelder_Mead OK, Powell much too slow, CG not so bad
+    my_logger.warning(f'\n\tStart chisq: {spectrogram_chisq(guess, s, Nx, Ny, data, data_errors)}')
+
+    # TODO: add jacobian except if Nelder-Mead
+    # TODO: test methods: Nelder_Mead OK but need to increase maxiter, Powell much too slow,
+    # CG not so bad, BFGS not reach minimum
     my_logger = set_logger(__name__)
-    res = minimize(spectrogram_chisq, guess, method="BFGS", bounds=None,
-                   args=(s, Nx, Ny, data, data_errors), jac=None)
+    #res = minimize(spectrogram_chisq, guess, method="Nelder-Mead", bounds=None,
+    #               args=(s, Nx, Ny, data, data_errors), jac=None, options={'maxiter': 2000*len(guess), 'adaptive': True})
     my_logger.warning(f'\n{res}')
     fit = s.evaluate(Nx, Ny, res.x)
     my_logger.debug(f'\n\tSpectrogram best fitting parameters:\n{res.x}')
