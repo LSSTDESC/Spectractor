@@ -11,9 +11,16 @@ class Image(object):
 
     def __init__(self, filename, target="", disperser_label=""):
         """
-        Args:
-            target:
-            filename (:obj:`str`): path to the image
+        The image class contains all the features necessary to load an image and extract a spectrum.
+
+        Parameters
+        ----------
+        filename: str
+            The file name where the image is.
+        target: str, optional
+            The target name, to be found in data bases.
+        disperser_label: str, optional
+            The disperser label to load its properties
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.filename = filename
@@ -50,8 +57,13 @@ class Image(object):
 
     def load_image(self, file_name):
         """
-        Args:
-            file_name (:obj:`str`): path to the image
+        Load the image and store some information from header in class attributes. Load the target and disperser properties.
+
+        Parameters
+        ----------
+        file_name: str
+            The file name.
+
         """
         if parameters.OBS_NAME == 'CTIO':
             self.load_CTIO_image(file_name)
