@@ -7,6 +7,7 @@ coloredlogs
 scikit-image
 pysynphot
 emcee
+iminuit
 coverage
 configparser
 coveralls
