@@ -247,13 +247,14 @@ class PSF2D(Fittable2DModel):
 
 class ChromaticPSF1D:
 
-    def __init__(self):
+    def __init__(self, order=10):
         # file_name="", image=None, order=1, target=None):
         # Spectrum.__init__(self, file_name=file_name, image=image, order=order, target=target)
         # self.profile_params = profile_params
         self.my_logger = set_logger(self.__class__.__name__)
         self.PSF1D = PSF1D()
-        self.polynomial_orders = {key: 4 for key in self.PSF1D.param_names}
+        self.order = order
+        self.polynomial_orders = {key: order for key in self.PSF1D.param_names}
         self.polynomial_orders['saturation'] = 0
         self.Nx = 0
         self.Ny = 0
@@ -304,7 +305,7 @@ class ChromaticPSF1D:
         >>> profile_params = s.from_profile_params_to_poly_params(Nx, profile_params)
         >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
         """
-        pixels = np.linspace(0, 1, Nx)
+        pixels = np.linspace(-1, 1, Nx)
         poly_params = np.array([])
         for k, name in enumerate(self.PSF1D.param_names):
             if name is 'amplitude_moffat':
@@ -354,7 +355,7 @@ class ChromaticPSF1D:
         >>> profile_params = s.from_profile_params_to_poly_params(Nx, profile_params)
         >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
         """
-        pixels = np.linspace(0, 1, Nx)
+        pixels = np.linspace(-1, 1, Nx)
         profile_params = np.zeros((Nx, len(self.PSF1D.param_names)))
         shift = 0
         for k, name in enumerate(self.PSF1D.param_names):
@@ -541,12 +542,12 @@ class ChromaticPSF1D:
         [0, 50, 100, 150, 200, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 2, 0, 0, 0, -0.8, 1, 0, 0, 0, 0, 2, 8000]
         """
         params = [50 * i for i in range(Nx)]
-        params += [0] * (self.polynomial_orders['x_mean'] - 1) + [0, Ny / 2]  # y mean
-        params += [0] * (self.polynomial_orders['gamma'] - 1) + [0, 5]  # gamma
-        params += [0] * (self.polynomial_orders['alpha'] - 1) + [0, 2]  # alpha
-        params += [0] * (self.polynomial_orders['eta_gauss'] - 1) + [-0.8, 0]  # eta_gauss
-        params += [0] * (self.polynomial_orders['stddev'] - 1) + [0, 2]  # stddev
-        params += [8000]  # saturation
+        params += [0.] * (self.polynomial_orders['x_mean'] - 1) + [0, Ny / 2]  # y mean
+        params += [0.] * (self.polynomial_orders['gamma'] - 1) + [0, 5]  # gamma
+        params += [0.] * (self.polynomial_orders['alpha'] - 1) + [0, 2]  # alpha
+        params += [0.] * (self.polynomial_orders['eta_gauss'] - 1) + [-0.4, -0.4]  # eta_gauss
+        params += [0.] * (self.polynomial_orders['stddev'] - 1) + [0, 2]  # stddev
+        params += [8000.]  # saturation
         return np.array(params)
 
     def plot_summary(self, truth=None):
@@ -876,6 +877,9 @@ def fit_chromatic_PSF1D(Nx, Ny, data, guess, bounds=None, data_errors=None, ):
     # Fit the data:
     >>> p = fit_chromatic_PSF1D(Nx, Ny, data, guess, bounds=bounds, data_errors=data_errors)
     >>> fit = s.evaluate(Nx, Ny, p)
+    >>> s.poly_params = p
+    >>> s.profile_params = s.from_poly_params_to_profile_params(Nx, p)
+    >>> s.plot_summary(truth=params)
 
     # Plot data, best fit model and residuals:
     >>> import matplotlib.pyplot as plt
