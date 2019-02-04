@@ -664,7 +664,8 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, saturation=None, live_fit=Fal
     moffat_guess = [getattr(fit, p).value for p in fit.param_names]
     guess[:4] = moffat_guess
     init_guess = np.copy(guess)
-    pixel_range = np.concatenate([np.arange(ymax_index, Nx), np.arange(ymax_index, 0, -1)])
+    # Go from max to right, then from max to left
+    pixel_range = np.concatenate([np.arange(ymax_index, Nx), np.arange(ymax_index, -1, -1)])
     for x in pixel_range:
         guess = np.copy(guess)
         if x == ymax_index:
