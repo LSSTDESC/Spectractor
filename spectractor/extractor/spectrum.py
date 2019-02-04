@@ -831,7 +831,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         image.plot_image_simple(ax[2], data=data,
                                 scale="log", title='', units=image.units, aspect='auto')
-        centers = s.PSF_params[1]
+        centers = s.profile_params[1]
         ax[2].plot(s.pixels, centers, label='fitted spectrum centers')
         ax[2].plot(s.pixels, centers+s.fwhms, 'k-', label='fitted FWHM')
         ax[2].plot(s.pixels, centers-s.fwhms, 'k-')
