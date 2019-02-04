@@ -370,13 +370,9 @@ class ChromaticPSF1D:
         if saturation is None:
             saturation = 2 * np.max(data)
         Ny, Nx = data.shape
-        bounds = []
-        bounds.append([0.1 * np.max(data[:, x]) for x in range(Nx)])
-        bounds.append([3.0 * np.max(data[:, x]) for x in range(Nx)])
+        bounds = [[0.1 * np.max(data[:, x]) for x in range(Nx)], [3.0 * np.max(data[:, x]) for x in range(Nx)]]
         for k, name in enumerate(self.PSF1D.param_names):
-            tmp_bounds = []
-            tmp_bounds.append([None] * (1 + self.polynomial_orders[name]))
-            tmp_bounds.append([None] * (1 + self.polynomial_orders[name]))
+            tmp_bounds = [[None] * (1 + self.polynomial_orders[name]), [None] * (1 + self.polynomial_orders[name])]
             # if name is "x_mean":
             #     tmp_bounds[0].append(0)
             #     tmp_bounds[1].append(Ny)
@@ -562,10 +558,10 @@ class ChromaticPSF1D:
             PSF_truth = self.from_poly_params_to_profile_params(self.Nx, truth)
         all_pixels = np.arange(self.Nx)
         for i, name in enumerate(self.PSF1D.param_names):
-            fit, cov, model = fit_poly1d(self.pixels, self.profile_params[i], order=self.polynomial_orders[name])
+            fit, cov, model = fit_poly1d(self.pixels, self.profile_params[:, i], order=self.polynomial_orders[name])
             PSF_models.append(np.polyval(fit, all_pixels))
         for i, name in enumerate(self.PSF1D.param_names):
-            p = ax[0].plot(self.pixels, self.profile_params[i], label=test.param_names[i], marker='o', linestyle='none')
+            p = ax[0].plot(self.pixels, self.profile_params[:, i], label=test.param_names[i], marker='o', linestyle='none')
             if i > 0:
                 ax[0].plot(all_pixels, PSF_models[i], color=p[0].get_color())
             if truth is not None:
@@ -573,7 +569,7 @@ class ChromaticPSF1D:
         img = np.zeros((self.Ny, self.Nx)).astype(float)
         yy, xx = np.mgrid[:self.Ny, :self.Nx]
         for x in self.pixels[::self.Nx // 10]:
-            params = [PSF_models[p][x] for p in range(len(self.profile_params))]
+            params = [PSF_models[p][x] for p in range(len(self.PSF1D.param_names))]
             psf = PSF2D.evaluate(xx, yy, 1, x, self.Ny // 2, *params[2:])
             psf /= np.max(psf)
             img += psf
@@ -644,27 +640,35 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, saturation=None, live_fit=Fal
     Ny, Nx = data.shape
     middle = Ny // 2
     index = np.arange(Ny)
-    # Prepare the fit
-    bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
-    y = data[:, 0]
-    guess = [np.nanmax(y) - np.nanmean(y), middle, 5, 2, 0, 2, saturation]
-    maxi = np.abs(np.nanmax(y))
-    bounds = [(0.1 * maxi, None), (middle - w, middle + w), (1, w), (1, 10), (-1, 0), (0.1, w),
-              (0, 2 * saturation)]
     # Prepare the outputs
     s = ChromaticPSF1D()
     s.pixels = np.arange(Nx).astype(int)
     s.Nx = Nx
     s.Ny = Ny
-    s.profile_params = np.zeros((len(guess), Nx))
+    s.profile_params = np.zeros((Nx, len(s.PSF1D.param_names)))
     s.flux = np.zeros(Nx)
     s.flux_integral = np.zeros(Nx)
     s.flux_err = np.zeros(Nx)
     s.fwhms = np.zeros(Nx)
-    # set the pixel array where to fit the transverse profile
-    # 50 steps starting from the middle to the edges
-    for x in s.pixels:
+    # Prepare the fit: start with the maximum of the spectrum
+    ymax_index = int(np.unravel_index(np.argmax(data), data.shape)[1])
+    bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
+    y = data[:, ymax_index]
+    guess = [np.nanmax(y) - np.nanmean(y), middle, 5, 2, 0, 2, saturation]
+    maxi = np.abs(np.nanmax(y))
+    bounds = [(0.1 * maxi, None), (middle - w, middle + w), (1, w), (1, 10), (-1, 0), (0.1, w),
+              (0, 2 * saturation)]
+    # first fit with moffat only to initialize the guess
+    # hypothesis that max of spectrum if well describe by a focused PSF
+    fit = fit_moffat1d_outlier_removal(index, y, sigma=3, niter=2, guess=guess[:4], bounds=np.array(bounds[:4]).T)
+    moffat_guess = [getattr(fit, p).value for p in fit.param_names]
+    guess[:4] = moffat_guess
+    init_guess = np.copy(guess)
+    pixel_range = np.concatenate([np.arange(ymax_index, Nx), np.arange(ymax_index, 0, -1)])
+    for x in pixel_range:
         guess = np.copy(guess)
+        if x == ymax_index:
+            guess = np.copy(init_guess)
         # fit the background with a polynomial function
         y = data[:, x]
         bgd = data[bgd_index, x]
@@ -738,7 +742,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, saturation=None, live_fit=Fal
         # compute the flux
         guess = [getattr(fit, p).value for p in fit.param_names]
         fwhm = fit.fwhm(x_array=index)
-        s.profile_params[:, x] = guess
+        s.profile_params[x, :] = guess
         s.flux_integral[x] = fit.integrate(bounds=(-10 * fwhm + guess[1], 10 * fwhm + guess[1]), x_array=index)
         s.flux_err[x] = np.sqrt(np.sum(err[:, x] ** 2))
         s.flux[x] = np.sum(signal)
@@ -862,7 +866,7 @@ def fit_chromatic_PSF1D(Nx, Ny, data, guess, bounds=None, data_errors=None, ):
 
     # Estimate the first guess values
     >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], saturation=saturation, live_fit=False)
-    >>> guess = s.from_profile_params_to_poly_params()
+    >>> guess = s.from_profile_params_to_poly_params(Nx, s.profile_params)
     >>> im_guess = s.evaluate(Nx, Ny, guess)
 
     # Set bounds
@@ -900,8 +904,8 @@ def fit_chromatic_PSF1D(Nx, Ny, data, guess, bounds=None, data_errors=None, ):
 
     def spectrogram_chisq(params):
         in_bounds, penalty, name = s.check_bounds(Nx, Ny, params)
-        if not in_bounds:
-            my_logger.warning(f"{name} {in_bounds} {penalty}")
+        # if not in_bounds:
+        #    my_logger.warning(f"{name} {in_bounds} {penalty}")
         mod = s.evaluate(Nx, Ny, params)
         if data_errors is None:
             return np.nansum((mod - data) ** 2) + penalty
