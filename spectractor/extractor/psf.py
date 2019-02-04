@@ -247,7 +247,7 @@ class PSF2D(Fittable2DModel):
 
 class ChromaticPSF1D:
 
-    def __init__(self, order=10):
+    def __init__(self, order=4):
         # file_name="", image=None, order=1, target=None):
         # Spectrum.__init__(self, file_name=file_name, image=image, order=order, target=target)
         # self.profile_params = profile_params
@@ -312,7 +312,8 @@ class ChromaticPSF1D:
                 amplitude = profile_params[:, k]
                 poly_params = np.concatenate([poly_params, amplitude])
             else:
-                fit, cov, model = fit_poly1d(pixels, profile_params[:, k], order=self.polynomial_orders[name])
+                # fit, cov, model = fit_poly1d(pixels, profile_params[:, k], order=self.polynomial_orders[name])
+                fit = np.polynomial.legendre.legfit(pixels, profile_params[:, k], deg=self.polynomial_orders[name])
                 poly_params = np.concatenate([poly_params, fit])
         return poly_params
 
@@ -362,8 +363,9 @@ class ChromaticPSF1D:
             if name == 'amplitude_moffat':
                 profile_params[:, k] = poly_params[:Nx]
             else:
-                profile_params[:, k] = np.polyval(poly_params[Nx + shift:Nx + shift + self.polynomial_orders[name] + 1],
-                                                  pixels)
+                # profile_params[:, k] = np.polyval(poly_params[Nx + shift:Nx + shift + self.polynomial_orders[name] + 1],
+                #                                  pixels)
+                profile_params[:, k] = np.polynomial.legendre.legval(pixels, poly_params[Nx + shift:Nx + shift + self.polynomial_orders[name] + 1])
                 shift = shift + self.polynomial_orders[name] + 1
         return profile_params
 
@@ -499,8 +501,8 @@ class ChromaticPSF1D:
         >>> Nx = 100
         >>> Ny = 20
         >>> s = ChromaticPSF1D()
-        >>> profile_params = s.generate_test_poly_params(Nx, Ny)
-        >>> output = s.evaluate(Nx, Ny, profile_params)
+        >>> poly_params = s.generate_test_poly_params(Nx, Ny)
+        >>> output = s.evaluate(Nx, Ny, poly_params)
 
         >>> import matplotlib.pyplot as plt
         >>> im = plt.imshow(output, origin='lower')
@@ -513,6 +515,7 @@ class ChromaticPSF1D:
         y = np.arange(Ny)
         output = np.zeros((Ny, Nx))
         for k in range(Nx):
+            # self.my_logger.warning(f"{k} {profile_params[k]}")
             output[:, k] = PSF1D.evaluate(y, *profile_params[k])
         return output
 
@@ -534,12 +537,11 @@ class ChromaticPSF1D:
 
         Examples
         --------
-        >>> s = ChromaticPSF1D()
+        >>> s = ChromaticPSF1D(order=1)
         >>> Nx = 5
         >>> Ny = 4
         >>> params = s.generate_test_poly_params(Nx, Ny)
-        >>> print(params)
-        [0, 50, 100, 150, 200, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 2, 0, 0, 0, -0.8, 1, 0, 0, 0, 0, 2, 8000]
+        >>> assert(np.all(np.isclose(params, [ 0, 50, 100, 150, 200, 2, 0, 5, 0, 2, 0, -0.4, -0.4, 2, 0, 8000])))
         """
         params = [50 * i for i in range(Nx)]
         params += [0.] * (self.polynomial_orders['x_mean'] - 1) + [0, Ny / 2]  # y mean
@@ -548,7 +550,20 @@ class ChromaticPSF1D:
         params += [0.] * (self.polynomial_orders['eta_gauss'] - 1) + [-0.4, -0.4]  # eta_gauss
         params += [0.] * (self.polynomial_orders['stddev'] - 1) + [0, 2]  # stddev
         params += [8000.]  # saturation
-        return np.array(params)
+        poly_params = np.zeros_like(params)
+        poly_params[:Nx] = params[:Nx]
+        index = Nx - 1
+        for name in self.PSF1D.param_names:
+            if name == 'amplitude_moffat':
+                continue
+            else:
+                shift = self.polynomial_orders[name] + 1
+                c = np.polynomial.legendre.poly2leg(params[index+shift:index:-1])
+                coeffs = np.zeros(shift)
+                coeffs[:c.size] = c
+                poly_params[index+1:index+shift+1] = coeffs
+                index = index + shift
+        return poly_params
 
     def plot_summary(self, truth=None):
         fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12, 6))
