@@ -205,10 +205,10 @@ class Spectrum:
         """
         plt.figure(figsize=[12, 6])
         self.plot_spectrum_simple(plt.gca(), xlim=xlim, label=label)
-        if len(self.target.spectra)>0:
+        if len(self.target.spectra) > 0:
             for k in range(len(self.target.spectra)):
-                s = self.target.spectra[k] #/np.max(self.target.spectra[k])*np.max(self.data)
-                plt.plot(self.target.wavelengths[k],s,lw=2,label='Tabulated spectra #%d' % k)
+                s = self.target.spectra[k]  # /np.max(self.target.spectra[k])*np.max(self.data)
+                plt.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
         if self.lambdas is not None:
             # self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
             #                        print_table=parameters.VERBOSE)
@@ -290,7 +290,6 @@ class Spectrum:
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
-
 
 
 def calibrate_spectrum(spectrum, xlim=None):
@@ -814,15 +813,24 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     ymin = max(0, y0 - ws[1])
     # Roughly estimates the wavelengths and set start 50 nm before parameters.LAMBDA_MIN
     # and end 50 nm after parameters.LAMBDA_MAX
-    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx)-x0, x0=image.target_pixcoords_rotated)
-    pixel_start = int(np.argmin(np.abs(lambdas-(parameters.LAMBDA_MIN-50))))
-    pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas-(parameters.LAMBDA_MAX+50)))))
+    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - x0, x0=image.target_pixcoords_rotated)
+    pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 50))))
+    pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 50)))))
     # Create spectrogram
     data = data[ymin:ymax, pixel_start:pixel_end]
     err = err[ymin:ymax, pixel_start:pixel_end]
     Ny, Nx = data.shape
     # Fit the transverse profile
-    s = fit_transverse_PSF1D_profile(data, err, w, ws, saturation=image.saturation, live_fit=(parameters.DEBUG or True))
+    s = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1,
+                                     saturation=image.saturation, live_fit=(parameters.DEBUG or True))
+    guess = s.from_profile_params_to_poly_params(s.profile_params)
+    s.plot_summary()
+    # Set bounds
+    bounds = s.set_bounds(data, saturation=image.saturation)
+    # Fit the data:
+    s_fit = fit_chromatic_PSF1D(data, guess, bounds=bounds, data_errors=err)
+    s.profile_params = s.from_poly_params_to_profile_params(s_fit.poly_params)
+    s.plot_summary()
     # Fill spectrum object
     spectrum.data = np.array(s.flux)
     spectrum.err = np.array(s.flux_err)
@@ -833,14 +841,15 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                                 scale="log", title='', units=image.units, aspect='auto')
         centers = s.profile_params[1]
         ax[2].plot(s.pixels, centers, label='fitted spectrum centers')
-        ax[2].plot(s.pixels, centers+s.fwhms, 'k-', label='fitted FWHM')
-        ax[2].plot(s.pixels, centers-s.fwhms, 'k-')
+        ax[2].plot(s.pixels, centers + s.fwhms, 'k-', label='fitted FWHM')
+        ax[2].plot(s.pixels, centers - s.fwhms, 'k-')
         ax[2].set_ylim(0, Ny)
         ax[2].set_xlim(0, Nx)
         ax[2].legend(loc='best')
         spectrum.plot_spectrum_simple(ax[0], lambdas=s.pixels)
         ax[0].plot(s.pixels, s.flux_integral, 'k-')
-        ax[1].plot(s.pixels, (np.array(s.flux) - np.array(s.flux_integral))/np.array(s.flux), label='(integral-data)/data')
+        ax[1].plot(s.pixels, (np.array(s.flux) - np.array(s.flux_integral)) / np.array(s.flux),
+                   label='(integral-data)/data')
         ax[1].legend()
         ax[1].set_ylim(-1, 1)
         ax[1].set_ylabel('Relative difference')
@@ -854,4 +863,3 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         if parameters.DISPLAY:
             plt.show()
     return spectrum
-
