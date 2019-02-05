@@ -14,7 +14,7 @@ from astropy.stats import sigma_clip
 from astropy.table import Table
 
 from spectractor.tools import LevMarLSQFitterWithNan, dichotomie, fit_poly1d_outlier_removal, \
-    fit_poly1d, fit_moffat1d_outlier_removal, fit_moffat1d
+    fit_poly1d, fit_moffat1d_outlier_removal
 from spectractor import parameters
 from spectractor.config import set_logger
 
@@ -265,6 +265,7 @@ class ChromaticPSF1D:
         self.flux_err = np.zeros(Nx)
         self.fwhms = np.zeros(Nx)
         self.n_poly_params = Nx
+        self.fitted_pixels = np.arange(Nx)
         for name in self.PSF1D.param_names:
             self.n_poly_params += self.degrees[name] + 1
         self.poly_params = np.zeros(self.n_poly_params)
@@ -557,8 +558,9 @@ class ChromaticPSF1D:
             fit, cov, model = fit_poly1d(self.pixels, self.profile_params[:, i], order=self.degrees[name])
             PSF_models.append(np.polyval(fit, all_pixels))
         for i, name in enumerate(self.PSF1D.param_names):
-            p = ax[0].plot(self.pixels, self.profile_params[:, i], label=test.param_names[i], marker='o',
-                           linestyle='none')
+            p = ax[0].plot(self.pixels, self.profile_params[:, i], marker='+', linestyle='none')
+            ax[0].plot(self.fitted_pixels, self.profile_params[self.fitted_pixels, i], label=test.param_names[i],
+                       marker='o', linestyle='none', color=p[0].get_color())
             if i > 0:
                 ax[0].plot(all_pixels, PSF_models[i], color=p[0].get_color())
             if truth is not None:
@@ -586,7 +588,7 @@ class ChromaticPSF1D:
             plt.show()
 
 
-def fit_transverse_PSF1D_profile(data, err, w, ws, saturation=None, live_fit=False):
+def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None, live_fit=False):
     """
     Fit the transverse profile of a 2D data image with a PSF1D profile.
     Loop is done on the x-axis direction.
@@ -603,6 +605,9 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, saturation=None, live_fit=Fal
         Half width of central region where the spectrum is extracted and summed (default: 10)
     ws: list
         up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
+    pixel_step: int, optional
+        The step in pixels between the slices to be fitted (default: 1).
+        The values for the skipped pixels are interpolated with splines from the fitted parameters.
     saturation: float, optional
         The saturation level of the image. Default is set to twice the maximum of the data array and has no effect.
     live_fit: bool, optional
@@ -625,7 +630,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, saturation=None, live_fit=Fal
     >>> data_errors = np.sqrt(data+1)
 
     # Fit the transverse profile:
-    >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], saturation=saturation, live_fit=True)
+    >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10, saturation=saturation, live_fit=True)
     >>> assert(np.all(np.isclose(s.pixels[:5], np.arange(s.Nx)[:5], rtol=1e-3)))
     >>> s.plot_summary(truth=params)
     """
@@ -647,12 +652,22 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, saturation=None, live_fit=Fal
               (0, 2 * saturation)]
     # first fit with moffat only to initialize the guess
     # hypothesis that max of spectrum if well describe by a focused PSF
-    fit = fit_moffat1d_outlier_removal(index, y, sigma=3, niter=2, guess=guess[:4], bounds=np.array(bounds[:4]).T)
+    bgd = data[bgd_index, ymax_index]
+    bgd_fit = fit_poly1d_outlier_removal(bgd_index, bgd, order=1, sigma=3.0, niter=2)
+    signal = y - bgd_fit(index)
+    fit = fit_moffat1d_outlier_removal(index, signal, sigma=3, niter=2, guess=guess[:4], bounds=np.array(bounds[:4]).T)
     moffat_guess = [getattr(fit, p).value for p in fit.param_names]
     guess[:4] = moffat_guess
     init_guess = np.copy(guess)
     # Go from max to right, then from max to left
-    pixel_range = np.concatenate([np.arange(ymax_index, Nx), np.arange(ymax_index, -1, -1)])
+    # includes the boundaries to avoid Runge phenomenum in chromatic_fit
+    pixel_range = list(np.arange(ymax_index, Nx, pixel_step).astype(int))
+    if Nx - 1 not in pixel_range:
+        pixel_range.append(Nx - 1)
+    pixel_range += list(np.arange(ymax_index, -1, -pixel_step).astype(int))
+    if 0 not in pixel_range:
+        pixel_range.append(0)
+    pixel_range = np.array(pixel_range)
     for x in pixel_range:
         guess = np.copy(guess)
         if x == ymax_index:
@@ -684,15 +699,15 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, saturation=None, live_fit=Fal
         # first a simple moffat to get the general shape
         # moffat1d = fit_moffat1d_outlier_removal(index, signal, sigma=5, niter=2,
         #                                        guess=guess[:4], bounds=np.array(bounds[:4]).T)
-        #guess[:4] = [getattr(moffat1d, p).value for p in moffat1d.param_names]
+        # guess[:4] = [getattr(moffat1d, p).value for p in moffat1d.param_names]
         # then PSF1D model using the result from the Moffat1D fit
-        #fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
+        # fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
         #                                            guess=guess, bounds=bounds, sigma=5, niter=2,
         #                                            niter_basinhopping=5, T_basinhopping=1)
         good_indices = [i for i in index if i not in outliers]
         fit = fit_PSF1D_minuit(index[good_indices], signal[good_indices], guess=guess, bounds=bounds)
         sigma = 5
-        outliers = [i for i in index if np.abs((signal[i] - fit(i))/err[i, x]) > sigma]
+        outliers = [i for i in index if np.abs((signal[i] - fit(i)) / err[i, x]) > sigma]
         """
         This part is relevant if outliers rejection above is activated
         # test if 3 consecutive pixels are in the outlier list
@@ -760,10 +775,10 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, saturation=None, live_fit=Fal
             ax[0].text(0.95, 0.95, txt, horizontalalignment='right',
                        verticalalignment='top', transform=ax[0].transAxes)
             ax[0].set_title(f'x={x}')
-            residuals = (y - model)/ err[:, x] #/ model
-            residuals_err = err[:, x]/ err[:, x] #/ model
-            residuals_outliers = (data[outliers, x] - model_outliers)/err[outliers, x] #/ model_outliers
-            residuals_outliers_err = err[outliers, x]/err[outliers, x] #/ model_outliers
+            residuals = (y - model) / err[:, x]  # / model
+            residuals_err = err[:, x] / err[:, x]  # / model
+            residuals_outliers = (data[outliers, x] - model_outliers) / err[outliers, x]  # / model_outliers
+            residuals_outliers_err = err[outliers, x] / err[outliers, x]  # / model_outliers
             ax[1].errorbar(index, residuals, yerr=residuals_err, fmt='ro')
             ax[1].errorbar(outliers, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
             ax[1].axhline(0, color='b')
@@ -782,6 +797,17 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, saturation=None, live_fit=Fal
                 plt.draw()
                 plt.pause(1e-8)
                 plt.close()
+    # interpolate the skipped pixels with splines
+    x = np.arange(Nx)
+    xp = np.array(sorted(set(list(pixel_range))))
+    s.fitted_pixels = xp
+    for i in range(len(s.PSF1D.param_names)):
+        yp = s.profile_params[xp, i]
+        s.profile_params[:, i] = interp1d(xp, yp, kind='cubic')(x)
+    s.flux_integral = interp1d(xp, s.flux_integral[xp], kind='cubic', bounds_error=False, fill_value='extrapolate')(x)
+    s.flux = interp1d(xp, s.flux[xp], kind='cubic', bounds_error=False, fill_value='extrapolate')(x)
+    s.flux_err = interp1d(xp, s.flux_err[xp], kind='cubic', bounds_error=False, fill_value='extrapolate')(x)
+    s.fwhms = interp1d(xp, s.fwhms[xp], kind='cubic', bounds_error=False, fill_value='extrapolate')(x)
     return s
 
 
@@ -868,44 +894,22 @@ def fit_chromatic_PSF1D(data, guess, deg=4, bounds=None, data_errors=None, ):
     >>> data_errors = np.sqrt(data+1)
 
     # Estimate the first guess values
-    >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], saturation=saturation, live_fit=False)
+    >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+    ... pixel_step=10, saturation=saturation, live_fit=False)
     >>> guess = s.from_profile_params_to_poly_params(s.profile_params)
-    >>> im_guess = s.evaluate(guess)
+    >>> s.plot_summary(truth=params)
 
     # Set bounds
     >>> bounds = s.set_bounds(data, saturation=saturation)
 
     # Fit the data:
     >>> s_fit = fit_chromatic_PSF1D(data, guess, bounds=bounds, data_errors=data_errors)
-    >>> fit = s.evaluate(s_fit.poly_params)
-    >>> s.profile_params = s.from_poly_params_to_profile_params(p)
+    >>> s.profile_params = s.from_poly_params_to_profile_params(s_fit.poly_params)
     >>> s.plot_summary(truth=params)
-
-    # Plot data, best fit model and residuals:
-    >>> import matplotlib.pyplot as plt
-    >>> fig, ax = plt.subplots(5, 1, sharex='all', figsize=(6,8))
-    >>> im0 = ax[0].imshow(data, origin='lower', aspect='auto')
-    >>> ax[0].set_title('Data')
-    >>> plt.colorbar(im0, ax=ax[0])
-    >>> im1 = ax[1].imshow(im_guess, origin='lower', aspect='auto')
-    >>> ax[1].set_title('Guess')
-    >>> plt.colorbar(im1, ax=ax[1])
-    >>> im2 = ax[2].imshow((data-im_guess)/data_errors, origin='lower', aspect='auto')
-    >>> ax[2].set_title('(Data-Guess)/Data_errors')
-    >>> plt.colorbar(im2, ax=ax[2])
-    >>> im3 = ax[3].imshow(fit, origin='lower', aspect='auto')
-    >>> ax[3].set_title('Fit')
-    >>> plt.colorbar(im3, ax=ax[3])
-    >>> im4 = ax[4].imshow((data-fit)/data_errors, origin='lower', aspect='auto')
-    >>> ax[4].set_title('(Data-Fit)/Data_errors')
-    >>> plt.colorbar(im4, ax=ax[4])
-    >>> fig.tight_layout()
-    >>> plt.show()
     """
     my_logger = set_logger(__name__)
     Ny, Nx = data.shape
     s = ChromaticPSF1D(Nx, Ny, deg=deg)
-    nparams = guess.size
 
     def spectrogram_chisq(poly_params):
         in_bounds, penalty, name = s.check_bounds(poly_params)
@@ -919,13 +923,36 @@ def fit_chromatic_PSF1D(data, guess, deg=4, bounds=None, data_errors=None, ):
 
     my_logger.debug(f'\n\tStart chisq: {spectrogram_chisq(guess)}')
     error = 0.01 * np.abs(guess) * np.ones_like(guess)
-    fix = [False] * nparams
+    fix = [False] * s.n_poly_params
     fix[-1] = True
     # noinspection PyArgumentList
     m = Minuit.from_array_func(fcn=spectrogram_chisq, start=guess, error=error, errordef=1, limit=bounds, fix=fix)
     m.migrad()
     s.poly_params = m.np_values()
     s.profile_params = s.from_poly_params_to_profile_params(s.poly_params)
+    if parameters.DEBUG or True:
+        # Plot data, best fit model and residuals:
+        fig, ax = plt.subplots(5, 1, sharex='all', figsize=(6, 8))
+        im0 = ax[0].imshow(data, origin='lower', aspect='auto')
+        ax[0].set_title('Data')
+        plt.colorbar(im0, ax=ax[0])
+        im_guess = s.evaluate(guess)
+        im1 = ax[1].imshow(im_guess, origin='lower', aspect='auto')
+        fit = s.evaluate(s.poly_params)
+        ax[1].set_title('Guess')
+        plt.colorbar(im1, ax=ax[1])
+        im2 = ax[2].imshow((data - im_guess) / data_errors, origin='lower', aspect='auto')
+        ax[2].set_title('(Data-Guess)/Data_errors')
+        plt.colorbar(im2, ax=ax[2])
+        im3 = ax[3].imshow(fit, origin='lower', aspect='auto')
+        ax[3].set_title('Fit')
+        plt.colorbar(im3, ax=ax[3])
+        im4 = ax[4].imshow((data - fit) / data_errors, origin='lower', aspect='auto')
+        ax[4].set_title('(Data-Fit)/Data_errors')
+        plt.colorbar(im4, ax=ax[4])
+        fig.tight_layout()
+        plt.show()
+
     return s
 
 
@@ -991,6 +1018,8 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
         2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
     data_errors: np.array
         the 2D array uncertainties.
+    method: str, optional
+        the minimisation method: 'minimize' or 'basinhopping' (default: 'minimize').
 
     Returns
     -------
