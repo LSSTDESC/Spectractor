@@ -705,7 +705,8 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         #                                            guess=guess, bounds=bounds, sigma=5, niter=2,
         #                                            niter_basinhopping=5, T_basinhopping=1)
         good_indices = [i for i in index if i not in outliers]
-        fit = fit_PSF1D_minuit(index[good_indices], signal[good_indices], guess=guess, bounds=bounds)
+        fit = fit_PSF1D_minuit(index[good_indices], signal[good_indices], guess=guess, bounds=bounds,
+                               data_errors=err[good_indices, x])
         sigma = 5
         outliers = [i for i in index if np.abs((signal[i] - fit(i)) / err[i, x]) > sigma]
         """
@@ -1276,10 +1277,83 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
 
     def PSF1D_chisq_v2(params):
         mod = model.evaluate(x, *params)
-        # if len(m) == 0 or len(data) == 0:
-        #     return 1e20
-        # if np.any(m < 0) or np.any(m > 1.5 * np.max(data)) or np.max(m) < 0.5 * np.max(data):
-        #     return 1e20
+        diff = mod - data
+        if data_errors is None:
+            return np.nansum(diff * diff)
+        else:
+            return np.nansum((diff / data_errors) ** 2)
+
+    error = 0.1 * np.abs(guess) * np.ones_like(guess)
+    fix = [False] * len(guess)
+    fix[-1] = True
+    # noinspection PyArgumentList
+    m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
+                               print_level=parameters.DEBUG)
+    m.migrad()
+
+    PSF = PSF1D(*m.np_values())
+
+    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
+    return PSF
+
+
+
+def fit_PSF1D_minuit_3outlier_removal(x, data, data_errors, guess=None, bounds=None, sigma=3, niter=2):
+    """Fit a PSF 1D model with parameters:
+        amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+    using Minuit. Find outliers data point above sigma*data_errors from the fit over niter iterations.
+    Only at least 3 consecutive outliers are considered.
+
+    Parameters
+    ----------
+    x: np.array
+        1D array of the x coordinates.
+    data: np.array
+        the 1D array profile.
+    guess: array_like, optional
+        list containing a first guess for the PSF parameters (default: None).
+    bounds: list, optional
+        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
+    data_errors: np.array
+        the 1D array uncertainties.
+
+    Returns
+    -------
+    fitted_model: PSF1D
+        the PSF1D fitted model.
+
+    Examples
+    --------
+
+    Create the model:
+    >>> import numpy as np
+    >>> X = np.arange(0, 50)
+    >>> PSF = PSF1D()
+    >>> p = (50, 25, 5, 1, -0.2, 1, 60)
+    >>> Y = PSF.evaluate(X, *p)
+    >>> Y_err = np.sqrt(Y)/10.
+
+    Prepare the fit:
+    >>> guess = (60, 20, 3.2, 1.2, -0.1, 2,  60)
+    >>> bounds = ((0, 200), (10, 40), (0.5, 10), (0.5, 5), (-10, 200), (0.01, 10), (0, 400))
+
+    Fit with error bars:
+    >>> model = fit_PSF1D_minuit_3outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err)
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
+    Fit without error bars:
+    >>> model = fit_PSF1D_minuit_3outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=None)
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
+    """
+
+    my_logger = set_logger(__name__)
+    model = PSF1D()
+
+    def PSF1D_chisq_v2(params):
+        mod = model.evaluate(x, *params)
         diff = mod - data
         if data_errors is None:
             return np.nansum(diff * diff)
