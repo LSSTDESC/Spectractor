@@ -332,13 +332,13 @@ class ChromaticPSF1D:
         Returns
         -------
         profile_params: array
-            a Nx * len(self.PSF1D.param_names) numpy array containing the PSF1D parameters as a function of pixels.
+            Nx * len(self.PSF1D.param_names) numpy array containing the PSF1D parameters as a function of pixels.
 
         Examples
         --------
 
         # Build a mock spectrogram with random Poisson noise:
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4)
+        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=1)
         >>> poly_params_test = s.generate_test_poly_params()
         >>> data = s.evaluate(poly_params_test)
         >>> data = np.random.poisson(data)
@@ -375,14 +375,14 @@ class ChromaticPSF1D:
         for k, name in enumerate(self.PSF1D.param_names):
             tmp_bounds = [[None] * (1 + self.degrees[name]), [None] * (1 + self.degrees[name])]
             # if name is "x_mean":
-            #     tmp_bounds[0].append(0)
-            #     tmp_bounds[1].append(Ny)
+            #      tmp_bounds[0].append(0)
+            #      tmp_bounds[1].append(Ny)
             # elif name is "gamma":
-            #     tmp_bounds[0].append(0)
-            #     tmp_bounds[1].append(Ny / 2)
+            #      tmp_bounds[0].append(0)
+            #      tmp_bounds[1].append(None) # Ny/2
             # elif name is "alpha":
-            #     tmp_bounds[0].append(1)
-            #     tmp_bounds[1].append(10)
+            #      tmp_bounds[0].append(1)
+            #      tmp_bounds[1].append(None) # 10
             # elif name is "eta_gauss":
             #     tmp_bounds[0].append(-1)
             #     tmp_bounds[1].append(0)
@@ -438,10 +438,11 @@ class ChromaticPSF1D:
                     penalty /= np.abs(np.mean(p))
                     in_bounds = False
                     outbound_parameter_name += name + ' '
-            # elif name is "gamma":
-            #     if np.any(p < 0) or np.any(p > Ny / 2):
-            #         in_bounds = False
-            #         break
+            elif name is "gamma":
+                 if np.any(p < 0) or np.any(p > self.Ny):
+                     in_bounds = False
+                     penalty = 1e20
+                     break
             # elif name is "alpha":
             #     if np.any(p < 1) or np.any(p > 10):
             #         in_bounds = False
@@ -456,10 +457,11 @@ class ChromaticPSF1D:
                     penalty += np.sum(1 - profile_params[p < -1, k])
                     penalty /= np.abs(np.mean(p))
                     outbound_parameter_name += name + ' '
-            # elif name is "stddev":
-            #     if np.any(p < 0.1) or np.any(p > Ny / 2):
-            #         in_bounds = False
-            #         break
+            elif name is "stddev":
+                 if np.any(p < 0) or np.any(p > self.Ny):
+                     in_bounds = False
+                     penalty = 1e20
+                     break
             elif name is "saturation":
                 continue
             else:
@@ -552,7 +554,7 @@ class ChromaticPSF1D:
         PSF_models = []
         PSF_truth = []
         if truth is not None:
-            PSF_truth = self.from_poly_params_to_profile_params(truth)
+            PSF_truth = truth.from_poly_params_to_profile_params(truth.poly_params)
         all_pixels = np.arange(self.Nx)
         for i, name in enumerate(self.PSF1D.param_names):
             fit, cov, model = fit_poly1d(self.pixels, self.profile_params[:, i], order=self.degrees[name])
@@ -588,7 +590,7 @@ class ChromaticPSF1D:
             plt.show()
 
 
-def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None, live_fit=False):
+def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None, live_fit=False, sigma=5, deg=4):
     """
     Fit the transverse profile of a 2D data image with a PSF1D profile.
     Loop is done on the x-axis direction.
@@ -612,6 +614,8 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         The saturation level of the image. Default is set to twice the maximum of the data array and has no effect.
     live_fit: bool, optional
         If True, the transverse profile fit is plotted in live accross the loop (default: False).
+    sigma: int
+        Sigma for outlier rejection (default: 5).
 
     Returns
     -------
@@ -630,7 +634,8 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     >>> data_errors = np.sqrt(data+1)
 
     # Fit the transverse profile:
-    >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10, saturation=saturation, live_fit=True)
+    >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
+    ... saturation=saturation, live_fit=True, sigma=5)
     >>> assert(np.all(np.isclose(s.pixels[:5], np.arange(s.Nx)[:5], rtol=1e-3)))
     >>> s.plot_summary(truth=params)
     """
@@ -641,7 +646,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     middle = Ny // 2
     index = np.arange(Ny)
     # Prepare the outputs
-    s = ChromaticPSF1D(Nx, Ny)
+    s = ChromaticPSF1D(Nx, Ny, deg=deg)
     # Prepare the fit: start with the maximum of the spectrum
     ymax_index = int(np.unravel_index(np.argmax(data), data.shape)[1])
     bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
@@ -653,9 +658,10 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     # first fit with moffat only to initialize the guess
     # hypothesis that max of spectrum if well describe by a focused PSF
     bgd = data[bgd_index, ymax_index]
-    bgd_fit = fit_poly1d_outlier_removal(bgd_index, bgd, order=1, sigma=3.0, niter=2)
+    bgd_fit = fit_poly1d_outlier_removal(bgd_index, bgd, order=1, sigma=sigma, niter=2)
     signal = y - bgd_fit(index)
-    fit = fit_moffat1d_outlier_removal(index, signal, sigma=3, niter=2, guess=guess[:4], bounds=np.array(bounds[:4]).T)
+    fit = fit_moffat1d_outlier_removal(index, signal, sigma=sigma, niter=2,
+                                       guess=guess[:4], bounds=np.array(bounds[:4]).T)
     moffat_guess = [getattr(fit, p).value for p in fit.param_names]
     guess[:4] = moffat_guess
     init_guess = np.copy(guess)
@@ -676,7 +682,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         y = data[:, x]
         bgd = data[bgd_index, x]
         bgd_err = err[bgd_index, x]
-        bgd_fit = fit_poly1d_outlier_removal(bgd_index, bgd, order=1, sigma=3.0, niter=2)
+        bgd_fit = fit_poly1d_outlier_removal(bgd_index, bgd, order=1, sigma=sigma, niter=2)
         signal = y - bgd_fit(index)
         # in case guess amplitude is too low
         pdf = np.abs(signal)
@@ -704,11 +710,12 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         # fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
         #                                            guess=guess, bounds=bounds, sigma=5, niter=2,
         #                                            niter_basinhopping=5, T_basinhopping=1)
-        good_indices = [i for i in index if i not in outliers]
-        fit = fit_PSF1D_minuit(index[good_indices], signal[good_indices], guess=guess, bounds=bounds,
-                               data_errors=err[good_indices, x])
-        sigma = 5
-        outliers = [i for i in index if np.abs((signal[i] - fit(i)) / err[i, x]) > sigma]
+        # fit = fit_PSF1D_minuit(index[good_indices], signal[good_indices], guess=guess, bounds=bounds,
+        #                       data_errors=err[good_indices, x])
+        fit, outliers = fit_PSF1D_minuit_outlier_removal(index, signal, guess=guess, bounds=bounds,
+                               data_errors=err[:, x], sigma=sigma, niter=2, consecutive=4)
+        # good_indices = [i for i in index if i not in outliers]
+        # outliers = [i for i in index if np.abs((signal[i] - fit(i)) / err[i, x]) > sigma]
         """
         This part is relevant if outliers rejection above is activated
         # test if 3 consecutive pixels are in the outlier list
@@ -861,7 +868,7 @@ def save_chromatic_psf(file_name, s):
     t = Table(data_rows.T, names=names, dtype=types)
 
 
-def fit_chromatic_PSF1D(data, guess, deg=4, bounds=None, data_errors=None, ):
+def fit_chromatic_PSF1D(data, guess, deg=4, bounds=None, data_errors=None):
     """
     Fit a chromatic PSF1D model on 2D data.
 
@@ -881,14 +888,15 @@ def fit_chromatic_PSF1D(data, guess, deg=4, bounds=None, data_errors=None, ):
     Returns
     -------
     s: ChromaticPSF1D
-        The chromatic PSF containing all the information on the wavelength dependeces of the parameters adn the flux.
+        The chromatic PSF containing all the information on the wavelength dependences of the parameters adn the flux.
 
     Examples
     --------
 
     # Build a mock spectrogram with random Poisson noise:
-    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100)
+    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=1)
     >>> params = s0.generate_test_poly_params()
+    >>> s0.poly_params = params
     >>> saturation = params[-1]
     >>> data = s0.evaluate(params)
     >>> data = np.random.poisson(data)
@@ -896,65 +904,105 @@ def fit_chromatic_PSF1D(data, guess, deg=4, bounds=None, data_errors=None, ):
 
     # Estimate the first guess values
     >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-    ... pixel_step=10, saturation=saturation, live_fit=False)
+    ... pixel_step=1, saturation=saturation, live_fit=False, deg=1)
     >>> guess = s.from_profile_params_to_poly_params(s.profile_params)
-    >>> s.plot_summary(truth=params)
+    >>> s.plot_summary(truth=s0)
 
     # Set bounds
     >>> bounds = s.set_bounds(data, saturation=saturation)
 
     # Fit the data:
-    >>> s_fit = fit_chromatic_PSF1D(data, guess, bounds=bounds, data_errors=data_errors)
+    >>> s_fit = fit_chromatic_PSF1D(data, guess, bounds=bounds, data_errors=data_errors, deg=1)
     >>> s.profile_params = s.from_poly_params_to_profile_params(s_fit.poly_params)
-    >>> s.plot_summary(truth=params)
+    >>> s.plot_summary(truth=s0)
     """
     my_logger = set_logger(__name__)
     Ny, Nx = data.shape
     s = ChromaticPSF1D(Nx, Ny, deg=deg)
+    pixels = np.arange(Ny)
 
-    def spectrogram_chisq(poly_params):
+    W = 1./(data_errors*data_errors)
+    W = [np.diag(W[:, x]) for x in range(Nx)]
+    J = np.zeros((Nx, Ny))
+    poly_params = np.copy(guess)
+
+    def spectrogram_chisq(shape_params):
+        # linear regression for the amplitude parameters
+        poly_params[Nx:] = shape_params
+        profile_params = s.from_poly_params_to_profile_params(poly_params)
+        profile_params[:Nx, 0] = 1
+        J = np.array([s.PSF1D.evaluate(pixels, *profile_params[x, :]) for x in range(Nx)])
+        amplitude_params = [J[x].T.dot(W[x]).dot(data[:, x]) / (J[x].T.dot(W[x]).dot(J[x])) for x in range(Nx)]
+        poly_params[:Nx] = amplitude_params
         in_bounds, penalty, name = s.check_bounds(poly_params)
-        # if not in_bounds:
-        #    my_logger.warning(f"{name} {in_bounds} {penalty}")
         mod = s.evaluate(poly_params)
+        s.poly_params = np.copy(poly_params)
         if data_errors is None:
             return np.nansum((mod - data) ** 2) + penalty
         else:
             return np.nansum(((mod - data) / data_errors) ** 2) + penalty
 
-    my_logger.debug(f'\n\tStart chisq: {spectrogram_chisq(guess)}')
-    error = 0.01 * np.abs(guess) * np.ones_like(guess)
-    fix = [False] * s.n_poly_params
+    def spectrogram_chisq_jacobian(shape_params):
+        poly_params[Nx:] = shape_params
+        profile_params = s.from_poly_params_to_profile_params(poly_params)
+        J = np.array([s.PSF1D.evaluate(pixels, *profile_params[x, :]) for x in range(Nx)])
+        grad_J = np.array([s.PSF1D.fit_deriv(pixels, *profile_params[x, :]) for x in range(Nx)])
+        amplitude_params = np.array([J[x].T.dot(W[x]).dot(data[:, x]) / (J[x].T.dot(W[x]).dot(J[x])) for x in range(Nx)])
+        diff = (J.dot(amplitude_params) - data)
+        grad_chi2_over_p = []
+        for p, value in enumerate(shape_params):
+            grad_chi2_over_p.append([np.trace(2*grad_J[x, p].T.dot(W[x].dot(diff[x]).dot(amplitude_params.T))) for x in range(Nx)])
+        return grad_chi2_over_p
+
+    # grad = spectrogram_chisq_jacobian(guess[Nx:])
+    # my_logger.warning(f"{grad.shape} {grad}")
+
+    my_logger.debug(f'\n\tStart chisq: {spectrogram_chisq(guess[Nx:])}')
+    error = 0.1 * np.abs(guess) * np.ones_like(guess)
+    fix = [False] * (s.n_poly_params-Nx)
     fix[-1] = True
+    # fix[:Nx] = [True] * Nx
     # noinspection PyArgumentList
-    m = Minuit.from_array_func(fcn=spectrogram_chisq, start=guess, error=error, errordef=1, limit=bounds, fix=fix)
+    m = Minuit.from_array_func(fcn=spectrogram_chisq, start=guess[Nx:], error=error[Nx:], errordef=1, limit=bounds[Nx:], fix=fix, print_level=2)
     m.migrad()
-    s.poly_params = m.np_values()
+    # m.hesse()
+    #print(m.np_matrix())
+    #print(m.np_matrix(correlation=True))
+    s.poly_params[Nx:] = m.np_values()
     s.profile_params = s.from_poly_params_to_profile_params(s.poly_params)
     if parameters.DEBUG or True:
         # Plot data, best fit model and residuals:
-        fig, ax = plt.subplots(5, 1, sharex='all', figsize=(6, 8))
-        im0 = ax[0].imshow(data, origin='lower', aspect='auto')
-        ax[0].set_title('Data')
-        plt.colorbar(im0, ax=ax[0])
-        im_guess = s.evaluate(guess)
-        im1 = ax[1].imshow(im_guess, origin='lower', aspect='auto')
-        fit = s.evaluate(s.poly_params)
-        ax[1].set_title('Guess')
-        plt.colorbar(im1, ax=ax[1])
-        im2 = ax[2].imshow((data - im_guess) / data_errors, origin='lower', aspect='auto')
-        ax[2].set_title('(Data-Guess)/Data_errors')
-        plt.colorbar(im2, ax=ax[2])
-        im3 = ax[3].imshow(fit, origin='lower', aspect='auto')
-        ax[3].set_title('Fit')
-        plt.colorbar(im3, ax=ax[3])
-        im4 = ax[4].imshow((data - fit) / data_errors, origin='lower', aspect='auto')
-        ax[4].set_title('(Data-Fit)/Data_errors')
-        plt.colorbar(im4, ax=ax[4])
-        fig.tight_layout()
-        plt.show()
-
+        plot_residuals(s, data, data_errors, guess=guess, title='Best fit')
     return s
+
+
+def plot_residuals(s, data, data_errors, guess=None,  live_fit=False, title=""):
+    fig, ax = plt.subplots(5, 1, sharex='all', figsize=(6, 8))
+    plt.title(title)
+    im0 = ax[0].imshow(data, origin='lower', aspect='auto')
+    ax[0].set_title('Data')
+    plt.colorbar(im0, ax=ax[0])
+    im_guess = s.evaluate(guess)
+    im1 = ax[1].imshow(im_guess, origin='lower', aspect='auto')
+    fit = s.evaluate(s.poly_params)
+    ax[1].set_title('Guess')
+    plt.colorbar(im1, ax=ax[1])
+    im2 = ax[2].imshow((data - im_guess) / data_errors, origin='lower', aspect='auto')
+    ax[2].set_title('(Data-Guess)/Data_errors')
+    plt.colorbar(im2, ax=ax[2])
+    im3 = ax[3].imshow(fit, origin='lower', aspect='auto')
+    ax[3].set_title(title)
+    plt.colorbar(im3, ax=ax[3])
+    im4 = ax[4].imshow((data - fit) / data_errors, origin='lower', aspect='auto')
+    ax[4].set_title('(Data-Fit)/Data_errors')
+    plt.colorbar(im4, ax=ax[4])
+    fig.tight_layout()
+    if live_fit:
+        plt.draw()
+        plt.pause(1e-8)
+        plt.close()
+    else:
+        plt.show()
 
 
 def PSF2D_chisq(params, model, xx, yy, zz, zz_err=None):
@@ -1254,11 +1302,11 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     >>> PSF = PSF1D()
     >>> p = (50, 25, 5, 1, -0.2, 1, 60)
     >>> Y = PSF.evaluate(X, *p)
-    >>> Y_err = np.sqrt(Y)/10.
+    >>> Y_err = np.sqrt(1+Y)
 
     Prepare the fit:
     >>> guess = (60, 20, 3.2, 1.2, -0.1, 2,  60)
-    >>> bounds = ((0, 200), (10, 40), (0.5, 10), (0.5, 5), (-10, 200), (0.01, 10), (0, 400))
+    >>> bounds = ((0, 200), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 400))
 
     Fit with error bars:
     >>> model = fit_PSF1D_minuit(X, Y, guess=guess, bounds=bounds, data_errors=Y_err)
@@ -1297,8 +1345,7 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     return PSF
 
 
-
-def fit_PSF1D_minuit_3outlier_removal(x, data, data_errors, guess=None, bounds=None, sigma=3, niter=2):
+def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=None, sigma=3, niter=2, consecutive=3):
     """Fit a PSF 1D model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
     using Minuit. Find outliers data point above sigma*data_errors from the fit over niter iterations.
@@ -1310,17 +1357,25 @@ def fit_PSF1D_minuit_3outlier_removal(x, data, data_errors, guess=None, bounds=N
         1D array of the x coordinates.
     data: np.array
         the 1D array profile.
+    data_errors: np.array
+        the 1D array uncertainties.
     guess: array_like, optional
         list containing a first guess for the PSF parameters (default: None).
     bounds: list, optional
         2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
-    data_errors: np.array
-        the 1D array uncertainties.
+    sigma: int
+        the sigma limit to exclude data points (default: 3).
+    niter: int
+        the number of loop iterations to exclude  outliers and refit the model (default: 2).
+    consecutive: int
+        the number of outliers that have to be consecutive to be considered (default: 3).
 
     Returns
     -------
     fitted_model: PSF1D
         the PSF1D fitted model.
+    outliers: list
+        the list of the outlier indices.
 
     Examples
     --------
@@ -1329,46 +1384,76 @@ def fit_PSF1D_minuit_3outlier_removal(x, data, data_errors, guess=None, bounds=N
     >>> import numpy as np
     >>> X = np.arange(0, 50)
     >>> PSF = PSF1D()
-    >>> p = (50, 25, 5, 1, -0.2, 1, 60)
+    >>> p = (1000, 25, 5, 1, -0.2, 1, 6000)
     >>> Y = PSF.evaluate(X, *p)
-    >>> Y_err = np.sqrt(Y)/10.
+    >>> Y += 400*np.exp(-((X-10)/2)**2)
+    >>> Y_err = np.sqrt(1+Y)
 
     Prepare the fit:
-    >>> guess = (60, 20, 3.2, 1.2, -0.1, 2,  60)
-    >>> bounds = ((0, 200), (10, 40), (0.5, 10), (0.5, 5), (-10, 200), (0.01, 10), (0, 400))
+    >>> guess = (600, 20, 3.2, 1.2, -0.1, 2,  6000)
+    >>> bounds = ((0, 6000), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000))
 
     Fit with error bars:
-    >>> model = fit_PSF1D_minuit_3outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err)
+    >>> model, outliers = fit_PSF1D_minuit_outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err,
+    ... sigma=3, niter=2, consecutive=3)
     >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
-
-    Fit without error bars:
-    >>> model = fit_PSF1D_minuit_3outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=None)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
-
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
     """
 
     my_logger = set_logger(__name__)
+    PSF = PSF1D(*guess)
     model = PSF1D()
+    outliers = np.array([])
+    indices = [i for i in range(x.shape[0]) if i not in outliers]
 
     def PSF1D_chisq_v2(params):
         mod = model.evaluate(x, *params)
-        diff = mod - data
+        diff = mod[indices] - data[indices]
         if data_errors is None:
             return np.nansum(diff * diff)
         else:
-            return np.nansum((diff / data_errors) ** 2)
+            return np.nansum((diff / data_errors[indices]) ** 2)
 
     error = 0.1 * np.abs(guess) * np.ones_like(guess)
     fix = [False] * len(guess)
     fix[-1] = True
-    # noinspection PyArgumentList
-    m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
-                               print_level=parameters.DEBUG)
-    m.migrad()
 
-    PSF = PSF1D(*m.np_values())
+    consecutive_outliers = []
+    for step in range(niter):
+        # noinspection PyArgumentList
+        m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
+                                   print_level=parameters.DEBUG)
+        m.migrad()
+        guess = m.np_values()
+        PSF = PSF1D(*m.np_values())
+        for ip, p in enumerate(model.param_names):
+            setattr(model, p, guess[ip])
+        # remove outliers
+        indices_no_nan = ~np.isnan(data)
+        diff = model(x[indices_no_nan]) - data[indices_no_nan]
+        if data_errors is not None:
+            outliers = np.where(np.abs(diff) / data_errors[indices_no_nan] > sigma)[0]
+        else:
+            std = np.std(diff)
+            outliers = np.where(np.abs(diff) / std > sigma)[0]
+        if len(outliers) > 0:
+            # test if 3 consecutive pixels are in the outlier list
+            test = 0
+            consecutive_outliers = []
+            for o in range(1, len(outliers)):
+                t = outliers[o] - outliers[o - 1]
+                if t == 1:
+                    test += t
+                else:
+                    test = 0
+                if test >= consecutive-1:
+                    for i in range(consecutive):
+                        consecutive_outliers.append(outliers[o-i])
+            consecutive_outliers = list(set(consecutive_outliers))
+            my_logger.debug(f"\n\tConsecutive oultlier indices: {consecutive_outliers}")
+            indices = [i for i in range(x.shape[0]) if i not in outliers]
+        else:
+            break
 
     my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF
+    return PSF, consecutive_outliers
