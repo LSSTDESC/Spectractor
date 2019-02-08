@@ -441,7 +441,7 @@ class ChromaticPSF1D:
             elif name is "gamma":
                  if np.any(p < 0) or np.any(p > self.Ny):
                      in_bounds = False
-                     penalty = 1e20
+                     penalty = 1
                      break
             # elif name is "alpha":
             #     if np.any(p < 1) or np.any(p > 10):
@@ -460,7 +460,7 @@ class ChromaticPSF1D:
             elif name is "stddev":
                  if np.any(p < 0) or np.any(p > self.Ny):
                      in_bounds = False
-                     penalty = 1e20
+                     penalty = 1
                      break
             elif name is "saturation":
                 continue
@@ -637,7 +637,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
     ... saturation=saturation, live_fit=True, sigma=5)
     >>> assert(np.all(np.isclose(s.pixels[:5], np.arange(s.Nx)[:5], rtol=1e-3)))
-    >>> s.plot_summary(truth=params)
+    >>> s.plot_summary(truth=s0)
     """
     my_logger = set_logger(__name__)
     if saturation is None:
@@ -894,7 +894,7 @@ def fit_chromatic_PSF1D(data, guess, deg=4, bounds=None, data_errors=None):
     --------
 
     # Build a mock spectrogram with random Poisson noise:
-    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=1)
+    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4)
     >>> params = s0.generate_test_poly_params()
     >>> s0.poly_params = params
     >>> saturation = params[-1]
@@ -904,7 +904,7 @@ def fit_chromatic_PSF1D(data, guess, deg=4, bounds=None, data_errors=None):
 
     # Estimate the first guess values
     >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-    ... pixel_step=1, saturation=saturation, live_fit=False, deg=1)
+    ... pixel_step=1, saturation=saturation, live_fit=False, deg=4)
     >>> guess = s.from_profile_params_to_poly_params(s.profile_params)
     >>> s.plot_summary(truth=s0)
 
@@ -912,7 +912,7 @@ def fit_chromatic_PSF1D(data, guess, deg=4, bounds=None, data_errors=None):
     >>> bounds = s.set_bounds(data, saturation=saturation)
 
     # Fit the data:
-    >>> s_fit = fit_chromatic_PSF1D(data, guess, bounds=bounds, data_errors=data_errors, deg=1)
+    >>> s_fit = fit_chromatic_PSF1D(data, guess, bounds=bounds, data_errors=data_errors, deg=4)
     >>> s.profile_params = s.from_poly_params_to_profile_params(s_fit.poly_params)
     >>> s.plot_summary(truth=s0)
     """
@@ -942,18 +942,20 @@ def fit_chromatic_PSF1D(data, guess, deg=4, bounds=None, data_errors=None):
         else:
             return np.nansum(((mod - data) / data_errors) ** 2) + penalty
 
-    def spectrogram_chisq_jacobian(shape_params):
-        poly_params[Nx:] = shape_params
-        profile_params = s.from_poly_params_to_profile_params(poly_params)
-        J = np.array([s.PSF1D.evaluate(pixels, *profile_params[x, :]) for x in range(Nx)])
-        grad_J = np.array([s.PSF1D.fit_deriv(pixels, *profile_params[x, :]) for x in range(Nx)])
-        amplitude_params = np.array([J[x].T.dot(W[x]).dot(data[:, x]) / (J[x].T.dot(W[x]).dot(J[x])) for x in range(Nx)])
-        diff = (J.dot(amplitude_params) - data)
-        grad_chi2_over_p = []
-        for p, value in enumerate(shape_params):
-            grad_chi2_over_p.append([np.trace(2*grad_J[x, p].T.dot(W[x].dot(diff[x]).dot(amplitude_params.T))) for x in range(Nx)])
-        return grad_chi2_over_p
-
+    # def spectrogram_chisq_jacobian(shape_params):
+    #     poly_params[Nx:] = shape_params
+    #     profile_params = s.from_poly_params_to_profile_params(poly_params)
+    #     J = np.array([s.PSF1D.evaluate(pixels, *profile_params[x, :]) for x in range(Nx)])
+    #     grad_J = np.array([s.PSF1D.fit_deriv(pixels, *profile_params[x, :]).T for x in range(Nx)])
+    #     amplitude_params = np.array([J[x].T.dot(W[x]).dot(data[:, x]) / (J[x].T.dot(W[x]).dot(J[x])) for x in range(Nx)])
+    #     diff = np.array([J[x].dot(amplitude_params[x]) - data[:, x] for x in range(Nx)])
+    #     grad_chi2_over_p = []
+    #     my_logger.warning(f"{shape_params[:-1]} {grad_J.shape}")
+    #     for p, name in enumerate(shape_params[:-1]):
+    #         my_logger.warning(f"{p} {name} {2*grad_J[10, :, p]}")
+    #         my_logger.warning(f"{p} {name} {2*grad_J[10, :, p].T.dot(np.outer(W[10].dot(diff[10]),amplitude_params[10].T))}")
+    #         grad_chi2_over_p.append([2*grad_J[x, :, p].T.dot(np.outer(W[x].dot(diff[x]),amplitude_params.T)) for x in range(Nx)])
+    #     return grad_chi2_over_p
     # grad = spectrogram_chisq_jacobian(guess[Nx:])
     # my_logger.warning(f"{grad.shape} {grad}")
 
@@ -1311,12 +1313,12 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     Fit with error bars:
     >>> model = fit_PSF1D_minuit(X, Y, guess=guess, bounds=bounds, data_errors=Y_err)
     >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-2))
 
     Fit without error bars:
     >>> model = fit_PSF1D_minuit(X, Y, guess=guess, bounds=bounds, data_errors=None)
     >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-2))
 
     """
 
@@ -1331,14 +1333,23 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
         else:
             return np.nansum((diff / data_errors) ** 2)
 
+    def PSF1D_chisq_v2_jac(params):
+        diff = model.evaluate(x, *params) - data
+        jac = model.fit_deriv(x, *params)
+        if data_errors is None:
+            return np.array([np.nansum(2 * jac[p] * diff) for p in range(len(params))])
+        else:
+            yy_err2 = data_errors * data_errors
+            return np.array([np.nansum(2 * jac[p] * diff / yy_err2) for p in range(len(params))])
+
     error = 0.1 * np.abs(guess) * np.ones_like(guess)
     fix = [False] * len(guess)
     fix[-1] = True
     # noinspection PyArgumentList
+    # 3 times faster with gradient
     m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
-                               print_level=parameters.DEBUG)
+                               print_level=parameters.DEBUG, grad=PSF1D_chisq_v2_jac)
     m.migrad()
-
     PSF = PSF1D(*m.np_values())
 
     my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
@@ -1386,7 +1397,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     >>> PSF = PSF1D()
     >>> p = (1000, 25, 5, 1, -0.2, 1, 6000)
     >>> Y = PSF.evaluate(X, *p)
-    >>> Y += 400*np.exp(-((X-10)/2)**2)
+    >>> Y += 100*np.exp(-((X-10)/2)**2)
     >>> Y_err = np.sqrt(1+Y)
 
     Prepare the fit:
@@ -1414,6 +1425,15 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
         else:
             return np.nansum((diff / data_errors[indices]) ** 2)
 
+    def PSF1D_chisq_v2_jac(params):
+        diff = model.evaluate(x, *params) - data
+        jac = model.fit_deriv(x, *params)
+        if data_errors is None:
+            return np.array([np.nansum(2 * jac[p] * diff) for p in range(len(params))])
+        else:
+            yy_err2 = data_errors * data_errors
+            return np.array([np.nansum(2 * jac[p] * diff / yy_err2) for p in range(len(params))])
+
     error = 0.1 * np.abs(guess) * np.ones_like(guess)
     fix = [False] * len(guess)
     fix[-1] = True
@@ -1422,7 +1442,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     for step in range(niter):
         # noinspection PyArgumentList
         m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
-                                   print_level=parameters.DEBUG)
+                                   print_level=parameters.DEBUG, grad=PSF1D_chisq_v2_jac)
         m.migrad()
         guess = m.np_values()
         PSF = PSF1D(*m.np_values())
