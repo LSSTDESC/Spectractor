@@ -821,7 +821,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     err = err[ymin:ymax, pixel_start:pixel_end]
     Ny, Nx = data.shape
     # Fit the transverse profile
-    s = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1,
+    s = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5,
                                      saturation=image.saturation, live_fit=parameters.DEBUG)
     guess = s.from_profile_params_to_poly_params(s.profile_params)
     if parameters.DEBUG or True:
@@ -829,9 +829,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Set bounds
     bounds = s.set_bounds(data, saturation=image.saturation)
     # Fit the data:
-    # s_fit = fit_chromatic_PSF1D(data, guess, bounds=bounds, data_errors=err)
-    # s.profile_params = s.from_poly_params_to_profile_params(s_fit.poly_params)
-    # s.plot_summary()
+    s_fit = fit_chromatic_PSF1D(data, guess, bounds=bounds, data_errors=err)
+    s.profile_params = s.from_poly_params_to_profile_params(s_fit.poly_params)
+    s.plot_summary()
     # Fill spectrum object
     spectrum.data = np.array(s.flux)
     spectrum.err = np.array(s.flux_err)
