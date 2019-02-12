@@ -45,10 +45,12 @@ class Spectrum:
         self.data = None
         self.err = None
         self.x0 = None
+        self.pixels = None
         self.lambdas = None
         self.lambdas_binwidths = None
         self.lambdas_indices = None
         self.order = order
+        self.chromatic_psf = None
         self.filter = None
         self.filters = None
         self.units = 'ADU/s'
@@ -207,7 +209,7 @@ class Spectrum:
         self.plot_spectrum_simple(plt.gca(), xlim=xlim, label=label)
         if len(self.target.spectra) > 0:
             for k in range(len(self.target.spectra)):
-                s = self.target.spectra[k]  # /np.max(self.target.spectra[k])*np.max(self.data)
+                s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
                 plt.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
         if self.lambdas is not None:
             # self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
@@ -306,12 +308,13 @@ def calibrate_spectrum(spectrum, xlim=None):
         List of minimum and maximum abscisses
 
     """
+    my_logger = set_logger(__name__)
     if xlim is None:
-        left_cut, right_cut = [0, spectrum.data.shape[0]]
+        left_cut, right_cut = [0, spectrum.data.size]
     else:
         left_cut, right_cut = xlim
     spectrum.data = spectrum.data[left_cut:right_cut]
-    pixels = np.arange(left_cut, right_cut, 1) - spectrum.target_pixcoords_rotated[0]
+    pixels = spectrum.pixels[left_cut:right_cut] - spectrum.target_pixcoords_rotated[0]
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
     spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
@@ -813,7 +816,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     ymin = max(0, y0 - ws[1])
     # Roughly estimates the wavelengths and set start 50 nm before parameters.LAMBDA_MIN
     # and end 50 nm after parameters.LAMBDA_MAX
-    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - x0, x0=image.target_pixcoords_rotated)
+    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - x0, x0=image.target_pixcoords)
     pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 50))))
     pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 50)))))
     # Create spectrogram
@@ -821,35 +824,39 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     err = err[ymin:ymax, pixel_start:pixel_end]
     Ny, Nx = data.shape
     # Fit the transverse profile
-    s, bgd_model_func = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5,
+    s, bgd_model_func = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,
                                      saturation=image.saturation, live_fit=parameters.DEBUG)
-    guess = s.from_profile_params_to_poly_params(s.profile_params)
-    if parameters.DEBUG or True:
-        s.plot_summary()
-    # Set bounds
-    bounds = s.set_bounds(data, saturation=image.saturation)
-    # Fit the data:
-    s_fit = fit_chromatic_PSF1D(data, guess, bgd_model_func=bgd_model_func, bounds=bounds, data_errors=err)
-    s.profile_params = s.from_poly_params_to_profile_params(s_fit.poly_params)
-    s.plot_summary()
     # Fill spectrum object
-    spectrum.data = np.array(s.flux)
-    spectrum.err = np.array(s.flux_err)
+    spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
+    spectrum.data = np.copy(s.table['flux_sum'])
+    spectrum.err = np.copy(s.table['flux_err'])
+    if parameters.DEBUG:
+        s.plot_summary()
+    # Fit the data:
+    s = fit_chromatic_PSF1D(data, s, bgd_model_func=bgd_model_func, data_errors=err)
+    spectrum.chromatic_psf = s
+    spectrum.data = np.copy(s.table['flux_integral'])
+    s.table['Dx'] = spectrum.pixels.astype(float) - x0
+    s.pixels = spectrum.pixels
+    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(np.arange(pixel_start, pixel_end) - x0, x0=image.target_pixcoords)
+    s.table['lambdas'] = first_guess_lambdas
+    s.table.write(image.filename.replace('.fits','_table.csv'), overwrite=True)
     # Summary plot
     if parameters.DEBUG or True:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         image.plot_image_simple(ax[2], data=data,
                                 scale="log", title='', units=image.units, aspect='auto')
         centers = s.profile_params[:, 1]
-        ax[2].plot(s.pixels, centers, label='fitted spectrum centers')
-        ax[2].plot(s.pixels, centers + s.fwhms, 'k-', label='fitted FWHM')
-        ax[2].plot(s.pixels, centers - s.fwhms, 'k-')
+        ax[2].plot(s.pixels, centers, label='Fitted spectrum centers')
+        ax[2].plot(s.pixels, 0.5*Ny + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
+        ax[2].plot(s.pixels, 0.5*Ny + s.table['Dy_fwhm_sup'], 'k-')
         ax[2].set_ylim(0, Ny)
         ax[2].set_xlim(0, Nx)
         ax[2].legend(loc='best')
-        spectrum.plot_spectrum_simple(ax[0], lambdas=s.pixels)
-        ax[0].plot(s.pixels, s.flux_integral, 'k-')
-        ax[1].plot(s.pixels, (np.array(s.flux) - np.array(s.flux_integral)) / np.array(s.flux),
+        spectrum.plot_spectrum_simple(ax[0], lambdas=s.pixels, label='Modelled spectrum')
+        ax[0].plot(s.pixels, s.table['flux_sum'], 'k-', label='Cross spectrum')
+        ax[0].legend(loc='best')
+        ax[1].plot(s.pixels, (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
                    label='(integral-data)/data')
         ax[1].legend()
         ax[1].grid(True)
