@@ -92,8 +92,8 @@ class PSF1D(Fittable1DModel):
         rr = (x - x_mean) * (x - x_mean)
         rr_gg = rr / (gamma * gamma)
         # use **(-alpha) instead of **(alpha) to avoid overflow power errors due to high alpha exponents
-        import warnings
-        warnings.filterwarnings('error')
+        # import warnings
+        # warnings.filterwarnings('error')
         try:
             a = amplitude_moffat * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
         except RuntimeWarning:
@@ -556,6 +556,8 @@ class ChromaticPSF1D:
                 * Nx first parameters are amplitudes for the Moffat transverse profiles
                 * next parameters are polynomial coefficients for all the PSF1D parameters
                 in the same order as in PSF1D definition, except amplitude_moffat
+        noise_level: float, optional
+            Noise level to set minimal boundary for amplitudes (negatively).
 
         Returns
         -------
@@ -922,7 +924,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     y = data[:, ymax_index]
     guess = [np.nanmax(y) - np.nanmean(y), middle, 5, 2, 0, 2, saturation]
     maxi = np.abs(np.nanmax(y))
-    bounds = [(0.1 * maxi, None), (middle - w, middle + w), (0.1, Ny // 2), (1, 6), (-1, 0), (0.1, Ny // 2),
+    bounds = [(0.1 * maxi, 2*maxi), (middle - w, middle + w), (0.1, Ny // 2), (1, 6), (-1, 0), (0.1, Ny // 2),
               (0, 2 * saturation)]
     # first fit with moffat only to initialize the guess
     # hypothesis that max of spectrum if well describe by a focused PSF
@@ -952,7 +954,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         y = data[:, x]
         bgd = data[bgd_index, x]
         bgd_err = err[bgd_index, x]
-        bgd_fit, outliers = fit_poly1d_outlier_removal(bgd_index, bgd, order=1, sigma=sigma, niter=2)
+        bgd_fit, outliers = fit_poly1d_outlier_removal(bgd_index, bgd, order=parameters.BGD_ORDER, sigma=sigma, niter=2)
         bgd_model[:, x] = bgd_fit(index)
         signal = y - bgd_fit(index)
         # in case guess amplitude is too low
@@ -963,7 +965,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         mean = np.nansum(pdf * index)
         std = np.sqrt(np.nansum(pdf * (index - mean) ** 2))
         maxi = np.abs(np.nanmax(signal))
-        bounds[0] = (0.1 * np.nanstd(bgd), None)
+        bounds[0] = (0.1 * np.nanstd(bgd), 2*np.nanmax(y))
         # if guess[4] > -1:
         #    guess[0] = np.max(signal) / (1 + guess[4])
         if guess[0] * (1 + guess[4]) < 3 * np.nanstd(bgd):
@@ -1164,25 +1166,25 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
         bgd = bgd_model_func(np.arange(Nx), pixels)
 
     data_subtracted = data - bgd
-    bgd_std = np.std(np.random.poisson(bgd))
+    bgd_std = float(np.std(np.random.poisson(bgd)))
 
-    import warnings
-    warnings.filterwarnings('error')
+    # import warnings
+    # warnings.filterwarnings('error')
 
     def spectrogram_chisq(shape_params):
         # linear regression for the amplitude parameters
         poly_params[Nx:] = np.copy(shape_params)
         profile_params = chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
         profile_params[:Nx, 0] = 1
-        try:
-            J = np.array([chromatic_psf.PSF1D.evaluate(pixels, *profile_params[x, :]) for x in range(Nx)])
-        except:
-            for x in range(Nx):
-                my_logger.warning(f"{x} {profile_params[x, :]}")
+        # try:
+        J = np.array([chromatic_psf.PSF1D.evaluate(pixels, *profile_params[x, :]) for x in range(Nx)])
+        # except:
+        #     for x in range(Nx):
+        #         my_logger.warning(f"{x} {profile_params[x, :]}")
         J_dot_W_dot_J = np.array([J[x].T.dot(W[x]).dot(J[x]) for x in range(Nx)])
         # my_logger.warning(f"{shape_params}")
-        if np.any(np.isclose(J_dot_W_dot_J, 0, rtol=1e-6)):
-            pass
+        # if np.any(np.isclose(J_dot_W_dot_J, 0, rtol=1e-6)):
+        #     pass
             # my_logger.warning(f"crasssshhhhh {shape_params}")
             # profile_params = chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True, verbose=True)
             # for x in range(Nx):
@@ -1204,17 +1206,17 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
         poly_params[:Nx] = amplitude_params
         in_bounds, penalty, name = chromatic_psf.check_bounds(poly_params, noise_level=5 * bgd_std)
         # my_logger.warning(f"amplitude {amplitude_params}")
-        if in_bounds is False:
-            for k, n in enumerate(chromatic_psf.PSF1D.param_names):
-                if n in name:
-                    my_logger.warning(f"{name} {profile_params[:, k]}  {shape_params} {penalty} {bgd_std} {name}")
-        if False:
-            my_logger.warning(f"crasssshhhhh {shape_params}")
-            # profile_params = chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True, verbose=True)
-            for x in range(Nx):
-                my_logger.warning(f"\n{x} {profile_params[x, :]} {J[x]} {J_dot_W_dot_J[x]}")
-            my_logger.warning(f"\n{J_dot_W_dot_J}")
-            sys.exit()
+        # if in_bounds is False:
+        #     for k, n in enumerate(chromatic_psf.PSF1D.param_names):
+        #         if n in name:
+        #             my_logger.warning(f"{name} {profile_params[:, k]}  {shape_params} {penalty} {bgd_std} {name}")
+        # if False:
+        #     my_logger.warning(f"crasssshhhhh {shape_params}")
+        #     # profile_params = chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True, verbose=True)
+        #     for x in range(Nx):
+        #         my_logger.warning(f"\n{x} {profile_params[x, :]} {J[x]} {J_dot_W_dot_J[x]}")
+        #     my_logger.warning(f"\n{J_dot_W_dot_J}")
+        #     sys.exit()
         mod = chromatic_psf.evaluate(poly_params)
         # if bgd_model_func is not None:
         #     mod += bgd
@@ -1229,19 +1231,22 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
     #     profile_params = s.from_poly_params_to_profile_params(poly_params)
     #     J = np.array([s.PSF1D.evaluate(pixels, *profile_params[x, :]) for x in range(Nx)])
     #     grad_J = np.array([s.PSF1D.fit_deriv(pixels, *profile_params[x, :]).T for x in range(Nx)])
-    #     amplitude_params = np.array([J[x].T.dot(W[x]).dot(data[:, x]) / (J[x].T.dot(W[x]).dot(J[x])) for x in range(Nx)])
+    #     amplitude_params = np.array([J[x].T.dot(W[x]).dot(data[:, x]) / (J[x].T.dot(W[x]).dot(J[x]))
+    #  for x in range(Nx)])
     #     diff = np.array([J[x].dot(amplitude_params[x]) - data[:, x] for x in range(Nx)])
     #     grad_chi2_over_p = []
     #     my_logger.warning(f"{shape_params[:-1]} {grad_J.shape}")
     #     for p, name in enumerate(shape_params[:-1]):
     #         my_logger.warning(f"{p} {name} {2*grad_J[10, :, p]}")
-    #         my_logger.warning(f"{p} {name} {2*grad_J[10, :, p].T.dot(np.outer(W[10].dot(diff[10]),amplitude_params[10].T))}")
-    #         grad_chi2_over_p.append([2*grad_J[x, :, p].T.dot(np.outer(W[x].dot(diff[x]),amplitude_params.T)) for x in range(Nx)])
+    #         my_logger.warning(f"{p} {name} {2*grad_J[10, :, p].T.dot(np.outer(W[10].
+    # dot(diff[10]),amplitude_params[10].T))}")
+    #         grad_chi2_over_p.append([2*grad_J[x, :, p].T.dot(np.outer(W[x].dot(diff[x]),amplitude_params.T))
+    #  for x in range(Nx)])
     #     return grad_chi2_over_p
     # grad = spectrogram_chisq_jacobian(guess[Nx:])
     # my_logger.warning(f"{grad.shape} {grad}")
 
-    my_logger.warning(f'\n\tStart chisq: {spectrogram_chisq(guess[Nx:])} with {guess[Nx:]}')
+    my_logger.debug(f'\n\tStart chisq: {spectrogram_chisq(guess[Nx:])} with {guess[Nx:]}')
     error = 0.01 * np.abs(guess) * np.ones_like(guess)
     fix = [False] * (chromatic_psf.n_poly_params - Nx)
     fix[-1] = True

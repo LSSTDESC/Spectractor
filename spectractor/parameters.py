@@ -65,10 +65,11 @@ LAMBDA_MIN = 350  # minimum wavelength for spectrum extraction (in nm)
 LAMBDA_MAX = 1100  # maximum wavelength for spectrum extraction (in nm)
 LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, 1)
 
-# background subtraction parameters
+# Background subtraction parameters
 PIXWIDTH_SIGNAL = 10 # half transverse width of the signal rectangular window in pixels
 PIXDIST_BACKGROUND = 20 # distance from dispersion axis to analyse the background in pixels
 PIXWIDTH_BACKGROUND = 10 # transverse width of the background rectangular window in pixels
+BGD_ORDER = 1 # the order of the polynomial background to fit transversaly
 
 # Detection line algorithm
 CALIB_BGD_ORDER = 3  # order of the background polynome to fit

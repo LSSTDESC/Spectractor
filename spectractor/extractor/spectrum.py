@@ -258,6 +258,42 @@ class Spectrum:
         save_fits(output_file_name, self.header, [self.lambdas, self.data, self.err], overwrite=overwrite)
         self.my_logger.info('\n\tSpectrum saved in %s' % output_file_name)
 
+    def save_spectrogram(self, output_file_name, overwrite=False):
+        """Save the spectrogram into a fits file (data, error and background).
+
+        Parameters
+        ----------
+        output_file_name: str
+            Path of the output fits file.
+        overwrite: bool,  optional
+            If True overwrite the output file if needed (default: False).
+
+        Examples
+        --------
+        """
+        self.header['UNIT1'] = self.units
+        self.header['COMMENTS'] = 'First HDU gives the data in UNIT1 units, ' \
+                                  'second HDU gives the uncertainties, ' \
+                                  'third HDU the  fitted background.'
+        self.header['S_X0'] = self.spectrogram_x0
+        self.header['S_Y0'] = self.spectrogram_y0
+        self.header['S_XMIN'] = self.spectrogram_xmin
+        self.header['S_XMAX'] = self.spectrogram_xmax
+        self.header['S_YMIN'] = self.spectrogram_ymin
+        self.header['S_YMAX'] = self.spectrogram_ymax
+        hdu1 = fits.PrimaryHDU()
+        hdu2 = fits.ImageHDU()
+        hdu3 = fits.ImageHDU()
+        hdu1.header = self.header
+        hdu1.data = self.spectrogram
+        hdu2.data = self.spectrogram_err
+        hdu3.data = self.spectrogram_bgd
+        hdu = fits.HDUList([hdu1, hdu2, hdu3])
+        output_directory = '/'.join(output_file_name.split('/')[:-1])
+        ensure_dir(output_directory)
+        hdu.writeto(output_file_name, overwrite=overwrite)
+        self.my_logger.info('\n\tSpectrogram saved in %s' % output_file_name)
+
     def load_spectrum(self, input_file_name):
         """Load the spectrum from a fits file (data, error and wavelengths).
 
@@ -290,8 +326,69 @@ class Spectrum:
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
+            self.load_spectrogram(input_file_name.replace('spectrum','spectrogram'))
         else:
             self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
+
+    def load_spectrogram(self, input_file_name):
+        """Load the spectrum from a fits file (data, error and wavelengths).
+
+        Parameters
+        ----------
+        input_file_name: str
+            Path to the input fits file
+
+        Examples
+        --------
+        >>> s = Spectrum()
+        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
+        """
+        if os.path.isfile(input_file_name):
+            hdu_list = fits.open(input_file_name)
+            header = hdu_list[0].header
+            self.spectrogram = hdu_list[0].data
+            self.spectrogram_err = hdu_list[1].data
+            self.spectrogram_bgd = hdu_list[2].data
+            self.spectrogram_x0 = header['S_X0']
+            self.spectrogram_y0 = header['S_Y0']
+            self.spectrogram_xmin = header['S_XMIN']
+            self.spectrogram_xmax = header['S_XMAX']
+            self.spectrogram_ymin = header['S_YMIN']
+            self.spectrogram_ymax = header['S_YMAX']
+            hdu_list.close()  # need to free allocation for file descripto
+            self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
+        else:
+            self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
+
+    def load_spectrogram(self, input_file_name):
+        """Load the spectrum from a fits file (data, error and wavelengths).
+
+        Parameters
+        ----------
+        input_file_name: str
+            Path to the input fits file
+
+        Examples
+        --------
+        >>> s = Spectrum()
+        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
+        """
+        if os.path.isfile(input_file_name):
+            hdu_list = fits.open(input_file_name)
+            header = hdu_list[0].header
+            self.spectrogram = hdu_list[0].data
+            self.spectrogram_err = hdu_list[1].data
+            self.spectrogram_bgd = hdu_list[2].data
+            self.spectrogram_x0 = header['S_X0']
+            self.spectrogram_y0 = header['S_Y0']
+            self.spectrogram_xmin = header['S_XMIN']
+            self.spectrogram_xmax = header['S_XMAX']
+            self.spectrogram_ymin = header['S_YMIN']
+            self.spectrogram_ymax = header['S_YMAX']
+            hdu_list.close()  # need to free allocation for file descripto
+            self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
+        else:
+            self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
 
 
 def calibrate_spectrum(spectrum, xlim=None):
@@ -817,8 +914,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Roughly estimates the wavelengths and set start 50 nm before parameters.LAMBDA_MIN
     # and end 50 nm after parameters.LAMBDA_MAX
     lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords)
-    pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 50))))
-    pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 50)))))
+    pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
+    pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0)))))
     # Create spectrogram
     data = data[ymin:ymax, pixel_start:pixel_end]
     err = err[ymin:ymax, pixel_start:pixel_end]
@@ -841,9 +938,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     s.table['lambdas'] = first_guess_lambdas
     # rotate and save the table
     s.rotate_table(-image.rotation_angle)
-    spectrum.my_logger.warning(f'\n{s.table}')
-    s.table.write(image.filename.replace('.fits','_table.csv'), overwrite=True)
-    # Extract the spectrogram
+    spectrum.my_logger.debug(f'\n{s.table}')
+    # Extract the spectrogram edges
     data = np.copy(image.data)[:, 0:right_edge]
     err = np.copy(image.stat_errors)[:, 0:right_edge]
     Ny, Nx = data.shape
@@ -853,17 +949,29 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     ymin = max(0, y0 + int(s.table['Dy_mean'].min()) - ws[1])
     distance = np.sqrt(s.table['Dx']**2+s.table['Dy_mean']**2)
     lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords)
-    lambda_min_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 50))))
-    lambda_max_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 50))))
+    lambda_min_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
+    lambda_max_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0))))
     xmin = int(s.table['Dx'][lambda_min_index] + x0)
     xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0))
+    # Position of the order 0 in the spectrogram coordinates
+    target_pixcoords_spectrogram = [image.target_pixcoords[0]-xmin, image.target_pixcoords[1]-ymin ]
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
-    bgd_model_func  = extract_background(data, err, deg=1, ws=ws, sigma=5, live_fit=False)
-    target_pixcoords_spectrogram = [image.target_pixcoords[0]-xmin, image.target_pixcoords[1]-ymin ]
-    print(xmin,xmax,ymin,ymax,lambda_min_index,lambda_max_index,data.shape, target_pixcoords_spectrogram)
+    # Extract the non rotated background
+    bgd_model_func  = extract_background(data, err, deg=parameters.BGD_ORDER, ws=ws, sigma=5, live_fit=False)
+    bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
+    # Save results
+    spectrum.spectrogram = data
+    spectrum.spectrogram_err = err
+    spectrum.spectrogram_bgd = bgd
+    spectrum.spectrogram_x0 = target_pixcoords_spectrogram[0]
+    spectrum.spectrogram_y0 = target_pixcoords_spectrogram[1]
+    spectrum.spectrogram_xmin = xmin
+    spectrum.spectrogram_xmax = xmax
+    spectrum.spectrogram_ymin = ymin
+    spectrum.spectrogram_ymax = ymax
     # Summary plot
     if parameters.DEBUG or True:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))

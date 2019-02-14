@@ -64,6 +64,7 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     output_filename = output_filename.replace('.fits', '_spectrum.fits')
     output_filename = output_filename.replace('.fz', '_spectrum.fits')
     output_filename = os.path.join(output_directory, output_filename)
+    output_filename_spectrogram = output_filename.replace('spectrum','spectrogram')
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
     target_pixcoords = find_target(image, guess)
@@ -88,7 +89,10 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     else:
         spectrum.header['WARNINGS'] = 'No calibration procedure with spectral features.'
     # Save the spectrum
+    spectrum.chromatic_psf.table['lambdas'] = spectrum.lambdas
     spectrum.save_spectrum(output_filename, overwrite=True)
+    spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
+    spectrum.chromatic_psf.table.write(image.filename.replace('.fits','_table.csv'), overwrite=True)
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
