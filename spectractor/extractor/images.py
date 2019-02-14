@@ -38,6 +38,7 @@ class Image(object):
         self.gain = None
         self.stat_errors = None
         self.stat_errors_rotated = None
+        self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
         self.load_image(filename)
@@ -114,6 +115,7 @@ class Image(object):
         self.data = np.concatenate((data1[10:-10, 10:-10], data2[10:-10, 10:-10]))
         self.date_obs = self.header['DATE-OBS']
         self.expo = float(self.header['EXPTIME'])
+        self.header['ROTANGLE'] = self.rotation_angle
         self.header['LSHIFT'] = 0.
         self.header['D2CCD'] = parameters.DISTANCE2CCD
         self.data = self.data.T
@@ -283,8 +285,8 @@ def find_target_1Dprofile(image, sub_image, guess, rotated=False):
     profile_Y_raw = np.sum(sub_image, axis=1)
     # fit and subtract smooth polynomial background
     # with 3sigma rejection of outliers (star peaks)
-    bkgd_X = fit_poly1d_outlier_removal(X, profile_X_raw, order=2)
-    bkgd_Y = fit_poly1d_outlier_removal(Y, profile_Y_raw, order=2)
+    bkgd_X, outliers = fit_poly1d_outlier_removal(X, profile_X_raw, order=2)
+    bkgd_Y, outliers = fit_poly1d_outlier_removal(Y, profile_Y_raw, order=2)
     profile_X = profile_X_raw - bkgd_X(X)  # np.min(profile_X)
     profile_Y = profile_Y_raw - bkgd_Y(Y)  # np.min(profile_Y)
     avX, sigX = weighted_avg_and_std(X, profile_X ** 4)
@@ -458,6 +460,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
 def turn_image(image):
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
                                                           right_edge=parameters.CCD_IMSIZE - 200)
+    image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
     if not np.isnan(image.rotation_angle):
