@@ -90,16 +90,6 @@ class Atmosphere(object):
 
 # ----------------------------------------------------------------------------------
 class AtmosphereGrid(Atmosphere):
-    """
-    Atmosphere():
-        class to evaluate series of atmospheres calling libradtran
-    Args:
-        airmass (:obj:`float`): airmass of the target
-        pressure (:obj:`float`): pressure of the atmosphere
-        temperature (:obj:`float`): temperature of the atmosphere
-        filenamedata (:obj:`strt`): XXXXXXXXXX
-        filename (:obj:`strt`): atmospheric grid file name to load_image
-    """
 
     def __init__(self, data_filename, filename="", airmass=1., pressure=800., temperature=10.):
         Atmosphere.__init__(self, airmass, pressure, temperature)
@@ -121,13 +111,13 @@ class AtmosphereGrid(Atmosphere):
         self.index_atm_data = 4
 
         # specify parameters for the atmospheric grid
-        self.set_grid(pwv_grid=[0,10,5],ozone_grid=[100,700,7],aerosol_grid=[0,0.1,5])
+        self.set_grid(pwv_grid=[0, 10, 5], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 5])
 
         self.header = fits.Header()
         if filename != "":
             self.load_file(filename)
 
-    def set_grid(self,pwv_grid=[0,10,5],ozone_grid=[100,700,7],aerosol_grid=[0,0.1,5]):
+    def set_grid(self, pwv_grid=[0, 10, 5], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 5]):
         # aerosols
         # NB_AER_POINTS=20
         self.NB_AER_POINTS = int(aerosol_grid[2])
@@ -442,10 +432,6 @@ class SpectrumSimulation(Spectrum):
 
     # ---------------------------------------------------------------------------
     def __init__(self, spectrum, atmosphere, telescope, disperser):
-        """
-        Args:
-            file_name (:obj:`str`): path to the image
-        """
         Spectrum.__init__(self)
         for k, v in list(spectrum.__dict__.items()):
             self.__dict__[k] = copy.copy(v)
@@ -532,7 +518,7 @@ class SpectrumSimGrid():
         self.filename = ""
         if filename != "":
             self.filename = filename
-            self.load_spectrum(filename)
+            self.spectrum.load_spectrum(filename)
 
     # ----------------------------------------------------------------------------
     def compute(self):
@@ -592,9 +578,6 @@ def SimulatorInit(filename):
     """ SimulatorInit
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
-
-    Args:
-        filename (:obj:`str`): file_name of the image (data)
     """
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SIMULATOR initialisation')
@@ -644,20 +627,6 @@ def SimulatorCore(spectrum, telescope, disperser, target, airmass=1.0, pressure=
     """ SimulatorCore
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
-
-    Args:
-        spectrum (:obj:`Spectrum`): data spectrum object
-        telescope (:obj:`TelescopeTransmission`): telescope transmission
-        disperer (:obj:`Hologram`): disperser object
-        target (:obj:`Target`): target object
-        lambdas (:obj:`float`): wavelength array (in nm)
-        airmass (:obj:`float`): airmass of the target
-        pressure (:obj:`float`): pressure in hPa
-        temperature (:obj:`float`): temperature in celsius
-        pwv (:obj:`float`): pressure water vapor
-        ozone (:obj:`float`): ozone quantity
-        aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth
-        reso (:obj:`float`): width of gaussian in nm to convolve with spectrum
     """
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SIMULATOR core program')
@@ -671,20 +640,15 @@ def SimulatorCore(spectrum, telescope, disperser, target, airmass=1.0, pressure=
     spectrum_simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift)
     if parameters.DEBUG:
         infostring = '\n\t ========= Spectra simulation :  ==============='
-        spectrum_simulation.plot_spectrum(fit=False)
+        spectrum_simulation.plot_spectrum()
     return spectrum_simulation
 
 
 # ----------------------------------------------------------------------------------
-def SimulatorSimGrid(filename, outputdir, pwv_grid=[0,10,5], ozone_grid=[100,700,7], aerosol_grid=[0,0.1,5],
-                     A1=1., A2=0., reso=None, D=parameters.DISTANCE2CCD, shift=0.):
+def SimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 5]):
     """ SimulatorSimGrid
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
-
-    Args:
-        filename (:obj:`str`): file_name of the image (data)
-        outputdir (:obj:`str`): path to the output directory
 
     """
     my_logger = set_logger(__name__)
@@ -716,7 +680,7 @@ def SimulatorSimGrid(filename, outputdir, pwv_grid=[0,10,5], ozone_grid=[100,700
     else:
         atmgrid = atm.compute()
         header = atm.save_file(filename=output_atmfilename)
-        #libradtran.clean_simulation_directory()
+        # libradtran.clean_simulation_directory()
     if parameters.VERBOSE:
         infostring = '\n\t ========= Atmospheric simulation :  ==============='
         my_logger.info(infostring)
@@ -742,14 +706,6 @@ def Simulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A1=1., A2
     """ Simulator
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
-
-    Args:
-        filename (:obj:`str`): file_name of the image (data)
-        outputdir (:obj:`str`): path to the output directory
-        pwv (:obj:`float`): pressure water vapor
-        ozone (:obj:`float`): ozone quantity
-        aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth
-        reso (:obj:`float`): width of gaussian in nm to convolve with spectrum
     """
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTORSIM')
