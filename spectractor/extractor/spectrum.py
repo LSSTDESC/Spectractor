@@ -816,7 +816,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     ymin = max(0, y0 - ws[1])
     # Roughly estimates the wavelengths and set start 50 nm before parameters.LAMBDA_MIN
     # and end 50 nm after parameters.LAMBDA_MAX
-    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - x0, x0=image.target_pixcoords)
+    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords)
     pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 50))))
     pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 50)))))
     # Create spectrogram
@@ -830,26 +830,49 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
     spectrum.data = np.copy(s.table['flux_sum'])
     spectrum.err = np.copy(s.table['flux_err'])
-    if parameters.DEBUG:
+    if parameters.DEBUG or True:
         s.plot_summary()
     # Fit the data:
     s = fit_chromatic_PSF1D(data, s, bgd_model_func=bgd_model_func, data_errors=err)
     spectrum.chromatic_psf = s
     spectrum.data = np.copy(s.table['flux_integral'])
-    s.table['Dx'] = spectrum.pixels.astype(float) - x0
-    s.pixels = spectrum.pixels
-    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(np.arange(pixel_start, pixel_end) - x0, x0=image.target_pixcoords)
+    s.table['Dx'] = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
+    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(np.arange(pixel_start, pixel_end) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords)
     s.table['lambdas'] = first_guess_lambdas
+    # rotate and save the table
+    s.rotate_table(-image.rotation_angle)
+    spectrum.my_logger.warning(f'\n{s.table}')
     s.table.write(image.filename.replace('.fits','_table.csv'), overwrite=True)
+    # Extract the spectrogram
+    data = np.copy(image.data)[:, 0:right_edge]
+    err = np.copy(image.stat_errors)[:, 0:right_edge]
+    Ny, Nx = data.shape
+    x0 = int(image.target_pixcoords[0])
+    y0 = int(image.target_pixcoords[1])
+    ymax = min(Ny, y0 + int(s.table['Dy_mean'].max()) + ws[1])
+    ymin = max(0, y0 + int(s.table['Dy_mean'].min()) - ws[1])
+    distance = np.sqrt(s.table['Dx']**2+s.table['Dy_mean']**2)
+    lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords)
+    lambda_min_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 50))))
+    lambda_max_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 50))))
+    xmin = int(s.table['Dx'][lambda_min_index] + x0)
+    xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0))
+    # Create spectrogram
+    data = data[ymin:ymax, xmin:xmax]
+    err = err[ymin:ymax, xmin:xmax]
+    Ny, Nx = data.shape
+    bgd_model_func  = extract_background(data, err, deg=1, ws=ws, sigma=5, live_fit=False)
+    target_pixcoords_spectrogram = [image.target_pixcoords[0]-xmin, image.target_pixcoords[1]-ymin ]
+    print(xmin,xmax,ymin,ymax,lambda_min_index,lambda_max_index,data.shape, target_pixcoords_spectrogram)
     # Summary plot
     if parameters.DEBUG or True:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         image.plot_image_simple(ax[2], data=data,
                                 scale="log", title='', units=image.units, aspect='auto')
-        centers = s.profile_params[:, 1]
-        ax[2].plot(s.pixels, centers, label='Fitted spectrum centers')
-        ax[2].plot(s.pixels, 0.5*Ny + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
-        ax[2].plot(s.pixels, 0.5*Ny + s.table['Dy_fwhm_sup'], 'k-')
+        ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy'], label='Fitted spectrum centers')
+        ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_mean'], 'g-', label='Dispersion axis')
+        ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
+        ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-')
         ax[2].set_ylim(0, Ny)
         ax[2].set_xlim(0, Nx)
         ax[2].legend(loc='best')

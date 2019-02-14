@@ -386,6 +386,8 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
     -------
     model: Astropy model
         The best fitting astropy model.
+    outliers: array_like
+        List of the outlier points.
 
     Examples
     --------
@@ -393,7 +395,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
     >>> p = [3,2,1,0]
     >>> y = np.polyval(p, x)
     >>> y[::10] = 0.
-    >>> model = fit_poly1d_outlier_removal(x,y,order=3,sigma=3)
+    >>> model, outliers = fit_poly1d_outlier_removal(x,y,order=3,sigma=3)
     >>> print('{:.2f}'.format(model.c0.value))
     0.00
     >>> print('{:.2f}'.format(model.c1.value))
@@ -416,6 +418,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         filtered_data, or_fitted_model = or_fit(gg_init, x, y)
+        outliers = [] # not working
         '''
         import matplotlib.pyplot as plt
         plt.figure(figsize=(8,5))
@@ -426,7 +429,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
         plt.legend(loc=2, numpoints=1)
         if parameters.DISPLAY: plt.show()
         '''
-        return or_fitted_model
+        return or_fitted_model, outliers
 
 
 def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
