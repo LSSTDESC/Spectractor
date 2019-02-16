@@ -55,6 +55,8 @@ class Spectrum:
         self.filters = None
         self.units = 'ADU/s'
         self.gain = parameters.CCD_GAIN
+        self.chromatic_psf = ChromaticPSF1D(1,1,deg=1,saturation=1)
+        self.rotation_angle = 0
         if file_name != "":
             self.filename = file_name
             self.load_spectrum(file_name)
@@ -281,6 +283,8 @@ class Spectrum:
         self.header['S_XMAX'] = self.spectrogram_xmax
         self.header['S_YMIN'] = self.spectrogram_ymin
         self.header['S_YMAX'] = self.spectrogram_ymax
+        self.header['S_DEG'] = self.spectrogram_deg
+        self.header['S_SAT'] = self.spectrogram_saturation
         hdu1 = fits.PrimaryHDU()
         hdu2 = fits.ImageHDU()
         hdu3 = fits.ImageHDU()
@@ -321,12 +325,15 @@ class Spectrum:
                 self.target = load_target(self.header['TARGET'], verbose=parameters.VERBOSE)
             if self.header['UNIT2'] != "":
                 self.units = self.header['UNIT2']
+            if self.header['ROTANGLE'] != "":
+                self.rotation_angle = self.header['ROTANGLE']
             if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             self.load_spectrogram(input_file_name.replace('spectrum','spectrogram'))
+            self.load_chromatic_psf(input_file_name.replace('spectrum.fits','table.csv'))
         else:
             self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
 
@@ -355,12 +362,16 @@ class Spectrum:
             self.spectrogram_xmax = header['S_XMAX']
             self.spectrogram_ymin = header['S_YMIN']
             self.spectrogram_ymax = header['S_YMAX']
+            self.spectrogram_deg = header['S_DEG']
+            self.spectrogram_saturation = header['S_SAT']
+            self.spectrogram_Nx = self.spectrogram_xmax - self.spectrogram_xmin
+            self.spectrogram_Ny = self.spectrogram_ymax - self.spectrogram_ymin
             hdu_list.close()  # need to free allocation for file descripto
             self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
 
-    def load_spectrogram(self, input_file_name):
+    def load_chromatic_psf(self, input_file_name):
         """Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
@@ -371,21 +382,12 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum()
-        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s.load_spectrum('outputs/reduc_20170530_132_spectrum.fits')
         """
         if os.path.isfile(input_file_name):
-            hdu_list = fits.open(input_file_name)
-            header = hdu_list[0].header
-            self.spectrogram = hdu_list[0].data
-            self.spectrogram_err = hdu_list[1].data
-            self.spectrogram_bgd = hdu_list[2].data
-            self.spectrogram_x0 = header['S_X0']
-            self.spectrogram_y0 = header['S_Y0']
-            self.spectrogram_xmin = header['S_XMIN']
-            self.spectrogram_xmax = header['S_XMAX']
-            self.spectrogram_ymin = header['S_YMIN']
-            self.spectrogram_ymax = header['S_YMAX']
-            hdu_list.close()  # need to free allocation for file descripto
+            self.chromatic_psf = ChromaticPSF1D(self.spectrogram_Nx, self.spectrogram_Ny,
+                                                deg=self.spectrogram_deg, saturation=self.spectrogram_saturation)
+            self.chromatic_psf.table = Table.read(input_file_name)
             self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
@@ -945,14 +947,14 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     Ny, Nx = data.shape
     x0 = int(image.target_pixcoords[0])
     y0 = int(image.target_pixcoords[1])
-    ymax = min(Ny, y0 + int(s.table['Dy_mean'].max()) + ws[1])
+    ymax = min(Ny, y0 + int(s.table['Dy_mean'].max()) + ws[1] + 1) # +1 to  include edges
     ymin = max(0, y0 + int(s.table['Dy_mean'].min()) - ws[1])
-    distance = np.sqrt(s.table['Dx']**2+s.table['Dy_mean']**2)
+    distance = s.get_distance_along_dispersion_axis()
     lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords)
     lambda_min_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
     lambda_max_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0))))
     xmin = int(s.table['Dx'][lambda_min_index] + x0)
-    xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0))
+    xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0)+1) # +1 to  include edges
     # Position of the order 0 in the spectrogram coordinates
     target_pixcoords_spectrogram = [image.target_pixcoords[0]-xmin, image.target_pixcoords[1]-ymin ]
     # Create spectrogram
@@ -972,6 +974,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.spectrogram_xmax = xmax
     spectrum.spectrogram_ymin = ymin
     spectrum.spectrogram_ymax = ymax
+    spectrum.spectrogram_deg = spectrum.chromatic_psf.deg
+    spectrum.spectrogram_saturation = spectrum.chromatic_psf.saturation
     # Summary plot
     if parameters.DEBUG or True:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
@@ -980,7 +984,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy'], label='Fitted spectrum centers')
         ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_mean'], 'g-', label='Dispersion axis')
         ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
-        ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-')
+        ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-', label='')
         ax[2].set_ylim(0, Ny)
         ax[2].set_xlim(0, Nx)
         ax[2].legend(loc='best')
