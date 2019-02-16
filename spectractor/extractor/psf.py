@@ -365,6 +365,45 @@ class ChromaticPSF1D:
                 poly_params = np.concatenate([poly_params, fit])
         return poly_params
 
+    def from_table_to_profile_params(self):
+        """
+        Extract the profile parameters from self.table.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        profile_params: array
+            Nx * len(self.PSF1D.param_names) numpy array containing the PSF1D parameters as a function of pixels.
+
+        Examples
+        --------
+        """
+        profile_params = np.zeros((self.Nx, len(self.PSF1D.param_names)))
+        for k, name in enumerate(self.PSF1D.param_names):
+            profile_params[:, k] = self.table[name]
+        return profile_params
+
+    def from_table_to_poly_params(self):
+        """
+        Extract the polynomial parameters from self.table.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        profile_params: array_like
+            A set of parameters that can be evaluated by the chromatic PSF class evaluate function.
+
+        Examples
+        --------
+        """
+        profile_params = self.from_table_to_profile_params()
+        poly_params = self.from_profile_params_to_poly_params(profile_params)
+        return poly_params
+
     def from_poly_params_to_profile_params(self, poly_params, force_positive=False, verbose=False):
         """
         Evaluate the PSF1D profile parameters from the polynomial coefficients.
@@ -464,6 +503,7 @@ class ChromaticPSF1D:
             self.table['fwhms'][x] = fwhm
             self.table['Dy_fwhm_inf'][x] = p[1] - fwhm - 0.5 * self.Ny
             self.table['Dy_fwhm_sup'][x] = p[1] + fwhm - 0.5 * self.Ny
+            self.table['Dy_mean'][x] = 0
 
     def set_bounds_old(self, data):
         if self.saturation is None:
@@ -663,6 +703,9 @@ class ChromaticPSF1D:
             # self.my_logger.warning(f"{k} {profile_params[k]}")
             output[:, k] = PSF1D.evaluate(y, *profile_params[k])
         return output
+
+    def get_distance_along_dispersion_axis(self, shift_x=0, shift_y=0):
+        return np.sqrt((self.table['Dx']-shift_x) ** 2 + (self.table['Dy_mean']-shift_y) ** 2)
 
     def generate_test_poly_params(self):
         """
