@@ -1,6 +1,5 @@
 from astropy.coordinates import Angle
 from matplotlib import cm
-from matplotlib.ticker import MaxNLocator
 
 from spectractor.extractor.targets import *
 from spectractor.extractor.psf import *
@@ -171,39 +170,14 @@ class Image(object):
         self.header.comments['PARANGLE'] = 'parallactic angle in degree'
         return self.parallactic_angle
 
-    def plot_image_simple(self, ax, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                          target_pixcoords=None, vmin=None, vmax=None, aspect=None):
+    def plot_image(self, data=None, scale="lin", title="", units="Image units", plot_stats=False,
+                   target_pixcoords=None, figsize=[9.3, 8], aspect=None):
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
         if data is None:
             data = np.copy(self.data)
         if plot_stats:
             data = np.copy(self.stat_errors)
-        if scale == "log" or scale == "log10":
-            # removes the zeros and negative pixels first
-            zeros = np.where(data <= 0)
-            min_noz = np.min(data[np.where(data > 0)])
-            data[zeros] = min_noz
-            # apply log
-            data = np.log10(data)
-        im = ax.imshow(data, origin='lower', cmap='jet', vmin=vmin, vmax=vmax, aspect=aspect)
-        ax.grid(color='white', ls='solid')
-        ax.grid(True)
-        ax.set_xlabel('X [pixels]')
-        ax.set_ylabel('Y [pixels]')
-        cb = plt.colorbar(im, ax=ax)
-        cb.formatter.set_powerlimits((0, 0))
-        cb.locator = MaxNLocator(7, prune=None)
-        cb.update_ticks()
-        cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
-        if title != "":
-            ax.set_title(title)
-        if target_pixcoords is not None:
-            ax.scatter(target_pixcoords[0], target_pixcoords[1], marker='o', s=100, edgecolors='k', facecolors='none',
-                       label='Target', linewidth=2)
-
-    def plot_image(self, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                   target_pixcoords=None, figsize=[9.3, 8], aspect=None):
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
-        self.plot_image_simple(ax, data=data, scale=scale, title=title, units=units, plot_stats=plot_stats,
+        plot_image_simple(ax, data=data, scale=scale, title=title, units=units,
                                target_pixcoords=target_pixcoords, aspect=aspect)
         plt.legend()
         if parameters.DISPLAY:
