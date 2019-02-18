@@ -1,10 +1,11 @@
+import sys
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from spectractor.simulation.simulator import *
 from spectractor.fit.statistics import *
 
 from spectractor.parameters import FIT_WORKSPACE as fit_workspace
 
-from scipy.optimize import minimize
+from iminuit import Minuit
 
 import emcee
 from emcee.utils import MPIPool
@@ -21,25 +22,17 @@ class FitWorkspace:
         self.verbose = verbose
         self.plot = plot
         self.live_fit = live_fit
-        self.A1 = 1.0
-        self.A2 = 0.05
-        self.ozone = 300.
-        self.pwv = 3
-        self.aerosols = 0.03
-        self.reso = 1.5
-        self.D = parameters.DISTANCE2CCD
-        self.shift = 0.
-        self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D, self.shift])
+        self.p = np.array([])
         self.ndim = len(self.p)
         self.lambdas = None
         self.model = None
         self.model_err = None
         self.model_noconv = None
-        self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
-                             r"alpha_pix [pix]"]
-        self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
-                           r"$\alpha_{\mathrm{pix}}$ [pix]"]
-        self.bounds = ((0, 0, 0, 0, 0, 1, 50, -20), (2, 0.5, 800, 10, 1.0, 10, 60, 20))
+        self.input_labels = []
+        self.axis_names = []
+        self.input_labels = []
+        self.axis_names = []
+        self.bounds = ((), ())
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.nsteps = nsteps
         self.nbins = nbins
@@ -62,8 +55,8 @@ class FitWorkspace:
             self.atmosphere = AtmosphereGrid(filename, atmgrid_filename)
             if parameters.VERBOSE:
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_filename}. ')
-        self.get_truth()
-        self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
+        self.truth = None
+        self.simulation = None
         if parameters.DEBUG:
             for k in range(10):
                 atmo = self.atmosphere.simulate(300, k, 0.05)
@@ -74,21 +67,6 @@ class FitWorkspace:
             plt.legend(loc='best')
             if parameters.DISPLAY:
                 plt.show()
-
-    def get_truth(self):
-        if 'A1' in list(self.spectrum.header.keys()):
-            A1_truth = self.spectrum.header['A1']
-            A2_truth = self.spectrum.header['A2']
-            ozone_truth = self.spectrum.header['OZONE']
-            pwv_truth = self.spectrum.header['PWV']
-            aerosols_truth = self.spectrum.header['VAOD']
-            reso_truth = self.spectrum.header['RESO']
-            D_truth = self.spectrum.header['D2CCD']
-            shift_truth = self.spectrum.header['X0SHIFT']
-            self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth,
-                          reso_truth, D_truth, shift_truth)
-        else:
-            self.truth = None
 
     def set_start(self):
         self.start = np.array(
@@ -286,6 +264,48 @@ class FitWorkspace:
         print(f"Input file: {self.filename}\nWalkers: {self.nwalkers}\t Steps: {self.nsteps}")
         print('************************************')
 
+
+class SpectrumFitWorkspace(FitWorkspace):
+
+    def __init__(self, filename, atmgrid_filename="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False):
+        FitWorkspace.__init__(self, filename, atmgrid_filename, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                              live_fit)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.A1 = 1.0
+        self.A2 = 0.05
+        self.ozone = 300.
+        self.pwv = 3
+        self.aerosols = 0.03
+        self.reso = 1.5
+        self.D = parameters.DISTANCE2CCD
+        self.shift = 0.
+        self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D, self.shift])
+        self.ndim = len(self.p)
+        self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
+                             r"alpha_pix [pix]"]
+        self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
+                           r"$\alpha_{\mathrm{pix}}$ [pix]"]
+        self.bounds = ((0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1), (1, 10), (50, 60), (-20, 20))
+        self.nwalkers = max(2 * self.ndim, nwalkers)
+        self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
+        self.get_truth()
+
+    def get_truth(self):
+        if 'A1' in list(self.spectrum.header.keys()):
+            A1_truth = self.spectrum.header['A1']
+            A2_truth = self.spectrum.header['A2']
+            ozone_truth = self.spectrum.header['OZONE']
+            pwv_truth = self.spectrum.header['PWV']
+            aerosols_truth = self.spectrum.header['VAOD']
+            reso_truth = self.spectrum.header['RESO']
+            D_truth = self.spectrum.header['D2CCD']
+            shift_truth = self.spectrum.header['X0SHIFT']
+            self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth,
+                          reso_truth, D_truth, shift_truth)
+        else:
+            self.truth = None
+
     def plot_spectrum_comparison_simple(self, ax, title='', extent=None, size=0.4):
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))
@@ -347,6 +367,147 @@ class FitWorkspace:
         fig.savefig(figname, dpi=100)
 
 
+class SpectrogramFitWorkspace(FitWorkspace):
+
+    def __init__(self, filename, atmgrid_filename="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False):
+        FitWorkspace.__init__(self, filename, atmgrid_filename, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                              live_fit)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.A1 = 1.0
+        self.A2 = 0.05
+        self.ozone = 300.
+        self.pwv = 3
+        self.aerosols = 0.03
+        self.D = parameters.DISTANCE2CCD
+        self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
+        self.psf_poly_params = self.psf_poly_params[self.spectrum.spectrogram_Nx:]
+        self.psf_poly_params_labels = [f"a{k}" for k in range(self.psf_poly_params.size)]
+        self.psf_poly_params_names = [f"$a_{k}$" for k in range(self.psf_poly_params.size)]
+        self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds(data=None)
+        self.shift_x = 0.
+        self.shift_y = 0.
+        self.angle = self.spectrum.rotation_angle
+        self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols,
+                           self.D, self.shift_x, self.shift_y, self.angle] + list(self.psf_poly_params))
+        self.ndim = self.p.size
+        self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", r"D_CCD [mm]",
+                             r"shift_x [pix]", r"shift_y [pix]", r"angle"] + self.psf_poly_params_labels
+        self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", r"$D_{CCD}$ [mm]",
+                           r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"\theta"] + \
+                           self.psf_poly_params_names
+        self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1),
+                                                (50, 60), (-2, 2), (-2, 2), (-3, 3)]), self.psf_poly_params_bounds])
+        self.nwalkers = max(2 * self.ndim, nwalkers)
+        self.simulation = SpectrogramSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
+        self.get_spectrogram_truth()
+
+    def get_spectrogram_truth(self):
+        if 'A1' in list(self.spectrum.header.keys()):
+            A1_truth = self.spectrum.header['A1']
+            A2_truth = self.spectrum.header['A2']
+            ozone_truth = self.spectrum.header['OZONE']
+            pwv_truth = self.spectrum.header['PWV']
+            aerosols_truth = self.spectrum.header['VAOD']
+            D_truth = self.spectrum.header['D2CCD']
+            shift_x_truth = self.spectrum.header['X0SHIFT']
+            shift_y_truth = self.spectrum.header['Y0SHIFT']
+            angle_truth = self.spectrum.header['ROTANGLE']
+            self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth,
+                          D_truth, shift_x_truth, shift_y_truth, angle_truth)
+        else:
+            self.truth = None
+
+    def plot_spectrogram_comparison_simple(self, ax, title='', extent=None, size=0.4):
+        lambdas = self.spectrum.lambdas
+        sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
+        if extent is not None:
+            sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
+        plot_image_simple(ax[0], data=self.model[:, sub], aspect='auto')
+        # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
+        # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
+        if title != '':
+            ax[0].set_title(title, fontsize=10, loc='left')
+        residuals = (self.spectrum.spectrogram - self.model) / self.spectrum.spectrogram_err
+        residuals_err = self.spectrum.spectrogram_err / self.model
+        std = np.std(residuals[:, sub])
+        plot_image_simple(ax[2], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(data-fit)/fit', aspect='auto')
+        ax[2].set_title('(data-fit)/data_err')
+        ax[0].set_xticks(ax[2].get_xticks()[1:-1])
+        ax[0].get_yaxis().set_label_coords(-0.15, 0.6)
+        ax[2].get_yaxis().set_label_coords(-0.15, 0.5)
+        plot_image_simple(ax[1], data=self.spectrum.spectrogram[:, sub], title='Data', aspect='auto')
+        ax[1].get_yaxis().set_label_coords(-0.15, 0.5)
+
+    def plot_spectrogram_fit(self):
+        """
+        Examples
+        --------
+        >>> filename = 'outputs/reduc_20170530_130_spectrum.fits'
+        >>> atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+        >>> fit_workspace = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000, burnin=10000,
+        ... nbins=10, verbose=1, plot=True, live_fit=False)
+        >>> A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, *psf = fit_workspace.p
+        >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, psf)
+        >>> fit_workspace.lambdas = lambdas
+        >>> fit_workspace.model = model
+        >>> fit_workspace.model_err = model_err
+        >>> fit_workspace.plot_spectrogram_fit()
+        """
+        fig, ax = plt.subplots(3, 3, figsize=(12, 6))
+        A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, *psf = self.p
+        self.title = f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f},' \
+                     f'D={D:.2f}mm, shift_x={shift_x:.2f}pix, shift_y={shift_y:.2f}pix, angle={angle:.2f} '
+        # main plot
+        self.plot_spectrogram_comparison_simple(ax[:, 0], title=self.title, size=0.8)
+        # zoom O2
+        self.plot_spectrogram_comparison_simple(ax[:, 1], extent=[730, 800], title='Zoom $O_2$', size=0.8)
+        # zoom H2O
+        self.plot_spectrogram_comparison_simple(ax[:, 2], extent=[870, 1000], title='Zoom $H_2 O$', size=0.8)
+        fig.tight_layout()
+        if self.live_fit:
+            plt.draw()
+            plt.pause(1e-8)
+            plt.close()
+        else:
+            if parameters.DISPLAY and self.verbose:
+                plt.show()
+        figname = self.filename.replace('.fits', '_bestfit.pdf')
+        self.my_logger.info(f'\n\tSave figure: {figname}')
+        fig.savefig(figname, dpi=100)
+
+
+def simulate_spectrogram(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, *psf_poly_params):
+    print('tttt',A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, psf_poly_params)
+    lambdas, model, model_err = \
+        fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, psf_poly_params)
+    fit_workspace.p = [A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle] + list(psf_poly_params)
+    fit_workspace.lambdas = lambdas
+    fit_workspace.model = model
+    fit_workspace.model_err = model_err
+    if fit_workspace.live_fit:
+        fit_workspace.plot_spectrogram_fit()
+    return lambdas, model, model_err
+
+
+def chisq_spectrogram(p):
+    lambdas, model, model_err = simulate_spectrogram(*p)
+    chisq = np.sum((model - fit_workspace.spectrum.spectrogram) ** 2 / (model_err ** 2 + fit_workspace.spectrum.spectrogram_err ** 2))
+    print('cc',chisq)
+    return chisq
+
+
+def lnlike_spectrogram(p):
+    return -0.5 * chisq_spectrogram(p)
+
+
+def lnprob_spectrogram(p):
+    lp = lnprior(p, fit_workspace.bounds)
+    if not np.isfinite(lp):
+        return -1e20
+    return lp + lnlike_spectrogram(p)
+
+
 def simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift):
     lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift)
     # if fit_workspace.live_fit:
@@ -394,20 +555,47 @@ def sort_on_runtime(p, depth_index=5):
 
 
 def run_minimisation():
-    bounds = tuple([(fit_workspace.bounds[0][i], fit_workspace.bounds[1][i]) for i in range(fit_workspace.ndim)])
-    nll = lambda p: -lnlike(p)
-    result = minimize(nll, fit_workspace.p, method='L-BFGS-B',
-                      options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True, 'maxiter': 100000,
-                               'maxls': 50, 'maxcor': 30},
-                      bounds=bounds)
-    fit_workspace.p = result['x']
+    my_logger = set_logger(__name__)
+    #bounds = [(fit_workspace.bounds[0][i], fit_workspace.bounds[1][i]) for i in range(fit_workspace.ndim)]
+    bounds = fit_workspace.bounds
+    if isinstance(fit_workspace, SpectrumFitWorkspace):
+        nll = lambda p: -lnlike(p)
+    elif isinstance(fit_workspace, SpectrogramFitWorkspace):
+        nll = lambda p: -lnlike_spectrogram(p)
+    else:
+        my_logger.error(f'\n\tUnknown fit_workspace class type {type(fit_workspace)}.\n'
+                        f'Choose either "SpectrumFitWorkspace" of "SpectrogramFitWorkspace"')
+        sys.exit()
+    # result = minimize(nll, fit_workspace.p, method='L-BFGS-B',
+    #                   options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True, 'maxiter': 100000,
+    #                            'maxls': 50, 'maxcor': 30},
+    #                   bounds=bounds)
+    # fit_workspace.p = result['x']
+    guess = np.array([1.0221355184586634, 0.05, 300.0, 3.0, 0.03, 55.45, 0.0, 0.0, -0.6305218866359683, 0.9697783937167165, -0.23418568011585317, 0.33884422382705437, 6.491300580087118, 7.23813399139167, 3.4442522038396097, 3.2040421136282338, 2.3246058070491347, 0.8560985887811235, -0.24436185918630957, -0.24696445586018434, -0.0028070102515497844, 3.028241966129593, 2.8582943432553085, -0.3948830196355327, 999.9999999999964])
+    # guess = fit_workspace.p
+    fix = [True] * guess.size
+    fix[0] = False
+    # fix[2:5] = [False, False, False]
+    # fix[5] = False
+    fix[9:12] = [False, False, False]
+    fit_workspace.simulation.fix_psf_cube = True
+    error = 0.1 * np.abs(guess) * np.ones_like(guess)
+    m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
+                               fix=fix, print_level=2, limit=bounds)
+    m.migrad()
+    fit_workspace.p = m.np_values()
     print(fit_workspace.p)
-    simulate(*fit_workspace.p)
-    fit_workspace.plot_fit()
+    if isinstance(fit_workspace, SpectrumFitWorkspace):
+        simulate(*fit_workspace.p)
+    elif isinstance(fit_workspace, SpectrogramFitWorkspace):
+        simulate_spectrogram(*fit_workspace.p)
+    fit_workspace.live_fit = False
+    fit_workspace.plot_spectrogram_fit()
 
 
 def run_emcee(w):
     global fit_workspace
+    my_logger = set_logger(__name__)
     fit_workspace = w
     fit_workspace.print_settings()
     nsamples = fit_workspace.nsteps
@@ -446,10 +634,11 @@ if __name__ == "__main__":
                       help="Write results in given output directory (default: ./outputs/).")
     (opts, args) = parser.parse_args()
 
-    filename = 'outputs/data_30may17/reduc_20170530_130_spectrum.fits'
+    filename = 'outputs/reduc_20170530_130_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-    fit_workspace = FitWorkspace(filename, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000, burnin=10000,
-                                 nbins=10, verbose=0, plot=False, live_fit=False)
-    run_emcee()
-    fit_workspace.analyze_chains()
+    fit_workspace = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000, burnin=10000,
+                                 nbins=10, verbose=1, plot=True, live_fit=True)
+    run_minimisation()
+    # run_emcee()
+    # fit_workspace.analyze_chains()
