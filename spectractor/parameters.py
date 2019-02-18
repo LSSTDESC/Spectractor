@@ -61,7 +61,7 @@ ROT_PREFILTER = True  # must be set to true, otherwise create residuals and corr
 ROT_ORDER = 5  # must be above 3
 
 # Range for spectrum
-LAMBDA_MIN = 300  # minimum wavelength for spectrum extraction (in nm)
+LAMBDA_MIN = 350  # minimum wavelength for spectrum extraction (in nm)
 LAMBDA_MAX = 1100  # maximum wavelength for spectrum extraction (in nm)
 LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, 1)
 

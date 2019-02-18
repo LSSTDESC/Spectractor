@@ -5,6 +5,9 @@ from astropy.modeling import models, fitting
 from astropy.stats import sigma_clip
 from astropy.io import fits
 
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+
 import warnings
 from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
@@ -918,6 +921,32 @@ def clean_target_spikes(data, saturation):
         saturated_pixels = np.where(data >= saturation)
         delta = delta - len(saturated_pixels[0])
     return data
+
+
+def plot_image_simple(ax, data=None, scale="lin", title="", units="Image units",
+                      target_pixcoords=None, vmin=None, vmax=None, aspect=None):
+    if scale == "log" or scale == "log10":
+        # removes the zeros and negative pixels first
+        zeros = np.where(data <= 0)
+        min_noz = np.min(data[np.where(data > 0)])
+        data[zeros] = min_noz
+        # apply log
+        data = np.log10(data)
+    im = ax.imshow(data, origin='lower', cmap='jet', vmin=vmin, vmax=vmax, aspect=aspect)
+    ax.grid(color='white', ls='solid')
+    ax.grid(True)
+    ax.set_xlabel('X [pixels]')
+    ax.set_ylabel('Y [pixels]')
+    cb = plt.colorbar(im, ax=ax)
+    cb.formatter.set_powerlimits((0, 0))
+    cb.locator = MaxNLocator(7, prune=None)
+    cb.update_ticks()
+    cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
+    if title != "":
+        ax.set_title(title)
+    if target_pixcoords is not None:
+        ax.scatter(target_pixcoords[0], target_pixcoords[1], marker='o', s=100, edgecolors='k', facecolors='none',
+                   label='Target', linewidth=2)
 
 
 def load_fits(file_name, hdu_index=0):

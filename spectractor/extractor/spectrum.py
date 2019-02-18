@@ -230,6 +230,48 @@ class Spectrum:
             else:
                 plt.show()
 
+    def plot_spectrogram_simple(self, ax, data=None, scale="lin", title="", units="Image units", plot_stats=False,
+                          target_pixcoords=None, vmin=None, vmax=None, aspect=None):
+        if data is None:
+            data = np.copy(self.spectrogram)
+        if plot_stats:
+            data = np.copy(self.spectrogram_err)
+        if scale == "log" or scale == "log10":
+            # removes the zeros and negative pixels first
+            zeros = np.where(data <= 0)
+            min_noz = np.min(data[np.where(data > 0)])
+            data[zeros] = min_noz
+            # apply log
+            data = np.log10(data)
+        im = ax.imshow(data, origin='lower', cmap='jet', vmin=vmin, vmax=vmax, aspect=aspect)
+        ax.grid(color='white', ls='solid')
+        ax.grid(True)
+        ax.set_xlabel('X [pixels]')
+        ax.set_ylabel('Y [pixels]')
+        cb = plt.colorbar(im, ax=ax)
+        cb.formatter.set_powerlimits((0, 0))
+        cb.locator = MaxNLocator(7, prune=None)
+        cb.update_ticks()
+        cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
+        if title != "":
+            ax.set_title(title)
+        if target_pixcoords is not None:
+            ax.scatter(target_pixcoords[0], target_pixcoords[1], marker='o', s=100, edgecolors='k', facecolors='none',
+                       label='Target', linewidth=2)
+
+    def plot_spectrogram(self, data=None, scale="lin", title="", units="Image units", plot_stats=False,
+                   target_pixcoords=None, figsize=[9.3, 8], aspect=None):
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        if data is None:
+            data = np.copy(self.spectrogram)
+        if plot_stats:
+            data = np.copy(self.spectrogram_err)
+        plot_image_simple(ax, data=data, scale=scale, title=title, units=units,
+                               target_pixcoords=target_pixcoords, aspect=aspect)
+        plt.legend()
+        if parameters.DISPLAY:
+            plt.show()
+
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).
 
@@ -898,9 +940,10 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     right_edge: int
         Right-hand pixel position above which no pixel should be used (default: 1800)
     """
+    my_logger = set_logger(__name__)
     if ws is None:
         ws = [20, 30]
-    image.my_logger.info(
+    my_logger.info(
         '\n\tExtracting spectrum from image: spectrum with width 2*{:d} pixels'
         ' and background from {:d} to {:d} pixels'.format(
             w, ws[0], ws[1]))
@@ -922,25 +965,43 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     data = data[ymin:ymax, pixel_start:pixel_end]
     err = err[ymin:ymax, pixel_start:pixel_end]
     Ny, Nx = data.shape
+    my_logger.info(f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
     # Fit the transverse profile
+    my_logger.info(f'\n\tStart PSF1D transverse fit...')
     s, bgd_model_func = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,
                                      saturation=image.saturation, live_fit=parameters.DEBUG)
     # Fill spectrum object
     spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
     spectrum.data = np.copy(s.table['flux_sum'])
     spectrum.err = np.copy(s.table['flux_err'])
-    if parameters.DEBUG or True:
+    my_logger.debug(f'\n\tTransverse fit table:\n{s.table}')
+    if parameters.DEBUG:
         s.plot_summary()
     # Fit the data:
+    my_logger.info(f'\n\tStart ChromaticPSF1D polynomial fit...')
     s = fit_chromatic_PSF1D(data, s, bgd_model_func=bgd_model_func, data_errors=err)
     spectrum.chromatic_psf = s
     spectrum.data = np.copy(s.table['flux_integral'])
-    s.table['Dx'] = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
+    s.table['Dx_rot'] = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
+    s.table['Dx'] = np.copy(s.table['Dx_rot'])
+    my_logger.warning(f"{s.table['x_mean']}")
+    s.table['Dy'] = s.table['x_mean'] - (image.target_pixcoords_rotated[1] - ymin)
+    s.table['Dy_fwhm_inf'] = s.table['x_mean'] - s.table['fwhm'] - (image.target_pixcoords_rotated[1] - ymin)
+    s.table['Dy_fwhm_sup'] = s.table['x_mean'] + s.table['fwhm'] - (image.target_pixcoords_rotated[1] - ymin)
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(np.arange(pixel_start, pixel_end) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords)
     s.table['lambdas'] = first_guess_lambdas
+    my_logger.warning(f"{s.table['x_mean']}")
+    s.table['x_mean'] = s.table['x_mean'] - (image.target_pixcoords_rotated[1] - ymin)
+    my_logger.warning(f"{s.table['x_mean']}")
+    my_logger.warning(f"{s.table['Dy']}")
+    my_logger.warning(f"{s.table['Dy_mean']}")
+    my_logger.debug(f'\n\tTransverse fit table before derotation:\n{s.table}')
     # rotate and save the table
     s.rotate_table(-image.rotation_angle)
-    spectrum.my_logger.debug(f'\n{s.table}')
+    my_logger.debug(f'\n\tTransverse fit table after derotation:\n{s.table}')
+    my_logger.warning(f"{s.table['x_mean']}")
+    my_logger.warning(f"{s.table['Dy']}")
+    my_logger.warning(f"{s.table['Dy_mean']}")
     # Extract the spectrogram edges
     data = np.copy(image.data)[:, 0:right_edge]
     err = np.copy(image.stat_errors)[:, 0:right_edge]
@@ -961,6 +1022,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
+    my_logger.info(f'\n\tExtract spectrogram: crop image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))'
+                   f'\n\tNew target position in spectrogram frame: {target_pixcoords_spectrogram}')
     # Extract the non rotated background
     bgd_model_func  = extract_background(data, err, deg=parameters.BGD_ORDER, ws=ws, sigma=5, live_fit=False)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
@@ -979,7 +1042,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Summary plot
     if parameters.DEBUG or True:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
-        image.plot_image_simple(ax[2], data=data,
+        plot_image_simple(ax[2], data=data,
                                 scale="log", title='', units=image.units, aspect='auto')
         ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy'], label='Fitted spectrum centers')
         ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_mean'], 'g-', label='Dispersion axis')
