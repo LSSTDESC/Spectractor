@@ -6,6 +6,7 @@ from astropy.stats import sigma_clip
 from astropy.io import fits
 
 import matplotlib.pyplot as plt
+import matplotlib.colors
 from matplotlib.ticker import MaxNLocator
 
 import warnings
@@ -275,7 +276,7 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     """
     maxfev = 10000
     popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma,
-                           absolute_sigma=True, method='trf', xtol=1e-4, ftol=1e-4, verbose=1,
+                           absolute_sigma=True, method='trf', xtol=1e-4, ftol=1e-4, verbose=0,
                            jac=multigauss_and_bgd_jacobian, x_scale='jac')
     return popt, pcov
 
@@ -923,8 +924,8 @@ def clean_target_spikes(data, saturation):
     return data
 
 
-def plot_image_simple(ax, data=None, scale="lin", title="", units="Image units",
-                      target_pixcoords=None, vmin=None, vmax=None, aspect=None):
+def plot_image_simple(ax, data=None, scale="lin", title="", units="Image units", cmap=None,
+                      target_pixcoords=None, vmin=None, vmax=None, aspect=None, cax=None):
     if scale == "log" or scale == "log10":
         # removes the zeros and negative pixels first
         zeros = np.where(data <= 0)
@@ -932,12 +933,12 @@ def plot_image_simple(ax, data=None, scale="lin", title="", units="Image units",
         data[zeros] = min_noz
         # apply log
         data = np.log10(data)
-    im = ax.imshow(data, origin='lower', cmap='jet', vmin=vmin, vmax=vmax, aspect=aspect)
-    ax.grid(color='white', ls='solid')
+    im = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect)
+    ax.grid(color='silver', ls='solid')
     ax.grid(True)
     ax.set_xlabel('X [pixels]')
     ax.set_ylabel('Y [pixels]')
-    cb = plt.colorbar(im, ax=ax)
+    cb = plt.colorbar(im, ax=ax, cax=cax)
     cb.formatter.set_powerlimits((0, 0))
     cb.locator = MaxNLocator(7, prune=None)
     cb.update_ticks()
@@ -1018,6 +1019,64 @@ def dichotomie(f, a, b, epsilon):
         N += 1
     return x
 
+
+def wavelength_to_rgb(wavelength, gamma=0.8):
+    ''' taken from http://www.noah.org/wiki/Wavelength_to_RGB_in_Python
+    This converts a given wavelength of light to an
+    approximate RGB color value. The wavelength must be given
+    in nanometers in the range from 380 nm through 750 nm
+    (789 THz through 400 THz).
+
+    Based on code by Dan Bruton
+    http://www.physics.sfasu.edu/astro/color/spectra.html
+    Additionally alpha value set to 0.5 outside range
+    '''
+    wavelength = float(wavelength)
+    if 380 <= wavelength <= 750:
+        A = 1.
+    else:
+        A = 0.5
+    if wavelength < 380:
+        wavelength = 380.
+    if wavelength > 750:
+        wavelength = 750.
+    if 380 <= wavelength <= 440:
+        attenuation = 0.3 + 0.7 * (wavelength - 380) / (440 - 380)
+        R = ((-(wavelength - 440) / (440 - 380)) * attenuation) ** gamma
+        G = 0.0
+        B = (1.0 * attenuation) ** gamma
+    elif 440 <= wavelength <= 490:
+        R = 0.0
+        G = ((wavelength - 440) / (490 - 440)) ** gamma
+        B = 1.0
+    elif 490 <= wavelength <= 510:
+        R = 0.0
+        G = 1.0
+        B = (-(wavelength - 510) / (510 - 490)) ** gamma
+    elif 510 <= wavelength <= 580:
+        R = ((wavelength - 510) / (580 - 510)) ** gamma
+        G = 1.0
+        B = 0.0
+    elif 580 <= wavelength <= 645:
+        R = 1.0
+        G = (-(wavelength - 645) / (645 - 580)) ** gamma
+        B = 0.0
+    elif 645 <= wavelength <= 750:
+        attenuation = 0.3 + 0.7 * (750 - wavelength) / (750 - 645)
+        R = (1.0 * attenuation) ** gamma
+        G = 0.0
+        B = 0.0
+    else:
+        R = 0.0
+        G = 0.0
+        B = 0.0
+    return (R, G, B, A)
+
+
+def from_lambda_to_colormap(lambdas):
+    colorlist = [wavelength_to_rgb(lbda) for lbda in lambdas]
+    spectralmap = matplotlib.colors.LinearSegmentedColormap.from_list("spectrum", colorlist)
+    return spectralmap
 
 
 if __name__ == "__main__":
