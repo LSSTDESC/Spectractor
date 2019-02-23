@@ -55,7 +55,7 @@ class Spectrum:
         self.filters = None
         self.units = 'ADU/s'
         self.gain = parameters.CCD_GAIN
-        self.chromatic_psf = ChromaticPSF1D(1,1,deg=1,saturation=1)
+        self.chromatic_psf = ChromaticPSF1D(1, 1, deg=1, saturation=1)
         self.rotation_angle = 0
         if file_name != "":
             self.filename = file_name
@@ -211,7 +211,7 @@ class Spectrum:
         self.plot_spectrum_simple(plt.gca(), xlim=xlim, label=label)
         if len(self.target.spectra) > 0:
             for k in range(len(self.target.spectra)):
-                s = self.target.spectra[k]/np.max(self.target.spectra[k])*np.max(self.data)
+                s = self.target.spectra[k] / np.max(self.target.spectra[k]) * np.max(self.data)
                 plt.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
         if self.lambdas is not None:
             # self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
@@ -231,7 +231,7 @@ class Spectrum:
                 plt.show()
 
     def plot_spectrogram_simple(self, ax, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                          target_pixcoords=None, vmin=None, vmax=None, aspect=None):
+                                target_pixcoords=None, vmin=None, vmax=None, aspect=None):
         if data is None:
             data = np.copy(self.spectrogram)
         if plot_stats:
@@ -260,14 +260,14 @@ class Spectrum:
                        label='Target', linewidth=2)
 
     def plot_spectrogram(self, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                   target_pixcoords=None, figsize=[9.3, 8], aspect=None):
+                         target_pixcoords=None, figsize=[9.3, 8], aspect=None):
         fig, ax = plt.subplots(1, 1, figsize=figsize)
         if data is None:
             data = np.copy(self.spectrogram)
         if plot_stats:
             data = np.copy(self.spectrogram_err)
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units,
-                               target_pixcoords=target_pixcoords, aspect=aspect)
+                          target_pixcoords=target_pixcoords, aspect=aspect)
         plt.legend()
         if parameters.DISPLAY:
             plt.show()
@@ -365,6 +365,7 @@ class Spectrum:
             extract_info_from_CTIO_header(self, self.header)
             if self.header['TARGET'] != "":
                 self.target = load_target(self.header['TARGET'], verbose=parameters.VERBOSE)
+                self.lines = self.target.lines
             if self.header['UNIT2'] != "":
                 self.units = self.header['UNIT2']
             if self.header['ROTANGLE'] != "":
@@ -374,8 +375,8 @@ class Spectrum:
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
-            self.load_spectrogram(input_file_name.replace('spectrum','spectrogram'))
-            self.load_chromatic_psf(input_file_name.replace('spectrum.fits','table.csv'))
+            self.load_spectrogram(input_file_name.replace('spectrum', 'spectrogram'))
+            self.load_chromatic_psf(input_file_name.replace('spectrum.fits', 'table.csv'))
         else:
             self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
 
@@ -824,9 +825,14 @@ def calibrate_spectrum_with_lines(spectrum):
 
     Returns
     -------
-    D: float
-        The new distance between the CCD and the disperser.
+    lambdas: array_like
+        The new wavelength array in nm.
 
+    Examples
+    --------
+    >>> spectrum = Spectrum('outputs/reduc_20170530_134_spectrum.fits')
+    >>> lambdas = calibrate_spectrum_with_lines(spectrum)
+    >>> spectrum.plot_spectrum()
     """
     # Convert wavelength array into original pixels
     x0 = spectrum.x0
@@ -842,17 +848,16 @@ def calibrate_spectrum_with_lines(spectrum):
     D = parameters.DISTANCE2CCD  # - parameters.DISTANCE2CCD_ERR
     D_err = parameters.DISTANCE2CCD_ERR
 
-    def shift_minimizer(params, spectrum, x0):
-        spectrum.disperser.D = params[0]
-        pixel_shift = params[1]
-        lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift,
-                                                                  x0=[x0[0] + pixel_shift, x0[1]], order=spectrum.order)
+    def shift_minimizer(params):
+        spectrum.disperser.D, shift = params
+        lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - shift,
+                                                                  x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None)
-        chisq += (pixel_shift * pixel_shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
+        chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG:
             spectrum.lambdas = lambdas_test
             spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
-                                                        f'\nD={D:.2f}mm, shift={pixel_shift:.2f}pix')
+                                                        f'\nD={D:.2f}mm, shift={shift:.2f}pix')
         return chisq
 
     # grid exploration of the parameters
@@ -864,7 +869,7 @@ def calibrate_spectrum_with_lines(spectrum):
     chisq_grid = np.zeros((len(Ds), len(pixel_shifts)))
     for i, D in enumerate(Ds):
         for j, pixel_shift in enumerate(pixel_shifts):
-            chisq_grid[i, j] = shift_minimizer([D, pixel_shift], spectrum, x0)
+            chisq_grid[i, j] = shift_minimizer([D, pixel_shift])
     imin, jmin = np.unravel_index(chisq_grid.argmin(), chisq_grid.shape)
     D = Ds[imin]
     pixel_shift = pixel_shifts[jmin]
@@ -885,18 +890,23 @@ def calibrate_spectrum_with_lines(spectrum):
         plt.legend()
         plt.show()
     # now minimize around the global minimum found previously
-    res = opt.minimize(shift_minimizer, start, args=(spectrum, x0), method='L-BFGS-B',
-                       options={'maxiter': 200, 'ftol': 1e-3},
-                       bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
-    if parameters.DEBUG:
-        print(res)
-    if not res.success:
-        spectrum.my_logger.warning('\n\tMinimizer failed.')
-        print(res)
-    D = res.x[0]
+    # res = opt.minimize(shift_minimizer, start, args=(), method='L-BFGS-B',
+    #                    options={'maxiter': 200, 'ftol': 1e-3},
+    #                    bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
+    error = [parameters.DISTANCE2CCD_ERR, pixel_shift_step]
+    fix = [False, False]
+    m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1,
+                               fix=fix, print_level=2,
+                               limit=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
+    m.migrad()
+    # if parameters.DEBUG:
+    #     print(m.prin)
+    # if not res.success:
+    #     spectrum.my_logger.warning('\n\tMinimizer failed.')
+    #     print(res)
+    D, pixel_shift = m.np_values()
     spectrum.disperser.D = D
-    pixel_shift = res.x[1]
-    x0 = [x0[0] + res.x[1], x0[1]]
+    x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
     # check success, xO ou D sur les bords du prior
     lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift, x0=x0, order=spectrum.order)
@@ -958,18 +968,22 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     ymin = max(0, y0 - ws[1])
     # Roughly estimates the wavelengths and set start 50 nm before parameters.LAMBDA_MIN
     # and end 50 nm after parameters.LAMBDA_MAX
-    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords)
+    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
+                                                      x0=image.target_pixcoords)
     pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
     pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0)))))
+    if (pixel_end-pixel_start) % 2 == 0:  # spectrogram table must have odd size in x for the fourier simulation
+        pixel_end -= 1
     # Create spectrogram
     data = data[ymin:ymax, pixel_start:pixel_end]
     err = err[ymin:ymax, pixel_start:pixel_end]
     Ny, Nx = data.shape
-    my_logger.info(f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
+    my_logger.info(
+        f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     s, bgd_model_func = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,
-                                     saturation=image.saturation, live_fit=parameters.DEBUG)
+                                                     saturation=image.saturation, live_fit=parameters.DEBUG)
     # Fill spectrum object
     spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
     spectrum.data = np.copy(s.table['flux_sum'])
@@ -984,49 +998,58 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.data = np.copy(s.table['flux_integral'])
     s.table['Dx_rot'] = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
     s.table['Dx'] = np.copy(s.table['Dx_rot'])
-    my_logger.warning(f"{s.table['x_mean']}")
     s.table['Dy'] = s.table['x_mean'] - (image.target_pixcoords_rotated[1] - ymin)
-    s.table['Dy_fwhm_inf'] = s.table['x_mean'] - s.table['fwhm'] - (image.target_pixcoords_rotated[1] - ymin)
-    s.table['Dy_fwhm_sup'] = s.table['x_mean'] + s.table['fwhm'] - (image.target_pixcoords_rotated[1] - ymin)
-    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(np.arange(pixel_start, pixel_end) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords)
+    s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
+    s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
+    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(
+        np.arange(pixel_start, pixel_end) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords)
     s.table['lambdas'] = first_guess_lambdas
-    my_logger.warning(f"{s.table['x_mean']}")
     s.table['x_mean'] = s.table['x_mean'] - (image.target_pixcoords_rotated[1] - ymin)
-    my_logger.warning(f"{s.table['x_mean']}")
-    my_logger.warning(f"{s.table['Dy']}")
-    my_logger.warning(f"{s.table['Dy_mean']}")
-    my_logger.debug(f'\n\tTransverse fit table before derotation:\n{s.table}')
+    my_logger.debug(f"\n\tTransverse fit table before derotation:\n{s.table[['Dx_rot', 'Dx', 'x_mean', 'Dy']]}")
     # rotate and save the table
     s.rotate_table(-image.rotation_angle)
-    my_logger.debug(f'\n\tTransverse fit table after derotation:\n{s.table}')
-    my_logger.warning(f"{s.table['x_mean']}")
-    my_logger.warning(f"{s.table['Dy']}")
-    my_logger.warning(f"{s.table['Dy_mean']}")
+    my_logger.debug(f"\n\tTransverse fit table after derotation:\n{s.table[['Dx_rot', 'Dx', 'x_mean', 'Dy']]}")
     # Extract the spectrogram edges
     data = np.copy(image.data)[:, 0:right_edge]
     err = np.copy(image.stat_errors)[:, 0:right_edge]
     Ny, Nx = data.shape
     x0 = int(image.target_pixcoords[0])
     y0 = int(image.target_pixcoords[1])
-    ymax = min(Ny, y0 + int(s.table['Dy_mean'].max()) + ws[1] + 1) # +1 to  include edges
+    ymax = min(Ny, y0 + int(s.table['Dy_mean'].max()) + ws[1] + 1)  # +1 to  include edges
     ymin = max(0, y0 + int(s.table['Dy_mean'].min()) - ws[1])
     distance = s.get_distance_along_dispersion_axis()
     lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords)
     lambda_min_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
     lambda_max_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0))))
     xmin = int(s.table['Dx'][lambda_min_index] + x0)
-    xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0)+1) # +1 to  include edges
+    xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
+    if (xmax-xmin) % 2 == 0:  # spectrogram must have odd size in x for the fourier simulation
+        xmax -= 1
+        s.table.remove_row(-1)
     # Position of the order 0 in the spectrogram coordinates
-    target_pixcoords_spectrogram = [image.target_pixcoords[0]-xmin, image.target_pixcoords[1]-ymin ]
+    target_pixcoords_spectrogram = [image.target_pixcoords[0] - xmin, image.target_pixcoords[1] - ymin]
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
+    # Extract the non rotated background
+    bgd_model_func = extract_background(data, err, deg=parameters.BGD_ORDER, ws=ws, sigma=5, live_fit=False)
+    bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
+    # Crop the background lateral regions
+    bgd_width = ws[1]-ws[0]
+    yeven = 0
+    if (Ny - 2*bgd_width) % 2 == 0:  # spectrogram must have odd size in y for the fourier simulation
+        yeven = 1
+    ymax = ymax - bgd_width + yeven
+    ymin += bgd_width
+    bgd = bgd[bgd_width:-bgd_width+yeven, :]
+    data = data[bgd_width:-bgd_width+yeven, :]
+    err = err[bgd_width:-bgd_width+yeven, :]
+    Ny, Nx = data.shape
+    # Position of the order 0 in the spectrogram coordinates
+    target_pixcoords_spectrogram[1] -= bgd_width
     my_logger.info(f'\n\tExtract spectrogram: crop image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))'
                    f'\n\tNew target position in spectrogram frame: {target_pixcoords_spectrogram}')
-    # Extract the non rotated background
-    bgd_model_func  = extract_background(data, err, deg=parameters.BGD_ORDER, ws=ws, sigma=5, live_fit=False)
-    bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
     # Save results
     spectrum.spectrogram = data
     spectrum.spectrogram_err = err
@@ -1042,20 +1065,27 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Summary plot
     if parameters.DEBUG or True:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
-        plot_image_simple(ax[2], data=data,
-                                scale="log", title='', units=image.units, aspect='auto')
-        ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy'], label='Fitted spectrum centers')
-        ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_mean'], 'g-', label='Dispersion axis')
-        ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
-        ax[2].plot(s.table['Dx']+target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-', label='')
+        plot_image_simple(ax[2], data=data, cmap=None,
+                          scale="log", title='', units=image.units, aspect='auto')
+        ax[2].plot(s.table['Dx'] + target_pixcoords_spectrogram[0],
+                   target_pixcoords_spectrogram[1] + s.table['Dy_mean'],
+                   label='Dispersion axis')
+        ax[2].scatter(s.table['Dx'] + target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1] + s.table['Dy'],
+                      c=s.table['lambdas'], edgecolors='None', cmap=from_lambda_to_colormap(s.table['lambdas']),
+                      label='Fitted spectrum centers',
+                      marker='o', s=10)
+        ax[2].plot(s.table['Dx'] + target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1]
+                   + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
+        ax[2].plot(s.table['Dx'] + target_pixcoords_spectrogram[0], target_pixcoords_spectrogram[1]
+                   + s.table['Dy_fwhm_sup'], 'k-', label='')
         ax[2].set_ylim(0, Ny)
         ax[2].set_xlim(0, Nx)
         ax[2].legend(loc='best')
         spectrum.plot_spectrum_simple(ax[0], lambdas=s.pixels, label='Modelled spectrum')
-        ax[0].plot(s.pixels, s.table['flux_sum'], 'k-', label='Cross spectrum')
+        ax[0].plot(s.pixels[:s.table['flux_sum'].size], s.table['flux_sum'], 'k-', label='Cross spectrum')
         ax[0].legend(loc='best')
-        ax[1].plot(s.pixels, (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
-                   label='(integral-data)/data')
+        ax[1].plot(s.pixels[:s.table['flux_sum'].size], (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
+                   label='(model_integral-cross_sum)/cross_sum')
         ax[1].legend()
         ax[1].grid(True)
         ax[1].set_ylim(-1, 1)
@@ -1070,5 +1100,3 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         if parameters.DISPLAY:
             plt.show()
     return spectrum
-
-
