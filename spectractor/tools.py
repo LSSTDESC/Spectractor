@@ -950,6 +950,55 @@ def plot_image_simple(ax, data=None, scale="lin", title="", units="Image units",
                    label='Target', linewidth=2)
 
 
+def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', label='', title='', units=''):
+    """Simple function to plot a spectrum with error bars and labels.
+
+    Parameters
+    ----------
+    ax: Axes
+        Axes instance to make the plot
+    xlim: list, optional
+        List of minimum and maximum abscisses
+    color: str
+        String for the color of the spectrum (default: 'r')
+    label: str
+        String label for the plot legend
+    lambdas: array, optional
+        The wavelengths array if it has been given externally (default: None)
+
+    Examples
+    --------
+    >>> import matplotlib.pyplot as plt
+    >>> f, ax = plt.subplots(1,1)
+    >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+    >>> s.plot_spectrum_simple(ax, xlim=[500,700], color='r', label='test')
+    >>> if parameters.DISPLAY: plt.show()
+    """
+    xs = lambdas
+    if xs is None:
+        xs = np.arange(data.size)
+    if data_err is not None:
+        ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=1, label=label, zorder=0, markersize=2)
+    else:
+        ax.plot(xs, data, f'{color}-', lw=2, label=label)
+    ax.grid(True)
+    if xlim is None and lambdas is not None:
+        xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
+    print('ttt',xlim)
+    ax.set_xlim(xlim)
+    ax.set_ylim(0., np.nanmax(data) * 1.2)
+    if lambdas is not None:
+        ax.set_xlabel('$\lambda$ [nm]')
+    else:
+        ax.set_xlabel('X [pixels]')
+    if units != '':
+        ax.set_ylabel(f'Flux [{units}]')
+    else:
+        ax.set_ylabel(f'Flux')
+    if title != '':
+        ax.set_title(title)
+
+
 def load_fits(file_name, hdu_index=0):
     hdu_list = fits.open(file_name)
     header = hdu_list[0].header

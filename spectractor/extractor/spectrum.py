@@ -138,65 +138,13 @@ class Spectrum:
                     f['label'], parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
                 break
 
-    def plot_spectrum_simple(self, ax, xlim=None, color='r', label='', lambdas=None):
-        """Simple function to plot a spectrum with error bars and labels.
-
-        Parameters
-        ----------
-        ax: Axes
-            Axes instance to make the plot
-        xlim: list, optional
-            List of minimum and maximum abscisses
-        color: str
-            String for the color of the spectrum (default: 'r')
-        label: str
-            String label for the plot legend
-        lambdas: array, optional
-            The wavelengths array if it has been given externally (default: None)
-
-        Examples
-        --------
-        >>> import matplotlib.pyplot as plt
-        >>> f, ax = plt.subplots(1,1)
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
-        >>> s.plot_spectrum_simple(ax, xlim=[500,700], color='r', label='test')
-        >>> if parameters.DISPLAY: plt.show()
-        """
-        xs = self.lambdas
-        if lambdas is not None:
-            xs = lambdas
-        if label == '':
-            label = f'Order {self.order:d} spectrum\nD={self.disperser.D:.2f}mm'
-            if self.x0 is not None:
-                label += f', x0={self.x0[0]:.2f}pix'
-        if xs is None:
-            xs = np.arange(self.data.shape[0])
-        if self.err is not None:
-            ax.errorbar(xs, self.data, yerr=self.err, fmt='{}o'.format(color), lw=1,
-                        label=label, zorder=0, markersize=2)
-        else:
-            ax.plot(xs, self.data, '{}-'.format(color), lw=2, label=label)
-        ax.grid(True)
-        if xlim is None and self.lambdas is not None:
-            xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
-        ax.set_xlim(xlim)
-        ax.set_ylim(0., np.nanmax(self.data) * 1.2)
-        if self.lambdas is not None:
-            ax.set_xlabel('$\lambda$ [nm]')
-        else:
-            ax.set_xlabel('X [pixels]')
-        ax.set_ylabel(f'Flux [{self.units}]')
-        ax.set_title(self.target.label)
-
-    def plot_spectrum(self, xlim=None, label='', live_fit=False):
+    def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label=''):
         """Plot spectrum with emission and absorption lines.
 
         Parameters
         ----------
         xlim: list, optional
             List of minimum and maximum abscisses (default: None)
-        label: str, optional
-            Label for the plot legend (default: '')
         live_fit: bool, optional
             If True the spectrum is plotted in live during the fitting procedures
             (default: False).
@@ -204,24 +152,30 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
-        >>> s.plot_spectrum(xlim=[500,700], fit=False)
+        >>> s.plot_spectrum(xlim=[500,700], live_fit=False)
         >>> if parameters.DISPLAY: plt.show()
         """
-        plt.figure(figsize=[12, 6])
-        self.plot_spectrum_simple(plt.gca(), xlim=xlim, label=label)
+        if ax is None:
+            plt.figure(figsize=[12, 6])
+            ax = plt.gca()
+        if label == '':
+            label = f'Order {self.order:d} spectrum\nD={self.disperser.D:.2f}mm'
+        if self.x0 is not None:
+            label += f', x0={self.x0[0]:.2f}pix'
+        title = self.target.label
+        plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
+                             title=title, units=self.units)
         if len(self.target.spectra) > 0:
             for k in range(len(self.target.spectra)):
                 s = self.target.spectra[k] / np.max(self.target.spectra[k]) * np.max(self.data)
-                plt.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
+                ax.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
         if self.lambdas is not None:
-            # self.lines.detect_lines(self.lambdas, self.data, spec_err=self.err, ax=plt.gca(),
-            #                        print_table=parameters.VERBOSE)
-            self.lines.plot_detected_lines(plt.gca(), print_table=parameters.VERBOSE)
+            self.lines.plot_detected_lines(ax, print_table=parameters.VERBOSE)
         if self.lambdas is not None and self.lines is not None:
-            self.lines.plot_atomic_lines(plt.gca(), fontsize=12)
-        plt.legend(loc='best')
+            self.lines.plot_atomic_lines(ax, fontsize=12)
+        ax.legend(loc='best')
         if self.filters is not None:
-            plt.gca().get_legend().set_title(self.filters)
+            ax.get_legend().set_title(self.filters)
         if parameters.DISPLAY:
             if live_fit:
                 plt.draw()
@@ -471,7 +425,7 @@ def calibrate_spectrum(spectrum, xlim=None):
     spectrum.convert_from_ADUrate_to_flam()
 
 
-def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
+def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None,
                  xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
     """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
     around emission or absorption tabulated lines, and to select surrounding pixels
@@ -491,6 +445,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
         The spectrum amplitude array
     spec_err: float array, optional
         The spectrum amplitude uncertainty array (default: None)
+    fwhm_func: callable, optional
+        The fwhm of the cross spectrum to reset CALIB_PEAK_WIDTH parameter as a function of lambda (default: None)
     snr_minlevel: float
         The minimum signal over noise ratio to consider using a fitted line in the computation of the mean
         shift output and to print it in the outpur table (default: 3)
@@ -512,27 +468,27 @@ def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
     >>> import numpy as np
     >>> lambdas = np.arange(300,1000,1)
     >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
-    >>> HALPHA = Line(656.3, atmospheric=False, label=r'$H\alpha$')
-    >>> HBETA = Line(486.3, atmospheric=False, label=r'$H\beta$')
-    >>> O2 = Line(762.1, atmospheric=True, label=r'$O_2$')
     >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
     >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
-    >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=3)
+    >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
     >>> spectrum_err = np.sqrt(spectrum)
     >>> spec = Spectrum()
     >>> spec.lambdas = lambdas
     >>> spec.data = spectrum
     >>> spec.err = spectrum_err
+    >>> fwhm_func = interp1d(lambdas, 1 + 0.01 * lambdas)
 
     Detect the lines
     >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True, atmospheric_lines=True, redshift=0, emission_spectrum=True)
-    >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err)
-    >>> print('{:.1f}'.format(global_chisq))
-    0.0
+    >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
+    >>> assert(global_chisq < 1)
 
     Plot the result
     >>> spec.lines = lines
-    >>> spec.plot_spectrum()
+    >>> fig = plt.figure()
+    >>> plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
+    >>> lines.plot_detected_lines(plt.gca())
+    >>> plt.show()
     """
 
     # main settings
@@ -543,7 +499,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
         peak_width = 7
         bgd_width = 15
     baseline_prior = 1  # *sigma gaussian prior on base line fit
-
     # initialisation
     lambda_shifts = []
     snrs = []
@@ -559,6 +514,9 @@ def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
         line.high_snr = False
         # wavelength of the line: find the nearest pixel index
         line_wavelength = line.wavelength
+        if fwhm_func is not None:
+            peak_width = max(2*fwhm_func(line_wavelength), parameters.CALIB_PEAK_WIDTH)
+        lines.my_logger.warning(f"{line_wavelength} {peak_width}")
         if line_wavelength < xlim[0] or line_wavelength > xlim[1]:
             continue
         l_index, l_lambdas = find_nearest(lambdas, line_wavelength)
@@ -713,6 +671,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, snr_minlevel=3, ax=None,
         guess = new_guess_list[k]
         bounds = new_bounds_list[k]
         bgd_index = []
+        if fwhm_func is not None:
+            peak_width = 2*np.mean(fwhm_func(lambdas[index]))
         for i in index:
             is_close_to_peak = False
             for j in peak_index:
@@ -830,7 +790,8 @@ def calibrate_spectrum_with_lines(spectrum):
 
     Examples
     --------
-    >>> spectrum = Spectrum('outputs/reduc_20170530_134_spectrum.fits')
+    >>> spectrum = Spectrum('outputs/reduc_20170530_130_spectrum.fits')
+    >>> print(spectrum.chromatic_psf.table)
     >>> lambdas = calibrate_spectrum_with_lines(spectrum)
     >>> spectrum.plot_spectrum()
     """
@@ -847,12 +808,16 @@ def calibrate_spectrum_with_lines(spectrum):
     # Detect emission/absorption lines and calibrate pixel/lambda
     D = parameters.DISTANCE2CCD  # - parameters.DISTANCE2CCD_ERR
     D_err = parameters.DISTANCE2CCD_ERR
+    fwhm_func = interp1d(spectrum.chromatic_psf.table['lambdas'],
+                         spectrum.chromatic_psf.table['fwhm'],
+                         fill_value=(parameters.CALIB_PEAK_WIDTH, parameters.CALIB_PEAK_WIDTH), bounds_error=False)
 
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
         lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - shift,
                                                                   x0=[x0[0] + shift, x0[1]], order=spectrum.order)
-        chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err, ax=None)
+        chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
+                             fwhm_func=None, ax=None)
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG:
             spectrum.lambdas = lambdas_test
@@ -861,6 +826,7 @@ def calibrate_spectrum_with_lines(spectrum):
         return chisq
 
     # grid exploration of the parameters
+    # necessary because of the the line detection algo
     D_step = D_err / 2
     pixel_shift_step = 0.5
     pixel_shift_prior = parameters.PIXSHIFT_PRIOR
@@ -1001,9 +967,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     s.table['Dy'] = s.table['x_mean'] - (image.target_pixcoords_rotated[1] - ymin)
     s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
     s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
-    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(
-        np.arange(pixel_start, pixel_end) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords)
-    s.table['lambdas'] = first_guess_lambdas
     s.table['x_mean'] = s.table['x_mean'] - (image.target_pixcoords_rotated[1] - ymin)
     my_logger.debug(f"\n\tTransverse fit table before derotation:\n{s.table[['Dx_rot', 'Dx', 'x_mean', 'Dy']]}")
     # rotate and save the table
@@ -1021,8 +984,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords)
     lambda_min_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
     lambda_max_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0))))
-    xmin = int(s.table['Dx'][lambda_min_index] + x0)
-    xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
+    xmin = int(s.table['Dx'][lambda_min_index]+x0)
+    xmax = min(right_edge, int(s.table['Dx'][lambda_max_index]+x0) + 1)  # +1 to  include edges
     if (xmax-xmin) % 2 == 0:  # spectrogram must have odd size in x for the fourier simulation
         xmax -= 1
         s.table.remove_row(-1)
@@ -1046,6 +1009,12 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     data = data[bgd_width:-bgd_width+yeven, :]
     err = err[bgd_width:-bgd_width+yeven, :]
     Ny, Nx = data.shape
+    # First guess for lambdas
+    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_distance_along_dispersion_axis(),
+                                                                  x0=image.target_pixcoords)
+    s.table['lambdas'] = first_guess_lambdas
+    spectrum.lambdas = np.array(first_guess_lambdas)
+    my_logger.warning(f"\n\tTransverse fit table after derotation:\n{s.table[['lambdas', 'Dx_rot', 'Dx']]}")
     # Position of the order 0 in the spectrogram coordinates
     target_pixcoords_spectrogram[1] -= bgd_width
     my_logger.info(f'\n\tExtract spectrogram: crop image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))'
@@ -1081,10 +1050,11 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[2].set_ylim(0, Ny)
         ax[2].set_xlim(0, Nx)
         ax[2].legend(loc='best')
-        spectrum.plot_spectrum_simple(ax[0], lambdas=s.pixels, label='Modelled spectrum')
+        spectrum.plot_spectrum()
         ax[0].plot(s.pixels[:s.table['flux_sum'].size], s.table['flux_sum'], 'k-', label='Cross spectrum')
         ax[0].legend(loc='best')
-        ax[1].plot(s.pixels[:s.table['flux_sum'].size], (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
+        ax[1].plot(s.pixels[:s.table['flux_sum'].size],
+                   (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
                    label='(model_integral-cross_sum)/cross_sum')
         ax[1].legend()
         ax[1].grid(True)
