@@ -1319,7 +1319,7 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
                                                                                     force_positive=True)
     chromatic_psf.fill_table_with_profile_params(chromatic_psf.profile_params)
     chromatic_psf.from_profile_params_to_shape_params(chromatic_psf.profile_params)
-    if parameters.DEBUG or True:
+    if parameters.DEBUG:
         # Plot data, best fit model and residuals:
         chromatic_psf.plot_summary()
         plot_residuals(chromatic_psf, bgd, data, data_errors, guess=guess, title='Best fit')

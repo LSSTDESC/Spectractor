@@ -155,6 +155,7 @@ class Image(object):
         min_noz = np.min(data[np.where(data > 0)])
         data[zeros] = min_noz
         # compute poisson noise
+        #   TODO: add read out noise (add in square to electrons)
         self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
 
     def compute_parallactic_angle(self):
@@ -223,7 +224,8 @@ def find_target(image, guess, rotated=False):
 
 
 def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
-    x0, y0 = guess
+    x0 = int(guess[0])
+    y0 = int(guess[1])
     Dx, Dy = widths
     if rotated:
         sub_image = np.copy(image.data_rotated[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
@@ -301,6 +303,7 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         rotated:
         guess (:obj:`list`): [x,y] guessed position of th target
     """
+    # TODO: replace with minuit and test on image _133.fits or decrease mean_prior
     # fit and subtract smooth polynomial background
     # with 3sigma rejection of outliers (star peaks)
     NY, NX = sub_image.shape
@@ -355,13 +358,13 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
         vmin = 0
         vmax = np.nanmax(sub_image)
-        image.plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
+        plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
                                 target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax1.legend(loc=1)
 
-        image.plot_image_simple(ax2, data=star2D(X, Y) + bkgd_2D(X, Y), scale="lin", title="",
+        plot_image_simple(ax2, data=star2D(X, Y) + bkgd_2D(X, Y), scale="lin", title="",
                                 units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
-        image.plot_image_simple(ax3, data=sub_image - star2D(X, Y) - bkgd_2D(X, Y), scale="lin", title="",
+        plot_image_simple(ax3, data=sub_image - star2D(X, Y) - bkgd_2D(X, Y), scale="lin", title="",
                                 units=f'Background+Star2D subtracted image\n({image.units})',
                                 target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax3.legend(loc=1)
@@ -448,11 +451,11 @@ def turn_image(image):
         margin = 100
         y0 = int(image.target_pixcoords[1])
         f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
-        image.plot_image_simple(ax1, data=image.data[max(0,y0 - 2*parameters.YWINDOW):min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin],
+        plot_image_simple(ax1, data=image.data[max(0,y0 - 2*parameters.YWINDOW):min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin],
                                 scale="log", title='Raw image (log10 scale)', units=image.units,
                                 target_pixcoords=(image.target_pixcoords[0] - margin, 2*parameters.YWINDOW), aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
-        image.plot_image_simple(ax2, data=image.data_rotated[max(0,y0 - 2*parameters.YWINDOW):
+        plot_image_simple(ax2, data=image.data_rotated[max(0,y0 - 2*parameters.YWINDOW):
                                                              min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin], scale="log", title='Turned image (log10 scale)',
                                 units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2*parameters.YWINDOW, 2*parameters.YWINDOW], 'k-')
