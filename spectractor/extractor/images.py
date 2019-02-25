@@ -343,7 +343,8 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         sub_image[sub_image >= 0.9 * image.saturation] = np.nan
     # fit
     bounds = list(np.array(bounds).T)
-    star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
+    #star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
+    star2D = fit_PSF2D_minuit(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     new_avX = star2D.x_mean.value
     new_avY = star2D.y_mean.value
     image.target_star2D = star2D
