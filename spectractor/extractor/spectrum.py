@@ -1073,7 +1073,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Summary plot
     if parameters.DEBUG or True:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
-        xx = np.arange(Nx)
+        x = np.arange(Nx)
+        xx = np.arange(s.table['Dx_rot'].size)
         plot_image_simple(ax[2], data=data, scale="log", title='', units=image.units, aspect='auto')
         ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_mean'], label='Dispersion axis')
         ax[2].scatter(xx, target_pixcoords_spectrogram[1] + s.table['Dy'],
@@ -1082,11 +1083,12 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
         ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-', label='')
         ax[2].set_ylim(0, Ny)
-        ax[2].set_xlim(0, Nx)
+        ax[2].set_xlim(0, xx.size)
         ax[2].legend(loc='best')
-        plot_spectrum_simple(ax[0], xx, spectrum.data, data_err=spectrum.err, units=image.units,
-                             label='Fitted spectrum', xlim=[0, Nx])
+        plot_spectrum_simple(ax[0], np.arange(spectrum.data.size), spectrum.data, data_err=spectrum.err,
+                             units=image.units, label='Fitted spectrum', xlim=[0, spectrum.data.size])
         ax[0].plot(xx, s.table['flux_sum'], 'k-', label='Cross spectrum')
+        ax[0].set_xlim(0, xx.size)
         ax[0].legend(loc='best')
         ax[1].plot(xx, (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
                    label='(model_integral-cross_sum)/cross_sum')
