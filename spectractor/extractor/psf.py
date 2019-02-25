@@ -458,7 +458,8 @@ class ChromaticPSF1D:
                     #                                  pixels)
                     profile_params[:, k] = \
                         np.polynomial.legendre.legval(pixels,
-                                                      poly_params[self.Nx + shift:self.Nx + shift + self.degrees[name] + 1])
+                                                      poly_params[
+                                                      self.Nx + shift:self.Nx + shift + self.degrees[name] + 1])
                 else:
                     profile_params[:, k] = \
                         np.polynomial.legendre.legval(pixels, poly_params[shift:shift + self.degrees[name] + 1])
@@ -719,7 +720,7 @@ class ChromaticPSF1D:
         return output
 
     def get_distance_along_dispersion_axis(self, shift_x=0, shift_y=0):
-        return np.sqrt((self.table['Dx']-shift_x) ** 2 + (self.table['Dy_mean']-shift_y) ** 2)
+        return np.sqrt((self.table['Dx'] - shift_x) ** 2 + (self.table['Dy_mean'] - shift_y) ** 2)
 
     def generate_test_poly_params(self):
         """
@@ -981,7 +982,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     y = data[:, ymax_index]
     guess = [np.nanmax(y) - np.nanmean(y), middle, 5, 2, 0, 2, saturation]
     maxi = np.abs(np.nanmax(y))
-    bounds = [(0.1 * maxi, 2*maxi), (middle - w, middle + w), (0.1, Ny // 2), (1, 6), (-1, 0), (0.1, Ny // 2),
+    bounds = [(0.1 * maxi, 2 * maxi), (middle - w, middle + w), (0.1, Ny // 2), (1, 6), (-1, 0), (0.1, Ny // 2),
               (0, 2 * saturation)]
     # first fit with moffat only to initialize the guess
     # hypothesis that max of spectrum if well describe by a focused PSF
@@ -1022,7 +1023,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         mean = np.nansum(pdf * index)
         std = np.sqrt(np.nansum(pdf * (index - mean) ** 2))
         maxi = np.abs(np.nanmax(signal))
-        bounds[0] = (0.1 * np.nanstd(bgd), 2*np.nanmax(y))
+        bounds[0] = (0.1 * np.nanstd(bgd), 2 * np.nanmax(y))
         # if guess[4] > -1:
         #    guess[0] = np.max(signal) / (1 + guess[4])
         if guess[0] * (1 + guess[4]) < 3 * np.nanstd(bgd):
@@ -1240,11 +1241,11 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
         # my_logger.warning(f"{shape_params}")
         # if np.any(np.isclose(J_dot_W_dot_J, 0, rtol=1e-6)):
         #     pass
-            # my_logger.warning(f"crasssshhhhh {shape_params}")
-            # profile_params = chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True, verbose=True)
-            # for x in range(Nx):
-            #   my_logger.warning(f"{x} {profile_params[x, :]}")
-            #   my_logger.warning(f"{x} {J[x]}")
+        # my_logger.warning(f"crasssshhhhh {shape_params}")
+        # profile_params = chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True, verbose=True)
+        # for x in range(Nx):
+        #   my_logger.warning(f"{x} {profile_params[x, :]}")
+        #   my_logger.warning(f"{x} {J[x]}")
         # J_dot_W_dot_J[np.isclose(J_dot_W_dot_J, 0, rtol=1e-3) ] = 1e-3
         # try:
         amplitude_params = [
@@ -1471,6 +1472,92 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
         sys.exit()
     my_logger.debug(f'\n{res}')
     PSF = PSF2D(*res.x)
+    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
+    return PSF
+
+
+def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
+    """Fit a PSF 2D model with parameters :
+        amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
+    using basin hopping global minimization method.
+
+    Parameters
+    ----------
+    x: np.array
+        2D array of the x coordinates from meshgrid.
+    y: np.array
+        2D array of the y coordinates from meshgrid.
+    data: np.array
+        the 2D array image.
+    guess: array_like, optional
+        List containing a first guess for the PSF parameters (default: None).
+    bounds: list, optional
+        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
+    data_errors: np.array
+        the 2D array uncertainties.
+    method: str, optional
+        the minimisation method: 'minimize' or 'basinhopping' (default: 'minimize').
+
+    Returns
+    -------
+    fitted_model: PSF2D
+        the PSF2D fitted model.
+
+    Examples
+    --------
+
+    Create the model:
+    >>> import numpy as np
+    >>> X, Y = np.mgrid[:50,:50]
+    >>> PSF = PSF2D()
+    >>> p = (50, 25, 25, 5, 1, -0.4, 1, 60)
+    >>> Z = PSF.evaluate(X, Y, *p)
+    >>> Z_err = np.sqrt(Z)/10.
+
+    Prepare the fit:
+    >>> guess = (52, 22, 22, 3.2, 1.2, -0.1, 2, 60)
+    >>> bounds = ((1, 200), (10, 40), (10, 40), (0.5, 10), (0.5, 5), (-100, 200), (0.01, 10), (0, 400))
+
+    Fit with error bars:
+    >>> model = fit_PSF2D_minuit(X, Y, Z, guess=guess, bounds=bounds, data_errors=Z_err)
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
+    Fit without error bars:
+    >>> model = fit_PSF2D_minuit(X, Y, Z, guess=guess, bounds=bounds, data_errors=None)
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+    """
+
+    model = PSF2D()
+    my_logger = set_logger(__name__)
+
+    error = 0.001 * np.abs(guess) * np.ones_like(guess)
+    z = np.where(np.isclose(error, 0.0, 1e-6))
+    error[z] = 0.001
+    bounds = np.array(bounds)
+    if bounds.shape[0] == 2 and bounds.shape[1] > 2:
+        bounds = bounds.T
+    guess = np.array(guess)
+
+    def chisq_PSF2D(params):
+        return PSF2D_chisq(params, model, x, y, data, data_errors)
+
+    def chisq_PSF2D_jac(params):
+        return PSF2D_chisq_jac(params, model, x, y, data, data_errors)
+
+    fix = [False] * error.size
+    fix[-1] = True
+    # noinspection PyArgumentList
+    m = Minuit.from_array_func(fcn=chisq_PSF2D, start=guess, error=error, errordef=1,
+                               fix=fix, print_level=0, limit=bounds, grad=chisq_PSF2D_jac)
+
+    m.tol = 0.001
+    m.migrad()
+    popt = m.np_values()
+
+    my_logger.debug(f'\n{popt}')
+    PSF = PSF2D(*popt)
     my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
     return PSF
 
