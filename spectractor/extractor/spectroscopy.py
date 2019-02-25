@@ -2,6 +2,7 @@ from astropy.table import Table
 from scipy.interpolate import interp1d
 
 from spectractor.tools import *
+from spectractor import parameters
 
 
 class Line:
@@ -61,6 +62,7 @@ class Line:
         self.fit_fwhm = None
         self.fit_popt = None
         self.fit_chisq = None
+        self.fit_bgd_npar = parameters.CALIB_BGD_NPARAMS
 
     def gaussian_model(self, lambdas, A=1, sigma=2, use_fit=False):
         """Return a Gaussian model of the spectral line.
@@ -245,10 +247,11 @@ class Lines:
         lambdas = np.zeros(1)
         rows = []
         j = 0
-        bgd_npar = parameters.CALIB_BGD_NPARAMS
         for line in self.lines:
             if line.fitted is True:
                 # look for lines in subset fit
+                bgd_npar = line.fit_bgd_npar
+                parameters.CALIB_BGD_NPARAMS = bgd_npar
                 if lambdas.shape != line.fit_lambdas.shape or not np.allclose(lambdas, line.fit_lambdas, 1e-3):
                     j = 0
                     lambdas = np.copy(line.fit_lambdas)

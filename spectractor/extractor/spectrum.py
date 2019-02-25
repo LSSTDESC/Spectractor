@@ -478,7 +478,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     >>> spec.lambdas = lambdas
     >>> spec.data = spectrum
     >>> spec.err = spectrum_err
-    >>> fwhm_func = interp1d(lambdas, 1 + 0.01 * lambdas)
+    >>> fwhm_func = interp1d(lambdas, 0.01 * lambdas)
 
     Detect the lines
     >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
@@ -502,11 +502,13 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         peak_width = 7
         bgd_width = 15
     fwhm_to_peak_width_factor = 3
+    len_index_to_bgd_npar_factor = 0.12
     baseline_prior = 1  # *sigma gaussian prior on base line fit
     # initialisation
     lambda_shifts = []
     snrs = []
     index_list = []
+    bgd_npar_list = []
     peak_index_list = []
     guess_list = []
     bounds_list = []
@@ -520,7 +522,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         line_wavelength = line.wavelength
         if fwhm_func is not None:
             peak_width = max(fwhm_to_peak_width_factor*fwhm_func(line_wavelength), parameters.CALIB_PEAK_WIDTH)
-        lines.my_logger.warning(f"{line_wavelength} {peak_width}")
         if line_wavelength < xlim[0] or line_wavelength > xlim[1]:
             continue
         l_index, l_lambdas = find_nearest(lambdas, line_wavelength)
@@ -592,6 +593,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         # the background with CALIB_BGD_ORDER order polynom
         # guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), lambdas[peak_index],
         #                          0.5 * (line.width_bounds[0] + line.width_bounds[1])]
+        bgd_npar = max(parameters.CALIB_BGD_NPARAMS, int(len_index_to_bgd_npar_factor * (index[-1] - index[0])))
+        bgd_npar_list.append(bgd_npar)
         guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), line_wavelength,
                                   0.5 * (line.width_bounds[0] + line.width_bounds[1])]
         if line_strategy == np.less:
@@ -629,7 +632,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     for merge in merges:
         if len(guess_list) == 0:
             continue
-        tmp_guess = [guess_list[i][bgd_npar + 1] for i in merge]
+        tmp_guess = [guess_list[i][-2] for i in merge]
         new_merges.append([x for _, x in sorted(zip(tmp_guess, merge))])
     # reorder lists with merges
     new_peak_index_list = []
@@ -645,10 +648,11 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         new_lines_list.append([])
         for i in merge:
             # add the bgd parameters
-            if i == merge[0]:
-                new_guess_list[-1] += guess_list[i][:bgd_npar]
-                new_bounds_list[-1][0] += bounds_list[i][0][:bgd_npar]
-                new_bounds_list[-1][1] += bounds_list[i][1][:bgd_npar]
+            bgd_npar = bgd_npar_list[i]
+            # if i == merge[0]:
+            #     new_guess_list[-1] += guess_list[i][:bgd_npar]
+            #     new_bounds_list[-1][0] += bounds_list[i][0][:bgd_npar]
+            #     new_bounds_list[-1][1] += bounds_list[i][1][:bgd_npar]
             # add the gauss parameters
             new_peak_index_list[-1].append(peak_index_list[i])
             new_index_list[-1] += index_list[i]
@@ -658,10 +662,10 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             new_lines_list[-1].append(lines_list[i])
         # set central peak bounds exactly between two close lines
         for k in range(len(merge) - 1):
-            new_bounds_list[-1][0][bgd_npar + 3 * (k + 1) + 1] = 0.5 * (
-                    new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][bgd_npar + 3 * (k + 1) + 1])
-            new_bounds_list[-1][1][bgd_npar + 3 * k + 1] = 0.5 * (
-                    new_guess_list[-1][bgd_npar + 3 * k + 1] + new_guess_list[-1][bgd_npar + 3 * (k + 1) + 1]) + 1e-3
+            new_bounds_list[-1][0][3 * (k + 1) + 1] = 0.5 * (
+                    new_guess_list[-1][3 * k + 1] + new_guess_list[-1][3 * (k + 1) + 1])
+            new_bounds_list[-1][1][3 * k + 1] = 0.5 * (
+                    new_guess_list[-1][3 * k + 1] + new_guess_list[-1][3 * (k + 1) + 1]) + 1e-3
             # last term is to avoid equalities
             # between bounds in some pathological case
         # sort pixel indices and remove doublons
@@ -685,20 +689,27 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
                     break
             if not is_close_to_peak:
                 bgd_index.append(i)
+        # add background guess and bounds
+        bgd_npar = max(parameters.CALIB_BGD_ORDER+1, int(len_index_to_bgd_npar_factor * len(bgd_index)))
+        parameters.CALIB_BGD_NPARAMS = bgd_npar
+        guess = [0] * bgd_npar + guess
+        bounds[0] = [-np.inf] * bgd_npar + bounds[0]
+        bounds[1] = [ np.inf] * bgd_npar + bounds[1]
         if len(bgd_index) > 0:
             try:
                 fit, cov, model = fit_poly1d(lambdas[bgd_index], spec[bgd_index],
-                                             order=parameters.CALIB_BGD_ORDER, w=1. / spec_err[bgd_index])
+                                             order=bgd_npar-1, w=1. / spec_err[bgd_index])
             except:
                 fit, cov, model = fit_poly1d(lambdas[index], spec[index],
-                                             order=parameters.CALIB_BGD_ORDER, w=1. / spec_err[index])
+                                             order=bgd_npar-1, w=1. / spec_err[index])
         else:
             fit, cov, model = fit_poly1d(lambdas[index], spec[index],
-                                         order=parameters.CALIB_BGD_ORDER, w=1. / spec_err[index])
+                                         order=bgd_npar-1, w=1. / spec_err[index])
         # fig = plt.figure()
         # plt.plot(lambdas[index], spec[index])
         # plt.plot(lambdas[bgd_index], spec[bgd_index], 'ro')
         # plt.plot(lambdas[index], np.polyval(fit, lambdas[index]), 'b--')
+        # plt.title(f"{fit}")
         # plt.show()
         for n in range(bgd_npar):
             # guess[n] = getattr(bgd, bgd.param_names[parameters.CALIB_BGD_ORDER - n]).value
@@ -750,6 +761,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             line.fit_snr = snr
             line.fit_chisq = chisq
             line.fit_fwhm = FWHM
+            line.fit_bgd_npar = bgd_npar
             if snr < snr_minlevel:
                 continue
             line.high_snr = True
@@ -795,7 +807,7 @@ def calibrate_spectrum_with_lines(spectrum):
 
     Examples
     --------
-    >>> spectrum = Spectrum('outputs/reduc_20170530_130_spectrum.fits')
+    >>> spectrum = Spectrum('outputs/reduc_20170530_134_spectrum.fits')
     >>> import spectractor.parameters as parameters
     >>> parameters.DEBUG = True
     >>> lambdas = calibrate_spectrum_with_lines(spectrum)
