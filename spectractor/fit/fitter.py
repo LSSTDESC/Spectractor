@@ -426,23 +426,25 @@ class SpectrogramFitWorkspace(FitWorkspace):
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
-        plot_image_simple(ax[0, 0], data=self.model[:, sub], aspect='auto', cax=ax[0, 1])
+        norm = np.max(self.spectrum.spectrogram[:, sub])
+        plot_image_simple(ax[0, 0], data=self.model[:, sub]/norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
+                          units='1/max(data)')
         if dispersion:
-            ax[0, 0].scatter(self.spectrum.chromatic_psf.table['Dx'][sub[2:-3]] + self.spectrum.spectrogram_x0 - sub[0],
-                             self.spectrum.chromatic_psf.table['Dy'][sub[2:-3]] + self.spectrum.spectrogram_y0,
-                             cmap=from_lambda_to_colormap(self.lambdas[sub[2:-3]]), edgecolors='None',
+            y = self.spectrum.chromatic_psf.table['Dy'][sub[2:-3]] + self.spectrum.spectrogram_y0
+            x = self.spectrum.chromatic_psf.table['Dx'][sub[2:-3]] + self.spectrum.spectrogram_x0 - sub[0]
+            y = np.ones_like(x)
+            ax[0, 0].scatter(x, y, cmap=from_lambda_to_colormap(self.lambdas[sub[2:-3]]), edgecolors='None',
                              c=self.lambdas[sub[2:-3]],
-                             label='', marker='o', s=3)
-
+                             label='', marker='o', s=10)
         # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
         # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
         if title != '':
             ax[0, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
         residuals = (self.spectrum.spectrogram - self.model)
         residuals_err = self.spectrum.spectrogram_err / self.model
-        std = np.std(residuals[:, sub])
-        plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='Data-Model',
-                          aspect='auto', cax=ax[2, 1])
+        std = np.std(residuals[:, sub]/norm)
+        plot_image_simple(ax[2, 0], data=residuals[:, sub]/norm, vmin=-5 * std, vmax=5 * std, title='Data-Model',
+                          aspect='auto', cax=ax[2, 1], units='1/max(data)')
         ax[2, 0].set_title('Data-Model',  fontsize=10, loc='center', color='white', y=0.8)
         ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
         ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
@@ -450,8 +452,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
         # ax[0, 0].get_yaxis().set_label_coords(-0.15, 0.6)
         # ax[2, 0].get_yaxis().set_label_coords(-0.15, 0.5)
-        plot_image_simple(ax[1, 0], data=self.spectrum.spectrogram[:, sub], title='Data', aspect='auto',
-                          cax=ax[1, 1])
+        plot_image_simple(ax[1, 0], data=self.spectrum.spectrogram[:, sub]/norm, title='Data', aspect='auto',
+                          cax=ax[1, 1], vmin=0, vmax=1, units='1/max(data)')
         ax[1, 0].set_title('Data',  fontsize=10, loc='center', color='white', y=0.8)
         # remove the underlying axes
         #for ax in ax[3, 1]:
@@ -622,6 +624,10 @@ def run_minimisation():
     guess = np.array([1.0177449875857436, 0.03273899280095122, 244.28900108972238, 9.99985328071115, 0.05574572930987309, 55.2113222597155, -1.9999934481655455, -0.16588415261849976, 1.3518973026372976, -1.681859821533847, 1.418683896878165, 0.5533962728465286, 0.06744270896451146, 3.7242663590096523, -1.2946316193457752, 1.0714560991986213, 3.027495524307809, -0.07472328983133317, 0.9555378331632957, -0.3653217756888738, -0.1428741221990274, -0.06995171218400704, 2.1270602543705697, -0.9765558807737923, -0.05544098513783982, 499.99999999999835])
     guess = np.array([1.008504591340807, 0.01608223007207482, 360.55203093205034, 9.999396124992284, 0.07408687185771112, 55.278549773179, -1.9999880367300542, -0.19831397139122675 ,1.731835570968407, -1.681859821533847, 1.4512075119943928, 0.6298897489162698, 0.1715121918150413, 3.6949934638991815, -1.2787266139872775, 1.1050818585131204, 3.0678599353279385, -0.141000223367532, 0.8878220330543275, -0.34365173970314067, -0.17666624793314062, -0.0778543688708959, 2.0961259559036165, -0.912009316148657, 0.058847183286068916, 499.99999999999835])
     guess = np.array([1.021105038594662, 0.004522557159414742, 399.1804795838472, 7.151266092418873, 0.06532628682748798, 55.28129937643125, -1.5796083498014732, -0.214022484422576, 1.5532729238980494, -1.681859821533847, 1.4669017969146076, 0.6167895273613202, 0.2240612421558033, 3.636185977901238, -1.252269816889516, 1.2319551727230675, 3.1212613617244513, -0.15132200936139598, 0.8692478333014879, -0.34168336262027477, -0.21066308766825492, 0.08067864362906049, 1.9588266937720888, -0.7975072607096434, 0.32389616177447655, 499.99999999999835])
+    guess = np.array([1.0366998266719039, 0.004507639176858286, 399.4198145877904, 7.215159083565414, 0.08266331155696338, 55.280677934039204, -1.5564540460823222, -0.21652809896889513, 1.250962900742465, -1.681859821533847, 1.470425366924636, 0.6161148577211758, 0.2421533852584033, 3.561778492416353, -1.059725547707348, 1.4931481207457546, 3.1170667497250073, -0.05919930769817048, 1.1566057476874898, -0.3515353556779109, -0.2075394603290166, 0.009817803444294074, 1.8852361491878789, -0.6617678455884933, 0.3016531226564242, 499.99999999999835])
+    guess = np.array([1.0366998266719039, 0.004507639176858286, 399.4198145877904, 7.215159083565414, 0.08266331155696338, 55.280677934039204, 0, 0, 0, -1.681859821533847, 1.470425366924636, 0.6161148577211758, 0.2421533852584033, 3.561778492416353, -1.059725547707348, 1.4931481207457546, 3.1170667497250073, -0.05919930769817048, 1.1566057476874898, -0.3515353556779109, -0.2075394603290166, 0.009817803444294074, 1.8852361491878789, -0.6617678455884933, 0.3016531226564242, 499.99999999999835])
+    guess = np.array([1.038693017194872, 0.014983232888026998, 359.2518435660411, 6.6262238673287, 0.08480281237510423, 55.47387105727235, 0.0, 0.0, 0.0, -1.681859821533847, 1.730748597544949, 0.612373940323533, 0.24547646456941183, 3.564350412174735, -1.0642369170107189, 1.4935151575387235, 3.1141507499206753, -0.05129722758108418, 1.1577838137704235, -0.34873907926191927, -0.21087528505338857, 0.011817195823953307, 1.8888212027868385, -0.6645364716921955, 0.2974984385969018, 499.99999999999835])
+    guess = np.array([1.0394618294886782, 0.01154317609147179, 364.0477305040566, 6.59911786795859, 0.09779530546529702, 55.47729830849739, 0.0, 0.0, 0.0, -1.681859821533847, 1.7273809469430867, 0.6268937806919278, 0.24119541144075615, 3.5687624173038226, -1.0642904069090242, 1.4986372379043165, 3.1034564816834247, -0.039422282485462944, 1.1652241960873397, -0.35544149646334117, -0.20554803472490044, 0.009000631817785203, 1.8938325433914882, -0.6647492390942517, 0.2886232193756685, 499.99999999999835])
     # guess = fit_workspace.p
     fix = [True] * guess.size
     fix[0] = False # A1
@@ -629,15 +635,17 @@ def run_minimisation():
     fix[2:5] = [False, False, False] # LIBRADTRAN
     # fix[3] = False
     fix[5] = False #DCCD
-    fix[5:8] = [False, False, False] #DCCD
+    fix[5:8] = [False, True, True] #DCCD
     # fix[10:13] = [False, False, False] # centers
     fix[10:] = [False] * (guess.size-10)
-    fix[8] = False # shift_t
+    fix[8] = True # shift_t
     fix[-1] = True
     fit_workspace.simulation.fix_psf_cube = False
-    error = 0.1 * np.abs(guess) * np.ones_like(guess)
+    error = 0.01 * np.abs(guess) * np.ones_like(guess)
     z = np.where(np.isclose(error,0.0,1e-6))
+    error[2:5] =  0.3*np.abs(guess[2:5]) * np.ones_like(guess[2:5])
     error[z] = 1.
+    # noinspection PyArgumentList
     m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
                                fix=fix, print_level=2, limit=bounds)
     m.tol = 10

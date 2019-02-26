@@ -257,8 +257,9 @@ class Lines:
                     lambdas = np.copy(line.fit_lambdas)
                     if ax is not None:
                         ax.plot(lambdas, multigauss_and_bgd(lambdas, *line.fit_popt), lw=2, color='b')
-                        ax.plot(lambdas, np.polyval(line.fit_popt[0:bgd_npar], lambdas), lw=2, color='b',
-                                linestyle='--')
+                        x_norm = rescale_x_for_legendre(lambdas)
+                        bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
+                        ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
                 popt = line.fit_popt
                 peak_pos = popt[bgd_npar + 3 * j + 1]
                 FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
