@@ -152,12 +152,21 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
     return popt, pcov
 
 
+def rescale_x_for_legendre(x):
+    middle = 0.5*(np.max(x) + np.min(x))
+    x_norm = x - middle
+    if np.max(x_norm) != 0:
+        return x_norm / np.max(x_norm)
+    else:
+        return x_norm
+
 # noinspection PyTypeChecker
 def multigauss_and_bgd(x, *params):
-    """Multiple Gaussian profile plus a polynomial background to data, using curve_fit.
-    The degree of the polynomial background is fixed by parameters.CALIB_BGD_ORDER.
-    The order of the parameters is a first block CALIB_BGD_ORDER+1 parameters (from high to low monomial terms,
-    same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    """Multiple Gaussian profile plus a polynomial background to data.
+    Polynomial function is based on the orthogonal Legendre polynomial basis.
+    The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
+    The order of the parameters is a first block CALIB_BGD_NPARAMS parameters (from low to high Legendre polynome degree,
+    contrary to np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
     deviation.
 
     Parameters
@@ -173,14 +182,24 @@ def multigauss_and_bgd(x, *params):
 
     Examples
     --------
+    >>> import spectractor.parameters as parameters
+    >>> parameters.CALIB_BGD_NPARAMS = 4
     >>> x = np.arange(600.,800.,1)
-    >>> p = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
+    >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
-    >>> print(y[0])
-    349.0
+    >>> print(f'{y[0]:.2f}')
+    19.00
+
+    ..plot:
+        import matplotlib.pyplot as plt
+        plt.plot(x,y,'r-')
+        plt.show()
+
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
-    out = np.polyval(params[0:bgd_nparams], x)
+    # out = np.polyval(params[0:bgd_nparams], x)
+    x_norm = rescale_x_for_legendre(x)
+    out = np.polynomial.legendre.legval(x_norm, params[0:bgd_nparams])
     for k in range((len(params) - bgd_nparams) // 3):
         out += gauss(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
     return out
@@ -188,11 +207,11 @@ def multigauss_and_bgd(x, *params):
 
 # noinspection PyTypeChecker
 def multigauss_and_bgd_jacobian(x, *params):
-    """Jacobien of the multiple Gaussian profile plus a polynomial background to data, using curve_fit.
-    The degree of the polynomial background is fixed by parameters.CALIB_BGD_ORDER.
-    The order of the parameters is a first block CALIB_BGD_ORDER+1 parameters (from high to low monomial terms,
-    same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
-    deviation.
+    """Jacobien of the multiple Gaussian profile plus a polynomial background to data.
+    The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
+    The order of the parameters is a first block CALIB_BGD_NPARAMS parameters (from low to high Legendre polynome degree,
+    contrary to np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
+    deviation. x values are renormalised on the [-1, 1] interval for the background.
 
     Parameters
     ----------
@@ -207,19 +226,24 @@ def multigauss_and_bgd_jacobian(x, *params):
 
     Examples
     --------
+    >>> import spectractor.parameters as parameters
+    >>> parameters.CALIB_BGD_NPARAMS = 4
     >>> x = np.arange(600.,800.,1)
-    >>> p = [-1e-6, -1e-4, 1, 1, 20, 650, 3, 40, 750, 5]
+    >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd_jacobian(x, *p)
-    >>> print(y[0][0])
-    216000000.0
+    >>> assert(np.all(np.isclose(y[0],np.ones_like(x))))
     >>> print(y.shape)
     (10, 200)
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
     out = []
+    x_norm = rescale_x_for_legendre(x)
     for k in range(bgd_nparams):
         # out.append(params[k]*(parameters.CALIB_BGD_ORDER-k)*x**(parameters.CALIB_BGD_ORDER-(k+1)))
-        out.append(x ** (bgd_nparams - 1 - k))
+        # out.append(x ** (bgd_nparams - 1 - k))
+        c = np.zeros(bgd_nparams)
+        c[k] = 1
+        out.append(np.polynomial.legendre.legval(x_norm, c))
     for k in range((len(params) - bgd_nparams) // 3):
         jac = list(gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]))
         out += jac
@@ -227,13 +251,13 @@ def multigauss_and_bgd_jacobian(x, *params):
 
 
 # noinspection PyTypeChecker
-def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None):
-    """Fit a multiple Gaussian profile plus a polynomial background to data, using curve_fit.
+def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None, fix_centroids=False):
+    """Fit a multiple Gaussian profile plus a polynomial background to data, using iminuit.
     The mean guess value of the Gaussian must not be far from the truth values.
-    Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.CALIB_BGD_ORDER.
-    The order of the parameters is a first block CALIB_BGD_ORDER+1 parameters (from high to low monomial terms,
+    Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
+    The order of the parameters is a first block CALIB_BGD_NPARAMS parameters (from high to low monomial terms,
     same as np.polyval), and then block of 3 parameters for the Gaussian profiles like amplitude, mean and standard
-    deviation.
+    deviation. x values are renormalised on the [-1, 1] interval for the background.
 
     Parameters
     ----------
@@ -258,23 +282,23 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     Examples
     --------
     >>> x = np.arange(600.,800.,1)
-    >>> p = [-1e-6, -4e-4, 1, 1, 20, 650, 3, 40, 750, 5]
+    >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
     >>> print(f'{y[0]:.2f}')
-    241.00
+    19.00
     >>> err = 0.1 * np.sqrt(y)
-    >>> guess = (0,0,1,1,10,640,3,20,760,5)
+    >>> guess = (15,0,0,0,10,640,2,20,750,7)
     >>> bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
     >>> popt, pcov = fit_multigauss_and_bgd(x, y, guess=guess, bounds=bounds, sigma=err)
-    >>> assert np.all(np.isclose(p[4:],popt[4:],rtol=1e-2))
+    >>> assert np.all(np.isclose(p,popt,rtol=1e-4))
     >>> fit = multigauss_and_bgd(x, *popt)
 
-    # # plot
-    # >>> import matplotlib.pyplot as plt
-    # >>> plt.errorbar(x,y,yerr=err,linestyle='None')
-    # >>> plt.plot(x,fit,'r-')
-    # >>> plt.plot(x,multigauss_and_bgd(x, *guess),'k--')
-    # >>> plt.show()
+    ..plot:
+    >>> import matplotlib.pyplot as plt
+    >>> plt.errorbar(x,y,yerr=err,linestyle='None')
+    >>> plt.plot(x,fit,'r-')
+    >>> plt.plot(x,multigauss_and_bgd(x, *guess),'k--')
+    >>> plt.show()
     """
     # maxfev = 10000
     # popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma,
@@ -303,6 +327,9 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
             return np.array([np.nansum(2 * jac[p] * diff / (sigma*sigma)) for p in range(len(params))])
 
     fix = [False] * error.size
+    if fix_centroids:
+        for k in range(parameters.CALIB_BGD_NPARAMS, len(fix), 3):
+           fix[k+1] = True
     # noinspection PyArgumentList
     m = Minuit.from_array_func(fcn=chisq_multigauss_and_bgd, start=guess, error=error, errordef=1,
                                fix=fix, print_level=0, limit=bounds, grad=chisq_multigauss_and_bgd_jac)
@@ -359,6 +386,61 @@ def fit_poly1d(x, y, order, w=None):
         else:
             fit, cov = np.polyfit(x, y, order, cov=True, w=w)
         model = np.polyval(fit, x)
+    else:
+        fit = np.array([0] * (order + 1))
+        model = y
+    return fit, cov, model
+
+
+# noinspection PyTupleAssignmentBalance
+def fit_poly1d_legendre(x, y, order, w=None):
+    """Fit a 1D polynomial function to data using Legendre polynomial orthogonal basis.
+
+    Parameters
+    ----------
+    x: array
+        The x data values.
+    y: array
+        The y data values.
+    order: int
+        The degree of the polynomial function.
+    w: array, optional
+        Weights on the y data (default: None).
+
+    Returns
+    -------
+    fit: array
+        The best fitting parameter values.
+    cov: 2D-array
+        The covariance matrix
+    model: array
+        The best fitting profile
+
+    Examples
+    --------
+    >>> x = np.arange(500., 1000., 1)
+    >>> p = [-1e-6, -1e-4, 1, 1]
+    >>> y = np.polyval(p, x)
+    >>> err = np.ones_like(y)
+    >>> fit, cov, model = fit_poly1d_legendre(x,y,order=3)
+    >>> assert np.all(np.isclose(p,fit,3))
+    >>> fit, cov2, model2 = fit_poly1d_legendre(x,y,order=3,w=err)
+    >>> assert np.all(np.isclose(p,fit,3))
+
+    ..plot:
+        import matplotlib.pyplot as plt
+        plt.errorbar(x,y,yerr=err,fmt='ro')
+        plt.plot(x,model2)
+        plt.show()
+    """
+    cov = -1
+    x_norm = rescale_x_for_legendre(x)
+    if len(x) > order:
+        if w is None:
+            fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True)
+        else:
+            fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True, w=w)
+        model = np.polynomial.legendre.legval(x_norm, fit)
     else:
         fit = np.array([0] * (order + 1))
         model = y

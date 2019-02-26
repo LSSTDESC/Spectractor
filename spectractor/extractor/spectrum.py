@@ -503,7 +503,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         bgd_width = 15
     fwhm_to_peak_width_factor = 3
     len_index_to_bgd_npar_factor = 0.12
-    baseline_prior = 1  # *sigma gaussian prior on base line fit
+    baseline_prior = 0.1  # *sigma gaussian prior on base line fit
     # initialisation
     lambda_shifts = []
     snrs = []
@@ -697,18 +697,22 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         bounds[1] = [ np.inf] * bgd_npar + bounds[1]
         if len(bgd_index) > 0:
             try:
-                fit, cov, model = fit_poly1d(lambdas[bgd_index], spec[bgd_index],
+                fit, cov, model = fit_poly1d_legendre(lambdas[bgd_index], spec[bgd_index],
                                              order=bgd_npar-1, w=1. / spec_err[bgd_index])
             except:
-                fit, cov, model = fit_poly1d(lambdas[index], spec[index],
+                fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index],
                                              order=bgd_npar-1, w=1. / spec_err[index])
         else:
-            fit, cov, model = fit_poly1d(lambdas[index], spec[index],
+            fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index],
                                          order=bgd_npar-1, w=1. / spec_err[index])
+        # lines.my_logger.warning(f'{bgd_npar} {fit}')
         # fig = plt.figure()
         # plt.plot(lambdas[index], spec[index])
         # plt.plot(lambdas[bgd_index], spec[bgd_index], 'ro')
-        # plt.plot(lambdas[index], np.polyval(fit, lambdas[index]), 'b--')
+        # x_norm = rescale_x_for_legendre(lambdas[index])
+        # lines.my_logger.warning(f'tototot {x_norm}')
+        # plt.plot(lambdas[index], np.polynomial.legendre.legval(x_norm, fit), 'b-')
+        # plt.plot(lambdas[bgd_index], model, 'b--')
         # plt.title(f"{fit}")
         # plt.show()
         for n in range(bgd_npar):
@@ -719,8 +723,9 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             bounds[1][n] = guess[n] + b
         for j in range(len(new_lines_list[k])):
             idx = new_peak_index_list[k][j]
+            x_norm = rescale_x_for_legendre(lambdas[idx])
             guess[bgd_npar + 3 * j] = np.sign(guess[bgd_npar + 3 * j]) * abs(
-                spec[idx] - np.polyval(guess[:bgd_npar], lambdas[idx]))
+                spec[idx] - np.polynomial.legendre.legval(x_norm, guess[:bgd_npar]))
             if np.sign(guess[bgd_npar + 3 * j]) < 0:  # absorption
                 bounds[0][bgd_npar + 3 * j] = 2 * guess[bgd_npar + 3 * j]
             else:  # emission
@@ -730,7 +735,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         sigma = None
         if spec_err is not None:
             sigma = spec_err[index]
-        popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma)
+        popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma,
+                                            fix_centroids=True)
         # noise level defined as the std of the residuals if no error
         noise_level = np.std(spec[index] - multigauss_and_bgd(lambdas[index], *popt))
         # otherwise mean of error bars of bgd lateral bands
@@ -757,7 +763,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             line.fit_lambdas = lambdas[index]
             line.fit_popt = popt
             line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
-            line.fit_bgd = np.polyval(popt[:bgd_npar], lambdas[index])
+            x_norm = rescale_x_for_legendre(lambdas[index])
+            line.fit_bgd = np.polynomial.legendre.legval(x_norm, popt[:bgd_npar])
             line.fit_snr = snr
             line.fit_chisq = chisq
             line.fit_fwhm = FWHM
@@ -853,6 +860,7 @@ def calibrate_spectrum_with_lines(spectrum):
     pixel_shift_prior = parameters.PIXSHIFT_PRIOR
     Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
     pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
+    # pixel_shifts = np.array([0])
     chisq_grid = np.zeros((len(Ds), len(pixel_shifts)))
     for i, D in enumerate(Ds):
         for j, pixel_shift in enumerate(pixel_shifts):
@@ -1034,7 +1042,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
 
     # Crop the background lateral regions
-    bgd_width = ws[1]-ws[0]
+    bgd_width = ws[1] - w
     yeven = 0
     if (Ny - 2*bgd_width) % 2 == 0:  # spectrogram must have odd size in y for the fourier simulation
         yeven = 1
