@@ -117,13 +117,13 @@ class AtmosphereGrid(Atmosphere):
         self.index_atm_data = 4
 
         # specify parameters for the atmospheric grid
-        self.set_grid(pwv_grid=[0, 10, 5], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 5])
+        self.set_grid(pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10])
 
         self.header = fits.Header()
         if filename != "":
             self.load_file(filename)
 
-    def set_grid(self, pwv_grid=[0, 10, 5], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 5]):
+    def set_grid(self, pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
         # aerosols
         # NB_AER_POINTS=20
         self.NB_AER_POINTS = int(aerosol_grid[2])

@@ -331,11 +331,15 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Save images and parameters
     image.header['A1'] = A1
     image.header['A2'] = A2
+    image.header['X0_T'] = target_pixcoords[0]
+    image.header['Y0_T'] = target_pixcoords[1]
+    image.header['D2CCD_T'] = spectrum.disperser.D
     image.header['OZONE'] = ozone
     image.header['PWV'] = pwv
     image.header['VAOD'] = aerosols
     image.header['reso'] = reso
     image.header['ROTATION'] = int(with_rotation)
+    image.header['ROTANGLE'] = spectrum.rotation_angle
     image.header['STARS'] = int(with_stars)
     image.save_image(output_filename, overwrite=True)
     return image

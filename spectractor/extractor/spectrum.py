@@ -951,9 +951,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     if ws is None:
         ws = [20, 30]
     my_logger.info(
-        '\n\tExtracting spectrum from image: spectrum with width 2*{:d} pixels'
-        ' and background from {:d} to {:d} pixels'.format(
-            w, ws[0], ws[1]))
+        f'\n\tExtracting spectrum from image: spectrum with width 2*{w:d} pixels '
+        f'and background from {ws[0]:d} to {ws[1]:d} pixels')
 
     # Make a data copy
     data = np.copy(image.data_rotated)[:, 0:right_edge]
@@ -1052,7 +1051,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     data = data[bgd_width:-bgd_width+yeven, :]
     err = err[bgd_width:-bgd_width+yeven, :]
     Ny, Nx = data.shape
-
     # First guess for lambdas
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_distance_along_dispersion_axis(),
                                                                   x0=image.target_pixcoords)
