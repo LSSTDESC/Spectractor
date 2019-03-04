@@ -656,7 +656,7 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
         or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
         if parameters.VERBOSE:
             print(or_fitted_model)
-        if parameters.VERBOSE:
+        if parameters.DEBUG:
             print(fit.fit_info)
         return or_fitted_model
 
@@ -740,7 +740,7 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
         or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
         if parameters.VERBOSE:
             print(or_fitted_model)
-        if parameters.VERBOSE:
+        if parameters.DEBUG:
             print(fit.fit_info)
         return or_fitted_model
 
