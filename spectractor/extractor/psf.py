@@ -61,7 +61,7 @@ class PSF1D(Fittable1DModel):
         >>> import matplotlib.pyplot as plt
         >>> x = np.arange(0, 60, 0.01)
         >>> plt.plot(x, PSF.evaluate(x, *p)) #doctest: +ELLIPSIS
-        <matplotlib.image.AxesImage object at 0x...>
+        <matplotlib.lines.Line2D object at 0x...>
         >>> if parameters.DISPLAY: plt.show()
         """
         params = [getattr(self, p).value for p in self.param_names]
@@ -183,9 +183,9 @@ class PSF1D(Fittable1DModel):
         >>> import matplotlib.pyplot as plt
         >>> xx = np.arange(0, 60, 0.01)
         >>> plt.plot(xx, PSF.evaluate(xx, *p)) #doctest: +ELLIPSIS
-        <matplotlib.image.AxesImage object at 0x...>
+        <matplotlib.lines.Line2D object at 0x...>
         >>> plt.plot(x, PSF.evaluate(x, *p)) #doctest: +ELLIPSIS
-        <matplotlib.image.AxesImage object at 0x...>
+        <matplotlib.lines.Line2D object at 0x...>
         >>> if parameters.DISPLAY: plt.show()
 
         """
@@ -709,9 +709,8 @@ class ChromaticPSF1D:
 
         >>> import matplotlib.pyplot as plt
         >>> im = plt.imshow(output, origin='lower')  #doctest: +ELLIPSIS
-        <matplotlib.image.AxesImage object at 0x...>
         >>> plt.colorbar(im)  #doctest: +ELLIPSIS
-        <matplotlib.image.AxesImage object at 0x...>
+        <matplotlib.colorbar.Colorbar object at 0x...>
         >>> if parameters.DISPLAY: plt.show()
 
         """
@@ -969,7 +968,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     ... saturation=saturation, live_fit=True, sigma=5)
     >>> assert(np.all(np.isclose(s.pixels[:5], np.arange(s.Nx)[:5], rtol=1e-3)))
     >>> assert(not np.any(np.isclose(s.table['flux_sum'][3:6], np.zeros(s.Nx)[3:6], rtol=1e-3)))
-    >>> assert(np.all(np.isclose(s.table['y'][-10:-1], 0.5*s.Nx*np.ones(s.Nx)[-10:-1], rtol=1e-2)))
+    >>> assert(np.all(np.isclose(s.table['Dy'][-10:-1], np.zeros(s.Nx)[-10:-1], rtol=1e-2)))
     >>> s.plot_summary(truth=s0)
     """
     my_logger = set_logger(__name__)
@@ -1087,7 +1086,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         s.profile_params[x, :] = guess
         s.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
         s.table['flux_sum'][x] = np.sum(signal)
-        if live_fit:
+        if live_fit and parameters.DISPLAY:
             model = fit(index) + bgd_fit(index)
             model_outliers = fit(outliers) + bgd_fit(outliers)
             fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex='all', gridspec_kw={'height_ratios': [5, 1]})
@@ -1133,10 +1132,9 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
             ax[1].get_yaxis().set_label_coords(-0.1, 0.5)
             fig.tight_layout()
             fig.subplots_adjust(wspace=0, hspace=0)
-            if parameters.DISPLAY:
-                plt.draw()
-                plt.pause(1e-8)
-                plt.close()
+            plt.draw()
+            plt.pause(1e-8)
+            plt.close()
     # interpolate the skipped pixels with splines
     x = np.arange(Nx)
     xp = np.array(sorted(set(list(pixel_range))))
@@ -1881,7 +1879,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     for step in range(niter):
         # noinspection PyArgumentList
         m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
-                                   print_level=parameters.DEBUG, grad=PSF1D_chisq_v2_jac)
+                                   print_level=0, grad=PSF1D_chisq_v2_jac)
         m.migrad()
         guess = m.np_values()
         PSF = PSF1D(*m.np_values())
@@ -1909,12 +1907,12 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
                     for i in range(consecutive):
                         consecutive_outliers.append(outliers[o - i])
             consecutive_outliers = list(set(consecutive_outliers))
-            my_logger.debug(f"\n\tConsecutive oultlier indices: {consecutive_outliers}")
+            # my_logger.debug(f"\n\tConsecutive oultlier indices: {consecutive_outliers}")
             indices = [i for i in range(x.shape[0]) if i not in outliers]
         else:
             break
 
-    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
+    # my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
     return PSF, consecutive_outliers
 
 

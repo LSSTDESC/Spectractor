@@ -179,9 +179,10 @@ class Lines:
 
         Examples
         --------
-        >>> lines = Lines()
+        >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
         >>> sorted_lines = lines.sort_lines()
-
+        >>> print([l.wavelength for l in sorted_lines][:5])
+        [382.044, 393.366, 396.847, 410.2, 430.79]
         """
         sorted_lines = []
         for line in self.lines:
@@ -225,7 +226,7 @@ class Lines:
         >>> f, ax = plt.subplots(1,1)
         >>> ax.set_xlim(300,1000)
         (300, 1000)
-        >>> lines = Lines()
+        >>> lines = Lines(HYDROGEN_LINES)
         >>> ax = lines.plot_atomic_lines(ax)
         >>> assert ax is not None
         """

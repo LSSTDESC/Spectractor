@@ -29,7 +29,7 @@ class Spectrum:
         1
         >>> print(s.target.label)
         PNG321.0+3.9
-        >>> print(s.disperser)
+        >>> print(s.disperser_label)
         HoloPhAg
 
         Load a spectrum from a fits image file
