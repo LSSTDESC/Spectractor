@@ -571,7 +571,7 @@ class ChromaticPSF1D:
         else:
             bounds = [[], []]
         for k, name in enumerate(self.PSF1D.param_names):
-            tmp_bounds = [[None] * (1 + self.degrees[name]), [None] * (1 + self.degrees[name])]
+            tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
             # if name is "x_mean":
             #      tmp_bounds[0].append(0)
             #      tmp_bounds[1].append(Ny)
