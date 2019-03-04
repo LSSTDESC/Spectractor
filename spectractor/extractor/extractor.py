@@ -100,3 +100,11 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     spectrum.chromatic_psf.table['lambdas'] = spectrum.lambdas
     spectrum.chromatic_psf.table.write(output_filename_psf, overwrite=True)
     return spectrum
+
+
+if __name__ == "__main__":
+    import doctest
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
+
+    doctest.testmod()

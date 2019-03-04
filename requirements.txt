@@ -1,7 +1,7 @@
-numpy==1.15
+numpy
 scipy
 matplotlib
-astropy==3.0
+astropy
 astroquery
 coloredlogs
 scikit-image

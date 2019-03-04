@@ -1912,3 +1912,12 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
 
     my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
     return PSF, consecutive_outliers
+
+
+if __name__ == "__main__":
+    import doctest
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
+
+    doctest.testmod()
+
