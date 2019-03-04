@@ -783,12 +783,12 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         shift = np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2)
         # if guess values on tabulated lines have not moved: penalize the chisq
         global_chisq += shift
-        lines.my_logger.debug(f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}'
-                              f'\n\tTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
+        # lines.my_logger.debug(f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}'
+        #                      f'\n\tTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
     else:
         global_chisq = 2 * len(parameters.LAMBDAS)
-        lines.my_logger.debug(
-            f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}\n\tTotal chisq: {global_chisq:.3f}')
+        # lines.my_logger.debug(
+        #    f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}\n\tTotal chisq: {global_chisq:.3f}')
     return global_chisq
 
 
@@ -847,7 +847,7 @@ def calibrate_spectrum_with_lines(spectrum):
         chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None)
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
-        if parameters.DEBUG:
+        if parameters.DEBUG and parameters.DISPLAY:
             spectrum.lambdas = lambdas_test
             spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
                                                         f'\nD={D:.2f}mm, shift={shift:.2f}pix')

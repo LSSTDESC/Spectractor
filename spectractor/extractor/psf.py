@@ -1312,7 +1312,7 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
     # fix[:Nx] = [True] * Nx
     # noinspection PyArgumentList
     m = Minuit.from_array_func(fcn=spectrogram_chisq, start=guess[Nx:], error=error[Nx:], errordef=1,
-                               fix=fix, print_level=2, limit=bounds[Nx:])
+                               fix=fix, print_level=parameters.DEBUG, limit=bounds[Nx:])
     m.migrad()
     # m.hesse()
     # print(m.np_matrix())
@@ -1322,7 +1322,7 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
                                                                                     force_positive=True)
     chromatic_psf.fill_table_with_profile_params(chromatic_psf.profile_params)
     chromatic_psf.from_profile_params_to_shape_params(chromatic_psf.profile_params)
-    if parameters.DEBUG:
+    if parameters.DEBUG and parameters.DISPLAY:
         # Plot data, best fit model and residuals:
         chromatic_psf.plot_summary()
         plot_residuals(chromatic_psf, bgd, data, data_errors, guess=guess, title='Best fit')
