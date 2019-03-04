@@ -27,8 +27,9 @@ class Throughput():
         self.filename_FGB37 = os.path.join(self.path_transmission, "FGB37.txt")
         self.filename_RG715 = os.path.join(self.path_transmission, "RG175.txt")
         self.filename_telescope_throughput = os.path.join(self.path_transmission, 'ctio_throughput.txt')
-        self.filename_total_throughput = os.path.join(self.path_transmission, 'ctio_throughput_300517_v1.txt')
         self.filename_mirrors = os.path.join(self.path_transmission, 'lsst_mirrorthroughput.txt')
+        self.filename_total_throughput = os.path.join(self.path_transmission, 'ctio_throughput_300517_v1.txt')
+        # self.filename_total_throughput = os.path.join(self.path_transmission, '20171006_RONCHI400_clear_45_median_tpt.txt')
 
     def get_quantum_efficiency(self):
         data_qe = ascii.read(self.filename_quantum_efficiency)
@@ -59,10 +60,14 @@ class Throughput():
         return x[indexes], y[indexes]
 
     def get_total_throughput(self):
-        data_rg = ascii.read(self.filename_total_throughput)
-        x = data_rg["col1"]
-        y = data_rg["col2"]
-        z = data_rg["col3"]
+        # data_rg = ascii.read(self.filename_total_throughput)
+        # x = data_rg["col1"]
+        # y = data_rg["col2"]
+        # z = data_rg["col3"]
+        data = np.loadtxt(self.filename_total_throughput)
+        x = data.T[0]
+        y = data.T[1]
+        z = data.T[2]
         indexes = np.where(np.logical_and(x > parameters.LAMBDA_MIN, x < parameters.LAMBDA_MAX))
         return x[indexes], y[indexes], z[indexes]
 
