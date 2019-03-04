@@ -61,6 +61,7 @@ before_script:
   - python --version
   - git clone git@github.com:jeremyneveu/slitless.git slitless
   - "cd slitless"
+  - git checkout spectractor
   - "pip install ."
   - "cd ../"
 
