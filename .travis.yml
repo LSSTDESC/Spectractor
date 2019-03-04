@@ -26,7 +26,6 @@ install:
       wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
     fi
   - bash miniconda.sh -b -p $HOME/miniconda
-  - conda create -n py36 python=3.6 pip
   - export PATH="$HOME/miniconda/bin:$PATH"
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
@@ -61,6 +60,7 @@ before_script:
   - "make uvspec"
   - "cd ../"
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
+  - conda create -n py36 python=3.6 pip
   - source activate py36
   - python --version
   - "git clone https://$CI_USER_TOKEN@github.com/jeremyneveu/slitless.git slitless"
