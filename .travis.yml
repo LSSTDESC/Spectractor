@@ -59,7 +59,7 @@ before_script:
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
   - source activate
   - python --version
-  - git clone git@gitlab.in2p3.fr:Jeremy/slitless.git slitless
+  - git clone git@github.com:jeremyneveu/slitless.git slitless
   - "cd slitless"
   - "pip install ."
   - "cd ../"
