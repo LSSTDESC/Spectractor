@@ -1042,3 +1042,11 @@ def SpectrogramSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05
     # spectrogram_simulation.save_spectrum(output_filename, overwrite=True)
 
     return spectrogram_simulation
+
+
+if __name__ == "__main__":
+    import doctest
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
+
+    doctest.testmod()
