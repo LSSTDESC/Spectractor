@@ -324,8 +324,8 @@ class Spectrum:
                 self.lines = self.target.lines
             if self.header['UNIT2'] != "":
                 self.units = self.header['UNIT2']
-            if self.header['ROTANGLE'] != "":
-                self.rotation_angle = self.header['ROTANGLE']
+            # if self.header['ROTANGLE'] != "":
+            #    self.rotation_angle = self.header['ROTANGLE']
             if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
