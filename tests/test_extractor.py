@@ -19,7 +19,7 @@ def test_logbook():
 
 
 def test_extractor():
-    file_names = ['tests/data/reduc_20170530_134_spectrum.fits']
+    file_names = ['tests/data/reduc_20170605_028.fits']
 
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
     parameters.DEBUG = True

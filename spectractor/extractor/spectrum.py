@@ -521,7 +521,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         # wavelength of the line: find the nearest pixel index
         line_wavelength = line.wavelength
         if fwhm_func is not None:
-            peak_width = max(fwhm_to_peak_width_factor*fwhm_func(line_wavelength), parameters.CALIB_PEAK_WIDTH)
+            peak_width = max(fwhm_to_peak_width_factor * fwhm_func(line_wavelength), parameters.CALIB_PEAK_WIDTH)
         if line_wavelength < xlim[0] or line_wavelength > xlim[1]:
             continue
         l_index, l_lambdas = find_nearest(lambdas, line_wavelength)
@@ -680,7 +680,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         bounds = new_bounds_list[k]
         bgd_index = []
         if fwhm_func is not None:
-            peak_width = fwhm_to_peak_width_factor*np.mean(fwhm_func(lambdas[index]))
+            peak_width = fwhm_to_peak_width_factor * np.mean(fwhm_func(lambdas[index]))
         for i in index:
             is_close_to_peak = False
             for j in peak_index:
@@ -690,21 +690,21 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             if not is_close_to_peak:
                 bgd_index.append(i)
         # add background guess and bounds
-        bgd_npar = max(parameters.CALIB_BGD_ORDER+1, int(len_index_to_bgd_npar_factor * len(bgd_index)))
+        bgd_npar = max(parameters.CALIB_BGD_ORDER + 1, int(len_index_to_bgd_npar_factor * len(bgd_index)))
         parameters.CALIB_BGD_NPARAMS = bgd_npar
         guess = [0] * bgd_npar + guess
         bounds[0] = [-np.inf] * bgd_npar + bounds[0]
-        bounds[1] = [ np.inf] * bgd_npar + bounds[1]
+        bounds[1] = [np.inf] * bgd_npar + bounds[1]
         if len(bgd_index) > 0:
             try:
                 fit, cov, model = fit_poly1d_legendre(lambdas[bgd_index], spec[bgd_index],
-                                             order=bgd_npar-1, w=1. / spec_err[bgd_index])
+                                                      order=bgd_npar - 1, w=1. / spec_err[bgd_index])
             except:
                 fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index],
-                                             order=bgd_npar-1, w=1. / spec_err[index])
+                                                      order=bgd_npar - 1, w=1. / spec_err[index])
         else:
             fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index],
-                                         order=bgd_npar-1, w=1. / spec_err[index])
+                                                  order=bgd_npar - 1, w=1. / spec_err[index])
         # lines.my_logger.warning(f'{bgd_npar} {fit}')
         # fig = plt.figure()
         # plt.plot(lambdas[index], spec[index])
@@ -892,7 +892,8 @@ def calibrate_spectrum_with_lines(spectrum):
     fix = [False, False]
     m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1,
                                fix=fix, print_level=2,
-                               limit=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
+                               limit=(
+                               (D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
     m.migrad()
     # if parameters.DEBUG:
     #     print(m.prin)
@@ -971,7 +972,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                                                       x0=image.target_pixcoords)
     pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
     pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0)))))
-    if (pixel_end-pixel_start) % 2 == 0:  # spectrogram table must have odd size in x for the fourier simulation
+    if (pixel_end - pixel_start) % 2 == 0:  # spectrogram table must have odd size in x for the fourier simulation
         pixel_end -= 1
 
     # Create spectrogram
@@ -1023,9 +1024,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords)
     lambda_min_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
     lambda_max_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0))))
-    xmin = int(s.table['Dx'][lambda_min_index]+x0)
-    xmax = min(right_edge, int(s.table['Dx'][lambda_max_index]+x0) + 1)  # +1 to  include edges
-    if (xmax-xmin) % 2 == 0:  # spectrogram must have odd size in x for the fourier simulation
+    xmin = int(s.table['Dx'][lambda_min_index] + x0)
+    xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
+    if (xmax - xmin) % 2 == 0:  # spectrogram must have odd size in x for the fourier simulation
         xmax -= 1
         s.table.remove_row(-1)
 
@@ -1043,13 +1044,13 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Crop the background lateral regions
     bgd_width = ws[1] - w
     yeven = 0
-    if (Ny - 2*bgd_width) % 2 == 0:  # spectrogram must have odd size in y for the fourier simulation
+    if (Ny - 2 * bgd_width) % 2 == 0:  # spectrogram must have odd size in y for the fourier simulation
         yeven = 1
     ymax = ymax - bgd_width + yeven
     ymin += bgd_width
-    bgd = bgd[bgd_width:-bgd_width+yeven, :]
-    data = data[bgd_width:-bgd_width+yeven, :]
-    err = err[bgd_width:-bgd_width+yeven, :]
+    bgd = bgd[bgd_width:-bgd_width + yeven, :]
+    data = data[bgd_width:-bgd_width + yeven, :]
+    err = err[bgd_width:-bgd_width + yeven, :]
     Ny, Nx = data.shape
     # First guess for lambdas
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_distance_along_dispersion_axis(),
@@ -1077,7 +1078,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.spectrogram_saturation = spectrum.chromatic_psf.saturation
 
     # Summary plot
-    if parameters.DEBUG or True:
+    if parameters.DEBUG:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         x = np.arange(Nx)
         xx = np.arange(s.table['Dx_rot'].size)
