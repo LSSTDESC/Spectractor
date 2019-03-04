@@ -179,7 +179,7 @@ class Lines:
 
         Examples
         --------
-        >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
+        >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=0)
         >>> sorted_lines = lines.sort_lines()
         >>> print([l.wavelength for l in sorted_lines][:5])
         [382.044, 393.366, 396.847, 410.2, 430.79]
