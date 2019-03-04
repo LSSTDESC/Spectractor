@@ -72,8 +72,9 @@ before_script:
 script:
   - pip install numpy nose coloredlogs coverage coveralls
   - pip install -r requirements.txt
-  - python setup.py build
-  - python setup.py install
+  # - python setup.py build
+  # - python setup.py install
+  - pip install .
   - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
   - ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py
