@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 from astropy.coordinates import SkyCoord
 from astroquery.ned import Ned
 from astroquery.simbad import Simbad
@@ -32,27 +31,6 @@ class Target:
             String label to name the target
         verbose: bool, optional
             Set True to increase verbosity (default: False)
-
-        Examples
-        --------
-
-        Emission line object:
-        >>> t = Target('3C273')
-        >>> print(t.label)
-        3C273
-        >>> print(t.coord.dec)
-        2d03m08.598s
-        >>> print(t.emission_spectrum)
-        True
-
-        Standard star:
-        >>> t = Target('HD111980')
-        >>> print(t.label)
-        HD111980
-        >>> print(t.coord.dec)
-        -18d31m20.009s
-        >>> print(t.emission_spectrum)
-        False
 
         """
         self.my_logger = set_logger(self.__class__.__name__)

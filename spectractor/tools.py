@@ -30,7 +30,7 @@ def gauss_jacobian(x, A, x0, sigma):
     dA = gauss(x, A, x0, sigma) / A
     dx0 = A * (x - x0) / (sigma * sigma) * dA
     dsigma = A * (x-x0)*(x-x0) / (sigma ** 3) * dA
-    return np.array([dA, dx0, dsigma])
+    return np.array([dA, dx0, dsigma]).T
 
 
 def line(x, a, b):
@@ -67,16 +67,17 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> x = np.arange(600.,700.,2)
-    >>> y = gauss(x, 10, 650, 10)
+    >>> p = [10, 650, 10]
+    >>> y = gauss(x, *p)
     >>> y_err = np.ones_like(y)
-    >>> print(y[50])
+    >>> print(y[25])
     10.0
     >>> guess = (2,630,2)
     >>> popt, pcov = fit_gauss(x, y, guess=guess, bounds=((1,600,1),(100,700,100)), sigma=y_err)
     >>> assert np.all(np.isclose(p,popt))
     """
     popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds,  tr_solver='exact', jac=gauss_jacobian,
-                           sigma=sigma, method='dogbox', verbose=1, xtol=1e-20, ftol=1e-20)
+                           sigma=sigma, method='dogbox', verbose=0, xtol=1e-20, ftol=1e-20)
     return popt, pcov
 
 
@@ -245,7 +246,7 @@ def multigauss_and_bgd_jacobian(x, *params):
         c[k] = 1
         out.append(np.polynomial.legendre.legval(x_norm, c))
     for k in range((len(params) - bgd_nparams) // 3):
-        jac = list(gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]))
+        jac = list(gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]).T)
         out += jac
     return np.array(out)
 
@@ -294,11 +295,11 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     >>> fit = multigauss_and_bgd(x, *popt)
 
     ..plot:
-    >>> import matplotlib.pyplot as plt
-    >>> plt.errorbar(x,y,yerr=err,linestyle='None')
-    >>> plt.plot(x,fit,'r-')
-    >>> plt.plot(x,multigauss_and_bgd(x, *guess),'k--')
-    >>> plt.show()
+        import matplotlib.pyplot as plt
+        plt.errorbar(x,y,yerr=err,linestyle='None')
+        plt.plot(x,fit,'r-')
+        plt.plot(x,multigauss_and_bgd(x, *guess),'k--')
+        plt.show()
     """
     # maxfev = 10000
     # popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma,
@@ -646,18 +647,21 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
     >>> PSF = models.Gaussian2D()
     >>> p = (50, 25, 25, 5, 5, 0)
     >>> Z = PSF.evaluate(X, Y, *p)
-    >>> plt.imshow(Z, origin='loxer') #doctest: +ELLIPSIS
-    <matplotlib.image.AxesImage object at 0x...>
-    >>> plt.show()
+
+    ..plot:
+        plt.imshow(Z, origin='loxer') #doctest: +ELLIPSIS
+        plt.show()
     >>> guess = (45, 20, 20, 7, 7, 0)
     >>> bounds = ((1, 10, 10, 1, 1, -90), (100, 40, 40, 10, 10, 90))
     >>> fit = fit_gauss2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, circular=True)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
     >>> print(res)
     [50.0, 25.0, 25.0, 5.0, 5.0, 0.0]
-    >>> plt.imshow(Z-fit(X, Y), origin='loxer') #doctest: +ELLIPSIS
-    <matplotlib.image.AxesImage object at 0x...>
-    >>> plt.show()
+
+    ..plot:
+        plt.imshow(Z-fit(X, Y), origin='loxer') #doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at 0x...>
+        plt.show()
 
     """
     gg_init = models.Gaussian2D()
@@ -1087,9 +1091,10 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
     Examples
     --------
     >>> import matplotlib.pyplot as plt
+    >>> from spectractor.extractor.spectrum import Spectrum
     >>> f, ax = plt.subplots(1,1)
     >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
-    >>> s.plot_spectrum_simple(ax, xlim=[500,700], color='r', label='test')
+    >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=[500,700], color='r', label='test')
     >>> if parameters.DISPLAY: plt.show()
     """
     xs = lambdas
