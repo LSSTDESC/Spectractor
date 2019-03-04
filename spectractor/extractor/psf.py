@@ -50,7 +50,6 @@ class PSF1D(Fittable1DModel):
         --------
         >>> x = np.arange(0, 60, 1)
         >>> p = [2,30,4,2,-0.4,1,10]
-        # >>> p = [ 1.00000000e+00,  3.03178464e+01,  2.86103436e+01,  1.68555900e+01, -1.02603008e+00,  1.54523077e+01,  1.00000000e+03]
         >>> PSF = PSF1D(*p)
         >>> a, b =  p[1], p[1]+3*max(p[-2], p[2])
         >>> fwhm = PSF.fwhm(x_array=None)
@@ -61,8 +60,9 @@ class PSF1D(Fittable1DModel):
         7.083984375
         >>> import matplotlib.pyplot as plt
         >>> x = np.arange(0, 60, 0.01)
-        >>> plt.plot(x, PSF.evaluate(x, *p))
-        >>> plt.show()
+        >>> plt.plot(x, PSF.evaluate(x, *p)) #doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at 0x...>
+        >>> if parameters.DISPLAY: plt.show()
         """
         params = [getattr(self, p).value for p in self.param_names]
         interp = None
@@ -182,9 +182,11 @@ class PSF1D(Fittable1DModel):
 
         >>> import matplotlib.pyplot as plt
         >>> xx = np.arange(0, 60, 0.01)
-        >>> plt.plot(xx, PSF.evaluate(xx, *p))
-        >>> plt.plot(x, PSF.evaluate(x, *p))
-        >>> plt.show()
+        >>> plt.plot(xx, PSF.evaluate(xx, *p)) #doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at 0x...>
+        >>> plt.plot(x, PSF.evaluate(x, *p)) #doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at 0x...>
+        >>> if parameters.DISPLAY: plt.show()
 
         """
         params = [getattr(self, p).value for p in self.param_names]
@@ -706,9 +708,11 @@ class ChromaticPSF1D:
         >>> output = s.evaluate(poly_params)
 
         >>> import matplotlib.pyplot as plt
-        >>> im = plt.imshow(output, origin='lower')
-        >>> plt.colorbar(im)
-        >>> plt.show()
+        >>> im = plt.imshow(output, origin='lower')  #doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at 0x...>
+        >>> plt.colorbar(im)  #doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at 0x...>
+        >>> if parameters.DISPLAY: plt.show()
 
         """
         profile_params = self.from_poly_params_to_profile_params(poly_params)

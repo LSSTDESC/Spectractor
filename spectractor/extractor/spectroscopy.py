@@ -136,24 +136,24 @@ class Lines:
         Examples
         --------
         The default first five lines:
-        >>> lines = Lines(redshift=0, atmospheric_lines=False, hydrogen_only=False, emission_spectrum=False)
+        >>> lines = Lines(ISM_LINES+HYDROGEN_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=False, emission_spectrum=False)
         >>> print([lines.lines[i].wavelength for i in range(5)])
         [353.1, 388.8, 410.2, 434.0, 447.1]
 
         The four hydrogen lines only:
-        >>> lines = Lines(redshift=0, atmospheric_lines=False, hydrogen_only=True, emission_spectrum=True)
+        >>> lines = Lines(ISM_LINES+HYDROGEN_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(4)])
         [410.2, 434.0, 486.3, 656.3]
         >>> print(lines.emission_spectrum)
         True
 
         Redshift the hydrogen lines, the atmospheric lines stay unchanged:
-        >>> lines = Lines(redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
-        >>> print([lines.lines[i].wavelength for i in range(5)])
-        [382.044, 393.366, 396.847, 430.79, 438.355]
+        >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
+        >>> print([lines.lines[i].wavelength for i in range(7)])
+        [382.044, 393.366, 396.847, 430.79, 438.355, 686.719, 762.1]
 
         Redshift all the spectral lines, except the atmospheric lines:
-        >>> lines = Lines(redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
+        >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
         [382.044, 393.366, 396.847, 430.79, 438.355]
         """

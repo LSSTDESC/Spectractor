@@ -592,7 +592,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
         fit = fitting.LevMarLSQFitter()
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
-        filtered_data, or_fitted_model = or_fit(gg_init, x, y)
+        or_fitted_model, filtered_data = or_fit(gg_init, x, y)
         outliers = [] # not working
         '''
         import matplotlib.pyplot as plt
@@ -653,7 +653,11 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
         fit = fitting.LevMarLSQFitter()
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
-        filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
+        if parameters.VERBOSE:
+            print(or_fitted_model)
+        if parameters.VERBOSE:
+            print(fit.fit_info)
         return or_fitted_model
 
 
@@ -733,7 +737,7 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
         fit = fitting.LevMarLSQFitter()
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
-        filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
         if parameters.VERBOSE:
             print(or_fitted_model)
         if parameters.VERBOSE:
@@ -757,7 +761,7 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bound
         fit = fitting.LevMarLSQFitter()
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
-        filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
+        or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
         if parameters.VERBOSE:
             print(or_fitted_model)
         return or_fitted_model
@@ -779,7 +783,7 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=50, guess=None, bounds=N
         fit = fitting.LevMarLSQFitter()
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
-        filtered_data, or_fitted_model = or_fit(gg_init, x, y)
+        or_fitted_model, filtered_data = or_fit(gg_init, x, y)
         if parameters.VERBOSE:
             print(or_fitted_model)
         return or_fitted_model
