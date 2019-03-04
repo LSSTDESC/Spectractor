@@ -61,7 +61,7 @@ class PSF1D(Fittable1DModel):
         >>> import matplotlib.pyplot as plt
         >>> x = np.arange(0, 60, 0.01)
         >>> plt.plot(x, PSF.evaluate(x, *p)) #doctest: +ELLIPSIS
-        <matplotlib.lines.Line2D object at 0x...>
+        [<matplotlib.lines.Line2D object at 0x...>]
         >>> if parameters.DISPLAY: plt.show()
         """
         params = [getattr(self, p).value for p in self.param_names]
@@ -183,9 +183,9 @@ class PSF1D(Fittable1DModel):
         >>> import matplotlib.pyplot as plt
         >>> xx = np.arange(0, 60, 0.01)
         >>> plt.plot(xx, PSF.evaluate(xx, *p)) #doctest: +ELLIPSIS
-        <matplotlib.lines.Line2D object at 0x...>
+        [<matplotlib.lines.Line2D object at 0x...>]
         >>> plt.plot(x, PSF.evaluate(x, *p)) #doctest: +ELLIPSIS
-        <matplotlib.lines.Line2D object at 0x...>
+        [<matplotlib.lines.Line2D object at 0x...>]
         >>> if parameters.DISPLAY: plt.show()
 
         """

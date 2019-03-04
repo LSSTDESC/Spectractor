@@ -35,7 +35,7 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
 
     Examples
     --------
-    Look for the image charactristics:
+    Extract the spectrogram and its characteristics from the image:
     >>> import os
     >>> from spectractor.logbook import LogBook
     >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
