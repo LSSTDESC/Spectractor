@@ -14,8 +14,6 @@ from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 
-from iminuit import Minuit
-
 from skimage.feature import hessian_matrix
 from spectractor.config import *
 from spectractor import parameters
@@ -23,10 +21,62 @@ from math import floor
 
 
 def gauss(x, A, x0, sigma):
+    """Evaluate the Gaussian function.
+
+    Parameters
+    ----------
+    x: array_like
+        Abscisse array to evaluate the function of size Nx.
+    A: float
+        Amplitude of the Gaussian function.
+    x0: float
+        Mean of the Gaussian function.
+    sigma: float
+        Standard deviation of the Gaussian function.
+
+    Returns
+    -------
+    m: array_like
+        The Gaussian function evaluated on the x array.
+
+    Examples
+    --------
+    >>> x = np.arange(50)
+    >>> y = gauss(x, 10, 25, 3)
+    >>> print(y.shape)
+    (50,)
+    >>> y[25]
+    10.0
+    """
     return A * np.exp(-(x - x0)*(x - x0) / (2 * sigma * sigma))
 
 
 def gauss_jacobian(x, A, x0, sigma):
+    """Compute the Jacobian matrix of the Gaussian function.
+
+    Parameters
+    ----------
+    x: array_like
+        Abscisse array to evaluate the function of size Nx.
+    A: float
+        Amplitude of the Gaussian function.
+    x0: float
+        Mean of the Gaussian function.
+    sigma: float
+        Standard deviation of the Gaussian function.
+
+    Returns
+    -------
+    m: array_like
+        The Jacobian matrix of size 3 x Nx.
+
+    Examples
+    --------
+    >>> x = np.arange(50)
+    >>> jac = gauss_jacobian(x, 10, 25, 3)
+    >>> print(jac.shape)
+    (50, 3)
+    """
     dA = gauss(x, A, x0, sigma) / A
     dx0 = A * (x - x0) / (sigma * sigma) * dA
     dsigma = A * (x-x0)*(x-x0) / (sigma ** 3) * dA
@@ -146,7 +196,7 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
     >>> bounds = ((-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,100,800,100,100,800,100))
     >>> popt, pcov = fit_multigauss_and_line(x, y, guess=(0,1,3,630,3,3,770,3), bounds=bounds)
     >>> print(popt)
-    [   1.   10.   20.  650.    3.   40.  750.   10.]
+    [  1.  10.  20. 650.   3.  40. 750.  10.]
     """
     maxfev = 1000
     popt, pcov = curve_fit(multigauss_and_line, x, y, p0=guess, bounds=bounds, maxfev=maxfev, absolute_sigma=True)
@@ -160,6 +210,7 @@ def rescale_x_for_legendre(x):
         return x_norm / np.max(x_norm)
     else:
         return x_norm
+
 
 # noinspection PyTypeChecker
 def multigauss_and_bgd(x, *params):
@@ -232,9 +283,9 @@ def multigauss_and_bgd_jacobian(x, *params):
     >>> x = np.arange(600.,800.,1)
     >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd_jacobian(x, *p)
-    >>> assert(np.all(np.isclose(y[0],np.ones_like(x))))
+    >>> assert(np.all(np.isclose(y.T[0],np.ones_like(x))))
     >>> print(y.shape)
-    (10, 200)
+    (200, 10)
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
     out = []
@@ -246,9 +297,10 @@ def multigauss_and_bgd_jacobian(x, *params):
         c[k] = 1
         out.append(np.polynomial.legendre.legval(x_norm, c))
     for k in range((len(params) - bgd_nparams) // 3):
-        jac = list(gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]).T)
-        out += jac
-    return np.array(out)
+        jac = gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]).T
+        for j in jac:
+            out.append(list(j))
+    return np.array(out).T
 
 
 # noinspection PyTypeChecker
@@ -301,47 +353,47 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
         plt.plot(x,multigauss_and_bgd(x, *guess),'k--')
         plt.show()
     """
-    # maxfev = 10000
-    # popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma,
-    #                        absolute_sigma=True, method='trf', xtol=1e-4, ftol=1e-4, verbose=0,
-    #                        jac=multigauss_and_bgd_jacobian, x_scale='jac')
-    error = 0.1 * np.abs(guess) * np.ones_like(guess)
-    z = np.where(np.isclose(error,0.0,1e-6))
-    error[z] = 0.01
-    bounds = np.array(bounds)
-    if bounds.shape[0] == 2 and bounds.shape[1] > 2:
-        bounds = bounds.T
-    guess = np.array(guess)
-
-    def chisq_multigauss_and_bgd(params):
-        if sigma is None:
-            return np.nansum((multigauss_and_bgd(x, *params) - y)**2)
-        else:
-            return np.nansum(((multigauss_and_bgd(x, *params) - y)/sigma)**2)
-
-    def chisq_multigauss_and_bgd_jac(params):
-        diff = multigauss_and_bgd(x, *params) - y
-        jac = multigauss_and_bgd_jacobian(x, *params)
-        if sigma is None:
-            return np.array([np.nansum(2 * jac[p] * diff) for p in range(len(params))])
-        else:
-            return np.array([np.nansum(2 * jac[p] * diff / (sigma*sigma)) for p in range(len(params))])
-
-    fix = [False] * error.size
-    if fix_centroids:
-        for k in range(parameters.CALIB_BGD_NPARAMS, len(fix), 3):
-           fix[k+1] = True
-    # noinspection PyArgumentList
-    m = Minuit.from_array_func(fcn=chisq_multigauss_and_bgd, start=guess, error=error, errordef=1,
-                               fix=fix, print_level=0, limit=bounds, grad=chisq_multigauss_and_bgd_jac)
-
-    m.tol = 0.001
-    m.migrad()
-    try:
-        pcov = m.np_covariance()
-    except:
-        pcov = None
-    popt = m.np_values()
+    maxfev = 10000
+    popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma,
+                           absolute_sigma=True, method='trf', xtol=1e-4, ftol=1e-4, verbose=0,
+                           jac=multigauss_and_bgd_jacobian, x_scale='jac')
+    # error = 0.1 * np.abs(guess) * np.ones_like(guess)
+    # z = np.where(np.isclose(error,0.0,1e-6))
+    # error[z] = 0.01
+    # bounds = np.array(bounds)
+    # if bounds.shape[0] == 2 and bounds.shape[1] > 2:
+    #     bounds = bounds.T
+    # guess = np.array(guess)
+    #
+    # def chisq_multigauss_and_bgd(params):
+    #     if sigma is None:
+    #         return np.nansum((multigauss_and_bgd(x, *params) - y)**2)
+    #     else:
+    #         return np.nansum(((multigauss_and_bgd(x, *params) - y)/sigma)**2)
+    #
+    # def chisq_multigauss_and_bgd_jac(params):
+    #     diff = multigauss_and_bgd(x, *params) - y
+    #     jac = multigauss_and_bgd_jacobian(x, *params)
+    #     if sigma is None:
+    #         return np.array([np.nansum(2 * jac[p] * diff) for p in range(len(params))])
+    #     else:
+    #         return np.array([np.nansum(2 * jac[p] * diff / (sigma*sigma)) for p in range(len(params))])
+    #
+    # fix = [False] * error.size
+    # if fix_centroids:
+    #     for k in range(parameters.CALIB_BGD_NPARAMS, len(fix), 3):
+    #        fix[k+1] = True
+    # # noinspection PyArgumentList
+    # m = Minuit.from_array_func(fcn=chisq_multigauss_and_bgd, start=guess, error=error, errordef=1,
+    #                            fix=fix, print_level=0, limit=bounds, grad=chisq_multigauss_and_bgd_jac)
+    #
+    # m.tol = 0.001
+    # m.migrad()
+    # try:
+    #     pcov = m.np_covariance()
+    # except:
+    #     pcov = None
+    # popt = m.np_values()
     return popt, pcov
 
 
