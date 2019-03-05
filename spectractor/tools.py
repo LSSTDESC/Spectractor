@@ -424,15 +424,20 @@ def fit_poly1d(x, y, order, w=None):
     Examples
     --------
     >>> x = np.arange(500., 1000., 1)
-    >>> p = [3,2,1,0]
+    >>> p = [3, 2, 1, 1]
     >>> y = np.polyval(p, x)
     >>> err = np.ones_like(y)
-    >>> fit, cov, model = fit_poly1d(x,y,order=3)
-    >>> assert np.all(np.isclose(p,fit,3))
-    >>> fit, cov2, model2 = fit_poly1d(x,y,order=3,w=err)
-    >>> assert np.all(np.isclose(p,fit,3))
+    >>> fit, cov, model = fit_poly1d(x, y, order=3)
+    >>> assert np.all(np.isclose(p, fit, 1e-5))
+    >>> assert np.all(np.isclose(model, y))
+    >>> assert cov.shape == (4, 4)
+    >>> fit, cov2, model2 = fit_poly1d(x, y, order=3, w=err)
+    >>> assert np.all(np.isclose(p, fit, 1e-5))
+    >>> fit, cov3, model3 = fit_poly1d([0, 1], [1, 1], order=3, w=err)
+    >>> print(fit)
+    [0 0 0 0]
     """
-    cov = -1
+    cov = np.array([])
     if len(x) > order:
         if w is None:
             fit, cov = np.polyfit(x, y, order, cov=True)
@@ -479,6 +484,9 @@ def fit_poly1d_legendre(x, y, order, w=None):
     >>> assert np.all(np.isclose(p,fit,3))
     >>> fit, cov2, model2 = fit_poly1d_legendre(x,y,order=3,w=err)
     >>> assert np.all(np.isclose(p,fit,3))
+    >>> fit, cov3, model3 = fit_poly1d([0, 1], [1, 1], order=3, w=err)
+    >>> print(fit)
+    [0 0 0 0]
 
     ..plot:
         import matplotlib.pyplot as plt
@@ -666,7 +674,7 @@ def tied_circular_gauss2d(g1):
     return std
 
 
-def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds=None, circular=False):
+def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=None, circular=False):
     """Fit an astropy Gaussian 2D model with parameters :
         amplitude, x_mean,y_mean,x_stddev, y_stddev,theta
     using outlier removal methods.
@@ -682,17 +690,18 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
     sigma: float
         value of sigma for the sigma rejection of outliers (default: 3)
     niter: int
-        maximum number of iterations for the outlier detection (default: 50)
+        maximum number of iterations for the outlier detection (default: 3)
     guess: list, optional
         List containing a first guess for the PSF parameters (default: None).
     bounds: list, optional
         2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
-    circular
+    circular: bool, optional
+        If True, force the Gaussian shape to be circular (default: False)
 
     Returns
     -------
     fitted_model: Fittable
-        Astropy Gauss2D model
+        Astropy Gaussian2D model
 
     Examples
     --------
@@ -745,8 +754,56 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds
         return or_fitted_model
 
 
-def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bounds=None):
-    """Moffat2D parameters: amplitude, x_mean,y_mean,gamma,alpha"""
+def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=None):
+    """Fit an astropy Moffat 2D model with parameters :
+        amplitude, x_mean, y_mean, gamma, alpha
+    using outlier removal methods.
+
+    Parameters
+    ----------
+    x: np.array
+        2D array of the x coordinates from meshgrid.
+    y: np.array
+        2D array of the y coordinates from meshgrid.
+    z: np.array
+        the 2D array image.
+    sigma: float
+        value of sigma for the sigma rejection of outliers (default: 3)
+    niter: int
+        maximum number of iterations for the outlier detection (default: 3)
+    guess: list, optional
+        List containing a first guess for the PSF parameters (default: None).
+    bounds: list, optional
+        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
+
+    Returns
+    -------
+    fitted_model: Fittable
+        Astropy Moffat2D model
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> from astropy.modeling import models
+    >>> X, Y = np.mgrid[:100,:100]
+    >>> PSF = models.Moffat2D()
+    >>> p = (50, 50, 50, 5, 2)
+    >>> Z = PSF.evaluate(X, Y, *p)
+
+    ..plot:
+        plt.imshow(Z, origin='loxer')
+        plt.show()
+    >>> guess = (45, 48, 52, 4, 2)
+    >>> bounds = ((1, 10, 10, 1, 1), (100, 90, 90, 10, 10))
+    >>> fit = fit_moffat2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, niter=3)
+    >>> res = [getattr(fit, p).value for p in fit.param_names]
+    >>> assert(np.all(np.isclose(p, res, 1e-1)))
+
+    ..plot:
+        plt.imshow(Z-fit(X, Y), origin='loxer')
+        plt.show()
+    """
     gg_init = models.Moffat2D()
     if guess is not None:
         for ip, p in enumerate(gg_init.param_names):
@@ -767,8 +824,54 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=50, guess=None, bound
         return or_fitted_model
 
 
-def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=50, guess=None, bounds=None):
-    """Moffat1D parameters: amplitude, x_mean, gamma, alpha"""
+def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=None):
+    """Fit an astropy Moffat 1D model with parameters :
+        amplitude, x_mean, gamma, alpha
+    using outlier removal methods.
+
+    Parameters
+    ----------
+    x: np.array
+        1D array of the x coordinates from meshgrid.
+    y: np.array
+        the 1D array amplitudes.
+    sigma: float
+        value of sigma for the sigma rejection of outliers (default: 3)
+    niter: int
+        maximum number of iterations for the outlier detection (default: 3)
+    guess: list, optional
+        List containing a first guess for the PSF parameters (default: None).
+    bounds: list, optional
+        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
+
+    Returns
+    -------
+    fitted_model: Fittable
+        Astropy Moffat1D model
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> from astropy.modeling import models
+    >>> X = np.arange(100)
+    >>> PSF = models.Moffat1D()
+    >>> p = (50, 50, 5, 2)
+    >>> Y = PSF.evaluate(X, *p)
+
+    ..plot:
+        plt.imshow(Z, origin='loxer')
+        plt.show()
+    >>> guess = (45, 48, 4, 2)
+    >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
+    >>> fit = fit_moffat1d_outlier_removal(X, Y, guess=guess, bounds=bounds, niter=3)
+    >>> res = [getattr(fit, p).value for p in fit.param_names]
+    >>> assert(np.all(np.isclose(p, res, 1e-6)))
+
+    ..plot:
+        plt.imshow(Z-fit(X, Y), origin='loxer')
+        plt.show()
+    """
     gg_init = models.Moffat1D()
     if guess is not None:
         for ip, p in enumerate(gg_init.param_names):
@@ -790,7 +893,48 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=50, guess=None, bounds=N
 
 
 def fit_moffat1d(x, y, guess=None, bounds=None):
-    """Moffat1D parameters: amplitude, x_mean, gamma, alpha"""
+    """Fit an astropy Moffat 1D model with parameters :
+        amplitude, x_mean, gamma, alpha
+
+    Parameters
+    ----------
+    x: np.array
+        1D array of the x coordinates from meshgrid.
+    y: np.array
+        the 1D array amplitudes.
+    guess: list, optional
+        List containing a first guess for the PSF parameters (default: None).
+    bounds: list, optional
+        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
+
+    Returns
+    -------
+    fitted_model: Fittable
+        Astropy Moffat1D model
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> from astropy.modeling import models
+    >>> X = np.arange(100)
+    >>> PSF = models.Moffat1D()
+    >>> p = (50, 50, 5, 2)
+    >>> Y = PSF.evaluate(X, *p)
+
+    ..plot:
+        plt.imshow(Z, origin='loxer')
+        plt.show()
+    >>> guess = (45, 48, 4, 2)
+    >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
+    >>> fit = fit_moffat1d(X, Y, guess=guess, bounds=bounds)
+    >>> res = [getattr(fit, p).value for p in fit.param_names]
+    >>> assert(np.all(np.isclose(p, res, 1e-6)))
+
+    ..plot:
+        plt.imshow(Z-fit(X, Y), origin='loxer')
+        plt.show()
+    """
     gg_init = models.Moffat1D()
     if guess is not None:
         for ip, p in enumerate(gg_init.param_names):
@@ -946,11 +1090,18 @@ def fftconvolve_gaussian(array, reso):
 
     Examples
     --------
-    >>> array = np.ones(20)
+    >>> array = np.ones(100)
     >>> output = fftconvolve_gaussian(array, 3)
     >>> print(output[:3])
-    [ 0.5         0.63125312  0.74870357]
+    [ 0.5         0.63114657  0.74850168]
+    >>> array = np.ones((100, 100))
+    >>> output = fftconvolve_gaussian(array, 3)
+    >>> print(output[0][:3])
+    [ 0.5         0.63114657  0.74850168]
+    >>> array = np.ones((100, 100, 100))
+    >>> output = fftconvolve_gaussian(array, 3)
     """
+    my_logger = set_logger(__name__)
     if array.ndim == 2:
         kernel = gaussian(array.shape[1], reso)
         kernel /= np.sum(kernel)
@@ -961,7 +1112,7 @@ def fftconvolve_gaussian(array, reso):
         kernel /= np.sum(kernel)
         array = fftconvolve(array, kernel, mode='same')
     else:
-        sys.exit('fftconvolve_gaussian: array dimension must be 1 or 2.')
+        my_logger.error('\n\tArray dimension must be 1 or 2.')
     return array
 
 
@@ -989,12 +1140,18 @@ def formatting_numbers(value, error_high, error_low, std=None, label=None):
 
     Examples
     --------
-    >>> text = formatting_numbers(3., 0.789, 0.500, std=0.45, label='test')
-    >>> print(text)
+    >>> formatting_numbers(3., 0.789, 0.500, std=0.45, label='test')
     ('test', '3.0', '0.8', '0.5', '0.5')
-    >>> text = formatting_numbers(3., 0.07, 0.008, std=0.03, label='test')
-    >>> print(text)
+    >>> formatting_numbers(3., 0.07, 0.008, std=0.03, label='test')
     ('test', '3.000', '0.07', '0.008', '0.03')
+    >>> formatting_numbers(3240., 0.2, 0.4, std=0.3)
+    ('3240.0', '0.2', '0.4', '0.3')
+    >>> formatting_numbers(3240., 230, 420, std=330)
+    ('3240', '230', '420', '330')
+    >>> formatting_numbers(0, 0.008, 0.04, std=0.03)
+    ('0.000', '0.008', '0.040', '0.030')
+    >>> formatting_numbers(-55, 0.008, 0.04, std=0.03)
+    ('-55.000', '0.008', '0.04', '0.03')
     """
     str_std = ""
     out = []
@@ -1042,6 +1199,39 @@ def formatting_numbers(value, error_high, error_low, std=None, label=None):
 
 
 def pixel_rotation(x, y, theta, x0=0, y0=0):
+    """Rotate a 2D vector (x,y) of an angle theta clockwise.
+
+    Parameters
+    ----------
+    x: float
+        x coordinate
+    y: float
+        y coordinate
+    theta: float
+        angle in radians
+    x0: float, optional
+        x position of the center of rotation (default: 0)
+    y0: float, optional
+        y position of the center of rotation (default: 0)
+
+    Returns
+    -------
+    u: float
+        rotated x coordinate
+    v: float
+        rotated y coordinate
+
+    Examples
+    --------
+    >>> pixel_rotation(0, 0, 45)
+    (0.0, 0.0)
+    >>> u, v = pixel_rotation(1, 0, np.pi/4)
+    >>> assert np.isclose(u, 1/np.sqrt(2))
+    >>> assert np.isclose(v, -1/np.sqrt(2))
+    >>> u, v = pixel_rotation(1, 2, -np.pi/2, x0=1, y0=0)
+    >>> assert np.isclose(u, -2)
+    >>> assert np.isclose(v, 0)
+    """
     u = np.cos(theta) * (x - x0) + np.sin(theta) * (y - y0)
     v = -np.sin(theta) * (x - x0) + np.cos(theta) * (y - y0)
     return u, v
@@ -1102,8 +1292,45 @@ def clean_target_spikes(data, saturation):
     return data
 
 
-def plot_image_simple(ax, data=None, scale="lin", title="", units="Image units", cmap=None,
+def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap=None,
                       target_pixcoords=None, vmin=None, vmax=None, aspect=None, cax=None):
+    """Simple function to plot a spectrum with error bars and labels.
+
+    Parameters
+    ----------
+    ax: Axes
+        Axes instance to make the plot
+    data: array_like
+        The image data 2D array.
+    scale: str
+        Scaling of the image (choose between: lin, log or log10) (default: lin)
+    title: str
+        Title of the image (default: "")
+    units: str
+        Units of the image to be written in the color bar label (default: "Image units")
+    cmap: colormap
+        Color map label (default: None)
+    target_pixcoords: array_like, optional
+        2D array  giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
+    vmin: float
+        Minimum value of the image (default: None)
+    vmax: float
+        Maximum value of the image (default: None)
+    aspect: str
+        Aspect keyword to be passed to imshow (default: None)
+    cax: Axes, optional
+        Color bar axes if necessary (default: None).
+
+    Examples
+    --------
+    >>> import matplotlib.pyplot as plt
+    >>> from spectractor.extractor.images import Image
+    >>> f, ax = plt.subplots(1,1)
+    >>> im = Image('tests/data/reduc_20170605_028.fits')
+    >>> plot_image_simple(ax, im.data, scale="log10", units="ADU", target_pixcoords=(815,580),
+    ...                     title="tests/data/reduc_20170605_028.fits")
+    >>> if parameters.DISPLAY: plt.show()
+    """
     if scale == "log" or scale == "log10":
         # removes the zeros and negative pixels first
         zeros = np.where(data <= 0)

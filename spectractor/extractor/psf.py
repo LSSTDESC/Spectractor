@@ -515,40 +515,6 @@ class ChromaticPSF1D:
             self.table['fwhm'][x] = fwhm
             self.table['Dy_mean'][x] = 0
 
-    def set_bounds_old(self, data):
-        if self.saturation is None:
-            self.saturation = 2 * np.max(data)
-        Ny, Nx = data.shape
-        bounds = [[0.1 * np.max(data[:, x]) for x in range(Nx)], [100.0 * np.max(data[:, x]) for x in range(Nx)]]
-        for k, name in enumerate(self.PSF1D.param_names):
-            tmp_bounds = [[-1] * (1 + self.degrees[name]), [self.Ny] * (1 + self.degrees[name])]
-            # if name is "x_mean":
-            #      tmp_bounds[0].append(0)
-            #      tmp_bounds[1].append(Ny)
-            # elif name is "gamma":
-            #      tmp_bounds[0].append(0)
-            #      tmp_bounds[1].append(None) # Ny/2
-            # elif name is "alpha":
-            #      tmp_bounds[0].append(1)
-            #      tmp_bounds[1].append(None) # 10
-            # elif name is "eta_gauss":
-            #     tmp_bounds[0].append(-1)
-            #     tmp_bounds[1].append(0)
-            # elif name is "stddev":
-            #     tmp_bounds[0].append(0.1)
-            #     tmp_bounds[1].append(Ny / 2)
-            if name is "saturation":
-                tmp_bounds = [[0.1 * np.max(data)], [2 * self.saturation]]
-            elif name is "amplitude_moffat":
-                continue
-            # elif name is "eta_gauss":
-            #    tmp_bounds = [[-1] * (1 + self.degrees[name]), [1] * (1 + self.degrees[name])]
-            # else:
-            #     self.my_logger.error(f'Unknown parameter name {name} in set_bounds.')
-            bounds[0] += tmp_bounds[0]
-            bounds[1] += tmp_bounds[1]
-        return np.array(bounds).T
-
     def set_bounds(self, data=None):
         """
         This function returns an array of bounds for iminuit. It is very touchy, change the values with caution !
@@ -1375,30 +1341,78 @@ def PSF2D_chisq_jac(params, model, xx, yy, zz, zz_err=None):
         zz_err2 = zz_err * zz_err
         return np.array([np.nansum(2 * jac[p] * diff / zz_err2) for p in range(len(params))])
 
-
-def fit_PSF2D_outlier_removal(x, y, z, sigma=5.0, niter=10, guess=None, bounds=None):
-    """Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation"""
-    gg_init = PSF2D()
-    if guess is not None:
-        for ip, p in enumerate(gg_init.param_names):
-            getattr(gg_init, p).value = guess[ip]
-    if bounds is not None:
-        for ip, p in enumerate(gg_init.param_names):
-            getattr(gg_init, p).min = bounds[0][ip]
-            getattr(gg_init, p).max = bounds[1][ip]
-    gg_init.saturation.fixed = True
-    with warnings.catch_warnings():
-        # Ignore model linearity warning from the fitter
-        warnings.simplefilter('ignore')
-        fit = LevMarLSQFitterWithNan()
-        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
-        # get fitted model and filtered data
-        filtered_data, or_fitted_model = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE:
-            print(or_fitted_model)
-        if parameters.DEBUG:
-            print(fit.fit_info)
-        return or_fitted_model
+# DO NOT WORK
+# def fit_PSF2D_outlier_removal(x, y, data, sigma=3.0, niter=3, guess=None, bounds=None):
+#     """Fit a PSF 2D model with parameters:
+#         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+#     using scipy. Find outliers data point above sigma*data_errors from the fit over niter iterations.
+#
+#     Parameters
+#     ----------
+#     x: np.array
+#         2D array of the x coordinates.
+#     y: np.array
+#         2D array of the y coordinates.
+#     data: np.array
+#         the 1D array profile.
+#     guess: array_like, optional
+#         list containing a first guess for the PSF parameters (default: None).
+#     bounds: list, optional
+#         2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
+#     sigma: int
+#         the sigma limit to exclude data points (default: 3).
+#     niter: int
+#         the number of loop iterations to exclude  outliers and refit the model (default: 2).
+#
+#     Returns
+#     -------
+#     fitted_model: PSF2D
+#         the PSF2D fitted model.
+#
+#     Examples
+#     --------
+#
+#     Create the model:
+#     >>> X, Y = np.mgrid[:50,:50]
+#     >>> PSF = PSF2D()
+#     >>> p = (1000, 25, 25, 5, 1, -0.2, 1, 6000)
+#     >>> Z = PSF.evaluate(X, Y, *p)
+#     >>> Z += 100*np.exp(-((X-10)**2+(Y-10)**2)/4)
+#     >>> Z_err = np.sqrt(1+Z)
+#
+#     Prepare the fit:
+#     >>> guess = (1000, 27, 23, 3.2, 1.2, -0.1, 2,  6000)
+#     >>> bounds = np.array(((0, 6000), (10, 40), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000)))
+#     >>> bounds = bounds.T
+#
+#     Fit without bars:
+#     >>> model = fit_PSF2D_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, sigma=7, niter=5)
+#     >>> res = [getattr(model, p).value for p in model.param_names]
+#     >>> print(res, p)
+#     >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
+#     """
+#     gg_init = PSF2D()
+#     if guess is not None:
+#         for ip, p in enumerate(gg_init.param_names):
+#             getattr(gg_init, p).value = guess[ip]
+#     if bounds is not None:
+#         for ip, p in enumerate(gg_init.param_names):
+#             getattr(gg_init, p).min = bounds[0][ip]
+#             getattr(gg_init, p).max = bounds[1][ip]
+#     gg_init.saturation.fixed = True
+#     with warnings.catch_warnings():
+#         # Ignore model linearity warning from the fitter
+#         warnings.simplefilter('ignore')
+#         fit = LevMarLSQFitterWithNan()
+#         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+#         # get fitted model and filtered data
+#         or_fitted_model, filtered_data = or_fit(gg_init, x, y, data)
+#         if parameters.VERBOSE:
+#             print(or_fitted_model)
+#         if parameters.DEBUG:
+#             print(fit.fit_info)
+#         print(fit.fit_info)
+#         return or_fitted_model
 
 
 def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='minimize'):
@@ -1661,9 +1675,76 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
     return PSF
 
 
-def fit_PSF1D_outlier_removal(x, y, sub_errors=None, sigma=3.0, niter=3, guess=None, bounds=None, method='minimize',
+def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, guess=None, bounds=None, method='minimize',
                               niter_basinhopping=5, T_basinhopping=0.2):
-    """Star2D parameters: amplitude, x_mean,y_mean,stddev,saturation"""
+    """Fit a PSF 1D model with parameters:
+        amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+    using scipy. Find outliers data point above sigma*data_errors from the fit over niter iterations.
+
+    Parameters
+    ----------
+    x: np.array
+        1D array of the x coordinates.
+    data: np.array
+        the 1D array profile.
+    data_errors: np.array
+        the 1D array uncertainties.
+    guess: array_like, optional
+        list containing a first guess for the PSF parameters (default: None).
+    bounds: list, optional
+        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
+    sigma: int
+        the sigma limit to exclude data points (default: 3).
+    niter: int
+        the number of loop iterations to exclude  outliers and refit the model (default: 2).
+    method: str
+        Can be 'minimize' or 'basinhopping' (default: 'minimize').
+    niter_basinhopping: int, optional
+        The number of basin hops (default: 5)
+    T_basinhopping: float, optional
+        The temperature for the basin hops (default: 0.2)
+
+    Returns
+    -------
+    fitted_model: PSF1D
+        the PSF1D fitted model.
+    outliers: list
+        the list of the outlier indices.
+
+    Examples
+    --------
+
+    Create the model:
+    >>> import numpy as np
+    >>> X = np.arange(0, 50)
+    >>> PSF = PSF1D()
+    >>> p = (1000, 25, 5, 1, -0.2, 1, 6000)
+    >>> Y = PSF.evaluate(X, *p)
+    >>> Y += 100*np.exp(-((X-10)/2)**2)
+    >>> Y_err = np.sqrt(1+Y)
+
+    Prepare the fit:
+    >>> guess = (600, 27, 3.2, 1.2, -0.1, 2,  6000)
+    >>> bounds = ((0, 6000), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000))
+
+    Fit without bars:
+    >>> model, outliers = fit_PSF1D_outlier_removal(X, Y, guess=guess, bounds=bounds,
+    ... sigma=3, niter=5, method="minimize")
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
+
+    Fit with error bars:
+    >>> model, outliers = fit_PSF1D_outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err,
+    ... sigma=3, niter=2, method="minimize")
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
+
+    Fit with error bars and basinhopping:
+    >>> model, outliers = fit_PSF1D_outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err,
+    ... sigma=3, niter=5, method="basinhopping", niter_basinhopping=20)
+    >>> res = [getattr(model, p).value for p in model.param_names]
+    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
+    """
 
     my_logger = set_logger(__name__)
     indices = np.mgrid[:x.shape[0]]
@@ -1672,16 +1753,16 @@ def fit_PSF1D_outlier_removal(x, y, sub_errors=None, sigma=3.0, niter=3, guess=N
 
     for step in range(niter):
         # first fit
-        if sub_errors is None:
+        if data_errors is None:
             err = None
         else:
-            err = sub_errors[indices]
+            err = data_errors[indices]
         if method == 'minimize':
             res = minimize(PSF1D_chisq, guess, method="L-BFGS-B", bounds=bounds, jac=PSF1D_chisq_jac,
-                           args=(model, x[indices], y[indices], err))
+                           args=(model, x[indices], data[indices], err))
         elif method == 'basinhopping':
             minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, jac=PSF1D_chisq_jac,
-                                    args=(model, x[indices], y[indices], err))
+                                    args=(model, x[indices], data[indices], err))
             res = basinhopping(PSF1D_chisq, guess, T=T_basinhopping, niter=niter_basinhopping,
                                minimizer_kwargs=minimizer_kwargs)
         else:
@@ -1694,10 +1775,10 @@ def fit_PSF1D_outlier_removal(x, y, sub_errors=None, sigma=3.0, niter=3, guess=N
             setattr(model, p, res.x[ip])
         guess = res.x
         # remove outliers
-        indices_no_nan = ~np.isnan(y)
-        diff = model(x[indices_no_nan]) - y[indices_no_nan]
-        if sub_errors is not None:
-            outliers = np.where(np.abs(diff) / sub_errors[indices_no_nan] > sigma)[0]
+        indices_no_nan = ~np.isnan(data)
+        diff = model(x[indices_no_nan]) - data[indices_no_nan]
+        if data_errors is not None:
+            outliers = np.where(np.abs(diff) / data_errors[indices_no_nan] > sigma)[0]
         else:
             std = np.std(diff)
             outliers = np.where(np.abs(diff) / std > sigma)[0]
