@@ -161,7 +161,6 @@ class Lines:
         if redshift < 0:
             self.my_logger.warning(f'Redshift must be positive or null. Got {redshift}')
             sys.exit()
-
         self.lines = lines
         self.redshift = redshift
         self.atmospheric_lines = atmospheric_lines
@@ -185,6 +184,7 @@ class Lines:
         [382.044, 393.366, 396.847, 410.2, 430.79]
         """
         sorted_lines = []
+        import copy
         for line in self.lines:
             if self.hydrogen_only:
                 if not self.atmospheric_lines:
@@ -198,7 +198,7 @@ class Lines:
             else:
                 if not self.atmospheric_lines and line.atmospheric:
                     continue
-            sorted_lines.append(line)
+            sorted_lines.append(copy.copy(line))
         if self.redshift > 0:
             for line in sorted_lines:
                 if not line.atmospheric:

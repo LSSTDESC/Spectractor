@@ -814,9 +814,9 @@ def calibrate_spectrum_with_lines(spectrum):
 
     Examples
     --------
-    >>> spectrum = Spectrum('outputs/reduc_20170530_134_spectrum.fits')
-    >>> import spectractor.parameters as parameters
-    >>> parameters.DEBUG = True
+    >>> spectrum = Spectrum('tests/data/reduc_20170605_028_spectrum.fits')
+    >>> parameters.LAMBDA_MIN = 550
+    >>> parameters.LAMBDA_MAX = 800
     >>> lambdas = calibrate_spectrum_with_lines(spectrum)
     >>> spectrum.plot_spectrum()
     """
@@ -891,7 +891,7 @@ def calibrate_spectrum_with_lines(spectrum):
     error = [parameters.DISTANCE2CCD_ERR, pixel_shift_step]
     fix = [False, False]
     m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1,
-                               fix=fix, print_level=2,
+                               fix=fix, print_level=0,
                                limit=(
                                (D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
     m.migrad()

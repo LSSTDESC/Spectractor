@@ -342,7 +342,7 @@ class ChromaticPSF1D:
         --------
 
         # Build a mock spectrogram with random Poisson noise:
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4)
+        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
         >>> data = s.evaluate(poly_params_test)
         >>> data = np.random.poisson(data)
@@ -431,7 +431,7 @@ class ChromaticPSF1D:
         --------
 
         # Build a mock spectrogram with random Poisson noise:
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=1)
+        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=1, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
         >>> data = s.evaluate(poly_params_test)
         >>> data = np.random.poisson(data)
@@ -703,7 +703,7 @@ class ChromaticPSF1D:
 
         Examples
         --------
-        >>> s = ChromaticPSF1D(Nx=100, Ny=20, deg=4)
+        >>> s = ChromaticPSF1D(Nx=100, Ny=20, deg=4, saturation=8000)
         >>> poly_params = s.generate_test_poly_params()
         >>> output = s.evaluate(poly_params)
 
@@ -739,7 +739,7 @@ class ChromaticPSF1D:
 
         Examples
         --------
-        >>> s = ChromaticPSF1D(Nx=5, Ny=4, deg=1)
+        >>> s = ChromaticPSF1D(Nx=5, Ny=4, deg=1, saturation=8000)
         >>> params = s.generate_test_poly_params()
         >>> assert(np.all(np.isclose(params, [ 0, 50, 100, 150, 200, 2, 0, 5, 0, 2, 0, -0.4, -0.4, 2, 0, 8000])))
         """
@@ -824,7 +824,7 @@ def extract_background(data, err, deg=1, ws=(20, 30), sigma=5, live_fit=False):
     ws: list
         up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
     live_fit: bool, optional
-        If True, the transverse profile fit is plotted in live accross the loop (default: False).
+        If True, the transverse profile fit is plotted in live across the loop (default: False).
     sigma: int
         Sigma for outlier rejection (default: 5).
 
@@ -864,7 +864,7 @@ def extract_background(data, err, deg=1, ws=(20, 30), sigma=5, live_fit=False):
         bgd_err = err[bgd_index, x]
         bgd_fit, outliers = fit_poly1d_outlier_removal(bgd_index, bgd, order=deg, sigma=sigma, niter=2)
         bgd_model[:, x] = bgd_fit(index)
-        if live_fit:
+        if live_fit and parameters.DISPLAY:
             fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex='all', gridspec_kw={'height_ratios': [5, 1]})
             ax[0].errorbar(np.arange(Ny), y, yerr=err[:, x], fmt='ro',
                            label="original data")
@@ -905,7 +905,7 @@ def extract_background(data, err, deg=1, ws=(20, 30), sigma=5, live_fit=False):
     # interpolate the grid
     bgd_fit = bgd_model[:, pixel_range]
     bgd_model_func = interp2d(pixel_range, index, bgd_fit, kind='linear', bounds_error=False, fill_value=None)
-    if parameters.DEBUG:
+    if parameters.DEBUG and parameters.DISPLAY:
         # fig, ax = plt.subplots(1,3, figsize=(12,4))
         # noinspection PyTypeChecker
         b = bgd_model_func(pixel_range, index)
