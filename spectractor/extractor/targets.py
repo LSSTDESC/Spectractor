@@ -9,6 +9,37 @@ if os.getenv("PYSYN_CDBS"):
 
 
 def load_target(label, verbose=False):
+    """Load the target properties according to the type set by parameters.OBS_OBJECT_TYPE.
+
+    Currently, the type can be either "STAR", "HG-AR" or "MONOCHROMATOR". The label parameter gives the
+    name of the source and allows to load its specific properties.
+
+    Parameters
+    ----------
+    label: str
+        The label of the target.
+    verbose: bool, optional
+        If True, more verbosity (default: False).
+
+    Examples
+    --------
+    >>> parameters.OBS_OBJECT_TYPE = "STAR"
+    >>> t = load_target("HD111980", verbose=False)
+    >>> print(t.label)
+    HD111980
+    >>> print(t.coord.dec)
+    -18d31m20.009s
+    >>> parameters.OBS_OBJECT_TYPE = "MONOCHROMATOR"
+    >>> t = load_target("XX", verbose=False)
+    >>> print(t.label)
+    XX
+    >>> parameters.OBS_OBJECT_TYPE = "HG-AR"
+    >>> t = load_target("XX", verbose=False)
+    >>> print([l.wavelength for l in t.lines.lines][:5])
+    [253.652, 296.728, 302.15, 313.155, 334.148]
+    >>> parameters.OBS_OBJECT_TYPE = "OTHER"
+    >>> t = load_target("XX", verbose=False)
+    """
     if parameters.OBS_OBJECT_TYPE == 'STAR':
         return Star(label, verbose)
     elif parameters.OBS_OBJECT_TYPE == 'HG-AR':
@@ -46,19 +77,16 @@ class Target:
         self.coord = None
         self.redshift = 0
 
-    def load(self):
-        pass
-
 
 class ArcLamp(Target):
 
     def __init__(self, label, verbose=False):
-        """Initialize Star class.
+        """Initialize ArcLamp class.
 
         Parameters
         ----------
         label: str
-            String label to name the target
+            String label to name the lamp.
         verbose: bool, optional
             Set True to increase verbosity (default: False)
 
@@ -66,12 +94,10 @@ class ArcLamp(Target):
         --------
 
         Mercury-Argon lamp:
-        >>> s = Star('3C273')
-        >>> print(s.label)
-        3C273
-        >>> print(s.coord.dec)
-        2d03m08.598s
-        >>> print(s.emission_spectrum)
+        >>> t = ArcLamp("HG-AR", verbose=False)
+        >>> print([l.wavelength for l in t.lines.lines][:5])
+        [253.652, 296.728, 302.15, 313.155, 334.148]
+        >>> print(t.emission_spectrum)
         True
 
         """
@@ -87,25 +113,22 @@ class ArcLamp(Target):
 class Monochromator(Target):
 
     def __init__(self, label, verbose=False):
-        """Initialize Star class.
+        """Initialize Monochromator class.
 
         Parameters
         ----------
         label: str
-            String label to name the target
+            String label to name the monochromator.
         verbose: bool, optional
             Set True to increase verbosity (default: False)
 
         Examples
         --------
 
-        Mercury-Argon lamp:
-        >>> s = Star('3C273')
-        >>> print(s.label)
-        3C273
-        >>> print(s.coord.dec)
-        2d03m08.598s
-        >>> print(s.emission_spectrum)
+        >>> t = Monochromator("XX", verbose=False)
+        >>> print(t.label)
+        XX
+        >>> print(t.emission_spectrum)
         True
 
         """
