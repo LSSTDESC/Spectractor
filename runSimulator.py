@@ -2,6 +2,7 @@ from spectractor import parameters
 from spectractor.simulation.simulator import SpectrumSimulator, Atmosphere, AtmosphereGrid, SpectrumSimulatorSimGrid
 from spectractor.config import load_config
 
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
@@ -32,7 +33,7 @@ if __name__ == "__main__":
 
     for file_name in file_names:
         spectrum_simulation = SpectrumSimulator(file_name, pwv=3.1, ozone=387, aerosols=0.091,
-                                        A1=1.1, A2=0.15, reso=2.5, D=55.26, shift=-0.2)
+                                                A1=1.1, A2=0.15, reso=2.5, D=55.26, shift=-0.2)
         atmgrid = AtmosphereGrid(file_name)
         atm = Atmosphere(atmgrid.airmass, atmgrid.pressure, atmgrid.temperature)
         SpectrumSimulatorSimGrid(file_name, args.output_directory)
