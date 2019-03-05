@@ -1,7 +1,7 @@
 from spectractor.config import *
-import csv
 import matplotlib.pyplot as plt
 import pandas as pd
+
 
 class LogBook:
     """Class to load_image and analyse observation logbook csv files."""
@@ -130,7 +130,7 @@ class LogBook:
         """
         if isinstance(column_names, str):
             column_names = [column_names]
-        self.df.plot(x='date',y=column_names)
+        self.df.plot(x='date', y=column_names)
         if parameters.DISPLAY:
             plt.show()
 
