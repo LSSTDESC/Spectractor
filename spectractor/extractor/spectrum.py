@@ -381,7 +381,7 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum()
-        >>> s.load_spectrum('outputs/reduc_20170530_132_spectrum.fits')
+        >>> s.load_spectrum('outputs/reduc_20170530_134_spectrum.fits')
         """
         if os.path.isfile(input_file_name):
             self.chromatic_psf = ChromaticPSF1D(self.spectrogram_Nx, self.spectrogram_Ny,
@@ -491,7 +491,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     >>> fig = plt.figure()
     >>> plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
     >>> lines.plot_detected_lines(plt.gca())
-    >>> plt.show()
+    >>> if parameters.DISPLAY: plt.show()
     """
 
     # main settings

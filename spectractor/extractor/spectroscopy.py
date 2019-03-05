@@ -141,7 +141,7 @@ class Lines:
         [353.1, 388.8, 410.2, 434.0, 447.1]
 
         The four hydrogen lines only:
-        >>> lines = Lines(ISM_LINES+HYDROGEN_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=True, emission_spectrum=True)
+        >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(4)])
         [410.2, 434.0, 486.3, 656.3]
         >>> print(lines.emission_spectrum)
@@ -156,11 +156,14 @@ class Lines:
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
         [382.044, 393.366, 396.847, 430.79, 438.355]
+
+        Negative redshift:
+        >>> lines = Lines(HYDROGEN_LINES, redshift=-0.5)
+
         """
         self.my_logger = set_logger(self.__class__.__name__)
         if redshift < 0:
-            self.my_logger.warning(f'Redshift must be positive or null. Got {redshift}')
-            sys.exit()
+            self.my_logger.error(f'\n\tRedshift must be positive or null. Got redshift={redshift}.')
         self.lines = lines
         self.redshift = redshift
         self.atmospheric_lines = atmospheric_lines
@@ -226,9 +229,14 @@ class Lines:
         >>> f, ax = plt.subplots(1,1)
         >>> ax.set_xlim(300,1000)
         (300, 1000)
-        >>> lines = Lines(HYDROGEN_LINES)
+        >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
+        >>> lines.lines[5].fitted = True
+        >>> lines.lines[5].high_snr = True
+        >>> lines.lines[-1].fitted = True
+        >>> lines.lines[-1].high_snr = True
         >>> ax = lines.plot_atomic_lines(ax)
         >>> assert ax is not None
+        >>> if parameters.DISPLAY: plt.show()
         """
         xlim = ax.get_xlim()
         for l in self.lines:
@@ -245,6 +253,70 @@ class Lines:
         return ax
 
     def plot_detected_lines(self, ax=None, print_table=False):
+        """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
+        around emission or absorption tabulated lines, and to select surrounding pixels
+        to fit a (positive or negative) gaussian and a polynomial background. If several regions
+        overlap, a multi-gaussian fit is performed above a common polynomial background.
+        The mean global shift (in nm) between the detected and tabulated lines is returned, considering
+        only the lines with a signal-to-noise ratio above a threshold.
+        The order of the polynomial background is set in parameters.py with CALIB_BGD_ORDER.
+
+        Parameters
+        ----------
+        lines: Lines
+            The Lines object containing the line characteristics
+        lambdas: float array
+            The wavelength array (in nm)
+        spec: float array
+            The spectrum amplitude array
+        spec_err: float array, optional
+            The spectrum amplitude uncertainty array (default: None)
+        fwhm_func: callable, optional
+            The fwhm of the cross spectrum to reset CALIB_PEAK_WIDTH parameter as a function of lambda (default: None)
+        snr_minlevel: float
+            The minimum signal over noise ratio to consider using a fitted line in the computation of the mean
+            shift output and to print it in the outpur table (default: 3)
+        ax: Axes, optional
+            An Axes instance to over plot the result of the fit (default: None).
+        xlim: array, optional
+            (min, max) list limiting the wavelength interval where to detect spectral lines (default:
+            (parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
+
+        Returns
+        -------
+        shift: float
+            The mean shift (in nm) between the detected and tabulated lines
+
+        Examples
+        --------
+
+        Creation of a mock spectrum with emission and absorption lines
+        >>> from spectractor.extractor.spectrum import Spectrum, detect_lines
+        >>> lambdas = np.arange(300,1000,1)
+        >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
+        >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
+        >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
+        >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
+        >>> spectrum_err = np.sqrt(spectrum)
+        >>> spec = Spectrum()
+        >>> spec.lambdas = lambdas
+        >>> spec.data = spectrum
+        >>> spec.err = spectrum_err
+        >>> fwhm_func = interp1d(lambdas, 0.01 * lambdas)
+
+        Detect the lines
+        >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
+        ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
+        >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
+        >>> assert(global_chisq < 1)
+
+        Plot the result
+        >>> spec.lines = lines
+        >>> fig = plt.figure()
+        >>> plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
+        >>> lines.plot_detected_lines(plt.gca())
+        >>> if parameters.DISPLAY: plt.show()
+        """
         lambdas = np.zeros(1)
         rows = []
         j = 0
