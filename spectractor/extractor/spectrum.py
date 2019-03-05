@@ -324,8 +324,8 @@ class Spectrum:
                 self.lines = self.target.lines
             if self.header['UNIT2'] != "":
                 self.units = self.header['UNIT2']
-            # if self.header['ROTANGLE'] != "":
-            #    self.rotation_angle = self.header['ROTANGLE']
+            if self.header['ROTANGLE'] != "":
+                self.rotation_angle = self.header['ROTANGLE']
             if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
@@ -890,10 +890,9 @@ def calibrate_spectrum_with_lines(spectrum):
     #                    bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
     error = [parameters.DISTANCE2CCD_ERR, pixel_shift_step]
     fix = [False, False]
-    m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1,
-                               fix=fix, print_level=0,
-                               limit=(
-                               (D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
+    m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1, fix=fix, print_level=0,
+                               limit=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR),
+                                      (-2, 2)))
     m.migrad()
     # if parameters.DEBUG:
     #     print(m.prin)
