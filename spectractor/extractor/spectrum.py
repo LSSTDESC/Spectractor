@@ -720,6 +720,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             # guess[n] = getattr(bgd, bgd.param_names[parameters.CALIB_BGD_ORDER - n]).value
             guess[n] = fit[n]
             b = abs(baseline_prior * guess[n])
+            if b == 0.:
+                b = baseline_prior * np.std(spec[bgd_index])
             bounds[0][n] = guess[n] - b
             bounds[1][n] = guess[n] + b
         for j in range(len(new_lines_list[k])):
@@ -736,7 +738,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         sigma = None
         if spec_err is not None:
             sigma = spec_err[index]
-        my_logger.warning(f'\n{guess} {bounds}')
         popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma,
                                             fix_centroids=True)
         # noise level defined as the std of the residuals if no error
