@@ -370,7 +370,7 @@ class ChromaticPSF1D:
 
     def from_table_to_profile_params(self):
         """
-        Extract the profile parameters from self.table.
+        Extract the profile parameters from self.table and fill an array of profile parameters.
 
         Parameters
         ----------
@@ -382,6 +382,11 @@ class ChromaticPSF1D:
 
         Examples
         --------
+        >>> from spectractor.extractor.spectrum import Spectrum
+        >>> s = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
+        >>> profile_params = s.chromatic_psf.from_table_to_profile_params()
+        >>> assert(profile_params.shape == (s.chromatic_psf.Nx, len(s.chromatic_psf.PSF1D.param_names)))
+        >>> assert not np.all(np.isclose(profile_params, np.zeros_like(profile_params)))
         """
         profile_params = np.zeros((self.Nx, len(self.PSF1D.param_names)))
         for k, name in enumerate(self.PSF1D.param_names):
@@ -390,24 +395,30 @@ class ChromaticPSF1D:
 
     def from_table_to_poly_params(self):
         """
-        Extract the polynomial parameters from self.table.
+        Extract the polynomial parameters from self.table and fill an array with polynomial parameters.
 
         Parameters
         ----------
 
         Returns
         -------
-        profile_params: array_like
-            A set of parameters that can be evaluated by the chromatic PSF class evaluate function.
+        poly_params: array_like
+            A set of polynomial parameters that can be evaluated by the chromatic PSF class evaluate function.
 
         Examples
         --------
+        >>> from spectractor.extractor.spectrum import Spectrum
+        >>> s = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
+        >>> poly_params = s.chromatic_psf.from_table_to_poly_params()
+        >>> assert(poly_params.size > s.chromatic_psf.Nx)
+        >>> assert(len(poly_params.shape)==1)
+        >>> assert not np.all(np.isclose(poly_params, np.zeros_like(poly_params)))
         """
         profile_params = self.from_table_to_profile_params()
         poly_params = self.from_profile_params_to_poly_params(profile_params)
         return poly_params
 
-    def from_poly_params_to_profile_params(self, poly_params, force_positive=False, verbose=False):
+    def from_poly_params_to_profile_params(self, poly_params, force_positive=False):
         """
         Evaluate the PSF1D profile parameters from the polynomial coefficients. If poly_params length is smaller
         than self.Nx, it is assumed that the amplitude_moffat parameters are not included and set to arbitrarily to 1.
@@ -444,6 +455,11 @@ class ChromaticPSF1D:
         # From the profile parameters to the polynomial parameters:
         >>> profile_params = s.from_profile_params_to_poly_params(profile_params)
         >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
+
+        # From the polynomial parameters to the profile parameters without Moffat amplitudes:
+        >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test[100:])
+        >>> assert(np.all(np.isclose(profile_params[0], [1, 50, 5, 2, 0, 2, 8e3])))
+
         """
         pixels = np.linspace(-1, 1, self.Nx)
         profile_params = np.zeros((self.Nx, len(self.PSF1D.param_names)))
@@ -466,8 +482,6 @@ class ChromaticPSF1D:
                     profile_params[:, k] = \
                         np.polynomial.legendre.legval(pixels, poly_params[shift:shift + self.degrees[name] + 1])
                 shift = shift + self.degrees[name] + 1
-            if verbose:
-                self.my_logger.warning(f"\n{k} {name} {profile_params[:, k]}")
         if force_positive:
             for k, name in enumerate(self.PSF1D.param_names):
                 if name == "x_mean":
@@ -480,10 +494,6 @@ class ChromaticPSF1D:
                     profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
                 if name == "stddev":
                     profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
-        if verbose:
-            for k, name in enumerate(self.PSF1D.param_names):
-                self.my_logger.warning(f"\nafter {k} {name} {profile_params[:, k]}")
-
         return profile_params
 
     def from_profile_params_to_shape_params(self, profile_params):
