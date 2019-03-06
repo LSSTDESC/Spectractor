@@ -1239,9 +1239,32 @@ def pixel_rotation(x, y, theta, x0=0, y0=0):
 
 def detect_peaks(image):
     """
-    Takes an image and detect the peaks usingthe local maximum filter.
+    Takes an image and detect the peaks using the local maximum filter.
     Returns a boolean mask of the peaks (i.e. 1 when
-    the pixel's value is the neighborhood maximum, 0 otherwise)
+    the pixel's value is the neighborhood maximum, 0 otherwise).
+    Only positive peaks are detected (take absolute value or negative value of the
+    image to detect the negative ones).
+
+    Parameters
+    ----------
+    image: array_like
+        The image 2D array.
+
+    Returns
+    -------
+    detected_peaks: array_like
+        Boolean maskof the peaks.
+
+    Examples
+    --------
+    >>> im = np.zeros((50,50))
+    >>> im[4,6] = 2
+    >>> im[10,20] = -3
+    >>> im[49,49] = 1
+    >>> detected_peaks = detect_peaks(im)
+    >>> assert detected_peaks[4,6]
+    >>> assert not detected_peaks[10,20]
+    >>> assert detected_peaks[49,49]
     """
 
     # define an 8-connected neighborhood
