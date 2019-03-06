@@ -171,15 +171,52 @@ class Image(object):
         self.header.comments['PARANGLE'] = 'parallactic angle in degree'
         return self.parallactic_angle
 
-    def plot_image(self, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                   target_pixcoords=None, figsize=[9.3, 8], aspect=None):
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
-        if data is None:
-            data = np.copy(self.data)
+    def plot_image(self, ax=None, scale="lin", title="", units="Image units", plot_stats=False,
+                   target_pixcoords=None, figsize=[9.3, 8], aspect=None, vmin=None, vmax=None,
+                   cmap=None, cax=None):
+        """Plot image.
+
+        Parameters
+        ----------
+        ax: Axes, optional
+            Axes instance (default: None).
+        scale: str
+            Scaling of the image (choose between: lin, log or log10) (default: lin)
+        title: str
+            Title of the image (default: "")
+        units: str
+            Units of the image to be written in the color bar label (default: "Image units")
+        cmap: colormap
+            Color map label (default: None)
+        target_pixcoords: array_like, optional
+            2D array  giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
+        vmin: float
+            Minimum value of the image (default: None)
+        vmax: float
+            Maximum value of the image (default: None)
+        aspect: str
+            Aspect keyword to be passed to imshow (default: None)
+        cax: Axes, optional
+            Color bar axes if necessary (default: None).
+        figsize: tuple
+            Figure size (default: [9.3, 8]).
+        plot_stats: bool
+            If True, plot the uncertainty map instead of the image (default: False).
+
+        Examples
+        --------
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im.plot_image()
+        >>> if parameters.DISPLAY: plt.show()
+        """
+        if ax is None:
+            plt.figure(figsize=figsize)
+            ax = plt.gca()
+        data = np.copy(self.data)
         if plot_stats:
             data = np.copy(self.stat_errors)
-        plot_image_simple(ax, data=data, scale=scale, title=title, units=units,
-                               target_pixcoords=target_pixcoords, aspect=aspect)
+        plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
+                          target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         plt.legend()
         if parameters.DISPLAY:
             plt.show()
@@ -343,7 +380,7 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         sub_image[sub_image >= 0.9 * image.saturation] = np.nan
     # fit
     bounds = list(np.array(bounds).T)
-    #star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
+    # star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     star2D = fit_PSF2D_minuit(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     new_avX = star2D.x_mean.value
     new_avY = star2D.y_mean.value
@@ -360,14 +397,14 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
         vmin = 0
         vmax = np.nanmax(sub_image)
         plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
-                                target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
+                          target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax1.legend(loc=1)
 
         plot_image_simple(ax2, data=star2D(X, Y) + bkgd_2D(X, Y), scale="lin", title="",
-                                units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
+                          units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
         plot_image_simple(ax3, data=sub_image - star2D(X, Y) - bkgd_2D(X, Y), scale="lin", title="",
-                                units=f'Background+Star2D subtracted image\n({image.units})',
-                                target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
+                          units=f'Background+Star2D subtracted image\n({image.units})',
+                          target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax3.legend(loc=1)
 
         f.tight_layout()
@@ -398,12 +435,12 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     theta_guess = image.disperser.theta(image.target_pixcoords)
     mask2 = np.where(np.abs(theta - theta_guess) > deg_threshold)
     theta_mask[mask2] = np.nan
-    theta_mask = theta_mask[2:-2,2:-2]
+    theta_mask = theta_mask[2:-2, 2:-2]
     theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
     if parameters.OBS_OBJECT_TYPE != 'STAR':
         pixels = np.where(~np.isnan(theta_mask))
         p = np.polyfit(pixels[1], pixels[0], deg=1)
-        theta_median = np.arctan(p[0]) * 180/np.pi
+        theta_median = np.arctan(p[0]) * 180 / np.pi
     else:
         theta_median = float(np.median(theta_hist))
     theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
@@ -445,21 +482,25 @@ def turn_image(image):
         image.data_rotated = ndimage.interpolation.rotate(image.data, image.rotation_angle,
                                                           prefilter=parameters.ROT_PREFILTER,
                                                           order=parameters.ROT_ORDER)
-        image.stat_errors_rotated = np.sqrt(np.abs(ndimage.interpolation.rotate(image.stat_errors**2, image.rotation_angle,
-                                                                 prefilter=parameters.ROT_PREFILTER,
-                                                                 order=parameters.ROT_ORDER)))
+        image.stat_errors_rotated = np.sqrt(
+            np.abs(ndimage.interpolation.rotate(image.stat_errors ** 2, image.rotation_angle,
+                                                prefilter=parameters.ROT_PREFILTER,
+                                                order=parameters.ROT_ORDER)))
     if parameters.DEBUG:
         margin = 100
         y0 = int(image.target_pixcoords[1])
         f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
-        plot_image_simple(ax1, data=image.data[max(0,y0 - 2*parameters.YWINDOW):min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin],
-                                scale="log", title='Raw image (log10 scale)', units=image.units,
-                                target_pixcoords=(image.target_pixcoords[0] - margin, 2*parameters.YWINDOW), aspect='auto')
+        plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):min(y0 + 2 * parameters.YWINDOW,
+                                                                                       image.data.shape[0]),
+                                    margin:-margin],
+                          scale="log", title='Raw image (log10 scale)', units=image.units,
+                          target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
-        plot_image_simple(ax2, data=image.data_rotated[max(0,y0 - 2*parameters.YWINDOW):
-                                                             min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin], scale="log", title='Turned image (log10 scale)',
-                                units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
-        ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2*parameters.YWINDOW, 2*parameters.YWINDOW], 'k-')
+        plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
+                                                       min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
+                                    margin:-margin], scale="log", title='Turned image (log10 scale)',
+                          units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
+        ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
         f.tight_layout()
         if parameters.DISPLAY:
             plt.show()
@@ -467,6 +508,7 @@ def turn_image(image):
 
 if __name__ == "__main__":
     import doctest
+
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
 
