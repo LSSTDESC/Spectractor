@@ -136,7 +136,7 @@ class Spectrum:
                     f['label'], parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
                 break
 
-    def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label=''):
+    def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False):
         """Plot spectrum with emission and absorption lines.
 
         Parameters
@@ -150,12 +150,13 @@ class Spectrum:
         live_fit: bool, optional
             If True the spectrum is plotted in live during the fitting procedures
             (default: False).
+        force_lines: bool
+            Force the over plot of vertical lines for atomic lines if set to True (default: False).
 
         Examples
         --------
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
-        >>> s.plot_spectrum(xlim=[500,700], live_fit=False)
-        >>> if parameters.DISPLAY: plt.show()
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s.plot_spectrum(xlim=[500,900], live_fit=False, force_lines=True)
         """
         if ax is None:
             plt.figure(figsize=[12, 6])
@@ -174,7 +175,7 @@ class Spectrum:
         if self.lambdas is not None:
             self.lines.plot_detected_lines(ax, print_table=parameters.VERBOSE)
         if self.lambdas is not None and self.lines is not None:
-            self.lines.plot_atomic_lines(ax, fontsize=12)
+            self.lines.plot_atomic_lines(ax, fontsize=12, force=force_lines)
         ax.legend(loc='best')
         if self.filters is not None:
             ax.get_legend().set_title(self.filters)
@@ -186,45 +187,52 @@ class Spectrum:
             else:
                 plt.show()
 
-    def plot_spectrogram_simple(self, ax, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                                target_pixcoords=None, vmin=None, vmax=None, aspect=None):
-        if data is None:
-            data = np.copy(self.spectrogram)
-        if plot_stats:
-            data = np.copy(self.spectrogram_err)
-        if scale == "log" or scale == "log10":
-            # removes the zeros and negative pixels first
-            zeros = np.where(data <= 0)
-            min_noz = np.min(data[np.where(data > 0)])
-            data[zeros] = min_noz
-            # apply log
-            data = np.log10(data)
-        im = ax.imshow(data, origin='lower', cmap='jet', vmin=vmin, vmax=vmax, aspect=aspect)
-        ax.grid(color='white', ls='solid')
-        ax.grid(True)
-        ax.set_xlabel('X [pixels]')
-        ax.set_ylabel('Y [pixels]')
-        cb = plt.colorbar(im, ax=ax)
-        cb.formatter.set_powerlimits((0, 0))
-        cb.locator = MaxNLocator(7, prune=None)
-        cb.update_ticks()
-        cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
-        if title != "":
-            ax.set_title(title)
-        if target_pixcoords is not None:
-            ax.scatter(target_pixcoords[0], target_pixcoords[1], marker='o', s=100, edgecolors='k', facecolors='none',
-                       label='Target', linewidth=2)
+    def plot_spectrogram(self, ax=None, scale="lin", title="", units="Image units", plot_stats=False,
+                         target_pixcoords=None, vmin=None, vmax=None, figsize=[9.3, 8], aspect=None,
+                         cmap=None, cax=None):
+        """Plot spectrogram.
 
-    def plot_spectrogram(self, data=None, scale="lin", title="", units="Image units", plot_stats=False,
-                         target_pixcoords=None, figsize=[9.3, 8], aspect=None):
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
-        if data is None:
-            data = np.copy(self.spectrogram)
+        Parameters
+        ----------
+        ax: Axes, optional
+            Axes instance (default: None).
+        scale: str
+            Scaling of the image (choose between: lin, log or log10) (default: lin)
+        title: str
+            Title of the image (default: "")
+        units: str
+            Units of the image to be written in the color bar label (default: "Image units")
+        cmap: colormap
+            Color map label (default: None)
+        target_pixcoords: array_like, optional
+            2D array  giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
+        vmin: float
+            Minimum value of the image (default: None)
+        vmax: float
+            Maximum value of the image (default: None)
+        aspect: str
+            Aspect keyword to be passed to imshow (default: None)
+        cax: Axes, optional
+            Color bar axes if necessary (default: None).
+        figsize: tuple
+            Figure size (default: [9.3, 8]).
+        plot_stats: bool
+            If True, plot the uncertainty map instead of the spectrogram (default: False).
+
+        Examples
+        --------
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s.plot_spectrogram()
+        >>> if parameters.DISPLAY: plt.show()
+        """
+        if ax is None:
+            plt.figure(figsize=figsize)
+            ax = plt.gca()
+        data = np.copy(self.spectrogram)
         if plot_stats:
             data = np.copy(self.spectrogram_err)
-        plot_image_simple(ax, data=data, scale=scale, title=title, units=units,
-                          target_pixcoords=target_pixcoords, aspect=aspect)
-        plt.legend()
+        plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
+                          target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         if parameters.DISPLAY:
             plt.show()
 
@@ -720,7 +728,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             # guess[n] = getattr(bgd, bgd.param_names[parameters.CALIB_BGD_ORDER - n]).value
             guess[n] = fit[n]
             b = abs(baseline_prior * guess[n])
-            if b == 0.:
+            if np.isclose(b, 0, rtol=1e-6*float(np.mean(spec[bgd_index]))):
                 b = baseline_prior * np.std(spec[bgd_index])
             bounds[0][n] = guess[n] - b
             bounds[1][n] = guess[n] + b

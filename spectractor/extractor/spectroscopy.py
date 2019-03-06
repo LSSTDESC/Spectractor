@@ -209,19 +209,22 @@ class Lines:
         sorted_lines = sorted(sorted_lines, key=lambda x: x.wavelength)
         return sorted_lines
 
-    def plot_atomic_lines(self, ax, color_atomic='g', color_atmospheric='b', fontsize=12):
-        """Over plot the atomic lines as vertical lines.
+    def plot_atomic_lines(self, ax, color_atomic='g', color_atmospheric='b', fontsize=12, force=False):
+        """Over plot the atomic lines as vertical lines, only if they are fitted or with high
+        signal to  noise ratio, unless force keyword is set to True.
 
         Parameters
         ----------
         ax: Axes
-            An Axes instance on which plot the spectral lines
+            An Axes instance on which plot the spectral lines.
         color_atomic: str
-            Color of the atomic lines (default: 'g')
+            Color of the atomic lines (default: 'g').
         color_atmospheric: str
-            Color of the atmospheric lines (default: 'b')
+            Color of the atmospheric lines (default: 'b').
         fontsize: int
-            Font size of the spectral line labels (default: 12)
+            Font size of the spectral line labels (default: 12).
+        force: bool
+            Force the plot of vertical lines if set to True (default: False).
 
         Examples
         --------
@@ -240,7 +243,7 @@ class Lines:
         """
         xlim = ax.get_xlim()
         for l in self.lines:
-            if not l.fitted or not l.high_snr:
+            if (not l.fitted or not l.high_snr) and not force:
                 continue
             color = color_atomic
             if l.atmospheric:
