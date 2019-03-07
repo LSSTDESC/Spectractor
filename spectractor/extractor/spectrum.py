@@ -746,7 +746,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         sigma = None
         if spec_err is not None:
             sigma = spec_err[index]
-        #my_logger.warning(f'\n{guess}\n{np.mean(spec[bgd_index])}')
+        my_logger.warning(f'\n{guess}\n{np.mean(spec[bgd_index])}')
         popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma,
                                             fix_centroids=True)
         # noise level defined as the std of the residuals if no error
