@@ -202,6 +202,9 @@ class Star(Target):
     def load_spectra(self):
         """Load reference spectra from Pysynphot database or NED database.
 
+        If the object redshift is >0.2, the LAMBDA_MIN and LAMBDA_MAX parameters
+        are redshifted accordingly.
+
         Examples
         --------
         >>> s = Star('3C273')
