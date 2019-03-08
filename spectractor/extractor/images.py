@@ -335,7 +335,7 @@ def find_target(image, guess, rotated=False):
         sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
                                                                  widths=[Dx, Dy])
         # find the target
-        avX, avY = find_target_2Dprofile(image, sub_image, guess, rotated, sub_errors=sub_errors)
+        avX, avY = find_target_2Dprofile(image, sub_image, guess, sub_errors=sub_errors)
         # compute target position
         theX = x0 - Dx + avX
         theY = y0 - Dy + avY
