@@ -784,7 +784,7 @@ class ChromaticPSF1D:
             plt.show()
 
 
-def extract_background(data, err, deg=1, ws=(20, 30), sigma=5, live_fit=False):
+def extract_background(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5, live_fit=False):
     """
     Fit a polynomial background slice per slice along the x axis,
     with outlier removal, on lateral bands defined by the ws parameter.
@@ -799,6 +799,9 @@ def extract_background(data, err, deg=1, ws=(20, 30), sigma=5, live_fit=False):
         Degree of the polynomial model for the background (default: 1).
     ws: list
         up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
+    pixel_step: int, optional
+        The step in pixels between the slices to be fitted (default: 1).
+        The values for the skipped pixels are interpolated with splines from the fitted parameters.
     live_fit: bool, optional
         If True, the transverse profile fit is plotted in live across the loop (default: False).
     sigma: int
@@ -823,7 +826,7 @@ def extract_background(data, err, deg=1, ws=(20, 30), sigma=5, live_fit=False):
     >>> data_errors = np.sqrt(data+1)
 
     # Fit the transverse profile:
-    >>> bgd_model = extract_background(data, data_errors, deg=1, ws=[30,50], live_fit=True, sigma=5)
+    >>> bgd_model = extract_background(data, data_errors, deg=1, ws=[30,50], live_fit=True, sigma=5, pixel_step=50)
     """
     my_logger = set_logger(__name__)
     Ny, Nx = data.shape
@@ -831,52 +834,16 @@ def extract_background(data, err, deg=1, ws=(20, 30), sigma=5, live_fit=False):
     index = np.arange(Ny)
     # Prepare the fit
     bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
-    pixel_range = np.arange(Nx)
+    pixel_range = np.arange(0, Nx, pixel_step)
     bgd_model = np.zeros_like(data).astype(float)
     for x in pixel_range:
         # fit the background with a polynomial function
-        y = data[:, x]
         bgd = data[bgd_index, x]
-        bgd_err = err[bgd_index, x]
         bgd_fit, outliers = fit_poly1d_outlier_removal(bgd_index, bgd, order=deg, sigma=sigma, niter=2)
         bgd_model[:, x] = bgd_fit(index)
-        if live_fit and parameters.DISPLAY:
-            fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex='all', gridspec_kw={'height_ratios': [5, 1]})
-            ax[0].errorbar(np.arange(Ny), y, yerr=err[:, x], fmt='ro',
-                           label="original data")
-            ax[0].errorbar(bgd_index, bgd, yerr=bgd_err, fmt='bo', label="bgd data")
-            ax[0].errorbar(outliers, data[outliers, x], yerr=err[outliers, x],
-                           fmt='go', label=f"outliers ({sigma}$\sigma$)")
-            ax[0].plot(bgd_index, bgd_fit(bgd_index), 'b--',
-                       label="fitted bgd")
-            ylim = ax[0].get_ylim()
-            ax[0].set_ylim(ylim)
-            ax[0].set_ylabel('Transverse profile')
-            ax[0].legend(loc=2, numpoints=1)
-            ax[0].set_title(f'x={x}')
-            residuals = y - bgd_fit(index)
-            model_outliers = bgd_fit(outliers)
-            residuals_err = err[:, x] / err[:, x]  # / model
-            residuals_outliers = (data[outliers, x] - model_outliers) / err[outliers, x]  # / model_outliers
-            residuals_outliers_err = err[outliers, x] / err[outliers, x]  # / model_outliers
-            ax[1].errorbar(index, residuals, yerr=residuals_err, fmt='ro')
-            ax[1].errorbar(outliers, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
-            ax[1].axhline(0, color='b')
-            ax[0].grid(True)
-            ax[1].grid(True)
-            std = np.std(residuals)
-            ax[1].set_ylim([-3. * std, 3. * std])
-            ax[1].set_xlabel(ax[0].get_xlabel())
-            ax[1].set_ylabel('(data-fit)/err')
-            ax[0].set_xticks(ax[1].get_xticks()[1:-1])
-            ax[0].get_yaxis().set_label_coords(-0.1, 0.5)
-            ax[1].get_yaxis().set_label_coords(-0.1, 0.5)
-            fig.tight_layout()
-            fig.subplots_adjust(wspace=0, hspace=0)
-            if parameters.DISPLAY:
-                plt.draw()
-                plt.pause(1e-8)
-                plt.close()
+        if live_fit:
+            plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, bgd_fit=bgd_fit,
+                                          sigma=sigma, live_fit=live_fit)
     # prepare the background model
     # interpolate the grid
     bgd_fit = bgd_model[:, pixel_range]
@@ -1114,7 +1081,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
         The 2D spectrogram data array.
     err: array_like
         The 2D spectrogram uncertainty data array.
-    fit: callable, optional
+    fit: Fittable1DModel, optional
         Best fitting model function for the profile (default: None).
     bgd_fit: callable, optional
         Best fitting model function for the background of the profile (default: None).
@@ -1170,15 +1137,22 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     ax[0].set_ylim(ylim)
     ax[0].set_ylabel('Transverse profile')
     ax[0].legend(loc=2, numpoints=1)
-    txt = ""
-    for ip, p in enumerate(fit.param_names):
-        txt += f'{p}: {getattr(fit, p).value:.4g}\n'
-    ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
-    ax[0].set_title(f'x={x}')
     ax[0].grid(True)
-    if fit is not None and bgd_fit is not None:
-        model = fit(indices) + bgd_fit(indices)
-        model_outliers = fit(outliers) + bgd_fit(outliers)
+    if fit is not None:
+        txt = ""
+        for ip, p in enumerate(fit.param_names):
+            txt += f'{p}: {getattr(fit, p).value:.4g}\n'
+        ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
+        ax[0].set_title(f'x={x}')
+    model = np.zeros_like(indices).astype(float)
+    model_outliers = np.zeros_like(outliers).astype(float)
+    if fit is not None:
+        model += fit(indices)
+        model_outliers += fit(outliers)
+    if bgd_fit is not None:
+        model += bgd_fit(indices)
+        model_outliers += bgd_fit(outliers)
+    if fit is not None or bgd_fit is not None:
         residuals = (y - model) / err[:, x]  # / model
         residuals_err = err[:, x] / err[:, x]  # / model
         residuals_outliers = (data[outliers, x] - model_outliers) / err[outliers, x]  # / model_outliers
