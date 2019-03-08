@@ -210,6 +210,13 @@ class Star(Target):
         >>> s = Star('HD111980')
         >>> print(s.spectra[0][:4])
         [  2.16890002e-13   2.66480010e-13   2.03540011e-13   2.38780004e-13]
+        >>> s = Star('PKS1510-089')
+        >>> print(s.redshift)
+        0.36
+        >>> print(f'{parameters.LAMBDA_MIN:.1f}, {parameters.LAMBDA_MAX:.1f}')
+        408.0, 1496.0
+        >>> print(s.spectra[0][:4])
+        [ 117.34012  139.27621   87.38032  143.0816 ]
         """
         self.wavelengths = []  # in nm
         self.spectra = []
