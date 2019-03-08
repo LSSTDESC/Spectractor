@@ -8,21 +8,30 @@ from spectractor.extractor.dispersers import *
 
 class Image(object):
 
-    def __init__(self, filename, target="", disperser_label=""):
+    def __init__(self, file_name, target="", disperser_label=""):
         """
         The image class contains all the features necessary to load an image and extract a spectrum.
 
         Parameters
         ----------
-        filename: str
+        file_name: str
             The file name where the image is.
         target: str, optional
             The target name, to be found in data bases.
         disperser_label: str, optional
             The disperser label to load its properties
+
+        Examples
+        --------
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
+        >>> assert im.data is not None and np.mean(im.data) > 0
+        >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
+        >>> assert im.header is not None
+        >>> assert im.gain is not None and np.mean(im.gain) > 0
         """
         self.my_logger = set_logger(self.__class__.__name__)
-        self.filename = filename
+        self.file_name = file_name
         self.units = 'ADU'
         self.expo = -1
         self.airmass = None
@@ -40,7 +49,7 @@ class Image(object):
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
-        self.load_image(filename)
+        self.load_image(file_name)
         # Load the target if given
         self.target = None
         self.target_pixcoords = None
@@ -57,97 +66,82 @@ class Image(object):
 
     def load_image(self, file_name):
         """
-        Load the image and store some information from header in class attributes. Load the target and disperser properties.
+        Load the image and store some information from header in class attributes.
+        Then load the target and disperser properties. Called when an Image instance is created.
 
         Parameters
         ----------
         file_name: str
-            The file name.
+            The fits file name.
 
         """
         if parameters.OBS_NAME == 'CTIO':
-            self.load_CTIO_image(file_name)
+            load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
-            self.load_LPNHE_image(file_name)
+            load_LPNHE_image(self)
         # Load the disperser
-        self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
+        self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
         self.convert_to_ADU_rate_units()
         self.compute_statistical_error()
 
-    def load_CTIO_image(self, file_name):
-        """
-        Args:
-            file_name (:obj:`str`): path to the image
-        """
-        self.my_logger.info('\n\tLoading CTIO image %s...' % file_name)
-        self.header, self.data = load_fits(file_name)
-        extract_info_from_CTIO_header(self, self.header)
-        self.header['LSHIFT'] = 0.
-        self.header['D2CCD'] = parameters.DISTANCE2CCD
-        parameters.CCD_IMSIZE = int(self.header['XLENGTH'])
-        parameters.CCD_PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
-        if self.header['YLENGTH'] != parameters.CCD_IMSIZE:
-            self.my_logger.warning(
-                f'\n\tImage rectangular: X={parameters.CCD_IMSIZE:d} pix, Y={self.header["YLENGTH"]:d} pix')
-        if self.header['YPIXSIZE'] != parameters.CCD_PIXEL2ARCSEC:
-            self.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
-                parameters.CCD_PIXEL2ARCSEC, self.header['YPIXSIZE']))
-        self.coord = SkyCoord(self.header['RA'] + ' ' + self.header['DEC'], unit=(units.hourangle, units.deg),
-                              obstime=self.header['DATE-OBS'])
-        self.my_logger.info('\n\tImage loaded')
-        # compute CCD gain map
-        self.build_CTIO_gain_map()
-        self.compute_parallactic_angle()
-
-    def load_LPNHE_image(self, file_name):
-        """
-        Args:
-            file_name (:obj:`str`): path to the image
-        """
-        self.my_logger.info('\n\tLoading LPNHE image %s...' % file_name)
-        self.header, data1 = load_fits(file_name, 15)
-        self.header, data2 = load_fits(file_name, 7)
-        data1 = data1.astype(np.float64)
-        data2 = data2.astype(np.float64)
-        self.data = np.concatenate((data1[10:-10, 10:-10], data2[10:-10, 10:-10]))
-        self.date_obs = self.header['DATE-OBS']
-        self.expo = float(self.header['EXPTIME'])
-        self.header['ROTANGLE'] = self.rotation_angle
-        self.header['LSHIFT'] = 0.
-        self.header['D2CCD'] = parameters.DISTANCE2CCD
-        self.data = self.data.T
-        self.my_logger.info('\n\tImage loaded')
-        # compute CCD gain map
-        self.gain = float(self.header['CCDGAIN']) * np.ones_like(self.data)
-        parameters.CCD_IMSIZE = self.data.shape[1]
-
     def save_image(self, output_file_name, overwrite=False):
-        save_fits(output_file_name, self.header, self.data, overwrite=overwrite)
-        self.my_logger.info('\n\tImage saved in %s' % output_file_name)
+        """Save the image in a fits file.
 
-    def build_CTIO_gain_map(self):
-        size = parameters.CCD_IMSIZE
-        self.gain = np.zeros_like(self.data)
-        # ampli 11
-        self.gain[0:size // 2, 0:size // 2] = self.header['GTGAIN11']
-        # ampli 12
-        self.gain[0:size // 2, size // 2:size] = self.header['GTGAIN12']
-        # ampli 21
-        self.gain[size // 2:size, 0:size] = self.header['GTGAIN21']
-        # ampli 22
-        self.gain[size // 2:size, size // 2:size] = self.header['GTGAIN22']
+        Parameters
+        ----------
+        output_file_name: str
+            The output file name.
+        overwrite: bool
+            If True, overwrite the file if it exists previously (default: False).
+
+        Examples
+        --------
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im.save_image('tests/data/reduc_20170605_028_copy.fits', overwrite=True)
+        """
+        save_fits(output_file_name, self.header, self.data, overwrite=overwrite)
+        self.my_logger.info(f'\n\tImage saved in {output_file_name}')
 
     def convert_to_ADU_rate_units(self):
+        """Convert Image data from ADU to ADU/s units.
+
+        Examples
+        --------
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> print(im.expo)
+        600.0
+        >>> data_before = np.copy(im.data)
+        >>> im.convert_to_ADU_rate_units()
+        >>> assert np.all(np.isclose(data_before, im.data * im.expo))
+        """
         self.data = self.data.astype(np.float64) / self.expo
         self.units = 'ADU/s'
 
     def convert_to_ADU_units(self):
+        """Convert Image data from ADU/s to ADU units.
+
+        Examples
+        --------
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> print(im.expo)
+        600.0
+        >>> data_before = np.copy(im.data)
+        >>> im.convert_to_ADU_rate_units()
+        >>> data_after = np.copy(im.data)
+        >>> im.convert_to_ADU_units()
+        >>> assert np.all(np.isclose(data_before, im.data))
+        """
         self.data *= self.expo
         self.units = 'ADU'
 
     def compute_statistical_error(self):
+        """Compute the image noise map from Image.data as np.sqrt(data) / np.sqrt(gain * expo).
+
+        The read out noise is not included
+
+        """
         # removes the zeros and negative pixels first
         # set to minimum positive value
         data = np.copy(self.data)
@@ -159,7 +153,10 @@ class Image(object):
         self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
 
     def compute_parallactic_angle(self):
-        """from A. Guyonnet."""
+        """Compute the parallactic angle.
+
+        Script from A. Guyonnet.
+        """
         latitude = parameters.OBS_LATITUDE.split()
         latitude = float(latitude[0]) - float(latitude[1]) / 60. - float(latitude[2]) / 3600.
         latitude = Angle(latitude, units.deg).radian
@@ -206,7 +203,7 @@ class Image(object):
         Examples
         --------
         >>> im = Image('tests/data/reduc_20170605_028.fits')
-        >>> im.plot_image()
+        >>> im.plot_image(target_pixcoords=[820, 580])
         >>> if parameters.DISPLAY: plt.show()
         """
         if ax is None:
@@ -222,7 +219,104 @@ class Image(object):
             plt.show()
 
 
+def load_CTIO_image(image):
+    """Specific routine to load CTIO fits files and load their data and properties for Spectractor.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    image.my_logger.info(f'\n\tLoading CTIO image {image.file_name}...')
+    image.header, image.data = load_fits(image.file_name)
+    extract_info_from_CTIO_header(image, image.header)
+    image.header['LSHIFT'] = 0.
+    image.header['D2CCD'] = parameters.DISTANCE2CCD
+    parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
+    parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
+    if image.header['YLENGTH'] != parameters.CCD_IMSIZE:
+        image.my_logger.warning(
+            f'\n\tImage rectangular: X={parameters.CCD_IMSIZE:d} pix, Y={image.header["YLENGTH"]:d} pix')
+    if image.header['YPIXSIZE'] != parameters.CCD_PIXEL2ARCSEC:
+        image.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
+            parameters.CCD_PIXEL2ARCSEC, image.header['YPIXSIZE']))
+    image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
+                          obstime=image.header['DATE-OBS'])
+    image.my_logger.info('\n\tImage loaded')
+    # compute CCD gain map
+    build_CTIO_gain_map(image)
+    image.compute_parallactic_angle()
+
+
+def build_CTIO_gain_map(image):
+    """Compute the CTIO gain map according to header GAIN values.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    size = parameters.CCD_IMSIZE
+    image.gain = np.zeros_like(image.data)
+    # ampli 11
+    image.gain[0:size // 2, 0:size // 2] = image.header['GTGAIN11']
+    # ampli 12
+    image.gain[0:size // 2, size // 2:size] = image.header['GTGAIN12']
+    # ampli 21
+    image.gain[size // 2:size, 0:size] = image.header['GTGAIN21']
+    # ampli 22
+    image.gain[size // 2:size, size // 2:size] = image.header['GTGAIN22']
+
+
+def load_LPNHE_image(image):
+    """Specific routine to load LPNHE fits files and load their data and properties for Spectractor.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    image.my_logger.info(f'\n\tLoading LPNHE image {image.file_name}...')
+    image.header, data1 = load_fits(image.file_name, 15)
+    image.header, data2 = load_fits(image.file_name, 7)
+    data1 = data1.astype(np.float64)
+    data2 = data2.astype(np.float64)
+    image.data = np.concatenate((data1[10:-10, 10:-10], data2[10:-10, 10:-10]))
+    image.date_obs = image.header['DATE-OBS']
+    image.expo = float(image.header['EXPTIME'])
+    image.header['ROTANGLE'] = image.rotation_angle
+    image.header['LSHIFT'] = 0.
+    image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.data = image.data.T
+    image.my_logger.info('\n\tImage loaded')
+    # compute CCD gain map
+    image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
+    parameters.CCD_IMSIZE = image.data.shape[1]
+
+
 def find_target(image, guess, rotated=False):
+    """Find the target in the Image instance.
+
+    The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
+    using two iterative fits of a PSF2D model.
+    User must give a guess array in the raw image.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance.
+    guess: array_like
+        Two parameter array giving the estimated position of the target in the image.
+    rotated: bool
+        If True, the target is searched in the rotated image.
+
+    Returns
+    -------
+    x0: float
+        The x position of the target.
+    y0: float
+        The y position of the target.
+    """
     Dx = parameters.XWINDOW
     Dy = parameters.YWINDOW
     theX, theY = guess
@@ -261,6 +355,34 @@ def find_target(image, guess, rotated=False):
 
 
 def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
+    """Initialize the search of the target cropping the image and setting the saturation level.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance.
+    guess: array_like
+        Two parameter array giving the estimated position of the target in the image.
+    rotated: bool
+        If True, the target is searched in the rotated image.
+    widths: array_like
+        Two parameter array to define the width of the cropped image (default: [parameters.XWINDOW, parameters.YWINDOW])
+
+    Returns
+    -------
+    sub_image: array_like
+        The cropped image data array where the fit has to be performed.
+    x0: float
+        The x position of the target.
+    y0: float
+        The y position of the target.
+    Dx: int
+        The width of the cropped image.
+    Dy: int
+        The height of the cropped image.
+    sub_errors: array_like
+        The cropped image uncertainty array where the fit has to be performed.
+    """
     x0 = int(guess[0])
     y0 = int(guess[1])
     Dx, Dy = widths
@@ -275,14 +397,33 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     return sub_image, x0, y0, Dx, Dy, sub_errors
 
 
-def find_target_1Dprofile(image, sub_image, guess, rotated=False):
+def find_target_1Dprofile(image, sub_image, guess):
     """
-    Find precisely the position of the targeted object.
+    Find precisely the position of the targeted object fitting a PSF1D model
+    on each projection of the image along x and y, using outlier removal.
 
-    Args:
-        sub_image:
-        rotated:
-        guess (:obj:`list`): [x,y] guessed position of th target
+    Parameters
+    ----------
+    image: Image
+        The Image instance.
+    sub_image: array_like
+        The cropped image data array where the fit is performed.
+    guess: array_like
+        Two parameter array giving the estimated position of the target in the image.
+
+    Examples
+    --------
+    >>> im = Image('tests/data/reduc_20170605_028.fits')
+    >>> guess = [820, 580]
+
+    ..plot:
+        im.plot_image(target_pixcoords=[820, 580])
+
+    >>> parameters.DEBUG = True
+    >>> sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False)
+    >>> x1, y1 = find_target_1Dprofile(im, sub_image, guess)
+    >>> assert np.isclose(x1, np.argmax(np.nansum(sub_image, axis=0)), rtol=1e-2)
+    >>> assert np.isclose(y1, np.argmax(np.nansum(sub_image, axis=1)), rtol=1e-2)
     """
     NY, NX = sub_image.shape
     X = np.arange(NX)
@@ -310,8 +451,7 @@ def find_target_1Dprofile(image, sub_image, guess, rotated=False):
         image.my_logger.warning('\n\tY position determination of the target probably wrong')
     if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
-        image.plot_image_simple(ax1, data=sub_image, scale="log", title="", units=image.units, plot_stats=False,
-                                target_pixcoords=[avX, avY])
+        plot_image_simple(ax1, data=sub_image, scale="log", title="", units=image.units, target_pixcoords=[avX, avY])
         ax1.legend(loc=1)
         ax2.plot(X, profile_X_raw, 'r-', lw=2)
         ax2.plot(X, bkgd_X(X), 'g--', lw=2, label='bkgd')
@@ -331,14 +471,39 @@ def find_target_1Dprofile(image, sub_image, guess, rotated=False):
     return avX, avY
 
 
-def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=None):
+def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     """
-    Find precisely the position of the targeted object.
+    Find precisely the position of the targeted object fitting a PSF2D model.
+    A polynomial 2D background is subtracted first. Saturated pixels are masked with np.nan values.
 
-    Args:
-        sub_image:
-        rotated:
-        guess (:obj:`list`): [x,y] guessed position of th target
+    THE ERROR ARRAY IS NOT USED FOR THE MOMENT.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance.
+    sub_image: array_like
+        The cropped image data array where the fit is performed.
+    guess: array_like
+        Two parameter array giving the estimated position of the target in the image.
+    sub_image: array_like
+        The cropped image data array where the fit is performed.
+
+    Examples
+    --------
+    >>> im = Image('tests/data/reduc_20170605_028.fits')
+    >>> guess = [820, 580]
+
+    ..plot:
+        im.plot_image(target_pixcoords=[820, 580])
+
+    >>> parameters.DEBUG = True
+    >>> sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False)
+    >>> xmax = np.argmax(np.sum(sub_image, axis=0))
+    >>> ymax = np.argmax(np.sum(sub_image, axis=1))
+    >>> x1, y1 = find_target_2Dprofile(im, sub_image, guess)
+    >>> assert np.isclose(x1, xmax, rtol=1e-2)
+    >>> assert np.isclose(y1, ymax, rtol=1e-2)
     """
     # TODO: replace with minuit and test on image _133.fits or decrease mean_prior
     # fit and subtract smooth polynomial background
@@ -374,8 +539,9 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
     saturated_pixels = np.where(sub_image >= image.saturation)
     if len(saturated_pixels[0]) > 0:
         if parameters.DEBUG:
-            image.my_logger.info('\n\t%d saturated pixels: set saturation level to %d %s.' % (
-                len(saturated_pixels[0]), image.saturation, image.units))
+            image.my_logger.info(
+                f'\n\t{len(saturated_pixels[0])} saturated pixels: set saturation level '
+                f'to {image.saturation} {image.units}.')
         sub_image_subtracted[sub_image >= 0.9 * image.saturation] = np.nan
         sub_image[sub_image >= 0.9 * image.saturation] = np.nan
     # fit
@@ -395,7 +561,7 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
     if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
         vmin = 0
-        vmax = np.nanmax(sub_image)
+        vmax = float(np.nanmax(sub_image))
         plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
                           target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax1.legend(loc=1)
@@ -416,6 +582,51 @@ def find_target_2Dprofile(image, sub_image, guess, rotated=False, sub_errors=Non
 def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters.YWINDOW,
                                    right_edge=parameters.CCD_IMSIZE - 200,
                                    margin_cut=12):
+    """Compute the rotation angle in degree of a spectrogram with the Hessian of the image.
+    Use the disperser rotation angle map as a prior and the target_pixcoords values to crop the image
+    around the spectrogram.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance.
+    deg_threshold: float
+        Don't consider pixel with Hessian angle above deg_threshold or below -deg_threshold (default: 10).
+    width_cut: int
+        Half with of the image to consider in height (default: parameters.YWINDOW).
+    right_edge: int
+        Maximum pixel on the right edge (default: parameters.CCD_IMSIZE - 200).
+    margin_cut: int
+        After computing the Hessian, to avoid bad values on the edges the function cut on the
+        edge of image margin_cut pixels.
+
+    Returns
+    -------
+    theta: float
+        The median value of the histogram of angles deduced with the Hessian of the pixels (in degree).
+
+    Examples
+    --------
+    >>> im=Image('tests/data/reduc_20170605_028.fits', disperser_label='HoloPhAg')
+
+    # Create of False spectrogram:
+    >>> N = parameters.CCD_IMSIZE
+    >>> im.data = np.ones((N, N))
+    >>> slope = -0.1
+    >>> y = lambda x: slope * (x - 0.5*N) + 0.5*N
+    >>> for x in np.arange(N):
+    ...     im.data[int(y(x)), x] = 10
+    ...     im.data[int(y(x))+1, x] = 10
+
+    ..plot:
+        plt.imshow(im.data, origin='lower)
+        plt.show()
+
+    >>> im.target_pixcoords=(N//2, N//2)
+    >>> parameters.DEBUG = True
+    >>> theta = compute_rotation_angle_hessian(im)
+    >>> assert np.isclose(theta, np.arctan(slope)*180/np.pi, rtol=1e-2)
+    """
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region
     data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
@@ -450,9 +661,8 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     image.header.comments['THETAINT'] = 'rotation angle interp from disperser scan'
     if abs(theta_median - theta_guess) > theta_critical:
         image.my_logger.warning(
-            '\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels over {:d} pixels:'
-            '  {:.2f} vs {:.2f}'.format(
-                parameters.CCD_IMSIZE, theta_median, theta_guess))
+            f'\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels '
+            f'over {parameters.CCD_IMSIZE:d} pixels: {theta_median:.2f} vs {theta_guess:.2f}')
     if parameters.DEBUG:
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6))
         xindex = np.arange(data.shape[1])
@@ -473,6 +683,38 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
 
 
 def turn_image(image):
+    """Compute the rotation angle using the Hessian algorithm and turn the image.
+
+    The results are stored in Image.data_rotated and Image.stat_errors_rotated.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance.
+
+    Examples
+    --------
+    >>> im=Image('tests/data/reduc_20170605_028.fits', disperser_label='HoloPhAg')
+
+    # Create of False spectrogram:
+    >>> N = parameters.CCD_IMSIZE
+    >>> im.data = np.ones((N, N))
+    >>> slope = -0.1
+    >>> y = lambda x: slope * (x - 0.5*N) + 0.5*N
+    >>> for x in np.arange(N):
+    ...     im.data[int(y(x)), x] = 10
+    ...     im.data[int(y(x))+1, x] = 10
+
+    ..plot:
+        plt.imshow(im.data, origin='lower)
+        plt.show()
+
+    >>> im.target_pixcoords=(N//2, N//2)
+    >>> parameters.DEBUG = True
+    >>> turn_image(im)
+    >>> assert im.data_rotated is not None
+    >>> assert np.isclose(im.rotation_angle, np.arctan(slope)*180/np.pi, rtol=1e-2)
+    """
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
                                                           right_edge=parameters.CCD_IMSIZE - 200)
     image.header['ROTANGLE'] = image.rotation_angle
