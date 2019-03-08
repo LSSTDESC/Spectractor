@@ -589,6 +589,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
     3.00
 
     """
+    my_logger = set_logger(__name__)
     gg_init = models.Polynomial1D(order)
     gg_init.c0.min = np.min(y)
     gg_init.c0.max = 2 * np.max(y)
@@ -612,6 +613,8 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
         plt.legend(loc=2, numpoints=1)
         if parameters.DISPLAY: plt.show()
         '''
+        my_logger.info(f'\n\t{or_fitted_model}')
+        my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model, outliers
 
 
@@ -652,6 +655,7 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
     >>> assert np.isclose(fit.c1_1.value, -2)
 
     """
+    my_logger = set_logger(__name__)
     gg_init = models.Polynomial2D(order)
     gg_init.c0_0.min = np.min(z)
     gg_init.c0_0.max = 2 * np.max(z)
@@ -662,10 +666,8 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE:
-            print(or_fitted_model)
-        if parameters.DEBUG:
-            print(fit.fit_info)
+        my_logger.info(f'\n\t{or_fitted_model}')
+        my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
 
@@ -729,6 +731,7 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
         plt.show()
 
     """
+    my_logger = set_logger(__name__)
     gg_init = models.Gaussian2D()
     if guess is not None:
         for ip, p in enumerate(gg_init.param_names):
@@ -747,10 +750,8 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE:
-            print(or_fitted_model)
-        if parameters.DEBUG:
-            print(fit.fit_info)
+        my_logger.info(f'\n\t{or_fitted_model}')
+        my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
 
@@ -804,6 +805,7 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
         plt.imshow(Z-fit(X, Y), origin='loxer')
         plt.show()
     """
+    my_logger = set_logger(__name__)
     gg_init = models.Moffat2D()
     if guess is not None:
         for ip, p in enumerate(gg_init.param_names):
@@ -819,8 +821,8 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
-        if parameters.VERBOSE:
-            print(or_fitted_model)
+        my_logger.info(f'\n\t{or_fitted_model}')
+        my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
 
@@ -872,6 +874,7 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
         plt.imshow(Z-fit(X, Y), origin='loxer')
         plt.show()
     """
+    my_logger = set_logger(__name__)
     gg_init = models.Moffat1D()
     if guess is not None:
         for ip, p in enumerate(gg_init.param_names):
@@ -887,8 +890,8 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y)
-        if parameters.VERBOSE:
-            print(or_fitted_model)
+        my_logger.info(f'\n\t{or_fitted_model}')
+        my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
 
@@ -935,6 +938,7 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
         plt.imshow(Z-fit(X, Y), origin='loxer')
         plt.show()
     """
+    my_logger = set_logger(__name__)
     gg_init = models.Moffat1D()
     if guess is not None:
         for ip, p in enumerate(gg_init.param_names):
@@ -948,8 +952,8 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
         warnings.simplefilter('ignore')
         fit = fitting.LevMarLSQFitter()
         fitted_model = fit(gg_init, x, y)
-        if parameters.VERBOSE:
-            print(fitted_model)
+        my_logger.info(f'\n\t{fitted_model}')
+        my_logger.debug(f'\n\t{fit.fit_info}')
         return fitted_model
 
 

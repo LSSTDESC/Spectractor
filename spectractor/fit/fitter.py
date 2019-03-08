@@ -263,7 +263,7 @@ class FitWorkspace:
 
     def print_settings(self):
         print('************************************')
-        print(f"Input file: {self.filename}\nWalkers: {self.nwalkers}\t Steps: {self.nsteps}")
+        print(f"Input file: {self.file_name}\nWalkers: {self.nwalkers}\t Steps: {self.nsteps}")
         print('************************************')
 
 
@@ -469,9 +469,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         """
         Examples
         --------
-        >>> filename = 'outputs/reduc_20170530_130_spectrum.fits'
-        >>> atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-        >>> fit_workspace = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000, burnin=10000,
+        >>> file_name = 'outputs/reduc_20170530_130_spectrum.fits'
+        >>> atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+        >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000, burnin=10000,
         ... nbins=10, verbose=1, plot=True, live_fit=False)
         >>> A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, *psf = fit_workspace.p
         >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, psf)
@@ -713,7 +713,7 @@ if __name__ == "__main__":
     (opts, args) = parser.parse_args()
 
     filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    # filename = 'outputs/sim_20170530_134_spectrum.fits'
+    # file_name = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     fit_workspace = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000,
