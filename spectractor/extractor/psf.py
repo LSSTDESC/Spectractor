@@ -1063,7 +1063,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         s.profile_params[x, :] = guess
         s.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
         s.table['flux_sum'][x] = np.sum(signal)
-        if live_fit and parameters.DISPLAY:
+        if live_fit:
             plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, fit, bgd_fit, guess,
                                           PSF_guess,  outliers, sigma, live_fit)
     # interpolate the skipped pixels with splines
