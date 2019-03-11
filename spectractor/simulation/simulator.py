@@ -442,25 +442,25 @@ class AtmosphereGrid(Atmosphere):
             # hope those are the same parameters : TBD !!!!
             self.NB_ATM_POINTS = hdr['NBATMPTS']
 
-            self.NB_AER_POINTS = hdr['NBAERPTS']
-            self.AER_MIN = hdr['AERMIN']
-            self.AER_MAX = hdr['AERMAX']
+            NB_AER_POINTS = hdr['NBAERPTS']
+            AER_MIN = hdr['AERMIN']
+            AER_MAX = hdr['AERMAX']
 
-            self.NB_PWV_POINTS = hdr['NBPWVPTS']
-            self.PWV_MIN = hdr['PWVMIN']
-            self.PWV_MAX = hdr['PWVMAX']
+            NB_PWV_POINTS = hdr['NBPWVPTS']
+            PWV_MIN = hdr['PWVMIN']
+            PWV_MAX = hdr['PWVMAX']
 
-            self.NB_OZ_POINTS = hdr['NBOZPTS']
-            self.OZ_MIN = hdr['OZMIN']
-            self.OZ_MAX = hdr['OZMAX']
+            NB_OZ_POINTS = hdr['NBOZPTS']
+            OZ_MIN = hdr['OZMIN']
+            OZ_MAX = hdr['OZMAX']
 
-            self.AER_Points = np.linspace(self.AER_MIN, self.AER_MAX, self.NB_AER_POINTS)
-            self.OZ_Points = np.linspace(self.OZ_MIN, self.OZ_MAX, self.NB_OZ_POINTS)
-            self.PWV_Points = np.linspace(self.PWV_MIN, self.PWV_MAX, self.NB_PWV_POINTS)
+            self.AER_Points = np.linspace(AER_MIN, AER_MAX, NB_AER_POINTS)
+            self.OZ_Points = np.linspace(OZ_MIN, OZ_MAX, NB_OZ_POINTS)
+            self.PWV_Points = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
 
-            self.NBWLBINS = hdr['NBWLBIN']
-            self.WLMIN = hdr['WLMIN']
-            self.WLMAX = hdr['WLMAX']
+            # NBWLBINS = hdr['NBWLBIN']
+            # WLMIN = hdr['WLMIN']
+            # WLMAX = hdr['WLMAX']
 
             self.index_atm_count = hdr['IDX_CNT']
             self.index_atm_aer = hdr['IDX_AER']
@@ -473,13 +473,13 @@ class AtmosphereGrid(Atmosphere):
             self.atmgrid[:, :] = hdu[0].data[:, :]
 
             if parameters.VERBOSE or parameters.DEBUG:
-                self.my_logger.info('\n\tAtmosphere.load_image atm-file=%s' % (self.filename))
+                self.my_logger.info(f'\n\tAtmosphere.load_image atm-file={self.filename}')
 
             # interpolate the grid
             self.lambdas = self.atmgrid[0, self.index_atm_data:]
             self.model = RegularGridInterpolator((self.lambdas, self.OZ_Points, self.PWV_Points, self.AER_Points), (
-                self.atmgrid[1:, self.index_atm_data:].reshape(self.NB_AER_POINTS, self.NB_PWV_POINTS,
-                                                               self.NB_OZ_POINTS,
+                self.atmgrid[1:, self.index_atm_data:].reshape(NB_AER_POINTS, NB_PWV_POINTS,
+                                                               NB_OZ_POINTS,
                                                                len(self.lambdas))).T, bounds_error=False, fill_value=0)
 
     def simulate(self, ozone, pwv, aerosols):
@@ -519,7 +519,7 @@ class AtmosphereGrid(Atmosphere):
         return self.transmission
 
 
-class TelescopeTransmission():
+class TelescopeTransmission:
 
     def __init__(self, filter_name=""):
         """Transmission of the telescope as product of the following transmissions:
@@ -538,10 +538,12 @@ class TelescopeTransmission():
         --------
         >>> t = TelescopeTransmission()
         >>> t.plot_transmission()
-       """
+        """
 
         self.my_logger = set_logger(self.__class__.__name__)
         self.filter_name = filter_name
+        self.transmission = None
+        self.transmission_err = None
         self.load_transmission()
 
     def load_transmission(self):
@@ -618,12 +620,22 @@ class TelescopeTransmission():
 
 
 class SpectrumSimulation(Spectrum):
-    """ SpectrumSim class used to store information and methods
-    relative to spectrum simulation.
-    """
 
-    # ---------------------------------------------------------------------------
     def __init__(self, spectrum, atmosphere, telescope, disperser):
+        """Class to simulate cross spectrum.
+
+        Parameters
+        ----------
+        spectrum: Spectrum
+            Spectrum instance to load main properties before simulation.
+        atmosphere: Atmosphere
+            Atmosphere or AtmosphereGrid instance to make the atmospheric simulation.
+        telescope: TelescopeTransmission
+            Telescope transmission.
+        disperser: Grating
+            Disperser instance.
+
+        """
         Spectrum.__init__(self)
         for k, v in list(spectrum.__dict__.items()):
             self.__dict__[k] = copy.copy(v)
@@ -637,6 +649,22 @@ class SpectrumSimulation(Spectrum):
         self.model = lambda x: np.zeros_like(x)
 
     def simulate_without_atmosphere(self, lambdas):
+        """Compute the spectrum of an object and its uncertainties
+        after its transmission throught the instrument except the atmosphere.
+        The units remains the ones of the Target instance.
+
+        Parameters
+        ----------
+        lambdas: array_like
+            The wavelength array in nm
+
+        Returns
+        -------
+        spectrum: array_like
+            The spectrum in Target units.
+        spectrum_err: array_like
+            The spectrum uncertainties in Target units.
+        """
         self.lambdas = lambdas
         self.err = np.zeros_like(lambdas)
         self.lambdas_binwidths = np.gradient(lambdas)
@@ -651,6 +679,38 @@ class SpectrumSimulation(Spectrum):
         return self.data, self.err
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0., D=parameters.DISTANCE2CCD, shift=0.):
+        """Simulate the cross spectrum of an object and its uncertainties
+        after its transmission throught the instrument and the atmosphere.
+
+        Parameters
+        ----------
+        A1: float
+            Global amplitude of the spectrum (default: 1).
+        A2: float
+            Relative amplitude of the order 2 spectrum contamination (default: 0).
+        ozone: float
+            Ozone quantity in Dobson
+        pwv: float
+            Precipitable Water Vapor quantity in mm
+        aerosols: float
+            VAOD Vertical Aerosols Optical Depth
+        reso: float
+            Gaussian kernel size for the convolution (default: 0).
+        D: float
+            Distance between the CCD and the disperser in mm (default: parameters.DISTANCE2CCD)
+        shift: float
+            Shift in pixels of the order 0 position estimate (default: 0).
+
+        Returns
+        -------
+        lambdas: array_like
+            The wavelength array in nm used for the interpolation.
+        spectrum: callable
+            The spectrum interpolated function in Target units.
+        spectrum_err: array_like
+            The spectrum uncertainties interpolated function in Target units.
+
+        """
         pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0] - shift
         new_x0 = [self.x0[0] - shift, self.x0[1]]
         self.disperser.D = D
@@ -682,11 +742,22 @@ class SpectrumSimulation(Spectrum):
 
 
 class SpectrogramModel(Spectrum):
-    """ SpectrumSim class used to store information and methods
-    relative to spectrum simulation.
-    """
 
     def __init__(self, spectrum, atmosphere, telescope, disperser):
+        """Class to simulate a spectrogram.
+
+        Parameters
+        ----------
+        spectrum: Spectrum
+            Spectrum instance to load main properties before simulation.
+        atmosphere: Atmosphere
+            Atmosphere or AtmosphereGrid instance to make the atmospheric simulation.
+        telescope: TelescopeTransmission
+            Telescope transmission.
+        disperser: Grating
+            Disperser instance.
+
+        """
         Spectrum.__init__(self)
         for k, v in list(spectrum.__dict__.items()):
             self.__dict__[k] = copy.copy(v)
@@ -706,32 +777,34 @@ class SpectrogramModel(Spectrum):
 
     def simulate_spectrum(self, lambdas, ozone, pwv, aerosols, shift_t=0.):
         """
-        Simulate the spectrum of the object and return the result in flam units.
+        Simulate the spectrum of the object and return the result in Target units.
 
         Parameters
         ----------
         lambdas: array_like
             The wavelength array in nm.
         ozone: float
-            Ozone parameter for Libradtran.
+            Ozone quantity in Dobson
         pwv: float
-            Precipitable Water Vapor parameter for Libradtran.
+            Precipitable Water Vapor quantity in mm
         aerosols: float
-            Aerosols parameter for Libradtran.
+            VAOD Vertical Aerosols Optical Depth
+        shift_t: float
+            Shift of the transmission in nm (default: 0).
 
         Returns
         -------
         spectrum: array_like
-            The spectrum array in flam units.
+            The spectrum array in Target units.
         spectrum_err: array_like
-            The spectrum uncertainty array in flam units.
+            The spectrum uncertainty array in Target units.
 
         """
         spectrum_err = np.zeros_like(lambdas)
-        spectrum = self.disperser.transmission(lambdas-shift_t)
-        telescope_transmission = self.telescope.transmission(lambdas-shift_t)
+        spectrum = self.target.sed(lambdas)
+        spectrum *= self.disperser.transmission(lambdas - shift_t)
+        telescope_transmission = self.telescope.transmission(lambdas - shift_t)
         spectrum *= telescope_transmission
-        spectrum *= self.target.sed(lambdas)
         spectrum *= self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
         spectrum_err = np.zeros_like(spectrum)
         idx = np.where(telescope_transmission > 0)[0]
@@ -765,11 +838,14 @@ class SpectrogramModel(Spectrum):
         lambdas_order2 = lambdas_order2[lambdas_order2 > parameters.LAMBDA_MIN]
 
         distances_order2 = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=2)
-        Dx_func = interp1d(lambdas/2, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
-        Dy_mean_func = interp1d(lambdas/2, self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
-        dy_func = interp1d(lambdas/2, self.chromatic_psf.table['Dy']-self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
-        dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) + 1j * (self.chromatic_psf.table['Dy'] - shift_y)
-        dispersion_law_order2 = r0 + (Dx_func(lambdas_order2) - shift_x) + 1j * (Dy_mean_func(lambdas_order2) + dy_func(lambdas_order2) - shift_y)
+        Dx_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
+        Dy_mean_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
+        dy_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_mean'],
+                           bounds_error=False, fill_value=(0, 0))
+        dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) + 1j * (
+                    self.chromatic_psf.table['Dy'] - shift_y)
+        dispersion_law_order2 = r0 + (Dx_func(lambdas_order2) - shift_x) + 1j * (
+                    Dy_mean_func(lambdas_order2) + dy_func(lambdas_order2) - shift_y)
         return lambdas, dispersion_law, dispersion_law_order2
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
@@ -809,7 +885,7 @@ class SpectrogramModel(Spectrum):
         self.simulate_psf(psf_poly_params, angle)
         self.my_logger.debug(f'\n\tTime after simulate PSF: {time.time()-start}')
         start = time.time()
-        r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2) + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2 )
+        r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2) + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2)
         lambdas, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
         self.my_logger.debug(f'\n\tTime after simulate disp: {time.time()-start}')
         start = time.time()
@@ -1064,7 +1140,8 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
 
 def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
                              pwv=5, ozone=300, aerosols=0.05, A1=1.0, A2=0.,
-                             D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0., psf_poly_params=None):
+                             D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0.,
+                             psf_poly_params=None):
     """ SimulatorCore
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
@@ -1073,6 +1150,7 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
     my_logger.info('\n\tStart SPECTROGRAMSIMULATOR core program')
     # SIMULATE ATMOSPHERE
     # -------------------
+
     atmosphere = Atmosphere(airmass, pressure, temperature)
 
     # SPECTRUM SIMULATION
@@ -1188,16 +1266,21 @@ def SpectrogramSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05
     # Initialisation
     spectrum, telescope, disperser, target = SimulatorInit(filename)
 
+    if psf_poly_params is None:
+        my_logger.info('\n\tUse PSF parameters from _table.csv file.')
+        psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
+
     # SIMULATE SPECTRUM
     # -------------------
     airmass = spectrum.header['AIRMASS']
     pressure = spectrum.header['OUTPRESS']
     temperature = spectrum.header['OUTTEMP']
 
-    spectrogram_simulation = SpectrogramSimulatorCore(spectrum, telescope, disperser, target, airmass, pressure,
+    spectrogram_simulation = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                                       temperature, pwv, ozone, aerosols,
                                                       D=D, shift_x=shift_x,
-                                                      shift_y=shift_y, shift_t=shift_t, angle=angle, psf_poly_params=psf_poly_params)
+                                                      shift_y=shift_y, shift_t=shift_t, angle=angle,
+                                                      psf_poly_params=psf_poly_params)
 
     # Save the spectrum
     spectrogram_simulation.header['OZONE'] = ozone
