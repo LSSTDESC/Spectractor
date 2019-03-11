@@ -150,15 +150,15 @@ class Atmosphere:
 # ----------------------------------------------------------------------------------
 class AtmosphereGrid(Atmosphere):
 
-    def __init__(self, data_filename, filename="", airmass=1., pressure=800., temperature=10.):
+    def __init__(self, data_filename="", filename="", airmass=1., pressure=800., temperature=10.):
         """Class to load and interpolate grids of atmospheric transmission computed with Libradtran.
 
         Parameters
         ----------
-        data_filename: str
-            The file name of the atmospheric grid.
+        data_filename: str, optional
+            The original image fits file name from which the grid was computed or has to be computed (default: "").
         filename: str, optional
-            The original image fits file name from which the grid was computed (default: "").
+            The file name of the atmospheric grid if it exists (default: "").
         airmass: float, optional
             Airmass of the source object (default: 1).
         pressure: float, optional
@@ -168,7 +168,9 @@ class AtmosphereGrid(Atmosphere):
 
         Examples
         --------
-        >>> a = AtmosphereGrid('./tests/data/reduc_20170530_134_atmsim.fits')
+        >>> a = AtmosphereGrid(filename='./tests/data/reduc_20170530_134_atmsim.fits')
+        >>> a.data_filename.split('/')[-1]
+        'reduc_20170530_134_spectrum.fits'
         """
         Atmosphere.__init__(self, airmass, pressure, temperature)
         self.my_logger = set_logger(self.__class__.__name__)
