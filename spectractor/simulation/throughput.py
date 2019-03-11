@@ -278,7 +278,7 @@ def load_transmission(file_name):
     return x[indexes], y[indexes], err[indexes]
 
 
-def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, label="", title=""):
+def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, label="", title="", lw=2):
     """Plot the transmission with respect to the wavelength.
 
     Parameters
@@ -295,6 +295,8 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
         The label of the curve for the legend (default: "")
     title: str, optional
         The title of the plot (default: "")
+    lw: int
+        Line width (default: 2).
 
     Examples
     --------
@@ -315,9 +317,9 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
     >>> if parameters.DISPLAY: plt.show()
     """
     if uncertainties is None or np.all(np.isclose(uncertainties, np.zeros_like(transmissions))):
-        ax.plot(lambdas, transmissions, "-", label=label)
+        ax.plot(lambdas, transmissions, "-", label=label, lw=lw)
     else:
-        ax.errorbar(lambdas, transmissions, yerr=uncertainties, label=label)
+        ax.errorbar(lambdas, transmissions, yerr=uncertainties, label=label, lw=lw)
     if title != "":
         ax.set_title(title)
     ax.set_xlabel("$\lambda$ [nm]")
@@ -326,6 +328,40 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
     ax.grid()
     if label != "":
         ax.legend(loc="best")
+
+
+def plot_all_transmissions(title="Telescope transmissions"):
+    """Plot the transmission files.
+
+    Parameters
+    ----------
+    title: str, optional
+        The title of the plot.
+
+    Examples
+    --------
+    >>> plot_all_transmissions(title="CTIO")
+
+    """
+
+    plt.figure()
+    ax = plt.gca()
+    t = Throughput()
+    lambdas, transmissions, errors = t.load_quantum_efficiency()
+    plot_transmission_simple(ax, lambdas, transmissions, errors, label="Quantum efficiency")
+    lambdas, transmissions, errors = t.load_mirror_reflectivity()
+    plot_transmission_simple(ax, lambdas, transmissions, errors, label="Mirror")
+    lambdas, transmissions, errors = t.load_FGB37()
+    plot_transmission_simple(ax, lambdas, transmissions, errors, label="FGB37")
+    lambdas, transmissions, errors = t.load_RG715()
+    plot_transmission_simple(ax, lambdas, transmissions, errors, label="RG715")
+    lambdas, transmissions, errors = t.load_telescope_throughput()
+    plot_transmission_simple(ax, lambdas, transmissions, errors, label="Telescope")
+    lambdas, transmissions, errors = t.load_total_throughput()
+    plot_transmission_simple(ax, lambdas, transmissions, errors, label="Total throughput file",
+                             title=title, lw=4)
+    if parameters.DISPLAY:
+        plt.show()
 
 
 if __name__ == "__main__":
