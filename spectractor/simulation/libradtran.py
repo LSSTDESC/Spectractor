@@ -276,8 +276,14 @@ def clean_simulation_directory():
 
     Examples
     --------
-    >>> os.mkdir('simulations')
+    >>> ensure_dir('simulations')
     >>> clean_simulation_directory()
     >>> assert not os.path.isfile('simulations')
     """
     os.system("rm -rf simulations")
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

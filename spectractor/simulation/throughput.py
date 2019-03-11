@@ -319,7 +319,7 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
     else:
         ax.errorbar(lambdas, transmissions, yerr=uncertainties, label=label)
     if title != "":
-        ax.set_title('RG175')
+        ax.set_title(title)
     ax.set_xlabel("$\lambda$ [nm]")
     ax.set_ylabel("Transmission")
     ax.set_xlim(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)
@@ -330,7 +330,5 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
 
 if __name__ == "__main__":
     import doctest
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
