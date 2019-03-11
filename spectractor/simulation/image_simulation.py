@@ -1,8 +1,9 @@
-from spectractor.extractor.images import *
 from spectractor.extractor.spectrum import *
 from spectractor.simulation.simulator import *
 from spectractor import parameters
 import copy
+
+from scipy.signal import gaussian
 
 
 # from astroquery.gaia import Gaia, TapPlus, GaiaClass
@@ -42,7 +43,8 @@ class StarModel:
         cb.locator = MaxNLocator(7, prune=None)
         cb.update_ticks()
         cb.set_label('Arbitrary units')  # ,fontsize=16)
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
 
 class StarFieldModel:
@@ -130,7 +132,8 @@ class StarFieldModel:
         cb.locator = MaxNLocator(7, prune=None)
         cb.update_ticks()
         cb.set_label('Arbitrary units')  # ,fontsize=16)
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
 
 class BackgroundModel:
@@ -178,7 +181,8 @@ class BackgroundModel:
         cb.locator = MaxNLocator(7, prune=None)
         cb.update_ticks()
         cb.set_label('Arbitrary units')  # ,fontsize=16)
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
 
 class SpectrumModel:
@@ -194,6 +198,8 @@ class SpectrumModel:
         self.reso = reso
         self.rotation = rotation
         self.yprofile = models.Gaussian1D(1, 0, sigma)
+        self.true_lambdas = None
+        self.true_spectrum = None
 
     def model(self, x, y):
         self.true_lambdas = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)
@@ -252,7 +258,7 @@ class ImageModel(Image):
 
     def load_image(self, filename):
         super(ImageModel, self).load_image(filename)
-        hdu_list = fits.open(filename)
+        # hdu_list = fits.open(filename)
         # self.true_lambdas, self.true_spectrum = hdu_list[1].data
 
 
@@ -306,16 +312,22 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
             starfield.plot_model()
     # Spectrum model
     my_logger.info('\n\tSpectum model...')
-    lambdas = spectrum.lambdas
     airmass = image.header['AIRMASS']
     pressure = image.header['OUTPRESS']
     temperature = image.header['OUTTEMP']
     telescope = TelescopeTransmission(image.filter)
+
+    # Load PSF
+    if psf_poly_params is None:
+        my_logger.info('\n\tUse PSF parameters from _table.csv file.')
+        psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
+
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0.,
                                            angle=spectrum.rotation_angle,
                                            psf_poly_params=psf_poly_params)
+
     # Image model
     my_logger.info('\n\tImage model...')
     image.compute(star, background, spectrogram, starfield=starfield)
@@ -323,11 +335,13 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.convert_to_ADU_units()
     if parameters.VERBOSE:
         image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
+
     # Set output path
     ensure_dir(outputdir)
     output_filename = image_filename.split('/')[-1]
     output_filename = (output_filename.replace('reduc', 'sim')).replace('trim', 'sim')
     output_filename = os.path.join(outputdir, output_filename)
+
     # Save images and parameters
     image.header['A1'] = A1
     image.header['A2'] = A2

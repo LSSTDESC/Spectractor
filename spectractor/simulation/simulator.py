@@ -458,7 +458,7 @@ class AtmosphereGrid(Atmosphere):
             self.OZ_Points = np.linspace(OZ_MIN, OZ_MAX, NB_OZ_POINTS)
             self.PWV_Points = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
 
-            # NBWLBINS = hdr['NBWLBIN']
+            NBWLBINS = hdr['NBWLBIN']
             # WLMIN = hdr['WLMIN']
             # WLMAX = hdr['WLMAX']
 
@@ -468,7 +468,7 @@ class AtmosphereGrid(Atmosphere):
             self.index_atm_oz = hdr['IDX_OZ']
             self.index_atm_data = hdr['IDX_DATA']
 
-            self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_ATM_HEADER + self.NB_ATM_DATA))
+            self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_ATM_HEADER + NBWLBINS - 1))
 
             self.atmgrid[:, :] = hdu[0].data[:, :]
 
@@ -883,23 +883,25 @@ class SpectrogramModel(Spectrum):
         import time
         start = time.time()
         self.simulate_psf(psf_poly_params, angle)
-        self.my_logger.debug(f'\n\tTime after simulate PSF: {time.time()-start}')
+        self.my_logger.warning(f'\n\tTime after simulate PSF: {time.time()-start}')
         start = time.time()
         r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2) + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2)
         lambdas, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
-        self.my_logger.debug(f'\n\tTime after simulate disp: {time.time()-start}')
+        self.my_logger.warning(f'\n\tTime after simulate disp: {time.time()-start}')
         start = time.time()
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols, shift_t)
         self.true_spectrum = spectrum
-        self.my_logger.debug(f'\n\tTime after simulate spec: {time.time()-start}')
+        self.my_logger.warning(f'\n\tTime after simulate spec: {time.time()-start}')
         start = time.time()
         nlbda = lambdas.size
 
         # PSF cube
+        import pyfftw
         nima = self.spectrogram_Ny
         y, x = FA.create_coords((nima, nima), starts='auto')  # (ny, nx)
         if self.psf_cube is None or not self.fix_psf_cube:
             cube = np.zeros((nlbda, nima, nima))
+            cube = pyfftw.empty_aligned((nlbda, nima, nima), dtype='float32')
             shape_params = np.array([self.chromatic_psf.table[name] for name in PSF2D.param_names[3:]]).T
             for l in range(nlbda):
                 ima = PSF2D.evaluate(x, y, 1, 0, 0, *shape_params[l])
@@ -924,17 +926,17 @@ class SpectrogramModel(Spectrum):
             uh = self.uh
             vh = self.vh
             fhcube = self.fhcube
-        self.my_logger.debug(f'\n\tTime after fourier cube: {time.time()-start}')
+        self.my_logger.warning(f'\n\tTime after fourier cube: {time.time()-start}')
         start = time.time()
         r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2 - shift_x) \
              + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2 - shift_y)
         fdima0 = F.disperse_fcube(uh, vh, fhcube, spectrum, dispersion_law, method="numexpr")  # FT
-        self.my_logger.debug(f'\n\tTime after simulate after fourier: {time.time()-start}')
+        self.my_logger.warning(f'\n\tTime after simulate after fourier: {time.time()-start}')
         start = time.time()
 
         # Dispersed image (noiseless)
         dima0 = F.ifft_image(fdima0)
-        self.my_logger.debug(f'\n\tTime after simulate inverse fourier: {time.time()-start}')
+        self.my_logger.warning(f'\n\tTime after simulate inverse fourier: {time.time()-start}')
         start = time.time()
 
         # Now add the systematics
@@ -946,10 +948,10 @@ class SpectrogramModel(Spectrum):
             nlbda_order2 = dispersion_law_order2.size
             fdima0_2 = F.disperse_fcube(uh, vh, fhcube[-nlbda_order2:], spectrum[:nlbda_order2], dispersion_law_order2,
                                         method="numexpr")  # FT
-            self.my_logger.debug(f'\n\tTime after simulate after fourier order 2: {time.time()-start}')
+            self.my_logger.warning(f'\n\tTime after simulate after fourier order 2: {time.time()-start}')
             start = time.time()
             dima0_2 = F.ifft_image(fdima0_2)
-            self.my_logger.debug(f'\n\tTime after simulate inverse fourier order 2: {time.time()-start}')
+            self.my_logger.warning(f'\n\tTime after simulate inverse fourier order 2: {time.time()-start}')
             start = time.time()
 
             # sim_conv = interp1d(lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
@@ -972,7 +974,7 @@ class SpectrogramModel(Spectrum):
         self.lambdas = self.disperser.grating_pixel_to_lambda(distance, self.x0, order=1)
         # self.model = interp1d(self.lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
         # self.model_err = interp1d(self.lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
-        self.my_logger.debug(f'\n\tTime after conclusions: {time.time()-start}')
+        self.my_logger.warning(f'\n\tTime after conclusions: {time.time()-start}')
         start = time.time()
         if parameters.DEBUG:
             fig, ax = plt.subplots(2, 1, sharex="all", figsize=(12, 4))
