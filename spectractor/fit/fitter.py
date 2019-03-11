@@ -9,6 +9,8 @@ from iminuit import Minuit
 import emcee
 from emcee.utils import MPIPool
 
+import time
+
 
 class FitWorkspace:
 
@@ -507,6 +509,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
 def simulate_spectrogram(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, *psf_poly_params):
     print('tttt', A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, psf_poly_params)
+    start = time.time()
     fit_workspace.simulation.fix_psf_cube = False
     if np.all(np.isclose(psf_poly_params, fit_workspace.p[10:], rtol=1e-6)):
         fit_workspace.simulation.fix_psf_cube = True
@@ -516,8 +519,10 @@ def simulate_spectrogram(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shif
     fit_workspace.lambdas = lambdas
     fit_workspace.model = model
     fit_workspace.model_err = model_err
+    print('oooo after computation', time.time()-start)
     if fit_workspace.live_fit:
-        fit_workspace.plot_spectrogram_fit()
+        #fit_workspace.plot_spectrogram_fit()
+        print('oooo after plot', time.time()-start)
     return lambdas, model, model_err
 
 
@@ -636,14 +641,14 @@ def run_minimisation():
     # guess = np.array([1.0036791021833857, 0.018833770558709745, 338.0547800297367, 5.124495024795957, 0.06127554029880766, 55.47083973084643, 0.28104903491901023, -0.006396963559360369, 0.0, -1.54, 0.12601115569947202, -0.44177500169633965, 0.22784612458938883, 2.068571403099914, -1.336193340868478, 0.907309563186542, 1.704138680609022, -0.6802496108217749, 0.3669189518488262, -0.002886197372409439, -0.003236137155513198, -0.003474702040937771, 541.412075889249, 612.2819103192218, 39.695980305924444, 499.99999999999835])
     # truth sim_134
     # guess = np.array([1., 0.01, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.0, -1.54, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835])
-    # guess = fit_workspace.p
+    guess = fit_workspace.p
     fix = [True] * guess.size
-    fix[0] = False # A1
-    fix[1] = False # A2
-    fix[2:5] = [False, False, False] # LIBRADTRAN
+    fix[0] = True # A1
+    fix[1] = True # A2
+    fix[2:5] = [True, True, True] # LIBRADTRAN
     # fix[3] = False
-    fix[5] = False #DCCD
-    fix[5:8] = [False, False, False] #DCCD
+    fix[5] = True #DCCD
+    fix[5:8] = [True, True, True] #DCCD
     # fix[10:13] = [False, False, False] # centers
     fix[10:] = [False] * (guess.size-10)
     fix[8] = True # shift_t
@@ -661,7 +666,7 @@ def run_minimisation():
     # m.migrad()
     from scipy import optimize
     p = optimize.least_squares(spectrogram_weighted_res, guess, bounds=bounds.T, verbose=2)
-    fit_workspace.p = p[0] # m.np_values()
+    fit_workspace.p = p.x # m.np_values()
     print(fit_workspace.p)
     if isinstance(fit_workspace, SpectrumFitWorkspace):
         simulate(*fit_workspace.p)
@@ -713,7 +718,7 @@ if __name__ == "__main__":
     (opts, args) = parser.parse_args()
 
     filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    # file_name = 'outputs/sim_20170530_134_spectrum.fits'
+    filename = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     fit_workspace = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000,
