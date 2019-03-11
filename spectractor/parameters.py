@@ -29,6 +29,9 @@ OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
 OBS_EPOCH = "J2000.0"
 OBS_TRANSMISSION_SYSTEMATICS = 0.005
 OBS_OBJECT_TYPE = 'STAR'  # To choose between STAR, HG-AR, MONOCHROMATOR
+OBS_TELESCOPE_TRANSMISSION = 'ctio_throughput.txt' # telescope transmission file
+OBS_FULL_INSTRUMENT_TRANSMISSON = 'ctio_throughput_300517_v1.txt' # full instrument transmission file
+OBS_QUANTUM_EFFICIENCY = "qecurve.txt"  # quantum efficiency of the detector file
 
 # Filters
 HALPHA_CENTER = 655.9e-6  # center of the filter in mm
