@@ -613,7 +613,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
         plt.legend(loc=2, numpoints=1)
         if parameters.DISPLAY: plt.show()
         '''
-        my_logger.info(f'\n\t{or_fitted_model}')
+        # my_logger.info(f'\n\t{or_fitted_model}')
         # my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model, outliers
 
