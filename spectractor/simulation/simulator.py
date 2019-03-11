@@ -75,6 +75,20 @@ class Atmosphere:
         self.aerosols = None
         self.transmission = lambda x: np.ones_like(x).astype(float)
         self.title = ""
+        self.label = ""
+
+    def set_title(self):
+        """Make a title string for the simulation.
+
+        """
+        self.title = f'Atmospheric transmission with z={self.airmass:4.2f}, P={self.pressure:4.2f} hPa, ' \
+                     f'T={self.temperature:4.2f}$\degree$C'
+
+    def set_label(self):
+        """Make a label string for the simulation.
+
+        """
+        self.label = f'PWV={self.pwv:4.2f}mm, OZ={self.ozone:4.2f}DB, VAOD={self.aerosols:4.2f} '
 
     def simulate(self, ozone, pwv, aerosols):
         """Simulate the atmosphere transparency with Libradtran given atmospheric composition.
@@ -111,14 +125,17 @@ class Atmosphere:
 
         ..plot:
             fig = plt.figure()
-            plot_transmission_simple(plt.gca(), lambdas, transmission(lambdas), title=a.title)
+            plot_transmission_simple(plt.gca(), lambdas, transmission(lambdas), title=a.title, label=a.label)
             plt.show()
         """
 
-        self.title = f'\Atmospheric transmission with z={self.airmass:4.2f}, P={self.pressure:4.2f} hPa, ' \
-                     f'T={self.temperature:4.2f}$\degree$C\nPWV={pwv:4.2f}mm, OZ={ozone:4.2f}DB, VAOD={aerosols:4.2f} '
+        self.pwv = pwv
+        self.ozone = ozone
+        self.aerosols = aerosols
+        self.set_title()
+        self.set_label()
         if parameters.VERBOSE:
-            self.my_logger.info(f'\n\t{self.title}')
+            self.my_logger.info(f'\n\t{self.title}\n\t\t{self.label}')
 
         lib = libradtran.Libradtran()
         path = lib.simulate(self.airmass, pwv, ozone, aerosols, self.pressure)
@@ -126,9 +143,6 @@ class Atmosphere:
         wl = data[:, 0]
         atm = data[:, 1]
         self.transmission = interp1d(wl, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
-        self.pwv = pwv
-        self.ozone = ozone
-        self.aerosols = aerosols
         return self.transmission
 
     def plot_transmission(self):
@@ -137,12 +151,13 @@ class Atmosphere:
         Examples
         --------
         >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
-        >>> a.simulate(ozone=400, pwv=5, aerosols=0.05)
+        >>> transmission = a.simulate(ozone=400, pwv=5, aerosols=0.05)
         >>> a.plot_transmission()
 
         """
         plt.figure()
-        plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.transmission(parameters.LAMBDAS), title=self.title)
+        plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.transmission(parameters.LAMBDAS),
+                                 title=self.title, label=self.label)
         if parameters.DISPLAY:
             plt.show()
 
@@ -150,12 +165,13 @@ class Atmosphere:
 # ----------------------------------------------------------------------------------
 class AtmosphereGrid(Atmosphere):
 
-    def __init__(self, data_filename="", filename="", airmass=1., pressure=800., temperature=10.):
+    def __init__(self, image_filename="", filename="", airmass=1., pressure=800., temperature=10.,
+                 pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
         """Class to load and interpolate grids of atmospheric transmission computed with Libradtran.
 
         Parameters
         ----------
-        data_filename: str, optional
+        image_filename: str, optional
             The original image fits file name from which the grid was computed or has to be computed (default: "").
         filename: str, optional
             The file name of the atmospheric grid if it exists (default: "").
@@ -165,25 +181,32 @@ class AtmosphereGrid(Atmosphere):
             Pressure of the atmosphere in hPa (default: 800).
         temperature: float, optional
             Temperature of the atmosphere in Celsius degrees (default: 10).
+        pwv_grid: list
+            List of 3 numbers for the PWV quantity: min, max, number of simulations (default: [0, 10, 10]).
+        ozone_grid: list
+            List of 3 numbers for the ozone quantity: min, max, number of simulations (default: [100, 700, 7]).
+        aerosol_grid: list
+            List of 3 numbers for the aerosol quantity: min, max, number of simulations (default: [0, 0.1, 10]).
 
         Examples
         --------
         >>> a = AtmosphereGrid(filename='./tests/data/reduc_20170530_134_atmsim.fits')
-        >>> a.data_filename.split('/')[-1]
+        >>> a.image_filename.split('/')[-1]
         'reduc_20170530_134_spectrum.fits'
         """
         Atmosphere.__init__(self, airmass, pressure, temperature)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.data_filename = data_filename
+        self.image_filename = image_filename
+        self.filename = filename
         # ------------------------------------------------------------------------
         # Definition of data format for the atmospheric grid
         # -----------------------------------------------------------------------------
 
-        #  column 0 : count number
-        #  column 1 : aerosol value
-        #  column 2 : pwv value
-        #  column 3 : ozone value
-        #  column 4 : data start
+        #  row 0 : count number
+        #  row 1 : aerosol value
+        #  row 2 : pwv value
+        #  row 3 : ozone value
+        #  row 4 : data start
         self.index_atm_count = 0
         self.index_atm_aer = 1
         self.index_atm_pwv = 2
@@ -191,51 +214,90 @@ class AtmosphereGrid(Atmosphere):
         self.index_atm_data = 4
 
         # specify parameters for the atmospheric grid
-        self.set_grid(pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10])
+        self.atmgrid = None
+        self.NB_ATM_HEADER = self.index_atm_data + 1
+        self.NB_ATM_DATA = len(parameters.LAMBDAS) - 1
+        self.NB_ATM_POINTS = 0
+        self.AER_Points = np.array([])
+        self.OZ_Points = np.array([])
+        self.PWV_Points = np.array([])
+        self.set_grid(pwv_grid=pwv_grid, ozone_grid=ozone_grid, aerosol_grid=aerosol_grid)
+
+        # the interpolated grid
+        self.lambdas = parameters.LAMBDAS
+        self.model = None
 
         self.header = fits.Header()
         if filename != "":
             self.load_file(filename)
 
     def set_grid(self, pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
+        """Set the size of the simulation grid self.atmgrid before compute it.
+
+        The first column of self.atmgrid will contain the wavelengths set by parameters.LAMBDAS,
+        the other columns the future simulations.
+
+        Parameters
+        ----------
+        pwv_grid: list
+            List of 3 numbers for the PWV quantity: min, max, number of simulations (default: [0, 10, 10]).
+        ozone_grid: list
+            List of 3 numbers for the ozone quantity: min, max, number of simulations (default: [100, 700, 7]).
+        aerosol_grid: list
+            List of 3 numbers for the aerosol quantity: min, max, number of simulations (default: [0, 0.1, 10]).
+        """
         # aerosols
-        # NB_AER_POINTS=20
-        self.NB_AER_POINTS = int(aerosol_grid[2])
-        self.AER_MIN = float(aerosol_grid[0])
-        self.AER_MAX = float(aerosol_grid[1])
+        NB_AER_POINTS = int(aerosol_grid[2])
+        AER_MIN = float(aerosol_grid[0])
+        AER_MAX = float(aerosol_grid[1])
 
         # ozone
-        # NB_OZ_POINTS=5
-        self.NB_OZ_POINTS = int(ozone_grid[2])
-        self.OZ_MIN = float(ozone_grid[0])
-        self.OZ_MAX = float(ozone_grid[1])
+        NB_OZ_POINTS = int(ozone_grid[2])
+        OZ_MIN = float(ozone_grid[0])
+        OZ_MAX = float(ozone_grid[1])
 
         # pwv
-        # NB_PWV_POINTS=11
-        self.NB_PWV_POINTS = int(pwv_grid[2])
-        self.PWV_MIN = float(pwv_grid[0])
-        self.PWV_MAX = float(pwv_grid[1])
+        NB_PWV_POINTS = int(pwv_grid[2])
+        PWV_MIN = float(pwv_grid[0])
+        PWV_MAX = float(pwv_grid[1])
 
         # definition of the grid
-        self.AER_Points = np.linspace(self.AER_MIN, self.AER_MAX, self.NB_AER_POINTS)
-        self.OZ_Points = np.linspace(self.OZ_MIN, self.OZ_MAX, self.NB_OZ_POINTS)
-        self.PWV_Points = np.linspace(self.PWV_MIN, self.PWV_MAX, self.NB_PWV_POINTS)
+        self.AER_Points = np.linspace(AER_MIN, AER_MAX, NB_AER_POINTS)
+        self.OZ_Points = np.linspace(OZ_MIN, OZ_MAX, NB_OZ_POINTS)
+        self.PWV_Points = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
 
         # total number of points
-        self.NB_ATM_POINTS = self.NB_AER_POINTS * self.NB_OZ_POINTS * self.NB_PWV_POINTS
-
-        self.NB_atm_HEADER = 5
-        self.NB_atm_DATA = len(parameters.LAMBDAS) - 1
+        self.NB_ATM_POINTS = NB_AER_POINTS * NB_OZ_POINTS * NB_PWV_POINTS
 
         # create the numpy array that will contains the atmospheric grid
-        self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_atm_HEADER + self.NB_atm_DATA))
+        self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_ATM_HEADER + self.NB_ATM_DATA))
         self.atmgrid[0, self.index_atm_data:] = parameters.LAMBDAS
 
     def compute(self):
+        """Compute atmospheric transmissions and fill self.atmgrid.
+
+        The wavelengths used for the computation are the ones set by parameters.LAMBDAS.
+
+        Returns
+        -------
+        atmospheric_grid: array_like
+            The atmospheric grid self.atmgrid.
+
+        Examples
+        --------
+        >>> a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits',
+        ... pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
+        >>> atmospheric_grid = a.compute()
+        >>> assert np.all(np.isclose(a.atmgrid[0, a.index_atm_data:], parameters.LAMBDAS))
+        >>> assert not np.any(np.isclose(a.atmgrid[1, a.index_atm_data:], np.zeros_like(parameters.LAMBDAS), rtol=1e-6))
+        >>> assert a.atmgrid.shape == (3, a.index_atm_data+len(parameters.LAMBDAS))
+        >>> a.save_file(a.image_filename.replace('.fits', '_atmsim.fits'))
+        >>> a.plot_transmission()
+        """
         # first determine the length
         if parameters.VERBOSE or parameters.DEBUG:
-            self.my_logger.info('\n\tAtmosphere simulations for z=%4.2f, P=%4.2f, T=%4.2f, for data-file=%s ' % (
-                self.airmass, self.pressure, self.temperature, self.data_filename))
+            self.my_logger.info(f'\n\tAtmosphere simulations for z={self.airmass:4.2f}, P={self.pressure:4.2f}hPa, '
+                                f'T={self.temperature:4.2f}$\degree$C, for data-file={self.image_filename} ')
         count = 0
         for aer in self.AER_Points:
             for pwv in self.PWV_Points:
@@ -252,19 +314,36 @@ class AtmosphereGrid(Atmosphere):
         return self.atmgrid
 
     def plot_transmission(self):
+        """Plot the atmospheric transmission contained in the grid.
+
+        Examples
+        --------
+        >>> a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits',
+        ... pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
+        >>> atmospheric_grid = a.compute()
+        >>> a.plot_transmission()
+        """
         plt.figure()
         counts = self.atmgrid[1:, self.index_atm_count]
         for count in counts:
-            plt.plot(parameters.LAMBDAS, self.atmgrid[int(count), self.index_atm_data:])
-        plt.grid()
-        plt.xlabel("$\lambda$ [nm]")
-        plt.ylabel("Atmospheric transmission")
-        plt.title("Atmospheric variations")
-        if parameters.DISPLAY: plt.show()
+            label = f'PWV={self.atmgrid[int(count), self.index_atm_pwv]} ' \
+                    f'OZ={self.atmgrid[int(count), self.index_atm_oz]} ' \
+                    f'VAOD={self.atmgrid[int(count), self.index_atm_aer]}'
+            plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.atmgrid[int(count), self.index_atm_data:],
+                                     title="Atmospheric grid", label=label)
+        if parameters.DISPLAY:
+            plt.show()
 
-    def plot_transm_img(self):
+    def plot_transmission_image(self):
+        """Plot the atmospheric transmission contained in the grid using imshow.
+
+        Examples
+        --------
+        >>> a = AtmosphereGrid(filename='tests/data/reduc_20170530_134_atmsim.fits')
+        >>> a.plot_transmission_image()
+        """
         plt.figure()
-        img = plt.imshow(self.atmgrid[1:, self.index_atm_data:], origin='lower', cmap='jet')
+        img = plt.imshow(self.atmgrid[1:, self.index_atm_data:], origin='lower', cmap='jet', aspect="auto")
         plt.grid(True)
         plt.xlabel("$\lambda$ [nm]")
         plt.ylabel("Simulation number")
@@ -275,20 +354,24 @@ class AtmosphereGrid(Atmosphere):
             plt.show()
 
     def save_file(self, filename=""):
+        """Save the atmospheric grid in a fits file.
 
+        Parameters
+        ----------
+        filename: str
+            The output file name.
+        """
         hdr = fits.Header()
 
         if filename != "":
             self.filename = filename
 
         if self.filename == "":
-            infostring = '\n\t Atmosphere:save_file no settings file given ...'
-            self.my_logger.info(infostring)
-            return
+            self.my_logger.error('\n\tNo file name is given...')
         else:
             hdr['ATMSIM'] = "libradtran"
             hdr['SIMVERS'] = "2.0.1"
-            hdr['DATAFILE'] = self.data_filename
+            hdr['DATAFILE'] = self.image_filename
             hdr['SIMUFILE'] = os.path.basename(self.filename)
 
             hdr['AIRMASS'] = self.airmass
@@ -296,17 +379,17 @@ class AtmosphereGrid(Atmosphere):
             hdr['TEMPERAT'] = self.temperature
             hdr['NBATMPTS'] = self.NB_ATM_POINTS
 
-            hdr['NBAERPTS'] = self.NB_AER_POINTS
-            hdr['AERMIN'] = self.AER_MIN
-            hdr['AERMAX'] = self.AER_MAX
+            hdr['NBAERPTS'] = self.AER_Points.size
+            hdr['AERMIN'] = self.AER_Points.min()
+            hdr['AERMAX'] = self.AER_Points.max()
 
-            hdr['NBPWVPTS'] = self.NB_PWV_POINTS
-            hdr['PWVMIN'] = self.PWV_MIN
-            hdr['PWVMAX'] = self.PWV_MAX
+            hdr['NBPWVPTS'] = self.PWV_Points.size
+            hdr['PWVMIN'] = self.PWV_Points.min()
+            hdr['PWVMAX'] = self.PWV_Points.max()
 
-            hdr['NBOZPTS'] = self.NB_OZ_POINTS
-            hdr['OZMIN'] = self.OZ_MIN
-            hdr['OZMAX'] = self.OZ_MAX
+            hdr['NBOZPTS'] = self.OZ_Points.size
+            hdr['OZMIN'] = self.OZ_Points.min()
+            hdr['OZMAX'] = self.OZ_Points.max()
 
             hdr['AER_PTS'] = np.array_str(self.AER_Points)
             hdr['PWV_PTS'] = np.array_str(self.PWV_Points)
@@ -323,21 +406,24 @@ class AtmosphereGrid(Atmosphere):
 
             hdu = fits.PrimaryHDU(self.atmgrid, header=hdr)
             hdu.writeto(self.filename, overwrite=True)
-            if parameters.VERBOSE or parameters.DEBUG:
-                self.my_logger.info('\n\tAtmosphere.save atm-file=%s' % (self.filename))
-
-            return hdr
+            if parameters.VERBOSE:
+                self.my_logger.info(f'\n\tAtmosphere.save atm-file={self.filename}')
 
     def load_file(self, filename):
+        """Load the atmospheric grid from a fits file and interpolate across the points
+        using RegularGridInterpolator. Automatically called from __init__.
+
+        Parameters
+        ----------
+        filename: str
+            The input file name.
+        """
 
         if filename != "":
             self.filename = filename
 
         if self.filename == "":
-            infostring = '\n\t Atmosphere:load_file no settings file given ...'
-            self.my_logger.info(infostring)
-
-            return
+            self.my_logger.error('\n\tNo file name is given...')
         else:
 
             hdu = fits.open(self.filename)
@@ -346,7 +432,7 @@ class AtmosphereGrid(Atmosphere):
 
             # hdr['ATMSIM'] = "libradtran"
             # hdr['SIMVERS'] = "2.0.1"
-            self.data_filename = hdr['DATAFILE']
+            self.image_filename = hdr['DATAFILE']
             # hdr['SIMUFILE']=os.path.basename(self.file_name)
 
             self.airmass = hdr['AIRMASS']
@@ -382,7 +468,7 @@ class AtmosphereGrid(Atmosphere):
             self.index_atm_oz = hdr['IDX_OZ']
             self.index_atm_data = hdr['IDX_DATA']
 
-            self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_atm_HEADER + self.NB_atm_DATA))
+            self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_ATM_HEADER + self.NB_ATM_DATA))
 
             self.atmgrid[:, :] = hdu[0].data[:, :]
 
@@ -396,49 +482,82 @@ class AtmosphereGrid(Atmosphere):
                                                                self.NB_OZ_POINTS,
                                                                len(self.lambdas))).T, bounds_error=False, fill_value=0)
 
-            return self.atmgrid, self.header
-
     def simulate(self, ozone, pwv, aerosols):
-        """ first ozone, second pwv, last aerosols, to respect order of loops when generating the grid"""
+        """Interpolate from the atmospheric grid to get the atmospheric transmission.
+
+        First ozone, second pwv, last aerosols, to respect order of loops when generating the grid
+
+        Parameters
+        ----------
+        ozone: float
+            Ozone quantity in Dobson
+        pwv: float
+            Precipitable Water Vapor quantity in mm
+        aerosols: float
+            VAOD Vertical Aerosols Optical Depth
+
+        Examples
+        --------
+        >>> a = AtmosphereGrid(filename='tests/data/reduc_20170530_134_atmsim.fits')
+        >>> lambdas = np.arange(200, 1200)
+        >>> fig = plt.figure()
+        >>> for pwv in np.arange(5):
+        ...     transmission = a.simulate(ozone=400, pwv=pwv, aerosols=0.05)
+        ...     plot_transmission_simple(plt.gca(), lambdas, transmission(lambdas),
+        ...     title=a.title, label=a.label)
+        >>> if parameters.DISPLAY: plt.show()
+        """
+        self.pwv = pwv
+        self.ozone = ozone
+        self.aerosols = aerosols
+        self.set_title()
+        self.set_label()
         ones = np.ones_like(self.lambdas)
         points = np.array([self.lambdas, ozone * ones, pwv * ones, aerosols * ones]).T
         atm = self.model(points)
         self.transmission = interp1d(self.lambdas, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
-        self.pwv = pwv
-        self.ozone = ozone
-        self.aerosols = aerosols
         return self.transmission
 
 
-# ----------------------------------------------------------------------------------
 class TelescopeTransmission():
-    """
-    TelescopeTransmission : Transmission of the telescope
-    - mirrors
-    - throughput
-    - QE
-    - Filter
 
-    """
+    def __init__(self, filter_name=""):
+        """Transmission of the telescope as product of the following transmissions:
+        
+        - mirrors
+        - throughput
+        - quantum efficiency
+        - Filter
 
-    # ---------------------------------------------------------------------------
-    def __init__(self, filtername=""):
-        """
-        Args:
-        file_name (:obj:`str`): path to the data file_name (for info only)
-        """
+        Parameters
+        ----------
+        filter_name: str, optional
+            The filter string name.
+
+        Examples
+        --------
+        >>> t = TelescopeTransmission()
+        >>> t.plot_transmission()
+       """
 
         self.my_logger = set_logger(self.__class__.__name__)
-        self.filtername = filtername
+        self.filter_name = filter_name
         self.load_transmission()
 
-    # ---------------------------------------------------------------------------
     def load_transmission(self):
-        """
-        load_transmission(self) :
-            load_image the telescope transmission
-            return the total telescope transmission, disperser excluded,
-                as a fnction of the wavelength in Angstrom
+        """Load the transmission files and make a function.
+        
+        Returns
+        -------
+        transmission: callable
+            The transmission function using wavelengths in nm.
+
+        Examples
+        --------
+        >>> t = TelescopeTransmission()
+        >>> assert t.transmission is not None
+        >>> assert t.transmission_err is not None
+        >>> t.plot_transmission()
         """
 
         '''
@@ -456,55 +575,48 @@ class TelescopeTransmission():
         '''
         throughput = Throughput()
         wl, trm, err = throughput.load_total_throughput()
-        self.to = interp1d(wl, trm, kind='linear', bounds_error=False, fill_value=0.)
+        to = interp1d(wl, trm, kind='linear', bounds_error=False, fill_value=0.)
         err = np.sqrt(err ** 2 + parameters.OBS_TRANSMISSION_SYSTEMATICS ** 2)
-        self.to_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
+        to_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
 
         # Filter RG715
-        wl, trg = throughput.load_RG715()
-        self.tfr = interp1d(wl, trg, kind='linear', bounds_error=False, fill_value=0.)
+        wl, trg, err = throughput.load_RG715()
+        tfr = interp1d(wl, trg, kind='linear', bounds_error=False, fill_value=0.)
 
         # Filter FGB37
-        wl, trb = throughput.load_FGB37()
-        self.tfb = interp1d(wl, trb, kind='linear', bounds_error=False, fill_value=0.)
+        wl, trb, err = throughput.load_FGB37()
+        tfb = interp1d(wl, trb, kind='linear', bounds_error=False, fill_value=0.)
 
-        if self.filtername == "RG715":
-            TF = self.tfr
-        elif self.filtername == "FGB37":
-            TF = self.tfb
+        if self.filter_name == "RG715":
+            TF = tfr
+        elif self.filter_name == "FGB37":
+            TF = tfb
         else:
             TF = lambda x: np.ones_like(x).astype(float)
 
-        self.tf = TF
+        tf = TF
 
         # self.transmission=lambda x: self.qe(x)*self.to(x)*(self.tm(x)**2)*self.tf(x)
-        self.transmission = lambda x: self.to(x) * self.tf(x)
-        self.transmission_err = lambda x: self.to_err(x)
+        self.transmission = lambda x: to(x) * tf(x)
+        self.transmission_err = lambda x: to_err(x)
         return self.transmission
 
-    # ---------------------------------------------------------------------------
-    def plot_transmission(self, xlim=None):
-        """
-        plot_transmission()
-            plot the various transmissions of the instrument
+    def plot_transmission(self):
+        """Plot the transmission function and the associated uncertainties.
+
+        Examples
+        --------
+        >>> t = TelescopeTransmission()
+        >>> t.plot_transmission()
+
         """
         plt.figure()
-        # plt.plot(parameters.LAMBDAS,self.qe(parameters.LAMBDAS),'b-',label='qe')
-        plt.plot(parameters.LAMBDAS, self.to(parameters.LAMBDAS), 'g-', label='othr')
-        # plt.plot(parameters.LAMBDAS,self.tm(parameters.LAMBDAS),'y-',label='mirr')
-        plt.plot(parameters.LAMBDAS, self.tf(parameters.LAMBDAS), 'k-', label='filt')
-        plt.plot(parameters.LAMBDAS, self.tfr(parameters.LAMBDAS), 'k:', label='RG715')
-        plt.plot(parameters.LAMBDAS, self.tfb(parameters.LAMBDAS), 'k--', label='FGB37')
-        plt.errorbar(parameters.LAMBDAS, self.transmission(parameters.LAMBDAS),
-                     yerr=self.transmission_err(parameters.LAMBDAS), color='r', linestyle='-', lw=2, label='tot')
-        plt.legend()
-        plt.grid()
-        plt.xlabel("$\lambda$ [nm]")
-        plt.ylabel("Transmission")
-        plt.title("Telescope transmissions")
+        plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.transmission(parameters.LAMBDAS),
+                                 uncertainties=self.transmission_err(parameters.LAMBDAS))
+        if parameters.DISPLAY:
+            plt.show()
 
 
-# ----------------------------------------------------------------------------------
 class SpectrumSimulation(Spectrum):
     """ SpectrumSim class used to store information and methods
     relative to spectrum simulation.
@@ -569,13 +681,11 @@ class SpectrumSimulation(Spectrum):
         return self.lambdas, self.model, self.model_err
 
 
-# ----------------------------------------------------------------------------------
 class SpectrogramModel(Spectrum):
     """ SpectrumSim class used to store information and methods
     relative to spectrum simulation.
     """
 
-    # ---------------------------------------------------------------------------
     def __init__(self, spectrum, atmosphere, telescope, disperser):
         Spectrum.__init__(self)
         for k, v in list(spectrum.__dict__.items()):
@@ -802,7 +912,6 @@ class SpectrogramModel(Spectrum):
         return self.lambdas, self.data, self.err
 
 
-# ----------------------------------------------------------------------------------
 class SpectrumSimGrid():
     """ SpectrumSim class used to store information and methods
     relative to spectrum simulation.
@@ -833,7 +942,6 @@ class SpectrumSimGrid():
             self.filename = filename
             self.spectrum.load_spectrum(filename)
 
-    # ----------------------------------------------------------------------------
     def compute(self):
         sim = SpectrumSimulation(self.spectrum, self.atmgrid.atmgrid, self.telescope, self.disperser)
         # product of all sed and transmissions except atmosphere
@@ -848,7 +956,6 @@ class SpectrumSimGrid():
                                                              self.atmgrid.index_atm_data:] * all_transm
         return self.spectragrid
 
-    # ---------------------------------------------------------------------------
     def plot_spectra(self):
         plt.figure()
         counts = self.spectragrid[1:, self.atmgrid.index_atm_count]
@@ -860,7 +967,6 @@ class SpectrumSimGrid():
         plt.title("Spectra for Atmospheric variations")
         if parameters.DISPLAY: plt.show()
 
-    # ---------------------------------------------------------------------------
     def plot_spectra_img(self):
         plt.figure()
         img = plt.imshow(self.spectragrid[1:, self.atmgrid.index_atm_data:], origin='lower', cmap='jet')
@@ -934,7 +1040,6 @@ def SimulatorInit(filename):
     return spectrum, telescope, disperser, target
 
 
-# ----------------------------------------------------------------------------------
 def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
                           pwv=5, ozone=300, aerosols=0.05, A1=1.0, A2=0., reso=0, D=parameters.DISTANCE2CCD, shift=0.):
     """ SimulatorCore
@@ -957,7 +1062,6 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
     return spectrum_simulation
 
 
-# ----------------------------------------------------------------------------------
 def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
                              pwv=5, ozone=300, aerosols=0.05, A1=1.0, A2=0.,
                              D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0., psf_poly_params=None):
@@ -978,7 +1082,6 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
     return spectrogram_simulation
 
 
-# ----------------------------------------------------------------------------------
 def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_grid=[100, 700, 7],
                              aerosol_grid=[0, 0.1, 5]):
     """ SimulatorSimGrid
@@ -1011,21 +1114,21 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
         infostring = " atmospheric simulation file %s of size %d already exists, thus load_image it ..." % (
             output_atmfilename, filesize)
         my_logger.info(infostring)
-        atmgrid, header = atm.load_file(output_atmfilename)
+        atm.load_file(output_atmfilename)
     else:
-        atmgrid = atm.compute()
-        header = atm.save_file(filename=output_atmfilename)
+        atm.compute()
+        atm.save_file(filename=output_atmfilename)
         # libradtran.clean_simulation_directory()
     if parameters.VERBOSE:
         infostring = '\n\t ========= Atmospheric simulation :  ==============='
         my_logger.info(infostring)
         atm.plot_transmission()  # plot all atm transp profiles
-        atm.plot_transm_img()  # plot 2D image summary of atm simulations
+        atm.plot_transmission_image()  # plot 2D image summary of atm simulations
 
     # SPECTRA-GRID
     # -------------
     # in any case we re-calculate the spectra in case of change of spectrum function
-    spectra = SpectrumSimGrid(spectrum, atm, telescope, disperser, target, header)
+    spectra = SpectrumSimGrid(spectrum, atm, telescope, disperser, target, atm.header)
     spectragrid = spectra.compute()
     spectra.save_spectra(output_filename)
     if parameters.VERBOSE:
@@ -1035,7 +1138,6 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
     # ---------------------------------------------------------------------------
 
 
-# ----------------------------------------------------------------------------------
 def SpectrumSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A1=1., A2=0.,
                       reso=None, D=parameters.DISTANCE2CCD, shift=0.):
     """ Simulator
@@ -1075,7 +1177,6 @@ def SpectrumSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A
     return spectrum_simulation
 
 
-# ----------------------------------------------------------------------------------
 def SpectrogramSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A1=1., A2=0.,
                          D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0., psf_poly_params=None):
     """ Simulator
