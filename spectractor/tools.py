@@ -614,7 +614,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
         if parameters.DISPLAY: plt.show()
         '''
         my_logger.info(f'\n\t{or_fitted_model}')
-        my_logger.debug(f'\n\t{fit.fit_info}')
+        # my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model, outliers
 
 
@@ -667,7 +667,7 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
         my_logger.info(f'\n\t{or_fitted_model}')
-        my_logger.debug(f'\n\t{fit.fit_info}')
+        # my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
 
@@ -751,7 +751,7 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
         my_logger.info(f'\n\t{or_fitted_model}')
-        my_logger.debug(f'\n\t{fit.fit_info}')
+        # my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
 
@@ -822,7 +822,7 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
         my_logger.info(f'\n\t{or_fitted_model}')
-        my_logger.debug(f'\n\t{fit.fit_info}')
+        # my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
 
@@ -891,7 +891,7 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y)
         my_logger.info(f'\n\t{or_fitted_model}')
-        my_logger.debug(f'\n\t{fit.fit_info}')
+        # my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
 
@@ -953,7 +953,7 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
         fit = fitting.LevMarLSQFitter()
         fitted_model = fit(gg_init, x, y)
         my_logger.info(f'\n\t{fitted_model}')
-        my_logger.debug(f'\n\t{fit.fit_info}')
+        # my_logger.debug(f'\n\t{fit.fit_info}')
         return fitted_model
 
 
