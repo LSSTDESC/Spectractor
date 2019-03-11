@@ -369,29 +369,29 @@ class TelescopeTransmission():
 
         '''
         # QE
-        wl,qe=ctio.get_quantum_efficiency(datapath)
+        wl,qe=ctio.load_quantum_efficiency(datapath)
         self.qe=interp1d(wl,qe,kind='linear',bounds_error=False,fill_value=0.)
 
         #  Throughput
-        wl,trt=ctio.get_telescope_throughput(datapath)
+        wl,trt=ctio.load_telescope_throughput(datapath)
         self.to=interp1d(wl,trt,kind='linear',bounds_error=False,fill_value=0.)
 
         # Mirrors
-        wl,trm=ctio.get_mirror_reflectivity(datapath)
+        wl,trm=ctio.load_mirror_reflectivity(datapath)
         self.tm=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.)
         '''
         throughput = Throughput()
-        wl, trm, err = throughput.get_total_throughput()
+        wl, trm, err = throughput.load_total_throughput()
         self.to = interp1d(wl, trm, kind='linear', bounds_error=False, fill_value=0.)
         err = np.sqrt(err ** 2 + parameters.OBS_TRANSMISSION_SYSTEMATICS ** 2)
         self.to_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
 
         # Filter RG715
-        wl, trg = throughput.get_RG715()
+        wl, trg = throughput.load_RG715()
         self.tfr = interp1d(wl, trg, kind='linear', bounds_error=False, fill_value=0.)
 
         # Filter FGB37
-        wl, trb = throughput.get_FGB37()
+        wl, trb = throughput.load_FGB37()
         self.tfb = interp1d(wl, trb, kind='linear', bounds_error=False, fill_value=0.)
 
         if self.filtername == "RG715":
