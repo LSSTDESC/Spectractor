@@ -34,43 +34,91 @@ from spectractor.config import set_logger
 import spectractor.parameters as parameters
 
 import spectractor.simulation.libradtran as libradtran
-from spectractor.simulation.throughput import Throughput
+from spectractor.simulation.throughput import Throughput, plot_transmission_simple
 
 import slitless.fourier.arrays as FA
-# import slitless.fourier.plots as FP
 import slitless.fourier.fourier as F
-import slitless.fourier.models as FM
 
 
-class Atmosphere(object):
-    """
-    Atmosphere():
-        class to evaluate an atmospheric transmission calling libradtran
-    Args:
-        airmass (:obj:`float`): airmass of the target
-        pressure (:obj:`float`): pressure of the atmosphere
-        temperature (:obj:`float`): temperature of the atmosphere
-    """
+class Atmosphere:
 
     def __init__(self, airmass, pressure, temperature):
+        """Class to evaluate an atmospheric transmission using Libradtran.
+
+        Parameters
+        ----------
+        airmass: float
+            Airmass of the source object.
+        pressure: float
+            Pressure of the atmosphere in hPa.
+        temperature: float
+            Temperature of the atmosphere in Celsius degrees.
+
+        Examples
+        --------
+        >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
+        >>> print(a.airmass)
+        1.2
+        >>> print(a.pressure)
+        800
+        >>> print(a.temperature)
+        5
+        >>> print(a.transmission(500))
+        1.0
+        """
         self.my_logger = set_logger(self.__class__.__name__)
         self.airmass = airmass
         self.pressure = pressure
         self.temperature = temperature
+        self.pwv = None
+        self.ozone = None
+        self.aerosols = None
         self.transmission = lambda x: np.ones_like(x).astype(float)
+        self.title = ""
 
     def simulate(self, ozone, pwv, aerosols):
+        """Simulate the atmosphere transparency with Libradtran given atmospheric composition.
+
+        Values outside the Libradtran simulation range are set to zero.
+
+        Parameters
+        ----------
+        ozone: float
+            Ozone quantity in Dobson
+        pwv: float
+            Precipitable Water Vapor quantity in mm
+        aerosols: float
+            VAOD Vertical Aerosols Optical Depth
+
+        Returns
+        -------
+        transmission: callable
+            The transmission function of wavelengths in nm.
+
+        Examples
+        --------
+        >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
+        >>> transmission = a.simulate(ozone=400, pwv=5, aerosols=0.05)
+        >>> assert transmission is not None
+        >>> assert a.transmission(500) > 0
+        >>> a.ozone
+        400
+        >>> a.pwv
+        5
+        >>> a.aerosols
+        0.05
+        >>> a.plot_transmission()
+
+        ..plot:
+            fig = plt.figure()
+            plot_transmission_simple(plt.gca(), lambdas, transmission(lambdas), title=a.title)
+            plt.show()
         """
-        Args:
-            ozone (:obj:`float`): ozone quantity
-            pwv (:obj:`float`): pressure water vapor
-            aerosols (:obj:`float`): VAOD Vertical Aerosols Optical Depth
-        """
-        # first determine the length
+
+        self.title = f'\Atmospheric transmission with z={self.airmass:4.2f}, P={self.pressure:4.2f} hPa, ' \
+                     f'T={self.temperature:4.2f}$\degree$C\nPWV={pwv:4.2f}mm, OZ={ozone:4.2f}DB, VAOD={aerosols:4.2f} '
         if parameters.VERBOSE:
-            self.my_logger.info(
-                '\n\tAtmospheric simulation with z=%4.2f, P=%4.2f, T=%4.2f, PWV=%4.2f, OZ=%4.2f, VAOD=%4.2f ' % (
-                    self.airmass, self.pressure, self.temperature, pwv, ozone, aerosols))
+            self.my_logger.info(f'\n\t{self.title}')
 
         lib = libradtran.Libradtran()
         path = lib.simulate(self.airmass, pwv, ozone, aerosols, self.pressure)
@@ -84,20 +132,44 @@ class Atmosphere(object):
         return self.transmission
 
     def plot_transmission(self):
+        """Plot the atmospheric transmission computed with Libradtran.
+
+        Examples
+        --------
+        >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
+        >>> a.simulate(ozone=400, pwv=5, aerosols=0.05)
+        >>> a.plot_transmission()
+
+        """
         plt.figure()
-        plt.plot(parameters.LAMBDAS, self.transmission(parameters.LAMBDAS),
-                 label='z=%4.2f, P=%4.2f, T=%4.2f' % (self.airmass, self.pressure, self.temperature))
-        plt.grid()
-        plt.xlabel("$\lambda$ [nm]")
-        plt.ylabel("Atmospheric transparency")
-        plt.legend()
-        if parameters.DISPLAY: plt.show()
+        plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.transmission(parameters.LAMBDAS), title=self.title)
+        if parameters.DISPLAY:
+            plt.show()
 
 
 # ----------------------------------------------------------------------------------
 class AtmosphereGrid(Atmosphere):
 
     def __init__(self, data_filename, filename="", airmass=1., pressure=800., temperature=10.):
+        """Class to load and interpolate grids of atmospheric transmission computed with Libradtran.
+
+        Parameters
+        ----------
+        data_filename: str
+            The file name of the atmospheric grid.
+        filename: str, optional
+            The original image fits file name from which the grid was computed (default: "").
+        airmass: float, optional
+            Airmass of the source object (default: 1).
+        pressure: float, optional
+            Pressure of the atmosphere in hPa (default: 800).
+        temperature: float, optional
+            Temperature of the atmosphere in Celsius degrees (default: 10).
+
+        Examples
+        --------
+        >>> a = AtmosphereGrid('./tests/data/reduc_20170530_134_atmsim.fits')
+        """
         Atmosphere.__init__(self, airmass, pressure, temperature)
         self.my_logger = set_logger(self.__class__.__name__)
         self.data_filename = data_filename
@@ -1046,7 +1118,5 @@ def SpectrogramSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05
 
 if __name__ == "__main__":
     import doctest
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
