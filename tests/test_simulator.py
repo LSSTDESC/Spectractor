@@ -1,7 +1,8 @@
 from numpy.testing import run_module_suite
 
 from spectractor import parameters
-from spectractor.simulation.simulator import SpectrumSimulator, SpectrumSimulatorSimGrid, Atmosphere, AtmosphereGrid
+from spectractor.simulation.simulator import SpectrumSimulator, SpectrumSimulatorSimGrid, \
+    Atmosphere, AtmosphereGrid, SpectrogramSimulator
 from spectractor.config import load_config
 import os
 
@@ -16,6 +17,8 @@ def test_simulator():
         tag = file_name.split('/')[-1]
         spectrum_simulation = SpectrumSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
                                                 A1=1.1, A2=0.1, reso=2, D=56, shift=-3)
+        spectrogram_simulation = SpectrogramSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
+                                                A1=1.1, A2=0.1, D=56, shift_x=-3, shift_y=1, angle=-1)
         SpectrumSimulatorSimGrid(file_name, './tests/data/', pwv_grid=[0, 10, 2], ozone_grid=[200, 400, 2],
                                  aerosol_grid=[0, 0.1, 2])
         atmgrid = AtmosphereGrid(file_name, file_name.replace('spectrum', 'atmsim'))
