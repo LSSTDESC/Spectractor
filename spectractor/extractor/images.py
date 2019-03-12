@@ -416,7 +416,8 @@ def find_target_1Dprofile(image, sub_image, guess):
     >>> im = Image('tests/data/reduc_20170605_028.fits')
     >>> guess = [820, 580]
 
-    ..plot:
+    .. plot::
+
         im.plot_image(target_pixcoords=[820, 580])
 
     >>> parameters.DEBUG = True
@@ -494,7 +495,8 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     >>> im = Image('tests/data/reduc_20170605_028.fits')
     >>> guess = [820, 580]
 
-    ..plot:
+    .. plot::
+
         im.plot_image(target_pixcoords=[820, 580])
 
     >>> parameters.DEBUG = True
@@ -609,7 +611,8 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     --------
     >>> im=Image('tests/data/reduc_20170605_028.fits', disperser_label='HoloPhAg')
 
-    # Create of False spectrogram:
+    Create a mock spectrogram:
+
     >>> N = parameters.CCD_IMSIZE
     >>> im.data = np.ones((N, N))
     >>> slope = -0.1
@@ -618,14 +621,31 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     ...     im.data[int(y(x)), x] = 10
     ...     im.data[int(y(x))+1, x] = 10
 
-    ..plot:
-        plt.imshow(im.data, origin='lower)
-        plt.show()
+    .. plot::
+
+        from spectractor.extractor.images import Image
+        import spectractor.parameters as parameters
+        im=Image('tests/data/reduc_20170605_028.fits', disperser_label='HoloPhAg')
+        N = parameters.CCD_IMSIZE
+        N = parameters.CCD_IMSIZE
+        im.data = np.ones((N, N))
+        slope = -0.1
+        y = lambda x: slope * (x - 0.5*N) + 0.5*N
+        for x in np.arange(N):
+            im.data[int(y(x)), x] = 10
+            im.data[int(y(x))+1, x] = 10
+        plt.imshow(im.data, origin='lower')
 
     >>> im.target_pixcoords=(N//2, N//2)
     >>> parameters.DEBUG = True
     >>> theta = compute_rotation_angle_hessian(im)
-    >>> assert np.isclose(theta, np.arctan(slope)*180/np.pi, rtol=1e-2)
+    >>> print(f'{theta:.2f}, {np.arctan(slope)*180/np.pi:.2f}')
+    -5.72, -5.71
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(theta, np.arctan(slope)*180/np.pi, rtol=1e-2)
     """
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region
@@ -694,10 +714,12 @@ def turn_image(image):
 
     Examples
     --------
-    >>> im=Image('tests/data/reduc_20170605_028.fits', disperser_label='HoloPhAg')
 
-    # Create of False spectrogram:
+    Create of False spectrogram
+
+    >>> im=Image('tests/data/reduc_20170605_028.fits', disperser_label='HoloPhAg')
     >>> N = parameters.CCD_IMSIZE
+
     >>> im.data = np.ones((N, N))
     >>> slope = -0.1
     >>> y = lambda x: slope * (x - 0.5*N) + 0.5*N
@@ -705,15 +727,47 @@ def turn_image(image):
     ...     im.data[int(y(x)), x] = 10
     ...     im.data[int(y(x))+1, x] = 10
 
-    ..plot:
-        plt.imshow(im.data, origin='lower)
-        plt.show()
+    .. plot::
+
+        from spectractor.extractor.images import Image
+        import spectractor.parameters as parameters
+        im=Image('tests/data/reduc_20170605_028.fits', disperser_label='HoloPhAg')
+        N = parameters.CCD_IMSIZE
+        im.data = np.ones((N, N))
+        slope = -0.1
+        y = lambda x: slope * (x - 0.5*N) + 0.5*N
+        for x in np.arange(N):
+            im.data[int(y(x)), x] = 10
+            im.data[int(y(x))+1, x] = 10
+        plt.imshow(im.data, origin='lower')
 
     >>> im.target_pixcoords=(N//2, N//2)
     >>> parameters.DEBUG = True
     >>> turn_image(im)
-    >>> assert im.data_rotated is not None
-    >>> assert np.isclose(im.rotation_angle, np.arctan(slope)*180/np.pi, rtol=1e-2)
+
+    .. doctest::
+        :hide:
+
+        >>> assert im.data_rotated is not None
+        >>> assert np.isclose(im.rotation_angle, np.arctan(slope)*180/np.pi, rtol=1e-2)
+
+    .. plot::
+
+        from spectractor.extractor.images import Image, turn_image
+        import spectractor.parameters as parameters
+        im=Image('tests/data/reduc_20170605_028.fits', disperser_label='HoloPhAg')
+        N = parameters.CCD_IMSIZE
+        im.data = np.ones((N, N))
+        slope = -0.1
+        y = lambda x: slope * (x - 0.5*N) + 0.5*N
+        for x in np.arange(N):
+            im.data[int(y(x)), x] = 10
+            im.data[int(y(x))+1, x] = 10
+
+        im.target_pixcoords=(N//2, N//2)
+        turn_image(im)
+        plt.imshow(im.data_rotated, origin='lower')
+
     """
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
                                                           right_edge=parameters.CCD_IMSIZE - 200)

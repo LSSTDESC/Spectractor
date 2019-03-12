@@ -234,18 +234,22 @@ def multigauss_and_bgd(x, *params):
 
     Examples
     --------
-    >>> import spectractor.parameters as parameters
     >>> parameters.CALIB_BGD_NPARAMS = 4
-    >>> x = np.arange(600.,800.,1)
+    >>> x = np.arange(600., 800., 1)
     >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
     >>> print(f'{y[0]:.2f}')
     19.00
 
-    ..plot:
-        import matplotlib.pyplot as plt
+    .. plot::
+
+        import spectractor.parameters as parameters
+        from spectractor.tools import multigauss_and_bgd
+        parameters.CALIB_BGD_NPARAMS = 4
+        x = np.arange(600., 800., 1)
+        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
+        y = multigauss_and_bgd(x, *p)
         plt.plot(x,y,'r-')
-        plt.show()
 
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
@@ -1097,9 +1101,6 @@ def fftconvolve_gaussian(array, reso):
     >>> array = np.ones(100)
     >>> output = fftconvolve_gaussian(array, 3)
     >>> print(output[:3])
-<<<<<<< HEAD
-    [0.5        0.63125312 0.74870357]
-=======
     [ 0.5         0.63114657  0.74850168]
     >>> array = np.ones((100, 100))
     >>> output = fftconvolve_gaussian(array, 3)
@@ -1107,7 +1108,6 @@ def fftconvolve_gaussian(array, reso):
     [ 0.5         0.63114657  0.74850168]
     >>> array = np.ones((100, 100, 100))
     >>> output = fftconvolve_gaussian(array, 3)
->>>>>>> 0e123b8e16fd5d6e5d5995d961478e73bc23105c
     """
     my_logger = set_logger(__name__)
     if array.ndim == 2:
