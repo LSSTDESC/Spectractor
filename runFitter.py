@@ -1,6 +1,6 @@
 from spectractor import parameters
 from spectractor.fit.fitter import run_emcee, FitWorkspace
-
+from spectractor.config import load_config
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -15,8 +15,10 @@ if __name__ == "__main__":
                         help="Enter verbose (print more stuff).", default=False)
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
                         help="Write results in given output directory (default: ./outputs/).")
-    parser.add_argument("-c", "--csv", dest="csv", default="ctiofulllogbook_jun2017_v5.csv",
+    parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
+    parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
+                        help="INI config file. (default: config.ctio.ini).")
     args = parser.parse_args()
 
     parameters.VERBOSE = args.verbose
@@ -25,6 +27,8 @@ if __name__ == "__main__":
         parameters.VERBOSE = True
 
     file_names = args.input
+
+    load_config(args.config)
 
     for file_name in file_names:
         atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')

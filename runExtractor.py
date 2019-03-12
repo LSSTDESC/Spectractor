@@ -15,8 +15,10 @@ if __name__ == "__main__":
                         help="Enter verbose (print more stuff).", default=False)
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
                         help="Write results in given output directory (default: ./outputs/).")
-    parser.add_argument("-c", "--csv", dest="csv", default="ctiofulllogbook_jun2017_v5.csv",
+    parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
+    parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
+                        help="INI config file. (default: config.ctio.ini).")
     args = parser.parse_args()
 
     parameters.VERBOSE = args.verbose
@@ -26,10 +28,11 @@ if __name__ == "__main__":
 
     file_names = args.input
 
-    logbook = LogBook(logbook=args.csv)
+    logbook = LogBook(logbook=args.logbook)
     for file_name in file_names:
         tag = file_name.split('/')[-1]
-        target, xpos, ypos = logbook.search_for_image(tag)
+        disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None:
             continue
-        Spectractor(file_name, args.output_directory, [xpos, ypos], target)
+        # file_name = "outputs/sim_20170530_134.fits"
+        Spectractor(file_name, args.output_directory, [xpos, ypos], target, disperser_label, args.config)

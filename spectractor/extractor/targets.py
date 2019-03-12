@@ -1,63 +1,182 @@
-import os
-import matplotlib.pyplot as plt
-import numpy as np
-from astropy import units as units
 from astropy.coordinates import SkyCoord
 from astroquery.ned import Ned
 from astroquery.simbad import Simbad
-from scipy.interpolate import interp1d
 
-from spectractor import parameters
+from spectractor.extractor.spectroscopy import *
 
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
 
 
+def load_target(label, verbose=False):
+    """Load the target properties according to the type set by parameters.OBS_OBJECT_TYPE.
+
+    Currently, the type can be either "STAR", "HG-AR" or "MONOCHROMATOR". The label parameter gives the
+    name of the source and allows to load its specific properties.
+
+    Parameters
+    ----------
+    label: str
+        The label of the target.
+    verbose: bool, optional
+        If True, more verbosity (default: False).
+
+    Examples
+    --------
+    >>> parameters.OBS_OBJECT_TYPE = "STAR"
+    >>> t = load_target("HD111980", verbose=False)
+    >>> print(t.label)
+    HD111980
+    >>> print(t.coord.dec)
+    -18d31m20.009s
+    >>> parameters.OBS_OBJECT_TYPE = "MONOCHROMATOR"
+    >>> t = load_target("XX", verbose=False)
+    >>> print(t.label)
+    XX
+    >>> parameters.OBS_OBJECT_TYPE = "HG-AR"
+    >>> t = load_target("XX", verbose=False)
+    >>> print([l.wavelength for l in t.lines.lines][:5])
+    [253.652, 296.728, 302.15, 313.155, 334.148]
+    >>> parameters.OBS_OBJECT_TYPE = "OTHER"
+    >>> t = load_target("XX", verbose=False)
+    """
+    if parameters.OBS_OBJECT_TYPE == 'STAR':
+        return Star(label, verbose)
+    elif parameters.OBS_OBJECT_TYPE == 'HG-AR':
+        return ArcLamp(label, verbose)
+    elif parameters.OBS_OBJECT_TYPE == 'MONOCHROMATOR':
+        return Monochromator(label, verbose)
+    else:
+        t = Target(label, verbose)
+        t.my_logger.error(f'\n\tUnknown parameters.OBS_OBJECT_TYPE: {parameters.OBS_OBJECT_TYPE}')
+
+
 class Target:
 
     def __init__(self, label, verbose=False):
-        """Initialize Traget object.
+        """Initialize Target class.
 
         Parameters
         ----------
         label: str
             String label to name the target
-        verbose: book, optional
+        verbose: bool, optional
             Set True to increase verbosity (default: False)
 
-        Examples
-        --------
-
-        Emission line object:
-        >>> t = Target('3C273')
-        >>> print(t.label)
-        3C273
-        >>> print(t.coord.dec)
-        2d03m08.598s
-        >>> print(t.emission_spectrum)
-        True
-
-        Standard star:
-        >>> t = Target('HD111980')
-        >>> print(t.label)
-        HD111980
-        >>> print(t.coord.dec)
-        -18d31m20.009s
-        >>> print(t.emission_spectrum)
-        False
-
         """
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.label = label
-        self.coord = None
         self.type = None
-        self.redshift = 0
         self.wavelengths = []
         self.spectra = []
         self.verbose = verbose
         self.emission_spectrum = False
         self.hydrogen_only = False
         self.sed = None
+        self.lines = None
+        self.coord = None
+        self.redshift = 0
+
+
+class ArcLamp(Target):
+
+    def __init__(self, label, verbose=False):
+        """Initialize ArcLamp class.
+
+        Parameters
+        ----------
+        label: str
+            String label to name the lamp.
+        verbose: bool, optional
+            Set True to increase verbosity (default: False)
+
+        Examples
+        --------
+
+        Mercury-Argon lamp:
+        >>> t = ArcLamp("HG-AR", verbose=False)
+        >>> print([l.wavelength for l in t.lines.lines][:5])
+        [253.652, 296.728, 302.15, 313.155, 334.148]
+        >>> print(t.emission_spectrum)
+        True
+
+        """
+        Target.__init__(self, label, verbose=verbose)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.emission_spectrum = True
+        self.lines = Lines(HGAR_LINES, emission_spectrum=True)
+
+    def load(self):
+        pass
+
+
+class Monochromator(Target):
+
+    def __init__(self, label, verbose=False):
+        """Initialize Monochromator class.
+
+        Parameters
+        ----------
+        label: str
+            String label to name the monochromator.
+        verbose: bool, optional
+            Set True to increase verbosity (default: False)
+
+        Examples
+        --------
+
+        >>> t = Monochromator("XX", verbose=False)
+        >>> print(t.label)
+        XX
+        >>> print(t.emission_spectrum)
+        True
+
+        """
+        Target.__init__(self, label, verbose=verbose)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.emission_spectrum = True
+        self.lines = Lines([], emission_spectrum=True)
+
+    def load(self):
+        pass
+
+
+class Star(Target):
+
+    def __init__(self, label, verbose=False):
+        """Initialize Star class.
+
+        Parameters
+        ----------
+        label: str
+            String label to name the target
+        verbose: bool, optional
+            Set True to increase verbosity (default: False)
+
+        Examples
+        --------
+
+        Emission line object:
+        >>> s = Star('3C273')
+        >>> print(s.label)
+        3C273
+        >>> print(s.coord.dec)
+        2d03m08.598s
+        >>> print(s.emission_spectrum)
+        True
+
+        Standard star:
+        >>> s = Star('HD111980')
+        >>> print(s.label)
+        HD111980
+        >>> print(s.coord.dec)
+        -18d31m20.009s
+        >>> print(s.emission_spectrum)
+        False
+
+        """
+        Target.__init__(self, label, verbose=verbose)
+        self.my_logger = set_logger(self.__class__.__name__)
         self.load()
 
     def load(self):
@@ -65,8 +184,8 @@ class Target:
 
         Examples
         --------
-        >>> t = Target('3C273')
-        >>> print(t.coord.dec)
+        >>> s = Star('3C273')
+        >>> print(s.coord.dec)
         2d03m08.598s
 
         """
@@ -83,14 +202,24 @@ class Target:
     def load_spectra(self):
         """Load reference spectra from Pysynphot database or NED database.
 
+        If the object redshift is >0.2, the LAMBDA_MIN and LAMBDA_MAX parameters
+        are redshifted accordingly.
+
         Examples
         --------
-        >>> t = Target('3C273')
-        >>> print(t.spectra[0][:4])
+        >>> s = Star('3C273')
+        >>> print(s.spectra[0][:4])
         [  0.00000000e+00   2.50485769e-14   2.42380612e-14   2.40887886e-14]
-        >>> t = Target('HD111980')
-        >>> print(t.spectra[0][:4])
+        >>> s = Star('HD111980')
+        >>> print(s.spectra[0][:4])
         [  2.16890002e-13   2.66480010e-13   2.03540011e-13   2.38780004e-13]
+        >>> s = Star('PKS1510-089')
+        >>> print(s.redshift)
+        0.36
+        >>> print(f'{parameters.LAMBDA_MIN:.1f}, {parameters.LAMBDA_MAX:.1f}')
+        408.0, 1496.0
+        >>> print(s.spectra[0][:4])
+        [ 117.34012  139.27621   87.38032  143.0816 ]
         """
         self.wavelengths = []  # in nm
         self.spectra = []
@@ -105,6 +234,9 @@ class Target:
         if len(file_names) > 0:
             self.emission_spectrum = False
             self.hydrogen_only = True
+            self.lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES,
+                               redshift=0., emission_spectrum=self.emission_spectrum,
+                               hydrogen_only=self.hydrogen_only)
             for k, f in enumerate(file_names):
                 if '_mod_' in f:
                     continue
@@ -130,6 +262,9 @@ class Target:
                     self.hydrogen_only = True
                     parameters.LAMBDA_MIN *= 1 + self.redshift
                     parameters.LAMBDA_MAX *= 1 + self.redshift
+                self.lines = Lines(ATMOSPHERIC_LINES+ISM_LINES+HYDROGEN_LINES,
+                                   redshift=self.redshift, emission_spectrum=self.emission_spectrum,
+                                   hydrogen_only=self.hydrogen_only)
                 for k, h in enumerate(hdulists):
                     if h[0].header['NAXIS'] == 1:
                         self.spectra.append(h[0].data)
@@ -156,6 +291,9 @@ class Target:
                         self.wavelengths.append(waves)
             else:
                 self.emission_spectrum = True
+                self.lines = Lines(ATMOSPHERIC_LINES+ISM_LINES+HYDROGEN_LINES,
+                                   redshift=0., emission_spectrum=self.emission_spectrum,
+                                   hydrogen_only=self.hydrogen_only)
         self.build_sed()
 
     def build_sed(self, index=0):
@@ -168,9 +306,9 @@ class Target:
 
         Examples
         --------
-        >>> t = Target('HD111980')
-        >>> t.build_sed(index=0)
-        >>> t.sed(550)
+        >>> s = Star('HD111980')
+        >>> s.build_sed(index=0)
+        >>> s.sed(550)
         array(1.676051129017069e-11)
         """
         if len(self.spectra) == 0:
@@ -184,8 +322,8 @@ class Target:
 
         Examples
         --------
-        >>> t = Target('HD111980')
-        >>> t.plot_spectra()
+        >>> s = Star('HD111980')
+        >>> s.plot_spectra()
         """
         # target.load_spectra()  ## No global target object available  here (SDC)
         plt.figure()  # necessary to create a new plot (SDC)
