@@ -871,7 +871,7 @@ class SpectrogramModel(Spectrum):
         Example
         -------
         >>> from spectractor.extractor.psf import  ChromaticPSF1D
-        >>> spectrum, telescope, disperser, target = SimulatorInit('outputs/reduc_20170530_130_spectrum.fits')
+        >>> spectrum, telescope, disperser, target = SimulatorInit('./tests/data/reduc_20170530_134_spectrum.fits')
         >>> airmass = spectrum.header['AIRMASS']
         >>> pressure = spectrum.header['OUTPRESS']
         >>> temperature = spectrum.header['OUTTEMP']
