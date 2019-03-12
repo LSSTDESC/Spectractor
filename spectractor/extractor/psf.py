@@ -429,7 +429,7 @@ class ChromaticPSF1D:
             Parameter array of the model, in the form:
                 * Nx first parameters are amplitudes for the Moffat transverse profiles
                 * next parameters are polynomial coefficients for all the PSF1D parameters
-                in the same order as in PSF1D definition, except amplitude_moffat
+        in the same order as in PSF1D definition, except amplitude_moffat
         force_positive: bool, optional
             Force some profile parameters to be positive despite the polynomial coefficients (default: False)
 
@@ -588,7 +588,8 @@ class ChromaticPSF1D:
             Parameter array of the model, in the form:
                 * Nx first parameters are amplitudes for the Moffat transverse profiles
                 * next parameters are polynomial coefficients for all the PSF1D parameters
-                in the same order as in PSF1D definition, except amplitude_moffat
+        in the same order as in PSF1D definition, except amplitude_moffat
+
         noise_level: float, optional
             Noise level to set minimal boundary for amplitudes (negatively).
 
@@ -670,7 +671,7 @@ class ChromaticPSF1D:
             Parameter array of the model, in the form:
                 * Nx first parameters are amplitudes for the Moffat transverse profiles
                 * next parameters are polynomial coefficients for all the PSF1D parameters
-                in the same order as in PSF1D definition, except amplitude_moffat
+        in the same order as in PSF1D definition, except amplitude_moffat
 
         Returns
         -------
@@ -1489,6 +1490,7 @@ def PSF2D_chisq_jac(params, model, xx, yy, zz, zz_err=None):
 def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='minimize'):
     """Fit a PSF 2D model with parameters :
         amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
+
     using basin hopping global minimization method.
 
     Parameters
@@ -1566,6 +1568,7 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
 def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     """Fit a PSF 2D model with parameters :
         amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
+
     using basin hopping global minimization method.
 
     Parameters
@@ -1614,6 +1617,7 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     >>> model = fit_PSF2D_minuit(X, Y, Z, guess=guess, bounds=bounds, data_errors=None)
     >>> res = [getattr(model, p).value for p in model.param_names]
     >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
     """
 
     model = PSF2D()
@@ -1675,6 +1679,7 @@ def PSF1D_chisq_jac(params, model, xx, yy, yy_err=None):
 def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimize'):
     """Fit a PSF 1D model with parameters :
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+
     using basin hopping global minimization method.
 
     Parameters
@@ -1750,6 +1755,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
                               niter_basinhopping=5, T_basinhopping=0.2):
     """Fit a PSF 1D model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+
     using scipy. Find outliers data point above sigma*data_errors from the fit over niter iterations.
 
     Parameters
@@ -1864,6 +1870,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
 def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     """Fit a PSF 1D model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+
     using Minuit.
 
     Parameters
@@ -1948,6 +1955,7 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
 def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=None, sigma=3, niter=2, consecutive=3):
     """Fit a PSF 1D model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+
     using Minuit. Find outliers data point above sigma*data_errors from the fit over niter iterations.
     Only at least 3 consecutive outliers are considered.
 
