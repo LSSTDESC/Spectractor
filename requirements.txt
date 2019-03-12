@@ -13,3 +13,4 @@ iminuit
 coverage
 configparser
 coveralls
+pysynphot
