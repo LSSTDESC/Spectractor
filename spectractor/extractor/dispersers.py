@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 from scipy import interpolate
 from scipy import ndimage
 
@@ -35,11 +34,12 @@ def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=2
     # wavelength in nm, hologram produced at 639nm
     # spherical wave centered in 0,0,0
     U = lambda x, y, z: np.exp(2j * np.pi * np.sqrt(x * x + y * y + z * z) * 1e6 /
-                                          lambda_plot) / np.sqrt(x * x + y * y + z * z)
+                               lambda_plot) / np.sqrt(x * x + y * y + z * z)
     # superposition of two spherical sources centered in order 0 and order 1 positions
     xA = [order0_position[0] * parameters.CCD_PIXEL2MM, order0_position[1] * parameters.CCD_PIXEL2MM]
     xB = [order1_position[0] * parameters.CCD_PIXEL2MM, order1_position[1] * parameters.CCD_PIXEL2MM]
-    A = lambda x, y: U(x - xA[0], y - xA[1], -parameters.DISTANCE2CCD) + U(x-xB[0], y-xB[1], -parameters.DISTANCE2CCD)
+    A = lambda x, y: U(x - xA[0], y - xA[1], -parameters.DISTANCE2CCD) + U(x - xB[0], y - xB[1],
+                                                                           -parameters.DISTANCE2CCD)
     intensity = lambda x, y: np.abs(A(x, y)) ** 2
     xholo = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
     yholo = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
@@ -428,7 +428,7 @@ class Grating:
         >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, parameters.DISTANCE2CCD))
         """
         theta0 = get_theta0(x0)
-        return np.arcsin(order * lambdas*1e-6 * self.N(x0) + np.sin(theta0))
+        return np.arcsin(order * lambdas * 1e-6 * self.N(x0) + np.sin(theta0))
 
     def grating_pixel_to_lambda(self, deltaX, x0, order=1):
         """ Convert pixels into wavelengths (in nm) with.
@@ -684,7 +684,8 @@ class Hologram(Grating):
         if verbose:
             if self.is_hologram:
                 print('Hologram characteristics:')
-                print('\tN = {:.2f} +/- {:.2f} grooves/mm at plate center'.format(self.N(self.plate_center), self.N_err))
+                print(
+                    '\tN = {:.2f} +/- {:.2f} grooves/mm at plate center'.format(self.N(self.plate_center), self.N_err))
                 print('\tPlate center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
                     self.plate_center[0], self.plate_center[1], self.theta_tilt))
                 print('\tHologram center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
@@ -701,6 +702,7 @@ class Hologram(Grating):
 
 if __name__ == "__main__":
     import doctest
+
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
 
