@@ -34,6 +34,9 @@ install:
   - conda info -a
 
 before_script:
+  # use personal github token to clone slitless github private repo
+  - echo -e "machine github.com\n  login $CI_USER_TOKEN" > ~/.netrc
+  # necessary for libradtran make uvspec command
   - conda create -n py27 python=2.7 pip
   - source activate py27
   - python --version
@@ -57,14 +60,21 @@ before_script:
   - "make uvspec"
   - "cd ../"
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
-  - source activate
+  - conda create -n py36 python=3.6 pip
+  - source activate py36
   - python --version
+  - "git clone https://$CI_USER_TOKEN@github.com/jeremyneveu/slitless.git slitless"
+  - "cd slitless"
+  # - git checkout spectractor
+  - "pip install ."
+  - "cd ../"
 
 script:
   - pip install numpy nose coloredlogs coverage coveralls
   - pip install -r requirements.txt
-  - python setup.py build
-  - python setup.py install
+  # - python setup.py build
+  # - python setup.py install
+  - pip install .
   - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
   - ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py

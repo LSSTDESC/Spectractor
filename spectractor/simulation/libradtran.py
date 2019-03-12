@@ -1,8 +1,7 @@
 ################################################################
 #
-# Script to simulate air transparency with LibRadTran
+# Script to evaluate air transparency with LibRadTran
 # With a pure absorbing atmosphere
-# Here we vary PWV
 # author: sylvielsstfr, jeremy.neveu
 # creation date : November 2nd 2016
 # update : July 2018
@@ -17,12 +16,20 @@ from subprocess import Popen, PIPE
 
 from spectractor.tools import ensure_dir
 import spectractor.parameters as parameters
+from spectractor.config import set_logger
 
 
 class Libradtran:
 
     def __init__(self, home=''):
-        self.my_logger = parameters.set_logger(self.__class__.__name__)
+        """Initialize the Libradtran settings for Spectractor.
+
+        Parameters
+        ----------
+        home: str, optional
+            The path to the directory where libradtran directory is. If not specified $HOME is taken (default: '').
+        """
+        self.my_logger = set_logger(self.__class__.__name__)
         if home == '':
             self.home = os.environ['HOME']
         else:
@@ -57,6 +64,17 @@ class Libradtran:
         f.close()
 
     def run(self, inp, out, path=''):
+        """Run the libratran command uvpsec.
+
+        Parameters
+        ----------
+        inp: str
+            Input file.
+        out: str
+            Output file.
+        path: str, optional
+            Path to bin/uvpsec if necessary, otherwise use  self.home (default: "")
+        """
         if path != '':
             cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
         else:
@@ -65,21 +83,44 @@ class Libradtran:
         p.wait()
 
     def simulate(self, airmass, pwv, ozone, aerosol, pressure):
-        """
-        ProcessSimulationaer(airmass,pwv,ozone,aerosol,pressure)
-        with aerosol simulation is performed
-        default profile
+        """Simulate the atmosphere transmission with Libratran.
+
+        Parameters
+        ----------
+        airmass: float
+            The airmass of the atmosphere.
+        pwv: float
+            Precipitable Water Vapor amount in mm.
+        ozone: float
+            Ozone quantity in Dobson units.
+        aerosol: float
+            VAOD of the aerosols.
+        pressure: float
+            Pressure of the atmosphere in hPa.
+
+        Returns
+        -------
+        output_file_name: str
+            The output file name relative to the current directory.
+
+        Examples
+        --------
+        >>> parameters.DEBUG = True
+        >>> lib = Libradtran()
+        >>> output = lib.simulate(1.2, 2, 400, 0.07, 800)
+        >>> print(output)
+        simulations/pp/us/as/rt/in/RT_CTIO_pp_us_as_rt_z12_pwv20_oz40_aer7.OUT
         """
 
-        if parameters.DEBUG:
-            print('--------------------------------------------')
-            print('simulate')
-            print(' 1) airmass = ', airmass)
-            print(' 2) pwv = ', pwv)
-            print(' 3) ozone = ', ozone)
-            print(' 4) aer = ', aerosol)
-            print(' 5) pressure =', pressure)
-            print('--------------------------------------------')
+        self.my_logger.debug(
+            '\n\t--------------------------------------------'
+            '\n\tevaluate'
+            '\n\t 1) airmass = {airmass}'
+            '\n\t 2) pwv = {pwv}'
+            '\n\t 3) ozone = {ozone}'
+            '\n\t 4) aer = {aerosol}'
+            '\n\t 5) pressure =  {pressure}'
+            '\n\t--------------------------------------------')
 
         # build the part 1 of file_name
         base_filename_part1 = self.Prog + '_' + parameters.OBS_NAME + '_' + self.equation_solver + '_'
@@ -106,7 +147,8 @@ class Libradtran:
         elif self.equation_solver == 'ps':  # pseudo spherical
             equation_solver_equations = 'sdisort'
         else:
-            sys.exit(f'Unknown RTE equation solver {self.equation_solver}.')
+            self.my_logger.error(f'Unknown RTE equation solver {self.equation_solver}.')
+            sys.exit()
 
         #   Selection of absorption model
         absorption_model = 'reptran'
@@ -209,7 +251,7 @@ class Libradtran:
             if 600. < pressure < 1015.:
                 self.settings["pressure"] = pressure
             else:
-                print("crazy pressure p=", pressure, ' hPa')
+                self.my_logger.error(f'\n\tcrazy pressure p={pressure} hPa')
 
             self.settings["output_user"] = 'lambda edir'
             self.settings["altitude"] = str(parameters.OBS_ALTITUDE)  # Altitude LSST observatory
@@ -230,4 +272,18 @@ class Libradtran:
 
 
 def clean_simulation_directory():
+    """Remove the simulations directory.
+
+    Examples
+    --------
+    >>> ensure_dir('simulations')
+    >>> clean_simulation_directory()
+    >>> assert not os.path.isfile('simulations')
+    """
     os.system("rm -rf simulations")
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
