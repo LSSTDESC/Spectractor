@@ -34,7 +34,14 @@ class LogBook:
             return
         # self.csvfile = open(self.logbook, 'rU', encoding='latin-1')
         # self.reader = csv.DictReader(self.csvfile, delimiter=';', dialect=csv.excel_tab)
-        self.df = pd.read_csv(self.logbook, sep=";", decimal=",", encoding='latin-1', header='infer')
+        # SDC: deals with different formats of logbook files
+        logbookfilename=self.logbook
+
+        if logbookfilename.find("ctio")>=0:
+            self.df = pd.read_csv(self.logbook, sep=";", decimal=",", encoding='latin-1', header='infer')
+        else:
+            self.df = pd.read_csv(self.logbook, sep=",", decimal=".", encoding='latin-1', header='infer')
+
         self.df['date'] = pd.to_datetime(self.df.date)
 
     def search_for_image(self, filename):
