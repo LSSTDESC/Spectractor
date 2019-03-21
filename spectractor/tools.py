@@ -1451,6 +1451,17 @@ def extract_info_from_CTIO_header(obj, header):
     obj.filter_label = header['FILTER1']
     obj.disperser_label = header['FILTER2']
 
+def extract_info_from_PDM_header(obj, header):
+    obj.date_obs = header['DATE-OBS']
+    # SDC : note AIRMASS is in logbook, but it will be moved later in reduced image
+    obj.airmass = header['AIRMASS']
+    # SDC: note reduction already divides by exposure
+    obj.expo = header['EXPOSURE']
+    # SDC: note information is more in the filename
+    obj.filters = header['FILTER']
+    obj.filter_label = header['FILTER']
+    obj.disperser_label = header['FILTER']
+
 
 def save_fits(file_name, header, data, overwrite=False):
     hdu = fits.PrimaryHDU()

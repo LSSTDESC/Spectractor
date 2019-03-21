@@ -310,9 +310,12 @@ def load_PDM_image(image):
 
     # CTIO
     image.header, image.data = load_fits(image.file_name)
-    extract_info_from_CTIO_header(image, image.header)
+    extract_info_from_PDM_header(image, image.header)
+
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
+
+    
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
     parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
     if image.header['YLENGTH'] != parameters.CCD_IMSIZE:
