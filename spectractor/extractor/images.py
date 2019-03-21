@@ -79,6 +79,9 @@ class Image(object):
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
             load_LPNHE_image(self)
+        elif parameters.OBS_NAME == 'PICDUMIDI':
+            load_PDM_image(self)
+
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
@@ -277,6 +280,58 @@ def load_LPNHE_image(image):
         The Image instance to fill with file data and header.
     """
     image.my_logger.info(f'\n\tLoading LPNHE image {image.file_name}...')
+    image.header, data1 = load_fits(image.file_name, 15)
+    image.header, data2 = load_fits(image.file_name, 7)
+    data1 = data1.astype(np.float64)
+    data2 = data2.astype(np.float64)
+    image.data = np.concatenate((data1[10:-10, 10:-10], data2[10:-10, 10:-10]))
+    image.date_obs = image.header['DATE-OBS']
+    image.expo = float(image.header['EXPTIME'])
+    image.header['ROTANGLE'] = image.rotation_angle
+    image.header['LSHIFT'] = 0.
+    image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.data = image.data.T
+    image.my_logger.info('\n\tImage loaded')
+    # compute CCD gain map
+    image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
+    parameters.CCD_IMSIZE = image.data.shape[1]
+
+def load_PDM_image(image):
+    """Specific routine to load Pic du Midi fits files and load their data and properties for Spectractor.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    image.my_logger.info(f'\n\tLoading Pic du Midi image {image.file_name}...')
+
+    # Now implement this for PDM
+
+    # CTIO
+    image.header, image.data = load_fits(image.file_name)
+    extract_info_from_CTIO_header(image, image.header)
+    image.header['LSHIFT'] = 0.
+    image.header['D2CCD'] = parameters.DISTANCE2CCD
+    parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
+    parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
+    if image.header['YLENGTH'] != parameters.CCD_IMSIZE:
+        image.my_logger.warning(
+            f'\n\tImage rectangular: X={parameters.CCD_IMSIZE:d} pix, Y={image.header["YLENGTH"]:d} pix')
+    if image.header['YPIXSIZE'] != parameters.CCD_PIXEL2ARCSEC:
+        image.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
+            parameters.CCD_PIXEL2ARCSEC, image.header['YPIXSIZE']))
+    image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
+                           obstime=image.header['DATE-OBS'])
+    image.my_logger.info('\n\tImage loaded')
+    # compute CCD gain map
+    build_CTIO_gain_map(image)
+    image.compute_parallactic_angle()
+
+
+
+
+    # LPNHE
     image.header, data1 = load_fits(image.file_name, 15)
     image.header, data2 = load_fits(image.file_name, 7)
     data1 = data1.astype(np.float64)
