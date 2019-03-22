@@ -5,6 +5,9 @@ from spectractor.extractor.targets import *
 from spectractor.extractor.psf import *
 from spectractor.extractor.dispersers import *
 
+import pandas as pd
+import re
+
 
 class Image(object):
 
@@ -346,7 +349,57 @@ def load_PDM_image(image):
 
 
 def load_LogBook(image):
-    image.my_logger.info(f'\n\tLoad Logbook  {image.logbook}...')
+    image.my_logger.info(f'\n\tLoad Logbook  {image.logbook} for {image.file_name}...')
+
+    basefilename = os.path.basename(image.file_name)
+    dirfilename = os.path.dirname(image.file_name)
+
+    if re.search(".*20190214.*",dirfilename):
+        SEL_DATE="20190214"
+    else:
+        SEL_DATE = "20190215"
+
+    image.my_logger.info(f'\n\tLoad Logbook  : date identified  {SEL_DATE} for {image.file_name}...')
+
+    if SEL_DATE == "20190214":
+        SearchTagRe_date = '^T1M_([0-9]+)_.*_red[.]fit$'
+        SearchTagRe_time = '^T1M_[0-9]+_([0-9]+)_.*_red[.]fit$'
+        SearchTagRe_num = '^T1M_[0-9]+_[0-9]+_([0-9]+)_.*_red[.]fit$'
+        SearchTagRe_obj = '^T1M_[0-9]+_[0-9]+_[0-9]+_(.*)-.*_red[.]fit$'
+        SearchTagRe_disp = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-(.*)_Filtre.*_red[.]fit$'
+        SearchTagRe_filt = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-.*_(Filtre.*)[.][0-9]+_red[.]fit$'
+        SearchTagRe_evnum = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-.*_Filtre.*[.]([0-9]+)_red[.]fit$'
+
+    # 20190215
+    # No disperser
+    if SEL_DATE == "20190215":
+        SearchTagRe_date = '^T1M_([0-9]+)_.*_red[.]fit$'
+        SearchTagRe_time = '^T1M_[0-9]+_([0-9]+)_.*_red[.]fit$'
+        SearchTagRe_num = '^T1M_[0-9]+_[0-9]+_([0-9]+)_.*_red[.]fit$'
+        SearchTagRe_obj = '^T1M_[0-9]+_[0-9]+_[0-9]+_(.*)_Filtre.*_red[.]fit$'
+        SearchTagRe_disp = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_(.*)_Filtre.*_red[.]fit$'
+        SearchTagRe_filt = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_(Filtre.*)[.][0-9]+_red[.]fit$'
+        SearchTagRe_evnum = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_Filtre.*[.]([0-9]+)_red[.]fit$'
+
+    tag_date=re.findall(SearchTagRe_date, basefilename)[0]
+    tag_time=re.findall(SearchTagRe_time, basefilename)[0]
+    tag_num=re.findall(SearchTagRe_num, basefilename)[0]
+    tag_obj=re.findall(SearchTagRe_obj, basefilename)[0]
+    tag_disp=re.findall(SearchTagRe_disp, basefilename)[0]
+    tag_filt=re.findall(SearchTagRe_filt, basefilename)[0]
+    tag_evnum=re.findall(SearchTagRe_evnum, basefilename)[0]
+
+    image.my_logger.warning(f'\n\tLoad Logbook  :  tag_date = {tag_date}...')
+    image.my_logger.warning(f'\n\tLoad Logbook  :  tag_time = {tag_time}...')
+    image.my_logger.warning(f'\n\tLoad Logbook  :  tag_num = {tag_num}...')
+    image.my_logger.warning(f'\n\tLoad Logbook  :  tag_obj = {tag_obj}...')
+    image.my_logger.warning(f'\n\tLoad Logbook  :  tag_disp = {tag_disp}...')
+    image.my_logger.warning(f'\n\tLoad Logbook  :  tag_filt = {tag_filt}...')
+    image.my_logger.warning(f'\n\tLoad Logbook  :  tag_evnum = {tag_evnum}...')
+
+    df=pd.read_csv(image.logbook)
+    df_sel=df[df[file]==basefilename]
+    image.my_logger.warning(f'\n\tLoad Logbook  :  selected-row {df_sel.iloc[0]}...')
 
 
 
