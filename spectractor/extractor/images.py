@@ -398,8 +398,21 @@ def load_LogBook(image):
     image.my_logger.warning(f'\n\tLoad Logbook  :  tag_evnum = {tag_evnum}...')
 
     df=pd.read_csv(image.logbook)
-    df_sel=df[df[file]==basefilename]
+    df_sel=df[df['file']==basefilename]
     image.my_logger.warning(f'\n\tLoad Logbook  :  selected-row {df_sel.iloc[0]}...')
+
+
+    ra = df_sel.loc[df_sel.index[0],"RA"]
+    dec = df_sel.loc[df_sel.index[0], "DEC"]
+
+    image.my_logger.warning(f'\n\tLoad Logbook  : RA  = {ra} ...')
+    image.my_logger.warning(f'\n\tLoad Logbook  : DEC = {dec} ...')
+
+    image.header['HA'] = ra
+    image.header['DEC'] = dec
+
+    image.my_logger.warning(f'\n\tLoad Logbook : DONE ')
+
 
 
 
