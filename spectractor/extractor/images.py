@@ -90,8 +90,8 @@ class Image(object):
         elif parameters.OBS_NAME == 'LPNHE':
             load_LPNHE_image(self)
         elif parameters.OBS_NAME == 'PICDUMIDI':
-            load_LogBook(self)
             load_PDM_image(self)
+
 
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
@@ -323,6 +323,7 @@ def load_PDM_image(image):
     # Now implement this for PDM
 
     image.header, image.data = load_fits(image.file_name)
+
     extract_info_from_PDM_header(image, image.header)
 
     image.header['LSHIFT'] = 0.
@@ -338,12 +339,22 @@ def load_PDM_image(image):
     #image.data = image.data.T
     image.my_logger.info('\n\tImage loaded')
 
-    # TODO
-    #image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
-                           #obstime=image.header['DATE-OBS'])
+    # retrieve RA and DEC from logbook
+    load_LogBook(image)
+
+    image.my_logger.warning(f'\n\tload_PDM_image :: coord: ra = {image.header["RA"]} hour ...')
+    image.my_logger.warning(f'\n\tload_PDM_image :: coord: dec = {image.header["DEC"]} dec ...')
+    image.my_logger.warning(f'\n\tload_PDM_image :: date: dec = {image.header["DATE-OBS"]} ...')
+
+
+
+    image.coord = SkyCoord(str(image.header['RA']) + ' ' + str(image.header['DEC']),
+                           unit=(units.hourangle, units.deg),
+                           obstime=image.header['DATE-OBS'])
 
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
+    image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
 
     image.compute_parallactic_angle()
 
@@ -404,12 +415,16 @@ def load_LogBook(image):
 
     ra = df_sel.loc[df_sel.index[0],"RA"]
     dec = df_sel.loc[df_sel.index[0], "DEC"]
+    airmass=df_sel.loc[df_sel.index[0], "airmass"]
 
     image.my_logger.warning(f'\n\tLoad Logbook  : RA  = {ra} ...')
     image.my_logger.warning(f'\n\tLoad Logbook  : DEC = {dec} ...')
+    image.my_logger.warning(f'\n\tLoad Logbook  : airmass = {airmass} ...')
 
     image.header['HA'] = ra
+    image.header['RA'] = ra
     image.header['DEC'] = dec
+    image.header['AIRMASS'] = airmass
 
     image.my_logger.warning(f'\n\tLoad Logbook : DONE ')
 
