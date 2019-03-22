@@ -4,7 +4,7 @@ from spectractor.tools import ensure_dir
 
 
 def Spectractor(file_name, output_directory, guess, target, disperser_label="", config='./config/ctio.ini',
-                atmospheric_lines=True, line_detection=True):
+                atmospheric_lines=True, line_detection=True,logbook=None):
     """ Spectractor
     Main function to extract a spectrum from an image
 
@@ -55,7 +55,7 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     # Load config file
     load_config(config)
     # Load reduced image
-    image = Image(file_name, target=target, disperser_label=disperser_label)
+    image = Image(file_name, target=target, disperser_label=disperser_label,logbook=logbook)
     if parameters.DEBUG:
         image.plot_image(scale='log10', target_pixcoords=guess)
     # Set output path

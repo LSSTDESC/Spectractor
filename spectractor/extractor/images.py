@@ -8,7 +8,7 @@ from spectractor.extractor.dispersers import *
 
 class Image(object):
 
-    def __init__(self, file_name, target="", disperser_label=""):
+    def __init__(self, file_name, target="", disperser_label="",logbook=""):
         """
         The image class contains all the features necessary to load an image and extract a spectrum.
 
@@ -44,6 +44,10 @@ class Image(object):
         self.data = None
         self.data_rotated = None
         self.gain = None
+
+        self.logbook = logbook  # the logbook is a hook to retrieve information missing in the Header
+        self.adurate = False  # to tell if the image is in ADU/sec or not
+
         self.stat_errors = None
         self.stat_errors_rotated = None
         self.rotation_angle = 0
@@ -64,6 +68,9 @@ class Image(object):
             self.header.comments['REDSHIFT'] = 'redshift of the target'
         self.err = None
 
+
+
+
     def load_image(self, file_name):
         """
         Load the image and store some information from header in class attributes.
@@ -80,6 +87,7 @@ class Image(object):
         elif parameters.OBS_NAME == 'LPNHE':
             load_LPNHE_image(self)
         elif parameters.OBS_NAME == 'PICDUMIDI':
+            load_LogBook(self)
             load_PDM_image(self)
 
         # Load the disperser
@@ -222,6 +230,9 @@ class Image(object):
             plt.show()
 
 
+
+
+
 def load_CTIO_image(image):
     """Specific routine to load CTIO fits files and load their data and properties for Spectractor.
 
@@ -308,48 +319,36 @@ def load_PDM_image(image):
 
     # Now implement this for PDM
 
-    # CTIO
     image.header, image.data = load_fits(image.file_name)
     extract_info_from_PDM_header(image, image.header)
 
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
 
-    
-    parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
-    parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
-    if image.header['YLENGTH'] != parameters.CCD_IMSIZE:
-        image.my_logger.warning(
-            f'\n\tImage rectangular: X={parameters.CCD_IMSIZE:d} pix, Y={image.header["YLENGTH"]:d} pix')
-    if image.header['YPIXSIZE'] != parameters.CCD_PIXEL2ARCSEC:
-        image.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
-            parameters.CCD_PIXEL2ARCSEC, image.header['YPIXSIZE']))
-    image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
-                           obstime=image.header['DATE-OBS'])
+
+    # cumpute CCD gain map
+    image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
+    if parameters.CCD_IMSIZE != image.data.shape[1]:
+        image.my_logger.warning('\n\tCCD_IMSIZE: =%d , image size =%d ' % (
+            parameters.CCD_IMSIZE, image.data.shape[1]))
+
+    #image.data = image.data.T
+    image.my_logger.info('\n\tImage loaded')
+
+    # TODO
+    #image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
+                           #obstime=image.header['DATE-OBS'])
+
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
-    build_CTIO_gain_map(image)
+
     image.compute_parallactic_angle()
 
 
+def load_LogBook(image):
+    image.my_logger.info(f'\n\tLoad Logbook  {image.logbook}...')
 
 
-    # LPNHE
-    image.header, data1 = load_fits(image.file_name, 15)
-    image.header, data2 = load_fits(image.file_name, 7)
-    data1 = data1.astype(np.float64)
-    data2 = data2.astype(np.float64)
-    image.data = np.concatenate((data1[10:-10, 10:-10], data2[10:-10, 10:-10]))
-    image.date_obs = image.header['DATE-OBS']
-    image.expo = float(image.header['EXPTIME'])
-    image.header['ROTANGLE'] = image.rotation_angle
-    image.header['LSHIFT'] = 0.
-    image.header['D2CCD'] = parameters.DISTANCE2CCD
-    image.data = image.data.T
-    image.my_logger.info('\n\tImage loaded')
-    # compute CCD gain map
-    image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
-    parameters.CCD_IMSIZE = image.data.shape[1]
 
 
 def find_target(image, guess, rotated=False):
