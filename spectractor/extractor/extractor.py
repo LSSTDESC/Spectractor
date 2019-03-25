@@ -54,10 +54,13 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     my_logger.info('\n\tStart SPECTRACTOR')
     # Load config file
     load_config(config)
+
     # Load reduced image
     image = Image(file_name, target=target, disperser_label=disperser_label,logbook=logbook)
+
     if parameters.DEBUG:
         image.plot_image(scale='log10', target_pixcoords=guess)
+
     # Set output path
     ensure_dir(output_directory)
     output_filename = file_name.split('/')[-1]
@@ -66,16 +69,22 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     output_filename = os.path.join(output_directory, output_filename)
     output_filename_spectrogram = output_filename.replace('spectrum','spectrogram')
     output_filename_psf = output_filename.replace('spectrum.fits','table.csv')
+
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
     target_pixcoords = find_target(image, guess)
+
     # Rotate the image: several methods
     turn_image(image)
+
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
+
     target_pixcoords_rotated = find_target(image, guess, rotated=True)
+
     # Create Spectrum object
     spectrum = Spectrum(image=image)
+
     # Subtract background and bad pixels
     extract_spectrum_from_image(image, spectrum, w=parameters.PIXWIDTH_SIGNAL,
                                 ws = (parameters.PIXDIST_BACKGROUND,
@@ -89,9 +98,11 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
         calibrate_spectrum_with_lines(spectrum)
     else:
         spectrum.header['WARNINGS'] = 'No calibration procedure with spectral features.'
+
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
     spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
+
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)

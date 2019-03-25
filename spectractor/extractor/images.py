@@ -130,8 +130,10 @@ class Image(object):
         >>> im.convert_to_ADU_rate_units()
         >>> assert np.all(np.isclose(data_before, im.data * im.expo))
         """
-        self.data = self.data.astype(np.float64) / self.expo
-        self.units = 'ADU/s'
+        if not self.adurate:
+            self.data = self.data.astype(np.float64) / self.expo
+            self.units = 'ADU/s'
+            self.adurate=True
 
     def convert_to_ADU_units(self):
         """Convert Image data from ADU/s to ADU units.
@@ -147,8 +149,10 @@ class Image(object):
         >>> im.convert_to_ADU_units()
         >>> assert np.all(np.isclose(data_before, im.data))
         """
-        self.data *= self.expo
-        self.units = 'ADU'
+        if self.adurate==True:
+            self.data *= self.expo
+            self.units = 'ADU'
+            self.adurate = False
 
     def compute_statistical_error(self):
         """Compute the image noise map from Image.data as np.sqrt(data) / np.sqrt(gain * expo).
@@ -330,6 +334,13 @@ def load_PDM_image(image):
     image.header['D2CCD'] = parameters.DISTANCE2CCD
 
 
+    # Check if image already in ADU per second
+    # later, there will be a header KEY to know if already
+    image.adurate = True
+    image.units = 'ADU/s'
+
+
+
     # cumpute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
     if parameters.CCD_IMSIZE != image.data.shape[1]:
@@ -357,6 +368,7 @@ def load_PDM_image(image):
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
 
     image.compute_parallactic_angle()
+    image.my_logger.warning(f'\n\tload_PDM_image :: paralactic angle = {image.parallactic_angle}  ...')
 
 
 def load_LogBook(image):
@@ -425,6 +437,14 @@ def load_LogBook(image):
     image.header['RA'] = ra
     image.header['DEC'] = dec
     image.header['AIRMASS'] = airmass
+
+    # now need to load disperser and filter
+    image.disperser=df_sel.loc[df_sel.index[0], "disperser"]
+    image.disperser_label = df_sel.loc[df_sel.index[0], "disperser"]
+    image.filter=df_sel.loc[df_sel.index[0], "filt"]
+
+    image.my_logger.warning(f'\n\tLoad Logbook  : disperser = {image.disperser} ...')
+    image.my_logger.warning(f'\n\tLoad Logbook  : filter = {image.filter} ...')
 
     image.my_logger.warning(f'\n\tLoad Logbook : DONE ')
 
@@ -765,9 +785,13 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     >>> theta = compute_rotation_angle_hessian(im)
     >>> assert np.isclose(theta, np.arctan(slope)*180/np.pi, rtol=1e-2)
     """
+
+    image.my_logger.info(f'\n\t compute_rotation_angle_hessian')
+
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region
     data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+
     lambda_plus, lambda_minus, theta = hessian_and_theta(data, margin_cut)
     # thresholds
     lambda_threshold = np.min(lambda_minus)
@@ -792,15 +816,18 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         theta_median = np.arctan(p[0]) * 180 / np.pi
     else:
         theta_median = float(np.median(theta_hist))
+
     theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
     image.header['THETAFIT'] = theta_median
     image.header.comments['THETAFIT'] = '[USED] rotation angle from the Hessian analysis'
     image.header['THETAINT'] = theta_guess
     image.header.comments['THETAINT'] = 'rotation angle interp from disperser scan'
+
     if abs(theta_median - theta_guess) > theta_critical:
         image.my_logger.warning(
-            f'\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels '
-            f'over {parameters.CCD_IMSIZE:d} pixels: {theta_median:.2f} vs {theta_guess:.2f}')
+            f'\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels !!!! '
+            f'over {parameters.CCD_IMSIZE:d} pixels: {theta_median:.2f} vs {theta_guess:.2f} !!!!')
+
     if parameters.DEBUG:
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6))
         xindex = np.arange(data.shape[1])
