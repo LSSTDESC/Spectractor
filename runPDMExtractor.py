@@ -55,6 +55,7 @@ if __name__ == "__main__":
 
     # choose the date
     thedate = "20190214"
+    #thedate = "20190215"
 
     #This defines the logbbok to be used
     logbookfilename = "simple_logbook_PicDuMidi_" + thedate + ".csv"

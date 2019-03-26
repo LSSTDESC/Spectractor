@@ -408,7 +408,10 @@ def load_LogBook(image):
     tag_time=re.findall(SearchTagRe_time, basefilename)[0]
     tag_num=re.findall(SearchTagRe_num, basefilename)[0]
     tag_obj=re.findall(SearchTagRe_obj, basefilename)[0]
-    tag_disp=re.findall(SearchTagRe_disp, basefilename)[0]
+    if SEL_DATE == "20190214":
+        tag_disp=re.findall(SearchTagRe_disp, basefilename)[0]
+    else:
+        tag_disp="HOE"
     tag_filt=re.findall(SearchTagRe_filt, basefilename)[0]
     tag_evnum=re.findall(SearchTagRe_evnum, basefilename)[0]
 
@@ -786,13 +789,22 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     >>> assert np.isclose(theta, np.arctan(slope)*180/np.pi, rtol=1e-2)
     """
 
-    image.my_logger.info(f'\n\t compute_rotation_angle_hessian')
+    image.my_logger.info(f'\n\t compute_rotation_angle_hessian, width_cut={width_cut}....,deg_threshold={deg_threshold}......')
 
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region
-    data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+    if parameters.OBS_NAME == 'PICDUMIDI':
+        data = np.copy(image.data[y0 - width_cut:parameters.CCD_IMSIZE - width_cut, 0:right_edge])
+    else:
+        data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+
+    image.my_logger.warning(
+        f'\n\tcompute_rotation_angle_hessian :: call hessian_and_theta with margin_cut = {margin_cut}...')
 
     lambda_plus, lambda_minus, theta = hessian_and_theta(data, margin_cut)
+
+    image.my_logger.warning(f'\n\tcompute_rotation_angle_hessian :: hessian_and_theta found  theta = {theta}, lambda_plus={lambda_plus}, lambda_minus={lambda_minus} ...')
+
     # thresholds
     lambda_threshold = np.min(lambda_minus)
     mask = np.where(lambda_minus > lambda_threshold)
@@ -880,8 +892,14 @@ def turn_image(image):
     >>> assert im.data_rotated is not None
     >>> assert np.isclose(im.rotation_angle, np.arctan(slope)*180/np.pi, rtol=1e-2)
     """
+
+    image.my_logger.info(f'\n\tturn_image width_cut={parameters.YWINDOW}...')
+
+
+
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
                                                           right_edge=parameters.CCD_IMSIZE - 200)
+
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
