@@ -53,38 +53,89 @@ if __name__ == "__main__":
     sys.path.append(os.path.dirname(workbookDir))
 
 
+    ########################################################################################################################
+    #
+    # 1) Configuration
+    #
+    ########################################################################################################################
+
+
+    # Select the reduced rotated images
+    #----------------------------------
+    FLAG_ROTATION=True
+
+
     # choose the date
+    #-----------------
     thedate = "20190214"
     #thedate = "20190215"
 
-    #This defines the logbbok to be used
-    logbookfilename = "simple_logbook_PicDuMidi_" + thedate + ".csv"
 
-    #Read the logbook
+    #This above defines the logbbok to be used
+    #------------------------------------
+    if FLAG_ROTATION:
+        logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_rot_v2.csv"
+    else:
+        logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v2.csv"
+
+
+    #Read the logbook for testing
+    #------------------------------
     df = pd.read_csv(logbookfilename, sep=",", decimal=".", encoding='latin-1', header='infer')
 
     # Get the first filename
+    #--------------------------
     print("The first filename in the logbook :",df.file[0])
 
-    # Get the directory
+    # Defines the directory containing the reduced images
+    #-------------------------------------------------------
+
     if thedate == "20190215":
-        INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190215"
+        if FLAG_ROTATION:
+            INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190215_v3"
+        else:
+            INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190215_v2"
     else:
-        INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190214"
+        if FLAG_ROTATION:
+            INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190214_v3"
+        else:
+            INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190214_v2"
 
-    #select the filename to search for
+    # Defines the input image filename required
+    # -------------------------------------------------------
+
+
     if thedate == "20190215":
-        file_name = "T1M_20190215_225550_730_HD116405_Filtre_None_bin1x1.1_red.fit"
+        if FLAG_ROTATION:
+            file_name = "T1M_20190215_225550_730_HD116405_Filtre_None_bin1x1.1_red_rot.fit"
+        else:
+            file_name = "T1M_20190215_225550_730_HD116405_Filtre_None_bin1x1.1_red.fit"
     else:
-        file_name = "T1M_20190214_234122_495_HD116405-Ronchi_Filtre_None_bin1x1.1_red.fit"
+        if FLAG_ROTATION:
+            file_name = "T1M_20190214_234122_495_HD116405-Ronchi_Filtre_None_bin1x1.1_red_rot.fit"
+        else:
+            file_name = "T1M_20190214_234122_495_HD116405-Ronchi_Filtre_None_bin1x1.1_red.fit"
 
-    #defines the output
-    output_directory = "output"
 
-    #define the configuration file for Pic Du Midi
-    config = "config/picdumidi.ini"
+
+
+    # Defines the output directory
+    #------------------------------------
+    output_directory = "output/"+thedate
+
+
+    # Define the configuration file for Pic Du Midi
+    #-----------------------------------------------
+
+    if FLAG_ROTATION:
+        config = "../config/picdumidirot.ini"
+    else:
+        config = "../config/picdumidi.ini"
+
+
 
     # Run logbook
+    #--------------
     logbook = LogBook(logbookfilename)
 
 
@@ -98,11 +149,13 @@ if __name__ == "__main__":
     print("logbook : xpos ..............= ", xpos)
     print("logbook : ypos ..............= ", ypos)
 
-    # full input filename
+    # Build the full input filename
+    #----------------------
     fullfilename = os.path.join(INPUTDIR, file_name)
 
 
+    #############################
     #### RUN Spectractor
-
+    ############################
     Spectractor(fullfilename, output_directory, [xpos, ypos], target, disperser_label, config, logbook=logbookfilename)
 

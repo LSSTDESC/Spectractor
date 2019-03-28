@@ -382,32 +382,66 @@ def load_LogBook(image):
     else:
         SEL_DATE = "20190215"
 
+
+    FLAG_ROTATION=False
+
+    if re.search(".*rot.*", basefilename):
+        FLAG_ROTATION=True
+        image.my_logger.warning(f'\n\tload_PDM_image :: Image has been rotated !!!')
+
+
     image.my_logger.info(f'\n\tLoad Logbook  : date identified  {SEL_DATE} for {image.file_name}...')
 
+    # temporary decoding of info from filename
+
     if SEL_DATE == "20190214":
-        SearchTagRe_date = '^T1M_([0-9]+)_.*_red[.]fit$'
-        SearchTagRe_time = '^T1M_[0-9]+_([0-9]+)_.*_red[.]fit$'
-        SearchTagRe_num = '^T1M_[0-9]+_[0-9]+_([0-9]+)_.*_red[.]fit$'
-        SearchTagRe_obj = '^T1M_[0-9]+_[0-9]+_[0-9]+_(.*)-.*_red[.]fit$'
-        SearchTagRe_disp = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-(.*)_Filtre.*_red[.]fit$'
-        SearchTagRe_filt = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-.*_(Filtre.*)[.][0-9]+_red[.]fit$'
-        SearchTagRe_evnum = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-.*_Filtre.*[.]([0-9]+)_red[.]fit$'
+        if FLAG_ROTATION:
+            SearchTagRe_date = '^T1M_([0-9]+)_.*_red_rot[.]fit$'
+            SearchTagRe_time = '^T1M_[0-9]+_([0-9]+)_.*_red_rot[.]fit$'
+            SearchTagRe_num = '^T1M_[0-9]+_[0-9]+_([0-9]+)_.*_red_rot[.]fit$'
+            SearchTagRe_obj = '^T1M_[0-9]+_[0-9]+_[0-9]+_(.*)-.*_red_rot[.]fit$'
+            SearchTagRe_disp = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-(.*)_Filtre.*_red_rot[.]fit$'
+            SearchTagRe_filt = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-.*_(Filtre.*)[.][0-9]+_red_rot[.]fit$'
+            SearchTagRe_evnum = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-.*_Filtre.*[.]([0-9]+)_red_rot[.]fit$'
+    else:
+            SearchTagRe_date = '^T1M_([0-9]+)_.*_red[.]fit$'
+            SearchTagRe_time = '^T1M_[0-9]+_([0-9]+)_.*_red[.]fit$'
+            SearchTagRe_num = '^T1M_[0-9]+_[0-9]+_([0-9]+)_.*_red[.]fit$'
+            SearchTagRe_obj = '^T1M_[0-9]+_[0-9]+_[0-9]+_(.*)-.*_red[.]fit$'
+            SearchTagRe_disp = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-(.*)_Filtre.*_red[.]fit$'
+            SearchTagRe_filt = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-.*_(Filtre.*)[.][0-9]+_red[.]fit$'
+            SearchTagRe_evnum = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-.*_Filtre.*[.]([0-9]+)_red[.]fit$'
 
     # 20190215
     # No disperser
     if SEL_DATE == "20190215":
-        SearchTagRe_date = '^T1M_([0-9]+)_.*_red[.]fit$'
-        SearchTagRe_time = '^T1M_[0-9]+_([0-9]+)_.*_red[.]fit$'
-        SearchTagRe_num = '^T1M_[0-9]+_[0-9]+_([0-9]+)_.*_red[.]fit$'
-        SearchTagRe_obj = '^T1M_[0-9]+_[0-9]+_[0-9]+_(.*)_Filtre.*_red[.]fit$'
-        SearchTagRe_disp = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_(.*)_Filtre.*_red[.]fit$'
-        SearchTagRe_filt = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_(Filtre.*)[.][0-9]+_red[.]fit$'
-        SearchTagRe_evnum = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_Filtre.*[.]([0-9]+)_red[.]fit$'
+        if FLAG_ROTATION:
+            SearchTagRe_date = '^T1M_([0-9]+)_.*_red_rot[.]fit$'
+            SearchTagRe_time = '^T1M_[0-9]+_([0-9]+)_.*_red_rot[.]fit$'
+            SearchTagRe_num = '^T1M_[0-9]+_[0-9]+_([0-9]+)_.*_red_rot[.]fit$'
+            SearchTagRe_obj = '^T1M_[0-9]+_[0-9]+_[0-9]+_(.*)_Filtre.*_red_rot[.]fit$'
+            SearchTagRe_disp = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_(.*)_Filtre.*_red_rot[.]fit$'
+            SearchTagRe_filt = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_(Filtre.*)[.][0-9]+_red_rot[.]fit$'
+            SearchTagRe_evnum = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_Filtre.*[.]([0-9]+)_red_rot[.]fit$'
+        else:
+            SearchTagRe_date = '^T1M_([0-9]+)_.*_red[.]fit$'
+            SearchTagRe_time = '^T1M_[0-9]+_([0-9]+)_.*_red[.]fit$'
+            SearchTagRe_num = '^T1M_[0-9]+_[0-9]+_([0-9]+)_.*_red[.]fit$'
+            SearchTagRe_obj = '^T1M_[0-9]+_[0-9]+_[0-9]+_(.*)_Filtre.*_red[.]fit$'
+            SearchTagRe_disp = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_(.*)_Filtre.*_red[.]fit$'
+            SearchTagRe_filt = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_(Filtre.*)[.][0-9]+_red[.]fit$'
+            SearchTagRe_evnum = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*_Filtre.*[.]([0-9]+)_red[.]fit$'
+
+
+
+
 
     tag_date=re.findall(SearchTagRe_date, basefilename)[0]
     tag_time=re.findall(SearchTagRe_time, basefilename)[0]
     tag_num=re.findall(SearchTagRe_num, basefilename)[0]
     tag_obj=re.findall(SearchTagRe_obj, basefilename)[0]
+
+
     if SEL_DATE == "20190214":
         tag_disp=re.findall(SearchTagRe_disp, basefilename)[0]
     else:
@@ -428,8 +462,8 @@ def load_LogBook(image):
     image.my_logger.warning(f'\n\tLoad Logbook  :  selected-row {df_sel.iloc[0]}...')
 
 
-    ra = df_sel.loc[df_sel.index[0],"RA"]
-    dec = df_sel.loc[df_sel.index[0], "DEC"]
+    ra = df_sel.loc[df_sel.index[0],"ra"]
+    dec = df_sel.loc[df_sel.index[0], "dec"]
     airmass=df_sel.loc[df_sel.index[0], "airmass"]
 
     image.my_logger.warning(f'\n\tLoad Logbook  : RA  = {ra} ...')
@@ -793,10 +827,14 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
 
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region
-    if parameters.OBS_NAME == 'PICDUMIDI':
-        data = np.copy(image.data[y0 - width_cut:parameters.CCD_IMSIZE - width_cut, 0:right_edge])
-    else:
-        data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+    #if parameters.OBS_NAME == 'PICDUMIDI':
+    #    data = np.copy(image.data[y0 - width_cut:parameters.CCD_IMSIZE - width_cut, 0:right_edge])
+    #else:
+    #    data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+
+    # For rotated image, this should work !
+    data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+
 
     image.my_logger.warning(
         f'\n\tcompute_rotation_angle_hessian :: call hessian_and_theta with margin_cut = {margin_cut}...')
