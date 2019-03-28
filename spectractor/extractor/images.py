@@ -841,7 +841,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
 
     lambda_plus, lambda_minus, theta = hessian_and_theta(data, margin_cut)
 
-    image.my_logger.warning(f'\n\tcompute_rotation_angle_hessian :: hessian_and_theta found  theta = {theta}, lambda_plus={lambda_plus}, lambda_minus={lambda_minus} ...')
+    #image.my_logger.warning(f'\n\tcompute_rotation_angle_hessian :: hessian_and_theta found  theta = {theta}, lambda_plus={lambda_plus}, lambda_minus={lambda_minus} ...')
 
     # thresholds
     lambda_threshold = np.min(lambda_minus)

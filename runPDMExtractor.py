@@ -67,8 +67,8 @@ if __name__ == "__main__":
 
     # choose the date
     #-----------------
-    thedate = "20190214"
-    #thedate = "20190215"
+    thedate = "20190214"       # Works !!!
+    #thedate = "20190215"      # Does not work !!!!
 
 
     #This above defines the logbbok to be used
@@ -128,9 +128,9 @@ if __name__ == "__main__":
     #-----------------------------------------------
 
     if FLAG_ROTATION:
-        config = "../config/picdumidirot.ini"
+        config = "config/picdumidirot.ini"
     else:
-        config = "../config/picdumidi.ini"
+        config = "config/picdumidi.ini"
 
 
 
