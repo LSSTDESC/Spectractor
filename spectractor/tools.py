@@ -1323,7 +1323,7 @@ def clean_target_spikes(data, saturation):
     return data
 
 
-def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap=None,
+def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap="jet",
                       target_pixcoords=None, vmin=None, vmax=None, aspect=None, cax=None):
     """Simple function to plot a spectrum with error bars and labels.
 
@@ -1369,6 +1369,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         data[zeros] = min_noz
         # apply log
         data = np.log10(data)
+
     im = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect)
     ax.grid(color='silver', ls='solid')
     ax.grid(True)

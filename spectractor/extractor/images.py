@@ -188,7 +188,7 @@ class Image(object):
 
     def plot_image(self, ax=None, scale="lin", title="", units="Image units", plot_stats=False,
                    target_pixcoords=None, figsize=[9.3, 8], aspect=None, vmin=None, vmax=None,
-                   cmap=None, cax=None):
+                   cmap="jet", cax=None):
         """Plot image.
 
         Parameters
@@ -883,7 +883,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         xindex = np.arange(data.shape[1])
         x_new = np.linspace(xindex.min(), xindex.max(), 50)
         y_new = width_cut + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
-        ax1.imshow(theta_mask, origin='lower', cmap=cm.brg, aspect='auto', vmin=-deg_threshold, vmax=deg_threshold)
+        ax1.imshow(theta_mask, origin='lower', cmap=cm.jet, aspect='auto', vmin=-deg_threshold, vmax=deg_threshold)
         ax1.plot(x_new, y_new, 'b-')
         ax1.set_ylim(0, 2 * width_cut)
         ax1.set_xlabel('X [pixels]')
@@ -957,12 +957,12 @@ def turn_image(image):
                                                                                        image.data.shape[0]),
                                     margin:-margin],
                           scale="log", title='Raw image (log10 scale)', units=image.units,
-                          target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
+                          target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto',cmap="jet")
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
                                     margin:-margin], scale="log", title='Turned image (log10 scale)',
-                          units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
+                          units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto',cmap="jet")
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
         f.tight_layout()
         if parameters.DISPLAY:
