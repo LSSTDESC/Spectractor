@@ -78,11 +78,11 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
         output_filename_psf = output_filename.replace('spectrum.fits','table.csv')
     elif filetype=="fit":
         output_filename = os.path.basename(file_name)
-        output_filename = output_filename.replace('.fit', '_spectrum.fit')
-        output_filename = output_filename.replace('.fz', '_spectrum.fit')
+        output_filename = output_filename.replace('.fit', '_spectrum.fits')
+        output_filename = output_filename.replace('.fz', '_spectrum.fits')
         output_filename = os.path.join(output_directory, output_filename)
         output_filename_spectrogram = output_filename.replace('spectrum', 'spectrogram')
-        output_filename_psf = output_filename.replace('spectrum.fit', 'table.csv')
+        output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
     else:
         output_filename = os.path.basename(file_name)
         output_filename = output_filename.replace('.fits', '_spectrum.fits')

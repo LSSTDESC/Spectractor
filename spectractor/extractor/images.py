@@ -99,6 +99,7 @@ class Image(object):
                                   data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
         self.convert_to_ADU_rate_units()
         self.compute_statistical_error()
+        self.header["FILTER2"]=self.disperser_label
 
     def save_image(self, output_file_name, overwrite=False):
         """Save the image in a fits file.
@@ -332,7 +333,11 @@ def load_PDM_image(image):
 
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
-
+    image.header['EXPTIME']=image.header['EXPOSURE']
+    image.header['FILTERS'] = image.header['FILTER']+' '+ image.header['DISP']
+    image.header['FILTER1'] = image.header['FILTER']
+    image.header['FILTER2'] = image.header['DISP']
+    image.header['TARGET'] = image.header['OBJECT']
 
     # Check if image already in ADU per second
     # later, there will be a header KEY to know if already
