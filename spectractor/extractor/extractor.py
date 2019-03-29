@@ -63,12 +63,34 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
 
     # Set output path
     ensure_dir(output_directory)
-    output_filename = file_name.split('/')[-1]
-    output_filename = output_filename.replace('.fits', '_spectrum.fits')
-    output_filename = output_filename.replace('.fz', '_spectrum.fits')
-    output_filename = os.path.join(output_directory, output_filename)
-    output_filename_spectrogram = output_filename.replace('spectrum','spectrogram')
-    output_filename_psf = output_filename.replace('spectrum.fits','table.csv')
+
+    #test filename output : fit or fits
+
+    filetype=file_name.split('.')[-1]
+
+    if filetype=="fits":
+        #output_filename = file_name.split('/')[-1]
+        output_filename=os.path.basename(file_name)
+        output_filename = output_filename.replace('.fits', '_spectrum.fits')
+        output_filename = output_filename.replace('.fz', '_spectrum.fits')
+        output_filename = os.path.join(output_directory, output_filename)
+        output_filename_spectrogram = output_filename.replace('spectrum','spectrogram')
+        output_filename_psf = output_filename.replace('spectrum.fits','table.csv')
+    elif filetype=="fit":
+        output_filename = os.path.basename(file_name)
+        output_filename = output_filename.replace('.fit', '_spectrum.fit')
+        output_filename = output_filename.replace('.fz', '_spectrum.fit')
+        output_filename = os.path.join(output_directory, output_filename)
+        output_filename_spectrogram = output_filename.replace('spectrum', 'spectrogram')
+        output_filename_psf = output_filename.replace('spectrum.fit', 'table.csv')
+    else:
+        output_filename = os.path.basename(file_name)
+        output_filename = output_filename.replace('.fits', '_spectrum.fits')
+        output_filename = output_filename.replace('.fz', '_spectrum.fits')
+        output_filename = os.path.join(output_directory, output_filename)
+        output_filename_spectrogram = output_filename.replace('spectrum', 'spectrogram')
+        output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
+
 
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
@@ -100,6 +122,9 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
         spectrum.header['WARNINGS'] = 'No calibration procedure with spectral features.'
 
     # Save the spectrum
+    my_logger.info('\n\tSave Spectrum in {output_filename}...')
+    my_logger.info('\n\tSave Spectrogram in {output_filename_spectrogram}...')
+
     spectrum.save_spectrum(output_filename, overwrite=True)
     spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
 

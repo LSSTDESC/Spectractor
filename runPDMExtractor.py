@@ -83,9 +83,16 @@ if __name__ == "__main__":
     #------------------------------
     df = pd.read_csv(logbookfilename, sep=",", decimal=".", encoding='latin-1', header='infer')
 
+
+    #Select the index of the file in range 0..30
+    #--------------------------
+
+    idx_sel=2
+
     # Get the first filename
     #--------------------------
-    print("The first filename in the logbook :",df.file[0])
+    filename_sel=df.file[idx_sel]
+    print("The first filename in the logbook :",df.file[idx_sel])
 
     # Defines the directory containing the reduced images
     #-------------------------------------------------------
@@ -105,17 +112,17 @@ if __name__ == "__main__":
     # -------------------------------------------------------
 
 
-    if thedate == "20190215":
-        if FLAG_ROTATION:
-            file_name = "T1M_20190215_225550_730_HD116405_Filtre_None_bin1x1.1_red_rot.fit"
-        else:
-            file_name = "T1M_20190215_225550_730_HD116405_Filtre_None_bin1x1.1_red.fit"
-    else:
-        if FLAG_ROTATION:
-            file_name = "T1M_20190214_234122_495_HD116405-Ronchi_Filtre_None_bin1x1.1_red_rot.fit"
-        else:
-            file_name = "T1M_20190214_234122_495_HD116405-Ronchi_Filtre_None_bin1x1.1_red.fit"
-
+    #if thedate == "20190215":
+    #    if FLAG_ROTATION:
+    #        file_name = "T1M_20190215_225550_730_HD116405_Filtre_None_bin1x1.1_red_rot.fit"
+    #    else:
+    #        file_name = "T1M_20190215_225550_730_HD116405_Filtre_None_bin1x1.1_red.fit"
+    #else:
+    #    if FLAG_ROTATION:
+    #        file_name = "T1M_20190214_234122_495_HD116405-Ronchi_Filtre_None_bin1x1.1_red_rot.fit"
+    #    else:
+    #        file_name = "T1M_20190214_234122_495_HD116405-Ronchi_Filtre_None_bin1x1.1_red.fit"
+    file_name=filename_sel
 
 
 
