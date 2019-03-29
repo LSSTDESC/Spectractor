@@ -1,2 +1,2 @@
 #x_center y_center theta_tilt_in_degree
-741.000 741.000 45
+174.0 208.0 45.0
