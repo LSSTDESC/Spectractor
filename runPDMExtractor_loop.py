@@ -10,6 +10,7 @@ from spectractor.logbook import LogBook
 import os
 import sys
 import pandas as pd
+import numpy as np
 
 
 
@@ -101,7 +102,7 @@ if __name__ == "__main__":
     # loop on file index
     parameters.DEBUG = False
 
-    for idx_sel in np.arange(idx_sel_min,idx,sel-max):
+    for idx_sel in np.arange(idx_sel_min,idx_sel_max):
 
         # Get the first filename
         #--------------------------
