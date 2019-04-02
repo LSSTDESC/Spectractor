@@ -68,8 +68,8 @@ if __name__ == "__main__":
 
     # choose the date
     #-----------------
-    #thedate = "20190214"       # Works !!!
-    thedate = "20190215"      # Does not work !!!!
+    thedate = "20190214"       # Works !!!
+    #thedate = "20190215"        #
 
 
     #This above defines the logbbok to be used

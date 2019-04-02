@@ -36,8 +36,8 @@ if __name__ == "__main__":
     parameters.VERBOSE = True
     parameters.DEBUG = True
 
-    # thedate="20190214"
-    thedate = "20190215"
+    thedate="20190214"
+    #thedate = "20190215"
 
     output_directory = "output/" + thedate
 

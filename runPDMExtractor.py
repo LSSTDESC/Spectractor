@@ -67,8 +67,8 @@ if __name__ == "__main__":
 
     # choose the date
     #-----------------
-    #thedate = "20190214"       # Works !!!
-    thedate = "20190215"      # Does not work !!!!
+    thedate = "20190214"       # Works !!!
+    #thedate = "20190215"      # Does not work !!!!
 
 
     #This above defines the logbbok to be used
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     #Select the index of the file in range 0..30
     #--------------------------
 
-    idx_sel=4
+    idx_sel=0
 
     # Get the first filename
     #--------------------------
