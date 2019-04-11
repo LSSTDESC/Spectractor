@@ -48,7 +48,11 @@ class Image(object):
         self.data_rotated = None
         self.gain = None
 
+        #if logbook != "":
         self.logbook = logbook  # the logbook is a hook to retrieve information missing in the Header
+        #else:
+        #    self.logbook="/Users/dagoret/MacOSX/GitHub/LSST/Spectractor/simple_logbook_PicDuMidi_20190214_v4.csv"  # for debuging purpose for rotation study
+
         self.adurate = False  # to tell if the image is in ADU/sec or not
 
         self.stat_errors = None
@@ -97,8 +101,12 @@ class Image(object):
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
+        # convert in ADU rate
         self.convert_to_ADU_rate_units()
+        # Compute statistical error for each pixel
         self.compute_statistical_error()
+
+
         self.header["FILTER2"]=self.disperser_label
 
     def save_image(self, output_file_name, overwrite=False):
@@ -337,16 +345,21 @@ def load_PDM_image(image):
     image.header['FILTERS'] = image.header['FILTER']+' '+ image.header['DISP']
     image.header['FILTER1'] = image.header['FILTER']
     image.header['FILTER2'] = image.header['DISP']
+    #image.header["FILTER2"] = image.disperser_label #better take the name in the logbook
     image.header['TARGET'] = image.header['OBJECT']
 
     # Check if image already in ADU per second
-    # later, there will be a header KEY to know if already
-    image.adurate = True
-    image.units = 'ADU/s'
+
+    if image.header['ADURATE']==1:
+        image.adurate = True
+        image.units = 'ADU/s'
+    else:
+        image.adurate = False
+        image.units = 'ADU'
 
 
 
-    # cumpute CCD gain map
+    # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
     if parameters.CCD_IMSIZE != image.data.shape[1]:
         image.my_logger.warning('\n\tCCD_IMSIZE: =%d , image size =%d ' % (
@@ -395,7 +408,7 @@ def load_LogBook(image):
         image.my_logger.warning(f'\n\tload_PDM_image :: Image has been rotated !!!')
 
 
-    image.my_logger.info(f'\n\tLoad Logbook  : date identified  {SEL_DATE} for {image.file_name}...')
+    image.my_logger.info(f'\n\tLoad Logbook  : date identified  SEL_DATE={SEL_DATE} for imagefile={image.file_name}, FLAG_ROTATION={FLAG_ROTATION}...')
 
     # temporary decoding of info from filename
 
@@ -408,7 +421,7 @@ def load_LogBook(image):
             SearchTagRe_disp = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-(.*)_Filtre.*_red_rot[.]fit$'
             SearchTagRe_filt = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-.*_(Filtre.*)[.][0-9]+_red_rot[.]fit$'
             SearchTagRe_evnum = '^T1M_[0-9]+_[0-9]+_[0-9]+_.*-.*_Filtre.*[.]([0-9]+)_red_rot[.]fit$'
-    else:
+        else:
             SearchTagRe_date = '^T1M_([0-9]+)_.*_red[.]fit$'
             SearchTagRe_time = '^T1M_[0-9]+_([0-9]+)_.*_red[.]fit$'
             SearchTagRe_num = '^T1M_[0-9]+_[0-9]+_([0-9]+)_.*_red[.]fit$'
@@ -475,6 +488,8 @@ def load_LogBook(image):
     image.my_logger.warning(f'\n\tLoad Logbook  : DEC = {dec} ...')
     image.my_logger.warning(f'\n\tLoad Logbook  : airmass = {airmass} ...')
 
+
+    # this information is inside the header now, It could be retrieved from the header
     image.header['HA'] = ra
     image.header['RA'] = ra
     image.header['DEC'] = dec
