@@ -177,7 +177,10 @@ class Image(object):
         data[zeros] = min_noz
         # compute poisson noise
         #   TODO: add read out noise (add in square to electrons)
-        self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
+        if self.adurate == True: # for ADU per second
+            self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
+        else: # For ADU
+            self.stat_errors = np.sqrt(data) / np.sqrt(self.gain)
 
     def compute_parallactic_angle(self):
         """Compute the parallactic angle.
@@ -360,6 +363,7 @@ def load_PDM_image(image):
 
 
     # compute CCD gain map
+    # For PDM gain is electrons per ADU
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
     if parameters.CCD_IMSIZE != image.data.shape[1]:
         image.my_logger.warning('\n\tCCD_IMSIZE: =%d , image size =%d ' % (
@@ -843,49 +847,82 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     >>> assert np.isclose(theta, np.arctan(slope)*180/np.pi, rtol=1e-2)
     """
 
+    # flag for Pic du Midi
+    FLAG_PDM=True
+
     image.my_logger.info(f'\n\t compute_rotation_angle_hessian, width_cut={width_cut}....,deg_threshold={deg_threshold}......')
 
     x0, y0 = np.array(image.target_pixcoords).astype(int)
-    # extract a region
-    #if parameters.OBS_NAME == 'PICDUMIDI':
-    #    data = np.copy(image.data[y0 - width_cut:parameters.CCD_IMSIZE - width_cut, 0:right_edge])
-    #else:
-    #    data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
 
-    # For rotated image, this should work !
-    data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+    # For rotated image, this should work but not for unrotated image
+    if not FLAG_PDM:
+        data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+
+    else:
+        # construction of a new way of calculating rotation angle
+        dw= width_cut
+        disperser_theta0 = image.disperser.theta_tilt  # disperser rotation in degree
+        alpha0 = disperser_theta0 / 180. * np.pi        # conversion into radian
+
+        # compute the coordinates of the two points M1, M2 of the straight line D1, D2, one above, one below the dispersion axis
+        (x1, y1) = (x0 - dw * np.sin(alpha0), y0 + dw * np.cos(alpha0))
+        (x2, y2) = (x0 + dw * np.sin(alpha0), y0 - dw * np.cos(alpha0))
+
+        image.my_logger.info(
+            f'\n\t compute_rotation_angle_hessian, x0 = {x0} pix, y0 = {y0} pix, theta_disp = {disperser_theta0} deg......')
+
+        data = np.copy(image.data) # copy the whole array
+        x = np.arange(0, data.shape[1])
+        y = np.arange(0, data.shape[0])
+        xx, yy = np.meshgrid(x, y)
+
+
+        # clean
+        data_cleaned = np.where(np.logical_and(yy - y1 < np.tan(alpha0) * (xx - x1), yy - y2 > np.tan(alpha0) * (xx - x2)),data, 0)
+        data=data_cleaned
+
 
 
     image.my_logger.warning(
         f'\n\tcompute_rotation_angle_hessian :: call hessian_and_theta with margin_cut = {margin_cut}...')
 
-    lambda_plus, lambda_minus, theta = hessian_and_theta(data, margin_cut)
+    if not FLAG_PDM:
+        lambda_plus, lambda_minus, theta = hessian_and_theta(data, margin_cut)
+    else:
+        lambda_plus, lambda_minus, theta = hessian_and_theta(data, 1)
 
-    #image.my_logger.warning(f'\n\tcompute_rotation_angle_hessian :: hessian_and_theta found  theta = {theta}, lambda_plus={lambda_plus}, lambda_minus={lambda_minus} ...')
+    image.my_logger.warning(f'\n\tcompute_rotation_angle_hessian :: hessian_and_theta found lambda_plus={lambda_plus}, lambda_minus={lambda_minus} ...')
 
     # thresholds
     lambda_threshold = np.min(lambda_minus)
     mask = np.where(lambda_minus > lambda_threshold)
     theta_mask = np.copy(theta)
     theta_mask[mask] = np.nan
+
     minimum_pixels = 0.01 * 2 * width_cut * right_edge
+
     while len(theta_mask[~np.isnan(theta_mask)]) < minimum_pixels:
         lambda_threshold /= 2
         mask = np.where(lambda_minus > lambda_threshold)
         theta_mask = np.copy(theta)
         theta_mask[mask] = np.nan
         # print len(theta_mask[~np.isnan(theta_mask)]), lambda_threshold
+
     theta_guess = image.disperser.theta(image.target_pixcoords)
     mask2 = np.where(np.abs(theta - theta_guess) > deg_threshold)
     theta_mask[mask2] = np.nan
     theta_mask = theta_mask[2:-2, 2:-2]
     theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
+
     if parameters.OBS_OBJECT_TYPE != 'STAR':
         pixels = np.where(~np.isnan(theta_mask))
         p = np.polyfit(pixels[1], pixels[0], deg=1)
         theta_median = np.arctan(p[0]) * 180 / np.pi
     else:
         theta_median = float(np.median(theta_hist))
+
+
+
 
     theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
     image.header['THETAFIT'] = theta_median
@@ -915,6 +952,9 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         if parameters.DISPLAY:
             plt.show()
     return theta_median
+
+
+
 
 
 def turn_image(image):
@@ -951,15 +991,20 @@ def turn_image(image):
     >>> assert np.isclose(im.rotation_angle, np.arctan(slope)*180/np.pi, rtol=1e-2)
     """
 
-    image.my_logger.info(f'\n\tturn_image width_cut={parameters.YWINDOW}...')
+    image.my_logger.info(f'\n\tturn_image :: width_cut={parameters.YWINDOW}...')
+
+    if parameters.OBS_NAME == 'PICDUMIDI':
+        image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,right_edge=parameters.CCD_IMSIZE)
+
+    else:
+        image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
+                                                         right_edge=parameters.CCD_IMSIZE - 200)
 
 
 
-    image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
-                                                          right_edge=parameters.CCD_IMSIZE - 200)
 
     image.header['ROTANGLE'] = image.rotation_angle
-    image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
+    image.my_logger.info(f'\n\tturn_image ::  Rotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
     if not np.isnan(image.rotation_angle):
         image.data_rotated = ndimage.interpolation.rotate(image.data, image.rotation_angle,
@@ -970,23 +1015,94 @@ def turn_image(image):
                                                 prefilter=parameters.ROT_PREFILTER,
                                                 order=parameters.ROT_ORDER)))
     if parameters.DEBUG:
-        margin = 100
-        y0 = int(image.target_pixcoords[1])
-        f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
-        plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):min(y0 + 2 * parameters.YWINDOW,
-                                                                                       image.data.shape[0]),
+
+        if not parameters.OBS_NAME == 'PICDUMIDI':
+            margin = 100
+            y0 = int(image.target_pixcoords[1])
+            f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
+            plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):min(y0 + 2 * parameters.YWINDOW,
+                                                                                           image.data.shape[0]),
                                     margin:-margin],
                           scale="log", title='Raw image (log10 scale)', units=image.units,
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto',cmap="jet")
-        ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
-        plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
+            ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
+            plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
                                     margin:-margin], scale="log", title='Turned image (log10 scale)',
                           units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto',cmap="jet")
-        ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
-        f.tight_layout()
-        if parameters.DISPLAY:
-            plt.show()
+            ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
+            f.tight_layout()
+            if parameters.DISPLAY:
+                plt.show()
+
+
+        else: # Pic du Midi Case
+            margin=100
+            right_edge_max=parameters.CCD_IMSIZE
+
+            x0, y0 = np.array(image.target_pixcoords).astype(int)
+            dw = margin
+            disperser_theta0 = image.disperser.theta_tilt  # disperser rotation in degree
+            alpha0 = disperser_theta0 / 180. * np.pi  # conversion into radian
+
+            # compute the coordinates of the two points M1, M2 of the straight line D1, D2, one above, one below the dispersion axis
+            (x1, y1) = (x0 - dw * np.sin(alpha0), y0 + dw * np.cos(alpha0))
+            (x2, y2) = (x0 + dw * np.sin(alpha0), y0 - dw * np.cos(alpha0))
+            (x3, y3) = (right_edge_max-dw*np.sin(alpha0), y0 + np.tan(alpha0)*(right_edge_max-dw*np.sin(alpha0)))
+            (x4, y4) = (x3-np.sin(alpha0)*dw, y3+ np.cos(alpha0)*dw)
+            (x5, y5) = (right_edge_max, y3 - np.cos(alpha0) * dw)
+
+            # boundaries of unrotated image
+            x1 = int(x1)
+            x2 = int(x2)
+            y1 = int(y1)
+            y2 = int(y2)
+
+            XMIN=int(max(0,x1))
+            XMAX=int(right_edge_max-dw*np.sin(alpha0))
+            YMIN=int(max(0,y2))
+            YMAX=int(min(parameters.CCD_IMSIZE,y4))
+
+
+            # boundaries of rotated image
+
+            alpha_rot=image.rotation_angle*np.pi/180.
+
+            X0c=x0-image.data.shape[1]/2.
+            Y0c=y0-image.data.shape[0]/2.
+
+            newX0c=X0c*np.cos(alpha_rot)+Y0c*np.sin(alpha_rot)
+            newY0c = -X0c * np.sin(alpha_rot) + Y0c * np.cos(alpha_rot)
+
+            newX0=int(newX0c+image.data_rotated.shape[1]/2.)
+            newY0 = int(newY0c + image.data_rotated.shape[0]/2.)
+
+
+            newXMIN=int(newX0)
+            newXMAX=image.data_rotated.shape[1]
+
+
+
+            f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
+            plot_image_simple(ax1, data=image.data[YMIN:YMAX,XMIN:XMAX],
+                              scale="log", title='Raw image (log10 scale)', units=image.units,
+                              target_pixcoords=(image.target_pixcoords[0] - XMIN, image.target_pixcoords[1]-YMIN ),
+                              aspect='auto', cmap="jet")
+
+            plot_image_simple(ax2, data=image.data_rotated[newY0-margin:newY0+margin,newXMIN:newXMAX],
+                                                          scale="log", title='Turned image (log10 scale)',
+                        units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto',
+                              cmap="jet")
+
+            f.tight_layout()
+            if parameters.DISPLAY:
+                plt.show()
+
+
+
+
+
+
 
 
 if __name__ == "__main__":

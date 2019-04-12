@@ -76,7 +76,7 @@ if __name__ == "__main__":
     if FLAG_ROTATION:
         logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_rot_v2.csv"
     else:
-        logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v2.csv"
+        #logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v2.csv"
         logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v4.csv"
 
 
@@ -167,5 +167,8 @@ if __name__ == "__main__":
     #############################
     #### RUN Spectractor
     ############################
+
+    parameters.DISPLAY=True
+
     Spectractor(fullfilename, output_directory, [xpos, ypos], target, disperser_label, config, logbook=logbookfilename)
 
