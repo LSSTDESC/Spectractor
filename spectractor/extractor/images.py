@@ -856,10 +856,14 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
 
     # For rotated image, this should work but not for unrotated image
     if not FLAG_PDM:
+        image.my_logger.info(
+            f'\n\t compute_rotation_angle_hessian : DO NOT PERFORM rotation for Pic Du Midi !!!! ......')
         data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
 
     else:
         # construction of a new way of calculating rotation angle
+        image.my_logger.info(
+            f'\n\t compute_rotation_angle_hessian : DO PERFORM rotation for Pic Du Midi !!!! ......')
         dw= width_cut
         disperser_theta0 = image.disperser.theta_tilt  # disperser rotation in degree
         alpha0 = disperser_theta0 / 180. * np.pi        # conversion into radian
@@ -879,22 +883,31 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
 
         # clean
         data_cleaned = np.where(np.logical_and(yy - y1 < np.tan(alpha0) * (xx - x1), yy - y2 > np.tan(alpha0) * (xx - x2)),data, 0)
-        data=data_cleaned
+        data_cleaned_cut=data_cleaned[max(x0,y0)+10:,max(x0,y0)+10:] # do not put star in Hessian
+        #data=data_cleaned_cut
+        data = data_cleaned
 
+        #plt.figure()
+        #plt.imshow(data,origin="lower",cmap="jet")
+        #plt.show()
 
 
     image.my_logger.warning(
         f'\n\tcompute_rotation_angle_hessian :: call hessian_and_theta with margin_cut = {margin_cut}...')
 
-    if not FLAG_PDM:
-        lambda_plus, lambda_minus, theta = hessian_and_theta(data, margin_cut)
-    else:
-        lambda_plus, lambda_minus, theta = hessian_and_theta(data, 1)
 
-    image.my_logger.warning(f'\n\tcompute_rotation_angle_hessian :: hessian_and_theta found lambda_plus={lambda_plus}, lambda_minus={lambda_minus} ...')
+    lambda_plus, lambda_minus, theta = hessian_and_theta(data, margin_cut)
+
+
+    #image.my_logger.warning(f'\n\tcompute_rotation_angle_hessian :: hessian_and_theta found lambda_plus={lambda_plus}, lambda_minus={lambda_minus} ...')
 
     # thresholds
-    lambda_threshold = np.min(lambda_minus)
+    #lambda_threshold = np.min(lambda_minus)
+    lambda_threshold = np.min(lambda_minus.flatten())
+
+    image.my_logger.warning(
+        f'\n\tcompute_rotation_angle_hessian :: hessian_and_theta found lambda_threshold={lambda_threshold} ...')
+
     mask = np.where(lambda_minus > lambda_threshold)
     theta_mask = np.copy(theta)
     theta_mask[mask] = np.nan
@@ -908,7 +921,15 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         theta_mask[mask] = np.nan
         # print len(theta_mask[~np.isnan(theta_mask)]), lambda_threshold
 
-    theta_guess = image.disperser.theta(image.target_pixcoords)
+
+    if not FLAG_PDM:
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        theta_guess = image.disperser.theta(image.target_pixcoords)  # SDC C'est cela qui empechait de tourner !!!!!!!!
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    else:
+        theta_guess = image.disperser.theta_tilt
+
+
     mask2 = np.where(np.abs(theta - theta_guess) > deg_threshold)
     theta_mask[mask2] = np.nan
     theta_mask = theta_mask[2:-2, 2:-2]
