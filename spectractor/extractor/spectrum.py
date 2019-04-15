@@ -972,6 +972,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     data = np.copy(image.data_rotated)[:, 0:right_edge]
     err = np.copy(image.stat_errors_rotated)[:, 0:right_edge]
 
+
+
+
     # Lateral bands to remove sky background
     Ny, Nx = data.shape
     x0 = int(image.target_pixcoords_rotated[0])
@@ -979,14 +982,54 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
 
+    my_logger.info(
+        f'\n\tExtracting spectrum from image: extract_spectrum_from_image : Ny;Nx= {Ny}, {Nx}, x0,y0= {x0}, {y0} '
+        f'and ymin, ymax= {ymin}, {ymax}')
+
+    plt.figure(figsize=(6, 6))
+    plt.title("DEBUG 1 : extract_spectrum_from_image")
+    plt.imshow(data, cmap="jet", origin="lower",vmin=0,vmax=data.flatten().max()*0.1)
+    plt.scatter(x0, y0, marker='o', s=100, edgecolors='y', facecolors='none',
+               label='Target', linewidth=2)
+    plt.grid(True,color="white")
+    plt.show()
+
+
+
     # Roughly estimates the wavelengths and set start 50 nm before parameters.LAMBDA_MIN
     # and end 50 nm after parameters.LAMBDA_MAX
-    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
+
+    if parameters.OBS_NAME != 'PICDUMIDI':
+        lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
                                                       x0=image.target_pixcoords)
+    else:
+        lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
+                                                          x0=image.target_pixcoords_rotated)
+
+    plt.figure(figsize=(6, 6))
+    plt.title("DEBUG 2 : extract_spectrum_from_image show dispersion relation ")
+    plt.plot(np.arange(Nx), lambdas,"b-")
+
+    plt.grid()
+    plt.xlabel("pixels")
+    plt.ylabel("wavelength (nm)")
+    plt.show()
+
+
     pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
     pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0)))))
+
+    my_logger.info(
+        f'\n\tExtracting spectrum from image: extract_spectrum_from_image : pixel_start = {pixel_start} pixel_end = {pixel_end} ')
+
+
+
     if (pixel_end - pixel_start) % 2 == 0:  # spectrogram table must have odd size in x for the fourier simulation
         pixel_end -= 1
+
+    my_logger.info(
+        f'\n\tExtracting spectrum from image: extract_spectrum_from_image : pixel_start = {pixel_start} pixel_end = {pixel_end} ')
+
 
     # Create spectrogram
     data = data[ymin:ymax, pixel_start:pixel_end]
@@ -994,6 +1037,12 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     Ny, Nx = data.shape
     my_logger.info(
         f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
+
+    plt.figure(figsize=(6, 6))
+    plt.title("DEBUG 2 : extract_spectrum_from_image after crop")
+    plt.imshow(data, cmap="jet", origin="lower")
+    plt.Circle((x0, y0), radius=10, color='y')
+    plt.show()
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')

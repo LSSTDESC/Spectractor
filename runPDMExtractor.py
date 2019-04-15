@@ -88,7 +88,7 @@ if __name__ == "__main__":
     #Select the index of the file in range 0..30
     #--------------------------
 
-    idx_sel=0
+    idx_sel=2
 
     # Get the first filename
     #--------------------------

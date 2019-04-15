@@ -63,12 +63,12 @@ if __name__ == "__main__":
 
     # Select the reduced rotated images
     #----------------------------------
-    FLAG_ROTATION=True
+    FLAG_ROTATION=False
 
 
     # choose the date
     #-----------------
-    thedate = "20190214"       # Works !!!
+    thedate = "20190214"         # Works !!!
     #thedate = "20190215"        #
 
 
@@ -77,7 +77,8 @@ if __name__ == "__main__":
     if FLAG_ROTATION:
         logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_rot_v2.csv"
     else:
-        logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v2.csv"
+        #logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v2.csv"
+        logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v4.csv"
 
 
     #Read the logbook for testing
@@ -116,12 +117,14 @@ if __name__ == "__main__":
             if FLAG_ROTATION:
                 INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190215_v3"
             else:
-                INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190215_v2"
+                #INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190215_v2"
+                INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190215_v4"
         else:
             if FLAG_ROTATION:
                 INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190214_v3"
             else:
-                INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190214_v2"
+                #INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190214_v2"
+                INPUTDIR = "/Users/dagoret/DATA/PicDuMidiFev2019/prod_20190214_v4"
 
         # Defines the input image filename required
         # -------------------------------------------------------
