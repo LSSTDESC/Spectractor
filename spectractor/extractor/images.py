@@ -848,14 +848,14 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     """
 
     # flag for Pic du Midi
-    FLAG_PDM=True
+
 
     image.my_logger.info(f'\n\t compute_rotation_angle_hessian, width_cut={width_cut}....,deg_threshold={deg_threshold}......')
 
     x0, y0 = np.array(image.target_pixcoords).astype(int)
 
     # For rotated image, this should work but not for unrotated image
-    if not FLAG_PDM:
+    if parameters.OBS_NAME != 'PICDUMIDI':
         image.my_logger.info(
             f'\n\t compute_rotation_angle_hessian : DO NOT PERFORM rotation for Pic Du Midi !!!! ......')
         data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
@@ -922,7 +922,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         # print len(theta_mask[~np.isnan(theta_mask)]), lambda_threshold
 
 
-    if not FLAG_PDM:
+    if parameters.OBS_NAME != 'PICDUMIDI':
     #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         theta_guess = image.disperser.theta(image.target_pixcoords)  # SDC C'est cela qui empechait de tourner !!!!!!!!
     #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1027,6 +1027,8 @@ def turn_image(image):
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tturn_image ::  Rotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
+
+    # perform the rotation
     if not np.isnan(image.rotation_angle):
         image.data_rotated = ndimage.interpolation.rotate(image.data, image.rotation_angle,
                                                           prefilter=parameters.ROT_PREFILTER,
@@ -1037,7 +1039,7 @@ def turn_image(image):
                                                 order=parameters.ROT_ORDER)))
     if parameters.DEBUG:
 
-        if not parameters.OBS_NAME == 'PICDUMIDI':
+        if parameters.OBS_NAME != 'PICDUMIDI':
             margin = 100
             y0 = int(image.target_pixcoords[1])
             f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
@@ -1099,7 +1101,7 @@ def turn_image(image):
             newY0 = int(newY0c + image.data_rotated.shape[0]/2.)
 
 
-            newXMIN=int(newX0)
+            newXMIN=max(int(newX0)-margin,0)
             newXMAX=image.data_rotated.shape[1]
 
 

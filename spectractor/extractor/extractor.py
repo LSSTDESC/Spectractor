@@ -93,7 +93,7 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
 
 
     # Find the exact target position in the raw cut image: several methods
-    my_logger.info('\n\tSearch for the target in the image...')
+    my_logger.info('\n\tSearch for the target in the original image...')
     target_pixcoords = find_target(image, guess)
 
     # Rotate the image: several methods
@@ -108,10 +108,19 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     spectrum = Spectrum(image=image)
 
     # Subtract background and bad pixels
-    extract_spectrum_from_image(image, spectrum, w=parameters.PIXWIDTH_SIGNAL,
+    if parameters.OBS_NAME != 'PICDUMIDI':
+        extract_spectrum_from_image(image, spectrum, w=parameters.PIXWIDTH_SIGNAL,
                                 ws = (parameters.PIXDIST_BACKGROUND,
                                       parameters.PIXDIST_BACKGROUND+parameters.PIXWIDTH_BACKGROUND),
                                 right_edge=parameters.CCD_IMSIZE-200)
+    else:
+        extract_spectrum_from_image(image, spectrum, w=parameters.PIXWIDTH_SIGNAL,
+                                    ws=(parameters.PIXDIST_BACKGROUND,
+                                        parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND),
+                                    right_edge=2500)
+
+
+
     spectrum.atmospheric_lines = atmospheric_lines
     # Calibrate the spectrum
     calibrate_spectrum(spectrum)
