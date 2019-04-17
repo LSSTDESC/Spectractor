@@ -63,13 +63,13 @@ if __name__ == "__main__":
 
     # Select the reduced rotated images
     #----------------------------------
-    FLAG_ROTATION=False
+    FLAG_ROTATION=False   # outdated
 
 
     # choose the date
     #-----------------
-    thedate = "20190214"         # Works !!!
-    #thedate = "20190215"        #
+    #thedate = "20190214"         # Works !!!
+    thedate = "20190215"        #
 
 
     #This above defines the logbbok to be used

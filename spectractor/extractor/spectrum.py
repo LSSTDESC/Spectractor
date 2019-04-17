@@ -1040,11 +1040,12 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     my_logger.info(
         f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
-    plt.figure(figsize=(6, 6))
-    plt.title("DEBUG 2 : extract_spectrum_from_image after crop")
-    plt.imshow(data, cmap="jet", origin="lower")
-    plt.Circle((x0, y0), radius=10, color='y')
-    plt.show()
+    if parameters.DEBUG:
+        plt.figure(figsize=(6, 6))
+        plt.title("DEBUG 2 : extract_spectrum_from_image after crop")
+        plt.imshow(data, cmap="jet", origin="lower")
+        plt.Circle((x0, y0), radius=10, color='y')
+        plt.show()
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
