@@ -114,10 +114,12 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
                                       parameters.PIXDIST_BACKGROUND+parameters.PIXWIDTH_BACKGROUND),
                                 right_edge=parameters.CCD_IMSIZE-200)
     else:
+        alpha_rot=image.rotation_angle*np.pi/180.
+        right_edge_max=int(parameters.CCD_IMSIZE/np.cos(alpha_rot))-100
         extract_spectrum_from_image(image, spectrum, w=parameters.PIXWIDTH_SIGNAL,
                                     ws=(parameters.PIXDIST_BACKGROUND,
                                         parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND),
-                                    right_edge=2500)
+                                    right_edge=right_edge_max)
 
 
 

@@ -983,16 +983,18 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     ymin = max(0, y0 - ws[1])
 
     my_logger.info(
-        f'\n\tExtracting spectrum from image: extract_spectrum_from_image : Ny;Nx= {Ny}, {Nx}, x0,y0= {x0}, {y0} '
+        f'\n\tExtracting spectrum from image: extract_spectrum_from_image : Ny,Nx= {Ny}, {Nx}, x0,y0= {x0}, {y0} '
         f'and ymin, ymax= {ymin}, {ymax}')
 
-    plt.figure(figsize=(6, 6))
-    plt.title("DEBUG 1 : extract_spectrum_from_image")
-    plt.imshow(data, cmap="jet", origin="lower",vmin=0,vmax=data.flatten().max()*0.1)
-    plt.scatter(x0, y0, marker='o', s=100, edgecolors='y', facecolors='none',
+
+    if parameters.DEBUG:
+        plt.figure(figsize=(6, 6))
+        plt.title("DEBUG 1 : extract_spectrum_from_image")
+        plt.imshow(data, cmap="jet", origin="lower",vmin=0,vmax=data.flatten().max()*0.1)
+        plt.scatter(x0, y0, marker='o', s=100, edgecolors='y', facecolors='none',
                label='Target', linewidth=2)
-    plt.grid(True,color="white")
-    plt.show()
+        plt.grid(True,color="white")
+        plt.show()
 
 
 
@@ -1006,14 +1008,14 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
                                                           x0=image.target_pixcoords_rotated)
 
-    plt.figure(figsize=(6, 6))
-    plt.title("DEBUG 2 : extract_spectrum_from_image show dispersion relation ")
-    plt.plot(np.arange(Nx), lambdas,"b-")
-
-    plt.grid()
-    plt.xlabel("pixels")
-    plt.ylabel("wavelength (nm)")
-    plt.show()
+    if parameters.DEBUG:
+        plt.figure(figsize=(6, 6))
+        plt.title("DEBUG 2 : extract_spectrum_from_image show dispersion relation ")
+        plt.plot(np.arange(Nx), lambdas,"b-")Ò
+        plt.grid()
+        plt.xlabel("pixels")
+        plt.ylabel("wavelength (nm)")
+        plt.show()
 
 
     pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
@@ -1173,6 +1175,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[0].set_position([pos2.x0, pos0.y0, pos2.width, pos0.height])
         ax[1].set_position([pos2.x0, pos1.y0, pos2.width, pos1.height])
         if parameters.DISPLAY:
+            plt.suptitle("spectrum::extract_spectrum_from_image")
             plt.show()
     return spectrum
 

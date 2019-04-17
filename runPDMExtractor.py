@@ -62,13 +62,13 @@ if __name__ == "__main__":
 
     # Select the reduced rotated images
     #----------------------------------
-    FLAG_ROTATION=False
+    FLAG_ROTATION=False   # should not be used from now on
 
 
     # choose the date
     #-----------------
-    thedate = "20190214"       # Works !!!
-    #thedate = "20190215"      # Does not work !!!!
+    #thedate = "20190214"
+    thedate = "20190215"
 
 
     #This above defines the logbbok to be used
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     #Select the index of the file in range 0..30
     #--------------------------
 
-    idx_sel=2
+    idx_sel=0
 
     # Get the first filename
     #--------------------------

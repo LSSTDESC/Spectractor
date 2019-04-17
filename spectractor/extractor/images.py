@@ -779,21 +779,22 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     # debugging plots
     if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
-        vmin = 0
+        vmin = float(np.nanmin(sub_image))
         vmax = float(np.nanmax(sub_image))
-        plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
+        plot_image_simple(ax1, data=sub_image, scale="lin", title="total image", units=image.units,
                           target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax1.legend(loc=1)
 
-        plot_image_simple(ax2, data=star2D(X, Y) + bkgd_2D(X, Y), scale="lin", title="",
+        plot_image_simple(ax2, data=star2D(X, Y) + bkgd_2D(X, Y), scale="lin", title="star2D+blg2D",
                           units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
-        plot_image_simple(ax3, data=sub_image - star2D(X, Y) - bkgd_2D(X, Y), scale="lin", title="",
+        plot_image_simple(ax3, data=sub_image - star2D(X, Y) - bkgd_2D(X, Y), scale="lin", title="image-star2D-bkg2D",
                           units=f'Background+Star2D subtracted image\n({image.units})',
                           target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax3.legend(loc=1)
 
         f.tight_layout()
         if parameters.DISPLAY:
+            #plt.suptitle("Image::find_target_2Dprofile")
             plt.show()
     return new_avX, new_avY
 

@@ -1163,6 +1163,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
         ax[1].grid(True)
         std = np.std(residuals)
         ax[1].set_ylim([-3. * std, 3. * std])
+
         ax[1].set_xlabel(ax[0].get_xlabel())
         ax[1].set_ylabel('(data-fit)/err')
         ax[0].set_xticks(ax[1].get_xticks()[1:-1])
