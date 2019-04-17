@@ -1011,7 +1011,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     if parameters.DEBUG:
         plt.figure(figsize=(6, 6))
         plt.title("DEBUG 2 : extract_spectrum_from_image show dispersion relation ")
-        plt.plot(np.arange(Nx), lambdas,"b-")Ò
+        plt.plot(np.arange(Nx), lambdas,"b-")
         plt.grid()
         plt.xlabel("pixels")
         plt.ylabel("wavelength (nm)")
