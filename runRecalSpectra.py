@@ -1,5 +1,5 @@
 #########################################################################################################
-# View spectra produced in Spectractor
+# Recalibrate spectra produced in Spectractor
 #########################################################################################################
 
 import os
@@ -46,7 +46,6 @@ if __name__ == "__main__":
 
 
 
-
     ############################
     # 2) Get the config
     #########################
@@ -54,10 +53,9 @@ if __name__ == "__main__":
     config = "config/picdumidi.ini"
 
     my_logger = set_logger(__name__)
-    my_logger.info('\n\tStart RunViewSpectra')
+    my_logger.info('\n\tStart RunRecalSpectra')
     # Load config file
     load_config(config)
-
 
 
     ############################
@@ -109,6 +107,9 @@ if __name__ == "__main__":
 
         print("{}) : {}".format(idx,onlyfilesspectrum[idx]))
 
+        if idx>=1:
+            break
+
         fullfilename = os.path.join(output_directory, onlyfilesspectrum[idx])
         s = Spectrum()
         s.load_spectrum(fullfilename)
@@ -120,8 +121,12 @@ if __name__ == "__main__":
         s.plot_spectrum(ax=ax,xlim=None, label=basenamecut[idx],force_lines=True)
         figfilename="fig_spec_"+basenamecut[idx]+".png"
 
-        fig.savefig(figfilename)
+        #fig.savefig(figfilename)
 
+        # calibrate
+        calibrate_spectrum_with_lines(s)
+
+        s.plot_spectrum(xlim=None)
 
 
 
