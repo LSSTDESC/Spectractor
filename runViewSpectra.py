@@ -39,7 +39,8 @@ if __name__ == "__main__":
     #thedate="20190214"
     thedate = "20190215"
 
-    output_directory = "output/" + thedate
+    #output_directory = "output/" + thedate
+    output_directory = "/Users/dagoret/DATA/PicDuMidiFev2019/spectractor_spectra/" + thedate
 
     parameters.VERBOSE = True
     parameters.DISPLAY = True
