@@ -34,7 +34,8 @@ if __name__ == "__main__":
     ######################
 
     parameters.VERBOSE = True
-    parameters.DEBUG = True
+    parameters.DEBUG = False
+    parameters.DISPLAY = True
 
     #thedate="20190214"
     thedate = "20190215"
@@ -42,8 +43,7 @@ if __name__ == "__main__":
     #output_directory = "output/" + thedate
     output_directory = "/Users/dagoret/DATA/PicDuMidiFev2019/spectractor_spectra/" + thedate
 
-    parameters.VERBOSE = True
-    parameters.DISPLAY = True
+
 
 
 
@@ -108,8 +108,8 @@ if __name__ == "__main__":
 
         print("{}) : {}".format(idx,onlyfilesspectrum[idx]))
 
-        if idx>=1:
-            break
+        #if idx>=5:
+        #    break
 
         fullfilename = os.path.join(output_directory, onlyfilesspectrum[idx])
         s = Spectrum()

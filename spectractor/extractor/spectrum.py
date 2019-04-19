@@ -858,8 +858,17 @@ def calibrate_spectrum_with_lines(spectrum):
         spectrum.disperser.D, shift = params
         lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - shift,
                                                                   x0=[x0[0] + shift, x0[1]], order=spectrum.order)
-        chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
+
+        if parameters.OBS_NAME != 'PICDUMIDI':
+            chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None)
+        else:
+            # for Pic du Midi restriction of absorption line in range 430-800 nm (Hgamma to O2) because  of wiggles
+            chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
+                             fwhm_func=fwhm_func, ax=None,xlim = (430.,800.))
+
+
+
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             spectrum.lambdas = lambdas_test
@@ -869,35 +878,31 @@ def calibrate_spectrum_with_lines(spectrum):
 
     #--------------------------------------------------
     # grid exploration of the parameters
-    # necessary because of the the line detection algo
+    # necessary because of the  line detection algo
     #---------------------------------------------------------
 
     if parameters.OBS_NAME != 'PICDUMIDI':
-
-
         D_step = D_err / 2
         pixel_shift_step = 0.5
-
         pixel_shift_prior = parameters.PIXSHIFT_PRIOR
-
         Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
         pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
     else:
-
         D_step = D_err
         pixel_shift_step = 0.5
         pixel_shift_prior = parameters.PIXSHIFT_PRIOR
-        Ds = np.arange(D - 9 * D_err, D + 10 * D_err, D_step)
-        pixel_shifts = np.arange(-3*pixel_shift_prior, 3*pixel_shift_prior + pixel_shift_step, pixel_shift_step)
+        Ds = np.arange(D - 5 * D_err, D + 6* D_err, D_step)
+        pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
 
-    spectrum.my_logger.info('\n\tDs={}'.format(Ds))
-    spectrum.my_logger.info('\n\tpixel_shifts={}'.format(pixel_shifts))
+    #if parameters.DEBUG:
+    #    spectrum.my_logger.info('\n\tDs={}'.format(Ds))
+    #    spectrum.my_logger.info('\n\tpixel_shifts={}'.format(pixel_shifts))
 
     # pixel_shifts = np.array([0])
     chisq_grid = np.zeros((len(Ds), len(pixel_shifts)))
     for i, D in enumerate(Ds):
         for j, pixel_shift in enumerate(pixel_shifts):
-            spectrum.my_logger.info('\n\tD={:2.2f} , pixel_shift={:2.2f}'.format(D,pixel_shift))
+            #spectrum.my_logger.info('\n\tD={:2.2f} , pixel_shift={:2.2f}'.format(D,pixel_shift))
             chisq_grid[i, j] = shift_minimizer([D, pixel_shift])
 
     imin, jmin = np.unravel_index(chisq_grid.argmin(), chisq_grid.shape)
@@ -909,12 +914,13 @@ def calibrate_spectrum_with_lines(spectrum):
     if imin == 0 or imin == Ds.size or jmin == 0 or jmin == pixel_shifts.size:
         spectrum.my_logger.warning('\n\tMinimum chisq is on the edge of the exploration grid.')
 
-    if parameters.DEBUG and parameters.DISPLAY:
+    #if parameters.DEBUG and parameters.DISPLAY:
+    if parameters.VERBOSE and parameters.DISPLAY:
         im = plt.imshow(np.log10(chisq_grid), origin='lower', aspect='auto',
                         extent=(
                             np.min(pixel_shifts) - pixel_shift_step / 2, np.max(pixel_shifts) + pixel_shift_step / 2,
                             np.min(Ds) - D_step / 2, np.max(Ds) + D_step / 2))
-        plt.gca().scatter(pixel_shift, D, marker='o', s=100, edgecolors='k', facecolors='none',
+        plt.gca().scatter(pixel_shift, D, marker='o', s=100, edgecolors='red', facecolors='none',
                           label='Minimum', linewidth=2)
         c = plt.colorbar(im)
         c.set_label('Log10(chisq)')
@@ -939,8 +945,8 @@ def calibrate_spectrum_with_lines(spectrum):
                                       (-2, 2)))
     else:
         m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1, fix=fix, print_level=0,
-                                   limit=((D - 9 * parameters.DISTANCE2CCD_ERR, D + 10 * parameters.DISTANCE2CCD_ERR),
-                                          (-6, 6)))
+                                   limit=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR),
+                                          (-2, 2)))
     m.migrad()
     #if parameters.DEBUG:
     #    print(m.pri)
