@@ -865,7 +865,9 @@ def calibrate_spectrum_with_lines(spectrum):
         else:
             # for Pic du Midi restriction of absorption line in range 430-800 nm (Hgamma to O2) because  of wiggles
             chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
-                             fwhm_func=fwhm_func, ax=None,xlim = (430.,800.))
+                                 fwhm_func=fwhm_func, ax=None, xlim=(parameters.LAMBDA_MIN, 800.))
+                                 #fwhm_func=fwhm_func, ax=None,xlim = (430.,800.))
+
 
 
 
@@ -891,8 +893,8 @@ def calibrate_spectrum_with_lines(spectrum):
         D_step = D_err
         pixel_shift_step = 0.5
         pixel_shift_prior = parameters.PIXSHIFT_PRIOR
-        Ds = np.arange(D - 5 * D_err, D + 6* D_err, D_step)
-        pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
+        Ds = np.arange(D - 7 * D_err, D + 8* D_err, D_step)
+        pixel_shifts = np.arange(-2*pixel_shift_prior, 2*pixel_shift_prior + pixel_shift_step, pixel_shift_step)
 
     #if parameters.DEBUG:
     #    spectrum.my_logger.info('\n\tDs={}'.format(Ds))
@@ -905,6 +907,7 @@ def calibrate_spectrum_with_lines(spectrum):
             #spectrum.my_logger.info('\n\tD={:2.2f} , pixel_shift={:2.2f}'.format(D,pixel_shift))
             chisq_grid[i, j] = shift_minimizer([D, pixel_shift])
 
+    # values for initialization
     imin, jmin = np.unravel_index(chisq_grid.argmin(), chisq_grid.shape)
     D = Ds[imin]
     pixel_shift = pixel_shifts[jmin]
@@ -915,7 +918,7 @@ def calibrate_spectrum_with_lines(spectrum):
         spectrum.my_logger.warning('\n\tMinimum chisq is on the edge of the exploration grid.')
 
     #if parameters.DEBUG and parameters.DISPLAY:
-    if parameters.VERBOSE and parameters.DISPLAY:
+    if (parameters.VERBOSE or parameters.DEBUG) and parameters.DISPLAY:
         im = plt.imshow(np.log10(chisq_grid), origin='lower', aspect='auto',
                         extent=(
                             np.min(pixel_shifts) - pixel_shift_step / 2, np.max(pixel_shifts) + pixel_shift_step / 2,
@@ -944,9 +947,12 @@ def calibrate_spectrum_with_lines(spectrum):
                                limit=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR),
                                       (-2, 2)))
     else:
+        #m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1, fix=fix, print_level=0,
+        #                           limit=((D - 7 * parameters.DISTANCE2CCD_ERR, D + 7 * parameters.DISTANCE2CCD_ERR),
+        #                                  (-5, 5)))
         m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1, fix=fix, print_level=0,
                                    limit=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR),
-                                          (-2, 2)))
+                                          (pixel_shift-3,pixel_shift+3)))
     m.migrad()
     #if parameters.DEBUG:
     #    print(m.pri)
@@ -1046,8 +1052,10 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
                                                       x0=image.target_pixcoords)
     else:
+        #lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
+        #                                                  x0=image.target_pixcoords_rotated)
         lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
-                                                          x0=image.target_pixcoords_rotated)
+                                                          x0=image.target_pixcoords)
 
     if parameters.DEBUG:
         plt.figure(figsize=(6, 6))
@@ -1083,7 +1091,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     if parameters.DEBUG:
         plt.figure(figsize=(6, 6))
-        plt.title("DEBUG 2 : extract_spectrum_from_image after crop")
+        plt.title("DEBUG 3 : extract_spectrum_from_image after crop")
         plt.imshow(data, cmap="jet", origin="lower")
         plt.Circle((x0, y0), radius=10, color='y')
         plt.show()

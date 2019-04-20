@@ -40,7 +40,8 @@ if __name__ == "__main__":
     thedate = "20190215"
 
     #output_directory = "output/" + thedate
-    output_directory = "/Users/dagoret/DATA/PicDuMidiFev2019/spectractor_spectra/" + thedate
+    #output_directory = "/Users/dagoret/DATA/PicDuMidiFev2019/spectractor_spectra/" + thedate
+    output_directory = "/Users/dagoret/MacOSX/GitHub/LSST/Spectractor/output/" + thedate
 
     parameters.VERBOSE = True
     parameters.DISPLAY = True
@@ -119,7 +120,7 @@ if __name__ == "__main__":
 
 
         s.plot_spectrum(ax=ax,xlim=None, label=basenamecut[idx],force_lines=True)
-        figfilename="fig_spec_"+basenamecut[idx]+".png"
+        figfilename="figures/20190215/fig_spec_"+basenamecut[idx]+".png"
 
         fig.savefig(figfilename)
 
