@@ -77,7 +77,8 @@ if __name__ == "__main__":
         logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_rot_v2.csv"
     else:
         #logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v2.csv"
-        logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v4.csv"
+        #logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v4.csv"
+        logbookfilename = "allobs_logbook_PicDuMidi_" + thedate + "_v4_filter_None.csv"
 
 
     #Read the logbook for testing
