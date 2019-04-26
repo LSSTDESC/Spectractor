@@ -90,7 +90,7 @@ if __name__ == "__main__":
     #Select the index of the file in range 0..30
     #--------------------------
 
-    idx_sel_min=37
+    idx_sel_min=176
     idx_sel_max = len(df)
 
 
@@ -160,7 +160,9 @@ if __name__ == "__main__":
         tag_file = file_name
         disperser_label, target, xpos, ypos = logbook.search_for_image(tag_file)
 
-
+        print(
+            "-----------------------------------------------------------------------------------------------------------")
+        print("logbook : idx_sel ...........=",idx_sel)
         print("logbook : filename ..........= ",tag_file)
         print("logbook : disperser_label .. = ", disperser_label)
         print("logbook : xpos ..............= ", xpos)
@@ -168,11 +170,69 @@ if __name__ == "__main__":
 
         # Build the full input filename
         #----------------------
-        fullfilename = os.path.join(INPUTDIR, file_name)
+        fullfilename_input = os.path.join(INPUTDIR, file_name)
+
+        # workout the outputfilename to test if it exists
+        #--------------------------------------------------
+
+
+        filetype = file_name.split('.')[-1]
+
+        if filetype == "fits":
+            # output_filename = file_name.split('/')[-1]
+            output_filename = os.path.basename(file_name)
+            output_filename = output_filename.replace('.fits', '_spectrum.fits')
+            output_filename = output_filename.replace('.fz', '_spectrum.fits')
+            output_filename = os.path.join(output_directory, output_filename)
+            output_filename_spectrogram = output_filename.replace('spectrum', 'spectrogram')
+            output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
+        elif filetype == "fit":
+            output_filename = os.path.basename(file_name)
+            output_filename = output_filename.replace('.fit', '_spectrum.fits')
+            output_filename = output_filename.replace('.fz', '_spectrum.fits')
+            output_filename = os.path.join(output_directory, output_filename)
+            output_filename_spectrogram = output_filename.replace('spectrum', 'spectrogram')
+            output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
+        else:
+            output_filename = os.path.basename(file_name)
+            output_filename = output_filename.replace('.fits', '_spectrum.fits')
+            output_filename = output_filename.replace('.fz', '_spectrum.fits')
+            output_filename = os.path.join(output_directory, output_filename)
+            output_filename_spectrogram = output_filename.replace('spectrum', 'spectrogram')
+            output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
+
+        # test if outputfilename exists
+        fullfilename_output = output_filename
+        fullfilename_output_spectrogram = output_filename_spectrogram
+        fullfilename_output_psf = output_filename_psf
+
+
+        # go to next simulation if output files already exists
+        if os.path.isfile(fullfilename_output) and os.path.isfile(fullfilename_output_spectrogram) and os.path.isfile(
+                fullfilename_output_psf):
+            filesize = os.stat(fullfilename_output).st_size
+            print(
+                ">>>>> output filename : {} already exists with size {} ! Skip Spectractor".format(fullfilename_output,
+                                                                                                   filesize))
+
+            filesize = os.stat(fullfilename_output_spectrogram).st_size
+            print(">>>>> output filename : {} already exists with size {} ! Skip Spectractor".format(
+                fullfilename_output_spectrogram,
+                filesize))
+
+            filesize = os.stat(fullfilename_output_psf).st_size
+            print(">>>>> output filename : {} already exists with size {} ! Skip Spectractor".format(
+                fullfilename_output_psf,
+                filesize))
+
+            continue
+
+
+
 
 
         #############################
         #### RUN Spectractor
         ############################
-        Spectractor(fullfilename, output_directory, [xpos, ypos], target, disperser_label, config, logbook=logbookfilename)
+        Spectractor(fullfilename_input, output_directory, [xpos, ypos], target, disperser_label, config, logbook=logbookfilename)
 
