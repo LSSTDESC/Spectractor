@@ -90,7 +90,7 @@ if __name__ == "__main__":
     #Select the index of the file in range 0..30
     #--------------------------
 
-    idx_sel_min=176
+    idx_sel_min=182
     idx_sel_max = len(df)
 
 
@@ -138,7 +138,8 @@ if __name__ == "__main__":
 
         # Defines the output directory
         #------------------------------------
-        output_directory = "output/"+thedate
+        #output_directory = "output/"+thedate
+        output_directory = "/Users/dagoret/DATA/PicDuMidiFev2019/spectractor_output/" +thedate
 
 
         # Define the configuration file for Pic Du Midi
@@ -234,5 +235,9 @@ if __name__ == "__main__":
         #############################
         #### RUN Spectractor
         ############################
-        Spectractor(fullfilename_input, output_directory, [xpos, ypos], target, disperser_label, config, logbook=logbookfilename)
+        try:
+            Spectractor(fullfilename_input, output_directory, [xpos, ypos], target, disperser_label, config, logbook=logbookfilename)
+        except :
+            print("Unexpected error:", sys.exc_info()[0])
+            pass
 

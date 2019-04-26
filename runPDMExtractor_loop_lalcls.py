@@ -230,5 +230,8 @@ if __name__ == "__main__":
         #############################
         #### RUN Spectractor
         ############################
-        Spectractor(fullfilename, output_directory, [xpos, ypos], target, disperser_label, config, logbook=logbookfilename)
-
+        try:
+            Spectractor(fullfilename, output_directory, [xpos, ypos], target, disperser_label, config, logbook=logbookfilename)
+        except :
+            print("Unexpected error:", sys.exc_info()[0])
+            pass
