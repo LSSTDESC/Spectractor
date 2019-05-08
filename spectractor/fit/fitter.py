@@ -399,22 +399,19 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds(data=None)
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
-        self.shift_t = 0.
         self.angle = self.spectrum.rotation_angle
         self.saturation = self.spectrum.spectrogram_saturation
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols,
-                           self.D, self.shift_x, self.shift_y, self.shift_t] + list(self.psf_poly_params))
-        self.psf_params_start_index = 9
+                           self.D, self.shift_x, self.shift_y])
+        self.psf_params_start_index = self.p.size
+        self.p = np.concatenate([self.p, self.psf_poly_params])
         self.ndim = self.p.size
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", r"D_CCD [mm]",
-                             r"shift_x [pix]", r"shift_y [pix]", r"shift_T [nm]",
-                             r"angle"] + self.psf_poly_params_labels
+                             r"shift_x [pix]", r"shift_y [pix]"] + self.psf_poly_params_labels
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", r"$D_{CCD}$ [mm]",
-                           r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
-                           r"$\Delta_{\mathrm{T}}$ [nm]"] + \
-                          self.psf_poly_params_names
+                           r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]"] + self.psf_poly_params_names
         self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1),
-                                                (50, 60), (-2, 2), (-2, 2), (-40, 40)]),
+                                                (50, 60), (-2, 2), (-2, 2)]),
                                       self.psf_poly_params_bounds])
         if atmgrid_filename != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
@@ -552,15 +549,15 @@ class SpectrogramFitWorkspace(FitWorkspace):
 plot_counter = 0
 
 
-def simulate_spectrogram(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, *psf_poly_params):
+def simulate_spectrogram(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, *psf_poly_params):
     global plot_counter
     # print('tttt', A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, psf_poly_params)
     fit_workspace.simulation.fix_psf_cube = False
     if np.all(np.isclose(psf_poly_params, fit_workspace.p[fit_workspace.psf_params_start_index:], rtol=1e-6)):
         fit_workspace.simulation.fix_psf_cube = True
     lambdas, model, model_err = \
-        fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, psf_poly_params)
-    fit_workspace.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t] + list(psf_poly_params))
+        fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, psf_poly_params)
+    fit_workspace.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y] + list(psf_poly_params))
     fit_workspace.lambdas = lambdas
     fit_workspace.model = model
     fit_workspace.model_err = model_err
@@ -698,23 +695,29 @@ def gradient_descent(params, epsilon, niter=10, fixed_params=None, tol = 1e-3):
                 # print(ip, fit_workspace.axis_names[ip], tmp_params[ip], fit_workspace.bounds[ip][1])
                 tmp_params[ip] = fit_workspace.bounds[ip][1]
         # prepare outputs
-        costs.append(cost)
+        costs.append(fval)
         params_table.append(np.copy(tmp_params))
         print(f"end iteration={i} in {time.time() - start:.2f}s cost={fval:.3f}")
-        if np.abs(alpha_min) < tol or np.abs(fval - cost) / cost < tol:
+        if np.abs(alpha_min) < tol or (len(costs) > 1 and np.abs(costs[-2] - fval) / fval < tol):
             break
     plt.close()
     return tmp_params, np.array(costs), np.array(params_table)
 
 
 def plot_gradient_descent(costs, params_table):
+    fig, ax = plt.subplots(1, 2, fidsize=(8,6))
     iterations = np.arange(params_table.shape[0])
-    plt.plot(iterations, costs, label="cost")
+    ax[0].plot(iterations, costs)
     for ip in range(params_table.shape[1]):
-        plt.plot(iterations, params_table[:, ip], label=f"{fit_workspace.axis_names[ip]}")
-    plt.gca().set_yscale("symlog")
-    plt.legend()
-    plt.grid()
+        ax[1].plot(iterations, params_table[:, ip], label=f"{fit_workspace.axis_names[ip]}")
+    ax[1].set_yscale("symlog")
+    ax[1].legend(ncol=3)
+    ax[1].grid()
+    ax[0].set_yscale("log")
+    ax[0].set_ylabel("$\chi^2$")
+    ax[0].grid()
+    ax[0].set_xlabel("Iterations")
+    ax[1].set_xlabel("Iterations")
     plt.show()
 
     if isinstance(fit_workspace, SpectrumFitWorkspace):
@@ -783,7 +786,9 @@ def run_minimisation(method="newton"):
         fix[1] = False  # A2
         fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
         fit_workspace.simulation.fix_psf_cube = False
-        fit_workspace.p, costs, params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix)
+        fit_workspace.p, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix)
+        params_table = np.concatenate([params_table, tmp_params_table])
+        costs = np.concatenate([costs, tmp_costs])
         print(fit_workspace.p)
         plot_gradient_descent(costs, params_table)
 
@@ -791,7 +796,7 @@ def run_minimisation(method="newton"):
         guess = np.array(fit_workspace.p)
         # guess =  np.array([ 9.57341110e-01,  3.21149660e-02,  3.00000000e+02,  3.00000000e+00,
         #   3.00000000e-02,  5.51650191e+01,  1.99999618e+00,  0.00000000e+00,
-        #   0.00000000e+00,  1.76245582e+00,  5.82214509e-01,  2.27827769e-01,
+        #   1.76245582e+00,  5.82214509e-01,  2.27827769e-01,
         #   2.12741265e+00, -1.32583056e+00,  1.01407834e+00,  1.72903242e+00,
         #  -6.72668605e-01,  4.23255049e-01, -3.17253279e-03, -3.44687146e-03,
         #  -3.59027314e-03,  2.14896817e+01, -5.76766492e+00,  1.07628816e+00])
@@ -801,7 +806,6 @@ def run_minimisation(method="newton"):
         fix[5:7] = [False] * 2  # dispersion params
         fit_workspace.simulation.fix_psf_cube = True
         fit_workspace.p, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix)
-        print(params_table.shape, tmp_params_table.shape)
         params_table = np.concatenate([params_table, tmp_params_table])
         costs = np.concatenate([costs, tmp_costs])
         print(fit_workspace.p)
@@ -811,11 +815,12 @@ def run_minimisation(method="newton"):
         guess = np.array(fit_workspace.p)
         # guess = np.array([ 9.70636227e-01,  2.15812703e-02,  3.00000000e+02,  3.00000000e+00,
         #  3.00000000e-02,  5.54560254e+01,  1.51615293e+00,  0.00000000e+00,
-        #  0.00000000e+00,  1.76245582e+00,  5.82214509e-01,  2.27827769e-01,
+        #  1.76245582e+00,  5.82214509e-01,  2.27827769e-01,
         #  2.12741265e+00, -1.32583056e+00,  1.01407834e+00,  1.72903242e+00,
         # -6.72668605e-01,  4.23255049e-01, -3.17253279e-03, -3.44687146e-03,
         # -3.59027314e-03,  2.14896817e+01, -5.76766492e+00,,  1.07628816e+00])
         fix = [False] * guess.size
+        fit_workspace.simulation.fix_psf_cube = False
         fit_workspace.p, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix, tol=1e-5)
         params_table = np.concatenate([params_table, tmp_params_table])
         costs = np.concatenate([costs, tmp_costs])
@@ -833,6 +838,7 @@ def run_minimisation(method="newton"):
         # costs = np.concatenate([costs, tmp_costs])
         # print(fit_workspace.p)
         # plot_gradient_descent(costs, params_table)
+
 
 def run_emcee():
     my_logger = set_logger(__name__)
