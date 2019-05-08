@@ -472,8 +472,6 @@ class ChromaticPSF1D:
                     profile_params[:, k] = np.ones(self.Nx)
             else:
                 if len(poly_params) > self.Nx:
-                    # profile_params[:, k] = np.polyval(poly_params[Nx + shift:Nx + shift + self.degrees[name] + 1],
-                    #                                  pixels)
                     profile_params[:, k] = \
                         np.polynomial.legendre.legval(pixels,
                                                       poly_params[
