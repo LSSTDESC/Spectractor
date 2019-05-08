@@ -1194,8 +1194,8 @@ def formatting_numbers(value, error_high, error_low, std=None, label=None):
             if std is not None:
                 str_std = f"{std:.2g}"
     out += [str_value, str_error_high]
-    if not np.isclose(error_high, error_low):
-        out += [str_error_low]
+    #if not np.isclose(error_high, error_low):
+    out += [str_error_low]
     if std is not None:
         out += [str_std]
     out = tuple(out)
