@@ -5,6 +5,7 @@ from spectractor.fit.statistics import *
 from spectractor.parameters import FIT_WORKSPACE as fit_workspace
 
 from iminuit import Minuit
+from scipy import optimize
 
 import emcee
 from schwimmbad import MPIPool
@@ -391,7 +392,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.aerosols = 0.03
         self.D = self.spectrum.header['D2CCD']
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
-        self.psf_poly_params = self.psf_poly_params[self.spectrum.spectrogram_Nx:-1] # remove saturation (fixed parameter)
+        self.psf_poly_params = self.psf_poly_params[
+                               self.spectrum.spectrogram_Nx:-1]  # remove saturation (fixed parameter)
         self.psf_poly_params_labels = [f"a{k}" for k in range(self.psf_poly_params.size)]
         self.psf_poly_params_names = ["$a_{" + str(k) + "}$" for k in range(self.psf_poly_params.size)]
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds(data=None)
@@ -481,6 +483,31 @@ class SpectrogramFitWorkspace(FitWorkspace):
         ax[3, 0].set_xlabel('$\lambda$ [nm]')
         ax[3, 0].legend(fontsize=7)
         ax[3, 0].grid(True)
+
+    def jacobian(self, params, epsilon, fixed_params=None):
+        # print("start")
+        start = time.time()
+        lambdas, model, model_err = simulate_spectrogram(*params)
+        model = model.flatten()
+        J = np.zeros((params.size, model.size))
+        for ip, p in enumerate(params):
+            if fixed_params[ip]:
+                continue
+            if ip < self.psf_params_start_index:
+                self.simulation.fix_psf_cube = True
+            else:
+                self.simulation.fix_psf_cube = False
+            tmp_p = np.copy(params)
+            if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
+                epsilon[ip] = - epsilon[ip]
+            tmp_p[ip] += epsilon[ip]
+            tmp_lambdas, tmp_model, tmp_model_err = simulate_spectrogram(*tmp_p)
+            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+        if False:
+            plt.imshow(J, origin="lower", aspect="auto")
+            plt.show()
+        print(f"\tjacobian time computation = {time.time() - start:.1f}s")
+        return J
 
     def plot_spectrogram_fit(self):
         """
@@ -613,283 +640,83 @@ def sort_on_runtime(p, depth_index=5):
     return p[idx], idx
 
 
-def run_minimisation():
-    my_logger = set_logger(__name__)
-    bounds = fit_workspace.bounds
-    if isinstance(fit_workspace, SpectrumFitWorkspace):
-        nll = lambda p: -lnlike(p)
-    elif isinstance(fit_workspace, SpectrogramFitWorkspace):
-        nll = lambda p: -lnlike_spectrogram(p)
-    else:
-        my_logger.error(f'\n\tUnknown fit_workspace class type {type(fit_workspace)}.\n'
-                        f'Choose either "SpectrumFitWorkspace" of "SpectrogramFitWorkspace"')
-        sys.exit()
-    # result = minimize(nll, fit_workspace.p, method='L-BFGS-B',
-    #                   options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True, 'maxiter': 100000,
-    #                            'maxls': 50, 'maxcor': 30},
-    #                   bounds=bounds)
-    # fit_workspace.p = result['x']
-    # reduc_134
-    guess = np.array(
-        [1.1999374575144732, 0.05, 300.0, 3.0, 0.03, 55.082071522198056, 0.0, 0.0, -13.9, -0.6305218866359683,
-         1.0395299151149904, 0.1275725960085727, 0.5280831133684005, 6.235160344247447, 6.784917251773036,
-         4.2369845643653115, 3.448993463233748, 1.6421707683237179, 1.9074156099667425, -0.09281914503246441,
-         -0.27894475572169325, 0.12240788960743397, 3.9261326346235434, 2.7938537263795604, 0.43486802733644325,
-         999.9999999999964])
-    guess = np.array(
-        [1.2045483348683912, 0.05, 300.0, 3.0, 0.03, 55.07937441283125, 0.0, 0.0, -13.9, -0.6305218866359683,
-         1.042808541712434, 0.13530636527489748, 0.5503986690804731, 5.33368295428954, 5.0841705471792755,
-         3.7713637509390625, 3.063271361527012, 0.8486787059487655, 1.9719045741976886, -0.05858775474963545,
-         -0.16956856815728952, 0.06644620580104998, 4.319269043951657, 2.866341144875256, -0.08709501136597646,
-         520.5744613957937])
-    guess = np.array(
-        [1.2045483348683912, 0.05, 300.0, 3.0, 0.03, 55.07937441283125, 0.0, 0.0, -13.9, -0.6305218866359683,
-         1.042808541712434, 0.13530636527489748, 0.5503986690804731, 5.33368295428954, 5.0841705471792755,
-         3.7713637509390625, 3.063271361527012, 0.8486787059487655, 1.9719045741976886, -0.05858775474963545,
-         -0.16956856815728952, 0.06644620580104998, 4.319269043951657, 2.866341144875256, -0.08709501136597646,
-         520.5744613957937])
-    guess = np.array([1.1783004945625857, 0.028771175829755774, 300.0, 3.5788603010605713, 0.03, 56.31035877782502,
-                      0.001324080414817609, 0.0, -27.69406155413207, -1.542396612306326, 0.11298966008548948,
-                      -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252,
-                      0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512,
-                      -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788,
-                      628.4966480821147, 12.438043546369354, 499.99999999999835])
-    # for _130.fits
-    # guess = np.array(
-    #     [1.0221355184586634, 0.05, 300.0, 3.0, 0.03, 55.45, 0.0, 0.0, -13.9, -0.6305218866359683, 0.9697783937167165,
-    #      -0.23418568011585317, 0.33884422382705437, 6.491300580087118, 7.23813399139167, 3.4442522038396097,
-    #      3.2040421136282338, 2.3246058070491347, 0.8560985887811235, -0.24436185918630957, -0.24696445586018434,
-    #      -0.0028070102515497844, 3.028241966129593, 2.8582943432553085, -0.3948830196355327, 999.9999999999964])
-    guess = np.array(
-        [1.0739594429903858, 0.05, 300.0, 3.0, 0.03, 55.45, 0.0, 0.0, -13.9, -0.6305218866359683, 0.9697783937167165,
-         -0.23418568011585317, 0.33884422382705437, 6.446415469477438,
-         7.729767353344003, 3.398518168281213, 3.246584721057184, 2.1288614628936395,
-         0.878365118777165, -0.22805156531233226, -0.26791683345602524, -0.03629293223130861,
-         3.570264949549503, 2.498371135708351, -0.29661704517488957, 999.9999999999964])
-    # sim_134
-    # guess = np.array([1.0200367670106933, 0.0363572740671097, 237.88100163825928, 9.99985583070645, 0.04881224044620258, 55.19390495103511, -1.18481117217888, -0.15902033562208118, 1.720820828790302, -1.681859821533847, 1.4118025344599496, 0.5302750543501547, 0.05486954668604792, 3.72604016525854, -1.296968852142376, 1.0703672456033204, 3.0205592886126813, -0.06300056342451373, 0.9697073189216313, -0.37263561988400884, -0.1330268748184035, -0.05678495440244433, 2.1345811085002606, -0.9857266387263521, -0.07773569454909918, 499.99999999999835])
-    # guess = np.array([1.0177449875857436, 0.03273899280095122, 244.28900108972238, 9.99985328071115, 0.05574572930987309, 55.2113222597155, -1.9999934481655455, -0.16588415261849976, 1.3518973026372976, -1.681859821533847, 1.418683896878165, 0.5533962728465286, 0.06744270896451146, 3.7242663590096523, -1.2946316193457752, 1.0714560991986213, 3.027495524307809, -0.07472328983133317, 0.9555378331632957, -0.3653217756888738, -0.1428741221990274, -0.06995171218400704, 2.1270602543705697, -0.9765558807737923, -0.05544098513783982, 499.99999999999835])
-    # guess = np.array([1.008504591340807, 0.01608223007207482, 360.55203093205034, 9.999396124992284, 0.07408687185771112, 55.278549773179, -1.9999880367300542, -0.19831397139122675 ,1.731835570968407, -1.681859821533847, 1.4512075119943928, 0.6298897489162698, 0.1715121918150413, 3.6949934638991815, -1.2787266139872775, 1.1050818585131204, 3.0678599353279385, -0.141000223367532, 0.8878220330543275, -0.34365173970314067, -0.17666624793314062, -0.0778543688708959, 2.0961259559036165, -0.912009316148657, 0.058847183286068916, 499.99999999999835])
-    # guess = np.array([1.021105038594662, 0.004522557159414742, 399.1804795838472, 7.151266092418873, 0.06532628682748798, 55.28129937643125, -1.5796083498014732, -0.214022484422576, 1.5532729238980494, -1.681859821533847, 1.4669017969146076, 0.6167895273613202, 0.2240612421558033, 3.636185977901238, -1.252269816889516, 1.2319551727230675, 3.1212613617244513, -0.15132200936139598, 0.8692478333014879, -0.34168336262027477, -0.21066308766825492, 0.08067864362906049, 1.9588266937720888, -0.7975072607096434, 0.32389616177447655, 499.99999999999835])
-    # guess = np.array([1.0366998266719039, 0.004507639176858286, 399.4198145877904, 7.215159083565414, 0.08266331155696338, 55.280677934039204, -1.5564540460823222, -0.21652809896889513, 1.250962900742465, -1.681859821533847, 1.470425366924636, 0.6161148577211758, 0.2421533852584033, 3.561778492416353, -1.059725547707348, 1.4931481207457546, 3.1170667497250073, -0.05919930769817048, 1.1566057476874898, -0.3515353556779109, -0.2075394603290166, 0.009817803444294074, 1.8852361491878789, -0.6617678455884933, 0.3016531226564242, 499.99999999999835])
-    # guess = np.array([1.0366998266719039, 0.004507639176858286, 399.4198145877904, 7.215159083565414, 0.08266331155696338, 55.280677934039204, 0, 0, 0, -1.681859821533847, 1.470425366924636, 0.6161148577211758, 0.2421533852584033, 3.561778492416353, -1.059725547707348, 1.4931481207457546, 3.1170667497250073, -0.05919930769817048, 1.1566057476874898, -0.3515353556779109, -0.2075394603290166, 0.009817803444294074, 1.8852361491878789, -0.6617678455884933, 0.3016531226564242, 499.99999999999835])
-    # guess = np.array([1.038693017194872, 0.014983232888026998, 359.2518435660411, 6.6262238673287, 0.08480281237510423, 55.47387105727235, 0.0, 0.0, 0.0, -1.681859821533847, 1.730748597544949, 0.612373940323533, 0.24547646456941183, 3.564350412174735, -1.0642369170107189, 1.4935151575387235, 3.1141507499206753, -0.05129722758108418, 1.1577838137704235, -0.34873907926191927, -0.21087528505338857, 0.011817195823953307, 1.8888212027868385, -0.6645364716921955, 0.2974984385969018, 499.99999999999835])
-    # guess = np.array([1.0394618294886782, 0.01004317609147179, 364.0477305040566, 6.59911786795859, 0.09779530546529702, 55.47729830849739, 0.0, 0.0, 0.0, -1.681859821533847, 1.7273809469430867, 0.6268937806919278, 0.24119541144075615, 3.5687624173038226, -1.0642904069090242, 1.4986372379043165, 3.1034564816834247, -0.039422282485462944, 1.1652241960873397, -0.35544149646334117, -0.20554803472490044, 0.009000631817785203, 1.8938325433914882, -0.6647492390942517, 0.2886232193756685, 499.99999999999835])
-    # guess = np.array([1.0036791021833857, 0.018833770558709745, 338.0547800297367, 5.124495024795957, 0.06127554029880766, 55.47083973084643, 0.28104903491901023, -0.006396963559360369, 0.0, -1.54, 0.12601115569947202, -0.44177500169633965, 0.22784612458938883, 2.068571403099914, -1.336193340868478, 0.907309563186542, 1.704138680609022, -0.6802496108217749, 0.3669189518488262, -0.002886197372409439, -0.003236137155513198, -0.003474702040937771, 541.412075889249, 612.2819103192218, 39.695980305924444, 499.99999999999835])
-    # truth sim_134
-    # guess = np.array([1., 0.01, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.0, -1.54, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835])
-    guess = fit_workspace.p
-    error = 0.1 * np.abs(guess)
-    #error[2:5] = 0.3 * np.abs(guess[2:5])
-    error[error==0] = 0.1
-    # noinspection PyArgumentList
-    # m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
-    #                            fix=fix, print_level=2, limit=bounds)
-    # m.tol = 10
-    # m.migrad()
-    from scipy import optimize
-
-    def jacobian(params, fixed_params=None):
-        # print("start")
+def gradient_descent(params, epsilon, niter=10, fixed_params=None, tol = 1e-3):
+    tmp_params = np.copy(params)
+    W = 1 / fit_workspace.spectrum.spectrogram_err.flatten() ** 2
+    ipar = np.arange(params.size)
+    if fixed_params is not None:
+        ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
+    costs = []
+    params_table = []
+    for i in range(niter):
+        print(f"start iteration={i}", end=' ')  # , tmp_params)
         start = time.time()
-        lambdas, model, model_err = simulate_spectrogram(*params)
-        model = model.flatten()
-        J = np.zeros((params.size, model.size))
-        for ip, p in enumerate(params):
-            if fixed_params[ip]:
-                continue
-            if ip < fit_workspace.psf_params_start_index:
-                fit_workspace.simulation.fix_psf_cube = True
-            else:
-                fit_workspace.simulation.fix_psf_cube = False
-            tmp_p = np.copy(params)
-            if tmp_p[ip]+epsilon[ip] < fit_workspace.bounds[ip][0] or tmp_p[ip]+epsilon[ip] > fit_workspace.bounds[ip][1]:
-                epsilon[ip] = - epsilon[ip]
-            tmp_p[ip] += epsilon[ip]
-            tmp_lambdas, tmp_model, tmp_model_err = simulate_spectrogram(*tmp_p)
-            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
-            if False:
-                print(ip, p, tmp_p[ip])
-                fit_workspace.plot_spectrogram_fit()
-        if False:
-            plt.imshow(J, origin="lower", aspect="auto")
-            plt.show()
-        print(f"\tjacobian time computation = {time.time() - start:.1f}s")
-        return J
+        tmp_lambdas, tmp_model, tmp_model_err = simulate_spectrogram(*tmp_params)
+        # if fit_workspace.live_fit:
+        #    fit_workspace.plot_spectrogram_fit()
+        residuals = (tmp_model - fit_workspace.spectrum.spectrogram).flatten()
+        cost = np.sum((residuals ** 2) * W)
+        print(f"cost={cost:.3f}")
+        J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
+        J = J[ipar].T  # remove unfixed parameter (null Jacobian vectors)
+        JT_W = J.T * W
+        JT_W_J = JT_W @ J
+        if fit_workspace.live_fit:
+            plt.close()
+            fig = plt.figure()
+            im = plt.imshow(JT_W_J)
+            plt.title("$J^T W J$")
+            plt.xticks(np.arange(ipar.size), [fit_workspace.axis_names[ip] for ip in ipar], rotation='vertical',
+                       fontsize=11)
+            plt.yticks(np.arange(ipar.size), [fit_workspace.axis_names[ip] for ip in ipar], fontsize=11)
+            cbar = fig.colorbar(im)
+            cbar.ax.tick_params(labelsize=9)
+            fig.tight_layout()
+            plt.draw()
+            plt.pause(1e-8)
+        JT_W_R0 = JT_W @ residuals
+        L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
+        inv_JT_W_J = L.T @ L
+        dparams = - inv_JT_W_J @ JT_W_R0
 
-    def gradient_descent(params, niter=10, fixed_params=None):
-        tmp_p = np.copy(params)
-        W = 1 / fit_workspace.spectrum.spectrogram_err.flatten() ** 2
-        ipar = np.arange(params.size)
-        if fixed_params is not None:
-            ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
-        costs = []
-        tmp_ps = [params]
-        for i in range(niter):
-            print(f"start iteration={i}", end=' ') # , tmp_p)
-            start = time.time()
-            tmp_lambdas, tmp_model, tmp_model_err = simulate_spectrogram(*tmp_p)
-            # if fit_workspace.live_fit:
-            #    fit_workspace.plot_spectrogram_fit()
-            residuals = (tmp_model - fit_workspace.spectrum.spectrogram).flatten()
-            cost = np.sum((residuals ** 2) * W)
-            print(f"cost={cost:.3f}")
-            J = jacobian(tmp_p, fixed_params=fixed_params)
-            J = J[ipar].T  # remove unfixed parameter (null Jacobian vectors)
-            JT_W = J.T * W
-            JT_W_J = JT_W @ J
-            if fit_workspace.live_fit:
-                plt.close()
-                fig = plt.figure()
-                im = plt.imshow(JT_W_J)
-                plt.title("$J^T W J$")
-                plt.xticks(np.arange(ipar.size), [fit_workspace.axis_names[ip] for ip in ipar], rotation='vertical',
-                           fontsize=11)
-                plt.yticks(np.arange(ipar.size), [fit_workspace.axis_names[ip] for ip in ipar], fontsize=11)
-                cbar = fig.colorbar(im)
-                cbar.ax.tick_params(labelsize=9)
-                fig.tight_layout()
-                plt.draw()
-                plt.pause(1e-8)
-            JT_W_R0 = JT_W @ residuals
-            L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
-            inv_JT_W_J = L.T @ L
-            dparams = - inv_JT_W_J @ JT_W_R0
+        def line_search(alpha):
+            tmp_params_2 = np.copy(tmp_params)
+            tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
+            lbd, mod, err = simulate_spectrogram(*tmp_params_2)
+            return np.sum(((mod - fit_workspace.spectrum.spectrogram) / fit_workspace.spectrum.spectrogram_err) ** 2)
 
-            def line_search(alpha):
-                tmp_p2 = np.copy(tmp_p)
-                tmp_p2[ipar] = tmp_p[ipar] + alpha * dparams
-                lbd, mod, err = simulate_spectrogram(*tmp_p2)
-                return np.sum(((mod - fit_workspace.spectrum.spectrogram) / fit_workspace.spectrum.spectrogram_err)**2)
-
-            # tol parameter acts on alpha (not func)
-            alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2)
-            print(f"\talpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}")
-            tmp_p[ipar] += alpha_min * dparams
-            # check bounds
-            for ip, p in enumerate(tmp_p):
-                if p < fit_workspace.bounds[ip][0]:
-                    # print(ip, fit_workspace.axis_names[ip], tmp_p[ip], fit_workspace.bounds[ip][0])
-                    tmp_p[ip] = fit_workspace.bounds[ip][0]
-                if p > fit_workspace.bounds[ip][1]:
-                    # print(ip, fit_workspace.axis_names[ip], tmp_p[ip], fit_workspace.bounds[ip][1])
-                    tmp_p[ip] = fit_workspace.bounds[ip][1]
-            # prepare outputs
-            costs.append(cost)
-            tmp_ps.append(np.copy(tmp_p))
-            print(f"end iteration={i} in {time.time() - start:.2f}s cost={fval:.3f}")
-            if np.abs(alpha_min) < 1e-3 or np.abs(fval-cost)/cost < 1e-3:
-                break
-        plt.close()
-        return tmp_p, np.array(costs), np.array(tmp_ps)
-
-    fix = [False] * guess.size
-    # fit shape
-    epsilon = 1e-3 * guess
-    epsilon[epsilon == 0] = 1e-3
-    # epsilon[0] = 0.01 * guess[0]
-    # epsilon[1] = 0.01 * guess[1]
-    # epsilon[9] = 0.01 * guess[9]
-
-    fix[-1] = True  # saturation
-    # fix[8] = True # shift_t
-    fix[9] = True # angle
-    # J = jacobian(guess)
-    x_scale = np.abs(guess)
-    x_scale[x_scale==0] = 0.1
-    #p = optimize.least_squares(spectrogram_weighted_res, guess, verbose=2, ftol=1e-6, x_scale=x_scale, diff_step=0.001, bounds=bounds.T)
-    #fit_workspace.p = p.x  # m.np_values()
+        # tol parameter acts on alpha (not func)
+        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2)
+        print(f"\talpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}")
+        tmp_params[ipar] += alpha_min * dparams
+        # check bounds
+        for ip, p in enumerate(tmp_params):
+            if p < fit_workspace.bounds[ip][0]:
+                # print(ip, fit_workspace.axis_names[ip], tmp_params[ip], fit_workspace.bounds[ip][0])
+                tmp_params[ip] = fit_workspace.bounds[ip][0]
+            if p > fit_workspace.bounds[ip][1]:
+                # print(ip, fit_workspace.axis_names[ip], tmp_params[ip], fit_workspace.bounds[ip][1])
+                tmp_params[ip] = fit_workspace.bounds[ip][1]
+        # prepare outputs
+        costs.append(cost)
+        params_table.append(np.copy(tmp_params))
+        print(f"end iteration={i} in {time.time() - start:.2f}s cost={fval:.3f}")
+        if np.abs(alpha_min) < tol or np.abs(fval - cost) / cost < tol:
+            break
+    plt.close()
+    return tmp_params, np.array(costs), np.array(params_table)
 
 
-    fix = [True] * guess.size
-    fix[0] = False  # A1
-    fix[1] = False  # A2
-    fix[2:5] = [True, True, True]  # LIBRADTRAN
-    fix[5] = True  # DCCD
-    fix[5:8] = [True, True, True]  # DCCD, shift_x, shift_y
-    fix[8] = True  # shift_t
-    fix[9] = True  # angle
-    # fix[10:13] = [False, False, False] # centers
-    fix[10:] = [False] * (guess.size - 10)
-    fix[-1] = True
-    fit_workspace.simulation.fix_psf_cube = False
-
-    # fit_workspace.p, costs, tmp_ps = gradient_descent(guess, niter=20, fixed_params=fix)
-    # print(fit_workspace.p)
-    # iterations = np.arange(tmp_ps.shape[0])
-    # plt.plot(iterations[1:], costs, label="cost")
-    # for ip in range(tmp_ps.shape[1]):
-    #     plt.plot(iterations, tmp_ps[:, ip], label=f"{fit_workspace.axis_names[ip]}")
-    # plt.gca().set_yscale("symlog")
-    # plt.legend()
-    # plt.grid()
-    # plt.show()
-    # if isinstance(fit_workspace, SpectrumFitWorkspace):
-    #     simulate(*fit_workspace.p)
-    # elif isinstance(fit_workspace, SpectrogramFitWorkspace):
-    #     simulate_spectrogram(*fit_workspace.p)
-    # # fit_workspace.live_fit = False
-    # fit_workspace.plot_spectrogram_fit()
-
-    # fit dispersion
-    epsilon = 1e-3 * guess
-    guess = np.array(fit_workspace.p)
-    # guess =  np.array([9.59080817e-01,  3.23760750e-02,  3.00000000e+02,  3.00000000e+00,
-    #   3.00000000e-02,  5.51650191e+01,  1.99999618e+00,  0.00000000e+00,
-    #   0.00000000e+00, -1.67886686e+00,  1.76133736e+00,  5.82856685e-01,
-    #   2.24782851e-01,  2.75484746e+00, -1.02280678e+00,  1.66470119e+00,
-    #   2.89062790e+00,  6.66660418e-02,  1.74829528e+00,  5.92490465e-02,
-    #   3.07210388e-02,  5.35730755e-02,  3.58280332e+00, -6.56668478e-01,
-    #   -2.59403139e-01,  5.00000000e+02])
-    fix = [True] * guess.size
-    fix[0] = False
-    fix[1] = False
-    fix[5:7] = [False] * 2  # dispersion params
-
-    # fit_workspace.p, costs, tmp_ps = gradient_descent(guess, niter=20, fixed_params=fix)
-    # print(fit_workspace.p)
-    # iterations = np.arange(tmp_ps.shape[0])
-    # plt.plot(iterations[1:], costs, label="cost")
-    # for ip in range(tmp_ps.shape[1]):
-    #     plt.plot(iterations, tmp_ps[:, ip], label=f"{fit_workspace.axis_names[ip]}")
-    # plt.gca().set_yscale("symlog")
-    # plt.legend()
-    # plt.grid()
-    # plt.show()
-    # if isinstance(fit_workspace, SpectrumFitWorkspace):
-    #     simulate(*fit_workspace.p)
-    # elif isinstance(fit_workspace, SpectrogramFitWorkspace):
-    #     simulate_spectrogram(*fit_workspace.p)
-    # fit_workspace.live_fit = False
-    # fit_workspace.plot_spectrogram_fit()
-
-    # fit all
-    guess = np.array(fit_workspace.p)
-    guess = np.array([ 9.71676197e-01,  2.17058252e-02,  3.00000000e+02,  3.00000000e+00,
-  3.00000000e-02,  5.54566381e+01,  1.50078372e+00,  0.00000000e+00,
-  0.00000000e+00, -1.67886686e+00,  1.76133736e+00,  5.82856685e-01,
-  2.24782851e-01,  2.75484746e+00, -1.02280678e+00,  1.66470119e+00,
-  2.89062790e+00,  6.66660418e-02,  1.74829528e+00,  5.92490465e-02,
-  3.07210388e-02,  5.35730755e-02,  3.58280332e+00, -6.56668478e-01,
- -2.59403139e-01,  5.00000000e+02])
-    guess = np.array([1., 0.01, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.0, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
-    epsilon = 1e-3 * guess
-    epsilon[epsilon == 0] = 1e-3
-    fix = [False] * guess.size
-    #fix[-1] = True  # saturation
-    # fix[8] = True # shift_t
-    #fix[9] = True # angle
-
-    fit_workspace.p, costs, tmp_ps = gradient_descent(guess, niter=20, fixed_params=fix)
-    print(fit_workspace.p)
-    iterations = np.arange(tmp_ps.shape[0])
-    plt.plot(iterations[1:], costs, label="cost")
-    for ip in range(tmp_ps.shape[1]):
-        plt.plot(iterations, tmp_ps[:, ip], label=f"{fit_workspace.axis_names[ip]}")
+def plot_gradient_descent(costs, params_table):
+    iterations = np.arange(params_table.shape[0])
+    plt.plot(iterations, costs, label="cost")
+    for ip in range(params_table.shape[1]):
+        plt.plot(iterations, params_table[:, ip], label=f"{fit_workspace.axis_names[ip]}")
     plt.gca().set_yscale("symlog")
     plt.legend()
     plt.grid()
     plt.show()
+
     if isinstance(fit_workspace, SpectrumFitWorkspace):
         simulate(*fit_workspace.p)
     elif isinstance(fit_workspace, SpectrogramFitWorkspace):
@@ -897,6 +724,115 @@ def run_minimisation():
     fit_workspace.live_fit = False
     fit_workspace.plot_spectrogram_fit()
 
+
+def run_minimisation(method="newton"):
+    my_logger = set_logger(__name__)
+    bounds = fit_workspace.bounds
+
+    # sim_134
+    # guess = fit_workspace.p
+    # truth sim_134
+    # guess = np.array([1., 0.01, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
+    guess = fit_workspace.p
+
+    if method == "minimize":
+        if isinstance(fit_workspace, SpectrumFitWorkspace):
+            nll = lambda p: -lnlike(p)
+        elif isinstance(fit_workspace, SpectrogramFitWorkspace):
+            nll = lambda p: -lnlike_spectrogram(p)
+        else:
+            my_logger.error(f'\n\tUnknown fit_workspace class type {type(fit_workspace)}.\n'
+                            f'Choose either "SpectrumFitWorkspace" of "SpectrogramFitWorkspace"')
+            sys.exit()
+        result = optimize.minimize(nll, fit_workspace.p, method='L-BFGS-B',
+                                   options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True,
+                                            'maxiter': 100000,
+                                            'maxls': 50, 'maxcor': 30},
+                                   bounds=bounds)
+        fit_workspace.p = result['x']
+        if isinstance(fit_workspace, SpectrumFitWorkspace):
+            simulate(*fit_workspace.p)
+        elif isinstance(fit_workspace, SpectrogramFitWorkspace):
+            simulate_spectrogram(*fit_workspace.p)
+        fit_workspace.live_fit = False
+        fit_workspace.plot_spectrogram_fit()
+
+    elif method == "minuit":
+        x_scale = np.abs(guess)
+        x_scale[x_scale == 0] = 0.1
+        p = optimize.least_squares(spectrogram_weighted_res, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
+                                   diff_step=0.001, bounds=bounds.T)
+        fit_workspace.p = p.x  # m.np_values()
+        if isinstance(fit_workspace, SpectrumFitWorkspace):
+            simulate(*fit_workspace.p)
+        elif isinstance(fit_workspace, SpectrogramFitWorkspace):
+            simulate_spectrogram(*fit_workspace.p)
+        fit_workspace.live_fit = False
+        fit_workspace.plot_spectrogram_fit()
+
+    elif method == "newton":
+        costs = np.array([chisq_spectrogram(guess)])
+        params_table = np.array([guess])
+
+        epsilon = 1e-3 * guess
+        epsilon[epsilon == 0] = 1e-3
+
+        # fit shape
+        fix = [True] * guess.size
+        fix[0] = False  # A1
+        fix[1] = False  # A2
+        fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
+        fit_workspace.simulation.fix_psf_cube = False
+        fit_workspace.p, costs, params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix)
+        print(fit_workspace.p)
+        plot_gradient_descent(costs, params_table)
+
+        # fit dispersion
+        guess = np.array(fit_workspace.p)
+        # guess =  np.array([ 9.57341110e-01,  3.21149660e-02,  3.00000000e+02,  3.00000000e+00,
+        #   3.00000000e-02,  5.51650191e+01,  1.99999618e+00,  0.00000000e+00,
+        #   0.00000000e+00,  1.76245582e+00,  5.82214509e-01,  2.27827769e-01,
+        #   2.12741265e+00, -1.32583056e+00,  1.01407834e+00,  1.72903242e+00,
+        #  -6.72668605e-01,  4.23255049e-01, -3.17253279e-03, -3.44687146e-03,
+        #  -3.59027314e-03,  2.14896817e+01, -5.76766492e+00,  1.07628816e+00])
+        fix = [True] * guess.size
+        fix[0] = False
+        fix[1] = False
+        fix[5:7] = [False] * 2  # dispersion params
+        fit_workspace.simulation.fix_psf_cube = True
+        fit_workspace.p, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix)
+        print(params_table.shape, tmp_params_table.shape)
+        params_table = np.concatenate([params_table, tmp_params_table])
+        costs = np.concatenate([costs, tmp_costs])
+        print(fit_workspace.p)
+        plot_gradient_descent(costs, params_table)
+
+        # fit all
+        guess = np.array(fit_workspace.p)
+        # guess = np.array([ 9.70636227e-01,  2.15812703e-02,  3.00000000e+02,  3.00000000e+00,
+        #  3.00000000e-02,  5.54560254e+01,  1.51615293e+00,  0.00000000e+00,
+        #  0.00000000e+00,  1.76245582e+00,  5.82214509e-01,  2.27827769e-01,
+        #  2.12741265e+00, -1.32583056e+00,  1.01407834e+00,  1.72903242e+00,
+        # -6.72668605e-01,  4.23255049e-01, -3.17253279e-03, -3.44687146e-03,
+        # -3.59027314e-03,  2.14896817e+01, -5.76766492e+00,,  1.07628816e+00])
+        fix = [False] * guess.size
+        fit_workspace.p, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix, tol=1e-5)
+        params_table = np.concatenate([params_table, tmp_params_table])
+        costs = np.concatenate([costs, tmp_costs])
+        print(fit_workspace.p)
+        plot_gradient_descent(costs, params_table)
+
+        # guess = np.array([   1.02567507e+00,  2.45414382e-02,  2.80731245e+02,  5.32560011e+00,
+        #   9.99999426e-02,  5.54586722e+01,  1.39076131e+00, -1.18388174e-01,
+        #  -1.36705519e+00,  1.63364275e+00,  5.79032719e-01,  2.33042280e-01,
+        #   2.13263419e+00, -1.32240681e+00,  1.01988963e+00,  1.73484576e+00,
+        #  -6.68617385e-01,  4.24851648e-01, -3.05735089e-03, -3.24985061e-03,
+        #  -3.57949612e-03,  2.47629860e+01, -5.57687825e+00,  8.09642846e-01])
+        # fit_workspace.p, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix)
+        # params_table = np.concatenate([params_table, tmp_params_table])
+        # costs = np.concatenate([costs, tmp_costs])
+        # print(fit_workspace.p)
+        # plot_gradient_descent(costs, params_table)
 
 def run_emcee():
     my_logger = set_logger(__name__)
@@ -911,7 +847,7 @@ def run_emcee():
         sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnlike_spectrogram, args=(),
                                         pool=pool,
                                         runtime_sortingfn=sort_on_runtime)
-        for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples), storechain=True)):
+        for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples))):
             if pool.is_master():
                 if (i + 1) % 100 == 0:
                     print("{0:5.1%}".format(float(i) / nsamples))
