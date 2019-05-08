@@ -852,7 +852,7 @@ class SpectrogramModel(Spectrum):
         return lambdas, dispersion_law, dispersion_law_order2
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
-                 shift_x=0., shift_y=0., shift_t=0., psf_poly_params=None):
+                 shift_x=0., shift_y=0., psf_poly_params=None):
         """
 
         Parameters
@@ -891,7 +891,7 @@ class SpectrogramModel(Spectrum):
         lambdas, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
         self.my_logger.debug(f'\n\tTime after simulate disp: {time.time()-start}')
         start = time.time()
-        spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols, shift_t)
+        spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
         self.true_spectrum = spectrum
         self.my_logger.debug(f'\n\tTime after simulate spec: {time.time()-start}')
         start = time.time()
