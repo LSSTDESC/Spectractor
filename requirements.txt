@@ -9,7 +9,10 @@ astroquery
 coloredlogs
 scikit-image
 pysynphot
-emcee
+h5py==2.8.0
+emcee==3.0rc2
+tqdm
+schwimmbad
 iminuit
 coverage
 configparser
