@@ -465,7 +465,7 @@ class Likelihood(Grid):
         cbar.ax.tick_params(labelsize=9)
         # plot the triangle
         fig.subplots_adjust(hspace=0, wspace=0)
-        if parameters.DISPLAY and parameters.VERBOSE:
+        if parameters.DISPLAY:
             plt.show()
         if output_filename != '':
             print(f'Save figure: {output_filename}')
