@@ -182,6 +182,10 @@ class Image(object):
         else: # For ADU
             self.stat_errors = np.sqrt(data) / np.sqrt(self.gain)
 
+        # TEST TO INCREASE ERRORS by a reasonnable factor
+        self.stat_errors*=3.0
+
+
     def compute_parallactic_angle(self):
         """Compute the parallactic angle.
 
