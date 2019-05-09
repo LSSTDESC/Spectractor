@@ -90,7 +90,7 @@ if __name__ == "__main__":
     #Select the index of the file in range 0..30
     #--------------------------
 
-    idx_sel_min=176
+    idx_sel_min=0
     idx_sel_max = len(df)
 
 
