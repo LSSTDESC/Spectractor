@@ -138,7 +138,14 @@ if __name__ == "__main__":
         # Defines the output directory
         #------------------------------------
         #output_directory = "output/"+thedate
-        output_directory = "/exp/jemeuso/data/PicDuMidiFev2019/spectractor_output_prod2/"+thedate
+        #output_directory = "/exp/jemeuso/data/PicDuMidiFev2019/spectractor_output_prod2/"+thedate
+
+        # output_directory = "output/"+thedate
+        # spectractor_output_prod    : production initiale
+        # spectractor_output_prod2   : production erreur statistiques multipliées par 3
+        # spectractor_output_prod3   : production avec les erreurs statistiques remises à leur valeur
+        # spectractor_output_test    : pour tester
+        output_directory = "/exp/jemeuso/data/PicDuMidiFev2019/spectractor_output_test/" + thedate
 
 
         # Define the configuration file for Pic Du Midi

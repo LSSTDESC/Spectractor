@@ -132,7 +132,11 @@ if __name__ == "__main__":
 
     # Defines the output directory
     #------------------------------------
-    output_directory = "output_prod2/"+thedate
+    # output_prod    : production initiale
+    # output_prod2   : production erreur statistiques multipliées par 3
+    # output_prod3   : erreurs statistiques remises à leur valeur
+    # output_test    : pou tester
+    output_directory = "output_test/"+thedate
 
 
     # Define the configuration file for Pic Du Midi
