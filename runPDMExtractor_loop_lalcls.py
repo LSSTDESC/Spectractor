@@ -145,7 +145,7 @@ if __name__ == "__main__":
         # spectractor_output_prod    : production initiale
         # spectractor_output_prod2   : production erreur statistiques multipliées par 3
         # spectractor_output_prod3   : production avec les erreurs statistiques remises à leur valeur
-        spectractor_output_prod4   : production avec les erreurs statistiques remises à leur valeur et saturation à 50000 ADU dans picdumidi.ini
+        #spectractor_output_prod4   : production avec les erreurs statistiques remises à leur valeur et saturation à 50000 ADU dans picdumidi.ini
         # saturation en dessous des 600000 : 500000 --> non linéarité
         # spectractor_output_test    : pour tester
         output_directory = "/exp/jemeuso/data/PicDuMidiFev2019/spectractor_output_test/" + thedate
