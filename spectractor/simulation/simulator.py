@@ -849,6 +849,13 @@ class SpectrogramModel(Spectrum):
                     self.chromatic_psf.table['Dy'] - shift_y)
         dispersion_law_order2 = r0 + (Dx_func(lambdas_order2) - shift_x) + 1j * (
                     Dy_mean_func(lambdas_order2) + dy_func(lambdas_order2) - shift_y)
+        #print(r0,self.chromatic_psf.table['Dx'][:6],self.chromatic_psf.table['Dy'][:6])
+        # plt.plot(dispersion_law.real, dispersion_law.imag)
+        # plt.title(f"{new_x0}")
+        # plt.draw()
+        # plt.pause(1e-8)
+        # plt.close()
+
         return lambdas, dispersion_law, dispersion_law_order2
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
@@ -887,7 +894,11 @@ class SpectrogramModel(Spectrum):
         self.simulate_psf(psf_poly_params)
         self.my_logger.debug(f'\n\tTime after simulate PSF: {time.time()-start}')
         start = time.time()
+        #print(self.spectrogram_x0, self.spectrogram_Nx, self.spectrogram_y0, self.spectrogram_Ny, self.spectrogram_xmin,self.spectrogram_ymin)
         r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2) + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2)
+        #print(r0)
+        #r0 = (self.spectrogram_x0 ) + 1j * (self.spectrogram_y0 )
+        #print(r0)
         lambdas, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
         self.my_logger.debug(f'\n\tTime after simulate disp: {time.time()-start}')
         start = time.time()
@@ -905,7 +916,9 @@ class SpectrogramModel(Spectrum):
             shape_params = np.array([self.chromatic_psf.table[name] for name in PSF2D.param_names[3:]]).T
             for l in range(nlbda):
                 ima = PSF2D.evaluate(x, y, 1, 0, 0, *shape_params[l])
-                ima /= ima.sum()  # Flux normalization: the flux should go in the spectrum
+                total = ima.sum()
+                if total != 0.:
+                    ima /= total  # Flux normalization: the flux should go in the spectrum
                 cube[l] = np.copy(ima)
             self.psf_cube = cube
         else:
@@ -935,7 +948,7 @@ class SpectrogramModel(Spectrum):
         start = time.time()
 
         # Dispersed image (noiseless)
-        dima0 = F.ifft_image(fdima0)
+        dima0 = F.ifft_image(fdima0, shifted=False)
         self.my_logger.debug(f'\n\tTime after simulate inverse fourier: {time.time()-start}')
         start = time.time()
 
@@ -950,7 +963,7 @@ class SpectrogramModel(Spectrum):
                                         method="numexpr")  # FT
             self.my_logger.debug(f'\n\tTime after simulate after fourier order 2: {time.time()-start}')
             start = time.time()
-            dima0_2 = F.ifft_image(fdima0_2)
+            dima0_2 = F.ifft_image(fdima0_2, shifted=False)
             self.my_logger.debug(f'\n\tTime after simulate inverse fourier order 2: {time.time()-start}')
             start = time.time()
 
@@ -1158,7 +1171,7 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
     # SPECTRUM SIMULATION
     # --------------------
     spectrogram_simulation = SpectrogramModel(spectrum, atmosphere, telescope, disperser)
-    spectrogram_simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, psf_poly_params)
+    spectrogram_simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, psf_poly_params)
     return spectrogram_simulation
 
 
