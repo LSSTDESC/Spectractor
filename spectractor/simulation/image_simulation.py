@@ -399,5 +399,5 @@ if __name__ == "__main__":
         if target is None or xpos is None or ypos is None:
             continue
 
-        image = ImageSim(file_name, spectrum_file_name, args.output_directory, A2=0.01,
+        image = ImageSim(file_name, spectrum_file_name, args.output_directory, A2=0.05,
                          psf_poly_params=psf_poly_params, with_stars=False)
