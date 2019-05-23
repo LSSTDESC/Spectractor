@@ -27,8 +27,17 @@ class PSF1D(Fittable1DModel):
     x_mean = Parameter('x_mean', default=0)
     gamma = Parameter('gamma', default=3)
     alpha = Parameter('alpha', default=3)
+
+    # No gaussian fit at PIC DU MIDI (useless)
+    #if parameters.OBS_NAME == 'PICDUMIDI':
+    #eta_gauss = Parameter('eta_gauss', default=0,fixed=True)
+    #else:
     eta_gauss = Parameter('eta_gauss', default=1)
+    #if parameters.OBS_NAME == 'PICDUMIDI':
+    #stddev = Parameter('stddev', default=10.,fixed=True)
+    #else:
     stddev = Parameter('stddev', default=1)
+
     saturation = Parameter('saturation', default=1)
 
     def fwhm(self, x_array=None):
@@ -1325,6 +1334,12 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
     error = 0.01 * np.abs(guess) * np.ones_like(guess)
     fix = [False] * (chromatic_psf.n_poly_params - Nx)
     fix[-1] = True
+
+    if parameters.OBS_NAME == 'PICDUMIDI':
+        fix[4] = True  # set eta_gauss
+        fix[5] = True  # stddev
+
+
     bounds = chromatic_psf.set_bounds(data)
     # fix[:Nx] = [True] * Nx
     # noinspection PyArgumentList
@@ -2002,6 +2017,13 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     """
 
     my_logger = set_logger(__name__)
+
+    if parameters.OBS_NAME == 'PICDUMIDI':
+        guess[4]=0 # set eta_gauss==0
+        guess[5]=-1.
+
+
+
     PSF = PSF1D(*guess)
     model = PSF1D()
     outliers = np.array([])
@@ -2027,6 +2049,10 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     error = 0.1 * np.abs(guess) * np.ones_like(guess)
     fix = [False] * len(guess)
     fix[-1] = True
+
+    if parameters.OBS_NAME == 'PICDUMIDI':
+        fix[4] = True  # set eta_gauss==0
+        fix[5] = True
 
     consecutive_outliers = []
     for step in range(niter):
