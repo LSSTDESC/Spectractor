@@ -438,7 +438,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]"] + self.psf_poly_params_names
         self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1),
                                                 (50, 60), (-3, 3), (-3, 3)]),
-                                      self.psf_poly_params_bounds])
+                                      self.psf_poly_params_bounds[:-1]]) # remove saturation
         if atmgrid_filename != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -657,7 +657,7 @@ def lnprob(p):
     return lp + lnlike(p)
 
 
-def gradient_descent(params, epsilon, niter=10, fixed_params=None, tol = 1e-3):
+def gradient_descent(params, epsilon, niter=10, fixed_params=None, xtol =  1e-3, ftol = 1e-3):
     tmp_params = np.copy(params)
     W = 1 / fit_workspace.spectrum.spectrogram_err.flatten() ** 2
     ipar = np.arange(params.size)
@@ -665,6 +665,7 @@ def gradient_descent(params, epsilon, niter=10, fixed_params=None, tol = 1e-3):
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
     costs = []
     params_table = []
+    inv_JT_W_J = np.zeros((len(ipar), len(ipar)))
     for i in range(niter):
         print(f"start iteration={i}", end=' ')  # , tmp_params)
         start = time.time()
@@ -678,22 +679,11 @@ def gradient_descent(params, epsilon, niter=10, fixed_params=None, tol = 1e-3):
         J = J[ipar].T  # remove unfixed parameter (null Jacobian vectors)
         JT_W = J.T * W
         JT_W_J = JT_W @ J
-        if fit_workspace.live_fit:
-            plt.close()
-            fig = plt.figure()
-            im = plt.imshow(JT_W_J)
-            plt.title("$J^T W J$")
-            plt.xticks(np.arange(ipar.size), [fit_workspace.axis_names[ip] for ip in ipar], rotation='vertical',
-                       fontsize=11)
-            plt.yticks(np.arange(ipar.size), [fit_workspace.axis_names[ip] for ip in ipar], fontsize=11)
-            cbar = fig.colorbar(im)
-            cbar.ax.tick_params(labelsize=9)
-            fig.tight_layout()
-            plt.draw()
-            plt.pause(1e-8)
         JT_W_R0 = JT_W @ residuals
         L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
         inv_JT_W_J = L.T @ L
+        if fit_workspace.live_fit:
+            plot_correlation_matrix(inv_JT_W_J, ipar)
         dparams = - inv_JT_W_J @ JT_W_R0
 
         def line_search(alpha):
@@ -718,10 +708,31 @@ def gradient_descent(params, epsilon, niter=10, fixed_params=None, tol = 1e-3):
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
         print(f"end iteration={i} in {time.time() - start:.2f}s cost={fval:.3f}")
-        if np.abs(alpha_min) < tol or (len(costs) > 1 and np.abs(costs[-2] - fval) / fval < tol):
+        if np.sum(np.abs(alpha_min * dparams))/np.sum(np.abs(tmp_params[ipar])) < xtol \
+                or (len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval),np.abs(costs[-2]), 1]) < ftol):
             break
     plt.close()
-    return tmp_params, np.array(costs), np.array(params_table)
+    return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
+
+
+def plot_psf_poly_params(psf_poly_params):
+    from spectractor.extractor.psf import PSF1D
+    psf = PSF1D()
+    truth_psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
+                             -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
+                             0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
+                             528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
+
+    x = np.linspace(-1, 1, 100)
+    for i in range(5):
+        print(i, truth_psf_poly_params[3 * i:3 * i + 3])
+        plt.plot(x, np.polynomial.legendre.legval(x, truth_psf_poly_params[3 * i:3 * i + 3]),
+                 label="truth " + psf.param_names[1 + i])
+        plt.plot(x, np.polynomial.legendre.legval(x, psf_poly_params[3 * i:3 * i + 3]),
+                 label="fit " + psf.param_names[1 + i])
+
+        plt.legend()
+        plt.show()
 
 
 def plot_gradient_descent(costs, params_table):
@@ -750,9 +761,51 @@ def plot_gradient_descent(costs, params_table):
     fit_workspace.plot_spectrogram_fit()
 
 
+def plot_correlation_matrix(cov, ipar=None):
+    plt.close()
+    fig = plt.figure()
+    rho = np.zeros_like(cov)
+    for i in range(cov.shape[0]):
+        for j in range(cov.shape[1]):
+            rho[i,j] = cov[i,j]/np.sqrt(cov[i,i]*cov[j,j])
+    im = plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
+    if ipar is None:
+        ipar = np.arange(0,cov.shape[0]).astype(int)
+    plt.title("Correlation matrix")
+    axis_names = [fit_workspace.axis_names[ip] for ip in ipar]
+    plt.xticks(np.arange(ipar.size), axis_names, rotation='vertical', fontsize=11)
+    plt.yticks(np.arange(ipar.size), axis_names, fontsize=11)
+    cbar = fig.colorbar(im)
+    cbar.ax.tick_params(labelsize=9)
+    fig.tight_layout()
+    if parameters.DISPLAY:
+        if fit_workspace.live_fit:
+            plt.draw()
+            plt.pause(1e-8)
+        else:
+            plt.show()
+
+
+def print_parameter_summary(params, cov, ipar=None):
+    if ipar is None:
+        ipar = np.arange(0,cov.shape[0]).astype(int)
+    for ip in ipar:
+        txt = "%s: %s +%s -%s" % formatting_numbers(params[ip], np.sqrt(cov[ip,ip]), np.sqrt(cov[ip,ip]), label=fit_workspace.input_labels[ip])
+        print(txt)
+
+
 def run_minimisation(method="newton"):
     my_logger = set_logger(__name__)
     bounds = fit_workspace.bounds
+
+    if isinstance(fit_workspace, SpectrumFitWorkspace):
+        nll = lambda p: -lnlike(p)
+    elif isinstance(fit_workspace, SpectrogramFitWorkspace):
+        nll = lambda p: -lnlike_spectrogram(p)
+    else:
+        my_logger.error(f'\n\tUnknown fit_workspace class type {type(fit_workspace)}.\n'
+                        f'Choose either "SpectrumFitWorkspace" of "SpectrogramFitWorkspace"')
+        sys.exit()
 
     # sim_134
     # guess = fit_workspace.p
@@ -761,20 +814,14 @@ def run_minimisation(method="newton"):
     guess = fit_workspace.p
 
     if method == "minimize":
-        if isinstance(fit_workspace, SpectrumFitWorkspace):
-            nll = lambda p: -lnlike(p)
-        elif isinstance(fit_workspace, SpectrogramFitWorkspace):
-            nll = lambda p: -lnlike_spectrogram(p)
-        else:
-            my_logger.error(f'\n\tUnknown fit_workspace class type {type(fit_workspace)}.\n'
-                            f'Choose either "SpectrumFitWorkspace" of "SpectrogramFitWorkspace"')
-            sys.exit()
+        start = time.time()
         result = optimize.minimize(nll, fit_workspace.p, method='L-BFGS-B',
                                    options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True,
                                             'maxiter': 100000,
                                             'maxls': 50, 'maxcor': 30},
                                    bounds=bounds)
         fit_workspace.p = result['x']
+        print(f"Minimize: total computation time: {time.time()-start}s")
         if isinstance(fit_workspace, SpectrumFitWorkspace):
             simulate(*fit_workspace.p)
         elif isinstance(fit_workspace, SpectrogramFitWorkspace):
@@ -782,38 +829,73 @@ def run_minimisation(method="newton"):
         fit_workspace.live_fit = False
         fit_workspace.plot_spectrogram_fit()
 
-    elif method == "minuit":
+    elif method == "least_squares":
+        start = time.time()
         x_scale = np.abs(guess)
         x_scale[x_scale == 0] = 0.1
         p = optimize.least_squares(spectrogram_weighted_res, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
                                    diff_step=0.001, bounds=bounds.T)
         fit_workspace.p = p.x  # m.np_values()
+        print(f"Least_squares: total computation time: {time.time()-start}s")
         if isinstance(fit_workspace, SpectrumFitWorkspace):
             simulate(*fit_workspace.p)
         elif isinstance(fit_workspace, SpectrogramFitWorkspace):
             simulate_spectrogram(*fit_workspace.p)
         fit_workspace.live_fit = False
         fit_workspace.plot_spectrogram_fit()
-
+    elif method == "minuit":
+        start = time.time()
+        fit_workspace.simulation.fix_psf_cube = False
+        error = 0.1 * np.abs(guess) * np.ones_like(guess)
+        error[2:5] = 0.3 * np.abs(guess[2:5]) * np.ones_like(guess[2:5])
+        z = np.where(np.isclose(error, 0.0, 1e-6))
+        error[z] = 1.
+        fix = [False] * guess.size
+        # noinspection PyArgumentList
+        m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
+                                   fix=fix, print_level=2, limit=bounds)
+        m.tol = 10
+        m.migrad()
+        fit_workspace.p = m.np_values()
+        print(f"Minuit: total computation time: {time.time()-start}s")
+        if isinstance(fit_workspace, SpectrumFitWorkspace):
+            simulate(*fit_workspace.p)
+        elif isinstance(fit_workspace, SpectrogramFitWorkspace):
+            simulate_spectrogram(*fit_workspace.p)
+        fit_workspace.live_fit = False
+        fit_workspace.plot_spectrogram_fit()
     elif method == "newton":
         costs = np.array([chisq_spectrogram(guess)])
         params_table = np.array([guess])
-
+        start = time.time()
         epsilon = 1e-3 * guess
         epsilon[epsilon == 0] = 1e-3
+
+        #guess[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 3] = [0.11298966008548948,
+         #                                                                                       -0.396825836448203,
+        #                                                                                        0.2060387678061209]
+        #guess[fit_workspace.psf_params_start_index+1:fit_workspace.psf_params_start_index + 3] = [
+        #                                                                                        -0.396825836448203,
+        #                                                                                        0.2060387678061209]
 
         # fit shape
         fix = [True] * guess.size
         fix[0] = False  # A1
         fix[1] = False  # A2
-        fix[7] = False  # y0
+        fix[7] = True  # y0
+        #fit_workspace.spectrum.rotation_angle = -1.54
         fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
+        #fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index+3] = [False] * 3
+        #fix[fit_workspace.psf_params_start_index+1:fit_workspace.psf_params_start_index+3]  = [True]*2
         fit_workspace.simulation.fix_psf_cube = False
-        fit_workspace.p, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix, tol=1e-2)
+        fit_workspace.p, cov, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix, xtol=1e-2, ftol=1e-2)
         params_table = np.concatenate([params_table, tmp_params_table])
         costs = np.concatenate([costs, tmp_costs])
         print(fit_workspace.p)
-        #plot_gradient_descent(costs, params_table)
+        plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
+        plot_gradient_descent(costs, params_table)
+        ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
+        plot_correlation_matrix(cov, ipar)
 
         # fit dispersion
         guess = np.array(fit_workspace.p)
@@ -826,9 +908,9 @@ def run_minimisation(method="newton"):
         fix = [True] * guess.size
         fix[0] = False
         fix[1] = False
-        fix[5:8] = [False] * 3  # dispersion params
+        fix[5:7] = [False] * 2  # dispersion params
         fit_workspace.simulation.fix_psf_cube = True
-        fit_workspace.p, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=2, fixed_params=fix, tol=1e-3)
+        fit_workspace.p, cov, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix, xtol=1e-3, ftol=1e-3)
         params_table = np.concatenate([params_table, tmp_params_table])
         costs = np.concatenate([costs, tmp_costs])
         print(fit_workspace.p)
@@ -843,12 +925,17 @@ def run_minimisation(method="newton"):
         # -6.72668605e-01,  4.23255049e-01, -3.17253279e-03, -3.44687146e-03,
         # -3.59027314e-03,  2.14896817e+01, -5.76766492e+00,,  1.07628816e+00])
         fix = [False] * guess.size
+        fix[7] = True # y0
         fit_workspace.simulation.fix_psf_cube = False
-        fit_workspace.p, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix, tol=1e-5)
+        fit_workspace.p, cov, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix, xtol=1e-3, ftol=1e-5)
         params_table = np.concatenate([params_table, tmp_params_table])
         costs = np.concatenate([costs, tmp_costs])
         print(fit_workspace.p)
+        print(f"Newton: total computation time: {time.time()-start}s")
         plot_gradient_descent(costs, params_table)
+        ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
+        print_parameter_summary(fit_workspace.p, cov, ipar)
+        plot_correlation_matrix(cov, ipar)
 
 
 def run_emcee():
@@ -900,8 +987,8 @@ if __name__ == "__main__":
     filename = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-    fit_workspace = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nsteps=20,
-                                            burnin=1, nbins=10, verbose=1, plot=True, live_fit=False)
-    run_minimisation()
-    run_emcee()
-    fit_workspace.analyze_chains()
+    fit_workspace = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nsteps=60,
+                                            burnin=20, nbins=10, verbose=1, plot=True, live_fit=False)
+    run_minimisation("newton")
+    #run_emcee()
+    #fit_workspace.analyze_chains()
