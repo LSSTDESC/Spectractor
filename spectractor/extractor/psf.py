@@ -482,9 +482,9 @@ class ChromaticPSF1D:
                 shift = shift + self.degrees[name] + 1
         if force_positive:
             for k, name in enumerate(self.PSF1D.param_names):
-                if name == "x_mean":
-                    profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
-                    profile_params[profile_params[:, k] >= self.Ny, k] = self.Ny
+                # if name == "x_mean":
+                #    profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
+                #    profile_params[profile_params[:, k] >= self.Ny, k] = self.Ny
                 if name == "alpha":
                     profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
                     # profile_params[profile_params[:, k] >= 6, k] = 6
