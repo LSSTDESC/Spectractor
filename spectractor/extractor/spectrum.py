@@ -1042,7 +1042,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     if (xmax - xmin) % 2 == 0:  # spectrogram must have odd size in x for the fourier simulation
         xmax -= 1
         s.table.remove_row(-1)
-
     # Position of the order 0 in the spectrogram coordinates
     target_pixcoords_spectrogram = [image.target_pixcoords[0] - xmin, image.target_pixcoords[1] - ymin]
 
@@ -1053,7 +1052,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Extract the non rotated background
     bgd_model_func = extract_background(data, err, deg=parameters.BGD_ORDER, ws=ws, sigma=5, live_fit=False)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
-
     # Crop the background lateral regions
     bgd_width = ws[1] - w
     yeven = 0

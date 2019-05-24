@@ -822,6 +822,7 @@ class SpectrogramModel(Spectrum):
     def simulate_psf(self, psf_poly_params):
         psf_poly_params_with_saturation = np.concatenate([psf_poly_params, [self.spectrogram_saturation]])
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params_with_saturation, force_positive=True)
+        print(self.pixels_x[-1], profile_params.shape, self.chromatic_psf.table['Dy_mean'].shape)
         self.chromatic_psf.fill_table_with_profile_params(profile_params)
         # self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
         # self.chromatic_psf.table['Dx'] = np.arange(self.spectrogram_Nx) - self.spec
@@ -830,6 +831,9 @@ class SpectrogramModel(Spectrum):
         # derotate
         # self.my_logger.warning(f"\n\tbefore\n {self.chromatic_psf.table[['Dx_rot', 'Dx', 'Dy', 'Dy_mean']][:5]} {angle}")
         self.chromatic_psf.rotate_table(-self.rotation_angle)
+        if parameters.DEBUG or True:
+            self.chromatic_psf.profile_params = self.chromatic_psf.from_table_to_profile_params()
+            self.chromatic_psf.plot_summary()
         # self.my_logger.warning(f"\n\tafter\n {self.chromatic_psf.table[['Dx_rot', 'Dx', 'Dy', 'Dy_mean']][:5]}  {angle}")
 
     def simulate_dispersion(self, D, shift_x, shift_y, r0):
@@ -838,23 +842,33 @@ class SpectrogramModel(Spectrum):
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
-        lambdas_order2 = lambdas_order2[lambdas_order2 > parameters.LAMBDA_MIN]
-
-        distances_order2 = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=2)
-        Dx_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
-        Dy_mean_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
-        dy_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_mean'],
+        lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
+        distances_order2 = self.disperser.grating_lambda_to_pixel(lambdas_order2, x0=new_x0, order=2)
+        # Dx_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
+        # Dy_mean_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
+        # dy_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_mean'],
+        #                    bounds_error=False, fill_value=(0, 0))
+        # dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) + 1j * (
+        #             self.chromatic_psf.table['Dy'] - shift_y)
+        # dispersion_law_order2 = r0 + (Dx_func(lambdas_order2) - shift_x) + 1j * (
+        #             Dy_mean_func(lambdas_order2) + dy_func(lambdas_order2) - shift_y)
+        # Dx_func = interp1d(lambdas, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
+        # Dy_mean_func = interp1d(lambdas, self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
+        dy_func = interp1d(lambdas, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_mean'],
                            bounds_error=False, fill_value=(0, 0))
         dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) + 1j * (
                     self.chromatic_psf.table['Dy'] - shift_y)
-        dispersion_law_order2 = r0 + (Dx_func(lambdas_order2) - shift_x) + 1j * (
-                    Dy_mean_func(lambdas_order2) + dy_func(lambdas_order2) - shift_y)
-        #print(r0,self.chromatic_psf.table['Dx'][:6],self.chromatic_psf.table['Dy'][:6])
-        # plt.plot(dispersion_law.real, dispersion_law.imag)
-        # plt.title(f"{new_x0}")
-        # plt.draw()
-        # plt.pause(1e-8)
-        # plt.close()
+        dispersion_law_order2 = r0 + (distances_order2*np.cos(np.pi*self.rotation_angle/180) - shift_x) + 1j * (
+                distances_order2*np.sin(np.pi * self.rotation_angle / 180) + dy_func(lambdas_order2) - shift_y)
+        if parameters.DEBUG or True:
+            print(r0,self.chromatic_psf.table['Dx'][:6],self.chromatic_psf.table['Dy'][:6],dy_func(lambdas_order2)[:6])
+            from spectractor.tools import from_lambda_to_colormap
+            plt.plot(r0.real+self.chromatic_psf.table['Dx'], r0.imag+self.chromatic_psf.table['Dy_mean'],'k-',label="mean")
+            plt.scatter(dispersion_law.real, dispersion_law.imag,label="dispersion_law",cmap=from_lambda_to_colormap(lambdas), c=lambdas)
+            plt.scatter(dispersion_law_order2.real, dispersion_law_order2.imag,label="dispersion_law_order2",cmap=from_lambda_to_colormap(lambdas_order2), c=lambdas_order2)
+            plt.title(f"{new_x0}")
+            plt.legend()
+            plt.show()
 
         return lambdas, dispersion_law, dispersion_law_order2
 
@@ -896,9 +910,6 @@ class SpectrogramModel(Spectrum):
         start = time.time()
         #print(self.spectrogram_x0, self.spectrogram_Nx, self.spectrogram_y0, self.spectrogram_Ny, self.spectrogram_xmin,self.spectrogram_ymin)
         r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2) + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2)
-        #print(r0)
-        #r0 = (self.spectrogram_x0 ) + 1j * (self.spectrogram_y0 )
-        #print(r0)
         lambdas, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
         self.my_logger.debug(f'\n\tTime after simulate disp: {time.time()-start}')
         start = time.time()
@@ -964,6 +975,7 @@ class SpectrogramModel(Spectrum):
             self.my_logger.debug(f'\n\tTime after simulate after fourier order 2: {time.time()-start}')
             start = time.time()
             dima0_2 = F.ifft_image(fdima0_2, shifted=False)
+            print(np.mean(dima0_2), np.max(dima0_2))
             self.my_logger.debug(f'\n\tTime after simulate inverse fourier order 2: {time.time()-start}')
             start = time.time()
 
@@ -974,7 +986,7 @@ class SpectrogramModel(Spectrum):
             # self.data = self.model(lambdas)
             # self.err = self.model_err(lambdas)
         # Going to observable spectrum: must convert units (ie multiply by dlambda)
-        self.data = A1 * (dima0 + A2 * dima0_2)
+        self.data = A1*(dima0 + A2 * dima0_2)
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         self.convert_from_flam_to_ADUrate()
