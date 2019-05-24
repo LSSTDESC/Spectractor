@@ -268,9 +268,14 @@ class ChromaticPSF1D:
         # self.pixels_fwhm_inf = np.zeros(Nx)
         self.n_poly_params = Nx
         self.fitted_pixels = np.arange(Nx).astype(int)
-        arr = np.zeros((Nx, len(self.PSF1D.param_names) + 11))
+
+        #arr = np.zeros((Nx, len(self.PSF1D.param_names) + 11))
+        #self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_mean', 'flux_sum', 'flux_integral',
+        #                               'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf', 'Dx_rot'] + list(
+
+        arr = np.zeros((Nx, len(self.PSF1D.param_names) + 13))
         self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_mean', 'flux_sum', 'flux_integral',
-                                       'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf', 'Dx_rot'] + list(
+                                       'flux_err','chi2_red','ndof' ,'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf', 'Dx_rot'] + list(
             self.PSF1D.param_names))
         self.saturation = saturation
         if saturation is None:
@@ -960,6 +965,9 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         pixel_range.append(0)
     pixel_range = np.array(pixel_range)
     bgd_model = np.zeros_like(data).astype(float)
+
+
+    # loop on pixels
     for x in pixel_range:
         guess = np.copy(guess)
         if x == ymax_index:
@@ -1039,9 +1047,18 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         s.profile_params[x, :] = guess
         s.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
         s.table['flux_sum'][x] = np.sum(signal)
+
+        # put fit quality result
+        s.table['chi2_red'][x] = reduced_chi2
+        s.table['ndof'][x] = ndof
+
+
+
         if live_fit:
             plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, fit, bgd_fit, guess,
-                                          PSF_guess,  outliers, sigma, live_fit)
+                                          PSF_guess,  outliers, sigma, live_fit,reduced_chi2)
+
+
     # interpolate the skipped pixels with splines
     x = np.arange(Nx)
     xp = np.array(sorted(set(list(pixel_range))))
@@ -1059,6 +1076,8 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     # interpolate the grid
     bgd_fit = bgd_model[:, xp]
     bgd_model_func = interp2d(xp, index, bgd_fit, kind='linear', bounds_error=False, fill_value=None)
+
+
     if parameters.DEBUG:
         # fig, ax = plt.subplots(1,3, figsize=(12,4))
         # noinspection PyTypeChecker
@@ -1073,7 +1092,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
 
 
 def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, bgd_fit=None,
-                                  params=None, PSF_guess=None, outliers=[], sigma=3, live_fit=False):
+                                  params=None, PSF_guess=None, outliers=[], sigma=3, live_fit=False,chi2=-1.):
     """Plot the transverse profile of  the spectrogram.
 
     This plot function is called in transverse_PSF1D_profile if live_fit option is True.
@@ -1148,7 +1167,10 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     ax[0].legend(loc=2, numpoints=1)
     ax[0].grid(True)
     if fit is not None:
-        txt = ""
+        if chi2<0:
+            txt = ""
+        else:
+            txt=f'chi2/ndof: {chi2:.4g}\n'
         for ip, p in enumerate(fit.param_names):
             txt += f'{p}: {getattr(fit, p).value:.4g}\n'
         ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
