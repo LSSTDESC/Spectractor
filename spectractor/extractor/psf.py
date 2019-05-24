@@ -999,7 +999,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
         #                                            niter_basinhopping=5, T_basinhopping=1)
         # fit = fit_PSF1D_minuit(index[good_indices], signal[good_indices], guess=guess, bounds=bounds,
         #                       data_errors=err[good_indices, x])
-        fit, outliers = fit_PSF1D_minuit_outlier_removal(index, signal, guess=guess, bounds=bounds,
+        fit, outliers ,reduced_chi2,ndof= fit_PSF1D_minuit_outlier_removal(index, signal, guess=guess, bounds=bounds,
                                                          data_errors=err[:, x], sigma=sigma, niter=2, consecutive=4)
         # good_indices = [i for i in index if i not in outliers]
         # outliers = [i for i in index if np.abs((signal[i] - fit(i)) / err[i, x]) > sigma]
@@ -1992,6 +1992,10 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
         the PSF1D fitted model.
     outliers: list
         the list of the outlier indices.
+    reduced_chi2
+         the reduced chi2
+    ndof
+        the number of degrees of fredoom ndata-nfittedparam
 
     Examples
     --------
@@ -2010,7 +2014,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     >>> bounds = ((0, 6000), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000))
 
     Fit with error bars:
-    >>> model, outliers = fit_PSF1D_minuit_outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err,
+    >>> model, outliers, reduced_chi2, ndof = fit_PSF1D_minuit_outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err,
     ... sigma=3, niter=2, consecutive=3)
     >>> res = [getattr(model, p).value for p in model.param_names]
     >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
@@ -2057,9 +2061,34 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     consecutive_outliers = []
     for step in range(niter):
         # noinspection PyArgumentList
+
+
         m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
                                    print_level=0, grad=PSF1D_chisq_v2_jac)
-        m.migrad()
+
+        # fmin contains the chi2 value at minimum
+        # fitpar contains the parameters
+        fmin,fitpar=m.migrad()
+
+
+        #%%%%%%
+        #my_logger.warning(f"\n Minuit-Migrad-GET-FMIN :: {m.get_fmin()}")
+        #my_logger.warning(f"\n Minuit-Migrad-GET-PARAM_STATES :: {m.get_param_states()}")
+        #my_logger.warning(f"\n Minuit-Migrad-FMIN :: {fmin}")
+        #my_logger.warning(f"\n Minuit-Migrad-FITPAR :: {fitpar}")
+        fixedpar_flagvec = np.array([fitpar[i].is_fixed for i in np.arange(len(fitpar))])
+        nfreeparam=np.count_nonzero(fixedpar_flagvec == False)
+        ndata=np.count_nonzero(~np.isnan(data))
+        ndof=ndata-nfreeparam
+        if ndof>0:
+            reduced_chi2=fmin["fval"]/ndof
+        else:
+            reduced_chi2=-1.
+        #my_logger.debug(f"\n Minuit-Migrad :: nfreeparam={nfreeparam} , ndata={ndata}, ndof={ndof}, reduced_chi2={reduced_chi2}")
+
+
+        #%%%%%%%
+
         guess = m.np_values()
         PSF = PSF1D(*m.np_values())
         for ip, p in enumerate(model.param_names):
@@ -2092,7 +2121,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
             break
 
     # my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF, consecutive_outliers
+    return PSF, consecutive_outliers,reduced_chi2,ndof
 
 
 if __name__ == "__main__":
