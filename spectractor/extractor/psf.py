@@ -268,10 +268,9 @@ class ChromaticPSF1D:
         # self.pixels_fwhm_inf = np.zeros(Nx)
         self.n_poly_params = Nx
         self.fitted_pixels = np.arange(Nx).astype(int)
-        arr = np.zeros((Nx, len(self.PSF1D.param_names) + 11))
+        arr = np.zeros((Nx, len(self.PSF1D.param_names) + 13))
         self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_mean', 'flux_sum', 'flux_integral',
-                                       'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf', 'Dx_rot'] + list(
-            self.PSF1D.param_names))
+                                       'flux_err','chi2_red','ndof' ,'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf', 'Dx_rot'] + list(self.PSF1D.param_names))
         self.saturation = saturation
         if saturation is None:
             self.saturation = 1e20
