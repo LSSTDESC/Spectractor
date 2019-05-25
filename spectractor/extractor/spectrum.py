@@ -1,4 +1,4 @@
-from scipy.signal import argrelextrema
+from scipy.signal import argrelextrema, savgol_filter
 
 from spectractor.extractor.images import *
 
@@ -482,6 +482,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
     >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
     >>> spectrum_err = np.sqrt(spectrum)
+    >>> spectrum = np.random.poisson(spectrum)
     >>> spec = Spectrum()
     >>> spec.lambdas = lambdas
     >>> spec.data = spectrum
@@ -513,6 +514,12 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     fwhm_to_peak_width_factor = 3
     len_index_to_bgd_npar_factor = 0.12
     baseline_prior = 0.1  # *sigma gaussian prior on base line fit
+    # filter the noise
+    #plt.errorbar(lambdas,spec,yerr=spec_err)
+    spec = np.copy(spec)
+    spec = savgol_filter(spec, 5, 2)
+    #plt.plot(lambdas,spec)
+    #plt.show()
     # initialisation
     lambda_shifts = []
     snrs = []
