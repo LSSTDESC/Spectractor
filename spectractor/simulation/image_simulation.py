@@ -335,7 +335,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.convert_to_ADU_units()
     if parameters.VERBOSE:
         image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
-
+        spectrogram.plot_spectrogram(title="Spectrogram simulation", units=image.units, aspect="auto")
     # Set output path
     ensure_dir(outputdir)
     output_filename = image_filename.split('/')[-1]
@@ -388,17 +388,16 @@ if __name__ == "__main__":
                        -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
                        0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
                        528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
-    psf_poly_params = [0.11298966008548948, -0.396825836448203, 10.60387678061209, 2.0649268678546955,
-                       -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
-                       0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
-                       528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
+    # psf_poly_params = [0.11298966008548948, -0.396825836448203, 10.60387678061209, 2.0649268678546955,
+    #                    -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
+    #                    0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
+    #                    528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
     # file_name="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
     # guess = [840, 530]
     # target = "HD205905"
     # x = np.linspace(-1, 1, 100)
     # plt.plot(x, np.polynomial.legendre.legval(x, psf_poly_params[0:3]))
     # plt.show()
-
     logbook = LogBook(logbook=args.logbook)
     for file_name in file_names:
         tag = file_name.split('/')[-1]
