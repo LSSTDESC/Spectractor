@@ -995,9 +995,13 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     my_logger.info(
         f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
+    # Extract the abckground on the rotated image
+    bgd_model_func = extract_background(data, deg=1, ws=ws, pixel_step=1, sigma=3)
+
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    s, bgd_model_func = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,
+    s = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,
+                                                     bgd_model_func=bgd_model_func,
                                                      saturation=image.saturation, live_fit=parameters.DEBUG)
 
     # Fill spectrum object
@@ -1051,7 +1055,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
     # Extract the non rotated background
-    bgd_model_func = extract_background(data, err, deg=parameters.BGD_ORDER, ws=ws, sigma=5, live_fit=False)
+    bgd_model_func = extract_background(data, deg=1, ws=ws, sigma=3)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
 
     # Crop the background lateral regions
