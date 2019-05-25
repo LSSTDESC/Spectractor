@@ -1056,7 +1056,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     Ny, Nx = data.shape
     # Extract the non rotated background
     bgd_model_func = extract_background(data, deg=1, ws=ws, sigma=3)
-    bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
+    xx, yy = np.meshgrid(np.arange(Nx), np.arange(Ny))
+    bgd = bgd_model_func(xx, yy)
 
     # Crop the background lateral regions
     bgd_width = ws[1] - w
