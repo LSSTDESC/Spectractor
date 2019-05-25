@@ -923,7 +923,7 @@ def extract_background(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
     # Fit a 1 degree 2D polynomial function with outlier removal
     xx, yy = np.meshgrid(pixel_range, bgd_index)
     bgd_model_func = fit_poly2d_outlier_removal(xx, yy, bgd_bands, order=deg, sigma=sigma, niter=20)
-    if parameters.DEBUG or True:
+    if parameters.DEBUG:
         fig, ax = plt.subplots(2,1, figsize=(12, 6), sharex='all')
         bgd_bands = np.copy(data).astype(float)
         bgd_bands[middle-ws[0]:middle+ws[0], :] = np.nan
