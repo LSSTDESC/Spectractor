@@ -75,7 +75,7 @@ class FitWorkspace:
         self.start = np.array(
             [np.random.uniform(self.p[i] - 0.02 * self.p[i], self.p[i] + 0.02 * self.p[i], self.nwalkers)
              for i in range(self.ndim)]).T
-        self.start[self.start == 0] = 1e-5*np.random.uniform(0,1)
+        self.start[self.start == 0] = 1e-5 * np.random.uniform(0, 1)
         return self.start
 
     def load_chains(self):
@@ -93,8 +93,8 @@ class FitWorkspace:
             thin = int(0.5 * np.min(tau))
         except emcee.autocorr.AutocorrError:
             tau = -1
-            burnin=self.burnin
-            thin=1
+            burnin = self.burnin
+            thin = 1
         self.chains = reader.get_chain(discard=burnin, flat=False, thin=thin)
         self.lnprobs = reader.get_log_prob(discard=burnin, flat=False, thin=thin)
         self.nsteps = self.chains.shape[0]
@@ -173,7 +173,7 @@ class FitWorkspace:
         chisq_std = []
         for k in nchains:
             chisqs = -2 * self.lnprobs[self.burnin:, k]
-            #if np.mean(chisqs) < 1e5:
+            # if np.mean(chisqs) < 1e5:
             chisq_averages.append(np.mean(chisqs))
             chisq_std.append(np.std(chisqs))
         self.global_average = np.mean(chisq_averages)
@@ -210,7 +210,8 @@ class FitWorkspace:
             print(text)
         # global_average = np.mean(-2*self.lnprobs[self.valid_chains, self.burnin:])
         # global_std = np.std(-2*self.lnprobs[self.valid_chains, self.burnin:])
-        ax[self.ndim, 0].set_ylim([self.global_average-5*self.global_std, self.global_average+5*self.global_std])
+        ax[self.ndim, 0].set_ylim(
+            [self.global_average - 5 * self.global_std, self.global_average + 5 * self.global_std])
         # Parameter vs Index
         print("Computing Parameter vs Index plots...")
         for i in range(self.ndim):
@@ -232,7 +233,7 @@ class FitWorkspace:
             for k in nchains:
                 ARs = []
                 indices = []
-                for l in range(self.burnin+window, self.nsteps, window):
+                for l in range(self.burnin + window, self.nsteps, window):
                     ARs.append(self.compute_local_acceptance_rate(l - window, l, k))
                     indices.append(l)
                 if self.valid_chains[k]:
@@ -255,7 +256,7 @@ class FitWorkspace:
             # ax[i, 1].legend(loc='upper right', ncol=2, fontsize=10)
         # Gelman-Rubin test.py
         if len(nchains) > 1:
-            step = max(1, (self.nsteps-self.burnin) // 20)
+            step = max(1, (self.nsteps - self.burnin) // 20)
             print(f'Gelman-Rubin tests (burnin={self.burnin:d}, step={step:d}, nsteps={self.nsteps:d}):')
             for i in range(self.ndim):
                 Rs = []
@@ -438,7 +439,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]"] + self.psf_poly_params_names
         self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1),
                                                 (50, 60), (-3, 3), (-3, 3)]),
-                                      self.psf_poly_params_bounds[:-1]]) # remove saturation
+                                      self.psf_poly_params_bounds[:-1]])  # remove saturation
         if atmgrid_filename != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -527,6 +528,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = simulate_spectrogram(*tmp_p)
             J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+            print(ip, self.input_labels[ip], p, tmp_p[ip] + epsilon[ip], J[ip])
         if False:
             plt.imshow(J, origin="lower", aspect="auto")
             plt.show()
@@ -657,7 +659,7 @@ def lnprob(p):
     return lp + lnlike(p)
 
 
-def gradient_descent(params, epsilon, niter=10, fixed_params=None, xtol =  1e-3, ftol = 1e-3):
+def gradient_descent(params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
     tmp_params = np.copy(params)
     W = 1 / fit_workspace.spectrum.spectrogram_err.flatten() ** 2
     ipar = np.arange(params.size)
@@ -676,7 +678,17 @@ def gradient_descent(params, epsilon, niter=10, fixed_params=None, xtol =  1e-3,
         cost = np.sum((residuals ** 2) * W)
         print(f"cost={cost:.3f}")
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
-        J = J[ipar].T  # remove unfixed parameter (null Jacobian vectors)
+        # remove parameters with unexpected null Jacobian vectors
+        for ip in range(J.shape[0]):
+            if ip not in ipar:
+                continue
+            if np.all(J[ip] == np.zeros(J.shape[1])):
+                ipar = np.delete(ipar, list(ipar).index(ip))
+                print(f"Step {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed at its "
+                      f"current value ({tmp_params[ip]}) in the following.")
+        # remove fixed parameters
+        J = J[ipar].T
+        # algebra
         JT_W = J.T * W
         JT_W_J = JT_W @ J
         JT_W_R0 = JT_W @ residuals
@@ -708,8 +720,8 @@ def gradient_descent(params, epsilon, niter=10, fixed_params=None, xtol =  1e-3,
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
         print(f"end iteration={i} in {time.time() - start:.2f}s cost={fval:.3f}")
-        if np.sum(np.abs(alpha_min * dparams))/np.sum(np.abs(tmp_params[ipar])) < xtol \
-                or (len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval),np.abs(costs[-2]), 1]) < ftol):
+        if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol \
+                or (len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2]), 1]) < ftol):
             break
     plt.close()
     return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
@@ -736,7 +748,7 @@ def plot_psf_poly_params(psf_poly_params):
 
 
 def plot_gradient_descent(costs, params_table):
-    fig, ax = plt.subplots(2, 1, figsize=(10,6), sharex="all")
+    fig, ax = plt.subplots(2, 1, figsize=(10, 6), sharex="all")
     iterations = np.arange(params_table.shape[0])
     ax[0].plot(iterations, costs, lw=2)
     for ip in range(params_table.shape[1]):
@@ -767,10 +779,10 @@ def plot_correlation_matrix(cov, ipar=None):
     rho = np.zeros_like(cov)
     for i in range(cov.shape[0]):
         for j in range(cov.shape[1]):
-            rho[i,j] = cov[i,j]/np.sqrt(cov[i,i]*cov[j,j])
+            rho[i, j] = cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
     im = plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
     if ipar is None:
-        ipar = np.arange(0,cov.shape[0]).astype(int)
+        ipar = np.arange(0, cov.shape[0]).astype(int)
     plt.title("Correlation matrix")
     axis_names = [fit_workspace.axis_names[ip] for ip in ipar]
     plt.xticks(np.arange(ipar.size), axis_names, rotation='vertical', fontsize=11)
@@ -788,9 +800,10 @@ def plot_correlation_matrix(cov, ipar=None):
 
 def print_parameter_summary(params, cov, ipar=None):
     if ipar is None:
-        ipar = np.arange(0,cov.shape[0]).astype(int)
+        ipar = np.arange(0, cov.shape[0]).astype(int)
     for ip in ipar:
-        txt = "%s: %s +%s -%s" % formatting_numbers(params[ip], np.sqrt(cov[ip,ip]), np.sqrt(cov[ip,ip]), label=fit_workspace.input_labels[ip])
+        txt = "%s: %s +%s -%s" % formatting_numbers(params[ip], np.sqrt(cov[ip, ip]), np.sqrt(cov[ip, ip]),
+                                                    label=fit_workspace.input_labels[ip])
         print(txt)
 
 
@@ -810,8 +823,8 @@ def run_minimisation(method="newton"):
     # sim_134
     # guess = fit_workspace.p
     # truth sim_134
-    # guess = np.array([1., 0.01, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
-    guess = fit_workspace.p
+    guess = np.array([1., 0.01, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
+    # guess = fit_workspace.p
 
     if method == "minimize":
         start = time.time()
@@ -865,16 +878,24 @@ def run_minimisation(method="newton"):
         fit_workspace.live_fit = False
         fit_workspace.plot_spectrogram_fit()
     elif method == "newton":
+        fit_workspace.live_fit= True
         costs = np.array([chisq_spectrogram(guess)])
         params_table = np.array([guess])
         start = time.time()
-        epsilon = 1e-3 * guess
-        epsilon[epsilon == 0] = 1e-3
+        epsilon = 1e-2 * guess
+        epsilon[epsilon == 0] = 1e-2
+        epsilon[0] = 1e-3 # A1
+        epsilon[1] = 1e-3 # A2
+        epsilon[2] = 10 # ozone
+        epsilon[3] = 0.05 # pwv
+        epsilon[4] = 0.001 # aerosols
+        epsilon[5] = 0.01 # DCCD
+        epsilon[6] = 0.05 # shift_x
 
-        #guess[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 3] = [0.11298966008548948,
-         #                                                                                       -0.396825836448203,
+        # guess[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 3] = [0.11298966008548948,
+        #                                                                                       -0.396825836448203,
         #                                                                                        0.2060387678061209]
-        #guess[fit_workspace.psf_params_start_index+1:fit_workspace.psf_params_start_index + 3] = [
+        # guess[fit_workspace.psf_params_start_index+1:fit_workspace.psf_params_start_index + 3] = [
         #                                                                                        -0.396825836448203,
         #                                                                                        0.2060387678061209]
 
@@ -883,12 +904,13 @@ def run_minimisation(method="newton"):
         fix[0] = False  # A1
         fix[1] = False  # A2
         fix[7] = True  # y0
-        #fit_workspace.spectrum.rotation_angle = -1.54
+        # fit_workspace.spectrum.rotation_angle = -1.54
         fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
-        #fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index+3] = [False] * 3
-        #fix[fit_workspace.psf_params_start_index+1:fit_workspace.psf_params_start_index+3]  = [True]*2
+        # fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index+3] = [False] * 3
+        # fix[fit_workspace.psf_params_start_index+1:fit_workspace.psf_params_start_index+3]  = [True]*2
         fit_workspace.simulation.fix_psf_cube = False
-        fit_workspace.p, cov, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix, xtol=1e-2, ftol=1e-2)
+        fit_workspace.p, cov, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix,
+                                                                             xtol=1e-2, ftol=1e-2)
         params_table = np.concatenate([params_table, tmp_params_table])
         costs = np.concatenate([costs, tmp_costs])
         print(fit_workspace.p)
@@ -910,11 +932,12 @@ def run_minimisation(method="newton"):
         fix[1] = False
         fix[5:7] = [False] * 2  # dispersion params
         fit_workspace.simulation.fix_psf_cube = True
-        fit_workspace.p, cov, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix, xtol=1e-3, ftol=1e-3)
+        fit_workspace.p, cov, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix,
+                                                                             xtol=1e-3, ftol=1e-3)
         params_table = np.concatenate([params_table, tmp_params_table])
         costs = np.concatenate([costs, tmp_costs])
         print(fit_workspace.p)
-        #plot_gradient_descent(costs, params_table)
+        # plot_gradient_descent(costs, params_table)
 
         # fit all
         guess = np.array(fit_workspace.p)
@@ -925,9 +948,10 @@ def run_minimisation(method="newton"):
         # -6.72668605e-01,  4.23255049e-01, -3.17253279e-03, -3.44687146e-03,
         # -3.59027314e-03,  2.14896817e+01, -5.76766492e+00,,  1.07628816e+00])
         fix = [False] * guess.size
-        fix[7] = True # y0
+        fix[7] = True  # y0
         fit_workspace.simulation.fix_psf_cube = False
-        fit_workspace.p, cov, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix, xtol=1e-3, ftol=1e-5)
+        fit_workspace.p, cov, tmp_costs, tmp_params_table = gradient_descent(guess, epsilon, niter=20, fixed_params=fix,
+                                                                             xtol=1e-3, ftol=1e-5)
         params_table = np.concatenate([params_table, tmp_params_table])
         costs = np.concatenate([costs, tmp_costs])
         print(fit_workspace.p)
@@ -953,8 +977,8 @@ def run_emcee():
         sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnlike_spectrogram, args=(),
                                         pool=pool, backend=backend)
         print(f"Initial size: {backend.iteration}")
-        if nsamples-backend.iteration > 0:
-            for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples-backend.iteration))):
+        if nsamples - backend.iteration > 0:
+            for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples - backend.iteration))):
                 if pool.is_master():
                     if (i + 1) % 100 == 0:
                         print("{0:5.1%}".format(float(i) / nsamples))
@@ -963,8 +987,9 @@ def run_emcee():
         sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnlike_spectrogram, args=(),
                                         threads=4, backend=backend)
         print(f"Initial size: {backend.iteration}")
-        if nsamples-backend.iteration > 0:
-            for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples-backend.iteration), progress=True)):
+        if nsamples - backend.iteration > 0:
+            for i, result in enumerate(
+                    sampler.sample(p0, iterations=max(0, nsamples - backend.iteration), progress=True)):
                 if (i + 1) % 100 == 0:
                     print("{0:5.1%}".format(float(i) / nsamples))
     fit_workspace.chains = sampler.chain
@@ -983,12 +1008,12 @@ if __name__ == "__main__":
                       help="Write results in given output directory (default: ./outputs/).")
     (opts, args) = parser.parse_args()
 
-    filename = 'outputs/reduc_20170530_130_spectrum.fits'
+    filename = 'outputs/reduc_20170530_134_spectrum.fits'
     filename = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     fit_workspace = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nsteps=60,
                                             burnin=20, nbins=10, verbose=1, plot=True, live_fit=False)
     run_minimisation("newton")
-    #run_emcee()
-    #fit_workspace.analyze_chains()
+    # run_emcee()
+    # fit_workspace.analyze_chains()
