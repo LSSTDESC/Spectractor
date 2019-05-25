@@ -266,29 +266,10 @@ class Lines:
 
         Parameters
         ----------
-        lines: Lines
-            The Lines object containing the line characteristics
-        lambdas: float array
-            The wavelength array (in nm)
-        spec: float array
-            The spectrum amplitude array
-        spec_err: float array, optional
-            The spectrum amplitude uncertainty array (default: None)
-        fwhm_func: callable, optional
-            The fwhm of the cross spectrum to reset CALIB_PEAK_WIDTH parameter as a function of lambda (default: None)
-        snr_minlevel: float
-            The minimum signal over noise ratio to consider using a fitted line in the computation of the mean
-            shift output and to print it in the outpur table (default: 3)
-        ax: Axes, optional
-            An Axes instance to over plot the result of the fit (default: None).
-        xlim: array, optional
-            (min, max) list limiting the wavelength interval where to detect spectral lines (default:
-            (parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
-
-        Returns
-        -------
-        shift: float
-            The mean shift (in nm) between the detected and tabulated lines
+        ax: Axes
+            The Axes instance if needed (default: None).
+        print_table: bool, optional
+            If True, print a summary table (default: False).
 
         Examples
         --------

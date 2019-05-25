@@ -2,6 +2,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from spectractor.simulation.simulator import *
 from spectractor.fit.statistics import *
 
+from scipy.optimize import minimize
 from spectractor.parameters import FIT_WORKSPACE as fit_workspace
 
 from iminuit import Minuit
@@ -15,7 +16,7 @@ import time
 
 class FitWorkspace:
 
-    def __init__(self, filename, atmgrid_filename="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+    def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False):
         self.my_logger = set_logger(self.__class__.__name__)
         self.filename = filename
@@ -45,16 +46,16 @@ class FitWorkspace:
         self.flat_chains = np.array([[]])
         self.valid_chains = [False] * self.nwalkers
         self.title = ""
-        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(filename)
+        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
         self.airmass = self.spectrum.header['AIRMASS']
         self.pressure = self.spectrum.header['OUTPRESS']
         self.temperature = self.spectrum.header['OUTTEMP']
         self.use_grid = False
-        if atmgrid_filename == "":
+        if atmgrid_file_name == "":
             self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
         else:
             self.use_grid = True
-            self.atmosphere = AtmosphereGrid(filename, atmgrid_filename)
+            self.atmosphere = AtmosphereGrid(file_name, atmgrid_file_name)
             if parameters.VERBOSE:
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_filename}. ')
         self.truth = None
@@ -400,9 +401,9 @@ class SpectrumFitWorkspace(FitWorkspace):
         else:
             if parameters.DISPLAY and parameters.VERBOSE:
                 plt.show()
-        figname = fit_workspace.filename.replace('.fits', '_bestfit.pdf')
-        print(f'Save figure: {figname}')
-        fig.savefig(figname, dpi=100)
+            figname = fit_workspace.filename.replace('.fits', '_bestfit.pdf')
+            print(f'Save figure: {figname}')
+            fig.savefig(figname, dpi=100)
 
 
 class SpectrogramFitWorkspace(FitWorkspace):
@@ -630,10 +631,10 @@ def simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift):
 
 def chisq(p):
     model, err = simulate(*p)
-    chisq = np.sum((model - fit_workspace.spectrum.data) ** 2 / (err ** 2 + fit_workspace.spectrum.err ** 2))
+    chisquare = np.sum((model - fit_workspace.spectrum.data) ** 2 / (err ** 2 + fit_workspace.spectrum.err ** 2))
     # chisq /= self.spectrum.data.size
     # print '\tReduced chisq =',chisq/self.spectrum.data.size
-    return chisq
+    return chisquare
 
 
 def lnprior(p, bounds):
