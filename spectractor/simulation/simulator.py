@@ -911,6 +911,7 @@ class SpectrogramModel(Spectrum):
         start = time.time()
         #print(self.spectrogram_x0, self.spectrogram_Nx, self.spectrogram_y0, self.spectrogram_Ny, self.spectrogram_xmin,self.spectrogram_ymin)
         r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2) + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2)
+        # r0 = (self.spectrogram_x0 ) + 1j * (self.spectrogram_y0 )
         lambdas, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
         self.my_logger.debug(f'\n\tTime after simulate disp: {time.time()-start}')
         start = time.time()
@@ -924,7 +925,7 @@ class SpectrogramModel(Spectrum):
         nima = self.spectrogram_Ny
         y, x = FA.create_coords((nima, nima), starts='auto')  # (ny, nx)
         if self.psf_cube is None or not self.fix_psf_cube:
-            cube = pyfftw.empty_aligned((nlbda, nima, nima), dtype='float32')
+            cube = pyfftw.zeros_aligned((nlbda, nima, nima), dtype='float32')
             shape_params = np.array([self.chromatic_psf.table[name] for name in PSF2D.param_names[3:]]).T
             for l in range(nlbda):
                 ima = PSF2D.evaluate(x, y, 1, 0, 0, *shape_params[l])
@@ -935,11 +936,12 @@ class SpectrogramModel(Spectrum):
             self.psf_cube = cube
         else:
             cube = self.psf_cube
-        start = time.time()
 
         # Extended image (nima × nlbda) has to be perfecty centered
         ny, nx = (nima, nlbda)  # Rectangular minimal embedding
         hcube = FA.embed_array(cube, (nlbda, ny, nx))
+        self.my_logger.debug(f'\n\tTime after filling the cube: {time.time()-start}')
+        start = time.time()
 
         # Generate slitless-spectroscopy image from Fourier analysis
         if self.fhcube is None or not self.fix_psf_cube:
@@ -960,7 +962,7 @@ class SpectrogramModel(Spectrum):
         start = time.time()
 
         # Dispersed image (noiseless)
-        dima0 = F.ifft_image(fdima0, shifted=False)
+        dima0 = F.ifft_image(fdima0)
         self.my_logger.debug(f'\n\tTime after simulate inverse fourier: {time.time()-start}')
         start = time.time()
 
@@ -975,7 +977,7 @@ class SpectrogramModel(Spectrum):
                                         method="numexpr")  # FT
             self.my_logger.debug(f'\n\tTime after simulate after fourier order 2: {time.time()-start}')
             start = time.time()
-            dima0_2 = F.ifft_image(fdima0_2, shifted=False)
+            dima0_2 = F.ifft_image(fdima0_2)
             self.my_logger.debug(f'\n\tTime after simulate inverse fourier order 2: {time.time()-start}')
             start = time.time()
 
@@ -987,27 +989,20 @@ class SpectrogramModel(Spectrum):
             # self.err = self.model_err(lambdas)
         # Going to observable spectrum: must convert units (ie multiply by dlambda)
         self.data = A1*(dima0 + A2 * dima0_2)
-        plt.plot(np.sum(self.data,axis=0))
-        plt.plot(np.sum(A1*dima0,axis=0))
-        plt.plot(np.sum(A1*A2*dima0_2,axis=0))
-        plt.plot(spectrum)
-        plt.show()
+        # plt.plot(np.sum(self.data,axis=0))
+        # plt.plot(np.sum(A1*dima0,axis=0))
+        # plt.plot(np.sum(A1*A2*dima0_2,axis=0))
+        # plt.plot(spectrum)
+        # plt.show()
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         self.convert_from_flam_to_ADUrate()
         self.data += self.spectrogram_bgd
+        self.lambdas = lambdas
+        self.lambdas_binwidths = np.gradient(lambdas)
         self.err = np.zeros_like(self.data)
-        # now we include effects related to the wrong extraction of the spectrum:
-        # wrong estimation of the order 0 position and wrong DISTANCE2CCD
-        distance = self.chromatic_psf.get_distance_along_dispersion_axis()
-        self.disperser.D = parameters.DISTANCE2CCD
-        self.lambdas = self.disperser.grating_pixel_to_lambda(distance, self.x0, order=1)
-        # self.model = interp1d(self.lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
-        # self.model_err = interp1d(self.lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
-        self.my_logger.debug(f'\n\tTime after conclusions: {time.time()-start}')
-        start = time.time()
         if parameters.DEBUG:
-            fig, ax = plt.subplots(2, 1, sharex="all", figsize=(12, 4))
+            fig, ax = plt.subplots(2, 1, sharex="all", figsize=(12, 6))
             ax[0].imshow(self.data, origin='lower')
             ax[0].set_title('Model')
             ax[1].imshow(self.spectrogram, origin='lower')
