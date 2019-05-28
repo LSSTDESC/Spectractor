@@ -328,6 +328,12 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
                                            angle=spectrum.rotation_angle,
                                            psf_poly_params=psf_poly_params)
 
+    # now we include effects related to the wrong extraction of the spectrum:
+    # wrong estimation of the order 0 position and wrong DISTANCE2CCD
+    distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
+    spectrum.disperser.D = parameters.DISTANCE2CCD
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=1)
+
     # Image model
     my_logger.info('\n\tImage model...')
     image.compute(star, background, spectrogram, starfield=starfield)
@@ -335,7 +341,6 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.convert_to_ADU_units()
     if parameters.VERBOSE:
         image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
-        spectrogram.plot_spectrogram(title="Spectrogram simulation", units=image.units, aspect="auto")
     # Set output path
     ensure_dir(outputdir)
     output_filename = image_filename.split('/')[-1]
