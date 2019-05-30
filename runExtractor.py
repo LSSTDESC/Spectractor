@@ -1,6 +1,7 @@
 from spectractor import parameters
 from spectractor.extractor.extractor import Spectractor
 from spectractor.logbook import LogBook
+from spectractor.config import load_config
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -28,11 +29,23 @@ if __name__ == "__main__":
 
     file_names = args.input
 
-    logbook = LogBook(logbook=args.logbook)
+    load_config(args.config)
+
+    if parameters.LOGBOOK != "None":
+        print(parameters.LOGBOOK, type(parameters.LOGBOOK))
+        logbook = LogBook(logbook=args.logbook)
+
     for file_name in file_names:
         tag = file_name.split('/')[-1]
-        disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
+        if parameters.LOGBOOK != "None":
+            print(parameters.LOGBOOK)
+            disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
+        else:
+            disperser_label = parameters.DISPERSER_DEFAULT
+            target = ""
+            xpos = parameters.ORDER0_X
+            ypos = parameters.ORDER0_Y
         if target is None or xpos is None or ypos is None:
             continue
-        file_name = "outputs/sim_20170530_134.fits"
+        # file_name = "outputs/sim_20170530_134.fits"
         Spectractor(file_name, args.output_directory, [xpos, ypos], target, disperser_label, args.config)

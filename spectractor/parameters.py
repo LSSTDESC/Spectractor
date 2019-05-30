@@ -11,6 +11,7 @@ import matplotlib as mpl
 mypath = os.path.dirname(__file__)
 HOLO_DIR = os.path.join(mypath, "extractor/dispersers/")
 THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
+LOGBOOK = "None" # external logbook
 
 # CCD characteristics
 CCD_IMSIZE = 2048  # size of the image in pixel
@@ -43,6 +44,7 @@ ZGUNN = {'label': 'Z-Gunn', 'min': 800, 'max': 1100}
 FILTERS = [RG715, FGB37, HALPHA_FILTER, ZGUNN]
 
 # Making of the holograms
+DISPERSER_DEFAULT = "" # default disperser label
 DISTANCE2CCD = 55.45  # distance between hologram and CCD in mm
 DISTANCE2CCD_ERR = 0.19  # uncertainty on distance between hologram and CCD in mm
 LAMBDA_CONSTRUCTOR = 639e-6  # constructor wavelength to make holograms in mm
@@ -53,6 +55,9 @@ PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x
 PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
 
 # Search windows in images
+IS_ORDER0 = True # is order 0 present on image
+ORDER0_X = 0 # estimated position of the order 0 in pixels on x axis
+ORDER0_Y = 0 # estimated position of the order 0 in pixels on y axis
 XWINDOW = 100  # window x size to search for the targeted object
 YWINDOW = 100  # window y size to search for the targeted object
 XWINDOW_ROT = 50   # window x size to search for the targeted object

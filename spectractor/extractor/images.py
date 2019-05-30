@@ -49,7 +49,6 @@ class Image(object):
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
-        self.load_image(file_name)
         # Load the target if given
         self.target = None
         self.target_pixcoords = None
@@ -63,6 +62,7 @@ class Image(object):
             self.header['REDSHIFT'] = self.target.redshift
             self.header.comments['REDSHIFT'] = 'redshift of the target'
         self.err = None
+        self.load_image(file_name)
 
     def load_image(self, file_name):
         """
@@ -79,6 +79,8 @@ class Image(object):
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
             load_LPNHE_image(self)
+        elif parameters.OBS_NAME == 'GEMINI':
+            load_Gemini_image(self)
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
@@ -146,7 +148,7 @@ class Image(object):
         # set to minimum positive value
         data = np.copy(self.data)
         zeros = np.where(data <= 0)
-        min_noz = np.min(data[np.where(data > 0)])
+        min_noz = np.nanmin(data[np.where(data > 0)])
         data[zeros] = min_noz
         # compute poisson noise
         #   TODO: add read out noise (add in square to electrons)
@@ -291,6 +293,32 @@ def load_LPNHE_image(image):
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
+    parameters.CCD_IMSIZE = image.data.shape[1]
+
+
+def load_Gemini_image(image):
+    """Specific routine to load LPNHE fits files and load their data and properties for Spectractor.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    image.my_logger.info(f'\n\tLoading GEMINI image {image.file_name}...')
+    image.header, data = load_fits(image.file_name, 0)
+    data = data.astype(np.float64)
+    image.data = data
+    #image.data[np.isnan(data)] = 0 #np.nanmax(data)
+    #image.date_obs = image.header['DATE-OBS']
+    image.expo = 1 # float(image.header['EXPTIME'])
+    image.header['ROTANGLE'] = 0
+    image.header['LSHIFT'] = 0.
+    image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.target = Star("HD111980")
+    print(image.target.label)
+    image.my_logger.info('\n\tImage loaded')
+    # compute CCD gain map
+    image.gain = 3 #float(image.header['CCDGAIN']) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
 
 
@@ -630,6 +658,8 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region
     data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+    min_noz = np.nanmin(data[np.where(data > 0)])
+    data[np.isnan(data)] = min_noz
     lambda_plus, lambda_minus, theta = hessian_and_theta(data, margin_cut)
     # thresholds
     lambda_threshold = np.min(lambda_minus)

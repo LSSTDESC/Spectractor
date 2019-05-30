@@ -67,13 +67,21 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     output_filename_spectrogram = output_filename.replace('spectrum','spectrogram')
     output_filename_psf = output_filename.replace('spectrum.fits','table.csv')
     # Find the exact target position in the raw cut image: several methods
-    my_logger.info('\n\tSearch for the target in the image...')
-    target_pixcoords = find_target(image, guess)
+    if parameters.IS_ORDER0:
+        my_logger.info('\n\tSearch for the target in the image...')
+        target_pixcoords = find_target(image, guess)
+    else:
+        my_logger.info('\n\tOrder 0 not in image. Set position in the image with default PARAMETERS values.')
+        image.target_pixcoords = [parameters.ORDER0_X, parameters.ORDER0_Y]
     # Rotate the image: several methods
     turn_image(image)
     # Find the exact target position in the rotated image: several methods
-    my_logger.info('\n\tSearch for the target in the rotated image...')
-    target_pixcoords_rotated = find_target(image, guess, rotated=True)
+    if parameters.IS_ORDER0:
+        my_logger.info('\n\tSearch for the target in the rotated image...')
+        target_pixcoords_rotated = find_target(image, guess, rotated=True)
+    else:
+        my_logger.info('\n\tOrder 0 not in image. Set position in rotated image with default PARAMETERS values.')
+        image.target_pixcoords_rotated = [parameters.ORDER0_X, parameters.ORDER0_Y]
     # Create Spectrum object
     spectrum = Spectrum(image=image)
     # Subtract background and bad pixels
