@@ -1221,6 +1221,7 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
         my_logger.info(infostring)
         atm.load_file(output_atmfilename)
     else:
+        my_logger.info(f"\n\tFile {output_atmfilename} does not exist yet. Compute it...")
         atm.compute()
         atm.save_file(filename=output_atmfilename)
         # libradtran.clean_simulation_directory()
