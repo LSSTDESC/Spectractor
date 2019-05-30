@@ -96,7 +96,7 @@ class LogBook:
                     'Fits file %s in logbook %s has no target x position. Skip file.' % (filename, self.logbook))
                 skip = True
             if np.isnan(row['Obj-posYpix']):
-                self.my_logger.warning(
+                self.my_logger.error(
                     'Fits file %s in logbook %s has no target y position. Skip file.' % (filename, self.logbook))
                 skip = True
             if not np.isnan(row['Dx']):
