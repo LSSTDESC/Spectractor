@@ -40,7 +40,7 @@ if __name__ == "__main__":
         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None:
             continue
-        spectrum_file_name = file_name.replace('.fits', '_spectrum.fits')
+        spectrum_file_name = args.output_directory+'/'+tag.replace('.fits', '_spectrum.fits')
         atmgrid = AtmosphereGrid(file_name)
         SpectrumSimulatorSimGrid(spectrum_file_name, args.output_directory)
         image = ImageSim(file_name, spectrum_file_name, args.output_directory, A1=1, A2=0.05,
