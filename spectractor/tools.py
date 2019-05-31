@@ -1448,7 +1448,7 @@ def extract_info_from_CTIO_header(obj, header):
     obj.airmass = header['AIRMASS']
     obj.expo = header['EXPTIME']
     obj.filters = header['FILTERS']
-    obj.filter_label = header['FILTER1']
+    obj.filter = header['FILTER1']
     obj.disperser_label = header['FILTER2']
 
 

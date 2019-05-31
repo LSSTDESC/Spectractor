@@ -1015,7 +1015,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, bgd_model_func=
     # Prepare the outputs
     s = ChromaticPSF1D(Nx, Ny, deg=deg, saturation=saturation)
     # Prepare the fit: start with the maximum of the spectrum
-    ymax_index = int(np.unravel_index(np.argmax(data), data.shape)[1])
+    ymax_index = int(np.unravel_index(np.argmax(data[middle-ws[0]:middle+ws[0],:]), data.shape)[1])
     bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
     y = data[:, ymax_index]
     guess = [np.nanmax(y) - np.nanmean(y), middle, 5, 2, 0, 2, saturation]
@@ -1062,7 +1062,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, bgd_model_func=
         mean = np.nansum(pdf * index)
         std = np.sqrt(np.nansum(pdf * (index - mean) ** 2))
         maxi = np.abs(np.nanmax(signal))
-        bounds[0] = (0.1 * np.nanstd(bgd), 2 * np.nanmax(y))
+        bounds[0] = (0.1 * np.nanstd(bgd), 2 * np.nanmax(y[middle-ws[0]:middle+ws[0]]))
         # if guess[4] > -1:
         #    guess[0] = np.max(signal) / (1 + guess[4])
         if guess[0] * (1 + guess[4]) < 3 * np.nanstd(bgd):
