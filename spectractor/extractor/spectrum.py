@@ -986,8 +986,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
 
-    # Roughly estimates the wavelengths and set start 50 nm before parameters.LAMBDA_MIN
-    # and end 50 nm after parameters.LAMBDA_MAX
+    # Roughly estimates the wavelengths and set start 0 nm before parameters.LAMBDA_MIN
+    # and end 0 nm after parameters.LAMBDA_MAX
     lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
                                                       x0=image.target_pixcoords)
     pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
