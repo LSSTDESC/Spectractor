@@ -1225,7 +1225,7 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
         atm.compute()
         atm.save_file(filename=output_atmfilename)
         # libradtran.clean_simulation_directory()
-    if parameters.VERBOSE:
+    if parameters.DEBUG:
         infostring = '\n\t ========= Atmospheric simulation :  ==============='
         my_logger.info(infostring)
         atm.plot_transmission()  # plot all atm transp profiles
@@ -1237,7 +1237,7 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
     spectra = SpectrumSimGrid(spectrum, atm, telescope, disperser, target, atm.header)
     spectragrid = spectra.compute()
     spectra.save_spectra(output_filename)
-    if parameters.VERBOSE:
+    if parameters.DEBUG:
         infostring = '\n\t ========= Spectra simulation :  ==============='
         spectra.plot_spectra()
         spectra.plot_spectra_img()
