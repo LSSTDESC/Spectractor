@@ -6,12 +6,16 @@ import matplotlib.pyplot as plt
 from scipy.optimize import basinhopping, minimize
 from scipy.interpolate import interp1d, interp2d
 from scipy.integrate import quad
+from scipy.signal import medfilt2d
 from iminuit import Minuit
 
 from astropy.modeling import fitting, Fittable1DModel, Fittable2DModel, Parameter
 from astropy.modeling.models import Moffat1D
 from astropy.stats import sigma_clip
 from astropy.table import Table
+
+from astropy.stats import SigmaClip
+from photutils import Background2D, SExtractorBackground
 
 from spectractor.tools import LevMarLSQFitterWithNan, dichotomie, fit_poly1d_outlier_removal, \
     fit_poly1d, fit_moffat1d_outlier_removal, fit_poly2d_outlier_removal
@@ -824,7 +828,7 @@ def extract_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=
     >>> data_errors = np.sqrt(data+1)
 
     # Fit the transverse profile:
-    >>> bgd_model = extract_background(data, data_errors, deg=1, ws=[30,50], live_fit=False, sigma=5, pixel_step=1)
+    >>> bgd_model = extract_background_fit1D(data, data_errors, deg=1, ws=[30,50], live_fit=False, sigma=5, pixel_step=1)
     """
     my_logger = set_logger(__name__)
     Ny, Nx = data.shape
@@ -841,31 +845,126 @@ def extract_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=
         bgd_fit, outliers = fit_poly1d_outlier_removal(bgd_index, bgd, order=deg, sigma=sigma, niter=2)
         bgd_model[:, x] = bgd_fit(index)
         if live_fit:
-            plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, bgd_fit=bgd_fit,
+            plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, bgd_model_func=bgd_fit,
                                           sigma=sigma, live_fit=live_fit)
     # Interpolate the grid on unfitted pixels
     bgd_fit = bgd_model[:, pixel_range]
-    bgd_model_func = interp2d(pixel_range, index, bgd_fit, kind='linear', bounds_error=False, fill_value=None)
     # Filter the background model
-    from scipy.signal import medfilt2d
-    # noinspection PyTypeChecker
-    b = bgd_model_func(np.arange(Nx), index)
-    bgd_model = medfilt2d(bgd_model,kernel_size=[9,3])
+    bgd_model = medfilt2d(bgd_model,kernel_size=[3,9])
     bgd_model_func = interp2d(np.arange(Nx), index, bgd_model, kind='linear', bounds_error=False, fill_value=None)
-    if parameters.DEBUG or True:
-        # fig, ax = plt.subplots(1,3, figsize=(12,4))
+    if parameters.DEBUG:
+        fig, ax = plt.subplots(3,1, figsize=(12, 6), sharex='all')
+        bgd_bands = np.copy(data).astype(float)
+        bgd_bands[middle-ws[0]:middle+ws[0], :] = np.nan
+        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=0)
+        c = plt.colorbar(im, ax=ax[0])
+        c.set_label(f'Data units (lin scale)')
+        ax[0].set_title(f'Data background: mean={np.nanmean(bgd_bands):.3f}, std={np.nanstd(bgd_bands):.3f}')
+        ax[0].set_xlabel('X [pixels]')
+        ax[0].set_ylabel('Y [pixels]')
+        x = np.arange(Nx)
+        y = np.arange(Ny)
         # noinspection PyTypeChecker
-        b = bgd_model_func(np.arange(Nx), index)
-        im = plt.imshow(b[9:-9,9:-9], origin='auto', aspect="auto")
-        plt.colorbar(im)
-        plt.title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')
+        b = bgd_model_func(x, y)
+        im = ax[1].imshow(b, origin='lower', aspect="auto")
+        ax[1].set_xlabel('X [pixels]')
+        ax[1].set_ylabel('Y [pixels]')
+        c2 = plt.colorbar(im, ax=ax[1])
+        c2.set_label(f'Data units (lin scale)')
+        ax[1].set_title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')
+        res = (bgd_bands-b)/err
+        im = ax[2].imshow(res, origin='lower', aspect="auto", vmin=-5, vmax=5)
+        ax[2].set_xlabel('X [pixels]')
+        ax[2].set_ylabel('Y [pixels]')
+        c2 = plt.colorbar(im, ax=ax[2])
+        c2.set_label(f'Data units (lin scale)')
+        ax[2].set_title(f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
+        fig.tight_layout()
         if parameters.DISPLAY:
             plt.show()
-
     return bgd_model_func
 
 
-def extract_background(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
+def extract_background_photutils(data, err, ws=(20, 30)):
+    """
+    Use photutils library median filter to estimate background behgin the sources.
+
+    Parameters
+    ----------
+    data: array
+        The 2D array image. The transverse profile is fitted on the y direction for all pixels along the x direction.
+    err: array
+        The uncertainties related to the data array.
+    ws: list
+        up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
+
+    Returns
+    -------
+    bgd_model_func: callable
+        A 2D function to model the extracted background
+
+    Examples
+    --------
+
+    # Build a mock spectrogram with random Poisson noise:
+    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, saturation=1000)
+    >>> params = s0.generate_test_poly_params()
+    >>> saturation = params[-1]
+    >>> data = s0.evaluate(params)
+    >>> bgd = 10*np.ones_like(data)
+    >>> data += bgd
+    >>> data = np.random.poisson(data)
+    >>> data_errors = np.sqrt(data+1)
+
+    # Fit the transverse profile:
+    >>> bgd_model = extract_background_photutils(data, data_errors, ws=[30,50])
+    """
+    my_logger = set_logger(__name__)
+    Ny, Nx = data.shape
+    middle = Ny // 2
+    # Estimate the background in the two lateral bands together
+    sigma_clip = SigmaClip(sigma=3.)
+    bkg_estimator = SExtractorBackground()
+    bgd_bands = np.copy(data).astype(float)
+    bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
+    mask = (np.isnan(bgd_bands))
+    bkg = Background2D(data, ((ws[1]-ws[0]),(ws[1]-ws[0])), filter_size=((ws[1]-ws[0])//2,(ws[1]-ws[0])//2),
+                       sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
+                       mask=mask)
+    bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False, fill_value=None)
+
+    if parameters.DEBUG or True:
+        fig, ax = plt.subplots(3,1, figsize=(12, 6), sharex='all')
+        bgd_bands = np.copy(data).astype(float)
+        bgd_bands[middle-ws[0]:middle+ws[0], :] = np.nan
+        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=0)
+        c = plt.colorbar(im, ax=ax[0])
+        c.set_label(f'Data units (lin scale)')
+        ax[0].set_title(f'Data background: mean={np.nanmean(bgd_bands):.3f}, std={np.nanstd(bgd_bands):.3f}')
+        ax[0].set_xlabel('X [pixels]')
+        ax[0].set_ylabel('Y [pixels]')
+        bkg.plot_meshes(outlines=True, color='#1f77b4', ax=ax[0])
+        b  =  bkg.background
+        im = ax[1].imshow(b, origin='lower', aspect="auto")
+        ax[1].set_xlabel('X [pixels]')
+        ax[1].set_ylabel('Y [pixels]')
+        c2 = plt.colorbar(im, ax=ax[1])
+        c2.set_label(f'Data units (lin scale)')
+        ax[1].set_title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')
+        res = (bgd_bands-b)/err
+        im = ax[2].imshow(res, origin='lower', aspect="auto", vmin=-5, vmax=5)
+        ax[2].set_xlabel('X [pixels]')
+        ax[2].set_ylabel('Y [pixels]')
+        c2 = plt.colorbar(im, ax=ax[2])
+        c2.set_label(f'Data units (lin scale)')
+        ax[2].set_title(f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
+        fig.tight_layout()
+        if parameters.DISPLAY:
+            plt.show()
+    return bgd_model_func
+
+
+def extract_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
     """
     Fit a 2D polynomial background with outlier removal, on lateral bands defined by the ws parameter.
 
@@ -904,7 +1003,7 @@ def extract_background(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
     >>> data_errors = np.sqrt(data+1)
 
     # Fit the transverse profile:
-    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=5, pixel_step=1)
+    >>> bgd_model_func = extract_background_poly2d(data, deg=1, ws=[30,50], sigma=5, pixel_step=1)
     """
     my_logger = set_logger(__name__)
     Ny, Nx = data.shape
@@ -921,7 +1020,9 @@ def extract_background(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
     # Fit a 1 degree 2D polynomial function with outlier removal
     xx, yy = np.meshgrid(pixel_range, bgd_index)
     bgd_model_func = fit_poly2d_outlier_removal(xx, yy, bgd_bands, order=deg, sigma=sigma, niter=20)
-    if parameters.DEBUG:
+    bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bgd_model_func(xx, yy), kind='linear', bounds_error=False, fill_value=None)
+
+    if parameters.DEBUG or True:
         fig, ax = plt.subplots(2,1, figsize=(12, 6), sharex='all')
         bgd_bands = np.copy(data).astype(float)
         bgd_bands[middle-ws[0]:middle+ws[0], :] = np.nan
@@ -932,7 +1033,7 @@ def extract_background(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
         ax[0].set_xlabel('X [pixels]')
         ax[0].set_ylabel('Y [pixels]')
         xx, yy = np.meshgrid(x, y)
-        b = bgd_model_func(xx, yy)
+        b = bgd_model_func(np.arange(Nx), np.arange(Ny))
         im = ax[1].imshow(b, origin='lower', aspect="auto")
         ax[1].set_xlabel('X [pixels]')
         ax[1].set_ylabel('Y [pixels]')
@@ -996,7 +1097,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, bgd_model_func=
     >>> data_errors = np.sqrt(data+1)
 
     # Extract the background
-    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=3, pixel_step=10)
+    >>> bgd_model_func = extract_background_photutils(data, err, ws=[30,50])
 
     # Fit the transverse profile:
     >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
@@ -1026,7 +1127,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, bgd_model_func=
     # hypothesis that max of spectrum if well describe by a focused PSF
     bgd = data[bgd_index, ymax_index]
     if bgd_model_func is not None:
-        signal = y - bgd_model_func([ymax_index]*index.size, index)
+        signal = y - bgd_model_func(ymax_index, index)[:, 0]
     else:
         signal = y
     fit = fit_moffat1d_outlier_removal(index, signal, sigma=sigma, niter=2,
@@ -1050,8 +1151,8 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, bgd_model_func=
         # fit the background with a polynomial function
         y = data[:, x]
         if bgd_model_func is not None:
-            x_array = [x] * index.size
-            signal = y - bgd_model_func(x_array, index)
+            # x_array = [x] * index.size
+            signal = y - bgd_model_func(x, index)[:,0]
         else:
             signal = y
         # in case guess amplitude is too low
@@ -1325,8 +1426,8 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
     poly_params = np.copy(guess)
     bgd = np.zeros_like(data)
     if bgd_model_func is not None:
-        xx, yy = np.meshgrid(np.arange(Nx), pixels)
-        bgd = bgd_model_func(xx, yy)
+        # xx, yy = np.meshgrid(np.arange(Nx), pixels)
+        bgd = bgd_model_func(np.arange(Nx), pixels)
 
     data_subtracted = data - bgd
     bgd_std = float(np.std(np.random.poisson(bgd)))
