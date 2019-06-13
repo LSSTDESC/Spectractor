@@ -31,8 +31,9 @@ if __name__ == "__main__":
     logbook = LogBook(logbook=args.logbook)
     for file_name in file_names:
         tag = file_name.split('/')[-1]
+        tag = tag.replace('sim_','reduc_')
         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None:
             continue
-        #file_name = "outputs/sim_20170530_134.fits"
+        # file_name = "outputs/sim_20170530_134.fits"
         Spectractor(file_name, args.output_directory, [xpos, ypos], target, disperser_label, args.config)
