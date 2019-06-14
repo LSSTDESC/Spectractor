@@ -14,7 +14,7 @@ from astropy.stats import sigma_clip
 from astropy.table import Table
 
 from spectractor.tools import LevMarLSQFitterWithNan, dichotomie, fit_poly1d_outlier_removal, \
-    fit_poly1d, fit_moffat1d_outlier_removal
+    fit_poly1d, fit_moffat1d_outlier_removal, fit_poly2d_outlier_removal
 from spectractor import parameters
 from spectractor.config import set_logger
 
@@ -798,7 +798,7 @@ class ChromaticPSF1D:
             plt.show()
 
 
-def extract_background(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5, live_fit=False):
+def extract_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5, live_fit=False):
     """
     Fit a polynomial background slice per slice along the x axis,
     with outlier removal, on lateral bands defined by the ws parameter.
@@ -840,7 +840,7 @@ def extract_background(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5, liv
     >>> data_errors = np.sqrt(data+1)
 
     # Fit the transverse profile:
-    >>> bgd_model = extract_background(data, data_errors, deg=1, ws=[30,50], live_fit=True, sigma=5, pixel_step=50)
+    >>> bgd_model = extract_background(data, data_errors, deg=1, ws=[30,50], live_fit=False, sigma=5, pixel_step=1)
     """
     my_logger = set_logger(__name__)
     Ny, Nx = data.shape
@@ -850,6 +850,7 @@ def extract_background(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5, liv
     bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
     pixel_range = np.arange(0, Nx, pixel_step)
     bgd_model = np.zeros_like(data).astype(float)
+    # Fit for pixels in pixel_range array
     for x in pixel_range:
         # fit the background with a polynomial function
         bgd = data[bgd_index, x]
@@ -858,24 +859,109 @@ def extract_background(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5, liv
         if live_fit:
             plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, bgd_fit=bgd_fit,
                                           sigma=sigma, live_fit=live_fit)
-    # prepare the background model
-    # interpolate the grid
+    # Interpolate the grid on unfitted pixels
     bgd_fit = bgd_model[:, pixel_range]
     bgd_model_func = interp2d(pixel_range, index, bgd_fit, kind='linear', bounds_error=False, fill_value=None)
-    if parameters.DEBUG:
+    # Filter the background model
+    from scipy.signal import medfilt2d
+    # noinspection PyTypeChecker
+    b = bgd_model_func(np.arange(Nx), index)
+    bgd_model = medfilt2d(bgd_model,kernel_size=[9,3])
+    bgd_model_func = interp2d(np.arange(Nx), index, bgd_model, kind='linear', bounds_error=False, fill_value=None)
+    if parameters.DEBUG or True:
         # fig, ax = plt.subplots(1,3, figsize=(12,4))
         # noinspection PyTypeChecker
-        b = bgd_model_func(pixel_range, index)
-        im = plt.imshow(b, origin='auto', aspect="auto")
+        b = bgd_model_func(np.arange(Nx), index)
+        im = plt.imshow(b[9:-9,9:-9], origin='auto', aspect="auto")
         plt.colorbar(im)
-        plt.title('Fitted background')
+        plt.title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')
         if parameters.DISPLAY:
             plt.show()
 
     return bgd_model_func
 
 
-def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None, live_fit=False, sigma=5, deg=4):
+def extract_background(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
+    """
+    Fit a 2D polynomial background with outlier removal, on lateral bands defined by the ws parameter.
+
+    Parameters
+    ----------
+    data: array
+        The 2D array image. The transverse profile is fitted on the y direction for all pixels along the x direction.
+    deg: int
+        Degree of the polynomial model for the background (default: 1).
+    ws: list
+        up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
+    pixel_step: int, optional
+        The step in pixels between the slices to be fitted (default: 1).
+        The values for the skipped pixels are interpolated with splines from the fitted parameters.
+    sigma: int
+        Sigma for outlier rejection (default: 5).
+
+    Returns
+    -------
+    bgd_model_func: callable
+        A 2D function to model the extracted background
+
+    Examples
+    --------
+
+    # Build a mock spectrogram with random Poisson noise:
+    >>> s0 = ChromaticPSF1D(Nx=80, Ny=100, saturation=1000)
+    >>> params = s0.generate_test_poly_params()
+    >>> saturation = params[-1]
+    >>> data = s0.evaluate(params)
+    >>> bgd = 10.*np.ones_like(data)
+    >>> xx, yy = np.meshgrid(np.arange(s0.Nx), np.arange(s0.Ny))
+    >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))
+    >>> data += bgd
+    >>> data = np.random.poisson(data)
+    >>> data_errors = np.sqrt(data+1)
+
+    # Fit the transverse profile:
+    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=5, pixel_step=1)
+    """
+    my_logger = set_logger(__name__)
+    Ny, Nx = data.shape
+    middle = Ny // 2
+    x = np.arange(Nx)
+    y = np.arange(Ny)
+    # Prepare the fit
+    bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
+    pixel_range = np.arange(0, Nx, pixel_step)
+    # Concatenate the background lateral bounds
+    bgd_bands = data[bgd_index, :]
+    bgd_bands = bgd_bands[:, pixel_range]
+    bgd_bands = bgd_bands.astype(float)
+    # Fit a 1 degree 2D polynomial function with outlier removal
+    xx, yy = np.meshgrid(pixel_range, bgd_index)
+    bgd_model_func = fit_poly2d_outlier_removal(xx, yy, bgd_bands, order=deg, sigma=sigma, niter=20)
+    if parameters.DEBUG:
+        fig, ax = plt.subplots(2,1, figsize=(12, 6), sharex='all')
+        bgd_bands = np.copy(data).astype(float)
+        bgd_bands[middle-ws[0]:middle+ws[0], :] = np.nan
+        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=0)
+        c = plt.colorbar(im, ax=ax[0])
+        c.set_label(f'Data units (lin scale)')
+        ax[0].set_title(f'Data background: mean={np.nanmean(bgd_bands):.3f}, std={np.nanstd(bgd_bands):.3f}')
+        ax[0].set_xlabel('X [pixels]')
+        ax[0].set_ylabel('Y [pixels]')
+        xx, yy = np.meshgrid(x, y)
+        b = bgd_model_func(xx, yy)
+        im = ax[1].imshow(b, origin='lower', aspect="auto")
+        ax[1].set_xlabel('X [pixels]')
+        ax[1].set_ylabel('Y [pixels]')
+        c2 = plt.colorbar(im, ax=ax[1])
+        c2.set_label(f'Data units (lin scale)')
+        ax[1].set_title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')
+        fig.tight_layout()
+        if parameters.DISPLAY:
+            plt.show()
+    return bgd_model_func
+
+
+def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, bgd_model_func=None, saturation=None, live_fit=False, sigma=5, deg=4):
     """
     Fit the transverse profile of a 2D data image with a PSF1D profile.
     Loop is done on the x-axis direction.
@@ -896,6 +982,8 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     pixel_step: int, optional
         The step in pixels between the slices to be fitted (default: 1).
         The values for the skipped pixels are interpolated with splines from the fitted parameters.
+    bgd_model_func: callable, optional
+        A 2D function to model the extracted background (default: None -> null background)
     saturation: float, optional
         The saturation level of the image. Default is set to twice the maximum of the data array and has no effect.
     live_fit: bool, optional
@@ -917,13 +1005,18 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     >>> saturation = params[-1]
     >>> data = s0.evaluate(params)
     >>> bgd = 10*np.ones_like(data)
+    >>> xx, yy = np.meshgrid(np.arange(s0.Nx), np.arange(s0.Ny))
+    >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))
     >>> data += bgd
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
+    # Extract the background
+    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=3, pixel_step=10)
+
     # Fit the transverse profile:
-    >>> s, bgd_model = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
-    ... saturation=saturation, live_fit=False, sigma=5)
+    >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
+    ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False, sigma=5)
     >>> assert(np.all(np.isclose(s.pixels[:5], np.arange(s.Nx)[:5], rtol=1e-3)))
     >>> assert(not np.any(np.isclose(s.table['flux_sum'][3:6], np.zeros(s.Nx)[3:6], rtol=1e-3)))
     >>> assert(np.all(np.isclose(s.table['Dy'][-10:-1], np.zeros(s.Nx)[-10:-1], rtol=1e-2)))
@@ -948,8 +1041,10 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     # first fit with moffat only to initialize the guess
     # hypothesis that max of spectrum if well describe by a focused PSF
     bgd = data[bgd_index, ymax_index]
-    bgd_fit, outliers = fit_poly1d_outlier_removal(bgd_index, bgd, order=1, sigma=sigma, niter=2)
-    signal = y - bgd_fit(index)
+    if bgd_model_func is not None:
+        signal = y - bgd_model_func([ymax_index]*index.size, index)
+    else:
+        signal = y
     fit = fit_moffat1d_outlier_removal(index, signal, sigma=sigma, niter=2,
                                        guess=guess[:4], bounds=np.array(bounds[:4]).T)
     moffat_guess = [getattr(fit, p).value for p in fit.param_names]
@@ -964,21 +1059,17 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
     if 0 not in pixel_range:
         pixel_range.append(0)
     pixel_range = np.array(pixel_range)
-    bgd_model = np.zeros_like(data).astype(float)
-
-
-    # loop on pixels
     for x in pixel_range:
         guess = np.copy(guess)
         if x == ymax_index:
             guess = np.copy(init_guess)
         # fit the background with a polynomial function
         y = data[:, x]
-        bgd = data[bgd_index, x]
-        bgd_err = err[bgd_index, x]
-        bgd_fit, outliers = fit_poly1d_outlier_removal(bgd_index, bgd, order=parameters.BGD_ORDER, sigma=sigma, niter=2)
-        bgd_model[:, x] = bgd_fit(index)
-        signal = y - bgd_fit(index)
+        if bgd_model_func is not None:
+            x_array = [x] * index.size
+            signal = y - bgd_model_func(x_array, index)
+        else:
+            signal = y
         # in case guess amplitude is too low
         pdf = np.abs(signal)
         signal_sum = np.nansum(np.abs(signal))
@@ -1055,10 +1146,9 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
 
 
         if live_fit:
-            plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, fit, bgd_fit, guess,
+            plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, fit, bgd_model_func, guess,
                                           PSF_guess,  outliers, sigma, live_fit,reduced_chi2)
-
-
+                
     # interpolate the skipped pixels with splines
     x = np.arange(Nx)
     xp = np.array(sorted(set(list(pixel_range))))
@@ -1072,27 +1162,11 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, saturation=None
                                    fill_value='extrapolate')(x)
     s.poly_params = s.from_profile_params_to_poly_params(s.profile_params)
     s.from_profile_params_to_shape_params(s.profile_params)
-    # prepare the background model
-    # interpolate the grid
-    bgd_fit = bgd_model[:, xp]
-    bgd_model_func = interp2d(xp, index, bgd_fit, kind='linear', bounds_error=False, fill_value=None)
+    return s
 
 
-    if parameters.DEBUG:
-        # fig, ax = plt.subplots(1,3, figsize=(12,4))
-        # noinspection PyTypeChecker
-        b = bgd_model_func(x, index)
-        im = plt.imshow(b, origin='auto', aspect="auto")
-        plt.colorbar(im)
-        plt.title('Fitted background')
-        if parameters.DISPLAY:
-            plt.show()
-
-    return s, bgd_model_func
-
-
-def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, bgd_fit=None,
-                                  params=None, PSF_guess=None, outliers=[], sigma=3, live_fit=False,chi2=-1.):
+def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, bgd_model_func=None,
+                                  params=None, PSF_guess=None, outliers=[], sigma=3, live_fit=False,chi2=-1):
     """Plot the transverse profile of  the spectrogram.
 
     This plot function is called in transverse_PSF1D_profile if live_fit option is True.
@@ -1111,8 +1185,8 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
         The 2D spectrogram uncertainty data array.
     fit: Fittable1DModel, optional
         Best fitting model function for the profile (default: None).
-    bgd_fit: callable, optional
-        Best fitting model function for the background of the profile (default: None).
+    bgd_model_func: callable, optional
+        A 2D function to model the extracted background (default: None -> null background)
     params: array_like, optional
         Best fitting model parameter array (default: None).
     PSF_guess: callable, optional
@@ -1129,7 +1203,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     --------
 
     # Build a mock spectrogram with random Poisson noise:
-    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, saturation=1000)
+    >>> s0 = ChromaticPSF1D(Nx=80, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
     >>> data = s0.evaluate(params)
@@ -1138,9 +1212,12 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
+    # Extract the background
+    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=3, pixel_step=10)
+
     # Fit the transverse profile:
     >>> s, bgd_model = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=50,
-    ... saturation=saturation, live_fit=True, sigma=5)
+    ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
 
     """
     Ny = len(indices)
@@ -1152,16 +1229,20 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     ax[0].errorbar(bgd_indices, bgd, yerr=bgd_err, fmt='bo', label="bgd data")
     if len(outliers) >0:
         ax[0].errorbar(outliers, data[outliers, x], yerr=err[outliers, x], fmt='go', label=f"outliers ({sigma}$\sigma$)")
-    ax[0].plot(bgd_indices, bgd_fit(bgd_indices), 'b--', label="fitted bgd")
+    if bgd_model_func is not None:
+        ax[0].plot(bgd_indices, bgd_model_func([x]*bgd_indices.size, bgd_indices), 'b--', label="fitted bgd")
     if PSF_guess is not None:
-        ax[0].plot(indices, PSF_guess(indices) + bgd_fit(indices), 'k--', label="guessed profile")
-    if fit is not None and bgd_fit is not None:
-        model = fit(indices) + bgd_fit(indices)
+        if bgd_model_func is not None:
+            ax[0].plot(indices, PSF_guess(indices) + bgd_model_func([x]*indices.size, indices), 'k--', label="guessed profile")
+        else:
+            ax[0].plot(indices, PSF_guess(indices), 'k--', label="guessed profile")
+    if fit is not None and bgd_model_func is not None:
+        model = fit(indices) + bgd_model_func([x]*indices.size, indices)
         ax[0].plot(indices, model, 'b-', label="fitted profile")
     ylim = ax[0].get_ylim()
     if params is not None:
         PSF_moffat = Moffat1D(*params[:4])
-        ax[0].plot(indices, PSF_moffat(indices) + bgd_fit(indices), 'b+', label="fitted moffat")
+        ax[0].plot(indices, PSF_moffat(indices) + bgd_model_func([x]*indices.size, indices), 'b+', label="fitted moffat")
     ax[0].set_ylim(ylim)
     ax[0].set_ylabel('Transverse profile')
     ax[0].legend(loc=2, numpoints=1)
@@ -1180,10 +1261,10 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     if fit is not None:
         model += fit(indices)
         model_outliers += fit(outliers)
-    if bgd_fit is not None:
-        model += bgd_fit(indices)
-        model_outliers += bgd_fit(outliers)
-    if fit is not None or bgd_fit is not None:
+    if bgd_model_func is not None:
+        model += bgd_model_func([x]*indices.size, indices)
+        model_outliers += bgd_model_func([x]*len(outliers), outliers)
+    if fit is not None or bgd_model_func is not None:
         residuals = (y - model) / err[:, x]  # / model
         residuals_err = err[:, x] / err[:, x]  # / model
         residuals_outliers = (data[outliers, x] - model_outliers) / err[outliers, x]  # / model_outliers
@@ -1246,9 +1327,12 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
+    # Extract the background
+    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=3, pixel_step=10)
+
     # Estimate the first guess values
-    >>> s, bgd_model_func = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-    ... pixel_step=1, saturation=saturation, live_fit=False, deg=4)
+    >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+    ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False, deg=4)
     >>> s.plot_summary(truth=s0)
 
     # Fit the data:
@@ -1269,13 +1353,11 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
     poly_params = np.copy(guess)
     bgd = np.zeros_like(data)
     if bgd_model_func is not None:
-        bgd = bgd_model_func(np.arange(Nx), pixels)
+        xx, yy = np.meshgrid(np.arange(Nx), pixels)
+        bgd = bgd_model_func(xx, yy)
 
     data_subtracted = data - bgd
     bgd_std = float(np.std(np.random.poisson(bgd)))
-
-    # import warnings
-    # warnings.filterwarnings('error')
 
     def spectrogram_chisq(shape_params):
         # linear regression for the amplitude parameters
@@ -1288,69 +1370,18 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
         #     for x in range(Nx):
         #         my_logger.warning(f"{x} {profile_params[x, :]}")
         J_dot_W_dot_J = np.array([J[x].T.dot(W[x]).dot(J[x]) for x in range(Nx)])
-        # my_logger.warning(f"{shape_params}")
-        # if np.any(np.isclose(J_dot_W_dot_J, 0, rtol=1e-6)):
-        #     pass
-        # my_logger.warning(f"crasssshhhhh {shape_params}")
-        # profile_params = chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True, verbose=True)
-        # for x in range(Nx):
-        #   my_logger.warning(f"{x} {profile_params[x, :]}")
-        #   my_logger.warning(f"{x} {J[x]}")
-        # J_dot_W_dot_J[np.isclose(J_dot_W_dot_J, 0, rtol=1e-3) ] = 1e-3
-        # try:
         amplitude_params = [
             J[x].T.dot(W[x]).dot(data_subtracted[:, x]) / (J_dot_W_dot_J[x]) if J_dot_W_dot_J[x] > 0 else 0.1 * bgd_std
             for x in
             range(Nx)]
-        # amplitude_params = [
-        #    J[x].T.dot(W[x]).dot(data_subtracted[:, x]) / (J_dot_W_dot_J[x]) for x in
-        #    range(Nx)]
-
-        # except RuntimeWarning:
-        #    my_logger.warning(f"{J_dot_W_dot_J} {profile_params} {W} {J}")
-
         poly_params[:Nx] = amplitude_params
         in_bounds, penalty, name = chromatic_psf.check_bounds(poly_params, noise_level=5 * bgd_std)
-        # my_logger.warning(f"amplitude {amplitude_params}")
-        # if in_bounds is False:
-        #     for k, n in enumerate(chromatic_psf.PSF1D.param_names):
-        #         if n in name:
-        #             my_logger.warning(f"{name} {profile_params[:, k]}  {shape_params} {penalty} {bgd_std} {name}")
-        # if False:
-        #     my_logger.warning(f"crasssshhhhh {shape_params}")
-        #     # profile_params = chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True, verbose=True)
-        #     for x in range(Nx):
-        #         my_logger.warning(f"\n{x} {profile_params[x, :]} {J[x]} {J_dot_W_dot_J[x]}")
-        #     my_logger.warning(f"\n{J_dot_W_dot_J}")
-        #     sys.exit()
         mod = chromatic_psf.evaluate(poly_params)
-        # if bgd_model_func is not None:
-        #     mod += bgd
         chromatic_psf.poly_params = np.copy(poly_params)
         if data_errors is None:
             return np.nansum((mod - data_subtracted) ** 2) + penalty
         else:
             return np.nansum(((mod - data_subtracted) / data_errors) ** 2) + penalty
-
-    # def spectrogram_chisq_jacobian(shape_params):
-    #     poly_params[Nx:] = shape_params
-    #     profile_params = s.from_poly_params_to_profile_params(poly_params)
-    #     J = np.array([s.PSF1D.evaluate(pixels, *profile_params[x, :]) for x in range(Nx)])
-    #     grad_J = np.array([s.PSF1D.fit_deriv(pixels, *profile_params[x, :]).T for x in range(Nx)])
-    #     amplitude_params = np.array([J[x].T.dot(W[x]).dot(data[:, x]) / (J[x].T.dot(W[x]).dot(J[x]))
-    #  for x in range(Nx)])
-    #     diff = np.array([J[x].dot(amplitude_params[x]) - data[:, x] for x in range(Nx)])
-    #     grad_chi2_over_p = []
-    #     my_logger.warning(f"{shape_params[:-1]} {grad_J.shape}")
-    #     for p, name in enumerate(shape_params[:-1]):
-    #         my_logger.warning(f"{p} {name} {2*grad_J[10, :, p]}")
-    #         my_logger.warning(f"{p} {name} {2*grad_J[10, :, p].T.dot(np.outer(W[10].
-    # dot(diff[10]),amplitude_params[10].T))}")
-    #         grad_chi2_over_p.append([2*grad_J[x, :, p].T.dot(np.outer(W[x].dot(diff[x]),amplitude_params.T))
-    #  for x in range(Nx)])
-    #     return grad_chi2_over_p
-    # grad = spectrogram_chisq_jacobian(guess[Nx:])
-    # my_logger.warning(f"{grad.shape} {grad}")
 
     my_logger.debug(f'\n\tStart chisq: {spectrogram_chisq(guess[Nx:])} with {guess[Nx:]}')
     error = 0.01 * np.abs(guess) * np.ones_like(guess)

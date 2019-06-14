@@ -1,4 +1,4 @@
-from scipy.signal import argrelextrema
+from scipy.signal import argrelextrema, savgol_filter
 
 from spectractor.extractor.images import *
 
@@ -340,6 +340,9 @@ class Spectrum:
             self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             self.load_spectrogram(input_file_name.replace('spectrum', 'spectrogram'))
+            
+            self.my_logger.info('\n\tLoading chromatic psf %s...' % input_file_name.replace('spectrum.fits', 'table.csv'))
+            
             self.load_chromatic_psf(input_file_name.replace('spectrum.fits', 'table.csv'))
         else:
             self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
@@ -482,6 +485,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
     >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
     >>> spectrum_err = np.sqrt(spectrum)
+    >>> spectrum = np.random.poisson(spectrum)
     >>> spec = Spectrum()
     >>> spec.lambdas = lambdas
     >>> spec.data = spectrum
@@ -513,6 +517,12 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     fwhm_to_peak_width_factor = 3
     len_index_to_bgd_npar_factor = 0.12
     baseline_prior = 0.1  # *sigma gaussian prior on base line fit
+    # filter the noise
+    #plt.errorbar(lambdas,spec,yerr=spec_err)
+    spec = np.copy(spec)
+    spec = savgol_filter(spec, 5, 2)
+    #plt.plot(lambdas,spec)
+    #plt.show()
     # initialisation
     lambda_shifts = []
     snrs = []
@@ -1089,16 +1099,13 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     my_logger.info(
         f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
-    if parameters.DEBUG:
-        plt.figure(figsize=(6, 6))
-        plt.title("DEBUG 3 : extract_spectrum_from_image after crop")
-        plt.imshow(data, cmap="jet", origin="lower")
-        plt.Circle((x0, y0), radius=10, color='y')
-        plt.show()
+    # Extract the abckground on the rotated image
+    bgd_model_func = extract_background(data, deg=1, ws=ws, pixel_step=1, sigma=3)
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    s, bgd_model_func = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,
+    s = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,
+                                                     bgd_model_func=bgd_model_func,
                                                      saturation=image.saturation, live_fit=parameters.DEBUG)
 
     # Fill spectrum object
@@ -1152,8 +1159,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
     # Extract the non rotated background
-    bgd_model_func = extract_background(data, err, deg=parameters.BGD_ORDER, ws=ws, sigma=5, live_fit=False)
-    bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
+    bgd_model_func = extract_background(data, deg=1, ws=ws, sigma=3)
+    xx, yy = np.meshgrid(np.arange(Nx), np.arange(Ny))
+    bgd = bgd_model_func(xx, yy)
 
     # Crop the background lateral regions
     bgd_width = ws[1] - w

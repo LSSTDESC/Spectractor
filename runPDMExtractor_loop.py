@@ -91,7 +91,8 @@ if __name__ == "__main__":
     #--------------------------
 
     idx_sel_min=0
-    idx_sel_max = len(df)
+    #idx_sel_max = len(df)
+    idx_sel_max = 10
 
 
 
