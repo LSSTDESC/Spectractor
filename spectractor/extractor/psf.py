@@ -1152,7 +1152,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, bgd_model_func=
         y = data[:, x]
         if bgd_model_func is not None:
             # x_array = [x] * index.size
-            signal = y - bgd_model_func(x, index)[:,0]
+            signal = y - bgd_model_func(x, index)[:,  0]
         else:
             signal = y
         # in case guess amplitude is too low
@@ -1307,19 +1307,19 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     if len(outliers) >0:
         ax[0].errorbar(outliers, data[outliers, x], yerr=err[outliers, x], fmt='go', label=f"outliers ({sigma}$\sigma$)")
     if bgd_model_func is not None:
-        ax[0].plot(bgd_indices, bgd_model_func([x]*bgd_indices.size, bgd_indices), 'b--', label="fitted bgd")
+        ax[0].plot(bgd_indices, bgd_model_func(x, bgd_indices)[:,  0], 'b--', label="fitted bgd")
     if PSF_guess is not None:
         if bgd_model_func is not None:
-            ax[0].plot(indices, PSF_guess(indices) + bgd_model_func([x]*indices.size, indices), 'k--', label="guessed profile")
+            ax[0].plot(indices, PSF_guess(indices) + bgd_model_func(x, indices)[:, 0], 'k--', label="guessed profile")
         else:
             ax[0].plot(indices, PSF_guess(indices), 'k--', label="guessed profile")
     if fit is not None and bgd_model_func is not None:
-        model = fit(indices) + bgd_model_func([x]*indices.size, indices)
+        model = fit(indices) + bgd_model_func(x, indices)[:, 0]
         ax[0].plot(indices, model, 'b-', label="fitted profile")
     ylim = ax[0].get_ylim()
     if params is not None:
         PSF_moffat = Moffat1D(*params[:4])
-        ax[0].plot(indices, PSF_moffat(indices) + bgd_model_func([x]*indices.size, indices), 'b+', label="fitted moffat")
+        ax[0].plot(indices, PSF_moffat(indices) + bgd_model_func(x, indices)[:, 0], 'b+', label="fitted moffat")
     ax[0].set_ylim(ylim)
     ax[0].set_ylabel('Transverse profile')
     ax[0].legend(loc=2, numpoints=1)
@@ -1336,15 +1336,17 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
         model += fit(indices)
         model_outliers += fit(outliers)
     if bgd_model_func is not None:
-        model += bgd_model_func([x]*indices.size, indices)
-        model_outliers += bgd_model_func([x]*len(outliers), outliers)
+        model += bgd_model_func(x, indices)[:, 0]
+        if len(outliers) > 0:
+            model_outliers += bgd_model_func(x, outliers)[:, 0]
     if fit is not None or bgd_model_func is not None:
         residuals = (y - model) / err[:, x]  # / model
         residuals_err = err[:, x] / err[:, x]  # / model
-        residuals_outliers = (data[outliers, x] - model_outliers) / err[outliers, x]  # / model_outliers
-        residuals_outliers_err = err[outliers, x] / err[outliers, x]  # / model_outliers
         ax[1].errorbar(indices, residuals, yerr=residuals_err, fmt='ro')
-        ax[1].errorbar(outliers, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
+        if len(outliers) > 0:
+            residuals_outliers = (data[outliers, x] - model_outliers) / err[outliers, x]  # / model_outliers
+            residuals_outliers_err = err[outliers, x] / err[outliers, x]  # / model_outliers
+            ax[1].errorbar(outliers, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
         ax[1].axhline(0, color='b')
         ax[1].grid(True)
         std = np.std(residuals)
