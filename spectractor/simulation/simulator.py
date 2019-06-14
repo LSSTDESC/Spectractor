@@ -939,6 +939,7 @@ class SpectrogramModel(Spectrum):
 
         # Extended image (nima × nlbda) has to be perfecty centered
         ny, nx = (nima, nlbda)  # Rectangular minimal embedding
+        # ny, nx = (nlbda, nlbda)  # Rectangular minimal embedding
         hcube = FA.embed_array(cube, (nlbda, ny, nx))
         self.my_logger.debug(f'\n\tTime after filling the cube: {time.time()-start}')
         start = time.time()
@@ -994,6 +995,9 @@ class SpectrogramModel(Spectrum):
         # plt.plot(np.sum(A1*A2*dima0_2,axis=0))
         # plt.plot(spectrum)
         # plt.show()
+        middle = self.data.shape[0]//2
+        width = int(self.spectrogram_ymax - self.spectrogram_ymin)//2
+        #self.data = self.data[middle-width:middle+width+1, :]
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         self.convert_from_flam_to_ADUrate()

@@ -233,6 +233,7 @@ class ImageModel(Image):
         self.data = star.model(xx, yy) + background.model(xx, yy)
         self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
         spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += (spectrogram.data - spectrogram.spectrogram_bgd)
+        #self.data[:,spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
         self.true_lambdas = spectrogram.lambdas
         self.true_spectrum = spectrogram.true_spectrum
         if starfield is not None:
