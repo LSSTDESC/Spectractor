@@ -29,7 +29,7 @@ from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import Target
 from spectractor.extractor.psf import PSF2D
-from spectractor.tools import fftconvolve_gaussian, ensure_dir
+from spectractor.tools import fftconvolve_gaussian, ensure_dir, rebin
 from spectractor.config import set_logger
 import spectractor.parameters as parameters
 
@@ -921,9 +921,13 @@ class SpectrogramModel(Spectrum):
         start = time.time()
         nlbda = lambdas.size
 
+        # oversampling of the PSF to avoid Gibbs ringings
+        # rescale_factor must be odd
+        rescale_factor = 3
+        nima = rescale_factor*self.spectrogram_Ny
+        y, x = FA.create_coords((nima, nima), starts='auto', steps=1/rescale_factor)  # (ny, nx)
+
         # PSF cube
-        nima = self.spectrogram_Ny
-        y, x = FA.create_coords((nima, nima), starts='auto')  # (ny, nx)
         if self.psf_cube is None or not self.fix_psf_cube:
             cube = pyfftw.zeros_aligned((nlbda, nima, nima), dtype='float32')
             shape_params = np.array([self.chromatic_psf.table[name] for name in PSF2D.param_names[3:]]).T
@@ -938,8 +942,7 @@ class SpectrogramModel(Spectrum):
             cube = self.psf_cube
 
         # Extended image (nima × nlbda) has to be perfecty centered
-        ny, nx = (nima, nlbda)  # Rectangular minimal embedding
-        # ny, nx = (nlbda, nlbda)  # Rectangular minimal embedding
+        ny, nx = (nima,  rescale_factor * nlbda)  # Rectangular minimal embedding
         hcube = FA.embed_array(cube, (nlbda, ny, nx))
         self.my_logger.debug(f'\n\tTime after filling the cube: {time.time()-start}')
         start = time.time()
@@ -947,9 +950,12 @@ class SpectrogramModel(Spectrum):
         # Generate slitless-spectroscopy image from Fourier analysis
         if self.fhcube is None or not self.fix_psf_cube:
             uh, vh, fhcube = F.fft_cube(hcube)  # same shape as hima
+            uh *= rescale_factor
+            vh *= rescale_factor
             self.uh = uh
             self.vh = vh
             self.fhcube = fhcube
+            # print(uh.shape, vh.shape, np.min(self.uh), np.max(self.uh), fhcube.shape, dispersion_law.reshape(-1, 1, 1).shape)
         else:
             uh = self.uh
             vh = self.vh
@@ -990,6 +996,10 @@ class SpectrogramModel(Spectrum):
             # self.err = self.model_err(lambdas)
         # Going to observable spectrum: must convert units (ie multiply by dlambda)
         self.data = A1*(dima0 + A2 * dima0_2)
+        #print(self.data.shape)
+        #toto = np.copy(self.data)
+        if rescale_factor != 1:
+            self.data = rebin(self.data, (self.spectrogram_Ny,self.spectrogram_Nx))
         # plt.plot(np.sum(self.data,axis=0))
         # plt.plot(np.sum(A1*dima0,axis=0))
         # plt.plot(np.sum(A1*A2*dima0_2,axis=0))
@@ -1001,6 +1011,11 @@ class SpectrogramModel(Spectrum):
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         self.convert_from_flam_to_ADUrate()
+        #print(self.data.shape, (self.spectrogram_Ny,self.spectrogram_Nx))
+        #fig, ax = plt.subplots(2,1)
+        #ax[0].imshow(self.data, origin="lower", aspect="auto")
+        #ax[1].imshow(toto, origin="lower", aspect="auto")
+        #plt.show()
         self.data += self.spectrogram_bgd
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
@@ -1329,7 +1344,7 @@ def SpectrogramSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05
     if outputdir != "":
         base_filename = filename.split('/')[-1]
         output_filename = os.path.join(outputdir, base_filename.replace('spectrum', 'sim'))
-    # spectrogram_simulation.save_spectrum(output_filename, overwrite=True)
+    #spectrogram_simulation.save_spectrum(output_filename, overwrite=True)
 
     return spectrogram_simulation
 
