@@ -233,7 +233,6 @@ class ImageModel(Image):
         self.data = star.model(xx, yy) + background.model(xx, yy)
         self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
         spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += (spectrogram.data - spectrogram.spectrogram_bgd)
-        #self.data[:,spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
         self.true_lambdas = spectrogram.lambdas
         self.true_spectrum = spectrogram.true_spectrum
         if starfield is not None:
@@ -342,6 +341,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.convert_to_ADU_units()
     if parameters.VERBOSE:
         image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
+
     # Set output path
     ensure_dir(outputdir)
     output_filename = image_filename.split('/')[-1]
@@ -361,6 +361,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['ROTATION'] = int(with_rotation)
     image.header['ROTANGLE'] = spectrum.rotation_angle
     image.header['STARS'] = int(with_stars)
+    image.header['BKGD_LEV'] = background.level
     image.save_image(output_filename, overwrite=True)
     return image
 
