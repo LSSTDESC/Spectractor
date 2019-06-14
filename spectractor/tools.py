@@ -1564,6 +1564,12 @@ def from_lambda_to_colormap(lambdas):
     return spectralmap
 
 
+def rebin(arr, new_shape):
+    shape = (new_shape[0], arr.shape[0] // new_shape[0],
+             new_shape[1], arr.shape[1] // new_shape[1])
+    return arr.reshape(shape).sum(-1).sum(1)
+
+
 if __name__ == "__main__":
     import doctest
     if np.__version__ >= "1.14.0":
