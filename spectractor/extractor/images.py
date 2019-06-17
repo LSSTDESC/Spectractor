@@ -43,7 +43,8 @@ class Image(object):
         self.header = None
         self.data = None
         self.data_rotated = None
-        self.gain = None
+        self.gain = None # in e-/ADU
+        self.read_out_noise= None
         self.stat_errors = None
         self.stat_errors_rotated = None
         self.rotation_angle = 0
@@ -83,8 +84,8 @@ class Image(object):
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
-        self.convert_to_ADU_rate_units()
         self.compute_statistical_error()
+        self.convert_to_ADU_rate_units()
 
     def save_image(self, output_file_name, overwrite=False):
         """Save the image in a fits file.
@@ -117,6 +118,9 @@ class Image(object):
         >>> assert np.all(np.isclose(data_before, im.data * im.expo))
         """
         self.data = self.data.astype(np.float64) / self.expo
+        self.stat_errors /= self.expo
+        if self.stat_errors_rotated is not None:
+            self.stat_errors_rotated /= self.expo
         self.units = 'ADU/s'
 
     def convert_to_ADU_units(self):
@@ -134,6 +138,9 @@ class Image(object):
         >>> assert np.all(np.isclose(data_before, im.data))
         """
         self.data *= self.expo
+        self.stat_errors *= self.expo
+        if self.stat_errors_rotated is not None:
+            self.stat_errors_rotated *= self.expo
         self.units = 'ADU'
 
     def compute_statistical_error(self):
@@ -142,15 +149,23 @@ class Image(object):
         The read out noise is not included
 
         """
+        if self.units != 'ADU':
+            self.my_logger.error('\n\tNoise must be estimated on an image in ADU units')
         # removes the zeros and negative pixels first
         # set to minimum positive value
         data = np.copy(self.data)
-        zeros = np.where(data <= 0)
-        min_noz = np.min(data[np.where(data > 0)])
-        data[zeros] = min_noz
+        min_noz = np.min(data[data > 0])
+        data[data <= 0] = min_noz
         # compute poisson noise
-        #   TODO: add read out noise (add in square to electrons)
-        self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
+        # self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
+        # convert in e- counts
+        data *= self.gain
+        err2 = data
+        if self.read_out_noise is not None:
+            err2 += self.read_out_noise*self.read_out_noise
+        self.stat_errors = np.sqrt(err2)
+        # convert in ADU
+        self.stat_errors /= self.gain
 
     def compute_parallactic_angle(self):
         """Compute the parallactic angle.
@@ -245,6 +260,7 @@ def load_CTIO_image(image):
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     build_CTIO_gain_map(image)
+    build_CTIO_read_out_noise_map(image)
     image.compute_parallactic_angle()
 
 
@@ -266,6 +282,26 @@ def build_CTIO_gain_map(image):
     image.gain[size // 2:size, 0:size] = image.header['GTGAIN21']
     # ampli 22
     image.gain[size // 2:size, size // 2:size] = image.header['GTGAIN22']
+
+
+def build_CTIO_read_out_noise_map(image):
+    """Compute the CTIO gain map according to header GAIN values.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    size = parameters.CCD_IMSIZE
+    image.read_out_noise = np.zeros_like(image.data)
+    # ampli 11
+    image.read_out_noise[0:size // 2, 0:size // 2] = image.header['GTRON11']
+    # ampli 12
+    image.read_out_noise[0:size // 2, size // 2:size] = image.header['GTRON12']
+    # ampli 21
+    image.read_out_noise[size // 2:size, 0:size] = image.header['GTRON21']
+    # ampli 22
+    image.read_out_noise[size // 2:size, size // 2:size] = image.header['GTRON22']
 
 
 def load_LPNHE_image(image):
