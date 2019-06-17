@@ -239,12 +239,22 @@ class ImageModel(Image):
             self.data += starfield.model(xx, yy)
 
     def add_poisson_noise(self):
-        if self.units == 'ADU':
-            self.my_logger.error('\n\tPoisson noise procedure has to be applied on map in ADU/s units')
+        if self.units != 'ADU':
+            self.my_logger.error('\n\tPoisson noise procedure has to be applied on map in ADU units')
         d = np.copy(self.data).astype(float)
-        d *= self.expo * self.gain
+        # convert to electron counts
+        d *= self.gain
+        print(np.mean(d[:100,:100]),np.std(d[:100,:100]))
+        # Poisson noise
         noisy = np.random.poisson(d).astype(float)
-        self.data = noisy / (self.expo * self.gain)
+        # Add read-out noise is available
+        if self.read_out_noise is not None:
+            noisy += np.random.normal(scale=self.read_out_noise)
+        # reconvert to ADU
+        self.data = noisy / self.gain
+        # removes zeros
+        min_noz = np.min(self.data[self.data > 0])
+        self.data[self.data <= 0] = min_noz
 
     def save_image(self, output_filename, overwrite=False):
         hdu0 = fits.PrimaryHDU()
@@ -293,12 +303,16 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     target_pixcoords = find_target(image, guess)
     # Background model
     my_logger.info('\n\tBackground model...')
-    background = BackgroundModel(level=image.target_bkgd2D(0, 0), frame=None) #frame=(1600, 1650))
+    yy, xx = np.mgrid[:parameters.XWINDOW,:parameters.YWINDOW]
+    bgd_level = np.mean(image.target_bkgd2D(xx,yy))
+    background = BackgroundModel(level=bgd_level, frame=None) #frame=(1600, 1650))
     if parameters.DEBUG:
         background.plot_model()
+
     # Target model
     my_logger.info('\n\tStar model...')
-    star = StarModel(target_pixcoords, image.target_star2D, image.target_star2D.amplitude.value, target=image.target)
+    # Spectrogram is simulated with spectrum.x0 target position: must be this position to simualte the target.
+    star = StarModel(spectrum.x0, image.target_star2D, image.target_star2D.amplitude.value, target=image.target)
     reso = star.sigma
     if parameters.DEBUG:
         star.plot_model()
@@ -310,6 +324,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         if parameters.VERBOSE:
             image.plot_image(scale='log10', target_pixcoords=starfield.pixcoords)
             starfield.plot_model()
+
     # Spectrum model
     my_logger.info('\n\tSpectum model...')
     airmass = image.header['AIRMASS']
@@ -330,15 +345,15 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # now we include effects related to the wrong extraction of the spectrum:
     # wrong estimation of the order 0 position and wrong DISTANCE2CCD
-    distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
-    spectrum.disperser.D = parameters.DISTANCE2CCD
-    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=1)
+    # distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
+    # spectrum.disperser.D = parameters.DISTANCE2CCD
+    # spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=1)
 
     # Image model
     my_logger.info('\n\tImage model...')
     image.compute(star, background, spectrogram, starfield=starfield)
-    image.add_poisson_noise()
     image.convert_to_ADU_units()
+    image.add_poisson_noise()
     if parameters.VERBOSE:
         image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
 
@@ -351,8 +366,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Save images and parameters
     image.header['A1'] = A1
     image.header['A2'] = A2
-    image.header['X0_T'] = target_pixcoords[0]
-    image.header['Y0_T'] = target_pixcoords[1]
+    image.header['X0_T'] = spectrum.x0[0]
+    image.header['Y0_T'] = spectrum.x0[1]
     image.header['D2CCD_T'] = spectrum.disperser.D
     image.header['OZONE'] = ozone
     image.header['PWV'] = pwv
