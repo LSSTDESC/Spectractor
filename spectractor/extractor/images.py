@@ -144,10 +144,9 @@ class Image(object):
         self.units = 'ADU'
 
     def compute_statistical_error(self):
-        """Compute the image noise map from Image.data as np.sqrt(data) / np.sqrt(gain * expo).
-
-        The read out noise is not included
-
+        """Compute the image noise map from Image.data. The latter must be in ADU.
+        The function first converts the image in electron counts units, evaluate the Poisson noise,
+        add in quadrature the read-out noise, takes the square root and returns a map in ADU units.
         """
         if self.units != 'ADU':
             self.my_logger.error('\n\tNoise must be estimated on an image in ADU units')
