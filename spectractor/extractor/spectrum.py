@@ -263,7 +263,18 @@ class Spectrum:
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
                                   'second column gives the spectrum in unit UNIT2, ' \
                                   'third column the corresponding errors.'
-        save_fits(output_file_name, self.header, [self.lambdas, self.data, self.err], overwrite=overwrite)
+        hdu1 = fits.PrimaryHDU()
+        hdu2 = fits.ImageHDU()
+        hdu3 = fits.ImageHDU()
+        hdu1.header = self.header
+        hdu1.data = [self.lambdas, self.data, self.err]
+        hdu2.data = self.spectrogram_fit
+        hdu3.data = self.spectrogram_residuals
+        hdu = fits.HDUList([hdu1, hdu2, hdu3])
+        output_directory = '/'.join(output_file_name.split('/')[:-1])
+        ensure_dir(output_directory)
+        hdu.writeto(output_file_name, overwrite=overwrite)
+        # OLD: save_fits(output_file_name, self.header, [self.lambdas, self.data, self.err], overwrite=overwrite)
         self.my_logger.info('\n\tSpectrum saved in %s' % output_file_name)
 
     def save_spectrogram(self, output_file_name, overwrite=False):
@@ -341,6 +352,10 @@ class Spectrum:
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             self.load_spectrogram(input_file_name.replace('spectrum', 'spectrogram'))
             self.load_chromatic_psf(input_file_name.replace('spectrum.fits', 'table.csv'))
+            hdu_list = fits.open(input_file_name)
+            if len(hdu_list) > 1:
+                self.spectrogram_fit = hdu_list[1].data
+                self.spectrogram_residuals = hdu_list[2].data
         else:
             self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
 
@@ -1023,6 +1038,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Fit the data:
     my_logger.info(f'\n\tStart ChromaticPSF1D polynomial fit...')
     s = fit_chromatic_PSF1D(data, s, bgd_model_func=bgd_model_func, data_errors=err)
+    spectrum.spectrogram_fit = s.evaluate(s.poly_params)
+    spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx), np.arange(Ny))) / err
     spectrum.chromatic_psf = s
     spectrum.data = np.copy(s.table['flux_integral'])
     s.table['Dx_rot'] = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
@@ -1061,6 +1078,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
+
     # Extract the non rotated background
     bgd_model_func = extract_background_photutils(data, err, ws=ws)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
@@ -1075,6 +1093,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     data = data[bgd_width:-bgd_width + yeven, :]
     err = err[bgd_width:-bgd_width + yeven, :]
     Ny, Nx = data.shape
+
     # First guess for lambdas
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_distance_along_dispersion_axis(),
                                                                   x0=image.target_pixcoords)
@@ -1091,6 +1110,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.spectrogram = data
     spectrum.spectrogram_err = err
     spectrum.spectrogram_bgd = bgd
+    spectrum.spectrogram_fit = s.evaluate(s.poly_params)
     spectrum.spectrogram_x0 = target_pixcoords_spectrogram[0]
     spectrum.spectrogram_y0 = target_pixcoords_spectrogram[1]
     spectrum.spectrogram_xmin = xmin
@@ -1103,7 +1123,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Summary plot
     if parameters.DEBUG:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
-        x = np.arange(Nx)
         xx = np.arange(s.table['Dx_rot'].size)
         plot_image_simple(ax[2], data=data, scale="log", title='', units=image.units, aspect='auto')
         ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_mean'], label='Dispersion axis')
