@@ -351,10 +351,10 @@ FE3 = Line(438.355, atmospheric=True, label=r'$Fe$',
            label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 CAII1 = Line(393.366, atmospheric=True, label=r'$Ca_{II}$',
              label_pos=[0.007, 0.02],
-             use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+             use_for_calibration=False)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 CAII2 = Line(396.847, atmospheric=True, label=r'$Ca_{II}$',
              label_pos=[0.007, 0.02],
-             use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+             use_for_calibration=False)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
           label_pos=[0.007, 0.02],
           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
