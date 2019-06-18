@@ -244,7 +244,6 @@ class ImageModel(Image):
         d = np.copy(self.data).astype(float)
         # convert to electron counts
         d *= self.gain
-        print(np.mean(d[:100,:100]),np.std(d[:100,:100]))
         # Poisson noise
         noisy = np.random.poisson(d).astype(float)
         # Add read-out noise is available
@@ -342,6 +341,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0.,
                                            angle=spectrum.rotation_angle,
                                            psf_poly_params=psf_poly_params)
+    spectrogram.fast_sim = False
 
     # now we include effects related to the wrong extraction of the spectrum:
     # wrong estimation of the order 0 position and wrong DISTANCE2CCD

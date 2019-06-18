@@ -826,7 +826,7 @@ def run_minimisation(method="newton"):
     # sim_134
     # guess = fit_workspace.p
     # truth sim_134
-    #guess = np.array([1., 0.05, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
+    # guess = np.array([1., 0.05, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
     guess = fit_workspace.p
 
     if method == "minimize":
@@ -898,29 +898,32 @@ def run_minimisation(method="newton"):
                 plot_correlation_matrix(fit_workspace.cov, ipar)
             return params_table, costs
 
+        fit_workspace.simulation.fast_sim = True
         costs = np.array([chisq_spectrogram(guess)])
         params_table = np.array([guess])
         start = time.time()
-        epsilon = 1e-3 * guess
+        epsilon = 1e-4 * guess
         epsilon[epsilon == 0] = 1e-3
         epsilon[0] = 1e-3 # A1
-        epsilon[1] = 1e-3 # A2
+        epsilon[1] = 1e-4 # A2
         epsilon[2] = 1 # ozone
         epsilon[3] = 0.01 # pwv
         epsilon[4] = 0.0005 # aerosols
         epsilon[5] = 0.001 # DCCD
         epsilon[6] = 0.005 # shift_x
+        print("start", guess)
 
         # fit trace
         fix = [True] * guess.size
         fix[0] = False  # A1
-        fix[1] = False  # A2
+        fix[1] = True  # A2
         fix[6] = True  # x0
         fix[7] = True  # y0
+        fit_workspace.simulation.fast_sim = True
         # fit_workspace.spectrum.rotation_angle = -1.54
         # fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
         fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index+3] = [False] * 3
-        fix[fit_workspace.psf_params_start_index+3:fit_workspace.psf_params_start_index+9] = [False] * 6
+        # fix[fit_workspace.psf_params_start_index+3:fit_workspace.psf_params_start_index+9] = [False] * 6
         # fix[fit_workspace.psf_params_start_index+1:fit_workspace.psf_params_start_index+3]  = [True]*2
         fit_workspace.simulation.fix_psf_cube = False
         params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
@@ -931,6 +934,7 @@ def run_minimisation(method="newton"):
         fix = [True] * guess.size
         fix[0] = False  # A1
         fix[1] = False  # A2
+        fit_workspace.simulation.fast_sim = True
         fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
         # fix[fit_workspace.psf_params_start_index+3:fit_workspace.psf_params_start_index+9] = [False] * 6
         fit_workspace.simulation.fix_psf_cube = False
@@ -949,13 +953,16 @@ def run_minimisation(method="newton"):
         fix[0] = False
         fix[1] = False
         fix[5] = False # DCCD
+        fix[6] = False # x0
         fit_workspace.simulation.fix_psf_cube = True
+        fit_workspace.simulation.fast_sim = True
         params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
                                                     fix=fix, xtol=1e-3, ftol=1e-2, niter=10)
 
         # fit all
         #fit_workspace.spectrum.spectrogram_err /= 5
         guess = np.array(fit_workspace.p)
+        fit_workspace.simulation.fast_sim = False
         # guess = np.array([ 9.70636227e-01,  2.15812703e-02,  3.00000000e+02,  3.00000000e+00,
         #  3.00000000e-02,  5.54560254e+01,  1.51615293e+00,  0.00000000e+00,
         #  1.76245582e+00,  5.82214509e-01,  2.27827769e-01,
@@ -963,7 +970,7 @@ def run_minimisation(method="newton"):
         # -6.72668605e-01,  4.23255049e-01, -3.17253279e-03, -3.44687146e-03,
         # -3.59027314e-03,  2.14896817e+01, -5.76766492e+00,,  1.07628816e+00])
         fix = [False] * guess.size
-        fix[6] = True  # x0
+        fix[6] = False  # x0
         fix[7] = True  # y0
         fit_workspace.simulation.fix_psf_cube = False
         params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
@@ -1019,11 +1026,11 @@ if __name__ == "__main__":
     (opts, args) = parser.parse_args()
 
     filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    # filename = 'outputs/sim_20170530_134_spectrum.fits'
+    filename = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     fit_workspace = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nsteps=60,
                                             burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
     run_minimisation("newton")
     # run_emcee()
-    fit_workspace.analyze_chains()
+    # fit_workspace.analyze_chains()
