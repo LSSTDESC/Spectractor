@@ -275,6 +275,7 @@ class ChromaticPSF1D:
         for name in self.PSF1D.param_names:
             self.n_poly_params += self.degrees[name] + 1
         self.poly_params = np.zeros(self.n_poly_params)
+        self.alpha_max = 10
 
     def fill_table_with_profile_params(self, profile_params):
         """
@@ -362,13 +363,21 @@ class ChromaticPSF1D:
         """
         pixels = np.linspace(-1, 1, self.Nx)
         poly_params = np.array([])
+        amplitude = None
         for k, name in enumerate(self.PSF1D.param_names):
             if name is 'amplitude_moffat':
                 amplitude = profile_params[:, k]
                 poly_params = np.concatenate([poly_params, amplitude])
-            else:
-                # fit, cov, model = fit_poly1d(pixels, profile_params[:, k], order=self.degrees[name])
-                fit = np.polynomial.legendre.legfit(pixels, profile_params[:, k], deg=self.degrees[name])
+        if amplitude is None:
+            self.my_logger.warning('\n\tAmplitude array not initialized. '
+                                   'Polynomial fit for shape parameters will be unweighted.')
+        for k, name in enumerate(self.PSF1D.param_names):
+            if name is not 'amplitude_moffat':
+                weights = np.copy(amplitude)
+                if name is 'stddev':
+                    i_eta = list(self.PSF1D.param_names).index('eta_gauss')
+                    weights = np.abs(amplitude * profile_params[:, i_eta])
+                fit = np.polynomial.legendre.legfit(pixels, profile_params[:, k], deg=self.degrees[name], w=weights)
                 poly_params = np.concatenate([poly_params, fit])
         return poly_params
 
@@ -609,7 +618,7 @@ class ChromaticPSF1D:
             if name == 'amplitude_moffat':
                 if np.any(p < -noise_level):
                     in_bounds = False
-                    penalty += np.abs(np.sum(profile_params[p < -noise_level, k])) / np.abs(np.mean(p))
+                    penalty += np.abs(np.sum(profile_params[p < -noise_level, k])) #/ np.mean(np.abs(p))
                     outbound_parameter_name += name + ' '
             elif name is "x_mean":
                 if np.any(p < 0):
@@ -617,8 +626,7 @@ class ChromaticPSF1D:
                     in_bounds = False
                     outbound_parameter_name += name + ' '
                 if np.any(p > self.Ny):
-                    penalty += np.sum(profile_params[p > self.Ny, k] - self.Ny)
-                    penalty /= np.abs(np.mean(p))
+                    penalty += np.sum(profile_params[p > self.Ny, k] - self.Ny) / np.abs(np.mean(p))
                     in_bounds = False
                     outbound_parameter_name += name + ' '
             # elif name is "gamma":
@@ -627,9 +635,8 @@ class ChromaticPSF1D:
             #         penalty = 1
             #         break
             elif name is "alpha":
-                if np.any(p > 10):
-                    penalty += np.sum(profile_params[p > 10, k] - 10)
-                    penalty /= np.abs(np.mean(p))
+                if np.any(p > self.alpha_max):
+                    penalty += np.sum(profile_params[p > self.alpha_max, k] - self.alpha_max) / np.abs(np.mean(p))
                     in_bounds = False
                     outbound_parameter_name += name + ' '
                 # if np.any(p < 0.1):
@@ -644,11 +651,10 @@ class ChromaticPSF1D:
                     in_bounds = False
                     outbound_parameter_name += name + ' '
                 if np.any(p < -1):
-                    penalty += np.sum(-1 - profile_params[p < -1, k])
-                    penalty /= np.abs(np.mean(p))
+                    penalty += np.sum(-1 - profile_params[p < -1, k]) / np.abs(np.mean(p))
                     in_bounds = False
                     outbound_parameter_name += name + ' '
-            # elif name is "stddev":
+             # elif name is "stddev":
             #     if np.any(p < 0) or np.any(p > self.Ny):
             #         in_bounds = False
             #         penalty = 1
@@ -933,7 +939,7 @@ def extract_background_photutils(data, err, ws=(20, 30)):
                        mask=mask)
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False, fill_value=None)
 
-    if parameters.DEBUG or True:
+    if parameters.DEBUG:
         fig, ax = plt.subplots(3,1, figsize=(12, 6), sharex='all')
         bgd_bands = np.copy(data).astype(float)
         bgd_bands[middle-ws[0]:middle+ws[0], :] = np.nan
@@ -1121,7 +1127,7 @@ def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, bgd_model_func=
     y = data[:, ymax_index]
     guess = [np.nanmax(y) - np.nanmean(y), middle, 5, 2, 0, 2, saturation]
     maxi = np.abs(np.nanmax(y))
-    bounds = [(0.1 * maxi, 2 * maxi), (middle - w, middle + w), (0.1, Ny // 2), (1, 6), (-1, 0), (0.1, Ny // 2),
+    bounds = [(0.1 * maxi, 2 * maxi), (middle - w, middle + w), (0.1, Ny // 2), (0.1, s.alpha_max), (-1, 0), (0.1, Ny // 2),
               (0, 2 * saturation)]
     # first fit with moffat only to initialize the guess
     # hypothesis that max of spectrum if well describe by a focused PSF
@@ -1290,7 +1296,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     >>> data_errors = np.sqrt(data+1)
 
     # Extract the background
-    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=3, pixel_step=10)
+    >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
     # Fit the transverse profile:
     >>> s, bgd_model = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=50,
@@ -1403,7 +1409,7 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
     >>> data_errors = np.sqrt(data+1)
 
     # Extract the background
-    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=3, pixel_step=10)
+    >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
     # Estimate the first guess values
     >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
@@ -1450,7 +1456,7 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
             for x in
             range(Nx)]
         poly_params[:Nx] = amplitude_params
-        in_bounds, penalty, name = chromatic_psf.check_bounds(poly_params, noise_level=5 * bgd_std)
+        in_bounds, penalty, name = chromatic_psf.check_bounds(poly_params, noise_level= bgd_std)
         mod = chromatic_psf.evaluate(poly_params)
         chromatic_psf.poly_params = np.copy(poly_params)
         if data_errors is None:
@@ -1471,12 +1477,13 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
     # m.hesse()
     # print(m.np_matrix())
     # print(m.np_matrix(correlation=True))
+    print(chromatic_psf.poly_params[:Nx])
     chromatic_psf.poly_params[Nx:] = m.np_values()
     chromatic_psf.profile_params = chromatic_psf.from_poly_params_to_profile_params(chromatic_psf.poly_params,
                                                                                     force_positive=True)
     chromatic_psf.fill_table_with_profile_params(chromatic_psf.profile_params)
     chromatic_psf.from_profile_params_to_shape_params(chromatic_psf.profile_params)
-    if parameters.DEBUG:
+    if parameters.DEBUG or True:
         # Plot data, best fit model and residuals:
         chromatic_psf.plot_summary()
         plot_chromatic_PSF1D_residuals(chromatic_psf, bgd, data, data_errors, guess=guess, title='Best fit')
@@ -2168,8 +2175,9 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     consecutive_outliers = []
     for step in range(niter):
         # noinspection PyArgumentList
+        # it seems that minuit with a jacobian function works less good...
         m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
-                                   print_level=0, grad=PSF1D_chisq_v2_jac)
+                                   print_level=0, grad=None)
         m.migrad()
         guess = m.np_values()
         PSF = PSF1D(*m.np_values())
