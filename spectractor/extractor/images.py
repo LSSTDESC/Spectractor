@@ -43,8 +43,8 @@ class Image(object):
         self.header = None
         self.data = None
         self.data_rotated = None
-        self.gain = None # in e-/ADU
-        self.read_out_noise= None
+        self.gain = None  # in e-/ADU
+        self.read_out_noise = None
         self.stat_errors = None
         self.stat_errors_rotated = None
         self.rotation_angle = 0
@@ -155,16 +155,33 @@ class Image(object):
         data = np.copy(self.data)
         min_noz = np.min(data[data > 0])
         data[data <= 0] = min_noz
-        # compute poisson noise
+        # OLD: compute poisson noise in ADU/s without read-out noise
         # self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
         # convert in e- counts
-        data *= self.gain
-        err2 = data
+        err2 = data * self.gain
         if self.read_out_noise is not None:
-            err2 += self.read_out_noise*self.read_out_noise
+            err2 += self.read_out_noise * self.read_out_noise
         self.stat_errors = np.sqrt(err2)
         # convert in ADU
         self.stat_errors /= self.gain
+        if parameters.DEBUG:
+            fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+            y = self.stat_errors.flatten() ** 2
+            x = data.flatten()
+            fit, cov, model = fit_poly1d(x, y, order=1)
+            gain = 1 / fit[0]
+            ax[0].text(0.05, 0.95, f"fitted gain={gain:.3g} [e-/ADU]\nintercept={fit[1]:.3g} [ADU$^2$]"
+                                   f"\nfitted read-out={np.sqrt(fit[1])*gain:.3g} [ADU]",
+                       horizontalalignment='left', verticalalignment='top', transform=ax[0].transAxes)
+            ax[0].scatter(x, y)
+            ax[0].plot(x, model, "k-")
+            ax[0].grid()
+            ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
+            ax[0].set_xlabel(r"Data pixel values [ADU]")
+            plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Uncertainty map", units=self.units,
+                              target_pixcoords=None, aspect="auto", cmap=None)
+            fig.tight_layout()
+            plt.show()
 
     def compute_parallactic_angle(self):
         """Compute the parallactic angle.
@@ -255,8 +272,8 @@ def load_CTIO_image(image):
         image.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
             parameters.CCD_PIXEL2ARCSEC, image.header['YPIXSIZE']))
     image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
-                          obstime=image.header['DATE-OBS'])
-    image.my_logger.info('\n\tImage loaded')
+                           obstime=image.header['DATE-OBS'])
+    image.my_logger.info(f'\n\tImage {image.file_name} loaded.')
     # compute CCD gain map
     build_CTIO_gain_map(image)
     build_CTIO_read_out_noise_map(image)
@@ -521,8 +538,8 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
         The cropped image data array where the fit is performed.
     guess: array_like
         Two parameter array giving the estimated position of the target in the image.
-    sub_image: array_like
-        The cropped image data array where the fit is performed.
+    sub_errors: array_like
+        The image data uncertainties.
 
     Examples
     --------
@@ -774,8 +791,8 @@ def turn_image(image):
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
-                                                       min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
-                                    margin:-margin], scale="log", title='Turned image (log10 scale)',
+                                                       min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]), margin:-margin],
+                          scale="log", title='Turned image (log10 scale)',
                           units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
         f.tight_layout()
