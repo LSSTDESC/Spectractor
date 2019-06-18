@@ -497,10 +497,7 @@ def fit_poly1d_legendre(x, y, order, w=None):
     cov = -1
     x_norm = rescale_x_for_legendre(x)
     if len(x) > order:
-        if w is None:
-            fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True)
-        else:
-            fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True, w=w)
+        fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True, w=w)
         model = np.polynomial.legendre.legval(x_norm, fit)
     else:
         fit = np.array([0] * (order + 1))
