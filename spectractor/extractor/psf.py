@@ -1,4 +1,3 @@
-import warnings
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,15 +8,14 @@ from scipy.integrate import quad
 from scipy.signal import medfilt2d
 from iminuit import Minuit
 
-from astropy.modeling import fitting, Fittable1DModel, Fittable2DModel, Parameter
+from astropy.modeling import Fittable1DModel, Fittable2DModel, Parameter
 from astropy.modeling.models import Moffat1D
-from astropy.stats import sigma_clip
 from astropy.table import Table
 
 from astropy.stats import SigmaClip
 from photutils import Background2D, SExtractorBackground
 
-from spectractor.tools import LevMarLSQFitterWithNan, dichotomie, fit_poly1d_outlier_removal, \
+from spectractor.tools import dichotomie, fit_poly1d_outlier_removal, \
     fit_poly1d, fit_moffat1d_outlier_removal, fit_poly2d_outlier_removal
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -34,6 +32,8 @@ class PSF1D(Fittable1DModel):
     eta_gauss = Parameter('eta_gauss', default=1)
     stddev = Parameter('stddev', default=1)
     saturation = Parameter('saturation', default=1)
+
+    param_titles = ["A", "y", "\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
 
     def fwhm(self, x_array=None):
         """
@@ -214,6 +214,8 @@ class PSF2D(Fittable2DModel):
     stddev = Parameter('stddev', default=1)
     saturation = Parameter('saturation', default=1)
 
+    param_titles = ["A", "x", "y", "\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
+
     @staticmethod
     def evaluate(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation):
         rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
@@ -276,6 +278,17 @@ class ChromaticPSF1D:
             self.n_poly_params += self.degrees[name] + 1
         self.poly_params = np.zeros(self.n_poly_params)
         self.alpha_max = 10
+        self.poly_params_labels = [] #[f"a{k}" for k in range(self.poly_params.size)]
+        self.poly_params_names = [] #"$a_{" + str(k) + "}$" for k in range(self.poly_params.size)]
+        for ip, p in enumerate(self.PSF1D.param_names):
+            if ip == 0:
+                self.poly_params_labels += [f"{p}_{k}" for k in range(self.Nx)]
+                self.poly_params_names += \
+                    ["$" + self.PSF1D.param_titles[ip] + "_{(" + str(k) +")}$" for k in range(self.Nx)]
+            else:
+                for k in range(self.degrees[p]+1):
+                    self.poly_params_labels.append(f"{p}_{k}")
+                    self.poly_params_names.append("$" + self.PSF1D.param_titles[ip] + "_{(" + str(k) +")}$")
 
     def fill_table_with_profile_params(self, profile_params):
         """

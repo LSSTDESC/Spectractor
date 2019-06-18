@@ -2,7 +2,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from spectractor.simulation.simulator import *
 from spectractor.fit.statistics import *
 
-from scipy.optimize import minimize
 from spectractor.parameters import FIT_WORKSPACE as fit_workspace
 
 from iminuit import Minuit
@@ -19,7 +18,7 @@ class FitWorkspace:
     def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False):
         self.my_logger = set_logger(self.__class__.__name__)
-        self.filename = filename
+        self.filename = file_name
         self.ndim = 0
         self.truth = None
         self.verbose = verbose
@@ -422,8 +421,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
         self.psf_poly_params = self.psf_poly_params[
                                self.spectrum.spectrogram_Nx:-1]  # remove saturation (fixed parameter)
-        self.psf_poly_params_labels = [f"a{k}" for k in range(self.psf_poly_params.size)]
-        self.psf_poly_params_names = ["$a_{" + str(k) + "}$" for k in range(self.psf_poly_params.size)]
+        self.psf_poly_params_labels = \
+            np.copy(self.spectrum.chromatic_psf.poly_params_labels[self.spectrum.spectrogram_Nx:-1])
+        self.psf_poly_params_names = \
+            np.copy(self.spectrum.chromatic_psf.poly_params_names[self.spectrum.spectrogram_Nx:-1])
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds(data=None)
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
@@ -435,9 +436,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.p = np.concatenate([self.p, self.psf_poly_params])
         self.ndim = self.p.size
         self.input_labels = ["A1", "A2", "ozone [db]", "PWV [mm]", "VAOD", r"D_CCD [mm]",
-                             r"shift_x [pix]", r"shift_y [pix]"] + self.psf_poly_params_labels
+                             r"shift_x [pix]", r"shift_y [pix]"] + list(self.psf_poly_params_labels)
         self.axis_names = ["$A_1$", "$A_2$", "ozone [db]", "PWV [mm]", "VAOD", r"$D_{CCD}$ [mm]",
-                           r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]"] + self.psf_poly_params_names
+                           r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]"] \
+                          + list(self.psf_poly_params_names)
         self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1),
                                                 (50, 60), (-3, 3), (-3, 3)]),
                                       self.psf_poly_params_bounds[:-1]])  # remove saturation
@@ -790,7 +792,7 @@ def plot_correlation_matrix(cov, ipar=None):
         ipar = np.arange(0, cov.shape[0]).astype(int)
     plt.title("Correlation matrix")
     axis_names = [fit_workspace.axis_names[ip] for ip in ipar]
-    plt.xticks(np.arange(ipar.size), axis_names, rotation='vertical', fontsize=11)
+    plt.xticks(np.arange(ipar.size), axis_names, rotation=45, fontsize=11)
     plt.yticks(np.arange(ipar.size), axis_names, fontsize=11)
     cbar = fig.colorbar(im)
     cbar.ax.tick_params(labelsize=9)
@@ -1025,7 +1027,7 @@ if __name__ == "__main__":
                       help="Write results in given output directory (default: ./outputs/).")
     (opts, args) = parser.parse_args()
 
-    filename = 'outputs/reduc_20170530_130_spectrum.fits'
+    filename = 'outputs/reduc_20170530_134_spectrum.fits'
     filename = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
