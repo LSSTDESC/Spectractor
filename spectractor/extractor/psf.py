@@ -1028,7 +1028,7 @@ def extract_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
     bgd_model_func = fit_poly2d_outlier_removal(xx, yy, bgd_bands, order=deg, sigma=sigma, niter=20)
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bgd_model_func(xx, yy), kind='linear', bounds_error=False, fill_value=None)
 
-    if parameters.DEBUG or True:
+    if parameters.DEBUG:
         fig, ax = plt.subplots(2,1, figsize=(12, 6), sharex='all')
         bgd_bands = np.copy(data).astype(float)
         bgd_bands[middle-ws[0]:middle+ws[0], :] = np.nan
@@ -1477,13 +1477,12 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
     # m.hesse()
     # print(m.np_matrix())
     # print(m.np_matrix(correlation=True))
-    print(chromatic_psf.poly_params[:Nx])
     chromatic_psf.poly_params[Nx:] = m.np_values()
     chromatic_psf.profile_params = chromatic_psf.from_poly_params_to_profile_params(chromatic_psf.poly_params,
                                                                                     force_positive=True)
     chromatic_psf.fill_table_with_profile_params(chromatic_psf.profile_params)
     chromatic_psf.from_profile_params_to_shape_params(chromatic_psf.profile_params)
-    if parameters.DEBUG or True:
+    if parameters.DEBUG:
         # Plot data, best fit model and residuals:
         chromatic_psf.plot_summary()
         plot_chromatic_PSF1D_residuals(chromatic_psf, bgd, data, data_errors, guess=guess, title='Best fit')
