@@ -1,6 +1,7 @@
 from spectractor import parameters
-from spectractor.fit.fitter import run_emcee, FitWorkspace
+from spectractor.fit.fitter import run_minimisation, SpectrogramFitWorkspace
 from spectractor.config import load_config
+
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -33,8 +34,8 @@ if __name__ == "__main__":
     for file_name in file_names:
         atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-        fit_workspace = FitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nwalkers=28, nsteps=2000,
-                                     burnin=1000,
-                                     nbins=10, verbose=0, plot=False, live_fit=False)
-        run_emcee(fit_workspace)
-        fit_workspace.analyze_chains()
+        fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_filename=atmgrid_filename, nsteps=2000,
+                                                burnin=1000, nbins=10, verbose=0, plot=False, live_fit=False)
+        run_minimisation(fit_workspace, method="newton")
+        # run_emcee(fit_workspace)
+        # fit_workspace.analyze_chains()
