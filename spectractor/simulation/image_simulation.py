@@ -354,7 +354,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.compute(star, background, spectrogram, starfield=starfield)
     image.convert_to_ADU_units()
     image.add_poisson_noise()
-    if parameters.VERBOSE:
+    if parameters.VERBOSE and parameters.DISPLAY:
         image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
 
     # Set output path
@@ -384,7 +384,10 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['PWV'] = pwv
     image.header['VAOD'] = aerosols
     image.header['PSF_DEG'] = spectrum.spectrogram_deg
-    image.header['PSF_POLY'] = np.array_str(np.array(psf_poly_params), max_line_width=1000, precision=4)
+    psf_poly_params_truth  =  np.array(psf_poly_params)
+    if psf_poly_params_truth.size > spectrum.spectrogram_Nx:
+        psf_poly_params_truth = psf_poly_params_truth[spectrum.spectrogram_Nx:]
+    image.header['PSF_POLY'] = np.array_str(psf_poly_params_truth, max_line_width=1000, precision=4)
     image.header['RESO'] = reso
     image.header['ROTATION'] = int(with_rotation)
     image.header['ROTANGLE'] = spectrum.rotation_angle
