@@ -534,45 +534,46 @@ class SpectrogramFitWorkspace(FitWorkspace):
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
-        norm = np.max(self.spectrum.spectrogram[:, sub])
-        plot_image_simple(ax[0, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
-                          units='1/max(data)')
-        if dispersion:
-            y = self.spectrum.chromatic_psf.table['Dy'][sub[2:-3]] + self.spectrum.spectrogram_y0
-            x = self.spectrum.chromatic_psf.table['Dx'][sub[2:-3]] + self.spectrum.spectrogram_x0 - sub[0]
-            y = np.ones_like(x)
-            ax[0, 0].scatter(x, y, cmap=from_lambda_to_colormap(self.lambdas[sub[2:-3]]), edgecolors='None',
-                             c=self.lambdas[sub[2:-3]],
-                             label='', marker='o', s=10)
-        # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
-        # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
-        if title != '':
-            ax[0, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
-        plot_image_simple(ax[1, 0], data=self.spectrum.spectrogram[:, sub] / norm, title='Data', aspect='auto',
-                          cax=ax[1, 1], vmin=0, vmax=1, units='1/max(data)')
-        ax[1, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
-        residuals = (self.spectrum.spectrogram - self.model)
-        residuals_err = self.spectrum.spectrogram_err / self.model
-        norm = self.spectrum.spectrogram_err[:, sub]
-        std = float(np.std(residuals[:, sub] / norm))
-        plot_image_simple(ax[2, 0], data=residuals[:, sub] / norm, vmin=-5 * std, vmax=5 * std, title='Data-Model',
-                          aspect='auto', cax=ax[2, 1], units='') #1/max(data)
-        ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='white', y=0.8)
-        ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
-        ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        # ax[0, 0].get_yaxis().set_label_coords(-0.15, 0.6)
-        # ax[2, 0].get_yaxis().set_label_coords(-0.15, 0.5)
-        # remove the underlying axes
-        # for ax in ax[3, 1]:
-        ax[3, 1].remove()
-        ax[3, 0].plot(self.lambdas[sub], self.spectrum.spectrogram.sum(axis=0)[sub], label='Data')
-        ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
-        ax[3, 0].set_ylabel('Cross spectrum')
-        ax[3, 0].set_xlabel('$\lambda$ [nm]')
-        ax[3, 0].legend(fontsize=7)
-        ax[3, 0].grid(True)
+        if len(sub)  > 0:
+            norm = np.max(self.spectrum.spectrogram[:, sub])
+            plot_image_simple(ax[0, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
+                              units='1/max(data)')
+            if dispersion:
+                y = self.spectrum.chromatic_psf.table['Dy'][sub[2:-3]] + self.spectrum.spectrogram_y0
+                x = self.spectrum.chromatic_psf.table['Dx'][sub[2:-3]] + self.spectrum.spectrogram_x0 - sub[0]
+                y = np.ones_like(x)
+                ax[0, 0].scatter(x, y, cmap=from_lambda_to_colormap(self.lambdas[sub[2:-3]]), edgecolors='None',
+                                 c=self.lambdas[sub[2:-3]],
+                                 label='', marker='o', s=10)
+            # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
+            # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
+            if title != '':
+                ax[0, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
+            plot_image_simple(ax[1, 0], data=self.spectrum.spectrogram[:, sub] / norm, title='Data', aspect='auto',
+                              cax=ax[1, 1], vmin=0, vmax=1, units='1/max(data)')
+            ax[1, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+            residuals = (self.spectrum.spectrogram - self.model)
+            residuals_err = self.spectrum.spectrogram_err / self.model
+            norm = self.spectrum.spectrogram_err[:, sub]
+            std = float(np.std(residuals[:, sub] / norm))
+            plot_image_simple(ax[2, 0], data=residuals[:, sub] / norm, vmin=-5 * std, vmax=5 * std, title='Data-Model',
+                              aspect='auto', cax=ax[2, 1], units='') #1/max(data)
+            ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='white', y=0.8)
+            ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
+            ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
+            ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
+            ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
+            # ax[0, 0].get_yaxis().set_label_coords(-0.15, 0.6)
+            # ax[2, 0].get_yaxis().set_label_coords(-0.15, 0.5)
+            # remove the underlying axes
+            # for ax in ax[3, 1]:
+            ax[3, 1].remove()
+            ax[3, 0].plot(self.lambdas[sub], self.spectrum.spectrogram.sum(axis=0)[sub], label='Data')
+            ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
+            ax[3, 0].set_ylabel('Cross spectrum')
+            ax[3, 0].set_xlabel('$\lambda$ [nm]')
+            ax[3, 0].legend(fontsize=7)
+            ax[3, 0].grid(True)
 
     def simulate(self, A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, *psf_poly_params):
         global plot_counter
@@ -1033,7 +1034,7 @@ if __name__ == "__main__":
     (opts, args) = parser.parse_args()
 
     filename = 'outputs/reduc_20170530_134_spectrum.fits'
-    filename = 'outputs/sim_20170530_134_spectrum.fits'
+    filename = 'outputs/sim_20170530_057_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nsteps=100,
