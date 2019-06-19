@@ -830,7 +830,8 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
         figname = fit_workspace.filename.replace(".fits", "_fitting.pdf")
         fit_workspace.my_logger.info(f"\n\tSave figure {figname}.")
         fig.savefig(figname, dpi=100, bbox_inches='tight')
-    plt.show()
+    if parameters.DISPLAY:
+        plt.show()
 
     fit_workspace.simulate(*fit_workspace.p)
     fit_workspace.live_fit = False
@@ -914,7 +915,7 @@ def run_minimisation(fit_workspace, method="newton"):
             ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
             print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
                                     [fit_workspace.input_labels[ip] for ip in ipar])
-            if parameters.DISPLAY:
+            if True:
                 #plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
                 plot_gradient_descent(fit_workspace, costs, params_table)
                 fit_workspace.plot_correlation_matrix(ipar=ipar)
