@@ -307,7 +307,7 @@ class FitWorkspace:
     def save_parameters_summary(self):
         output_filename = self.filename.replace(".fits", "_bestfit.txt")
         f = open(output_filename, 'w')
-        txt = ""
+        txt = self.spectrum.date_obs + "\n"
         for ip in np.arange(0, self.cov.shape[0]).astype(int):
             txt += "%s: %s +%s -%s\n" % formatting_numbers(self.p[ip], np.sqrt(self.cov[ip, ip]), np.sqrt(self.cov[ip, ip]),
                                                            label=self.input_labels[ip])
@@ -1034,7 +1034,7 @@ if __name__ == "__main__":
     (opts, args) = parser.parse_args()
 
     filename = 'outputs/reduc_20170530_134_spectrum.fits'
-    filename = 'outputs/sim_20170530_057_spectrum.fits'
+    filename = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nsteps=100,
