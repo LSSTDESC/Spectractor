@@ -298,6 +298,8 @@ class SpectrogramModel(Spectrum):
 
         return lambdas, dispersion_law, dispersion_law_order2
 
+
+    #@profile
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
                  shift_x=0., shift_y=0., psf_poly_params=None):
         """
@@ -388,9 +390,8 @@ class SpectrogramModel(Spectrum):
             vh = self.vh
             fhcube = self.fhcube
         self.my_logger.debug(f'\n\tTime after fourier cube: {time.time()-start}')
-        start = time.time()
-        r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2 - shift_x) \
-             + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2 - shift_y)
+        # r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2 - shift_x) \
+        #      + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2 - shift_y)
         fdima0 = F.disperse_fcube(uh, vh, fhcube, spectrum, dispersion_law, method="numexpr")  # FT
         self.my_logger.debug(f'\n\tTime after simulate after fourier: {time.time()-start}')
         start = time.time()
