@@ -408,8 +408,9 @@ class Spectrum:
         """
         if os.path.isfile(input_file_name):
             self.chromatic_psf = ChromaticPSF1D(self.spectrogram_Nx, self.spectrogram_Ny,
-                                                deg=self.spectrogram_deg, saturation=self.spectrogram_saturation)
-            self.chromatic_psf.table = Table.read(input_file_name)
+                                                deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,
+                                                file_name=input_file_name)
+            #self.chromatic_psf.table = Table.read(input_file_name)
             self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)

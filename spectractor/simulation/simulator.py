@@ -260,6 +260,9 @@ class SpectrogramModel(Spectrum):
     def simulate_dispersion(self, D, shift_x, shift_y, r0):
         new_x0 = [self.x0[0] - shift_x, self.x0[1] - shift_y]
         distance = np.array(self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x, shift_y=shift_y))
+        # must have odd size
+        if distance.size % 2 == 0:
+            distance = distance[:-1]
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
@@ -275,10 +278,10 @@ class SpectrogramModel(Spectrum):
         #             Dy_mean_func(lambdas_order2) + dy_func(lambdas_order2) - shift_y)
         # Dx_func = interp1d(lambdas, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
         # Dy_mean_func = interp1d(lambdas, self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
-        dy_func = interp1d(lambdas, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_mean'],
+        dy_func = interp1d(lambdas, self.chromatic_psf.table['Dy'][:distance.size] - self.chromatic_psf.table['Dy_mean'][:distance.size],
                            bounds_error=False, fill_value=(0, 0))
-        dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) + 1j * (
-                self.chromatic_psf.table['Dy'] - shift_y)
+        dispersion_law = r0 + (self.chromatic_psf.table['Dx'][:distance.size] - shift_x) + 1j * (
+                self.chromatic_psf.table['Dy'][:distance.size] - shift_y)
         dispersion_law_order2 = r0 + (distances_order2 * np.cos(np.pi * self.rotation_angle / 180) - shift_x) + 1j * (
                 distances_order2 * np.sin(np.pi * self.rotation_angle / 180) + dy_func(lambdas_order2) - shift_y)
         dispersion_law_order2 = dispersion_law_order2[::2]
