@@ -88,19 +88,15 @@ class FitWorkspace:
         self.nbetafits = [[]]
         self.nsteps = 0
         tau = -1
-        burnin = self.burnin
-        thin = 1
         reader = emcee.backends.HDFBackend(self.emcee_filename)
         try:
             tau = reader.get_autocorr_time()
             burnin = int(2 * np.max(tau))
-            thin = int(0.5 * np.min(tau))
+            thin = 1 #int(0.5 * np.min(tau))
         except emcee.autocorr.AutocorrError:
             tau = -1
-            burnin = self.burnin
-            thin = 1
-        self.chains = reader.get_chain(discard=burnin, flat=False, thin=thin)
-        self.lnprobs = reader.get_log_prob(discard=burnin, flat=False, thin=thin)
+        self.chains = reader.get_chain(discard=0, flat=False, thin=1)
+        self.lnprobs = reader.get_log_prob(discard=0, flat=False, thin=1)
         self.nsteps = self.chains.shape[0]
         self.nwalkers = self.chains.shape[1]
         print(f"Auto-correlation time: {tau}")
@@ -480,12 +476,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.aerosols = 0.05
         self.D = self.spectrum.header['D2CCD']
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
-        self.psf_poly_params = self.psf_poly_params[
-                               self.spectrum.spectrogram_Nx:-1]  # remove saturation (fixed parameter)
-        self.psf_poly_params_labels = \
-            np.copy(self.spectrum.chromatic_psf.poly_params_labels[self.spectrum.spectrogram_Nx:-1])
-        self.psf_poly_params_names = \
-            np.copy(self.spectrum.chromatic_psf.poly_params_names[self.spectrum.spectrogram_Nx:-1])
+        l = len(self.spectrum.chromatic_psf.table)
+        self.psf_poly_params = self.psf_poly_params[l:-1]  # remove saturation (fixed parameter)
+        self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[l:-1])
+        self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[l:-1])
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds(data=None)
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
@@ -532,9 +526,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
     def plot_spectrogram_comparison_simple(self, ax, title='', extent=None, dispersion=False):
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
+        sub = np.where(sub < self.spectrum.spectrogram_Nx)[0]
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
-        if len(sub)  > 0:
+        if len(sub) > 0:
             norm = np.max(self.spectrum.spectrogram[:, sub])
             plot_image_simple(ax[0, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
                               units='1/max(data)')
@@ -862,7 +857,6 @@ def run_minimisation(fit_workspace, method="newton"):
     # truth sim_134
     # guess = np.array([1., 0.05, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
     guess = fit_workspace.p
-
     if method == "minimize":
         start = time.time()
         result = optimize.minimize(nll, fit_workspace.p, method='L-BFGS-B',
@@ -1002,6 +996,8 @@ def run_emcee(fit_workspace):
         sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob_spectrogram, args=(),
                                         pool=pool, backend=backend)
         print(f"Initial size: {backend.iteration}")
+        if backend.iteration > 0:
+            p0 = backend.get_last_sample()
         if nsamples - backend.iteration > 0:
             for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples - backend.iteration))):
                 if pool.is_master():
@@ -1012,6 +1008,8 @@ def run_emcee(fit_workspace):
         sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob_spectrogram, args=(),
                                         threads=4, backend=backend)
         print(f"Initial size: {backend.iteration}")
+        if backend.iteration > 0:
+            p0 = backend.get_last_sample()
         if nsamples - backend.iteration > 0:
             for i, result in enumerate(
                     sampler.sample(p0, iterations=max(0, nsamples - backend.iteration), progress=True)):
@@ -1037,7 +1035,7 @@ if __name__ == "__main__":
     filename = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-    w = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nsteps=100,
+    w = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nsteps=1000,
                                             burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
     run_minimisation(w, method="newton")
     # fit_workspace = w
