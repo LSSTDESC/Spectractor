@@ -739,7 +739,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         #    fit_workspace.plot_spectrogram_fit()
         residuals = (tmp_model - fit_workspace.spectrum.spectrogram).flatten()
         cost = np.sum((residuals ** 2) * W)
-        print(f"cost={cost:.3f} ({tmp_model.size:d} pixels)")
+        print(f"cost={cost:.3f} chisq_red={cost/tmp_model.size:.3f}")
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):
