@@ -448,7 +448,6 @@ class SpectrogramModel(Spectrum):
         # ax[0].imshow(self.data, origin="lower", aspect="auto")
         # ax[1].imshow(toto, origin="lower", aspect="auto")
         # plt.show()
-        # TODO: check units of backougrnd
         if self.with_background:
             self.data += self.spectrogram_bgd
         self.lambdas = lambdas
@@ -622,7 +621,7 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
 def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
                              pwv=5, ozone=300, aerosols=0.05, A1=1.0, A2=0.,
                              D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0.,
-                             psf_poly_params=None, with_background=False, fast_sim=False):
+                             psf_poly_params=None, with_background=True, fast_sim=False):
     """ SimulatorCore
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
