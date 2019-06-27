@@ -469,6 +469,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         FitWorkspace.__init__(self, filename, atmgrid_filename, nwalkers, nsteps, burnin, nbins, verbose, plot,
                               live_fit)
         self.my_logger = set_logger(self.__class__.__name__)
+        self.crop_spectrogram()
         self.A1 = 1.0
         self.A2 = 0.01
         self.ozone = 400.
@@ -505,6 +506,20 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser)
         self.get_spectrogram_truth()
+
+    def crop_spectrogram(self):
+        bgd_width = parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND - parameters.PIXWIDTH_SIGNAL
+        # spectrogram must have odd size in y for the fourier simulation
+        yeven = 0
+        if (self.spectrum.spectrogram_Ny - 2 * bgd_width) % 2 == 0:
+            yeven = 1
+        self.spectrum.spectrogram_ymax = self.spectrum.spectrogram_ymax - bgd_width + yeven
+        self.spectrum.spectrogram_ymin += bgd_width
+        self.spectrum.spectrogram_bgd = self.spectrum.spectrogram_bgd[bgd_width:-bgd_width + yeven, :]
+        self.spectrum.spectrogram = self.spectrum.spectrogram[bgd_width:-bgd_width + yeven, :]
+        self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width + yeven, :]
+        self.spectrum.spectrogram_y0 -= bgd_width
+        self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram.shape
 
     def get_spectrogram_truth(self):
         if 'A1' in list(self.spectrum.header.keys()):
@@ -724,7 +739,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         #    fit_workspace.plot_spectrogram_fit()
         residuals = (tmp_model - fit_workspace.spectrum.spectrogram).flatten()
         cost = np.sum((residuals ** 2) * W)
-        print(f"cost={cost:.3f}")
+        print(f"cost={cost:.3f} ({tmp_model.size:d} pixels)")
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):

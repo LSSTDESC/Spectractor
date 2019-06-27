@@ -1083,17 +1083,27 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Extract the non rotated background
     bgd_model_func = extract_background_photutils(data, err, ws=ws)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
+
     # Crop the background lateral regions
-    bgd_width = ws[1] - w
-    yeven = 0
-    if (Ny - 2 * bgd_width) % 2 == 0:  # spectrogram must have odd size in y for the fourier simulation
-        yeven = 1
-    ymax = ymax - bgd_width + yeven
-    ymin += bgd_width
-    bgd = bgd[bgd_width:-bgd_width + yeven, :]
-    data = data[bgd_width:-bgd_width + yeven, :]
-    err = err[bgd_width:-bgd_width + yeven, :]
-    Ny, Nx = data.shape
+    # bgd_width = ws[1] - w
+    # yeven = 0
+    # if (Ny - 2 * bgd_width) % 2 == 0:  # spectrogram must have odd size in y for the fourier simulation
+    #     yeven = 1
+    # ymax = ymax - bgd_width + yeven
+    # ymin += bgd_width
+    # bgd = bgd[bgd_width:-bgd_width + yeven, :]
+    # data = data[bgd_width:-bgd_width + yeven, :]
+    # err = err[bgd_width:-bgd_width + yeven, :]
+    # Ny, Nx = data.shape
+    # target_pixcoords_spectrogram[1] -= bgd_width
+
+    # Spectrogram must have odd size in y for the fourier simulation
+    if Ny % 2 == 0:
+        ymax = ymax - 1
+        bgd = bgd[:-1, :]
+        data = data[:-1, :]
+        err = err[:-1, :]
+        Ny, Nx = data.shape
 
     # First guess for lambdas
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_distance_along_dispersion_axis(),
@@ -1103,7 +1113,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     my_logger.warning(f"\n\tTransverse fit table after derotation:\n{s.table[['lambdas', 'Dx_rot', 'Dx']]}")
 
     # Position of the order 0 in the spectrogram coordinates
-    target_pixcoords_spectrogram[1] -= bgd_width
     my_logger.info(f'\n\tExtract spectrogram: crop image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))'
                    f'\n\tNew target position in spectrogram frame: {target_pixcoords_spectrogram}')
 
@@ -1111,7 +1120,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.spectrogram = data
     spectrum.spectrogram_err = err
     spectrum.spectrogram_bgd = bgd
-    spectrum.spectrogram_fit = s.evaluate(s.poly_params)
     spectrum.spectrogram_x0 = target_pixcoords_spectrogram[0]
     spectrum.spectrogram_y0 = target_pixcoords_spectrogram[1]
     spectrum.spectrogram_xmin = xmin

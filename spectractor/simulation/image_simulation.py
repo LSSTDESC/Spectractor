@@ -232,7 +232,7 @@ class ImageModel(Image):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         self.data = star.model(xx, yy) + background.model(xx, yy)
         self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
-        spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += (spectrogram.data - spectrogram.spectrogram_bgd)
+        spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data  # - spectrogram.spectrogram_bgd)
         self.true_lambdas = spectrogram.lambdas
         self.true_spectrum = spectrogram.true_spectrum
         if starfield is not None:
@@ -302,9 +302,9 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     target_pixcoords = find_target(image, guess)
     # Background model
     my_logger.info('\n\tBackground model...')
-    yy, xx = np.mgrid[:parameters.XWINDOW,:parameters.YWINDOW]
-    bgd_level = np.mean(image.target_bkgd2D(xx,yy))
-    background = BackgroundModel(level=bgd_level, frame=None) #frame=(1600, 1650))
+    yy, xx = np.mgrid[:parameters.XWINDOW, :parameters.YWINDOW]
+    bgd_level = np.mean(image.target_bkgd2D(xx, yy))
+    background = BackgroundModel(level=bgd_level, frame=None)  # frame=(1600, 1650))
     if parameters.DEBUG:
         background.plot_model()
 
@@ -336,12 +336,12 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
 
+    # Increase
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0.,
                                            angle=spectrum.rotation_angle,
-                                           psf_poly_params=psf_poly_params)
-    spectrogram.fast_sim = False
+                                           psf_poly_params=psf_poly_params, with_background=False, fast_sim=False)
 
     # now we include effects related to the wrong extraction of the spectrum:
     # wrong estimation of the order 0 position and wrong DISTANCE2CCD
@@ -384,7 +384,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['PWV'] = pwv
     image.header['VAOD'] = aerosols
     image.header['PSF_DEG'] = spectrum.spectrogram_deg
-    psf_poly_params_truth  =  np.array(psf_poly_params)
+    psf_poly_params_truth = np.array(psf_poly_params)
     if psf_poly_params_truth.size > spectrum.spectrogram_Nx:
         psf_poly_params_truth = psf_poly_params_truth[spectrum.spectrogram_Nx:]
     image.header['PSF_POLY'] = np.array_str(psf_poly_params_truth, max_line_width=1000, precision=4)
