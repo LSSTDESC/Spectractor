@@ -719,7 +719,6 @@ class ChromaticPSF1D:
         y = np.arange(self.Ny)
         output = np.zeros((self.Ny, self.Nx))
         for k in range(self.Nx):
-            # self.my_logger.warning(f"{k} {profile_params[k]}")
             output[:, k] = PSF1D.evaluate(y, *profile_params[k])
         return output
 
@@ -1505,7 +1504,7 @@ def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=No
                                                                                     force_positive=True)
     chromatic_psf.fill_table_with_profile_params(chromatic_psf.profile_params)
     chromatic_psf.from_profile_params_to_shape_params(chromatic_psf.profile_params)
-    if parameters.DEBUG or True:
+    if parameters.DEBUG  or True:
         # Plot data, best fit model and residuals:
         chromatic_psf.plot_summary()
         plot_chromatic_PSF1D_residuals(chromatic_psf, bgd, data, data_errors, guess=guess, title='Best fit')
