@@ -165,7 +165,7 @@ class SpectrumSimulation(Spectrum):
 
 class SpectrogramModel(Spectrum):
 
-    def __init__(self, spectrum, atmosphere, telescope, disperser):
+    def __init__(self, spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=False):
         """Class to simulate a spectrogram.
 
         Parameters
@@ -186,8 +186,8 @@ class SpectrogramModel(Spectrum):
         self.disperser = disperser
         self.telescope = telescope
         self.atmosphere = atmosphere
-        self.pixels_x = np.arange(self.chromatic_psf.Nx).astype(int)
-        self.pixels_y = np.arange(self.chromatic_psf.Ny).astype(int)
+        #self.pixels_x = np.arange(self.chromatic_psf.Nx).astype(int)
+        #self.pixels_y = np.arange(self.chromatic_psf.Ny).astype(int)
         self.true_spectrum = None
         self.lambdas = None
         self.data = None
@@ -196,7 +196,8 @@ class SpectrogramModel(Spectrum):
         self.psf_cube = None
         self.fhcube = None
         self.fix_psf_cube = False
-        self.fast_sim = False
+        self.fast_sim = fast_sim
+        self.with_background = with_background
 
     def simulate_spectrum(self, lambdas, ozone, pwv, aerosols, shift_t=0.):
         """
@@ -447,7 +448,9 @@ class SpectrogramModel(Spectrum):
         # ax[0].imshow(self.data, origin="lower", aspect="auto")
         # ax[1].imshow(toto, origin="lower", aspect="auto")
         # plt.show()
-        self.data += self.spectrogram_bgd
+        # TODO: check units of backougrnd
+        if self.with_background:
+            self.data += self.spectrogram_bgd
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         self.err = np.zeros_like(self.data)
@@ -513,12 +516,13 @@ class SpectrumSimGrid():
         plt.figure()
         counts = self.spectragrid[1:, self.atmgrid.index_atm_count]
         for count in counts:
-            plt.plot(parameters.LAMBDAS, self.spectragrid[int(count), self.atmgrid.index_atm_data:])
+            plt.plot(self.lambdas, self.spectragrid[int(count), self.atmgrid.index_atm_data:])
         plt.grid()
         plt.xlabel("$\lambda$ [nm]")
         plt.ylabel("Flux [ADU/s]")
         plt.title("Spectra for Atmospheric variations")
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
     def plot_spectra_img(self):
         plt.figure()
@@ -618,7 +622,7 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
 def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
                              pwv=5, ozone=300, aerosols=0.05, A1=1.0, A2=0.,
                              D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0.,
-                             psf_poly_params=None):
+                             psf_poly_params=None, with_background=False, fast_sim=False):
     """ SimulatorCore
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
@@ -632,7 +636,8 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
 
     # SPECTRUM SIMULATION
     # --------------------
-    spectrogram_simulation = SpectrogramModel(spectrum, atmosphere, telescope, disperser)
+    spectrogram_simulation = SpectrogramModel(spectrum, atmosphere, telescope, disperser,
+                                              with_background=with_background, fast_sim=fast_sim)
     spectrogram_simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, psf_poly_params)
     return spectrogram_simulation
 
