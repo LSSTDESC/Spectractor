@@ -244,6 +244,7 @@ class AtmosphereGrid(Atmosphere):
         # create the numpy array that will contains the atmospheric grid
         self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_ATM_HEADER + self.NB_ATM_DATA))
         self.atmgrid[0, self.index_atm_data:] = parameters.LAMBDAS
+        self.lambdas = parameters.LAMBDAS
 
     def compute(self):
         """Compute atmospheric transmissions and fill self.atmgrid.
@@ -301,7 +302,7 @@ class AtmosphereGrid(Atmosphere):
             label = f'PWV={self.atmgrid[int(count), self.index_atm_pwv]} ' \
                     f'OZ={self.atmgrid[int(count), self.index_atm_oz]} ' \
                     f'VAOD={self.atmgrid[int(count), self.index_atm_aer]}'
-            plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.atmgrid[int(count), self.index_atm_data:],
+            plot_transmission_simple(plt.gca(), self.lambdas, self.atmgrid[int(count), self.index_atm_data:],
                                      title="Atmospheric grid", label=label)
         if parameters.DISPLAY:
             plt.show()
