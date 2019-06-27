@@ -516,12 +516,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             yeven = 1
         self.spectrum.spectrogram_ymax = self.spectrum.spectrogram_ymax - bgd_width + yeven
         self.spectrum.spectrogram_ymin += bgd_width
-        print(bgd_width)
-        fig, ax = plt.subplots(2, 1)
-        ax[0].imshow(self.spectrum.spectrogram_bgd)
         self.spectrum.spectrogram_bgd = self.spectrum.spectrogram_bgd[bgd_width:-bgd_width + yeven, :]
-        ax[1].imshow(self.spectrum.spectrogram_bgd)
-        plt.show()
         self.spectrum.spectrogram = self.spectrum.spectrogram[bgd_width:-bgd_width + yeven, :]
         self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width + yeven, :]
         self.spectrum.spectrogram_y0 -= bgd_width
