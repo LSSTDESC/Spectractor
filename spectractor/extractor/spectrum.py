@@ -1018,7 +1018,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     my_logger.info(
         f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
-    # Extract the abckground on the rotated image
+    # Extract the background on the rotated image
     bgd_model_func = extract_background_photutils(data, err, ws=ws)
     #bgd_model_func = extract_background_poly2D(data, ws=ws)
 

@@ -950,8 +950,10 @@ def extract_background_photutils(data, err, ws=(20, 30)):
     bgd_bands = np.copy(data).astype(float)
     bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
     mask = (np.isnan(bgd_bands))
-    bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
-                       filter_size=((ws[1] - ws[0]) // 2, (ws[1] - ws[0]) // 2),
+    # windows size in x is set to only 6 pixels to be able to estimate rapid variations of the background on real data
+    # filter window size is set to window // 2 so 3
+    bkg = Background2D(data, ((ws[1] - ws[0]), 6),
+                       filter_size=((ws[1] - ws[0]) // 2, 3),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False,
