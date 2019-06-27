@@ -504,7 +504,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
             self.bounds[4] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
         self.nwalkers = max(2 * self.ndim, nwalkers)
-        self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser)
+        self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
+                                           with_background=True, fast_sim=False)
         self.get_spectrogram_truth()
 
     def crop_spectrogram(self):
@@ -515,7 +516,12 @@ class SpectrogramFitWorkspace(FitWorkspace):
             yeven = 1
         self.spectrum.spectrogram_ymax = self.spectrum.spectrogram_ymax - bgd_width + yeven
         self.spectrum.spectrogram_ymin += bgd_width
+        print(bgd_width)
+        fig, ax = plt.subplots(2, 1)
+        ax[0].imshow(self.spectrum.spectrogram_bgd)
         self.spectrum.spectrogram_bgd = self.spectrum.spectrogram_bgd[bgd_width:-bgd_width + yeven, :]
+        ax[1].imshow(self.spectrum.spectrogram_bgd)
+        plt.show()
         self.spectrum.spectrogram = self.spectrum.spectrogram[bgd_width:-bgd_width + yeven, :]
         self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width + yeven, :]
         self.spectrum.spectrogram_y0 -= bgd_width
@@ -1035,16 +1041,34 @@ def run_emcee(fit_workspace):
 
 
 if __name__ == "__main__":
-    from optparse import OptionParser
+    from argparse import ArgumentParser
+    from spectractor.config import load_config
+    from spectractor.logbook import LogBook
 
-    parser = OptionParser()
-    parser.add_option("-d", "--debug", dest="debug", action="store_true",
-                      help="Enter debug mode (more verbose and plots).", default=False)
-    parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
-                      help="Enter verbose (print more stuff).", default=False)
-    parser.add_option("-o", "--output_directory", dest="output_directory", default="./outputs/",
-                      help="Write results in given output directory (default: ./outputs/).")
-    (opts, args) = parser.parse_args()
+    parser = ArgumentParser()
+    parser.add_argument(dest="input", metavar='path', default=["tests/data/reduc_20170530_134_spectrum.fits"],
+                        help="Input fits file name. It can be a list separated by spaces, or it can use * as wildcard.",
+                        nargs='*')
+    parser.add_argument("-d", "--debug", dest="debug", action="store_true",
+                        help="Enter debug mode (more verbose and plots).", default=False)
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
+                        help="Enter verbose (print more stuff).", default=False)
+    parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
+                        help="Write results in given output directory (default: ./outputs/).")
+    parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
+                        help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
+    parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
+                        help="INI config file. (default: config.ctio.ini).")
+    args = parser.parse_args()
+
+    parameters.VERBOSE = args.verbose
+    if args.debug:
+        parameters.DEBUG = True
+        parameters.VERBOSE = True
+
+    file_names = args.input
+
+    load_config(args.config)
 
     filename = 'outputs/reduc_20170530_134_spectrum.fits'
     filename = 'outputs/sim_20170530_134_spectrum.fits'
