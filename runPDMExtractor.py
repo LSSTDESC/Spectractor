@@ -67,8 +67,8 @@ if __name__ == "__main__":
 
     # choose the date
     #-----------------
-    #thedate = "20190214"
-    thedate = "20190215"
+    thedate = "20190214"
+    #thedate = "20190215"
 
 
     #This above defines the logbbok to be used
@@ -79,6 +79,11 @@ if __name__ == "__main__":
         #logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v2.csv"
         #logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v4.csv"
         logbookfilename = "allobs_logbook_PicDuMidi_" + thedate + "_v4_filter_None.csv"
+        if thedate == "20190215":
+            logbookfilename = "allobs_logbook_PicDuMidi_" + thedate + "_v4_filter_None.csv"
+        else:
+            logbookfilename = "simple_logbook_PicDuMidi_20190214_v4_filter_None_marcsel_july19.csv"
+
 
 
     #Read the logbook for testing
@@ -89,7 +94,7 @@ if __name__ == "__main__":
     #Select the index of the file in range 0..30
     #--------------------------
 
-    idx_sel=518
+    idx_sel=0
 
     # Get the first filename
     #--------------------------
@@ -136,8 +141,10 @@ if __name__ == "__main__":
     # output_prod2   : production erreur statistiques multipliées par 3
     # output_prod3   : erreurs statistiques remises à leur valeur
     # output_test    : pou tester
-    output_directory = "output_test/"+thedate
-
+    if  thedate == "20190215":
+        output_directory = "output_test/"+thedate
+    else:
+        output_directory = "output_test_marcsel_july19/" + thedate
 
     # Define the configuration file for Pic Du Midi
     #-----------------------------------------------

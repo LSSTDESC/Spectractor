@@ -68,8 +68,8 @@ if __name__ == "__main__":
 
     # choose the date
     #-----------------
-    #thedate = "20190214"         # Works !!!
-    thedate = "20190215"        #
+    thedate = "20190214"         # Works !!!
+    #thedate = "20190215"        #
 
 
     #This above defines the logbbok to be used
@@ -79,7 +79,10 @@ if __name__ == "__main__":
     else:
         #logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v2.csv"
         #logbookfilename = "simple_logbook_PicDuMidi_" + thedate + "_v4.csv"
-        logbookfilename = "allobs_logbook_PicDuMidi_"+ thedate + "_v4_filter_None.csv"
+        if thedate=="20190215":
+            logbookfilename = "allobs_logbook_PicDuMidi_"+ thedate + "_v4_filter_None.csv"
+        else:
+            logbookfilename ="simple_logbook_PicDuMidi_20190214_v4_filter_None_marcsel_july19.csv"
 
 
     #Read the logbook for testing
@@ -91,8 +94,8 @@ if __name__ == "__main__":
     #--------------------------
 
     idx_sel_min=0
-    #idx_sel_max = len(df)
-    idx_sel_max = 10
+    idx_sel_max = len(df)
+    #idx_sel_max = 10
 
 
 
@@ -147,7 +150,7 @@ if __name__ == "__main__":
 
 
         #output_directory = "/Users/dagoret/DATA/PicDuMidiFev2019/spectractor_output_prod3/" +thedate
-        output_directory = "/Users/dagoret/DATA/PicDuMidiFev2019/spectractor_output_test/" + thedate
+        output_directory = "/Users/dagoret/DATA/PicDuMidiFev2019/spectractor_output_test_marcsel_july19/" + thedate
 
 
         # Define the configuration file for Pic Du Midi
