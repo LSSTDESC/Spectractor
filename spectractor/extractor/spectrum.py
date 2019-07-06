@@ -136,7 +136,7 @@ class Spectrum:
                     f['label'], parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
                 break
 
-    def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False):
+    def plot_spectrum(self, ax=None, xlim=None, ylim=None,live_fit=False, label='', force_lines=False,drawclose=True):
         """Plot spectrum with emission and absorption lines.
 
         Parameters
@@ -166,21 +166,22 @@ class Spectrum:
         if self.x0 is not None:
             label += f', x0={self.x0[0]:.2f}pix'
         title = self.target.label
-        plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
+        plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, ylim=ylim,label=label,
                              title=title, units=self.units)
         if len(self.target.spectra) > 0:
             for k in range(len(self.target.spectra)):
                 s = self.target.spectra[k] / np.max(self.target.spectra[k]) * np.max(self.data)
-                ax.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
+                #ax.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
+                ax.plot(self.target.wavelengths[k], s, lw=2)
         if self.lambdas is not None:
             self.lines.plot_detected_lines(ax, print_table=parameters.VERBOSE)
         if self.lambdas is not None and self.lines is not None:
             self.lines.plot_atomic_lines(ax, fontsize=12, force=force_lines)
-        ax.legend(loc='best')
+        ax.legend(loc='upper right')
         if self.filters is not None:
             ax.get_legend().set_title(self.filters)
         if parameters.DISPLAY:
-            if live_fit:
+            if live_fit and drawclose:
                 plt.draw()
                 plt.pause(1e-8)
                 plt.close()
@@ -326,18 +327,47 @@ class Spectrum:
             self.data = raw_data[1]
             if len(raw_data) > 2:
                 self.err = raw_data[2]
-            extract_info_from_CTIO_header(self, self.header)
-            if self.header['TARGET'] != "":
-                self.target = load_target(self.header['TARGET'], verbose=parameters.VERBOSE)
-                self.lines = self.target.lines
-            if self.header['UNIT2'] != "":
-                self.units = self.header['UNIT2']
-            if self.header['ROTANGLE'] != "":
-                self.rotation_angle = self.header['ROTANGLE']
-            if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
-                self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
+
+            if parameters.OBS_NAME == 'CTIO' or parameters.OBS_NAME == 'LPNHE':
+                extract_info_from_CTIO_header(self, self.header)
+            elif parameters.OBS_NAME == 'PICDUMIDI':
+                extract_info_from_PDM_header(self, self.header)
+                self.header['LSHIFT'] = 0.
+                self.header['D2CCD'] = parameters.DISTANCE2CCD
+                self.header['EXPTIME'] = self.header['EXPOSURE']
+                self.header['FILTERS'] = self.header['FILTERS']
+                self.header['FILTER1'] = self.header['FILTER1']
+                self.header['FILTER2'] = self.header['FILTER2']
+                # image.header["FILTER2"] = image.disperser_label #better take the name in the logbook
+                self.header['TARGET'] = self.header['OBJECT']
+                self.filters=self.header['FILTERS']
+
+
+
+            if parameters.OBS_NAME == 'CTIO' or parameters.OBS_NAME == 'LPNHE':
+                if self.header['TARGET'] != "":
+                    self.target = load_target(self.header['TARGET'], verbose=parameters.VERBOSE)
+                    self.lines = self.target.lines
+                if self.header['UNIT2'] != "":
+                    self.units = self.header['UNIT2']
+                if self.header['ROTANGLE'] != "":
+                    self.rotation_angle = self.header['ROTANGLE']
+                if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
+                    self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
+
+
+
+            elif parameters.OBS_NAME == 'PICDUMIDI':
+                if self.header['OBJECT'] != "":
+                    self.target = load_target(self.header['OBJECT'], verbose=parameters.VERBOSE)
+                    self.lines = self.target.lines
+
+
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
+
+
+
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             self.load_spectrogram(input_file_name.replace('spectrum', 'spectrogram'))
             
@@ -1104,8 +1134,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    s = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,
-                                                     bgd_model_func=bgd_model_func,
+    s = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,bgd_model_func=bgd_model_func,
                                                      saturation=image.saturation, live_fit=parameters.DEBUG)
 
     # Fill spectrum object

@@ -1387,7 +1387,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
                    label='Target', linewidth=2)
 
 
-def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', label='', title='', units=''):
+def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, ylim=None,color='r', label='', title='', units=''):
     """Simple function to plot a spectrum with error bars and labels.
 
     Parameters
@@ -1424,6 +1424,9 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
     ax.set_xlim(xlim)
     ax.set_ylim(0., np.nanmax(data) * 1.2)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
     if lambdas is not None:
         ax.set_xlabel('$\lambda$ [nm]')
     else:
