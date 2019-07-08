@@ -28,11 +28,12 @@ class StarModel:
         self.sigma = self.model.stddev / 2
 
     def plot_model(self):
-        yy, xx = np.meshgrid(np.linspace(self.y0 - 10 * self.fwhm, self.y0 + 10 * self.fwhm, 50),
-                             np.linspace(self.x0 - 10 * self.fwhm, self.x0 + 10 * self.fwhm, 50))
+        x = np.linspace(self.x0 - 10 * self.fwhm, self.x0 + 10 * self.fwhm, 50)
+        y = np.linspace(self.y0 - 10 * self.fwhm, self.y0 + 10 * self.fwhm, 50)
+        yy, xx = np.meshgrid(x, y)
         star = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
-        im = plt.imshow(star, origin='lower', cmap='jet')
+        im = plt.pcolor(x, y, star, cmap='jet')
         ax.grid(color='white', ls='solid')
         ax.grid(True)
         ax.set_xlabel('X [pixels]')
@@ -353,7 +354,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info('\n\tImage model...')
     image.compute(star, background, spectrogram, starfield=starfield)
     image.convert_to_ADU_units()
-    image.add_poisson_noise()
+    #image.add_poisson_noise()
+    #TODO: add disrectisation in integers
     if parameters.VERBOSE and parameters.DISPLAY:
         image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
 
@@ -419,7 +421,7 @@ if __name__ == "__main__":
         parameters.VERBOSE = True
 
     file_names = ['CTIODataJune2017_reduced_RG715_v2/data_30may17/reduc_20170530_134.fits']
-    spectrum_file_name = 'outputs/reduc_20170530_132_spectrum.fits'
+    spectrum_file_name = 'outputs/reduc_20170530_134_spectrum.fits'
     # guess = [720, 670]
     # hologramme HoloAmAg
     psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
