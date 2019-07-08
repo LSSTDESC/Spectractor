@@ -487,17 +487,17 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.angle = self.spectrum.rotation_angle
         self.saturation = self.spectrum.spectrogram_saturation
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols,
-                           self.D, self.shift_x, self.shift_y])
+                           self.D, self.shift_x, self.shift_y, self.angle])
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params])
         self.ndim = self.p.size
         self.input_labels = ["A1", "A2", "ozone [db]", "PWV [mm]", "VAOD", r"D_CCD [mm]",
-                             r"shift_x [pix]", r"shift_y [pix]"] + list(self.psf_poly_params_labels)
+                             r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]"] + list(self.psf_poly_params_labels)
         self.axis_names = ["$A_1$", "$A_2$", "ozone [db]", "PWV [mm]", "VAOD", r"$D_{CCD}$ [mm]",
-                           r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]"] \
+                           r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]"] \
                            + list(self.psf_poly_params_names)
-        self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1),
-                                                (50, 60), (-3, 3), (-3, 3)]),
+        self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (1, 10), (0, 1),
+                                                (50, 60), (-3, 3), (-3, 3), (-90,90)]),
                                       self.psf_poly_params_bounds[:-1]])  # remove saturation
         if atmgrid_filename != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
@@ -509,7 +509,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.get_spectrogram_truth()
 
     def crop_spectrogram(self):
-        bgd_width = parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND - parameters.PIXWIDTH_SIGNAL
+        bgd_width = parameters.PIXWIDTH_BACKGROUND  + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         # spectrogram must have odd size in y for the fourier simulation
         yeven = 0
         if (self.spectrum.spectrogram_Ny - 2 * bgd_width) % 2 == 0:
@@ -521,6 +521,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width + yeven, :]
         self.spectrum.spectrogram_y0 -= bgd_width
         self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram.shape
+        self.my_logger.debug(f'\n\tSize of the spectrogram region after cropping: '
+                             f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')
 
     def get_spectrogram_truth(self):
         if 'A1' in list(self.spectrum.header.keys()):
@@ -565,11 +567,15 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[1, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
             residuals = (self.spectrum.spectrogram - self.model)
             residuals_err = self.spectrum.spectrogram_err / self.model
-            norm = self.spectrum.spectrogram_err[:, sub]
-            std = float(np.std(residuals[:, sub] / norm))
-            plot_image_simple(ax[2, 0], data=residuals[:, sub] / norm, vmin=-5 * std, vmax=5 * std, title='Data-Model',
-                              aspect='auto', cax=ax[2, 1], units='') #1/max(data)
-            ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='white', y=0.8)
+            #norm = self.spectrum.spectrogram_err[:, sub]
+            residuals /= norm
+            std = float(np.std(residuals[:, sub])) # /Err
+            plot_image_simple(ax[2, 0], data=residuals[:, sub] , vmin=-5 * std, vmax=5 * std, title='Data-Model',
+                              aspect='auto', cax=ax[2, 1], units='', cmap="bwr") #1/max(data)
+            ax[2, 0].set_title('(Data-Model)', fontsize=10, loc='center', color='black', y=0.8)
+            ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals[:, sub]):.3f}\nstd={np.std(residuals[:, sub]):.3f}',
+                          horizontalalignment='left', verticalalignment='bottom',
+                          color='black', transform=ax[2, 0].transAxes)
             ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
             ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
@@ -586,14 +592,14 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[3, 0].legend(fontsize=7)
             ax[3, 0].grid(True)
 
-    def simulate(self, A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, *psf_poly_params):
+    def simulate(self, A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, *psf_poly_params):
         global plot_counter
         self.simulation.fix_psf_cube = False
         if np.all(np.isclose(psf_poly_params, self.p[self.psf_params_start_index:], rtol=1e-6)):
             self.simulation.fix_psf_cube = True
         lambdas, model, model_err = \
-            self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, psf_poly_params)
-        self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y] + list(psf_poly_params))
+            self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, psf_poly_params)
+        self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle] + list(psf_poly_params))
         self.lambdas = lambdas
         self.model = model
         self.model_err = model_err
@@ -626,6 +632,14 @@ class SpectrogramFitWorkspace(FitWorkspace):
             plt.show()
         print(f"\tjacobian time computation = {time.time() - start:.1f}s")
         return J
+
+    def hessian(self, J, W):
+        # algebra
+        JT_W = J.T * W
+        JT_W_J = JT_W @ J
+        L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
+        inv_JT_W_J = L.T @ L
+        return inv_JT_W_J
 
     def plot_spectrogram_fit(self):
         """
@@ -692,9 +706,9 @@ def lnprob_spectrogram(p):
     return lp + lnlike_spectrogram(p, fit_workspace)
 
 
-def chisq(p, fit_workspace):
-    model, err = fit_workspace.simulate(*p)
-    chisquare = np.sum((model - fit_workspace.spectrum.data) ** 2 / (err ** 2 + fit_workspace.spectrum.err ** 2))
+def chisq(p, workspace):
+    model, err = workspace.simulate(*p)
+    chisquare = np.sum((model - workspace.spectrum.data) ** 2 / (err ** 2 + workspace.spectrum.err ** 2))
     # chisq /= self.spectrum.data.size
     # print '\tReduced chisq =',chisq/self.spectrum.data.size
     return chisquare
@@ -755,12 +769,12 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # algebra
         JT_W = J.T * W
         JT_W_J = JT_W @ J
-        JT_W_R0 = JT_W @ residuals
         L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
         inv_JT_W_J = L.T @ L
         if fit_workspace.live_fit:
             fit_workspace.cov = inv_JT_W_J
             fit_workspace.plot_correlation_matrix(ipar)
+        JT_W_R0 = JT_W @ residuals
         dparams = - inv_JT_W_J @ JT_W_R0
 
         def line_search(alpha):
@@ -871,7 +885,7 @@ def run_minimisation(fit_workspace, method="newton"):
     # sim_134
     # guess = fit_workspace.p
     # truth sim_134
-    # guess = np.array([1., 0.05, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
+    # guess = np.array([1., 0.05, 300, 5, 0.03, 55.45, 0.0, 0.0, -1.54, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
     guess = fit_workspace.p
     if method == "minimize":
         start = time.time()
@@ -926,7 +940,7 @@ def run_minimisation(fit_workspace, method="newton"):
             ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
             print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
                                     [fit_workspace.input_labels[ip] for ip in ipar])
-            if True:
+            if parameters.DISPLAY:
                 #plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
                 plot_gradient_descent(fit_workspace, costs, params_table)
                 fit_workspace.plot_correlation_matrix(ipar=ipar)
@@ -940,8 +954,8 @@ def run_minimisation(fit_workspace, method="newton"):
         epsilon[epsilon == 0] = 1e-3
         epsilon[0] = 1e-3 # A1
         epsilon[1] = 1e-4 # A2
-        epsilon[2] = 1 # ozone
-        epsilon[3] = 0.01 # pwv
+        epsilon[2] = 0.5 # ozone
+        epsilon[3] = 0.005 # pwv
         epsilon[4] = 0.0005 # aerosols
         epsilon[5] = 0.001 # DCCD
         epsilon[6] = 0.005 # shift_x
@@ -950,9 +964,10 @@ def run_minimisation(fit_workspace, method="newton"):
         # fit trace
         fix = [True] * guess.size
         fix[0] = False  # A1
-        fix[1] = True  # A2
+        fix[1] = False  # A2
         fix[6] = True  # x0
         fix[7] = True  # y0
+        fix[8] = False  # angle
         fit_workspace.simulation.fast_sim = True
         fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index+3] = [False] * 3
         fit_workspace.simulation.fix_psf_cube = False
@@ -1066,7 +1081,7 @@ if __name__ == "__main__":
     load_config(args.config)
 
     filename = 'outputs/reduc_20170530_134_spectrum.fits'
-    filename = 'outputs/sim_20170530_134_spectrum.fits'
+    filename = 'outputs/sim_20170530_132_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nsteps=1000,
