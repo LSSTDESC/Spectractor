@@ -239,7 +239,7 @@ class ImageModel(Image):
         if starfield is not None:
             self.data += starfield.model(xx, yy)
 
-    def add_poisson_noise(self):
+    def add_poisson_and_read_out_noise(self):
         if self.units != 'ADU':
             self.my_logger.error('\n\tPoisson noise procedure has to be applied on map in ADU units')
         d = np.copy(self.data).astype(float)
@@ -353,9 +353,17 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Image model
     my_logger.info('\n\tImage model...')
     image.compute(star, background, spectrogram, starfield=starfield)
+
+    # Convert data from ADU/s in ADU
     image.convert_to_ADU_units()
-    #image.add_poisson_noise()
-    #TODO: add disrectisation in integers
+
+    # Add Poisson and read-out noise
+    image.add_poisson_and_read_out_noise()
+
+    # Round float ADU into closest integers
+    image.data = np.around(image.data)
+
+    # Plot
     if parameters.VERBOSE and parameters.DISPLAY:
         image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
 
