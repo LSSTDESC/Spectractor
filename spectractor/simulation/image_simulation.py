@@ -336,6 +336,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     if psf_poly_params is None:
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
+        # TODO: solve this Gaussian PSF part issue
+        psf_poly_params[-7:-1] = 0.
 
     # Increase
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
