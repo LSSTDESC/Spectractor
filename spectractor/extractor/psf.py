@@ -210,7 +210,7 @@ class PSF2D(Fittable2DModel):
     y_mean = Parameter('y_mean', default=0)
     gamma = Parameter('gamma', default=3)
     alpha = Parameter('alpha', default=3)
-    eta_gauss = Parameter('eta_gauss', default=0.5)
+    eta_gauss = Parameter('eta_gauss', default=0.)
     stddev = Parameter('stddev', default=1)
     saturation = Parameter('saturation', default=1)
 
@@ -511,8 +511,9 @@ class ChromaticPSF1D:
                                                       poly_params[
                                                       l + shift:l + shift + self.degrees[name] + 1])
                 else:
-                    profile_params[:, k] = \
-                        np.polynomial.legendre.legval(pixels, poly_params[shift:shift + self.degrees[name] + 1])
+                    p = poly_params[shift:shift + self.degrees[name] + 1]
+                    if len(p) > 0: # to avoid saturation parameters in case not set
+                        profile_params[:, k] = np.polynomial.legendre.legval(pixels, p)
                 shift = shift + self.degrees[name] + 1
         if force_positive:
             for k, name in enumerate(self.PSF1D.param_names):
@@ -526,6 +527,9 @@ class ChromaticPSF1D:
                     profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
                 if name == "stddev":
                     profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
+                if name == "eta_gauss":
+                    profile_params[profile_params[:, k] > 0, k] = 0
+                    profile_params[profile_params[:, k] < -1, k] = -1
         return profile_params
 
     def from_profile_params_to_shape_params(self, profile_params):
@@ -956,8 +960,8 @@ def extract_background_photutils(data, err, ws=(20, 30)):
     mask = (np.isnan(bgd_bands))
     # windows size in x is set to only 6 pixels to be able to estimate rapid variations of the background on real data
     # filter window size is set to window // 2 so 3
-    bkg = Background2D(data, ((ws[1] - ws[0]), 6),
-                       filter_size=((ws[1] - ws[0]) // 2, 3),
+    bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
+                       filter_size=((ws[1] - ws[0]) // 2, (ws[1] - ws[0])//2),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False,

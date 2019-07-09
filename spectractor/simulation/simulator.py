@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 
 from scipy.interpolate import interp1d
+from scipy.integrate import quad
 
 from spectractor.extractor.images import Image
 from spectractor.extractor.spectrum import Spectrum
@@ -219,24 +220,34 @@ class SpectrogramModel(Spectrum):
         Returns
         -------
         spectrum: array_like
-            The spectrum array in Target units.
+            The spectrum array in ADU/s units.
         spectrum_err: array_like
-            The spectrum uncertainty array in Target units.
+            The spectrum uncertainty array in ADU/s units.
 
         """
-        spectrum = self.target.sed(lambdas)
-        spectrum *= self.disperser.transmission(lambdas - shift_t)
-        telescope_transmission = self.telescope.transmission(lambdas - shift_t)
-        spectrum *= telescope_transmission
-        spectrum *= self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
-        spectrum_err = np.zeros_like(spectrum)
-        idx = np.where(telescope_transmission > 0)[0]
-        spectrum_err[idx] = self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[idx]
-        self.lambdas = lambdas
-        self.lambdas_binwidths = np.gradient(lambdas)
+        spectrum = np.zeros_like(lambdas)
+        atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
+        if self.fast_sim:
+            spectrum = self.target.sed(lambdas)
+            spectrum *= self.disperser.transmission(lambdas - shift_t)
+            telescope_transmission = self.telescope.transmission(lambdas - shift_t)
+            spectrum *= telescope_transmission
+            spectrum *= atmosphere(lambdas)
+            spectrum_err = np.zeros_like(spectrum)
+            idx = np.where(telescope_transmission > 0)[0]
+            spectrum *= parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas)
+            spectrum_err[idx] = self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[idx]
+        else:
+            def integrand(lbda):
+                return lbda * self.target.sed(lbda) * self.telescope.transmission(lbda - shift_t) \
+                       * self.disperser.transmission(lbda - shift_t) * atmosphere(lbda)
+
+            for i in range(len(lambdas)-1):
+                spectrum[i] = parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i+1])[0]
+
         self.data = spectrum
-        self.err = spectrum_err
-        # self.convert_from_flam_to_ADUrate()
+        self.err = np.zeros_like(spectrum)
+
         # fig = plt.figure()
         # plt.plot(lambdas, spectrum/np.max(spectrum), label="spec")
         # plt.plot(lambdas, telescope_transmission/np.max(telescope_transmission), label="transmission")
@@ -292,6 +303,8 @@ class SpectrogramModel(Spectrum):
                 distances_order2 * np.sin(np.pi * self.rotation_angle / 180) + dy_func(lambdas_order2) - shift_y)
         dispersion_law_order2 = dispersion_law_order2[::2]
         lambdas_order2 = lambdas_order2[::2]
+        self.lambdas = lambdas
+        self.lambdas_binwidths = np.gradient(lambdas)
         if parameters.DEBUG:
             print(r0, self.chromatic_psf.table['Dx'][:6], self.chromatic_psf.table['Dy'][:6],
                   dy_func(lambdas_order2)[:6])
@@ -307,22 +320,19 @@ class SpectrogramModel(Spectrum):
 
         return lambdas, dispersion_law, dispersion_law_order2
 
-    def build_spectrogram(self, profile_params, spectrum, dispersion_law, lambdas):
+    def build_spectrogram(self, profile_params, spectrum, dispersion_law):
         # Spectrum units must in ADU/s
         yy, xx = np.mgrid[:self.spectrogram_Ny, :self.spectrogram_Nx]
         simul = np.zeros((self.spectrogram_Ny, self.spectrogram_Nx))
         nlbda = dispersion_law.size
-        lambdas_binwidths = np.gradient(lambdas)
         # TODO: increase rapidity (multithreading, optimisation...)
         for i in range(0, nlbda, 1):
             psf_lambda = PSF2D.evaluate(xx, yy, 1, dispersion_law[i].real, dispersion_law[i].imag, *profile_params[i, 2:])
             norm = PSF2D.normalisation(1, *profile_params[i, 2:-1])
             if norm > 0:
                 psf_lambda /= norm
-            # here spectrum is in erg/s/cm2/nm
+            # here spectrum is in ADU/s
             psf_lambda *= spectrum[i]
-            # convert from erg/s/cm2/nm to ADU/s
-            psf_lambda *= parameters.FLAM_TO_ADURATE * lambdas_binwidths[i] * lambdas[i]
             simul += psf_lambda
         return simul
 
@@ -358,25 +368,39 @@ class SpectrogramModel(Spectrum):
         >>> spec = SpectrogramModel(spectrum, atmosphere, telescope, disperser, with_background=True)
         >>> lambdas, data, err = spec.simulate(A2=0, angle=spectrum.rotation_angle, psf_poly_params=psf_poly_params)
         """
+        import time
+        start= time.time()
         self.rotation_angle = angle
         profile_params = self.simulate_psf(psf_poly_params)
+        self.my_logger.debug(f'\n\tAfter psf: {time.time()-start}')
+        start=time.time()
         r0 = self.spectrogram_x0 + 1j * self.spectrogram_y0
         lambdas, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
+        self.my_logger.debug(f'\n\tAfter dispersion: {time.time()-start}')
+        start=time.time()
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
         self.true_spectrum = spectrum
+        self.my_logger.debug(f'\n\tAfter spectrum: {time.time()-start}')
+        start=time.time()
+        ima1 = self.build_spectrogram(profile_params, spectrum, dispersion_law)
+        self.my_logger.debug(f'\n\tAfter build ima1: {time.time()-start}')
+        start=time.time()
 
-        ima1 = self.build_spectrogram(profile_params, spectrum, dispersion_law, lambdas)
-
+        # Add order 2
         ima2 = np.zeros_like(ima1)
         if A2 > 0.:
             nlbda_order2 = dispersion_law_order2.size
-            ima2 = self.build_spectrogram(profile_params[-nlbda_order2:], spectrum[:nlbda_order2],
-                                          dispersion_law_order2, lambdas[:nlbda_order2])
+            ima2 = self.build_spectrogram(profile_params[-nlbda_order2:], spectrum[:nlbda_order2], dispersion_law_order2)
+
+        self.my_logger.debug(f'\n\tAfter build ima2: {time.time()-start}')
+        start=time.time()
         # self.data is in ADU/s units here
         self.data = A1 * (ima1 + A2 * ima2)
         if self.with_background:
             self.data += self.spectrogram_bgd
         self.err = np.zeros_like(self.data)
+        self.my_logger.debug(f'\n\tAfter all: {time.time()-start}')
+        start=time.time()
         if parameters.DEBUG:
             fig, ax = plt.subplots(3, 1, sharex="all", figsize=(12, 9))
             ax[0].imshow(self.data, origin='lower')
