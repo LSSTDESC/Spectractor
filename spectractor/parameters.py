@@ -66,7 +66,8 @@ ROT_ORDER = 5  # must be above 3
 # Range for spectrum
 LAMBDA_MIN = 300  # minimum wavelength for spectrum extraction (in nm)
 LAMBDA_MAX = 1100  # maximum wavelength for spectrum extraction (in nm)
-LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, 1)
+LAMBDA_STEP = 0.2   # step size for the wavelength array (in nm)
+LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, LAMBDA_STEP)
 
 # Background subtraction parameters
 PIXWIDTH_SIGNAL = 10 # half transverse width of the signal rectangular window in pixels
