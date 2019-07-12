@@ -1025,9 +1025,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    s = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,
-                                     bgd_model_func=bgd_model_func,
-                                     saturation=image.saturation, live_fit=parameters.DEBUG)
+    s = ChromaticPSF1D(Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
+    s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, bgd_model_func=bgd_model_func,
+                                   saturation=image.saturation, live_fit=parameters.DEBUG)
 
     # Fill spectrum object
     spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
@@ -1039,7 +1039,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Fit the data:
     my_logger.info(f'\n\tStart ChromaticPSF1D polynomial fit...')
-    s = fit_chromatic_PSF1D(data, s, bgd_model_func=bgd_model_func, data_errors=err)
+    s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=err)
     spectrum.spectrogram_fit = s.evaluate(s.poly_params)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
