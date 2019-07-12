@@ -915,7 +915,7 @@ def extract_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=
     return bgd_model_func
 
 
-def extract_background_photutils(data, err, ws=(20, 30)):
+def extract_background_photutils(data, err, ws=(20, 30), mask_signal_region = True):
     """
     Use photutils library median filter to estimate background behgin the sources.
 
@@ -955,9 +955,12 @@ def extract_background_photutils(data, err, ws=(20, 30)):
     # Estimate the background in the two lateral bands together
     sigma_clip = SigmaClip(sigma=3.)
     bkg_estimator = SExtractorBackground()
-    bgd_bands = np.copy(data).astype(float)
-    bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
-    mask = (np.isnan(bgd_bands))
+    if mask_signal_region:
+        bgd_bands = np.copy(data).astype(float)
+        bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
+        mask = (np.isnan(bgd_bands))
+    else:
+        mask = None
     # windows size in x is set to only 6 pixels to be able to estimate rapid variations of the background on real data
     # filter window size is set to window // 2 so 3
     bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
