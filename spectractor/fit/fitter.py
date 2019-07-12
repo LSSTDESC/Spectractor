@@ -567,12 +567,12 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[1, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
             residuals = (self.spectrum.spectrogram - self.model)
             residuals_err = self.spectrum.spectrogram_err / self.model
-            # norm = self.spectrum.spectrogram_err[:, sub]
+            norm = self.spectrum.spectrogram_err
             residuals /= norm
             std = float(np.std(residuals[:, sub])) # /Err
-            plot_image_simple(ax[2, 0], data=residuals[:, sub] , vmin=-5 * std, vmax=5 * std, title='Data-Model',
+            plot_image_simple(ax[2, 0], data=residuals[:, sub] , vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
                               aspect='auto', cax=ax[2, 1], units='', cmap="bwr") #1/max(data)
-            ax[2, 0].set_title('(Data-Model)', fontsize=10, loc='center', color='black', y=0.8)
+            ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
             ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals[:, sub]):.3f}\nstd={np.std(residuals[:, sub]):.3f}',
                           horizontalalignment='left', verticalalignment='bottom',
                           color='black', transform=ax[2, 0].transAxes)
@@ -948,7 +948,7 @@ def run_minimisation(fit_workspace, method="newton"):
             ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
             print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
                                     [fit_workspace.input_labels[ip] for ip in ipar])
-            if parameters.DISPLAY:
+            if True:
                 #plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
                 plot_gradient_descent(fit_workspace, costs, params_table)
                 fit_workspace.plot_correlation_matrix(ipar=ipar)
@@ -1098,8 +1098,8 @@ if __name__ == "__main__":
 
     load_config(args.config)
 
-    filename = 'outputs/reduc_20170530_134_spectrum.fits'
-    filename = 'outputs/sim_20170530_132_spectrum.fits'
+    filename = 'outputs/reduc_20170530_130_spectrum.fits'
+    # filename = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nsteps=1000,
