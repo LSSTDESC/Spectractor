@@ -75,6 +75,9 @@ PIXDIST_BACKGROUND = 20 # distance from dispersion axis to analyse the backgroun
 PIXWIDTH_BACKGROUND = 10 # transverse width of the background rectangular window in pixels
 BGD_ORDER = 1 # the order of the polynomial background to fit transversaly
 
+# PSF
+PSF_POLY_ORDER = 2 # the order of the polynomials to model wavelength dependence of the shape parameters
+
 # Detection line algorithm
 CALIB_BGD_ORDER = 3  # order of the background polynome to fit
 CALIB_BGD_NPARAMS = CALIB_BGD_ORDER + 1  # number of unknown parameters for background
