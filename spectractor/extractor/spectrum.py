@@ -410,7 +410,7 @@ class Spectrum:
             self.chromatic_psf = ChromaticPSF1D(self.spectrogram_Nx, self.spectrogram_Ny,
                                                 deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,
                                                 file_name=input_file_name)
-            #self.chromatic_psf.table = Table.read(input_file_name)
+            # self.chromatic_psf.table = Table.read(input_file_name)
             self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
@@ -531,11 +531,11 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     len_index_to_bgd_npar_factor = 0.12
     baseline_prior = 0.1  # *sigma gaussian prior on base line fit
     # filter the noise
-    #plt.errorbar(lambdas,spec,yerr=spec_err)
+    # plt.errorbar(lambdas,spec,yerr=spec_err)
     spec = np.copy(spec)
     spec = savgol_filter(spec, 5, 2)
-    #plt.plot(lambdas,spec)
-    #plt.show()
+    # plt.plot(lambdas,spec)
+    # plt.show()
     # initialisation
     lambda_shifts = []
     snrs = []
@@ -630,6 +630,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), line_wavelength,
                                   0.5 * (line.width_bounds[0] + line.width_bounds[1])]
         if line_strategy == np.less:
+            # noinspection PyTypeChecker
             guess[bgd_npar] = -0.5 * np.max(spec[index])  # look for abosrption under bgd
         # bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), lambdas[index_inf], line.width_bounds[0]],
         #          [np.inf] * bgd_npar + [abs(np.max(spec[index])), lambdas[index_sup], line.width_bounds[1]]]
@@ -751,7 +752,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             # guess[n] = getattr(bgd, bgd.param_names[parameters.CALIB_BGD_ORDER - n]).value
             guess[n] = fit[n]
             b = abs(baseline_prior * guess[n])
-            if np.isclose(b, 0, rtol=1e-2*float(np.mean(spec[bgd_index]))):
+            if np.isclose(b, 0, rtol=1e-2 * float(np.mean(spec[bgd_index]))):
                 b = baseline_prior * np.std(spec[bgd_index])
                 if np.isclose(b, 0, rtol=1e-2 * float(np.mean(spec[bgd_index]))):
                     b = np.inf
@@ -1020,13 +1021,13 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Extract the background on the rotated image
     bgd_model_func = extract_background_photutils(data, err, ws=ws)
-    #bgd_model_func = extract_background_poly2D(data, ws=ws)
+    # bgd_model_func = extract_background_poly2D(data, ws=ws)
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     s = fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, deg=2,
-                                                     bgd_model_func=bgd_model_func,
-                                                     saturation=image.saturation, live_fit=parameters.DEBUG)
+                                     bgd_model_func=bgd_model_func,
+                                     saturation=image.saturation, live_fit=parameters.DEBUG)
 
     # Fill spectrum object
     spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
@@ -1040,7 +1041,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     my_logger.info(f'\n\tStart ChromaticPSF1D polynomial fit...')
     s = fit_chromatic_PSF1D(data, s, bgd_model_func=bgd_model_func, data_errors=err)
     spectrum.spectrogram_fit = s.evaluate(s.poly_params)
-    spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx), np.arange(Ny))) / err
+    spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
+                                                                                       np.arange(Ny))) / err
     spectrum.chromatic_psf = s
     spectrum.data = np.copy(s.table['flux_integral'])
     s.table['Dx_rot'] = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
@@ -1168,6 +1170,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
 if __name__ == "__main__":
     import doctest
+
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
 

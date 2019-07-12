@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from scipy.optimize import basinhopping, minimize
-from scipy.interpolate import interp1d, interp2d
+from scipy.interpolate import interp1d
 from scipy.integrate import quad
 from iminuit import Minuit
 
@@ -11,8 +11,8 @@ from astropy.modeling import Fittable1DModel, Fittable2DModel, Parameter
 from astropy.modeling.models import Moffat1D
 from astropy.table import Table
 
-from spectractor.tools import dichotomie, fit_poly1d_outlier_removal, \
-    fit_poly1d, fit_moffat1d_outlier_removal, fit_poly2d_outlier_removal
+from spectractor.tools import dichotomie, fit_poly1d, fit_moffat1d_outlier_removal
+from spectractor.extractor.background import extract_background_photutils
 from spectractor import parameters
 from spectractor.config import set_logger
 
@@ -1504,8 +1504,6 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
         2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
     data_errors: np.array
         the 2D array uncertainties.
-    method: str, optional
-        the minimisation method: 'minimize' or 'basinhopping' (default: 'minimize').
 
     Returns
     -------
