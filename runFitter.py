@@ -34,8 +34,8 @@ if __name__ == "__main__":
     for file_name in file_names:
         atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-        fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_filename=atmgrid_filename, nsteps=2000,
+        w = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=2000,
                                                 burnin=1000, nbins=10, verbose=0, plot=False, live_fit=False)
-        run_minimisation(fit_workspace, method="newton")
+        run_minimisation(w, method="newton")
         # run_emcee(fit_workspace)
         # fit_workspace.analyze_chains()

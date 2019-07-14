@@ -95,7 +95,7 @@ FLAM_TO_ADURATE = (
     (OBS_SURFACE * SED_UNIT * TIME_UNIT * wl_dwl_unit / hc / CCD_GAIN * g_disperser_ronchi).decompose()).value
 
 # fit workspace
-FIT_WORKSPACE = None
+# FIT_WORKSPACE = None
 
 # Plotting
 PAPER = False
