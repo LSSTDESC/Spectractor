@@ -11,14 +11,14 @@ verstrline = open(version_file, "rt").read()
 VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
 mo = re.search(VSRE, verstrline, re.M)
 if mo:
-    coord_version = mo.group(1)
+    current_version = mo.group(1)
 else:
     raise RuntimeError("Unable to find version string in %s." % (version_file,))
-print('Coord version is %s'%(coord_version))
+print('Coord version is %s' % (current_version))
 
 setup(
     name='Spectractor',
-    version='1.1',
+    version=current_version,
     packages=['spectractor', 'spectractor.extractor', 'spectractor.simulation', 'spectractor.fit'],
     install_requires=reqs,
     test_suite='nose.collector',
