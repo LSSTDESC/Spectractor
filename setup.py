@@ -4,6 +4,9 @@ import re
 
 reqs = open('requirements.txt', 'r').read().strip().splitlines()
 
+with open('README.md') as file:
+    long_description = file.read()
+
 # Read in the coord version from coord/_version.py
 # cf. http://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 version_file=os.path.join('spectractor','_version.py')
@@ -34,4 +37,5 @@ setup(
     author='J. Neveu, S. Dagoret-Campagne',
     author_email='jneveu@lal.in2p3.fr',
     description='',
+    long_description=long_description,
 )
