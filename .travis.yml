@@ -46,7 +46,7 @@ before_script:
   - "gzip -d netcdf-4.6.1.tar.gz"
   - "tar -xf netcdf-4.6.1.tar"
   - "cd netcdf-4.6.1"
-  - "./configure  --prefix=$TRAVIS_BUILD_DIR/NETCDF"
+  - "./configure  --prefix=$TRAVIS_BUILD_DIR/NETCDF --disable-netcdf-4"
   - "make"
   - "make install"
   - "cd ../"
