@@ -14,7 +14,7 @@ if mo:
     current_version = mo.group(1)
 else:
     raise RuntimeError("Unable to find version string in %s." % (version_file,))
-print('Coord version is %s' % (current_version))
+print('Spectractor version is %s' % (current_version))
 
 setup(
     name='Spectractor',
