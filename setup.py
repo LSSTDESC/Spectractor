@@ -1,6 +1,20 @@
 from setuptools import setup
+import os
+import re
 
 reqs = open('requirements.txt', 'r').read().strip().splitlines()
+
+# Read in the coord version from coord/_version.py
+# cf. http://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
+version_file=os.path.join('spectractor','_version.py')
+verstrline = open(version_file, "rt").read()
+VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
+mo = re.search(VSRE, verstrline, re.M)
+if mo:
+    coord_version = mo.group(1)
+else:
+    raise RuntimeError("Unable to find version string in %s." % (version_file,))
+print('Coord version is %s'%(coord_version))
 
 setup(
     name='Spectractor',
