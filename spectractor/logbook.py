@@ -4,6 +4,7 @@ from spectractor.config import set_logger
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+import numpy as np
 
 
 class LogBook:
@@ -140,7 +141,6 @@ class LogBook:
 
 if __name__ == "__main__":
     import doctest
-    import numpy as np
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
 

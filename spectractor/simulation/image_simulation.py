@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import numpy as np
 import copy
+import os
 
 
 # from astroquery.gaia import Gaia, TapPlus, GaiaClass
@@ -418,7 +419,6 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
 
 if __name__ == "__main__":
-    import os
     from spectractor.logbook import LogBook
     from argparse import ArgumentParser
 
