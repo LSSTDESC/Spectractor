@@ -1,8 +1,16 @@
 from astropy.coordinates import SkyCoord
+import astropy.units as units
 from astroquery.ned import Ned
 from astroquery.simbad import Simbad
+import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
+import os
+import numpy as np
 
-from spectractor.extractor.spectroscopy import *
+from spectractor import parameters
+from spectractor.config import set_logger
+from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
+                                                ISM_LINES)
 
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
