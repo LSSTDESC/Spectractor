@@ -1,6 +1,9 @@
-from spectractor.config import *
+from spectractor import parameters
+from spectractor.config import set_logger
+
 import matplotlib.pyplot as plt
 import pandas as pd
+import os
 
 
 class LogBook:
