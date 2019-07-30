@@ -1,8 +1,12 @@
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy import interpolate
+import numpy as np
+import sys
 
-from spectractor.tools import *
+
+from spectractor import parameters
+from spectractor.tools import formatting_numbers
 
 
 class Axis(object):
