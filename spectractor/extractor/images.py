@@ -1,5 +1,6 @@
 from astropy.coordinates import Angle, SkyCoord
 from astropy.modeling import fitting
+from astropy.io import fits
 import astropy.units as units
 from scipy import ndimage
 from matplotlib import cm
@@ -60,7 +61,12 @@ class Image(object):
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
-        self.load_image(file_name)
+        if parameters.CALLING_CODE != 'LSST_DM':
+            self.load_image(file_name)
+        else:
+            # data provided by the LSST shim, just instantiate objects
+            # necessary for the following code not to fail
+            self.header = fits.header.Header()
         # Load the target if given
         self.target = None
         self.target_pixcoords = None
