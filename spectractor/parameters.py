@@ -7,6 +7,23 @@ import matplotlib as mpl
 # These parameters are the default values adapted to CTIO
 # To modify them, please create a new config file and load it.
 
+
+def __getattr__(name):
+    """Method to allow querying items without them existing.
+
+    NB: This breaks hasattr(parameters, name), as that is implemented by
+    calling __getattr__() and checking it raises an AttributeError, so
+    hasattr() for parameters will now always return True.
+
+    If necessary this can be worked around by instead doing:
+        `if name in dir(parameters):`
+    """
+    if name in locals():
+        return locals()[name]
+    else:
+        return False
+
+
 # Paths
 mypath = os.path.dirname(__file__)
 HOLO_DIR = os.path.join(mypath, "extractor/dispersers/")
