@@ -880,6 +880,7 @@ def calibrate_spectrum_with_lines(spectrum):
     if x0 is None:
         x0 = spectrum.target_pixcoords
         spectrum.x0 = x0
+    # MFL notes: the logic with D seems confused here
     D = parameters.DISTANCE2CCD
     if spectrum.header['D2CCD'] != '':
         D = spectrum.header['D2CCD']
@@ -1147,7 +1148,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.spectrogram_saturation = spectrum.chromatic_psf.saturation
 
     # Summary plot
-    if parameters.DEBUG:
+    if parameters.DEBUG or parameters.LSST_SAVEFIGPATH:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         xx = np.arange(s.table['Dx_rot'].size)
         plot_image_simple(ax[2], data=data, scale="log", title='', units=image.units, aspect='auto')
@@ -1180,6 +1181,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[1].set_position([pos2.x0, pos1.y0, pos2.width, pos1.height])
         if parameters.DISPLAY:
             plt.show()
+        if parameters.LSST_SAVEFIGPATH:
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'spectrum.pdf'))
     return spectrum
 
 
