@@ -321,7 +321,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Target model
     my_logger.info('\n\tStar model...')
     # Spectrogram is simulated with spectrum.x0 target position: must be this position to simualte the target.
-    star = StarModel(spectrum.x0, image.target_star2D, image.target_star2D.amplitude.value, target=image.target)
+    star = StarModel(spectrum.x0, image.target_star2D, image.target_star2D.amplitude_moffat.value, target=image.target)
     reso = star.sigma
     if parameters.DEBUG:
         star.plot_model()
