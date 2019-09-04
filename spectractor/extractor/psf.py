@@ -1411,15 +1411,15 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
         # Estimate the first guess values
-        >>> s = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=saturation)
-        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
-        >>> s.plot_summary(truth=s0)
+        # >>> s = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=saturation)
+        # >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+        # ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+        # >>> s.plot_summary(truth=s0)
 
         # Fit the data:
-        >>> parameters.DEBUG = True
-        >>> s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
-        >>> s.plot_summary(truth=s0)
+        # >>> parameters.DEBUG = True
+        # >>> s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
+        # >>> s.plot_summary(truth=s0)
         """
         my_logger = set_logger(__name__)
         Ny, Nx = data.shape
