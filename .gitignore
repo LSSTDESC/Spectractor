@@ -11,6 +11,3 @@
 *.DS_Store
 *.xlsx
 .idea
-Spectractor.egg-info/
-build/
-dist/

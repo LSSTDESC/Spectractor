@@ -1,8 +1,8 @@
 from numpy.testing import run_module_suite
 
 from spectractor import parameters
-from spectractor.simulation.simulator import (SpectrumSimulator, SpectrumSimulatorSimGrid,
-                                              Atmosphere, AtmosphereGrid, SpectrogramSimulator)
+from spectractor.simulation.simulator import SpectrumSimulator, SpectrumSimulatorSimGrid, \
+    Atmosphere, AtmosphereGrid, SpectrogramSimulator
 from spectractor.simulation.image_simulation import ImageSim
 from spectractor.config import load_config
 import os

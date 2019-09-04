@@ -1,10 +1,8 @@
 from astropy.table import Table
 from scipy.interpolate import interp1d
-import numpy as np
 
+from spectractor.tools import *
 from spectractor import parameters
-from spectractor.config import set_logger
-from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_for_legendre
 
 
 class Line:

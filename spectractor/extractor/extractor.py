@@ -1,11 +1,5 @@
-import os
-import numpy as np
-
+from spectractor.extractor.spectrum import *
 from spectractor import parameters
-from spectractor.config import set_logger, load_config
-from spectractor.extractor.images import Image, find_target, turn_image
-from spectractor.extractor.spectrum import (Spectrum, extract_spectrum_from_image, calibrate_spectrum,
-                                            calibrate_spectrum_with_lines)
 from spectractor.tools import ensure_dir
 
 

@@ -1,11 +1,7 @@
 from scipy import interpolate
 from scipy import ndimage
-import matplotlib.pyplot as plt
-import numpy as np
-import os
 
-from spectractor import parameters
-from spectractor.tools import fit_poly2d
+from spectractor.tools import *
 
 
 def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=256000):

@@ -1,21 +1,9 @@
-from astropy.coordinates import Angle, SkyCoord
-from astropy.modeling import fitting
-from astropy.io import fits
-import astropy.units as units
-from scipy import ndimage
+from astropy.coordinates import Angle
 from matplotlib import cm
-import matplotlib.pyplot as plt
-import numpy as np
-import os
 
-from spectractor import parameters
-from spectractor.config import set_logger
-from spectractor.extractor.targets import load_target
-from spectractor.extractor.dispersers import Hologram
-from spectractor.extractor.psf import fit_PSF2D_minuit
-from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_info_from_CTIO_header,
-                               fit_poly1d, fit_poly1d_outlier_removal, weighted_avg_and_std,
-                               fit_poly2d_outlier_removal, hessian_and_theta)
+from spectractor.extractor.targets import *
+from spectractor.extractor.psf import *
+from spectractor.extractor.dispersers import *
 
 
 class Image(object):
@@ -62,12 +50,7 @@ class Image(object):
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
-        if parameters.CALLING_CODE != 'LSST_DM':
-            self.load_image(file_name)
-        else:
-            # data provided by the LSST shim, just instantiate objects
-            # necessary for the following code not to fail
-            self.header = fits.header.Header()
+        self.load_image(file_name)
         # Load the target if given
         self.target = None
         self.target_pixcoords = None
@@ -198,8 +181,6 @@ class Image(object):
             plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Uncertainty map", units=self.units,
                               target_pixcoords=None, aspect="auto", cmap=None)
             fig.tight_layout()
-            if parameters.LSST_SAVEFIGPATH:
-                fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.png'))
             plt.show()
 
     def compute_parallactic_angle(self):
@@ -539,8 +520,6 @@ def find_target_1Dprofile(image, sub_image, guess):
         f.tight_layout()
         if parameters.DISPLAY:
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:
-            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot1.pdf'))
     return avX, avY
 
 
@@ -649,8 +628,6 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
         f.tight_layout()
         if parameters.DISPLAY:
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:
-            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot2.pdf'))
     return new_avX, new_avY
 
 
@@ -754,8 +731,6 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         ax2.set_xlabel("Rotation angles [degrees]")
         if parameters.DISPLAY:
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:
-            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotation_hessian.pdf'))
     return theta_median
 
 
@@ -823,8 +798,7 @@ def turn_image(image):
         f.tight_layout()
         if parameters.DISPLAY:
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:
-            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotated_image.pdf'))
+
 
 if __name__ == "__main__":
     import doctest
