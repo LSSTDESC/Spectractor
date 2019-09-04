@@ -1075,7 +1075,7 @@ class ChromaticPSF:
             self.profile_params[x, -6:] = guess[1:]
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
-            if live_fit:
+            if live_fit and parameters.DISPLAY:
                 plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, fit, bgd_model_func, guess,
                                               PSF_guess, outliers, sigma, live_fit)
         # interpolate the skipped pixels with splines
