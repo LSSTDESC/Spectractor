@@ -15,7 +15,7 @@ from scipy.ndimage.filters import maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 
 from skimage.feature import hessian_matrix
-from spectractor.config import *
+from spectractor.config import set_logger
 from spectractor import parameters
 from math import floor
 

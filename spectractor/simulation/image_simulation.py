@@ -1,9 +1,18 @@
-from spectractor.extractor.spectrum import *
-from spectractor.simulation.simulator import *
 from spectractor import parameters
-import copy
+from spectractor.config import set_logger
+from spectractor.tools import pixel_rotation, detect_peaks, fftconvolve_gaussian, ensure_dir
+from spectractor.extractor.images import Image, find_target
+from spectractor.simulation.throughput import TelescopeTransmission
+from spectractor.simulation.simulator import SpectrogramSimulatorCore, SimulatorInit
 
-from scipy.signal import gaussian
+from astropy.modeling import models
+from astropy.io import fits
+from scipy.signal import fftconvolve, gaussian
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+import numpy as np
+import copy
+import os
 
 
 # from astroquery.gaia import Gaia, TapPlus, GaiaClass
@@ -410,7 +419,6 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
 
 if __name__ == "__main__":
-    import os
     from spectractor.logbook import LogBook
     from argparse import ArgumentParser
 

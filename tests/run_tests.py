@@ -2,8 +2,11 @@ from numpy.testing import run_module_suite
 import sys
 
 # Per-module accuracy, input correctness, and unit tests
-from tests.test_simulator import *
-from tests.test_extractor import *
+try:
+    from test_simulator import *
+except ModuleNotFoundError as e:
+    print("Skipping simulator test due to missing package: %s" % e)
+from test_extractor import *
 
 if __name__ == "__main__":
     # Run tests
