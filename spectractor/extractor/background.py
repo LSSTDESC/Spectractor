@@ -278,3 +278,9 @@ def extract_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
         if parameters.DISPLAY:
             plt.show()
     return bgd_model_func
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
