@@ -1,6 +1,21 @@
 from scipy.signal import argrelextrema, savgol_filter
+from scipy.interpolate import interp1d
+from astropy.io import fits
+from iminuit import Minuit
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
-from spectractor.extractor.images import *
+from spectractor import parameters
+from spectractor.config import set_logger
+from spectractor.extractor.dispersers import Hologram
+from spectractor.extractor.targets import load_target
+from spectractor.tools import (ensure_dir, load_fits, extract_info_from_CTIO_header, plot_image_simple,
+                               find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
+                               rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
+                               from_lambda_to_colormap)
+from spectractor.extractor.psf import ChromaticPSF1D
+from spectractor.extractor.background import extract_background_photutils
 
 
 class Spectrum:
@@ -865,6 +880,7 @@ def calibrate_spectrum_with_lines(spectrum):
     if x0 is None:
         x0 = spectrum.target_pixcoords
         spectrum.x0 = x0
+    # MFL notes: the logic with D seems confused here
     D = parameters.DISTANCE2CCD
     if spectrum.header['D2CCD'] != '':
         D = spectrum.header['D2CCD']
@@ -1132,7 +1148,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.spectrogram_saturation = spectrum.chromatic_psf.saturation
 
     # Summary plot
-    if parameters.DEBUG:
+    if parameters.DEBUG or parameters.LSST_SAVEFIGPATH:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         xx = np.arange(s.table['Dx_rot'].size)
         plot_image_simple(ax[2], data=data, scale="log", title='', units=image.units, aspect='auto')
@@ -1165,6 +1181,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[1].set_position([pos2.x0, pos1.y0, pos2.width, pos1.height])
         if parameters.DISPLAY:
             plt.show()
+        if parameters.LSST_SAVEFIGPATH:
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'spectrum.pdf'))
     return spectrum
 
 
