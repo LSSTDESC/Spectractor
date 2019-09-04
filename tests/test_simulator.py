@@ -16,8 +16,8 @@ def test_simulator():
 
     for file_name in file_names:
         tag = file_name.split('/')[-1]
-        spectrum_simulation = SpectrumSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
-                                                A1=1.1, A2=0.1, reso=2, D=56, shift=-3)
+        # spectrum_simulation = SpectrumSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
+        #                                        A1=1.1, A2=0.1, reso=2, D=56, shift=-3)
         spectrogram_simulation = SpectrogramSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
                                                       A1=1.1, A2=0.1, D=56, shift_x=-3, shift_y=1, angle=-1)
         psf_poly_params = spectrogram_simulation.chromatic_psf.from_table_to_poly_params()
@@ -28,7 +28,7 @@ def test_simulator():
         atmgrid = AtmosphereGrid(file_name, file_name.replace('spectrum', 'atmsim'))
         atm = Atmosphere(atmgrid.airmass, atmgrid.pressure, atmgrid.temperature)
         assert image_simulation.data is not None
-        assert spectrum_simulation.data is not None
+        # assert spectrum_simulation.data is not None
         assert spectrogram_simulation.data is not None
         assert os.path.isfile('./tests/data/' + tag.replace('_spectrum.fits', '_sim.fits')) is True
         assert atm.transmission is not None
