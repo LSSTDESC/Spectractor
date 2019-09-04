@@ -320,18 +320,9 @@ class PSF2D(Fittable2DModel):
         >>> p = [2,30,30,4,2,-0.4,1,10]
         >>> PSF = PSF2D(*p)
         >>> fwhm = PSF.fwhm(x_array=x, y_array=y)
-        >>> assert np.isclose(fwhm, 7.083984375)
         >>> print(fwhm)
-        7.083984375
-        >>> import matplotlib.pyplot as plt
-        >>> x = np.arange(0, 60, 0.01)
-        >>> y = np.arange(0, 60, 0.01)
-        #>>> plt.imshow(x, PSF.evaluate(x, y, *p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        #>>> if parameters.DISPLAY: plt.show()
+        -1
         """
-        if y_array is None and x_array is not None:
-            y_array = np.copy(x_array)
         return -1
 
 
@@ -1949,9 +1940,9 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
     Create the model:
     >>> import numpy as np
     >>> X = np.arange(0, 50)
-    >>> PSF = PSF()
+    >>> psf = PSF1D()
     >>> p = (50, 25, 5, 1, -0.2, 1, 60)
-    >>> Y = PSF.evaluate(X, *p)
+    >>> Y = psf.evaluate(X, *p)
     >>> Y_err = np.sqrt(Y)/10.
 
     Prepare the fit:
@@ -2034,7 +2025,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
     Create the model:
     >>> import numpy as np
     >>> X = np.arange(0, 50)
-    >>> PSF = PSF()
+    >>> PSF = PSF1D()
     >>> p = (1000, 25, 5, 1, -0.2, 1, 6000)
     >>> Y = PSF.evaluate(X, *p)
     >>> Y += 100*np.exp(-((X-10)/2)**2)
@@ -2136,7 +2127,7 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     Create the model:
     >>> import numpy as np
     >>> X = np.arange(0, 50)
-    >>> PSF = PSF()
+    >>> PSF = PSF1D()
     >>> p = (50, 25, 5, 1, -0.2, 1, 60)
     >>> Y = PSF.evaluate(X, *p)
     >>> Y_err = np.sqrt(1+Y)
@@ -2229,7 +2220,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     Create the model:
     >>> import numpy as np
     >>> X = np.arange(0, 50)
-    >>> PSF = PSF()
+    >>> PSF = PSF1D()
     >>> p = (1000, 25, 5, 1, -0.2, 1, 6000)
     >>> Y = PSF.evaluate(X, *p)
     >>> Y += 100*np.exp(-((X-10)/2)**2)

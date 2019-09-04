@@ -297,6 +297,8 @@ class Lines:
         >>> assert(global_chisq < 1)
 
         Plot the result
+        >>> import matplotlib.pyplot as plt
+        >>> from spectractor.tools import plot_spectrum_simple
         >>> spec.lines = lines
         >>> fig = plt.figure()
         >>> plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)

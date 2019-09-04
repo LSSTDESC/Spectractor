@@ -48,10 +48,11 @@ class Spectrum:
         HoloPhAg
 
         Load a spectrum from a fits image file
-        >>> image = Image('tests/data/reduc_20170605_028.fits', target='3C273')
+        >>> from spectractor.extractor.images import Image
+        >>> image = Image('tests/data/reduc_20170605_028.fits', target='PNG321.0+3.9')
         >>> s = Spectrum(image=image)
         >>> print(s.target.label)
-        3C273
+        PNG321.0+3.9
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.target = target
@@ -507,6 +508,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
 
     Creation of a mock spectrum with emission and absorption lines
     >>> import numpy as np
+    >>> from spectractor.extractor.spectroscopy import Lines, HALPHA, HBETA, O2
     >>> lambdas = np.arange(300,1000,1)
     >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
     >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
@@ -527,6 +529,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     >>> assert(global_chisq < 2)
 
     Plot the result
+    >>> import matplotlib.pyplot as plt
     >>> spec.lines = lines
     >>> fig = plt.figure()
     >>> plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
