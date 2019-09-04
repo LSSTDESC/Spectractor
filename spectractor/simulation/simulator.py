@@ -36,9 +36,6 @@ from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 import spectractor.parameters as parameters
 
-import slitless.fourier.arrays as FA
-import slitless.fourier.fourier as F
-
 import pyfftw
 
 
@@ -423,10 +420,10 @@ class SpectrogramModel(Spectrum):
             plt.show()
         return self.lambdas, self.data, self.err
 
-    #@profile
     def simulate_FFT(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
                  shift_x=0., shift_y=0., angle=0., psf_poly_params=None):
         """
+        DEPRECATED
 
         Parameters
         ----------
@@ -455,6 +452,8 @@ class SpectrogramModel(Spectrum):
         >>> spec = SpectrogramModel(spectrum, atmosphere, telescope, disperser)
         >>> lambdas, data, err = spec.simulate_FFT(psf_poly_params=psf_poly_params)
         """
+        import slitless.fourier.arrays as FA
+        import slitless.fourier.fourier as F
         import time
         start = time.time()
         self.rotation_angle = angle
