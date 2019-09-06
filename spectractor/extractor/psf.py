@@ -791,7 +791,7 @@ class ChromaticPSF:
 
         Examples
         --------
-        >>> s = ChromaticPSF(Nx=100, Ny=20, deg=4, saturation=8000)
+        >>> s = ChromaticPSF1D(Nx=100, Ny=20, deg=4, saturation=8000)
         >>> poly_params = np.zeros(5)
         >>> output = s.evaluate(poly_params)
 
