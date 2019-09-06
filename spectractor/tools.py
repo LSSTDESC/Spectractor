@@ -196,7 +196,7 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
     >>> bounds = ((-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,100,800,100,100,800,100))
     >>> popt, pcov = fit_multigauss_and_line(x, y, guess=(0,1,3,630,3,3,770,3), bounds=bounds)
     >>> print(popt)
-    [   1.   10.   20.  650.    3.   40.  750.   10.]
+    [  1.  10.  20. 650.   3.  40. 750.  10.]
     """
     maxfev = 1000
     popt, pcov = curve_fit(multigauss_and_line, x, y, p0=guess, bounds=bounds, maxfev=maxfev, absolute_sigma=True)
@@ -1565,8 +1565,8 @@ def rebin(arr, new_shape):
 
 if __name__ == "__main__":
     import doctest
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
+    # if np.__version__ >= "1.14.0":
+    #    np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
 

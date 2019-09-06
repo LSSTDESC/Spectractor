@@ -71,6 +71,11 @@ class Spectrum:
         self.gain = parameters.CCD_GAIN
         self.chromatic_psf = ChromaticPSF1D(1, 1, deg=1, saturation=1)
         self.rotation_angle = 0
+        self.spectrogram = None
+        self.spectrogram_bgd = None
+        self.spectrogram_err = None
+        self.spectrogram_residuals = None
+        self.spectrogram_fit = None
         if file_name != "":
             self.filename = file_name
             self.load_spectrum(file_name)
@@ -265,7 +270,7 @@ class Spectrum:
         Examples
         --------
         >>> import os
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
         >>> s.save_spectrum('./tests/test.fits')
         >>> assert os.path.isfile('./tests/test.fits')
 

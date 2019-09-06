@@ -442,15 +442,15 @@ class SpectrogramModel(Spectrum):
 
         Example
         -------
-        >>> from spectractor.extractor.psf import  ChromaticPSF1D
-        >>> spectrum, telescope, disperser, target = SimulatorInit('outputs/reduc_20170530_130_spectrum.fits')
-        >>> airmass = spectrum.header['AIRMASS']
-        >>> pressure = spectrum.header['OUTPRESS']
-        >>> temperature = spectrum.header['OUTTEMP']
-        >>> atmosphere = Atmosphere(airmass, pressure, temperature)
-        >>> psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
-        >>> spec = SpectrogramModel(spectrum, atmosphere, telescope, disperser)
-        >>> lambdas, data, err = spec.simulate_FFT(psf_poly_params=psf_poly_params)
+        # >>> from spectractor.extractor.psf import  ChromaticPSF1D
+        # >>> spectrum, telescope, disperser, target = SimulatorInit('outputs/reduc_20170530_134_spectrum.fits')
+        # >>> airmass = spectrum.header['AIRMASS']
+        # >>> pressure = spectrum.header['OUTPRESS']
+        # >>> temperature = spectrum.header['OUTTEMP']
+        # >>> atmosphere = Atmosphere(airmass, pressure, temperature)
+        # >>> psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
+        # >>> spec = SpectrogramModel(spectrum, atmosphere, telescope, disperser)
+        # >>> lambdas, data, err = spec.simulate_FFT(psf_poly_params=psf_poly_params)
         """
         import slitless.fourier.arrays as FA
         import slitless.fourier.fourier as F

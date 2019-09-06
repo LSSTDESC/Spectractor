@@ -252,7 +252,7 @@ def extract_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
     # Fit a 1 degree 2D polynomial function with outlier removal
     xx, yy = np.meshgrid(pixel_range, bgd_index)
     bgd_model_func = fit_poly2d_outlier_removal(xx, yy, bgd_bands, order=deg, sigma=sigma, niter=20)
-    bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bgd_model_func(xx, yy), kind='linear', bounds_error=False,
+    bgd_model_func = interp2d(xx, yy, bgd_model_func(xx, yy), kind='linear', bounds_error=False,
                               fill_value=None)
 
     if parameters.DEBUG:
