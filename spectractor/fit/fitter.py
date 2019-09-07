@@ -21,11 +21,11 @@ plot_counter = 0
 class FitWorkspace:
 
     def __init__(self, file_name, nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False):
+                 verbose=0, plot=False, live_fit=False, truth=None):
         self.my_logger = set_logger(self.__class__.__name__)
         self.filename = file_name
         self.ndim = 0
-        self.truth = None
+        self.truth = truth
         self.verbose = verbose
         self.plot = plot
         self.live_fit = live_fit
@@ -35,7 +35,7 @@ class FitWorkspace:
         self.ndim = len(self.p)
         self.data = None
         self.err = None
-        self.lambdas = None
+        self.x = None
         self.model = None
         self.model_err = None
         self.model_noconv = None
@@ -49,6 +49,7 @@ class FitWorkspace:
         self.nbins = nbins
         self.burnin = burnin
         self.start = []
+        self.likelihood = np.array([[]])
         self.chains = np.array([[]])
         self.lnprobs = np.array([[]])
         self.flat_chains = np.array([[]])
@@ -56,10 +57,6 @@ class FitWorkspace:
         self.global_average = None
         self.global_std = None
         self.title = ""
-        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
-        self.airmass = self.spectrum.header['AIRMASS']
-        self.pressure = self.spectrum.header['OUTPRESS']
-        self.temperature = self.spectrum.header['OUTTEMP']
         self.use_grid = False
         self.emcee_filename = self.filename.replace(self.filename.split('.')[-1], "_emcee.h5")
 
@@ -82,6 +79,8 @@ class FitWorkspace:
             thin = 1
         except emcee.autocorr.AutocorrError:
             tau = -1
+            burnin = -1
+            thin = -1
         self.chains = reader.get_chain(discard=0, flat=False, thin=1)
         self.lnprobs = reader.get_log_prob(discard=0, flat=False, thin=1)
         self.nsteps = self.chains.shape[0]
@@ -98,27 +97,45 @@ class FitWorkspace:
         return self.flat_chains
 
     def simulate(self, *p):
-        lambdas = np.array([])
-        model = np.array([])
-        model_err = np.array([])
-        return lambdas, model, model_err
+        x = np.array([])
+        self.model = np.array([])
+        self.model_err = np.array([])
+        return x, self.model, self.model_err
 
     def analyze_chains(self):
         self.load_chains()
         self.set_chain_validity()
         self.convergence_tests()
         self.build_flat_chains()
-        likelihood = self.chain2likelihood()
-        self.p = likelihood.mean_vec
+        self.likelihood = self.chain2likelihood()
+        self.cov = self.likelihood.cov_matrix
+        self.rho = self.likelihood.rho_matrix
+        self.p = self.likelihood.mean_vec
         self.simulate(*self.p)
-        if isinstance(self, SpectrumFitWorkspace):
-            self.plot_fit()
-        elif isinstance(self, SpectrogramFitWorkspace):
-            self.plot_spectrogram_fit()
+        self.plot_fit()
         figure_name = self.filename.replace('.fits', '_triangle.pdf')
-        likelihood.triangle_plots(output_filename=figure_name)
-        self.cov = likelihood.cov_matrix
-        self.rho = likelihood.rho_matrix
+        self.likelihood.triangle_plots(output_filename=figure_name)
+
+    def plot_fit(self):
+        plt.errorbar(self.x, self.data, yerr=self.err, fmt='ko', label='Data')
+        plt.plot(self.x, self.model, label='Best fitting model')
+        if self.truth is not None:
+            x, truth, truth_err = self.simulate(*self.truth)
+            plt.plot(self.x, truth, label="Truth")
+        plt.xlabel('$x$')
+        plt.ylabel('$y$')
+        title = ""
+        for i, label in enumerate(self.input_labels):
+            title += f"{label}={self.p[i]:.3g}"
+            if self.cov.size > 0:
+                title += f"+/-{np.sqrt(self.cov[i, i])}"
+            if i < len(self.input_labels)-1:
+                title += ", "
+        plt.title(title)
+        plt.legend()
+        plt.grid()
+        if parameters.DISPLAY:
+            plt.show()
 
     def chain2likelihood(self, pdfonly=False, walker_index=-1):
         if walker_index >= 0:
@@ -339,13 +356,13 @@ class FitWorkspace:
             else:
                 plt.show()
 
-    def spectrogram_weighted_res(self, p):
+    def weighted_residuals(self, p):
         lambdas, model, model_err = self.simulate(*p)
         res = ((model - self.data) / np.sqrt(model_err ** 2 + self.err ** 2)).flatten()
         return res
 
     def chisq(self, p):
-        res = self.spectrogram_weighted_res(p)
+        res = self.weighted_residuals(p)
         chisq = np.sum(res ** 2)
         return chisq
 
@@ -363,13 +380,42 @@ class FitWorkspace:
         else:
             return -np.inf
 
+    def jacobian(self, params, epsilon, fixed_params=None):
+        start = time.time()
+        lambdas, model, model_err = self.simulate(*params)
+        model = model.flatten()
+        J = np.zeros((params.size, model.size))
+        for ip, p in enumerate(params):
+            if fixed_params[ip]:
+                continue
+            tmp_p = np.copy(params)
+            if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
+                epsilon[ip] = - epsilon[ip]
+            tmp_p[ip] += epsilon[ip]
+            tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
+            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+        return J
+
+    @staticmethod
+    def hessian(J, W):
+        # algebra
+        JT_W = J.T * W
+        JT_W_J = JT_W @ J
+        L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
+        inv_JT_W_J = L.T @ L
+        return inv_JT_W_J
+
 
 class SpectrumFitWorkspace(FitWorkspace):
 
     def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False):
-        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit)
+                 verbose=0, plot=False, live_fit=False, truth=None):
+        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
+        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
+        self.airmass = self.spectrum.header['AIRMASS']
+        self.pressure = self.spectrum.header['OUTPRESS']
+        self.temperature = self.spectrum.header['OUTTEMP']
         if atmgrid_file_name == "":
             self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
         else:
@@ -490,9 +536,13 @@ class SpectrumFitWorkspace(FitWorkspace):
 class SpectrogramFitWorkspace(FitWorkspace):
 
     def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False):
+                 verbose=0, plot=False, live_fit=False, truth=None):
         FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                              live_fit)
+                              live_fit, truth=truth)
+        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
+        self.airmass = self.spectrum.header['AIRMASS']
+        self.pressure = self.spectrum.header['OUTPRESS']
+        self.temperature = self.spectrum.header['OUTTEMP']
         self.my_logger = set_logger(self.__class__.__name__)
         if atmgrid_file_name == "":
             self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
@@ -637,7 +687,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.model = model
         self.model_err = model_err
         if self.live_fit and (plot_counter % 30) == 0:
-            self.plot_spectrogram_fit()
+            self.plot_fit()
         plot_counter += 1
         return lambdas, model, model_err
 
@@ -666,16 +716,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         print(f"\tjacobian time computation = {time.time() - start:.1f}s")
         return J
 
-    @staticmethod
-    def hessian(J, W):
-        # algebra
-        JT_W = J.T * W
-        JT_W_J = JT_W @ J
-        L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
-        inv_JT_W_J = L.T @ L
-        return inv_JT_W_J
-
-    def plot_spectrogram_fit(self):
+    def plot_fit(self):
         """
         Examples
         --------
@@ -688,7 +729,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         >>> fit_workspace.lambdas = lambdas
         >>> fit_workspace.model = model
         >>> fit_workspace.model_err = model_err
-        >>> fit_workspace.plot_spectrogram_fit()
+        >>> fit_workspace.plot_fit()
         """
         gs_kw = dict(width_ratios=[3, 0.15, 1, 0.15, 1, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(12, 8), constrained_layout=True, gridspec_kw=gs_kw)
@@ -725,6 +766,7 @@ def lnprob_spectrogram(p):
 
 
 def lnprob(p):
+    global fit_workspace
     lp = fit_workspace.lnprior(p)
     if not np.isfinite(lp):
         return -1e20
@@ -745,10 +787,10 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         start = time.time()
         tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
         # if fit_workspace.live_fit:
-        #    fit_workspace.plot_spectrogram_fit()
+        #    fit_workspace.plot_fit()
         residuals = (tmp_model - fit_workspace.data).flatten()
         cost = np.sum((residuals ** 2) * W)
-        print(f"cost={cost:.3f} chisq_red={cost/tmp_model.size:.3f}")
+        print(f"cost={cost:.3f} chisq_red={cost / tmp_model.size:.3f}")
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):
@@ -858,7 +900,7 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
 
     fit_workspace.simulate(*fit_workspace.p)
     fit_workspace.live_fit = False
-    fit_workspace.plot_spectrogram_fit()
+    fit_workspace.plot_fit()
 
 
 def save_gradient_descent(fit_workspace, costs, params_table):
@@ -898,25 +940,25 @@ def run_minimisation(fit_workspace, method="newton"):
                                             'maxls': 50, 'maxcor': 30},
                                    bounds=bounds)
         fit_workspace.p = result['x']
-        print(f"Minimize: total computation time: {time.time()-start}s")
+        print(f"Minimize: total computation time: {time.time() - start}s")
         fit_workspace.simulate(*fit_workspace.p)
         fit_workspace.live_fit = False
-        fit_workspace.plot_spectrogram_fit()
+        fit_workspace.plot_fit()
 
     elif method == "least_squares":
         start = time.time()
         x_scale = np.abs(guess)
         x_scale[x_scale == 0] = 0.1
-        p = optimize.least_squares(fit_workspace.spectrogram_weighted_res, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
-                                   diff_step=0.001, bounds=bounds.T, args=fit_workspace)
+        p = optimize.least_squares(fit_workspace.weighted_residuals, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
+                                   diff_step=0.001, bounds=bounds.T)
         fit_workspace.p = p.x  # m.np_values()
-        print(f"Least_squares: total computation time: {time.time()-start}s")
+        print(f"Least_squares: total computation time: {time.time() - start}s")
         fit_workspace.simulate(*fit_workspace.p)
         fit_workspace.live_fit = False
-        fit_workspace.plot_spectrogram_fit()
+        fit_workspace.plot_fit()
     elif method == "minuit":
         start = time.time()
-        fit_workspace.simulation.fix_psf_cube = False
+        # fit_workspace.simulation.fix_psf_cube = False
         error = 0.1 * np.abs(guess) * np.ones_like(guess)
         error[2:5] = 0.3 * np.abs(guess[2:5]) * np.ones_like(guess[2:5])
         z = np.where(np.isclose(error, 0.0, 1e-6))
@@ -928,10 +970,10 @@ def run_minimisation(fit_workspace, method="newton"):
         m.tol = 10
         m.migrad()
         fit_workspace.p = m.np_values()
-        print(f"Minuit: total computation time: {time.time()-start}s")
+        print(f"Minuit: total computation time: {time.time() - start}s")
         fit_workspace.simulate(*fit_workspace.p)
         fit_workspace.live_fit = False
-        fit_workspace.plot_spectrogram_fit()
+        fit_workspace.plot_fit()
     elif method == "newton":
 
         def bloc_gradient_descent(guess, epsilon, params_table, costs, fix, xtol, ftol, niter):
@@ -953,7 +995,7 @@ def run_minimisation(fit_workspace, method="newton"):
         fit_workspace.simulation.fast_sim = True
         costs = np.array([fit_workspace.chisq_spectrogram(guess)])
         if parameters.DISPLAY:
-            fit_workspace.plot_spectrogram_fit()
+            fit_workspace.plot_fit()
         params_table = np.array([guess])
         start = time.time()
         epsilon = 1e-4 * guess
@@ -1023,7 +1065,7 @@ def run_minimisation(fit_workspace, method="newton"):
                                                     fix=fix, xtol=1e-5, ftol=1e-5, niter=40)
         fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
         save_gradient_descent(fit_workspace, costs, params_table)
-        print(f"Newton: total computation time: {time.time()-start}s")
+        print(f"Newton: total computation time: {time.time() - start}s")
 
 
 def run_emcee(fit_workspace):
