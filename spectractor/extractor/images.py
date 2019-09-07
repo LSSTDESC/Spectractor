@@ -188,7 +188,7 @@ class Image(object):
             fit, cov, model = fit_poly1d(x, y, order=1)
             gain = 1 / fit[0]
             ax[0].text(0.05, 0.95, f"fitted gain={gain:.3g} [e-/ADU]\nintercept={fit[1]:.3g} [ADU$^2$]"
-                                   f"\nfitted read-out={np.sqrt(fit[1])*gain:.3g} [ADU]",
+                                   f"\nfitted read-out={np.sqrt(fit[1]) * gain:.3g} [ADU]",
                        horizontalalignment='left', verticalalignment='top', transform=ax[0].transAxes)
             ax[0].scatter(x, y)
             ax[0].plot(x, model, "k-")
@@ -198,9 +198,10 @@ class Image(object):
             plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Uncertainty map", units=self.units,
                               target_pixcoords=None, aspect="auto", cmap=None)
             fig.tight_layout()
-            if parameters.LSST_SAVEFIGPATH:
+            if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
                 fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.png'))
-            plt.show()
+            if parameters.DISPLAY:  # pragma: no cover
+                plt.show()
 
     def compute_parallactic_angle(self):
         """Compute the parallactic angle.
@@ -265,7 +266,7 @@ class Image(object):
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         plt.legend()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:   # pragma: no cover
             plt.show()
 
 
@@ -339,7 +340,7 @@ def build_CTIO_read_out_noise_map(image):
     image.read_out_noise[size // 2:size, size // 2:size] = image.header['GTRON22']
 
 
-def load_LPNHE_image(image):
+def load_LPNHE_image(image):  # pragma: no cover
     """Specific routine to load LPNHE fits files and load their data and properties for Spectractor.
 
     Parameters
@@ -393,7 +394,7 @@ def find_target(image, guess, rotated=False):
     theX, theY = guess
     if rotated:
         angle = image.rotation_angle * np.pi / 180.
-        rotmat = np.matrix([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
+        rotmat = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
         vec = np.array(image.target_pixcoords) - 0.5 * np.array(image.data.shape[::-1])
         guess2 = np.dot(rotmat, vec) + 0.5 * np.array(image.data_rotated.shape[::-1])
         x0 = int(guess2[0, 0])
@@ -537,9 +538,9 @@ def find_target_1Dprofile(image, sub_image, guess):
         ax3.set_xlabel('Y [pixels]')
         ax3.legend(loc=1)
         f.tight_layout()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot1.pdf'))
     return avX, avY
 
@@ -647,9 +648,9 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
         ax3.legend(loc=1)
 
         f.tight_layout()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot2.pdf'))
     return new_avX, new_avY
 
@@ -752,9 +753,9 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         n, bins, patches = ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
         ax2.plot([theta_median, theta_median], [0, np.max(n)])
         ax2.set_xlabel("Rotation angles [degrees]")
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:   # pragma: no cover
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotation_hessian.pdf'))
     return theta_median
 
@@ -816,20 +817,19 @@ def turn_image(image):
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
-                                                       min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]), margin:-margin],
+                                                       min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
+                                    margin:-margin],
                           scale="log", title='Turned image (log10 scale)',
                           units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
         f.tight_layout()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:
+        if parameters.LSST_SAVEFIGPATH:   # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotated_image.pdf'))
+
 
 if __name__ == "__main__":
     import doctest
-
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
