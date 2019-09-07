@@ -40,7 +40,7 @@ class PSF1D(Fittable1DModel):
         # warnings.filterwarnings('error')
         try:
             a = amplitude_moffat * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
-        except RuntimeWarning:
+        except RuntimeWarning:  # pragma: no cover
             my_logger = set_logger(__name__)
             my_logger.warning(f"{[amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation]}")
             a = amplitude_moffat * eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
@@ -772,7 +772,7 @@ class ChromaticPSF:
     def get_distance_along_dispersion_axis(self, shift_x=0, shift_y=0):
         return np.sqrt((self.table['Dx'] - shift_x) ** 2 + (self.table['Dy_mean'] - shift_y) ** 2)
 
-    def evaluate(self, poly_params):
+    def evaluate(self, poly_params):  # pragma: no cover
         """
         Dummy function to simulate a 2D spectrogram of size Nx times Ny.
 
@@ -792,8 +792,9 @@ class ChromaticPSF:
         Examples
         --------
         >>> s = ChromaticPSF1D(Nx=100, Ny=20, deg=4, saturation=8000)
-        >>> poly_params = np.zeros(5)
+        >>> poly_params = s.generate_test_poly_params()
         >>> output = s.evaluate(poly_params)
+        >>> assert not np.all(np.isclose(output, 0))
 
         >>> import matplotlib.pyplot as plt
         >>> im = plt.imshow(output, origin='lower')  #doctest: +ELLIPSIS
@@ -842,7 +843,7 @@ class ChromaticPSF:
         ax[0].legend()
         fig.tight_layout()
         # fig.subplots_adjust(hspace=0)
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
     def plot_chromatic_PSF1D_residuals(self, bgd, data, data_errors, guess=None, live_fit=False, title=""):
@@ -883,7 +884,7 @@ class ChromaticPSF:
         ax[4].set_title('(Data-Fit)/Data_errors')
         plt.colorbar(im4, ax=ax[4])
         fig.tight_layout()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             if live_fit:
                 plt.draw()
                 plt.pause(1e-8)
@@ -1066,7 +1067,7 @@ class ChromaticPSF:
             self.profile_params[x, -6:] = guess[1:]
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
-            if live_fit and parameters.DISPLAY:
+            if live_fit and parameters.DISPLAY:  # pragma: no cover
                 plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, fit, bgd_model_func, guess,
                                               PSF_guess, outliers, sigma, live_fit)
         # interpolate the skipped pixels with splines
@@ -1556,8 +1557,8 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
     # Fit the transverse profile:
-    >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
-    >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=50,
+    >>> s = ChromaticPSF1D(Nx=80, Ny=100, deg=4, saturation=saturation)
+    >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
     ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
 
     """
@@ -2309,7 +2310,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
 if __name__ == "__main__":
     import doctest
 
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
+    #if np.__version__ >= "1.14.0":
+    #    np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
