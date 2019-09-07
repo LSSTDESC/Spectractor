@@ -675,7 +675,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[3, 0].plot(self.lambdas[sub], self.spectrum.spectrogram.sum(axis=0)[sub], label='Data')
             ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
             ax[3, 0].set_ylabel('Cross spectrum')
-            ax[3, 0].set_xlabel('$\lambda$ [nm]')
+            ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
             ax[3, 0].legend(fontsize=7)
             ax[3, 0].grid(True)
 
@@ -726,10 +726,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
         --------
         >>> file_name = 'outputs/reduc_20170530_130_spectrum.fits'
         >>> atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-        >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000, burnin=10000,
-        ... nbins=10, verbose=1, plot=True, live_fit=False)
+        >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_filename=atmgrid_filename,
+        ... nwalkers=28, nsteps=20000, burnin=10000, nbins=10, verbose=1, plot=True, live_fit=False)
         >>> A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, *psf = fit_workspace.p
-        >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, psf)
+        >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols,
+        ... D, shift_x, shift_y, shift_t, angle, psf)
         >>> fit_workspace.lambdas = lambdas
         >>> fit_workspace.model = model
         >>> fit_workspace.model_err = model_err
@@ -889,7 +890,7 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
     ax[1].legend(ncol=6, loc=9)
     ax[1].grid()
     ax[0].set_yscale("log")
-    ax[0].set_ylabel("$\chi^2$")
+    ax[0].set_ylabel(r"$\chi^2$")
     ax[1].set_ylabel("Parameters")
     ax[0].grid()
     ax[1].set_xlabel("Iterations")
