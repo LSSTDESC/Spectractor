@@ -126,9 +126,9 @@ class FitWorkspace:
         plt.ylabel('$y$')
         title = ""
         for i, label in enumerate(self.input_labels):
-            title += f"{label}={self.p[i]:.3g}"
+            title += f"{label} = {self.p[i]:.3g}"
             if self.cov.size > 0:
-                title += f"$\pm${np.sqrt(self.cov[i, i]):.3g}"
+                title += rf" $\pm$ {np.sqrt(self.cov[i, i]):.3g}"
             if i < len(self.input_labels)-1:
                 title += ", "
         plt.title(title)
@@ -384,7 +384,6 @@ class FitWorkspace:
             return -np.inf
 
     def jacobian(self, params, epsilon, fixed_params=None):
-        start = time.time()
         lambdas, model, model_err = self.simulate(*params)
         model = model.flatten()
         J = np.zeros((params.size, model.size))
@@ -426,6 +425,7 @@ class SpectrumFitWorkspace(FitWorkspace):
             self.atmosphere = AtmosphereGrid(file_name, atmgrid_file_name)
             if parameters.VERBOSE:
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
+        self.lambdas = self.spectrum.lambdas
         self.data = self.spectrum.data
         self.err = self.spectrum.err
         self.A1 = 1.0
@@ -555,6 +555,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             if parameters.VERBOSE:
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
         self.crop_spectrogram()
+        self.lambdas = self.spectrum.lambdas
         self.data = self.spectrum.spectrogram
         self.err = self.spectrum.spectrogram_err
         self.A1 = 1.0

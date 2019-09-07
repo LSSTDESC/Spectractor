@@ -63,7 +63,6 @@ before_script:
   - conda create -n py37 python=3.7 pip
   - source activate py37
   - python --version
-  - conda install mpi4py
   # - "git clone https://$CI_USER_TOKEN@github.com/jeremyneveu/slitless.git slitless"
   # - "cd slitless"
   # - git checkout spectractor
