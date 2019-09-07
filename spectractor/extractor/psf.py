@@ -1506,8 +1506,8 @@ class ChromaticPSF2D(ChromaticPSF):
             self.plot_chromatic_PSF1D_residuals(bgd, data, data_errors, guess=guess, title='Best fit')
 
 
-def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, bgd_model_func=None,
-                                  params=None, PSF_guess=None, outliers=[], sigma=3, live_fit=False):
+def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, bgd_model_func=None, params=None,
+                                  PSF_guess=None, outliers=[], sigma=3, live_fit=False):  # pragma: no cover
     """Plot the transverse profile of  the spectrogram.
 
     This plot function is called in transverse_PSF1D_profile if live_fit option is True.
