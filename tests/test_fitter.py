@@ -1,10 +1,6 @@
 from numpy.testing import run_module_suite
 import numpy as np
-import matplotlib.pyplot as plt
-from spectractor import parameters
-from spectractor.extractor.extractor import Spectractor
-from spectractor.logbook import LogBook
-from spectractor.fit.fitter import FitWorkspace, run_minimisation
+from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_emcee
 from spectractor.config import set_logger
 
 import os
@@ -47,14 +43,32 @@ def test_fitworkspace():
     yerr = sigma * np.ones_like(y)
     y += np.random.normal(scale=sigma, size=N)
 
-    # Do the  fit
-    w = LineFitWorkspace("test_linefitworkspace", x, y, yerr, truth=truth)
+    # Do the fits
+    file_name = "data/test_linefitworkspace.txt"
+    w = LineFitWorkspace(file_name, x, y, yerr, truth=truth, nwalkers=20, nsteps=3000, burnin=500, nbins=20)
     run_minimisation(w, method="minimize")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     run_minimisation(w, method="least_squares")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     run_minimisation(w, method="minuit")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+
+    def lnprob(p):
+        lp = w.lnprior(p)
+        if not np.isfinite(lp):
+            return -1e20
+        return lp + w.lnlike(p)
+
+    run_emcee(w, ln=lnprob)
+    w.analyze_chains()
+
+    assert w.chains.shape == (3000, 20, 2)
+    assert np.all(w.gelmans < 0.03)
+    assert os.path.exists("data/test_linefitworkspace.txt")
+    assert os.path.exists(file_name.replace(".txt", "_emcee.h5"))
+    assert os.path.exists(file_name.replace(".txt", "_emcee_convergence.pdf"))
+    assert os.path.exists(file_name.replace(".txt", "_emcee_triangle.pdf"))
+    assert np.all([np.abs(w.p[i] - truth[i]) / np.sqrt(w.cov[i,i]) < 2 for i in range(w.ndim)])
 
 
 if __name__ == "__main__":
