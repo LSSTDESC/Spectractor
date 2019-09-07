@@ -103,7 +103,7 @@ def extract_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=
         c2.set_label(f'Data units (lin scale)')
         ax[2].set_title(f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
         fig.tight_layout()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
     return bgd_model_func
 
@@ -194,7 +194,7 @@ def extract_background_photutils(data, err, ws=(20, 30), mask_signal_region=True
         c2.set_label(f'Data units (lin scale)')
         ax[2].set_title(f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
         fig.tight_layout()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
     return bgd_model_func
 
@@ -281,7 +281,7 @@ def extract_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
         c2.set_label(f'Data units (lin scale)')
         ax[1].set_title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')
         fig.tight_layout()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
     return bgd_model_func
 
