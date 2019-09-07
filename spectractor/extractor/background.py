@@ -42,6 +42,8 @@ def extract_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=
 
     # Build a mock spectrogram with random Poisson noise:
     >>> from spectractor.extractor.psf import ChromaticPSF1D
+    >>> from spectractor import parameters
+    >>> parameters.DEBUG = True
     >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
@@ -131,6 +133,8 @@ def extract_background_photutils(data, err, ws=(20, 30), mask_signal_region=True
 
     # Build a mock spectrogram with random Poisson noise:
     >>> from spectractor.extractor.psf import ChromaticPSF1D
+    >>> from spectractor import parameters
+    >>> parameters.DEBUG = True
     >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
@@ -223,6 +227,8 @@ def extract_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
 
     # Build a mock spectrogram with random Poisson noise:
     >>> from spectractor.extractor.psf import ChromaticPSF1D
+    >>> from spectractor import parameters
+    >>> parameters.DEBUG = True
     >>> s0 = ChromaticPSF1D(Nx=80, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
