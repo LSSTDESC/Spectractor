@@ -72,7 +72,6 @@ before_script:
   # - "cd ../"
 
 script:
-  - conda install mpi4py
   - pip install numpy nose coloredlogs coverage coveralls six
   - pip install -r requirements.txt
   # - python setup.py build
