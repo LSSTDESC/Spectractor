@@ -17,6 +17,14 @@ def __getattr__(name):
 
     If necessary this can be worked around by instead doing:
         `if name in dir(parameters):`
+
+    Examples
+    --------
+    >>> from spectractor import parameters
+    >>> print(parameters.CCD_IMSIZE)
+    2048
+    >>> print(parameters.DUMMY)
+    False
     """
     if name in locals():
         return locals()[name]
