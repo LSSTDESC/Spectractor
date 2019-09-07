@@ -7,6 +7,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import multiprocessing
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -50,6 +51,7 @@ class FitWorkspace:
         self.burnin = burnin
         self.start = []
         self.likelihood = np.array([[]])
+        self.gelmans = np.array([])
         self.chains = np.array([[]])
         self.lnprobs = np.array([[]])
         self.flat_chains = np.array([[]])
@@ -58,7 +60,10 @@ class FitWorkspace:
         self.global_std = None
         self.title = ""
         self.use_grid = False
-        self.emcee_filename = self.filename.replace(self.filename.split('.')[-1], "_emcee.h5")
+        if "." in self.filename:
+            self.emcee_filename = self.filename.split('.')[0] + "_emcee.h5"
+        else:
+            self.my_logger.warning("\n\tFile name must have an extension.")
 
     def set_start(self):
         self.start = np.array(
@@ -75,19 +80,14 @@ class FitWorkspace:
         reader = emcee.backends.HDFBackend(self.emcee_filename)
         try:
             tau = reader.get_autocorr_time()
-            burnin = int(2 * np.max(tau))
-            thin = 1
         except emcee.autocorr.AutocorrError:
             tau = -1
-            burnin = -1
-            thin = -1
         self.chains = reader.get_chain(discard=0, flat=False, thin=1)
         self.lnprobs = reader.get_log_prob(discard=0, flat=False, thin=1)
         self.nsteps = self.chains.shape[0]
         self.nwalkers = self.chains.shape[1]
         print(f"Auto-correlation time: {tau}")
-        print(f"Burn-in: {burnin}")
-        print(f"Thin: {thin}")
+        print(f"Burn-in: {self.burnin}")
         print(f"Chains shape: {self.chains.shape}")
         print(f"Log prob shape: {self.lnprobs.shape}")
         return self.chains, self.lnprobs
@@ -113,7 +113,7 @@ class FitWorkspace:
         self.p = self.likelihood.mean_vec
         self.simulate(*self.p)
         self.plot_fit()
-        figure_name = self.filename.replace('.fits', '_triangle.pdf')
+        figure_name = self.emcee_filename.replace('.h5', '_triangle.pdf')
         self.likelihood.triangle_plots(output_filename=figure_name)
 
     def plot_fit(self):
@@ -128,7 +128,7 @@ class FitWorkspace:
         for i, label in enumerate(self.input_labels):
             title += f"{label}={self.p[i]:.3g}"
             if self.cov.size > 0:
-                title += f"+/-{np.sqrt(self.cov[i, i])}"
+                title += f"$\pm${np.sqrt(self.cov[i, i]):.3g}"
             if i < len(self.input_labels)-1:
                 title += ", "
         plt.title(title)
@@ -163,10 +163,10 @@ class FitWorkspace:
 
     def compute_local_acceptance_rate(self, start_index, last_index, walker_index):
         frequences = []
-        test = -2 * self.lnprobs[walker_index, start_index]
+        test = -2 * self.lnprobs[start_index, walker_index]
         counts = 1
         for index in range(start_index + 1, last_index):
-            chi2 = -2 * self.lnprobs[walker_index, index]
+            chi2 = -2 * self.lnprobs[index, walker_index]
             if np.isclose(chi2, test):
                 counts += 1
             else:
@@ -266,6 +266,7 @@ class FitWorkspace:
         # Gelman-Rubin test.py
         if len(nchains) > 1:
             step = max(1, (self.nsteps - self.burnin) // 20)
+            self.gelmans = []
             print(f'Gelman-Rubin tests (burnin={self.burnin:d}, step={step:d}, nsteps={self.nsteps:d}):')
             for i in range(self.ndim):
                 Rs = []
@@ -288,16 +289,18 @@ class FitWorkspace:
                     Rs.append(R - 1)
                     lens.append(l)
                 print(f'\t{self.input_labels[i]}: R-1 = {Rs[-1]:.3f} (l = {lens[-1] - 1:d})')
+                self.gelmans.append(Rs[-1])
                 ax[i, 1].plot(lens, Rs, lw=1, label=self.axis_names[i])
                 ax[i, 1].axhline(0.03, c='k', linestyle='--')
                 ax[i, 1].set_xlabel('Walker length', fontsize=fontsize)
                 ax[i, 1].set_ylabel('$R-1$', fontsize=fontsize)
                 ax[i, 1].set_ylim(0, 0.6)
                 # ax[self.dim, 3].legend(loc='best', ncol=2, fontsize=10)
+        self.gelmans = np.array(self.gelmans)
         fig.tight_layout()
         plt.subplots_adjust(hspace=0)
         plt.show()
-        figure_name = self.emcee_filename.replace(self.emcee_filename.split('.')[-1], '_convergence.pdf')
+        figure_name = self.emcee_filename.replace('.h5', '_convergence.pdf')
         print(f'Save figure: {figure_name}')
         fig.savefig(figure_name, dpi=100)
 
@@ -372,7 +375,7 @@ class FitWorkspace:
     def lnprior(self, p):
         in_bounds = True
         for npar, par in enumerate(p):
-            if par < self.bounds[0][npar] or par > self.bounds[1][npar]:
+            if par < self.bounds[npar][0] or par > self.bounds[npar][1]:
                 in_bounds = False
                 break
         if in_bounds:
@@ -1068,7 +1071,7 @@ def run_minimisation(fit_workspace, method="newton"):
         print(f"Newton: total computation time: {time.time() - start}s")
 
 
-def run_emcee(fit_workspace):
+def run_emcee(fit_workspace, ln=lnprob):
     my_logger = set_logger(__name__)
     fit_workspace.print_settings()
     nsamples = fit_workspace.nsteps
@@ -1080,28 +1083,22 @@ def run_emcee(fit_workspace):
         if not pool.is_master():
             pool.wait()
             sys.exit(0)
-        sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob_spectrogram, args=(),
+        sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, ln, args=(),
                                         pool=pool, backend=backend)
         print(f"Initial size: {backend.iteration}")
         if backend.iteration > 0:
             p0 = backend.get_last_sample()
         if nsamples - backend.iteration > 0:
-            for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples - backend.iteration))):
-                if pool.is_master():
-                    if (i + 1) % 100 == 0:
-                        print("{0:5.1%}".format(float(i) / nsamples))
+            sampler.run_mcmc(p0, nsteps=max(0, nsamples - backend.iteration), progress=True)
         pool.close()
     except ValueError:
-        sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob_spectrogram, args=(),
-                                        threads=4, backend=backend)
+        sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, ln, args=(),
+                                        threads=multiprocessing.cpu_count(), backend=backend)
         print(f"Initial size: {backend.iteration}")
         if backend.iteration > 0:
-            p0 = backend.get_last_sample()
-        if nsamples - backend.iteration > 0:
-            for i, result in enumerate(
-                    sampler.sample(p0, iterations=max(0, nsamples - backend.iteration), progress=True)):
-                if (i + 1) % 100 == 0:
-                    print("{0:5.1%}".format(float(i) / nsamples))
+            p0 = sampler.get_last_sample()
+        for _ in sampler.sample(p0, iterations=max(0, nsamples - backend.iteration), progress=True, store=True):
+            continue
     fit_workspace.chains = sampler.chain
     fit_workspace.lnprobs = sampler.lnprobability
 
@@ -1144,5 +1141,5 @@ if __name__ == "__main__":
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
     run_minimisation(w, method="newton")
-    # run_emcee(w)
+    # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()

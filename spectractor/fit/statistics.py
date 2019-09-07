@@ -417,7 +417,7 @@ class Likelihood(Grid):
                             if j < i:
                                 self.contours[i][j].grid = self.grid
 
-    def triangle_plots(self,output_filename=''):
+    def triangle_plots(self, output_filename=''):
         n = self.dim
         fig = plt.figure(1, figsize=(16, 9))
         if parameters.PAPER:
