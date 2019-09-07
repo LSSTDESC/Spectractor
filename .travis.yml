@@ -15,6 +15,9 @@ addons: # for libradtran library
 python:
   - "3.7"
 
+before_install: :
+  - ./conf/ci/travis-ci/install-mpi.sh openmpi
+
 install:
   - sudo apt-get update
   - sudo apt-get install gfortran
