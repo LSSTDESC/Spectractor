@@ -44,7 +44,7 @@ def test_fitworkspace():
     y += np.random.normal(scale=sigma, size=N)
 
     # Do the fits
-    file_name = "data/test_linefitworkspace.txt"
+    file_name = "test_linefitworkspace.txt"
     w = LineFitWorkspace(file_name, x, y, yerr, truth=truth, nwalkers=20, nsteps=3000, burnin=500, nbins=20)
     run_minimisation(w, method="minimize")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
@@ -64,7 +64,7 @@ def test_fitworkspace():
 
     assert w.chains.shape == (3000, 20, 2)
     assert np.all(w.gelmans < 0.03)
-    assert os.path.exists("data/test_linefitworkspace.txt")
+    assert os.path.exists("test_linefitworkspace.txt")
     assert os.path.exists(file_name.replace(".txt", "_emcee.h5"))
     assert os.path.exists(file_name.replace(".txt", "_emcee_convergence.pdf"))
     assert os.path.exists(file_name.replace(".txt", "_emcee_triangle.pdf"))
