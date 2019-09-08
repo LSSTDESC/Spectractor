@@ -97,6 +97,30 @@ class FitWorkspace:
         return self.flat_chains
 
     def simulate(self, *p):
+        """Compute the model prediction given a set of parameters.
+
+        Parameters
+        ----------
+        p: array_like
+            Array of parameters for the computation of the model.
+
+        Returns
+        -------
+        x: array_like
+            The abscisse of the model prediction.
+        model: array_like
+            The model prediction.
+        model_err: array_like
+            The uncertainty on the model prediction.
+
+        Examples
+        --------
+        >>> w = FitWorkspace("filename.txt")
+        >>> p = np.zeros(3)
+        >>> x, model, model_err = w.simulate(*p)
+        >>> assert x is not None
+
+        """
         x = np.array([])
         self.model = np.array([])
         self.model_err = np.array([])
@@ -299,7 +323,8 @@ class FitWorkspace:
         self.gelmans = np.array(self.gelmans)
         fig.tight_layout()
         plt.subplots_adjust(hspace=0)
-        plt.show()
+        if parameters.DISPLAY:
+            plt.show()
         figure_name = self.emcee_filename.replace('.h5', '_convergence.pdf')
         print(f'Save figure: {figure_name}')
         fig.savefig(figure_name, dpi=100)
