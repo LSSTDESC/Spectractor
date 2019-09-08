@@ -1,9 +1,21 @@
-from astropy.coordinates import Angle
+from astropy.coordinates import Angle, SkyCoord
+from astropy.modeling import fitting
+from astropy.io import fits
+import astropy.units as units
+from scipy import ndimage
 from matplotlib import cm
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
-from spectractor.extractor.targets import *
-from spectractor.extractor.psf import *
-from spectractor.extractor.dispersers import *
+from spectractor import parameters
+from spectractor.config import set_logger
+from spectractor.extractor.targets import load_target
+from spectractor.extractor.dispersers import Hologram
+from spectractor.extractor.psf import fit_PSF2D_minuit
+from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_info_from_CTIO_header,
+                               fit_poly1d, fit_poly1d_outlier_removal, weighted_avg_and_std,
+                               fit_poly2d_outlier_removal, hessian_and_theta)
 
 
 class Image(object):
@@ -43,13 +55,19 @@ class Image(object):
         self.header = None
         self.data = None
         self.data_rotated = None
-        self.gain = None
+        self.gain = None  # in e-/ADU
+        self.read_out_noise = None
         self.stat_errors = None
         self.stat_errors_rotated = None
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
-        self.load_image(file_name)
+        if parameters.CALLING_CODE != 'LSST_DM':
+            self.load_image(file_name)
+        else:
+            # data provided by the LSST shim, just instantiate objects
+            # necessary for the following code not to fail
+            self.header = fits.header.Header()
         # Load the target if given
         self.target = None
         self.target_pixcoords = None
@@ -83,8 +101,8 @@ class Image(object):
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
-        self.convert_to_ADU_rate_units()
         self.compute_statistical_error()
+        self.convert_to_ADU_rate_units()
 
     def save_image(self, output_file_name, overwrite=False):
         """Save the image in a fits file.
@@ -117,6 +135,9 @@ class Image(object):
         >>> assert np.all(np.isclose(data_before, im.data * im.expo))
         """
         self.data = self.data.astype(np.float64) / self.expo
+        self.stat_errors /= self.expo
+        if self.stat_errors_rotated is not None:
+            self.stat_errors_rotated /= self.expo
         self.units = 'ADU/s'
 
     def convert_to_ADU_units(self):
@@ -134,23 +155,53 @@ class Image(object):
         >>> assert np.all(np.isclose(data_before, im.data))
         """
         self.data *= self.expo
+        self.stat_errors *= self.expo
+        if self.stat_errors_rotated is not None:
+            self.stat_errors_rotated *= self.expo
         self.units = 'ADU'
 
     def compute_statistical_error(self):
-        """Compute the image noise map from Image.data as np.sqrt(data) / np.sqrt(gain * expo).
-
-        The read out noise is not included
-
+        """Compute the image noise map from Image.data. The latter must be in ADU.
+        The function first converts the image in electron counts units, evaluate the Poisson noise,
+        add in quadrature the read-out noise, takes the square root and returns a map in ADU units.
         """
+        if self.units != 'ADU':
+            self.my_logger.error('\n\tNoise must be estimated on an image in ADU units')
         # removes the zeros and negative pixels first
         # set to minimum positive value
         data = np.copy(self.data)
-        zeros = np.where(data <= 0)
-        min_noz = np.min(data[np.where(data > 0)])
-        data[zeros] = min_noz
-        # compute poisson noise
-        #   TODO: add read out noise (add in square to electrons)
-        self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
+        min_noz = np.min(data[data > 0])
+        data[data <= 0] = min_noz
+        # OLD: compute poisson noise in ADU/s without read-out noise
+        # self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
+        # convert in e- counts
+        err2 = data * self.gain
+        if self.read_out_noise is not None:
+            err2 += self.read_out_noise * self.read_out_noise
+        self.stat_errors = np.sqrt(err2)
+        # convert in ADU
+        self.stat_errors /= self.gain
+        if parameters.DEBUG:
+            fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+            y = self.stat_errors.flatten() ** 2
+            x = data.flatten()
+            fit, cov, model = fit_poly1d(x, y, order=1)
+            gain = 1 / fit[0]
+            ax[0].text(0.05, 0.95, f"fitted gain={gain:.3g} [e-/ADU]\nintercept={fit[1]:.3g} [ADU$^2$]"
+                                   f"\nfitted read-out={np.sqrt(fit[1]) * gain:.3g} [ADU]",
+                       horizontalalignment='left', verticalalignment='top', transform=ax[0].transAxes)
+            ax[0].scatter(x, y)
+            ax[0].plot(x, model, "k-")
+            ax[0].grid()
+            ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
+            ax[0].set_xlabel(r"Data pixel values [ADU]")
+            plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Uncertainty map", units=self.units,
+                              target_pixcoords=None, aspect="auto", cmap=None)
+            fig.tight_layout()
+            if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+                fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.png'))
+            if parameters.DISPLAY:  # pragma: no cover
+                plt.show()
 
     def compute_parallactic_angle(self):
         """Compute the parallactic angle.
@@ -215,7 +266,7 @@ class Image(object):
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         plt.legend()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:   # pragma: no cover
             plt.show()
 
 
@@ -241,10 +292,11 @@ def load_CTIO_image(image):
         image.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
             parameters.CCD_PIXEL2ARCSEC, image.header['YPIXSIZE']))
     image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
-                          obstime=image.header['DATE-OBS'])
-    image.my_logger.info('\n\tImage loaded')
+                           obstime=image.header['DATE-OBS'])
+    image.my_logger.info(f'\n\tImage {image.file_name} loaded.')
     # compute CCD gain map
     build_CTIO_gain_map(image)
+    build_CTIO_read_out_noise_map(image)
     image.compute_parallactic_angle()
 
 
@@ -268,7 +320,27 @@ def build_CTIO_gain_map(image):
     image.gain[size // 2:size, size // 2:size] = image.header['GTGAIN22']
 
 
-def load_LPNHE_image(image):
+def build_CTIO_read_out_noise_map(image):
+    """Compute the CTIO gain map according to header GAIN values.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    size = parameters.CCD_IMSIZE
+    image.read_out_noise = np.zeros_like(image.data)
+    # ampli 11
+    image.read_out_noise[0:size // 2, 0:size // 2] = image.header['GTRON11']
+    # ampli 12
+    image.read_out_noise[0:size // 2, size // 2:size] = image.header['GTRON12']
+    # ampli 21
+    image.read_out_noise[size // 2:size, 0:size] = image.header['GTRON21']
+    # ampli 22
+    image.read_out_noise[size // 2:size, size // 2:size] = image.header['GTRON22']
+
+
+def load_LPNHE_image(image):  # pragma: no cover
     """Specific routine to load LPNHE fits files and load their data and properties for Spectractor.
 
     Parameters
@@ -322,11 +394,11 @@ def find_target(image, guess, rotated=False):
     theX, theY = guess
     if rotated:
         angle = image.rotation_angle * np.pi / 180.
-        rotmat = np.matrix([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
+        rotmat = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
         vec = np.array(image.target_pixcoords) - 0.5 * np.array(image.data.shape[::-1])
-        guess2 = np.dot(rotmat, vec) + 0.5 * np.array(image.data_rotated.shape[::-1])
-        x0 = int(guess2[0, 0])
-        y0 = int(guess2[0, 1])
+        guess2 = rotmat @ vec + 0.5 * np.array(image.data_rotated.shape[::-1])
+        x0 = int(guess2[0])
+        y0 = int(guess2[1])
         guess = [x0, y0]
         Dx = parameters.XWINDOW_ROT
         Dy = parameters.YWINDOW_ROT
@@ -466,8 +538,10 @@ def find_target_1Dprofile(image, sub_image, guess):
         ax3.set_xlabel('Y [pixels]')
         ax3.legend(loc=1)
         f.tight_layout()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot1.pdf'))
     return avX, avY
 
 
@@ -486,8 +560,8 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
         The cropped image data array where the fit is performed.
     guess: array_like
         Two parameter array giving the estimated position of the target in the image.
-    sub_image: array_like
-        The cropped image data array where the fit is performed.
+    sub_errors: array_like
+        The image data uncertainties.
 
     Examples
     --------
@@ -574,8 +648,10 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
         ax3.legend(loc=1)
 
         f.tight_layout()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot2.pdf'))
     return new_avX, new_avY
 
 
@@ -677,8 +753,10 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         n, bins, patches = ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
         ax2.plot([theta_median, theta_median], [0, np.max(n)])
         ax2.set_xlabel("Rotation angles [degrees]")
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:   # pragma: no cover
             plt.show()
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotation_hessian.pdf'))
     return theta_median
 
 
@@ -740,18 +818,18 @@ def turn_image(image):
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
-                                    margin:-margin], scale="log", title='Turned image (log10 scale)',
+                                    margin:-margin],
+                          scale="log", title='Turned image (log10 scale)',
                           units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
         f.tight_layout()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
+        if parameters.LSST_SAVEFIGPATH:   # pragma: no cover
+            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotated_image.pdf'))
 
 
 if __name__ == "__main__":
     import doctest
-
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
