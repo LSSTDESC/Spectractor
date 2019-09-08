@@ -82,10 +82,15 @@ def set_logger(logger):
     ...         self.my_logger.info('This info test function works.')
     ...         self.my_logger.debug('This debug test function works.')
     ...         self.my_logger.warning('This warning test function works.')
+    >>> from spectractor import parameters
+    >>> parameters.VERBOSE = True
+    >>> parameters.DEBUG = True
     >>> test = Test()
     >>> test.log()
     """
     my_logger = logging.getLogger(logger)
+    coloredlogs.DEFAULT_LEVEL_STYLES['warn'] = {'color': 'yellow'}
+    coloredlogs.DEFAULT_FIELD_STYLES['levelname'] = {'color':  'white', 'bold': True}
     if parameters.VERBOSE > 0:
         my_logger.setLevel(logging.INFO)
         coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.INFO)
