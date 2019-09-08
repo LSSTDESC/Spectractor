@@ -8,18 +8,18 @@ import os
 
 def test_logbook():
     logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-    #target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
-    #assert xpos is None
+    # target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
+    # assert xpos is None
     disperser_label, target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
     assert target == "PKS1510-089"
     assert xpos == 830
     assert ypos == 590
-    #logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
-    #logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
+    # logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+    # logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
 
 
 def test_extractor():
-    file_names = ['tests/data/reduc_20170605_028.fits']
+    file_names = ['tests/data/reduc_20170530_134.fits']
 
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
     parameters.DEBUG = True
