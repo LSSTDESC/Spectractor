@@ -1,8 +1,16 @@
 from astropy.coordinates import SkyCoord
+import astropy.units as units
 from astroquery.ned import Ned
 from astroquery.simbad import Simbad
+import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
+import os
+import numpy as np
 
-from spectractor.extractor.spectroscopy import *
+from spectractor import parameters
+from spectractor.config import set_logger
+from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
+                                                ISM_LINES)
 
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
@@ -106,7 +114,7 @@ class ArcLamp(Target):
         self.emission_spectrum = True
         self.lines = Lines(HGAR_LINES, emission_spectrum=True)
 
-    def load(self):
+    def load(self):  # pragma: no cover
         pass
 
 
@@ -137,7 +145,7 @@ class Monochromator(Target):
         self.emission_spectrum = True
         self.lines = Lines([], emission_spectrum=True)
 
-    def load(self):
+    def load(self):  # pragma: no cover
         pass
 
 
@@ -209,17 +217,17 @@ class Star(Target):
         --------
         >>> s = Star('3C273')
         >>> print(s.spectra[0][:4])
-        [  0.00000000e+00   2.50485769e-14   2.42380612e-14   2.40887886e-14]
+        [0.0000000e+00 2.5048577e-14 2.4238061e-14 2.4088789e-14]
         >>> s = Star('HD111980')
         >>> print(s.spectra[0][:4])
-        [  2.16890002e-13   2.66480010e-13   2.03540011e-13   2.38780004e-13]
+        [2.16890002e-13 2.66480010e-13 2.03540011e-13 2.38780004e-13]
         >>> s = Star('PKS1510-089')
         >>> print(s.redshift)
         0.36
         >>> print(f'{parameters.LAMBDA_MIN:.1f}, {parameters.LAMBDA_MAX:.1f}')
         408.0, 1496.0
         >>> print(s.spectra[0][:4])
-        [ 117.34012  139.27621   87.38032  143.0816 ]
+        [117.34012 139.27621  87.38032 143.0816 ]
         """
         self.wavelengths = []  # in nm
         self.spectra = []
@@ -309,7 +317,7 @@ class Star(Target):
         >>> s = Star('HD111980')
         >>> s.build_sed(index=0)
         >>> s.sed(550)
-        array(1.676051129017069e-11)
+        array(1.67605113e-11)
         """
         if len(self.spectra) == 0:
             self.sed = lambda x: np.zeros_like(x)
@@ -334,13 +342,13 @@ class Star(Target):
         plt.ylabel('Flux')
         plt.title(self.label)
         plt.legend()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
 
 if __name__ == "__main__":
     import doctest
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
+    #if np.__version__ >= "1.14.0":
+    #   np.set_printoptions(legacy="1.13")
 
     doctest.testmod()

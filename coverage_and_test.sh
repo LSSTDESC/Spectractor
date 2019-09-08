@@ -23,4 +23,10 @@ do
     coverage run -a --source=spectractor $i
 done
 
+for i in spectractor/fit/*.py
+do
+    echo Testing $i...
+    coverage run -a --source=spectractor $i
+done
+
 

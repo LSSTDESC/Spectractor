@@ -15,7 +15,7 @@ from scipy.ndimage.filters import maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 
 from skimage.feature import hessian_matrix
-from spectractor.config import *
+from spectractor.config import set_logger
 from spectractor import parameters
 from math import floor
 
@@ -196,7 +196,7 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
     >>> bounds = ((-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,100,800,100,100,800,100))
     >>> popt, pcov = fit_multigauss_and_line(x, y, guess=(0,1,3,630,3,3,770,3), bounds=bounds)
     >>> print(popt)
-    [   1.   10.   20.  650.    3.   40.  750.   10.]
+    [  1.  10.  20. 650.   3.  40. 750.  10.]
     """
     maxfev = 1000
     popt, pcov = curve_fit(multigauss_and_line, x, y, p0=guess, bounds=bounds, maxfev=maxfev, absolute_sigma=True)
@@ -497,10 +497,7 @@ def fit_poly1d_legendre(x, y, order, w=None):
     cov = -1
     x_norm = rescale_x_for_legendre(x)
     if len(x) > order:
-        if w is None:
-            fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True)
-        else:
-            fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True, w=w)
+        fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True, w=w)
         model = np.polynomial.legendre.legval(x_norm, fit)
     else:
         fit = np.array([0] * (order + 1))
@@ -1097,17 +1094,13 @@ def fftconvolve_gaussian(array, reso):
     >>> array = np.ones(100)
     >>> output = fftconvolve_gaussian(array, 3)
     >>> print(output[:3])
-<<<<<<< HEAD
-    [0.5        0.63125312 0.74870357]
-=======
-    [ 0.5         0.63114657  0.74850168]
+    [0.5        0.63114657 0.74850168]
     >>> array = np.ones((100, 100))
     >>> output = fftconvolve_gaussian(array, 3)
     >>> print(output[0][:3])
-    [ 0.5         0.63114657  0.74850168]
+    [0.5        0.63114657 0.74850168]
     >>> array = np.ones((100, 100, 100))
     >>> output = fftconvolve_gaussian(array, 3)
->>>>>>> 0e123b8e16fd5d6e5d5995d961478e73bc23105c
     """
     my_logger = set_logger(__name__)
     if array.ndim == 2:
@@ -1198,8 +1191,8 @@ def formatting_numbers(value, error_high, error_low, std=None, label=None):
             if std is not None:
                 str_std = f"{std:.2g}"
     out += [str_value, str_error_high]
-    if not np.isclose(error_high, error_low):
-        out += [str_error_low]
+    #if not np.isclose(error_high, error_low):
+    out += [str_error_low]
     if std is not None:
         out += [str_std]
     out = tuple(out)
@@ -1448,7 +1441,7 @@ def extract_info_from_CTIO_header(obj, header):
     obj.airmass = header['AIRMASS']
     obj.expo = header['EXPTIME']
     obj.filters = header['FILTERS']
-    obj.filter_label = header['FILTER1']
+    obj.filter = header['FILTER1']
     obj.disperser_label = header['FILTER2']
 
 
@@ -1564,10 +1557,16 @@ def from_lambda_to_colormap(lambdas):
     return spectralmap
 
 
+def rebin(arr, new_shape):
+    shape = (new_shape[0], arr.shape[0] // new_shape[0],
+             new_shape[1], arr.shape[1] // new_shape[1])
+    return arr.reshape(shape).sum(-1).sum(1)
+
+
 if __name__ == "__main__":
     import doctest
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
+    # if np.__version__ >= "1.14.0":
+    #    np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
 

@@ -12,9 +12,12 @@ update : July 2018
 """
 
 import os
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 
+from scipy.interpolate import interp1d
+
+from spectractor.config import set_logger
 import spectractor.parameters as parameters
 
 
@@ -362,6 +365,106 @@ def plot_all_transmissions(title="Telescope transmissions"):
                              title=title, lw=4)
     if parameters.DISPLAY:
         plt.show()
+
+
+class TelescopeTransmission:
+
+    def __init__(self, filter_name=""):
+        """Transmission of the telescope as product of the following transmissions:
+
+        - mirrors
+        - throughput
+        - quantum efficiency
+        - Filter
+
+        Parameters
+        ----------
+        filter_name: str, optional
+            The filter string name.
+
+        Examples
+        --------
+        >>> t = TelescopeTransmission()
+        >>> t.plot_transmission()
+        """
+
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.filter_name = filter_name
+        self.transmission = None
+        self.transmission_err = None
+        self.load_transmission()
+
+    def load_transmission(self):
+        """Load the transmission files and make a function.
+
+        Returns
+        -------
+        transmission: callable
+            The transmission function using wavelengths in nm.
+
+        Examples
+        --------
+        >>> t = TelescopeTransmission()
+        >>> assert t.transmission is not None
+        >>> assert t.transmission_err is not None
+        >>> t.plot_transmission()
+        """
+
+        '''
+        # QE
+        wl,qe=ctio.load_quantum_efficiency(datapath)
+        self.qe=interp1d(wl,qe,kind='linear',bounds_error=False,fill_value=0.)
+
+        #  Throughput
+        wl,trt=ctio.load_telescope_throughput(datapath)
+        self.to=interp1d(wl,trt,kind='linear',bounds_error=False,fill_value=0.)
+
+        # Mirrors
+        wl,trm=ctio.load_mirror_reflectivity(datapath)
+        self.tm=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.)
+        '''
+        throughput = Throughput()
+        wl, trm, err = throughput.load_total_throughput()
+        to = interp1d(wl, trm, kind='linear', bounds_error=False, fill_value=0.)
+        err = np.sqrt(err ** 2 + parameters.OBS_TRANSMISSION_SYSTEMATICS ** 2)
+        to_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
+
+        # Filter RG715
+        wl, trg, err = throughput.load_RG715()
+        tfr = interp1d(wl, trg, kind='linear', bounds_error=False, fill_value=0.)
+
+        # Filter FGB37
+        wl, trb, err = throughput.load_FGB37()
+        tfb = interp1d(wl, trb, kind='linear', bounds_error=False, fill_value=0.)
+
+        if self.filter_name == "RG715":
+            TF = tfr
+        elif self.filter_name == "FGB37":
+            TF = tfb
+        else:
+            TF = lambda x: np.ones_like(x).astype(float)
+
+        tf = TF
+
+        # self.transmission=lambda x: self.qe(x)*self.to(x)*(self.tm(x)**2)*self.tf(x)
+        self.transmission = lambda x: to(x) * tf(x)
+        self.transmission_err = lambda x: to_err(x)
+        return self.transmission
+
+    def plot_transmission(self):
+        """Plot the transmission function and the associated uncertainties.
+
+        Examples
+        --------
+        >>> t = TelescopeTransmission()
+        >>> t.plot_transmission()
+
+        """
+        plt.figure()
+        plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.transmission(parameters.LAMBDAS),
+                                 uncertainties=self.transmission_err(parameters.LAMBDAS))
+        if parameters.DISPLAY:
+            plt.show()
 
 
 if __name__ == "__main__":

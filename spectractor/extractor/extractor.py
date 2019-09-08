@@ -1,5 +1,11 @@
-from spectractor.extractor.spectrum import *
+import os
+import numpy as np
+
 from spectractor import parameters
+from spectractor.config import set_logger, load_config
+from spectractor.extractor.images import Image, find_target, turn_image
+from spectractor.extractor.spectrum import (Spectrum, extract_spectrum_from_image, calibrate_spectrum,
+                                            calibrate_spectrum_with_lines)
 from spectractor.tools import ensure_dir
 
 
@@ -39,7 +45,7 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     >>> import os
     >>> from spectractor.logbook import LogBook
     >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
-    >>> file_names = ['./tests/data/reduc_20170605_028.fits']
+    >>> file_names = ['./tests/data/reduc_20170530_134.fits']
     >>> for file_name in file_names:
     ...     tag = file_name.split('/')[-1]
     ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
@@ -47,7 +53,7 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     ...         continue
     ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target, disperser_label, './config/ctio.ini')
     ...     assert spectrum is not None
-    ...     assert os.path.isfile('tests/data/reduc_20170605_028_spectrum.fits')
+    ...     assert os.path.isfile('tests/data/educ_20170530_134_spectrum.fits')
     """
 
     my_logger = set_logger(__name__)
