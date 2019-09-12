@@ -1,5 +1,6 @@
 from spectractor import parameters
-from spectractor.fit.fitter import run_minimisation, SpectrogramFitWorkspace
+from spectractor.fit.fitter import run_minimisation
+from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace
 from spectractor.config import load_config
 
 

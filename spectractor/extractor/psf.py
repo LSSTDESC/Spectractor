@@ -15,6 +15,7 @@ from spectractor.tools import dichotomie, fit_poly1d, fit_moffat1d_outlier_remov
 from spectractor.extractor.background import extract_background_photutils
 from spectractor import parameters
 from spectractor.config import set_logger
+from spectractor.fit.fitter import FitWorkspace, run_minimisation
 
 
 class PSF1D(Fittable1DModel):
@@ -1287,6 +1288,33 @@ class ChromaticPSF1D(ChromaticPSF):
             # Plot data, best fit model and residuals:
             self.plot_summary()
             self.plot_chromatic_PSF1D_residuals(bgd, data, data_errors, guess=guess, title='Best fit')
+
+
+class ChromaticPSF1DFitWorkspace(FitWorkspace):
+
+    def __init__(self, file_name, x, y, yerr, nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False, truth=None):
+        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                              live_fit, truth=truth)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.x = x
+        self.data = y
+        self.err = yerr
+        self.a = 1
+        self.b = 1
+        self.p = np.array([self.a, self.b])
+        self.ndim = self.p.size
+        self.input_labels = ["a", "b"]
+        self.axis_names = ["$a$", "$b$"]
+        self.bounds = np.array([(-100, 100), (-100, 100)])
+        self.nwalkers = max(2 * self.ndim, nwalkers)
+
+    def simulate(self, a, b):
+        self.model = a * self.x + b
+        self.model_err = np.zeros_like(self.x)
+        return self.x, self.model, self.model_err
+
+
 
 
 class ChromaticPSF2D(ChromaticPSF):
