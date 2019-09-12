@@ -16,7 +16,7 @@ from spectractor.fit.statistics import Likelihood
 
 class FitWorkspace:
 
-    def __init__(self, file_name, nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+    def __init__(self, file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         self.my_logger = set_logger(self.__class__.__name__)
         self.filename = file_name
@@ -55,10 +55,13 @@ class FitWorkspace:
         self.global_std = None
         self.title = ""
         self.use_grid = False
-        if "." in self.filename:
-            self.emcee_filename = self.filename.split('.')[0] + "_emcee.h5"
+        if self.filename != "":
+            if "." in self.filename:
+                self.emcee_filename = self.filename.split('.')[0] + "_emcee.h5"
+            else:
+                self.my_logger.warning("\n\tFile name must have an extension.")
         else:
-            self.my_logger.warning("\n\tFile name must have an extension.")
+            self.emcee_filename = "emcee.h5"
 
     def set_start(self):
         self.start = np.array(
@@ -110,7 +113,7 @@ class FitWorkspace:
 
         Examples
         --------
-        >>> w = FitWorkspace("filename.txt")
+        >>> w = FitWorkspace()
         >>> p = np.zeros(3)
         >>> x, model, model_err = w.simulate(*p)
         >>> assert x is not None
@@ -148,7 +151,7 @@ class FitWorkspace:
             title += f"{label} = {self.p[i]:.3g}"
             if self.cov.size > 0:
                 title += rf" $\pm$ {np.sqrt(self.cov[i, i]):.3g}"
-            if i < len(self.input_labels)-1:
+            if i < len(self.input_labels) - 1:
                 title += ", "
         plt.title(title)
         plt.legend()
@@ -173,7 +176,9 @@ class FitWorkspace:
                     for j in rangedim:
                         if i != j:
                             likelihood.contours[i][j].fill_histogram(chains[:, i], chains[:, j], weights=None)
-            output_file = self.filename.replace('.fits', '_bestfit.txt')
+            output_file = ""
+            if self.filename != "":
+                output_file = self.filename.replace('.fits', '_bestfit.txt')
             likelihood.stats(output=output_file)
         else:
             for i in rangedim:
@@ -368,7 +373,7 @@ class FitWorkspace:
         cbar = fig.colorbar(im)
         cbar.ax.tick_params(labelsize=9)
         fig.tight_layout()
-        if parameters.SAVE:
+        if parameters.SAVE and self.filename != "":
             figname = self.filename.replace(self.filename.split('.')[-1], "_correlation.pdf")
             self.my_logger.info(f"Save figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
@@ -404,7 +409,7 @@ class FitWorkspace:
             return -np.inf
 
     def jacobian(self, params, epsilon, fixed_params=None):
-        lambdas, model, model_err = self.simulate(*params)
+        x, model, model_err = self.simulate(*params)
         model = model.flatten()
         J = np.zeros((params.size, model.size))
         for ip, p in enumerate(params):
@@ -414,7 +419,7 @@ class FitWorkspace:
             if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
-            tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
+            tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
             J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
         return J
 
@@ -535,7 +540,7 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
     ax[1].set_xlabel("Iterations")
     fig.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
-    if parameters.SAVE:
+    if parameters.SAVE and fit_workspace.filename != "":
         figname = fit_workspace.filename.replace(fit_workspace.filename.split('.')[-1], "_fitting.pdf")
         fit_workspace.my_logger.info(f"\n\tSave figure {figname}.")
         fig.savefig(figname, dpi=100, bbox_inches='tight')
@@ -559,23 +564,31 @@ def save_gradient_descent(fit_workspace, costs, params_table):
     fit_workspace.my_logger.info(f"\n\tSave gradient descent log {output_filename}.")
 
 
-def run_minimisation(fit_workspace, method="newton"):
+def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix, xtol, ftol, niter):
+    fit_workspace.p, fit_workspace.cov, tmp_costs, tmp_params_table = gradient_descent(fit_workspace, guess,
+                                                                                       epsilon, niter=niter,
+                                                                                       fixed_params=fix,
+                                                                                       xtol=xtol, ftol=ftol)
+    params_table = np.concatenate([params_table, tmp_params_table])
+    costs = np.concatenate([costs, tmp_costs])
+    ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
+    print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
+                            [fit_workspace.input_labels[ip] for ip in ipar])
+    if True:
+        # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
+        plot_gradient_descent(fit_workspace, costs, params_table)
+        fit_workspace.plot_correlation_matrix(ipar=ipar)
+    return params_table, costs
+
+
+def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50):
     my_logger = set_logger(__name__)
     bounds = fit_workspace.bounds
 
     nll = lambda params: -fit_workspace.lnlike(params)
 
-    # sim_134
-    # guess = fit_workspace.p
-    # truth sim_134
-    # guess = np.array([1., 0.05, 300, 5, 0.03, 55.45, 0.0, 0.0, -1.54, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
-    guess = np.array(
-        [1., 0.05, 300, 5, 0.03, 55.45, -0.275, 0.0, -1.54, -1.47570237e-01, -5.00195918e-01, 4.74296776e-01,
-         2.85776501e+00, -1.86436219e+00, 1.83899390e+00, 1.89342052e+00,
-         -9.43239034e-01, 1.06985560e+00, 0.00000000e+00, 0.00000000e+00,
-         0.00000000e+00, 1.44368271e+00, -9.95896258e-01, 1.59015965e+00])
-    # 5.00000000e+02
-    guess = fit_workspace.p
+    guess = fit_workspace.p.astype('float64')
+
     if method == "minimize":
         start = time.time()
         result = optimize.minimize(nll, fit_workspace.p, method='L-BFGS-B',
@@ -619,101 +632,26 @@ def run_minimisation(fit_workspace, method="newton"):
         fit_workspace.live_fit = False
         fit_workspace.plot_fit()
     elif method == "newton":
-
-        def bloc_gradient_descent(guess, epsilon, params_table, costs, fix, xtol, ftol, niter):
-            fit_workspace.p, fit_workspace.cov, tmp_costs, tmp_params_table = gradient_descent(fit_workspace, guess,
-                                                                                               epsilon, niter=niter,
-                                                                                               fixed_params=fix,
-                                                                                               xtol=xtol, ftol=ftol)
-            params_table = np.concatenate([params_table, tmp_params_table])
-            costs = np.concatenate([costs, tmp_costs])
-            ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
-            print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
-                                    [fit_workspace.input_labels[ip] for ip in ipar])
-            if True:
-                # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
-                plot_gradient_descent(fit_workspace, costs, params_table)
-                fit_workspace.plot_correlation_matrix(ipar=ipar)
-            return params_table, costs
-
-        fit_workspace.simulation.fast_sim = True
-        costs = np.array([fit_workspace.chisq_spectrogram(guess)])
-        if parameters.DISPLAY:
-            fit_workspace.plot_fit()
-        params_table = np.array([guess])
-        start = time.time()
-        epsilon = 1e-4 * guess
-        epsilon[epsilon == 0] = 1e-3
-        epsilon[0] = 1e-3  # A1
-        epsilon[1] = 1e-4  # A2
-        epsilon[2] = 1  # ozone
-        epsilon[3] = 0.01  # pwv
-        epsilon[4] = 0.001  # aerosols
-        epsilon[5] = 0.001  # DCCD
-        epsilon[6] = 0.0005  # shift_x
         my_logger.info(f"\n\tStart guess: {guess}")
+        costs = np.array([fit_workspace.chisq(guess)])
 
-        # cancel the Gaussian part of the PSF
-        # TODO: solve this Gaussian PSF part issue
-        guess[-6:] = 0
+        params_table = np.array([guess])
+        if epsilon is None:
+            epsilon = 1e-4 * guess
+            epsilon[epsilon == 0] = 1e-4
+        if fix is None:
+            fix = [False] * guess.size
 
-        # fit trace
-        fix = [True] * guess.size
-        fix[0] = False  # A1
-        fix[1] = False  # A2
-        fix[6] = True  # x0
-        fix[7] = True  # y0
-        fix[8] = True  # angle
-        fit_workspace.simulation.fast_sim = True
-        fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 3] = [False] * 3
-        fit_workspace.simulation.fix_psf_cube = False
-        params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
-                                                    fix=fix, xtol=1e-2, ftol=1e-2, niter=20)
-
-        # fit PSF
-        guess = np.array(fit_workspace.p)
-        fix = [True] * guess.size
-        fix[0] = False  # A1
-        fix[1] = False  # A2
-        fit_workspace.simulation.fast_sim = True
-        fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 9] = [False] * 9
-        # fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
-        fit_workspace.simulation.fix_psf_cube = False
-        params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
-                                                    fix=fix, xtol=1e-2, ftol=1e-2, niter=20)
-
-        # fit dispersion
-        guess = np.array(fit_workspace.p)
-        fix = [True] * guess.size
-        fix[0] = False
-        fix[1] = False
-        fix[5] = False  # DCCD
-        fix[6] = False  # x0
-        fit_workspace.simulation.fix_psf_cube = True
-        fit_workspace.simulation.fast_sim = True
-        params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
-                                                    fix=fix, xtol=1e-3, ftol=1e-2, niter=10)
-
-        # fit all except Gaussian part of the PSF
-        # TODO: solve this Gaussian PSF part issue
-        guess = np.array(fit_workspace.p)
-        fit_workspace.simulation.fast_sim = False
-        fix = [False] * guess.size
-        fix[6] = False  # x0
-        fix[7] = True  # y0
-        fix[8] = True  # angle
-        fix[-6:] = [True] * 6  # gaussian part
-        parameters.SAVE = True
-        fit_workspace.simulation.fix_psf_cube = False
-        params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
-                                                    fix=fix, xtol=1e-5, ftol=1e-5, niter=40)
-        fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
-        save_gradient_descent(fit_workspace, costs, params_table)
+        start = time.time()
+        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+                                                   fix=fix, xtol=xtol, ftol=ftol, niter=niter)
         print(f"Newton: total computation time: {time.time() - start}s")
+        if fit_workspace.filename != "":
+            fit_workspace.save_parameters_summary()
+            save_gradient_descent(fit_workspace, costs, params_table)
 
 
 def run_emcee(fit_workspace, ln=lnprob):
-    my_logger = set_logger(__name__)
     fit_workspace.print_settings()
     nsamples = fit_workspace.nsteps
     p0 = fit_workspace.set_start()
@@ -742,4 +680,3 @@ def run_emcee(fit_workspace, ln=lnprob):
             continue
     fit_workspace.chains = sampler.chain
     fit_workspace.lnprobs = sampler.lnprobability
-

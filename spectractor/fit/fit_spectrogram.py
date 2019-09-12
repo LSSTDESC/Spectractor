@@ -7,7 +7,7 @@ from spectractor.config import set_logger
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.simulation.simulator import SimulatorInit, SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_minimisation
+from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_gradient_descent, save_gradient_descent
 
 plot_counter = 0
 
@@ -265,6 +265,103 @@ def plot_psf_poly_params(psf_poly_params):
         plt.show()
 
 
+def run_spectrogram_minimisation(fit_workspace, method="newton"):
+    my_logger = set_logger(__name__)
+    bounds = fit_workspace.bounds
+
+    nll = lambda params: -fit_workspace.lnlike(params)
+
+    # sim_134
+    # guess = fit_workspace.p
+    # truth sim_134
+    # guess = np.array([1., 0.05, 300, 5, 0.03, 55.45, 0.0, 0.0, -1.54, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
+    guess = np.array(
+        [1., 0.05, 300, 5, 0.03, 55.45, -0.275, 0.0, -1.54, -1.47570237e-01, -5.00195918e-01, 4.74296776e-01,
+         2.85776501e+00, -1.86436219e+00, 1.83899390e+00, 1.89342052e+00,
+         -9.43239034e-01, 1.06985560e+00, 0.00000000e+00, 0.00000000e+00,
+         0.00000000e+00, 1.44368271e+00, -9.95896258e-01, 1.59015965e+00])
+    # 5.00000000e+02
+    guess = fit_workspace.p
+    if method != "newton":
+        run_minimisation(fit_workspace, method=method)
+    else:
+        fit_workspace.simulation.fast_sim = True
+        costs = np.array([fit_workspace.chisq(guess)])
+        if parameters.DISPLAY:
+            fit_workspace.plot_fit()
+        params_table = np.array([guess])
+        start = time.time()
+        epsilon = 1e-4 * guess
+        epsilon[epsilon == 0] = 1e-3
+        epsilon[0] = 1e-3  # A1
+        epsilon[1] = 1e-4  # A2
+        epsilon[2] = 1  # ozone
+        epsilon[3] = 0.01  # pwv
+        epsilon[4] = 0.001  # aerosols
+        epsilon[5] = 0.001  # DCCD
+        epsilon[6] = 0.0005  # shift_x
+        my_logger.info(f"\n\tStart guess: {guess}")
+
+        # cancel the Gaussian part of the PSF
+        # TODO: solve this Gaussian PSF part issue
+        guess[-6:] = 0
+
+        # fit trace
+        fix = [True] * guess.size
+        fix[0] = False  # A1
+        fix[1] = False  # A2
+        fix[6] = True  # x0
+        fix[7] = True  # y0
+        fix[8] = True  # angle
+        fit_workspace.simulation.fast_sim = True
+        fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 3] = [False] * 3
+        fit_workspace.simulation.fix_psf_cube = False
+        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+                                                   fix=fix, xtol=1e-2, ftol=1e-2, niter=20)
+
+        # fit PSF
+        guess = np.array(fit_workspace.p)
+        fix = [True] * guess.size
+        fix[0] = False  # A1
+        fix[1] = False  # A2
+        fit_workspace.simulation.fast_sim = True
+        fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 9] = [False] * 9
+        # fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
+        fit_workspace.simulation.fix_psf_cube = False
+        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+                                                   fix=fix, xtol=1e-2, ftol=1e-2, niter=20)
+
+        # fit dispersion
+        guess = np.array(fit_workspace.p)
+        fix = [True] * guess.size
+        fix[0] = False
+        fix[1] = False
+        fix[5] = False  # DCCD
+        fix[6] = False  # x0
+        fit_workspace.simulation.fix_psf_cube = True
+        fit_workspace.simulation.fast_sim = True
+        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+                                                   fix=fix, xtol=1e-3, ftol=1e-2, niter=10)
+
+        # fit all except Gaussian part of the PSF
+        # TODO: solve this Gaussian PSF part issue
+        guess = np.array(fit_workspace.p)
+        fit_workspace.simulation.fast_sim = False
+        fix = [False] * guess.size
+        fix[6] = False  # x0
+        fix[7] = True  # y0
+        fix[8] = True  # angle
+        fix[-6:] = [True] * 6  # gaussian part
+        parameters.SAVE = True
+        fit_workspace.simulation.fix_psf_cube = False
+        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+                                                   fix=fix, xtol=1e-5, ftol=1e-5, niter=40)
+        if fit_workspace.filename != "":
+            fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
+            save_gradient_descent(fit_workspace, costs, params_table)
+        print(f"Newton: total computation time: {time.time() - start}s")
+
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
     from spectractor.config import load_config
@@ -302,6 +399,6 @@ if __name__ == "__main__":
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-    run_minimisation(w, method="newton")
+    run_spectrogram_minimisation(w, method="newton")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()
