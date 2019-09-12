@@ -442,6 +442,7 @@ def lnprob(p):
 
 
 def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
+    my_logger = set_logger(__name__)
     tmp_params = np.copy(params)
     W = 1 / fit_workspace.err.flatten() ** 2
     ipar = np.arange(params.size)
@@ -451,14 +452,12 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     params_table = []
     inv_JT_W_J = np.zeros((len(ipar), len(ipar)))
     for i in range(niter):
-        print(f"start iteration={i}", end=' ')  # , tmp_params)
         start = time.time()
         tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
         # if fit_workspace.live_fit:
         #    fit_workspace.plot_fit()
         residuals = (tmp_model - fit_workspace.data).flatten()
         cost = np.sum((residuals ** 2) * W)
-        print(f"cost={cost:.3f} chisq_red={cost / tmp_model.size:.3f}")
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):
@@ -467,7 +466,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             if np.all(J[ip] == np.zeros(J.shape[1])):
                 ipar = np.delete(ipar, list(ipar).index(ip))
                 tmp_params[ip] = 0
-                print(f"Step {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed at 0 "
+                my_logger.warning(f"\n\tStep {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed at 0 "
                       f"in the following instead of its current value ({tmp_params[ip]}).")
         # remove fixed parameters
         J = J[ipar].T
@@ -490,10 +489,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
 
         # tol parameter acts on alpha (not func)
         alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2)
-        print(f"\talpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}")
         tmp_params[ipar] += alpha_min * dparams
-        print(f"shift: {alpha_min * dparams}")
-        print(f"new params: {tmp_params[ipar]}")
         # check bounds
         for ip, p in enumerate(tmp_params):
             if p < fit_workspace.bounds[ip][0]:
@@ -507,21 +503,30 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # prepare outputs
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
-        print(f"end iteration={i} in {time.time() - start:.2f}s cost={fval:.3f}")
-        # if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol \
-        #         or (len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2]), 1]) < ftol):
-        #     break
+        my_logger.info(f"\n\tIteration={i}: initial cost={cost:.3f} initial chisq_red={cost / tmp_model.size:.3f}"
+                       f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
+                       f"\n\tParameter shifts: {alpha_min * dparams}"
+                       f"\n\tNew parameters: {tmp_params[ipar]}"
+                       f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} computed in {time.time() - start:.2f}s")
+        if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol :
+            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
+                           f"relative to the sum of the parameters is below xtol={xtol}.")
+            break
         if len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2]), 1]) < ftol:
+            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
+                           f"relative change of cost is below ftol={ftol}.")
             break
     plt.close()
     return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
 
 
 def print_parameter_summary(params, cov, labels):
+    my_logger = set_logger(__name__)
+    txt = ""
     for ip in np.arange(0, cov.shape[0]).astype(int):
-        txt = "%s: %s +%s -%s" % formatting_numbers(params[ip], np.sqrt(cov[ip, ip]), np.sqrt(cov[ip, ip]),
+        txt += "%s: %s +%s -%s\n\t" % formatting_numbers(params[ip], np.sqrt(cov[ip, ip]), np.sqrt(cov[ip, ip]),
                                                     label=labels[ip])
-        print(txt)
+    my_logger.info(f"\n\t{txt}")
 
 
 def plot_gradient_descent(fit_workspace, costs, params_table):
@@ -574,7 +579,7 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
     ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
     print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
                             [fit_workspace.input_labels[ip] for ip in ipar])
-    if True:
+    if parameters.DEBUG:
         # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
         plot_gradient_descent(fit_workspace, costs, params_table)
         fit_workspace.plot_correlation_matrix(ipar=ipar)
@@ -597,7 +602,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
                                             'maxls': 50, 'maxcor': 30},
                                    bounds=bounds)
         fit_workspace.p = result['x']
-        print(f"Minimize: total computation time: {time.time() - start}s")
+        my_logger.info(f"\n\tMinimize: total computation time: {time.time() - start}s")
         fit_workspace.simulate(*fit_workspace.p)
         fit_workspace.live_fit = False
         fit_workspace.plot_fit()
@@ -609,7 +614,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         p = optimize.least_squares(fit_workspace.weighted_residuals, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
                                    diff_step=0.001, bounds=bounds.T)
         fit_workspace.p = p.x  # m.np_values()
-        print(f"Least_squares: total computation time: {time.time() - start}s")
+        my_logger.info(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
         fit_workspace.simulate(*fit_workspace.p)
         fit_workspace.live_fit = False
         fit_workspace.plot_fit()
@@ -627,7 +632,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         m.tol = 10
         m.migrad()
         fit_workspace.p = m.np_values()
-        print(f"Minuit: total computation time: {time.time() - start}s")
+        my_logger.info(f"\n\tMinuit: total computation time: {time.time() - start}s")
         fit_workspace.simulate(*fit_workspace.p)
         fit_workspace.live_fit = False
         fit_workspace.plot_fit()
@@ -645,13 +650,14 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         start = time.time()
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
                                                    fix=fix, xtol=xtol, ftol=ftol, niter=niter)
-        print(f"Newton: total computation time: {time.time() - start}s")
+        my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             fit_workspace.save_parameters_summary()
             save_gradient_descent(fit_workspace, costs, params_table)
 
 
 def run_emcee(fit_workspace, ln=lnprob):
+    my_logger = set_logger(__name__)
     fit_workspace.print_settings()
     nsamples = fit_workspace.nsteps
     p0 = fit_workspace.set_start()
@@ -664,7 +670,7 @@ def run_emcee(fit_workspace, ln=lnprob):
             sys.exit(0)
         sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, ln, args=(),
                                         pool=pool, backend=backend)
-        print(f"Initial size: {backend.iteration}")
+        my_logger.info(f"\n\tInitial size: {backend.iteration}")
         if backend.iteration > 0:
             p0 = backend.get_last_sample()
         if nsamples - backend.iteration > 0:
@@ -673,7 +679,7 @@ def run_emcee(fit_workspace, ln=lnprob):
     except ValueError:
         sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, ln, args=(),
                                         threads=multiprocessing.cpu_count(), backend=backend)
-        print(f"Initial size: {backend.iteration}")
+        my_logger.info(f"\n\tInitial size: {backend.iteration}")
         if backend.iteration > 0:
             p0 = sampler.get_last_sample()
         for _ in sampler.sample(p0, iterations=max(0, nsamples - backend.iteration), progress=True, store=True):
