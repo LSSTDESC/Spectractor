@@ -2,6 +2,7 @@ from numpy.testing import run_module_suite
 import numpy as np
 from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_emcee
 from spectractor.config import set_logger
+from spectractor import parameters
 
 import os
 
@@ -41,16 +42,20 @@ def test_fitworkspace():
     y = a * x + b
     yerr = sigma * np.ones_like(y)
     y += np.random.normal(scale=sigma, size=N)
+    parameters.VERBOSE = True
 
     # Do the fits
     file_name = "test_linefitworkspace.txt"
     w = LineFitWorkspace(x, y, yerr, file_name, truth=truth, nwalkers=20, nsteps=3000, burnin=500, nbins=20)
     run_minimisation(w, method="minimize")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    w.p = np.array([1, 1])
     run_minimisation(w, method="least_squares")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    w.p = np.array([1, 1])
     run_minimisation(w, method="minuit")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    w.p = np.array([1, 1])
     run_minimisation(w, method="newton")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
 
