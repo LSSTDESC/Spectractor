@@ -910,8 +910,9 @@ def calibrate_spectrum_with_lines(spectrum):
                              fwhm_func=fwhm_func, ax=None)
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
-            spectrum.lambdas = lambdas_test
-            spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
+            if parameters.LIVE_FIT:
+                spectrum.lambdas = lambdas_test
+                spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
                                                         f'\nD={D:.2f}mm, shift={shift:.2f}pix')
         return chisq
 
@@ -1051,7 +1052,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     s = ChromaticPSF1D(Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
     s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, bgd_model_func=bgd_model_func,
-                                   saturation=image.saturation, live_fit=parameters.DEBUG)
+                                   saturation=image.saturation, live_fit=False)
 
     # Fill spectrum object
     spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
@@ -1171,7 +1172,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[2].legend(loc='best')
         plot_spectrum_simple(ax[0], np.arange(spectrum.data.size), spectrum.data, data_err=spectrum.err,
                              units=image.units, label='Fitted spectrum', xlim=[0, spectrum.data.size])
-        ax[0].plot(xx, s.table['flux_sum'], 'k-', label='Cross spectrum')
+        ax[0].plot(xx, s.table['flux_sum'], fmt='k-', label='Cross spectrum')
         ax[0].set_xlim(0, xx.size)
         ax[0].legend(loc='best')
         ax[1].plot(xx, (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
