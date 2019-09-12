@@ -650,6 +650,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         start = time.time()
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
                                                    fix=fix, xtol=xtol, ftol=ftol, niter=niter)
+        fit_workspace.costs = costs
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             fit_workspace.save_parameters_summary()
