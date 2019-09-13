@@ -446,7 +446,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     my_logger.info("\n\tGradient descent")
     tmp_params = np.copy(params)
     W = 1 / fit_workspace.err.flatten() ** 2
-    my_logger.info("\n\tW", W)
+    my_logger.info(f'\n\tW {W}')
     ipar = np.arange(params.size)
     if fixed_params is not None:
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
@@ -456,17 +456,17 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     for i in range(niter):
         start = time.time()
         tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
-        print('tmp_params',tmp_params)
-        print('tmp_lambdas', tmp_lambdas)
-        print('tmp_model', tmp_model)
+        my_logger.info(f'\n\ttmp_params {tmp_params}')
+        my_logger.info(f'\n\ttmp_lambdas {tmp_lambdas}')
+        my_logger.info(f'\n\ttmp_model {tmp_model}')
         # if fit_workspace.live_fit:
         #    fit_workspace.plot_fit()
         residuals = (tmp_model - fit_workspace.data).flatten()
         cost = np.sum((residuals ** 2) * W)
-        print('residuals', residuals)
-        print('cost', cost)
+        my_logger.info(f'\n\tresiduals {residuals}')
+        my_logger.info(f'\n\tcost {cost}')
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
-        print('J', J)
+        my_logger.info(f'\n\tJ {J}')
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):
             if ip not in ipar:
@@ -483,13 +483,13 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         JT_W_J = JT_W @ J
         L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
         inv_JT_W_J = L.T @ L
-        print('inv_JT_W_J', inv_JT_W_J)
+        my_logger.info(f'\n\tinv_JT_W_J {inv_JT_W_J}')
         if fit_workspace.live_fit:
             fit_workspace.cov = inv_JT_W_J
             fit_workspace.plot_correlation_matrix(ipar)
         JT_W_R0 = JT_W @ residuals
         dparams = - inv_JT_W_J @ JT_W_R0
-        print('dparams', dparams)
+        my_logger.info(f'\n\tdparams {dparams}')
 
         def line_search(alpha):
             tmp_params_2 = np.copy(tmp_params)
