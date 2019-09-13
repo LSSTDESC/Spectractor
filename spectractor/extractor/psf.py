@@ -1451,14 +1451,14 @@ class ChromaticPSF1DFitWorkspace(FitWorkspace):
         ax[3, 0].set_xlabel(r'X [pixels]')
         ax[3, 0].legend(fontsize=7)
         ax[3, 0].grid(True)
-        if self.live_fit:
+        if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
             plt.close()
         else:
             if parameters.DISPLAY and self.verbose:
                 plt.show()
-        if parameters.SAVE:
+        if parameters.SAVE:  # pragma: no cover
             figname = self.filename.replace(self.filename.split('.')[-1], "_bestfit.pdf")
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
