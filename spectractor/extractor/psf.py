@@ -977,6 +977,9 @@ class ChromaticPSF:
         fit = fit_moffat1d_outlier_removal(index, signal, sigma=sigma, niter=2,
                                            guess=guess[:4], bounds=np.array(bounds[:4]).T)
         moffat_guess = [getattr(fit, p).value for p in fit.param_names]
+        signal_width_guess = moffat_guess[2]
+        bounds[2] = (0.1, min(Ny // 2, 5*signal_width_guess))
+        bounds[5] = (0.1, min(Ny // 2, 5*signal_width_guess))
         guess[:4] = moffat_guess
         init_guess = np.copy(guess)
         # Go from max to right, then from max to left
@@ -1015,53 +1018,8 @@ class ChromaticPSF:
             # if guess[0] * (1 + guess[4]) > 1.2 * maxi:
             #     guess = [0.9 * maxi, mean, std, 2, 0, std, saturation]
             PSF_guess = PSF1D(*guess)
-            outliers = []
-            # fit with outlier removal to clean background stars
-            # first a simple moffat to get the general shape
-            # moffat1d = fit_moffat1d_outlier_removal(index, signal, sigma=5, niter=2,
-            #                                        guess=guess[:4], bounds=np.array(bounds[:4]).T)
-            # guess[:4] = [getattr(moffat1d, p).value for p in moffat1d.param_names]
-            # then PSF model using the result from the Moffat1D fit
-            # fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
-            #                                            guess=guess, bounds=bounds, sigma=5, niter=2,
-            #                                            niter_basinhopping=5, T_basinhopping=1)
-            # fit = fit_PSF1D_minuit(index[good_indices], signal[good_indices], guess=guess, bounds=bounds,
-            #                       data_errors=err[good_indices, x])
             fit, outliers = fit_PSF1D_minuit_outlier_removal(index, signal, guess=guess, bounds=bounds,
                                                              data_errors=err[:, x], sigma=sigma, niter=2, consecutive=4)
-            # good_indices = [i for i in index if i not in outliers]
-            # outliers = [i for i in index if np.abs((signal[i] - fit(i)) / err[i, x]) > sigma]
-            """
-            This part is relevant if outliers rejection above is activated
-            # test if 3 consecutive pixels are in the outlier list
-            test = 0
-            consecutive_outliers = False
-            for o in range(1, len(outliers)):
-                t = outliers[o] - outliers[o - 1]
-                if t == 1:
-                    test += t
-                else:
-                    test = 0
-                if test > 1:
-                    consecutive_outliers = True
-                    break
-            # test if the fit has badly fitted the two highest data points or the middle points
-            test = np.copy(signal)
-            max_badfit = False
-            max_index = signal.argmax()
-            if max_index in outliers:
-                test[max_index] = 0
-                if test.argmax() in outliers:
-                    max_badfit = True
-            # if there are consecutive outliers or max is badly fitted, re-estimate the guess and refi
-            if consecutive_outliers:  # or max_badfit:
-                my_logger.warning(f'\n\tRefit because of max_badfit={max_badfit} or '
-                                  f'consecutive_outliers={consecutive_outliers}')
-                guess = [1.3 * maxi, middle, guess[2], guess[3], -0.3, std / 2, saturation]
-                fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
-                                                          guess=guess, bounds=bounds, sigma=5, niter=2,
-                                                          niter_basinhopping=20, T_basinhopping=1)
-            """
             # It is better not to propagate the guess to further pixel columns
             # otherwise fit_chromatic_psf1D is more likely to get trapped in a local minimum
             # Randomness of the slice fit is better :
