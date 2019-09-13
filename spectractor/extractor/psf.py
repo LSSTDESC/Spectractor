@@ -2032,13 +2032,15 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     model = PSF2D()
     my_logger = set_logger(__name__)
 
+    if bounds is not None:
+        bounds = np.array(bounds)
+        if bounds.shape[0] == 2 and bounds.shape[1] > 2:
+            bounds = bounds.T
+
+    guess = np.array(guess)
     error = 0.001 * np.abs(guess) * np.ones_like(guess)
     z = np.where(np.isclose(error, 0.0, 1e-6))
     error[z] = 0.001
-    bounds = np.array(bounds)
-    if bounds.shape[0] == 2 and bounds.shape[1] > 2:
-        bounds = bounds.T
-    guess = np.array(guess)
 
     def chisq_PSF2D(params):
         return PSF2D_chisq(params, model, x, y, data, data_errors)
