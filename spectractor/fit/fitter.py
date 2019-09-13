@@ -445,10 +445,10 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     my_logger = set_logger(__name__)
     my_logger.info("\n\tGradient descent")
     tmp_params = np.copy(params)
-    tmp_params = np.array([  1.80499581e+02,  -5.06029305e-01,   4.78096494e-01,   2.30810945e+00,
-  -1.87898044e+00 , -2.82236969e-02 ,  1.54675294e+00,  -9.54843262e-01,
-  -1.69948409e-02,  -2.65064619e-01,   1.13344854e-01,  -3.04769847e-01,
-   1.48158745e+00,   6.29053663e-01 ,  2.34882426e+00])
+  #   tmp_params = np.array([  1.80499581e+02,  -5.06029305e-01,   4.78096494e-01,   2.30810945e+00,
+  # -1.87898044e+00 , -2.82236969e-02 ,  1.54675294e+00,  -9.54843262e-01,
+  # -1.69948409e-02,  -2.65064619e-01,   1.13344854e-01,  -3.04769847e-01,
+  #  1.48158745e+00,   6.29053663e-01 ,  2.34882426e+00])
     W = 1 / fit_workspace.err.flatten() ** 2
     my_logger.info(f'\n\tW {W}')
     ipar = np.arange(params.size)
