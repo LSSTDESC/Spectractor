@@ -445,6 +445,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     my_logger = set_logger(__name__)
     tmp_params = np.copy(params)
     W = 1 / fit_workspace.err.flatten() ** 2
+    print('W', W)
     ipar = np.arange(params.size)
     if fixed_params is not None:
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
@@ -454,11 +455,17 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     for i in range(niter):
         start = time.time()
         tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
+        print('tmp_params',tmp_params)
+        print('tmp_lambdas', tmp_lambdas)
+        print('tmp_model', tmp_model)
         # if fit_workspace.live_fit:
         #    fit_workspace.plot_fit()
         residuals = (tmp_model - fit_workspace.data).flatten()
         cost = np.sum((residuals ** 2) * W)
+        print('residuals', residuals)
+        print('cost', cost)
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
+        print('J', J)
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):
             if ip not in ipar:
@@ -475,11 +482,13 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         JT_W_J = JT_W @ J
         L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
         inv_JT_W_J = L.T @ L
+        print('inv_JT_W_J', inv_JT_W_J)
         if fit_workspace.live_fit:
             fit_workspace.cov = inv_JT_W_J
             fit_workspace.plot_correlation_matrix(ipar)
         JT_W_R0 = JT_W @ residuals
         dparams = - inv_JT_W_J @ JT_W_R0
+        print('dparams', dparams)
 
         def line_search(alpha):
             tmp_params_2 = np.copy(tmp_params)
