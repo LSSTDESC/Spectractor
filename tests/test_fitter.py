@@ -46,7 +46,7 @@ def test_fitworkspace():
 
     # Do the fits
     file_name = "test_linefitworkspace.txt"
-    w = LineFitWorkspace(x, y, yerr, file_name, truth=truth, nwalkers=20, nsteps=3000, burnin=500, nbins=20)
+    w = LineFitWorkspace(x, y, yerr, file_name, truth=truth, nwalkers=20, nsteps=5000, burnin=1000, nbins=20)
     run_minimisation(w, method="minimize")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     w.p = np.array([1, 1])
@@ -68,7 +68,7 @@ def test_fitworkspace():
     run_emcee(w, ln=lnprob)
     w.analyze_chains()
 
-    assert w.chains.shape == (3000, 20, 2)
+    assert w.chains.shape == (5000, 20, 2)
     assert np.all(w.gelmans < 0.03)
     assert os.path.exists("test_linefitworkspace.txt")
     assert os.path.exists(file_name.replace(".txt", "_emcee.h5"))
