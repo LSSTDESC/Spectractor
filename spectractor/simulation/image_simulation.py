@@ -62,8 +62,12 @@ class StarModel:
         >>> model = fit_PSF2D_minuit(xx, yy, data, guess=p)
         >>> s = StarModel((20, 20), model, 200, target=None)
         >>> s.plot_model()
-        >>> assert s.x0==20 and s.y0==20
-        >>> assert s.model.amplitude==200
+        >>> s.x0
+        20
+        >>> s.y0
+        20
+        >>> s.model.amplitude
+        200
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.x0 = pixcoords[0]
@@ -224,8 +228,10 @@ class BackgroundModel:
         >>> parameters.CCD_IMSIZE = 200
         >>> bgd = BackgroundModel(10)
         >>> model = bgd.model()
-        >>> assert np.all(model==10)
-        >>> assert model.shape == (200, 200)
+        >>> np.all(model==10)
+        True
+        >>> model.shape
+        (200, 200)
         >>> bgd = BackgroundModel(10, frame=(160, 180, 3))
         >>> bgd.plot_model()
         """
@@ -291,7 +297,7 @@ class ImageModel(Image):
 
     def compute(self, star, background, spectrogram, starfield=None):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
-        self.data = star.model(xx, yy) + background.model(xx, yy)
+        self.data = star.model(xx, yy) + background.model()
         self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
         spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data  # - spectrogram.spectrogram_bgd)
         self.true_lambdas = spectrogram.lambdas
