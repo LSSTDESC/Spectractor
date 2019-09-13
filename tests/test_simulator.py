@@ -28,6 +28,7 @@ def test_simulator():
                                  aerosol_grid=[0, 0.1, 2])
         atmgrid = AtmosphereGrid(file_name, file_name.replace('spectrum', 'atmsim'))
         atm = Atmosphere(atmgrid.airmass, atmgrid.pressure, atmgrid.temperature)
+        assert os.path.isfile('./tests/data/' + tag.replace('_spectrum.fits', '_atmsim.fits')) is True
         assert image_simulation.data is not None
         # assert spectrum_simulation.data is not None
         assert spectrogram_simulation.data is not None
