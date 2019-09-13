@@ -1064,7 +1064,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Fit the data:
     my_logger.info(f'\n\tStart ChromaticPSF1D polynomial fit...')
-    s.fit_chromatic_PSF1D_minuit(data, bgd_model_func=bgd_model_func, data_errors=err)
+    s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=err)
     spectrum.spectrogram_fit = s.evaluate(s.poly_params)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
