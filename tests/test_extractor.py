@@ -31,8 +31,7 @@ def test_extractor():
         if target is None or xpos is None or ypos is None:
             continue
         spectrum = Spectractor(file_name, './outputs/', [xpos, ypos], target, disperser_label,
-                              config='./config/ctio.ini',
-                              line_detection=True, atmospheric_lines=True)
+                              config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10
         assert np.isclose(spectrum.lambdas[0], 296.56935941, atol=0.2)

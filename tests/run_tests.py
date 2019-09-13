@@ -11,7 +11,6 @@ if __name__ == "__main__":
 
     # If no args were specified, add arg to only do non-slow tests
     if len(args) == 1:
-        print('*************************************************************')
         print("Running tests that are not tagged as 'slow'. "
               "Use '--all' to run all tests.")
         args.append("-a!slow")
