@@ -443,9 +443,10 @@ def lnprob(p):
 
 def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
     my_logger = set_logger(__name__)
+    my_logger.info("\n\tGradient descent")
     tmp_params = np.copy(params)
     W = 1 / fit_workspace.err.flatten() ** 2
-    print('W', W)
+    my_logger.info("\n\tW", W)
     ipar = np.arange(params.size)
     if fixed_params is not None:
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
