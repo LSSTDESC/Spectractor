@@ -203,7 +203,7 @@ class PSF:
     def __init__(self):
         self.p = np.array([])
         self.input_labels = []
-        self.axes_names = []
+        self.axis_names = []
         self.bounds = [[]]
 
 
@@ -216,7 +216,7 @@ class PSF1D(PSF):
         else:
             self.p = [0.5, 0, 3, 3, 1, 1, 1]
         self.input_labels = ["amplitude_moffat", "mean", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
-        self.axes_names = ["A", r"$x_0$", r"$\gamma$", r"$\alpha$", r"$\eta", r"$\sigma", "saturation"]
+        self.axis_names = ["A", r"$x_0$", r"$\gamma$", r"$\alpha$", r"$\eta", r"$\sigma", "saturation"]
 
     def evaluate(self, x, p=None):
         if p is not None:
@@ -535,7 +535,7 @@ class PSFFitWorkspace(FitWorkspace):
         self.p = np.copy(self.psf.p[:-1])  # remove saturation (fixed parameter))
         self.saturation = self.psf.p[-1]
         self.input_labels = list(np.copy(self.psf.input_labels[:-1]))
-        self.axis_names = list(np.copy(self.psf.axes_names[:-1]))
+        self.axis_names = list(np.copy(self.psf.axis_names[:-1]))
         self.bounds = self.psf.bounds
         self.nwalkers = max(2 * self.ndim, nwalkers)
 
