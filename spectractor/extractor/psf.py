@@ -1892,7 +1892,7 @@ class ChromaticPSF1DFitWorkspace(FitWorkspace):
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
         profile_params[:self.Nx, 0] = 1
         profile_params[:self.Nx, 1] -= self.bgd_width
-        J = np.array([self.chromatic_psf.PSF.evaluate(self.pixels, *profile_params[x, :]) for x in range(self.Nx)])
+        J = np.array([self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]) for x in range(self.Nx)])
         J_dot_W_dot_J = np.array([J[x].T @ self.W[x] @ J[x] for x in range(self.Nx)])
         amplitude_params = [
             J[x].T @ self.W_dot_data[x] / (J_dot_W_dot_J[x]) if J_dot_W_dot_J[x] > 0 else 0.1 * self.bgd_std
