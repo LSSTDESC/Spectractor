@@ -677,9 +677,9 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
 def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50, sigma=5.0, clip_niter=3):
     my_logger = set_logger(__name__)
     for step in range(clip_niter):
-        my_logger.info(f"\n\tSigma-clipping step {step}/{clip_niter} (sigma={sigma})")
+        my_logger.debug(f"\n\tSigma-clipping step {step}/{clip_niter} (sigma={sigma})")
         run_minimisation(fit_workspace, method=method, epsilon=epsilon, fix=fix, xtol=xtol, ftol=ftol, niter=niter)
-        my_logger.info(f'\n\tBest fitting parameters:\n{fit_workspace.p}')
+        my_logger.debug(f'\n\tBest fitting parameters:\n{fit_workspace.p}')
         # remove outliers
         indices_no_nan = ~np.isnan(fit_workspace.data)
         residuals = np.abs(fit_workspace.model[indices_no_nan] - fit_workspace.data[indices_no_nan]) / fit_workspace.err[indices_no_nan]
@@ -687,15 +687,15 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
         outliers.sort()
         if len(outliers) > 0:
-            my_logger.info(f'\n\tOutliers flat index list:\n{outliers}')
+            my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
             if np.all(fit_workspace.outliers == outliers):
-                my_logger.info(f'\n\tOutliers flat index list unchanged since last iteration: '
+                my_logger.debug(f'\n\tOutliers flat index list unchanged since last iteration: '
                                f'break the sigma clipping iterations.')
                 break
             else:
                 fit_workspace.outliers = outliers
         else:
-            my_logger.info(f'\n\tNo outliers detected at first iteration: '
+            my_logger.debug(f'\n\tNo outliers detected at first iteration: '
                            f'break the sigma clipping iterations.')
             break
 
