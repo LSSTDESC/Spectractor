@@ -32,6 +32,7 @@ class FitWorkspace:
         self.data = None
         self.err = None
         self.x = None
+        self.outliers = []
         self.model = None
         self.model_err = None
         self.model_noconv = None
@@ -49,6 +50,7 @@ class FitWorkspace:
         self.gelmans = np.array([])
         self.chains = np.array([[]])
         self.lnprobs = np.array([[]])
+        self.costs = np.array([[]])
         self.flat_chains = np.array([[]])
         self.valid_chains = [False] * self.nwalkers
         self.global_average = None
@@ -385,8 +387,16 @@ class FitWorkspace:
                 plt.show()
 
     def weighted_residuals(self, p):
-        lambdas, model, model_err = self.simulate(*p)
-        res = ((model - self.data) / np.sqrt(model_err ** 2 + self.err ** 2)).flatten()
+        x, model, model_err = self.simulate(*p)
+        if len(self.outliers) > 0:
+            good_indices = [i for i in range(model.size) if i not in self.outliers]
+            model = model.flatten()[good_indices]
+            data = self.data.flatten()[good_indices]
+            model_err =  model_err.flatten()[good_indices]
+            err = self.err.flatten()[good_indices]
+            res = ((model - data)) / np.sqrt(model_err ** 2 + err ** 2)
+        else:
+            res = ((model - self.data) / np.sqrt(model_err ** 2 + self.err ** 2)).flatten()
         return res
 
     def chisq(self, p):
@@ -588,6 +598,8 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
 
 def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50):
     my_logger = set_logger(__name__)
+    my_logger.info(f"\n\tMinimisation method: {method}")
+
     bounds = fit_workspace.bounds
 
     nll = lambda params: -fit_workspace.lnlike(params)
@@ -663,6 +675,32 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if fit_workspace.filename != "":
             fit_workspace.save_parameters_summary()
             save_gradient_descent(fit_workspace, costs, params_table)
+
+
+def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50, sigma=5.0, clip_niter=3):
+    my_logger = set_logger(__name__)
+    for step in range(clip_niter):
+        my_logger.info(f"\n\tSigma-clipping step {step}/{clip_niter} (sigma={sigma})")
+        run_minimisation(fit_workspace, method=method, epsilon=epsilon, fix=fix, xtol=xtol, ftol=ftol, niter=niter)
+        my_logger.info(f'\n\tBest fitting parameters:\n{fit_workspace.p}')
+        # remove outliers
+        indices_no_nan = ~np.isnan(fit_workspace.data)
+        residuals = np.abs(fit_workspace.model[indices_no_nan] - fit_workspace.data[indices_no_nan]) / fit_workspace.err[indices_no_nan]
+        outliers = residuals > sigma
+        outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
+        outliers.sort()
+        if len(outliers) > 0:
+            my_logger.info(f'\n\tOutliers flat index list:\n{fit_workspace.outliers}')
+            if np.all(fit_workspace.outliers == outliers):
+                my_logger.info(f'\n\tOutliers flat index list unchanged since last iteration: '
+                               f'break the sigma clipping iterations.')
+                break
+            else:
+                fit_workspace.outliers = outliers
+        else:
+            my_logger.info(f'\n\tNo outliers detected at first iteration: '
+                           f'break the sigma clipping iterations.')
+            break
 
 
 def run_emcee(fit_workspace, ln=lnprob):
