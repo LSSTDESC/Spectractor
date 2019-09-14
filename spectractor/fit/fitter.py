@@ -606,7 +606,15 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         fit_workspace.simulate(*fit_workspace.p)
         fit_workspace.live_fit = False
         fit_workspace.plot_fit()
-
+    elif method == 'basinhopping':
+        start = time.time()
+        minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds)
+        result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs)
+        fit_workspace.p = result['x']
+        my_logger.info(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
+        fit_workspace.simulate(*fit_workspace.p)
+        fit_workspace.live_fit = False
+        fit_workspace.plot_fit()
     elif method == "least_squares":
         start = time.time()
         x_scale = np.abs(guess)
