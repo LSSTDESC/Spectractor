@@ -504,7 +504,9 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             tmp_params_2 = np.copy(tmp_params)
             tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
             lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
-            return np.sum(((mod[fit_workspace.not_outliers] - fit_workspace.data[fit_workspace.not_outliers]) / fit_workspace.err[fit_workspace.not_outliers]) ** 2)
+            return np.sum(((mod.flatten()[fit_workspace.not_outliers]
+                            - fit_workspace.data.flatten()[fit_workspace.not_outliers])
+                           / fit_workspace.err.flatten()[fit_workspace.not_outliers]) ** 2)
 
         # tol parameter acts on alpha (not func)
         alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2)
@@ -607,7 +609,6 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
 
 def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50):
     my_logger = set_logger(__name__)
-    my_logger.info(f"\n\tMinimisation method: {method}")
 
     bounds = fit_workspace.bounds
 
@@ -648,7 +649,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         fix = [False] * guess.size
         # noinspection PyArgumentList
         m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
-                                   fix=fix, print_level=parameters.DEBUG, limit=bounds)
+                                   fix=fix, print_level=False, limit=bounds)
         m.tol = 10
         m.migrad()
         fit_workspace.p = m.np_values()

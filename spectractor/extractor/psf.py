@@ -216,7 +216,7 @@ class PSF1D(PSF):
         else:
             self.p = [0.5, 0, 3, 3, 1, 1, 1]
         self.param_names = ["amplitude_moffat", "x_mean", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
-        self.axis_names = ["A", r"$x_0$", r"$\gamma$", r"$\alpha$", r"$\eta", r"$\sigma", "saturation"]
+        self.axis_names = ["A", r"m", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
 
     def evaluate(self, x, p=None):
         if p is not None:
@@ -1104,9 +1104,11 @@ class ChromaticPSF:
         pixel_x = np.arange(self.Nx).astype(int)
         for x in pixel_x:
             p = profile_params[x, :]
-            self.PSF.parameters = p
+            # self.PSF.parameters = p
+            self.PSF.p = p
             fwhm = self.PSF.fwhm(x_array=pixel_y)
             integral = self.PSF.integrate(bounds=(-10 * fwhm + p[1], 10 * fwhm + p[1]), x_array=pixel_y)
+            self.my_logger.warning(f"\n\t{x} {integral} {fwhm}")
             self.table['flux_integral'][x] = integral
             self.table['fwhm'][x] = fwhm
             self.table['Dy_mean'][x] = 0
