@@ -38,13 +38,12 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.D = self.spectrum.header['D2CCD']
         self.shift = self.spectrum.header['PIXSHIFT']
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D, self.shift])
-        self.ndim = len(self.p)
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]"]
         self.bounds = [(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1), (1, 10), (50, 60), (-20, 20)]
-        if atmgrid_filename != "":
+        if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
             self.bounds[4] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))

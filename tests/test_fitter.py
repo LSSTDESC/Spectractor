@@ -19,7 +19,6 @@ class LineFitWorkspace(FitWorkspace):
         self.a = 1
         self.b = 1
         self.p = np.array([self.a, self.b])
-        self.ndim = self.p.size
         self.input_labels = ["a", "b"]
         self.axis_names = ["$a$", "$b$"]
         self.bounds = np.array([(-100, 100), (-100, 100)])
