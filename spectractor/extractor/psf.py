@@ -2337,22 +2337,13 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
         else:
             return np.nansum((diff / data_errors) ** 2)
 
-    def PSF1D_chisq_v2_jac(params):
-        diff = model.evaluate(x, *params) - data
-        jac = model.fit_deriv(x, *params)
-        if data_errors is None:
-            return np.array([np.nansum(2 * jac[p] * diff) for p in range(len(params))])
-        else:
-            yy_err2 = data_errors * data_errors
-            return np.array([np.nansum(2 * jac[p] * diff / yy_err2) for p in range(len(params))])
-
     error = 0.1 * np.abs(guess) * np.ones_like(guess)
     fix = [False] * len(guess)
     fix[-1] = True
     # noinspection PyArgumentList
     # 3 times faster with gradient
     m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
-                               print_level=parameters.DEBUG, grad=PSF1D_chisq_v2_jac)
+                               print_level=parameters.DEBUG)
     m.migrad()
     PSF = PSF1D(*m.np_values())
 
@@ -2429,15 +2420,6 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
         else:
             return np.nansum((diff / data_errors[indices]) ** 2)
 
-    def PSF1D_chisq_v2_jac(params):
-        diff = model.evaluate(x, *params) - data
-        jac = model.fit_deriv(x, *params)
-        if data_errors is None:
-            return np.array([np.nansum(2 * jac[p] * diff) for p in range(len(params))])
-        else:
-            yy_err2 = data_errors * data_errors
-            return np.array([np.nansum(2 * jac[p] * diff / yy_err2) for p in range(len(params))])
-
     error = 0.1 * np.abs(guess) * np.ones_like(guess)
     fix = [False] * len(guess)
     fix[-1] = True
@@ -2486,8 +2468,5 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
 
 if __name__ == "__main__":
     import doctest
-
-    #if np.__version__ >= "1.14.0":
-    #    np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
