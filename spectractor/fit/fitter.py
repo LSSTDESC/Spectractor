@@ -427,7 +427,7 @@ class FitWorkspace:
 
     def jacobian(self, params, epsilon, fixed_params=None):
         x, model, model_err = self.simulate(*params)
-        model = model.flatten()
+        model = model.flatten()[self.not_outliers]
         J = np.zeros((params.size, model.size))
         for ip, p in enumerate(params):
             if fixed_params[ip]:
@@ -437,7 +437,7 @@ class FitWorkspace:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+            J[ip] = (tmp_model.flatten()[self.not_outliers] - model) / epsilon[ip]
         return J
 
     @staticmethod
@@ -461,7 +461,7 @@ def lnprob(p):
 def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
     my_logger = set_logger(__name__)
     tmp_params = np.copy(params)
-    W = 1 / fit_workspace.err.flatten() ** 2
+    W = 1 / (fit_workspace.err.flatten()[fit_workspace.not_outliers]) ** 2
     ipar = np.arange(params.size)
     if fixed_params is not None:
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
@@ -473,7 +473,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
         # if fit_workspace.live_fit:
         #    fit_workspace.plot_fit()
-        residuals = (tmp_model - fit_workspace.data).flatten()
+        residuals = (tmp_model - fit_workspace.data).flatten()[fit_workspace.not_outliers]
         cost = np.sum((residuals ** 2) * W)
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
         # remove parameters with unexpected null Jacobian vectors
@@ -502,7 +502,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             tmp_params_2 = np.copy(tmp_params)
             tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
             lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
-            return np.sum(((mod - fit_workspace.data) / fit_workspace.err) ** 2)
+            return np.sum(((mod[fit_workspace.not_outliers] - fit_workspace.data[fit_workspace.not_outliers]) / fit_workspace.err[fit_workspace.not_outliers]) ** 2)
 
         # tol parameter acts on alpha (not func)
         alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2)
@@ -622,18 +622,12 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
                                    bounds=bounds)
         fit_workspace.p = result['x']
         my_logger.info(f"\n\tMinimize: total computation time: {time.time() - start}s")
-        fit_workspace.simulate(*fit_workspace.p)
-        fit_workspace.live_fit = False
-        fit_workspace.plot_fit()
     elif method == 'basinhopping':
         start = time.time()
         minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds)
         result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs)
         fit_workspace.p = result['x']
         my_logger.info(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
-        fit_workspace.simulate(*fit_workspace.p)
-        fit_workspace.live_fit = False
-        fit_workspace.plot_fit()
     elif method == "least_squares":
         start = time.time()
         x_scale = np.abs(guess)
@@ -642,9 +636,6 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
                                    diff_step=0.001, bounds=bounds.T)
         fit_workspace.p = p.x  # m.np_values()
         my_logger.info(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
-        fit_workspace.simulate(*fit_workspace.p)
-        fit_workspace.live_fit = False
-        fit_workspace.plot_fit()
     elif method == "minuit":
         start = time.time()
         # fit_workspace.simulation.fix_psf_cube = False
@@ -660,9 +651,6 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         m.migrad()
         fit_workspace.p = m.np_values()
         my_logger.info(f"\n\tMinuit: total computation time: {time.time() - start}s")
-        fit_workspace.simulate(*fit_workspace.p)
-        fit_workspace.live_fit = False
-        fit_workspace.plot_fit()
     elif method == "newton":
         my_logger.info(f"\n\tStart guess: {guess}")
         costs = np.array([fit_workspace.chisq(guess)])
@@ -697,7 +685,7 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
         outliers.sort()
         if len(outliers) > 0:
-            my_logger.info(f'\n\tOutliers flat index list:\n{fit_workspace.outliers}')
+            my_logger.info(f'\n\tOutliers flat index list:\n{outliers}')
             if np.all(fit_workspace.outliers == outliers):
                 my_logger.info(f'\n\tOutliers flat index list unchanged since last iteration: '
                                f'break the sigma clipping iterations.')
