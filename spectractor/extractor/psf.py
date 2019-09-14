@@ -15,7 +15,7 @@ from spectractor.tools import dichotomie, fit_poly1d, fit_moffat1d_outlier_remov
 from spectractor.extractor.background import extract_background_photutils
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.fit.fitter import FitWorkspace, run_minimisation
+from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping
 
 
 class PSF1DAstropy(Fittable1DModel):
@@ -30,7 +30,7 @@ class PSF1DAstropy(Fittable1DModel):
     stddev = Parameter('stddev', default=1)
     saturation = Parameter('saturation', default=1)
 
-    param_titles = ["A", "y", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
+    axis_names = ["A", "y", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
 
     @staticmethod
     def evaluate(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
@@ -202,7 +202,7 @@ class PSF:
 
     def __init__(self):
         self.p = np.array([])
-        self.input_labels = []
+        self.param_names = []
         self.axis_names = []
         self.bounds = [[]]
 
@@ -215,7 +215,7 @@ class PSF1D(PSF):
             self.p = p
         else:
             self.p = [0.5, 0, 3, 3, 1, 1, 1]
-        self.input_labels = ["amplitude_moffat", "mean", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
+        self.param_names = ["amplitude_moffat", "x_mean", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
         self.axis_names = ["A", r"$x_0$", r"$\gamma$", r"$\alpha$", r"$\eta", r"$\sigma", "saturation"]
 
     def evaluate(self, x, p=None):
@@ -534,7 +534,7 @@ class PSFFitWorkspace(FitWorkspace):
         self.bgd_model_func = bgd_model_func
         self.p = np.copy(self.psf.p[:-1])  # remove saturation (fixed parameter))
         self.saturation = self.psf.p[-1]
-        self.input_labels = list(np.copy(self.psf.input_labels[:-1]))
+        self.input_labels = list(np.copy(self.psf.param_names[:-1]))
         self.axis_names = list(np.copy(self.psf.axis_names[:-1]))
         self.bounds = self.psf.bounds
         self.nwalkers = max(2 * self.ndim, nwalkers)
@@ -560,7 +560,7 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
         # self.data = self.data - self.bgd
         # self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
 
-    def simulate(self, params):
+    def simulate(self, amplitude_moffat, mean, gamma, alpha, eta_gauss, stddev):
         """
         Evaluate a PSF model.
 
@@ -585,12 +585,13 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
 
         # Fit the data:
         >>> w = PSF1DFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
-        >>> x, mod, mod_err = w.simulate(p[:-1])
+        >>> x, mod, mod_err = w.simulate(*p[:-1])
         >>> assert mod is not None
         >>> assert np.mean(np.abs(mod-data)/data_errors) < 0.5
         >>> w.plot_fit()
         """
-        self.model = self.psf.evaluate(self.pixels, p=np.array(list(params) + [self.saturation]))
+        params = [amplitude_moffat, mean, gamma, alpha, eta_gauss, stddev]
+        self.model = self.psf.evaluate(self.pixels, p=np.array(params + [self.saturation]))
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
@@ -801,9 +802,9 @@ class PSF2DFitWorkspace(FitWorkspace):
 
 class ChromaticPSF:
 
-    def __init__(self, PSF, Nx, Ny, deg=4, saturation=None, file_name=''):
+    def __init__(self, psf, Nx, Ny, deg=4, saturation=None, file_name=''):
         self.my_logger = set_logger(self.__class__.__name__)
-        self.PSF = PSF
+        self.PSF = psf
         self.deg = -1
         self.degrees = {}
         self.set_polynomial_degrees(deg)
@@ -835,11 +836,11 @@ class ChromaticPSF:
             if ip == 0:
                 self.poly_params_labels += [f"{p}_{k}" for k in range(len(self.table))]
                 self.poly_params_names += \
-                    ["$" + self.PSF.param_titles[ip] + "_{(" + str(k) + ")}$" for k in range(len(self.table))]
+                    ["$" + self.PSF.axis_names[ip] + "_{(" + str(k) + ")}$" for k in range(len(self.table))]
             else:
                 for k in range(self.degrees[p] + 1):
                     self.poly_params_labels.append(f"{p}_{k}")
-                    self.poly_params_names.append("$" + self.PSF.param_titles[ip] + "_{(" + str(k) + ")}$")
+                    self.poly_params_names.append("$" + self.PSF.axis_names[ip] + "_{(" + str(k) + ")}$")
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg
@@ -1418,13 +1419,12 @@ class ChromaticPSF:
         # Fit the transverse profile:
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
-        ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False, sigma=5)
+        ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
         >>> assert(np.all(np.isclose(s.pixels[:5], np.arange(s.Nx)[:5], rtol=1e-3)))
         >>> assert(not np.any(np.isclose(s.table['flux_sum'][3:6], np.zeros(s.Nx)[3:6], rtol=1e-3)))
         >>> assert(np.all(np.isclose(s.table['Dy'][-10:-1], np.zeros(s.Nx)[-10:-1], rtol=1e-2)))
         >>> s.plot_summary(truth=s0)
         """
-        my_logger = set_logger(__name__)
         if saturation is None:
             saturation = 2 * np.max(data)
         Ny, Nx = data.shape
@@ -1454,6 +1454,10 @@ class ChromaticPSF:
         bounds[5] = (0.1, min(Ny // 2, 5*signal_width_guess))
         guess[:4] = moffat_guess
         init_guess = np.copy(guess)
+        # Initialize FitWorkspace
+        psf = PSF1D(p=init_guess)
+        psf.bounds = bounds
+        w = PSF1DFitWorkspace(psf, signal, err[:, ymax_index])
         # Go from max to right, then from max to left
         # includes the boundaries to avoid Runge phenomenum in chromatic_fit
         pixel_range = list(np.arange(ymax_index, Nx, pixel_step).astype(int))
@@ -1489,21 +1493,30 @@ class ChromaticPSF:
                 guess = [0.9 * maxi, mean, std, 2, 0, std, saturation]
             # if guess[0] * (1 + guess[4]) > 1.2 * maxi:
             #     guess = [0.9 * maxi, mean, std, 2, 0, std, saturation]
-            PSF_guess = PSF1D(*guess)
-            fit, outliers = fit_PSF1D_minuit_outlier_removal(index, signal, guess=guess, bounds=bounds,
-                                                             data_errors=err[:, x], sigma=sigma, niter=2, consecutive=4)
+            # PSF_guess = PSF1D(*guess)
+            # fit, outliers = fit_PSF1D_minuit_outlier_removal(index, signal, guess=guess, bounds=bounds,
+            #                                                  data_errors=err[:, x], sigma=sigma, niter=2, consecutive=4)
+            PSF_guess = PSF1D(p=guess)
+            w.p = guess[:-1]
+            w.bounds = bounds[:-1]
+            w.data = signal
+            w.err = err[:, x]
+            run_minimisation_sigma_clipping(w, method="minuit", sigma=sigma, clip_niter=2)
             # It is better not to propagate the guess to further pixel columns
             # otherwise fit_chromatic_psf1D is more likely to get trapped in a local minimum
             # Randomness of the slice fit is better :
             # guess = [getattr(fit, p).value for p in fit.param_names]
-            best_fit = [getattr(fit, p).value for p in fit.param_names]
+            # best_fit = [getattr(fit, p).value for p in fit.param_names]
+            best_fit = w.p
             self.profile_params[x, 0] = best_fit[0]
-            self.profile_params[x, -6:] = best_fit[1:]
+            self.profile_params[x, -6:-1] = best_fit[1:]
+            self.profile_params[x, -1] = saturation
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
             if live_fit and parameters.DISPLAY:  # pragma: no cover
+                fit = PSF1D(p=list(best_fit)+[saturation])
                 plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, fit, bgd_model_func, best_fit,
-                                              PSF_guess, outliers, sigma, live_fit)
+                                              PSF_guess, w.outliers, sigma, live_fit)
         # interpolate the skipped pixels with splines
         x = np.arange(Nx)
         xp = np.array(sorted(set(list(pixel_range))))
@@ -1522,8 +1535,8 @@ class ChromaticPSF:
 class ChromaticPSF1D(ChromaticPSF):
 
     def __init__(self, Nx, Ny, deg=4, saturation=None, file_name=''):
-        PSF = PSF1D()
-        ChromaticPSF.__init__(self, PSF, Nx=Nx, Ny=Ny, deg=deg, saturation=saturation, file_name=file_name)
+        psf = PSF1D()
+        ChromaticPSF.__init__(self, psf, Nx=Nx, Ny=Ny, deg=deg, saturation=saturation, file_name=file_name)
         self.my_logger = set_logger(self.__class__.__name__)
 
     def generate_test_poly_params(self):
@@ -1601,7 +1614,8 @@ class ChromaticPSF1D(ChromaticPSF):
         y = np.arange(self.Ny)
         output = np.zeros((self.Ny, self.Nx))
         for k in range(self.Nx):
-            output[:, k] = PSF1D.evaluate(y, *profile_params[k])
+            # output[:, k] = PSF1D.evaluate(y, *profile_params[k])
+            output[:, k] = self.PSF.evaluate(y, p=profile_params[k])
         return output
 
     def fit_chromatic_PSF1D_minuit(self, data, bgd_model_func=None, data_errors=None):
@@ -2170,13 +2184,13 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
         The 2D spectrogram data array.
     err: array_like
         The 2D spectrogram uncertainty data array.
-    fit: Fittable1DModel, optional
+    fit: PSF1D, optional
         Best fitting model function for the profile (default: None).
     bgd_model_func: callable, optional
         A 2D function to model the extracted background (default: None -> null background)
     params: array_like, optional
         Best fitting model parameter array (default: None).
-    PSF_guess: callable, optional
+    PSF_guess: PSF1D, optional
         Guessed fitting model function for the profile before the fit (default: None).
     outliers: array_like, optional
         Pixel indices of the outliers across the dispersion axis (default: None).
@@ -2222,11 +2236,11 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
         ax[0].plot(bgd_indices, bgd_model_func(x, bgd_indices)[:, 0], 'b--', label="fitted bgd")
     if PSF_guess is not None:
         if bgd_model_func is not None:
-            ax[0].plot(indices, PSF_guess(indices) + bgd_model_func(x, indices)[:, 0], 'k--', label="guessed profile")
+            ax[0].plot(indices, PSF_guess.evaluate(indices) + bgd_model_func(x, indices)[:, 0], 'k--', label="guessed profile")
         else:
-            ax[0].plot(indices, PSF_guess(indices), 'k--', label="guessed profile")
+            ax[0].plot(indices, PSF_guess.evaluate(indices), 'k--', label="guessed profile")
     if fit is not None and bgd_model_func is not None:
-        model = fit(indices) + bgd_model_func(x, indices)[:, 0]
+        model = fit.evaluate(indices) + bgd_model_func(x, indices)[:, 0]
         ax[0].plot(indices, model, 'b-', label="fitted profile")
     ylim = ax[0].get_ylim()
     if params is not None:
@@ -2239,14 +2253,14 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     if fit is not None:
         txt = ""
         for ip, p in enumerate(fit.param_names):
-            txt += f'{p}: {getattr(fit, p).value:.4g}\n'
+            txt += f'{p}: {fit.p[ip]:.4g}\n'
         ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
         ax[0].set_title(f'x={x}')
     model = np.zeros_like(indices).astype(float)
     model_outliers = np.zeros_like(outliers).astype(float)
     if fit is not None:
-        model += fit(indices)
-        model_outliers += fit(outliers)
+        model += fit.evaluate(indices)
+        model_outliers += fit.evaluate(outliers)
     if bgd_model_func is not None:
         model += bgd_model_func(x, indices)[:, 0]
         if len(outliers) > 0:
