@@ -105,21 +105,21 @@ def test_minimisation_sigma_clipping():
     run_minimisation_sigma_clipping(w, method="minimize", sigma=sigma, clip_niter=clip_niter)
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     assert np.all(outliers == w.outliers)
-    # w.p = np.array([1, 1])
-    # w.outliers = []
-    # run_minimisation_sigma_clipping(w, method="basinhopping", sigma=sigma, clip_niter=clip_niter)
-    # assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
-    # assert np.all(outliers == w.outliers)
-    # w.p = np.array([1, 1])
-    # w.outliers = []
-    # run_minimisation_sigma_clipping(w, method="least_squares", sigma=sigma, clip_niter=clip_niter)
-    # assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
-    # assert np.all(outliers == w.outliers)
-    # w.p = np.array([1, 1])
-    # w.outliers = []
-    # run_minimisation_sigma_clipping(w, method="minuit", sigma=sigma, clip_niter=clip_niter)
-    # assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
-    # assert np.all(outliers == w.outliers)
+    w.p = np.array([1, 1])
+    w.outliers = []
+    run_minimisation_sigma_clipping(w, method="basinhopping", sigma=sigma, clip_niter=clip_niter)
+    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all(outliers == w.outliers)
+    w.p = np.array([1, 1])
+    w.outliers = []
+    run_minimisation_sigma_clipping(w, method="least_squares", sigma=sigma, clip_niter=clip_niter)
+    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all(outliers == w.outliers)
+    w.p = np.array([1, 1])
+    w.outliers = []
+    run_minimisation_sigma_clipping(w, method="minuit", sigma=sigma, clip_niter=clip_niter)
+    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all(outliers == w.outliers)
     w.p = np.array([1, 1])
     w.outliers = []
     run_minimisation_sigma_clipping(w, method="newton", sigma=sigma, clip_niter=clip_niter)
