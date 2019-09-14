@@ -648,7 +648,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         fix = [False] * guess.size
         # noinspection PyArgumentList
         m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
-                                   fix=fix, print_level=2, limit=bounds)
+                                   fix=fix, print_level=parameters.VERBOSE, limit=bounds)
         m.tol = 10
         m.migrad()
         fit_workspace.p = m.np_values()
