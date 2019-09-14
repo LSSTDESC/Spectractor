@@ -20,7 +20,6 @@ class FitWorkspace:
                  verbose=0, plot=False, live_fit=False, truth=None):
         self.my_logger = set_logger(self.__class__.__name__)
         self.filename = file_name
-        self.ndim = 0
         self.truth = truth
         self.verbose = verbose
         self.plot = plot
@@ -28,7 +27,6 @@ class FitWorkspace:
         self.p = np.array([])
         self.cov = np.array([[]])
         self.rho = np.array([[]])
-        self.ndim = len(self.p)
         self.data = None
         self.err = None
         self.x = None
@@ -64,6 +62,10 @@ class FitWorkspace:
                 self.my_logger.warning("\n\tFile name must have an extension.")
         else:
             self.emcee_filename = "emcee.h5"
+
+    @property
+    def ndim(self):
+        return len(self.p)
 
     @property
     def not_outliers(self):
