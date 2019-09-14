@@ -65,6 +65,13 @@ class FitWorkspace:
         else:
             self.emcee_filename = "emcee.h5"
 
+    @property
+    def not_outliers(self):
+        if len(self.outliers) > 0:
+            return [i for i in range(self.data.size) if i not in self.outliers]
+        else:
+            return list(np.arange(self.data.size))
+
     def set_start(self):
         self.start = np.array(
             [np.random.uniform(self.p[i] - 0.02 * self.p[i], self.p[i] + 0.02 * self.p[i], self.nwalkers)
@@ -389,7 +396,7 @@ class FitWorkspace:
     def weighted_residuals(self, p):
         x, model, model_err = self.simulate(*p)
         if len(self.outliers) > 0:
-            good_indices = [i for i in range(model.size) if i not in self.outliers]
+            good_indices = self.not_outliers
             model = model.flatten()[good_indices]
             data = self.data.flatten()[good_indices]
             model_err =  model_err.flatten()[good_indices]
