@@ -14,6 +14,7 @@ from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 from scipy.interpolate import interp1d
+from scipy.integrate import quad
 
 from skimage.feature import hessian_matrix
 from spectractor.config import set_logger
@@ -1064,7 +1065,7 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
         plt.ylabel("y")
         plt.show()
     """
-    interp = interp1d(x, y, kind="cubic", bounds_error=False, fill_value="extrapolated")
+    interp = interp1d(x, y, kind="cubic", bounds_error=False, fill_value="extrapolate")
     maximum = np.max(y) - minimum
     imax = np.argmax(y)
     a = imax + np.argmin(np.abs(y[imax:] - 0.9 * maximum))
@@ -1080,6 +1081,53 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
         return fwhm
     else:
         return fwhm, 0.5*maximum, center, res, center - abs(res-center)
+
+
+def compute_integral(x, y, bounds=None):
+    """
+    Compute the integral of an y(x) curve. The curve is interpolated and extrapolated with cubic splines.
+    If not provided, bounds are set to the x array edges.
+
+    Parameters
+    ----------
+    x: array_like
+        The abscisse array.
+    y: array_like
+        The function array.
+    bounds: array_like, optional
+        The bounds of the integral. If None, the edges of thex array are taken (default bounds=None).
+
+    Returns
+    -------
+    result: float
+        The integral of the PSF model.
+
+    Examples
+    --------
+
+    # Gaussian example
+    >>> x = np.arange(0, 100, 1)
+    >>> stddev = 4
+    >>> middle = 40
+    >>> psf = gauss(x, 1/(stddev*np.sqrt(2*np.pi)), middle, stddev)
+    >>> integral = compute_integral(x, psf)
+    >>> print(f"{integral:.6f}")
+    1.000000
+    >>> assert np.isclose(integral, 1, atol=1e-6)
+
+    # Defocused PSF example
+    >>> from spectractor.extractor.psf import PSF1D
+    >>> p = [2,30,4,2,-0.5,1,10]
+    >>> psf = PSF1D(p)
+    >>> integral = compute_integral(x, psf.evaluate(x))
+    >>> assert np.isclose(integral, 6.218299864507171, atol=1e-3)
+
+    """
+    if bounds is None:
+        bounds = (np.min(x), np.max(x))
+    interp = interp1d(x, y, kind="cubic", bounds_error=False, fill_value="extrapolate")
+    integral = quad(interp, bounds[0], bounds[1], limit=200)
+    return integral[0]
 
 
 def find_nearest(array, value):
