@@ -84,7 +84,10 @@ class PSF1D(PSF):
             my_logger = set_logger(__name__)
             my_logger.warning(f"{[amplitude_moffat, mean, gamma, alpha, eta_gauss, stddev, saturation]}")
             a = eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
-        norm = amplitude_moffat / compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
+        # integral = compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
+        dx = np.gradient(x)[0]
+        integral = np.sum(a) * dx
+        norm = amplitude_moffat /  integral
         a *= norm
         return np.clip(a, 0, saturation)
 
@@ -836,10 +839,9 @@ class ChromaticPSF:
         pixel_x = np.arange(self.Nx).astype(int)
         for x in pixel_x:
             p = profile_params[x, :]
-            # self.PSF.parameters = p
-            self.PSF.p = p
-            fwhm = self.PSF.fwhm(x_array=pixel_y)
-            integral = self.PSF.integrate(bounds=(-10 * fwhm + p[1], 10 * fwhm + p[1]), x_array=pixel_y)
+            out = self.PSF.evaluate(pixel_y, p=p)
+            fwhm = compute_fwhm(pixel_y, out, center=p[1], minimum=0)
+            integral = compute_integral(pixel_y, out)
             self.table['flux_integral'][x] = integral
             self.table['fwhm'][x] = fwhm
             self.table['Dy_mean'][x] = 0
@@ -1167,11 +1169,6 @@ class ChromaticPSF:
         ymax_index = int(np.unravel_index(np.argmax(data[middle - ws[0]:middle + ws[0], :]), data.shape)[1])
         bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
         y = data[:, ymax_index]
-        guess = [np.nanmax(y) - np.nanmean(y), middle, 5, 2, 0, 2, saturation]
-        maxi = np.abs(np.nanmax(y))
-        bounds = [(0.1 * maxi, 2 * maxi), (middle - w, middle + w), (0.1, Ny // 2), (0.1, self.alpha_max), (-1, 0),
-                  (0.1, Ny // 2),
-                  (0, 2 * saturation)]
         # first fit with moffat only to initialize the guess
         # hypothesis that max of spectrum if well describe by a focused PSF
         bgd = data[bgd_index, ymax_index]
@@ -1179,6 +1176,12 @@ class ChromaticPSF:
             signal = y - bgd_model_func(ymax_index, index)[:, 0]
         else:
             signal = y
+        fwhm = compute_fwhm(index, signal, minimum=0)
+        guess = [2*np.nanmax(signal), middle, 0.5*fwhm, 2, 0, 0.1*fwhm, saturation]
+        maxi = np.abs(np.nanmax(y))
+        bounds = [(0.1 * maxi, 10 * maxi), (middle - w, middle + w), (0.1, min(fwhm, Ny // 2)), (0.1, self.alpha_max), (-1, 0),
+                  (0.1, min(Ny // 2, fwhm)),
+                  (0, 2 * saturation)]
         fit = fit_moffat1d_outlier_removal(index, signal, sigma=sigma, niter=2,
                                            guess=guess[:4], bounds=np.array(bounds[:4]).T)
         moffat_guess = [getattr(fit, p).value for p in fit.param_names]
@@ -1219,7 +1222,8 @@ class ChromaticPSF:
             mean = np.nansum(pdf * index)
             std = np.sqrt(np.nansum(pdf * (index - mean) ** 2))
             maxi = np.abs(np.nanmax(signal))
-            bounds[0] = (0.1 * np.nanstd(bgd), 2 * np.nanmax(y[middle - ws[0]:middle + ws[0]]))
+            # bounds[0] = (0.1 * np.nanstd(bgd), 2 * np.nanmax(y[middle - ws[0]:middle + ws[0]]))
+            bounds[0] = (0.1 * np.nanstd(bgd), 1.5 * np.sum(y[middle - ws[0]:middle + ws[0]]))
             # if guess[4] > -1:
             #    guess[0] = np.max(signal) / (1 + guess[4])
             if guess[0] * (1 + guess[4]) < 3 * np.nanstd(bgd):
@@ -1234,12 +1238,14 @@ class ChromaticPSF:
             w.bounds = bounds[:-1]
             w.data = signal
             w.err = err[:, x]
-            run_minimisation_sigma_clipping(w, method="minuit", sigma=sigma, clip_niter=2)
+            epsilon = 1e-4 * guess
+            epsilon[epsilon == 0] = 1e-4
+            epsilon[-1] = 0.1
+            run_minimisation_sigma_clipping(w, method="minuit", sigma=sigma, clip_niter=2, epsilon=epsilon)
             # It is better not to propagate the guess to further pixel columns
             # otherwise fit_chromatic_psf1D is more likely to get trapped in a local minimum
             # Randomness of the slice fit is better :
-            # guess = [getattr(fit, p).value for p in fit.param_names]
-            # best_fit = [getattr(fit, p).value for p in fit.param_names]
+            # guess = np.array(list(np.copy(w.p))+[saturation])
             best_fit = w.p
             self.profile_params[x, 0] = best_fit[0]
             self.profile_params[x, -6:-1] = best_fit[1:]
@@ -1351,6 +1357,7 @@ class ChromaticPSF1D(ChromaticPSF):
             output[:, k] = self.PSF.evaluate(y, p=profile_params[k])
         return output
 
+    @deprecated(reason="Use fit_chromatic_PSF1D instead.")
     def fit_chromatic_PSF1D_minuit(self, data, bgd_model_func=None, data_errors=None):
         """
         Fit a chromatic PSF model on 2D data.
@@ -1993,7 +2000,8 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     model_outliers = np.zeros_like(outliers).astype(float)
     if fit is not None:
         model += fit.evaluate(indices)
-        model_outliers += fit.evaluate(outliers)
+        if len(outliers) > 0:
+            model_outliers += fit.evaluate(indices)[outliers]
     if bgd_model_func is not None:
         model += bgd_model_func(x, indices)[:, 0]
         if len(outliers) > 0:
