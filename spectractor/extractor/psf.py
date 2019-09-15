@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+from deprecated import deprecated
 
 from scipy.optimize import basinhopping, minimize
 from scipy.interpolate import interp1d, interp2d
@@ -16,186 +17,6 @@ from spectractor.extractor.background import extract_background_photutils
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping
-
-
-class PSF1DAstropy(Fittable1DModel):
-    inputs = ('x',)
-    outputs = ('y',)
-
-    amplitude_moffat = Parameter('amplitude_moffat', default=0.5)
-    x_mean = Parameter('x_mean', default=0)
-    gamma = Parameter('gamma', default=3)
-    alpha = Parameter('alpha', default=3)
-    eta_gauss = Parameter('eta_gauss', default=1)
-    stddev = Parameter('stddev', default=1)
-    saturation = Parameter('saturation', default=1)
-
-    axis_names = ["A", "y", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
-
-    @staticmethod
-    def evaluate(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = (x - x_mean) * (x - x_mean)
-        rr_gg = rr / (gamma * gamma)
-        # use **(-alpha) instead of **(alpha) to avoid overflow power errors due to high alpha exponents
-        # import warnings
-        # warnings.filterwarnings('error')
-        try:
-            a = amplitude_moffat * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
-        except RuntimeWarning:  # pragma: no cover
-            my_logger = set_logger(__name__)
-            my_logger.warning(f"{[amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation]}")
-            a = amplitude_moffat * eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
-        return np.clip(a, 0, saturation)
-
-    @staticmethod
-    def fit_deriv(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = (x - x_mean) * (x - x_mean)
-        rr_gg = rr / (gamma * gamma)
-        gauss_norm = np.exp(-(rr / (2. * stddev * stddev)))
-        d_eta_gauss = amplitude_moffat * gauss_norm
-        moffat_norm = (1 + rr_gg) ** (-alpha)
-        d_amplitude_moffat = moffat_norm + eta_gauss * gauss_norm
-        d_x_mean = amplitude_moffat * (eta_gauss * (x - x_mean) / (stddev * stddev) * gauss_norm
-                                       - alpha * moffat_norm * (-2 * x + 2 * x_mean) / (
-                                               gamma * gamma * (1 + rr_gg)))
-        d_stddev = amplitude_moffat * eta_gauss * rr / (stddev ** 3) * gauss_norm
-        d_alpha = - amplitude_moffat * moffat_norm * np.log(1 + rr_gg)
-        d_gamma = 2 * amplitude_moffat * alpha * moffat_norm * (rr_gg / (gamma * (1 + rr_gg)))
-        d_saturation = saturation * np.zeros_like(x)
-        return np.array([d_amplitude_moffat, d_x_mean, d_gamma, d_alpha, d_eta_gauss, d_stddev, d_saturation])
-
-    @staticmethod
-    def deriv(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = (x - x_mean) * (x - x_mean)
-        rr_gg = rr / (gamma * gamma)
-        d_eta_gauss = np.exp(-(rr / (2. * stddev * stddev)))
-        d_gauss = - eta_gauss * (x - x_mean) / (stddev * stddev) * d_eta_gauss
-        d_moffat = -  alpha * 2 * (x - x_mean) / (gamma * gamma * (1 + rr_gg) ** (alpha + 1))
-        return amplitude_moffat * (d_gauss + d_moffat)
-
-    def interpolation(self, x_array):
-        """
-
-        Parameters
-        ----------
-        x_array: array_like
-            The abscisse array to interpolate the model.
-
-        Returns
-        -------
-        interp: callable
-            Function corresponding to the interpolated model on the x_array array.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> p = [2,0,2,2,1,2,10]
-        >>> psf = PSF1DAstropy(*p)
-        >>> interp = psf.interpolation(x)
-        >>> assert np.isclose(interp(p[1]), psf.evaluate(p[1], *p))
-
-        """
-        params = [getattr(self, p).value for p in self.param_names]
-        return interp1d(x_array, self.evaluate(x_array, *params), fill_value=0, bounds_error=False)
-
-    def integrate(self, bounds=(-np.inf, np.inf), x_array=None):
-        """
-        Compute the integral of the PSF model. Bounds are -np.inf, np.inf by default, or provided
-        if no x_array is provided. Otherwise the bounds comes from x_array edges.
-
-        Parameters
-        ----------
-        x_array: array_like, optional
-            If not None, the interpoalted PSF modelis used for integration (default: None).
-        bounds: array_like, optional
-            The bounds of the integral (default bounds=(-np.inf, np.inf)).
-
-        Returns
-        -------
-        result: float
-            The integral of the PSF model.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> p = [2,30,4,2,-0.5,1,10]
-        >>> psf = PSF1DAstropy(*p)
-        >>> i = psf.integrate()
-        >>> assert np.isclose(i, 10.059742339728174)
-        >>> i = psf.integrate(bounds=(0,60), x_array=x)
-        >>> assert np.isclose(i, 10.046698028728645)
-
-        >>> import matplotlib.pyplot as plt
-        >>> xx = np.arange(0, 60, 0.01)
-        >>> plt.plot(xx, psf.evaluate(xx, *p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> plt.plot(x, psf.evaluate(x, *p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> if parameters.DISPLAY: plt.show()
-
-        """
-        params = [getattr(self, p).value for p in self.param_names]
-        if x_array is None:
-            i = quad(self.evaluate, bounds[0], bounds[1], args=tuple(params), limit=200)
-            return i[0]
-        else:
-            return np.trapz(self.evaluate(x_array, *params), x_array)
-
-    def fwhm(self, x_array=None):
-        """
-        Compute the full width half maximum of the PSF model with a dichotomie method.
-
-        Parameters
-        ----------
-        x_array: array_like, optional
-            An abscisse array is one wants to find FWHM on the interpolated PSF model
-            (to smooth the spikes from spurious parameter sets).
-
-        Returns
-        -------
-        FWHM: float
-            The full width half maximum of the PSF model.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> p = [2,30,4,2,-0.4,1,10]
-        >>> psf = PSF1DAstropy(*p)
-        >>> a, b =  p[1], p[1]+3*max(p[-2], p[2])
-        >>> fwhm = psf.fwhm(x_array=None)
-        >>> assert np.isclose(fwhm, 7.25390625)
-        >>> fwhm = psf.fwhm(x_array=x)
-        >>> assert np.isclose(fwhm, 7.083984375)
-        >>> print(fwhm)
-        7.083984375
-        >>> import matplotlib.pyplot as plt
-        >>> x = np.arange(0, 60, 0.01)
-        >>> plt.plot(x, psf.evaluate(x, *p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> if parameters.DISPLAY: plt.show()
-        """
-        params = [getattr(self, p).value for p in self.param_names]
-        interp = None
-        if x_array is not None:
-            interp = self.interpolation(x_array)
-            values = self.evaluate(x_array, *params)
-            maximum = np.max(values)
-            imax = np.argmax(values)
-            a = imax + np.argmin(np.abs(values[imax:] - 0.95 * maximum))
-            b = imax + np.argmin(np.abs(values[imax:] - 0.05 * maximum))
-
-            def eq(x):
-                return interp(x) - 0.5 * maximum
-        else:
-            maximum = self.amplitude_moffat.value * (1 + self.eta_gauss.value)
-            a = self.x_mean.value
-            b = self.x_mean.value + 3 * max(self.gamma.value, self.stddev.value)
-
-            def eq(x):
-                return self.evaluate(x, *params) - 0.5 * maximum
-        res = dichotomie(eq, a, b, 1e-2)
-        # res = newton()
-        return abs(2 * (res - self.x_mean.value))
 
 
 class PSF:
@@ -2550,6 +2371,188 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     return PSF
 
 
+@deprecated(reason='Use PSF1D class instead.')
+class PSF1DAstropy(Fittable1DModel):
+    inputs = ('x',)
+    outputs = ('y',)
+
+    amplitude_moffat = Parameter('amplitude_moffat', default=0.5)
+    x_mean = Parameter('x_mean', default=0)
+    gamma = Parameter('gamma', default=3)
+    alpha = Parameter('alpha', default=3)
+    eta_gauss = Parameter('eta_gauss', default=1)
+    stddev = Parameter('stddev', default=1)
+    saturation = Parameter('saturation', default=1)
+
+    axis_names = ["A", "y", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
+
+    @staticmethod
+    def evaluate(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
+        rr = (x - x_mean) * (x - x_mean)
+        rr_gg = rr / (gamma * gamma)
+        # use **(-alpha) instead of **(alpha) to avoid overflow power errors due to high alpha exponents
+        # import warnings
+        # warnings.filterwarnings('error')
+        try:
+            a = amplitude_moffat * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
+        except RuntimeWarning:  # pragma: no cover
+            my_logger = set_logger(__name__)
+            my_logger.warning(f"{[amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation]}")
+            a = amplitude_moffat * eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
+        return np.clip(a, 0, saturation)
+
+    @staticmethod
+    def fit_deriv(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
+        rr = (x - x_mean) * (x - x_mean)
+        rr_gg = rr / (gamma * gamma)
+        gauss_norm = np.exp(-(rr / (2. * stddev * stddev)))
+        d_eta_gauss = amplitude_moffat * gauss_norm
+        moffat_norm = (1 + rr_gg) ** (-alpha)
+        d_amplitude_moffat = moffat_norm + eta_gauss * gauss_norm
+        d_x_mean = amplitude_moffat * (eta_gauss * (x - x_mean) / (stddev * stddev) * gauss_norm
+                                       - alpha * moffat_norm * (-2 * x + 2 * x_mean) / (
+                                               gamma * gamma * (1 + rr_gg)))
+        d_stddev = amplitude_moffat * eta_gauss * rr / (stddev ** 3) * gauss_norm
+        d_alpha = - amplitude_moffat * moffat_norm * np.log(1 + rr_gg)
+        d_gamma = 2 * amplitude_moffat * alpha * moffat_norm * (rr_gg / (gamma * (1 + rr_gg)))
+        d_saturation = saturation * np.zeros_like(x)
+        return np.array([d_amplitude_moffat, d_x_mean, d_gamma, d_alpha, d_eta_gauss, d_stddev, d_saturation])
+
+    @staticmethod
+    def deriv(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
+        rr = (x - x_mean) * (x - x_mean)
+        rr_gg = rr / (gamma * gamma)
+        d_eta_gauss = np.exp(-(rr / (2. * stddev * stddev)))
+        d_gauss = - eta_gauss * (x - x_mean) / (stddev * stddev) * d_eta_gauss
+        d_moffat = -  alpha * 2 * (x - x_mean) / (gamma * gamma * (1 + rr_gg) ** (alpha + 1))
+        return amplitude_moffat * (d_gauss + d_moffat)
+
+    def interpolation(self, x_array):
+        """
+
+        Parameters
+        ----------
+        x_array: array_like
+            The abscisse array to interpolate the model.
+
+        Returns
+        -------
+        interp: callable
+            Function corresponding to the interpolated model on the x_array array.
+
+        Examples
+        --------
+        >>> x = np.arange(0, 60, 1)
+        >>> p = [2,0,2,2,1,2,10]
+        >>> psf = PSF1DAstropy(*p)
+        >>> interp = psf.interpolation(x)
+        >>> assert np.isclose(interp(p[1]), psf.evaluate(p[1], *p))
+
+        """
+        params = [getattr(self, p).value for p in self.param_names]
+        return interp1d(x_array, self.evaluate(x_array, *params), fill_value=0, bounds_error=False)
+
+    def integrate(self, bounds=(-np.inf, np.inf), x_array=None):
+        """
+        Compute the integral of the PSF model. Bounds are -np.inf, np.inf by default, or provided
+        if no x_array is provided. Otherwise the bounds comes from x_array edges.
+
+        Parameters
+        ----------
+        x_array: array_like, optional
+            If not None, the interpoalted PSF modelis used for integration (default: None).
+        bounds: array_like, optional
+            The bounds of the integral (default bounds=(-np.inf, np.inf)).
+
+        Returns
+        -------
+        result: float
+            The integral of the PSF model.
+
+        Examples
+        --------
+        >>> x = np.arange(0, 60, 1)
+        >>> p = [2,30,4,2,-0.5,1,10]
+        >>> psf = PSF1DAstropy(*p)
+        >>> i = psf.integrate()
+        >>> assert np.isclose(i, 10.059742339728174)
+        >>> i = psf.integrate(bounds=(0,60), x_array=x)
+        >>> assert np.isclose(i, 10.046698028728645)
+
+        >>> import matplotlib.pyplot as plt
+        >>> xx = np.arange(0, 60, 0.01)
+        >>> plt.plot(xx, psf.evaluate(xx, *p)) #doctest: +ELLIPSIS
+        [<matplotlib.lines.Line2D object at 0x...>]
+        >>> plt.plot(x, psf.evaluate(x, *p)) #doctest: +ELLIPSIS
+        [<matplotlib.lines.Line2D object at 0x...>]
+        >>> if parameters.DISPLAY: plt.show()
+
+        """
+        params = [getattr(self, p).value for p in self.param_names]
+        if x_array is None:
+            i = quad(self.evaluate, bounds[0], bounds[1], args=tuple(params), limit=200)
+            return i[0]
+        else:
+            return np.trapz(self.evaluate(x_array, *params), x_array)
+
+    def fwhm(self, x_array=None):
+        """
+        Compute the full width half maximum of the PSF model with a dichotomie method.
+
+        Parameters
+        ----------
+        x_array: array_like, optional
+            An abscisse array is one wants to find FWHM on the interpolated PSF model
+            (to smooth the spikes from spurious parameter sets).
+
+        Returns
+        -------
+        FWHM: float
+            The full width half maximum of the PSF model.
+
+        Examples
+        --------
+        >>> x = np.arange(0, 60, 1)
+        >>> p = [2,30,4,2,-0.4,1,10]
+        >>> psf = PSF1DAstropy(*p)
+        >>> a, b =  p[1], p[1]+3*max(p[-2], p[2])
+        >>> fwhm = psf.fwhm(x_array=None)
+        >>> assert np.isclose(fwhm, 7.25390625)
+        >>> fwhm = psf.fwhm(x_array=x)
+        >>> assert np.isclose(fwhm, 7.083984375)
+        >>> print(fwhm)
+        7.083984375
+        >>> import matplotlib.pyplot as plt
+        >>> x = np.arange(0, 60, 0.01)
+        >>> plt.plot(x, psf.evaluate(x, *p)) #doctest: +ELLIPSIS
+        [<matplotlib.lines.Line2D object at 0x...>]
+        >>> if parameters.DISPLAY: plt.show()
+        """
+        params = [getattr(self, p).value for p in self.param_names]
+        interp = None
+        if x_array is not None:
+            interp = self.interpolation(x_array)
+            values = self.evaluate(x_array, *params)
+            maximum = np.max(values)
+            imax = np.argmax(values)
+            a = imax + np.argmin(np.abs(values[imax:] - 0.95 * maximum))
+            b = imax + np.argmin(np.abs(values[imax:] - 0.05 * maximum))
+
+            def eq(x):
+                return interp(x) - 0.5 * maximum
+        else:
+            maximum = self.amplitude_moffat.value * (1 + self.eta_gauss.value)
+            a = self.x_mean.value
+            b = self.x_mean.value + 3 * max(self.gamma.value, self.stddev.value)
+
+            def eq(x):
+                return self.evaluate(x, *params) - 0.5 * maximum
+        res = dichotomie(eq, a, b, 1e-2)
+        # res = newton()
+        return abs(2 * (res - self.x_mean.value))
+
+
+@deprecated(reason='Use PSF1D class instead.')
 def PSF1D_chisq(params, model, xx, yy, yy_err=None):
     m = model.evaluate(xx, *params)
     if len(m) == 0 or len(yy) == 0:
@@ -2563,6 +2566,7 @@ def PSF1D_chisq(params, model, xx, yy, yy_err=None):
         return np.nansum((diff / yy_err) ** 2)
 
 
+@deprecated(reason='Use PSF1D class instead.')
 def PSF1D_chisq_jac(params, model, xx, yy, yy_err=None):
     diff = model.evaluate(xx, *params) - yy
     jac = model.fit_deriv(xx, *params)
@@ -2573,6 +2577,7 @@ def PSF1D_chisq_jac(params, model, xx, yy, yy_err=None):
         return np.array([np.nansum(2 * jac[p] * diff / yy_err2) for p in range(len(params))])
 
 
+@deprecated(reason='Use PSF1D class instead.')
 def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimize'):
     """Fit a PSF 1D Astropy model with parameters :
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
@@ -2647,6 +2652,7 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
     return psf
 
 
+@deprecated(reason='Use PSF1D class instead. Mainly because PSF integral must be normalized to one.')
 def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, guess=None, bounds=None, method='minimize',
                               niter_basinhopping=5, T_basinhopping=0.2):
     """Fit a PSF 1D Astropy model with parameters:
@@ -2762,6 +2768,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
     return model, outliers
 
 
+@deprecated(reason='Use PSF1D class instead.')
 def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     """Fit a PSF 1D Astropy model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
@@ -2837,6 +2844,7 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     return psf
 
 
+@deprecated(reason='Use PSF1D class instead.')
 def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=None, sigma=3, niter=2, consecutive=3):
     """Fit a PSF Astropy 1D model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
