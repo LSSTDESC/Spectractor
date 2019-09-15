@@ -718,7 +718,7 @@ class ChromaticPSF:
             p = profile_params[x, :]
             out = self.PSF.evaluate(self.pixels, p=p)
             fwhm = compute_fwhm(self.pixels, out, center=p[1], minimum=0)
-            self.table['flux_integral'][x] = p[0] # if PSF1D normalized
+            self.table['flux_integral'][x] = p[0]  # if PSF1D normalized
             self.table['fwhm'][x] = fwhm
             self.table['Dy_mean'][x] = 0
 
@@ -1201,7 +1201,7 @@ class ChromaticPSF:
         >>> s.plot_summary(truth=s0)
         """
         guess = np.copy(self.poly_params)
-        run_minimisation(w, method="newton", ftol=1e-5, xtol=1e-6, niter=50)
+        run_minimisation(w, method="newton", ftol=1e-6, xtol=1e-6, niter=50)
 
         self.poly_params = w.poly_params
         self.profile_params = self.from_poly_params_to_profile_params(self.poly_params, force_positive=True)
@@ -1632,6 +1632,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         amplitude_params = [
             J[x].T @ self.W_dot_data[x] / (J_dot_W_dot_J[x]) if J_dot_W_dot_J[x] > 0 else 0.1 * self.bgd_std
             for x in range(self.Nx)]
+        amplitude_params[amplitude_params < 0] = 0
         poly_params[:self.Nx] = amplitude_params
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         self.model = self.chromatic_psf.evaluate(poly_params)[self.bgd_width:-self.bgd_width, :]
@@ -1774,7 +1775,7 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
         """
-        w = ChromaticPSF2DFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func,live_fit=True)
+        w = ChromaticPSF2DFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func, live_fit=True)
         self.fit_chromatic_psf(w, data, data_errors=data_errors, bgd_model_func=bgd_model_func)
 
     @deprecated(reason="Has never worked... Use fit_chromatic_PSF2D instead.")
@@ -1920,10 +1921,10 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                  nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                            file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                                            live_fit, truth=truth)
+                                          file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                                          live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.pixels = np.mgrid[:self.Nx,:self.Ny]
+        self.pixels = np.mgrid[:self.Nx, :self.Ny]
 
         # error matrix
         self.W = 1. / (self.err * self.err)
@@ -1999,6 +2000,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         L = np.linalg.inv(np.linalg.cholesky(J_dot_W_dot_J))
         inv_J_dot_W_dot_J = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
         amplitude_params = inv_J_dot_W_dot_J @ (J.T @ self.W_dot_data)
+        amplitude_params[amplitude_params < 0] = 0
         # amplitude_params[np.diagonal(J_dot_W_dot_J) <= 0] = 0.1 * self.bgd_std
         # amplitude_params[amplitude_params < 0.1 * self.bgd_std] = 0.1 * self.bgd_std
         poly_params[:self.Nx] = amplitude_params
@@ -2065,6 +2067,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
 
     """
+    # TODO: merge with plot_fit of ChromaticPSF1DFitworkspace
     Ny = len(indices)
     y = data[:, x]
     bgd = data[bgd_indices, x]
