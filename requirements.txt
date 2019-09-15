@@ -19,3 +19,4 @@ iminuit
 coverage
 configparser
 coveralls
+deprecated
