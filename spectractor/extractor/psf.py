@@ -87,138 +87,66 @@ class PSF1D(PSF):
         # integral = compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
         dx = np.gradient(x)[0]
         integral = np.sum(a) * dx
-        norm = amplitude_moffat /  integral
+        norm = amplitude_moffat / integral
         a *= norm
         return np.clip(a, 0, saturation)
 
 
-class PSF2D(Fittable2DModel):
-    inputs = ('x', 'y',)
-    outputs = ('z',)
+class PSF2D(PSF):
 
-    amplitude_moffat = Parameter('amplitude_moffat', default=1)
-    x_mean = Parameter('x_mean', default=0)
-    y_mean = Parameter('y_mean', default=0)
-    gamma = Parameter('gamma', default=3)
-    alpha = Parameter('alpha', default=3)
-    eta_gauss = Parameter('eta_gauss', default=0.)
-    stddev = Parameter('stddev', default=1)
-    saturation = Parameter('saturation', default=1)
+    def __init__(self, p=None):
+        PSF.__init__(self)
+        if p is not None:
+            self.p = p
+        else:
+            self.p = [0.5, 0, 0, 3, 3, 1, 1, 1]
+        self.param_names = ["amplitude_moffat", "x_mean", "y_mean", "gamma", "alpha", "eta_gauss", "stddev",
+                            "saturation"]
+        self.axis_names = ["A", r"x", r"y", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
 
-    param_titles = ["A", "x", "y", "\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
+    def evaluate(self, pixels, p=None):
+        """Evaluate the PSF2D function.
 
-    @staticmethod
-    def evaluate(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation):
+        The function is normalized to have an integral equal to amplitude_moffat parameter.
+
+        Parameters
+        ----------
+        pixels: list
+            List containing the X abscisse 2D array and the Y abscisse 2D array.
+        p: array_like
+            The parameter array. If None, the array used to instanciate the class is taken.
+            If given, the class instance parameter array is updated.
+
+        Returns
+        -------
+        output: array_like
+            The PSF function evaluated.
+
+        Examples
+        --------
+        >>> p = [2,20,30,4,2,-0.5,1,10]
+        >>> psf = PSF2D(p)
+        >>> xx, yy = np.mgrid[:50, :60]
+        >>> out = psf.evaluate(pixels=[xx, yy])
+
+        .. plot ::
+            import matplotlib.pyplot as plt
+            fig = plt.figure()
+            plt.imshow(out, origin="lower")
+            plt.xlabel("X [pixels]")
+            plt.ylabel("Y [pixels]")
+            plt.show()
+        """
+        if p is not None:
+            self.p = p
+        x, y = pixels
+        amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation = self.p
         rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
         rr_gg = rr / (gamma * gamma)
-        a = amplitude * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
-        return np.clip(a, 0, saturation)
-
-    @staticmethod
-    def normalisation(amplitude, gamma, alpha, eta_gauss, stddev):
-        return amplitude * ((np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * stddev * stddev)
-
-    @staticmethod
-    def fit_deriv(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
-        rr_gg = rr / (gamma * gamma)
-        gauss_norm = np.exp(-(rr / (2. * stddev * stddev)))
-        d_eta_gauss = amplitude * gauss_norm
-        moffat_norm = (1 + rr_gg) ** (-alpha)
-        d_amplitude = moffat_norm + eta_gauss * gauss_norm
-        d_x_mean = amplitude * eta_gauss * (x - x_mean) / (stddev * stddev) * gauss_norm \
-                   - amplitude * alpha * moffat_norm * (-2 * x + 2 * x_mean) / (gamma ** 2 * (1 + rr_gg))
-        d_y_mean = amplitude * eta_gauss * (y - y_mean) / (stddev * stddev) * gauss_norm \
-                   - amplitude * alpha * moffat_norm * (-2 * y + 2 * y_mean) / (gamma ** 2 * (1 + rr_gg))
-        d_stddev = amplitude * eta_gauss * rr / (stddev ** 3) * gauss_norm
-        d_alpha = - amplitude * moffat_norm * np.log(1 + rr_gg)
-        d_gamma = 2 * amplitude * alpha * moffat_norm * (rr_gg / (gamma * (1 + rr_gg)))
-        d_saturation = saturation * np.zeros_like(x)
-        return [d_amplitude, d_x_mean, d_y_mean, d_gamma, d_alpha, d_eta_gauss, d_stddev, d_saturation]
-
-    def interpolation(self, x_array, y_array):
-        """
-
-        Parameters
-        ----------
-        x_array: array_like
-            The x array to interpolate the model.
-        y_array: array_like
-            The y array to interpolate the model.
-
-        Returns
-        -------
-        interp: callable
-            Function corresponding to the interpolated model on the (x_array,y_array) array.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> y = np.arange(0, 30, 1)
-        >>> p = [2,30,15,2,2,1,2,10]
-        >>> psf = PSF2D(*p)
-        >>> interp = psf.interpolation(x, y)
-        >>> assert np.isclose(interp(p[1], p[2]), psf.evaluate(p[1], p[2], *p))
-
-        """
-        params = [getattr(self, p).value for p in self.param_names]
-        xx, yy = np.meshgrid(x_array, y_array)
-        return interp2d(x_array, y_array, self.evaluate(xx, yy, *params), fill_value=0, bounds_error=False)
-
-    def integrate(self, bounds=(-np.inf, np.inf), x_array=None):
-        """
-        Ths PSF2D model is normalized to 1. The return of this function is trivially 1.
-
-        Parameters
-        ----------
-        x_array: array_like, optional
-            If not None, the interpoalted PSF modelis used for integration (default: None).
-        bounds: array_like, optional
-            The bounds of the integral (default bounds=(-np.inf, np.inf)).
-
-        Returns
-        -------
-        result: float
-            The integral of the PSF2D model, equal to one.
-
-        Examples
-        --------
-        >>> p = [2,30,4,2,-0.5,1,10]
-        >>> psf = PSF2D(*p)
-        >>> i = psf.integrate()
-        >>> assert np.isclose(i, 1)
-        """
-        return 1
-
-    def fwhm(self, x_array=None, y_array=None):
-        """
-        Compute the full width half maximum of the PSF model with a dichotomie method.
-
-        Parameters
-        ----------
-        x_array: array_like (optional)
-            An x array is one wants to find FWHM on the interpolated PSF model
-            (to smooth the spikes from spurious parameter sets).
-        y_array: array_like
-            An y array is one wants to find FWHM on the interpolated PSF model
-            (to smooth the spikes from spurious parameter sets).
-
-        Returns
-        -------
-        FWHM: float
-            The full width half maximum of the PSF model.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> y = np.arange(0, 60, 1)
-        >>> p = [2,30,30,4,2,-0.4,1,10]
-        >>> psf = PSF2D(*p)
-        >>> fwhm = psf.fwhm(x_array=x, y_array=y)
-        >>> print(fwhm)
-        -1
-        """
-        return -1
+        a = ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
+        norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * stddev * stddev
+        a *= amplitude / norm
+        return np.clip(a, 0, saturation).T
 
 
 class PSFFitWorkspace(FitWorkspace):
@@ -280,7 +208,8 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
     def __init__(self, psf, data, data_errors, bgd_model_func=None, file_name="",
                  nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
-        PSFFitWorkspace.__init__(self, psf, data, data_errors, bgd_model_func, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
+        PSFFitWorkspace.__init__(self, psf, data, data_errors, bgd_model_func, file_name, nwalkers, nsteps, burnin,
+                                 nbins, verbose, plot,
                                  live_fit, truth=truth)
 
         # prepare the fit
@@ -348,8 +277,8 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
         #                    label="guessed profile")
         #     else:
         #         ax[0].plot(indices, PSF_guess(indices), 'k--', label="guessed profile")
-        #if fit is not None and bgd_model_func is not None:
-            # model = fit(indices) + bgd_model_func(x, indices)[:, 0]
+        # if fit is not None and bgd_model_func is not None:
+        # model = fit(indices) + bgd_model_func(x, indices)[:, 0]
         ax[0].plot(x, self.model, 'b-', label="Model")
         ylim = ax[0].get_ylim()
         ax[0].set_ylim(ylim)
@@ -383,116 +312,64 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
             plt.show()
 
 
-class PSF2DFitWorkspace(FitWorkspace):
+class PSF2DFitWorkspace(PSFFitWorkspace):
 
     def __init__(self, psf, data, data_errors, bgd_model_func=None, file_name="",
                  nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
-        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                              live_fit, truth=truth)
-        self.my_logger = set_logger(self.__class__.__name__)
-        self.psf = psf
-        self.data = data
-        self.err = data_errors
-        self.bgd_model_func = bgd_model_func
-        length = len(self.chromatic_psf.table)
-        self.p = np.copy(self.chromatic_psf.poly_params[length:-1])  # remove saturation (fixed parameter))
-        self.input_labels = list(np.copy(self.chromatic_psf.poly_params_labels[length:-1]))
-        self.axis_names = list(np.copy(self.chromatic_psf.poly_params_names[length:-1]))
-        # self.bounds = self.chromatic_psf.set_bounds(data=None)[:-1]
-        self.nwalkers = max(2 * self.ndim, nwalkers)
+        PSFFitWorkspace.__init__(self, psf, data, data_errors, bgd_model_func, file_name, nwalkers, nsteps, burnin,
+                                 nbins, verbose, plot,
+                                 live_fit, truth=truth)
 
         # prepare the fit
         self.Ny, self.Nx = self.data.shape
-        if self.Ny != self.chromatic_psf.Ny:
-            self.my_logger.error(f"\n\tData y shape {self.Ny} different from ChromaticPSF input Ny {self.chromatic_psf.Ny}.")
-        if self.Nx != self.chromatic_psf.Nx:
-            self.my_logger.error(f"\n\tData x shape {self.Nx} different from ChromaticPSF input Nx {self.chromatic_psf.Nx}.")
-        self.pixels = np.arange(self.Ny)
-
+        self.pixels = np.mgrid[:self.Nx, :self.Ny]
         # prepare the background, data and errors
-        self.bgd = np.zeros_like(self.data)
-        if self.bgd_model_func is not None:
-            # xx, yy = np.meshgrid(np.arange(Nx), pixels)
-            self.bgd = self.bgd_model_func(np.arange(self.Nx), self.pixels)
-        self.data = self.data - self.bgd
-        self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
+        # self.bgd = np.zeros_like(self.data)
+        # if self.bgd_model_func is not None:
+        #     # xx, yy = np.meshgrid(np.arange(Nx), pixels)
+        #     self.bgd = self.bgd_model_func(np.arange(self.Nx), self.pixels)
+        # self.data = self.data - self.bgd
+        # self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
 
-        # crop spectrogram to fit faster
-        self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
-        self.data = self.data[self.bgd_width:-self.bgd_width, :]
-        self.pixels = np.arange(self.data.shape[0])
-        self.err = np.copy(self.err[self.bgd_width:-self.bgd_width, :])
-
-        # error matrix
-        self.W = 1. / (self.err * self.err)
-        self.W = [np.diag(self.W[:, x]) for x in range(self.Nx)]
-        self.W_dot_data = [self.W[x] @ self.data[:, x] for x in range(self.Nx)]
-
-    def simulate(self, *shape_params):
+    def simulate(self, amplitude_moffat, x_mean, y_mean, gamma, alpha, eta_gauss, stddev):
         """
-        Compute a ChromaticPSF model given PSF shape parameters and minimizing
-        amplitude parameters given a spectrogram data array.
+        Evaluate a PSF model.
 
         Parameters
         ----------
-        shape_params: array_like
-            PSF shape polynomial parameter array.
+        params: array_like
+            PSF parameter array.
 
         Examples
         --------
 
-        # Set the parameters
-        >>> parameters.PIXDIST_BACKGROUND = 40
-        >>> parameters.PIXWIDTH_BACKGROUND = 10
-        >>> parameters.PIXWIDTH_SIGNAL = 30
-
         # Build a mock spectrogram with random Poisson noise:
-        >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
-        >>> params = s0.generate_test_poly_params()
-        >>> s0.poly_params = params
-        >>> saturation = params[-1]
-        >>> data = s0.evaluate(params)
-        >>> bgd = 10*np.ones_like(data)
-        >>> data += bgd
+        >>> p = np.array([500, 20, 30, 3, 2, -0.1, 2, 400])
+        >>> psf = PSF2D(p)
+        >>> xx, yy = np.mgrid[:50, :60]
+        >>> data = psf.evaluate([xx, yy], p)
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        # >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        # Estimate the first guess values
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
-        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
-
-        # Simulate the data:
-        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
-        >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:-1])
+        # Fit the data:
+        >>> w = PSF2DFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
+        >>> x, mod, mod_err = w.simulate(*p[:-1])
         >>> assert mod is not None
+        >>> assert np.mean(np.abs(mod-data)/data_errors) < 0.5
         >>> w.plot_fit()
         """
-        # linear regression for the amplitude parameters
-        poly_params = np.copy(self.chromatic_psf.poly_params)
-        poly_params[self.Nx:-1] = np.copy(shape_params)
-        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
-        profile_params[:self.Nx, 0] = 1
-        profile_params[:self.Nx, 1] -= self.bgd_width
-        J = np.array([self.chromatic_psf.PSF.evaluate(self.pixels, *profile_params[x, :]) for x in range(self.Nx)])
-        J_dot_W_dot_J = np.array([J[x].T @ self.W[x] @ J[x] for x in range(self.Nx)])
-        amplitude_params = [
-            J[x].T @ self.W_dot_data[x] / (J_dot_W_dot_J[x]) if J_dot_W_dot_J[x] > 0 else 0.1 * self.bgd_std
-            for x in range(self.Nx)]
-        poly_params[:self.Nx] = amplitude_params
-        # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
-        self.model = self.chromatic_psf.evaluate(poly_params)[self.bgd_width:-self.bgd_width, :]
+        params = [amplitude_moffat, x_mean, y_mean, gamma, alpha, eta_gauss, stddev]
+        self.model = self.psf.evaluate(self.pixels, p=np.array(params + [self.saturation]))
         self.model_err = np.zeros_like(self.model)
-        self.poly_params = np.copy(poly_params)
         return self.pixels, self.model, self.model_err
 
     def plot_fit(self):
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
-        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), constrained_layout=True, gridspec_kw=gs_kw)
+        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(5, 7), constrained_layout=True, gridspec_kw=gs_kw)
         norm = np.max(self.data)
         plot_image_simple(ax[0, 0], data=self.model / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
                           units='1/max(data)')
@@ -546,12 +423,12 @@ class ChromaticPSF:
         self.Nx = Nx
         self.Ny = Ny
         self.profile_params = np.zeros((Nx, len(self.PSF.param_names)))
-        self.pixels = np.arange(Nx).astype(int)
+        self.pixels = np.mgrid[:Nx, :Ny]
         if file_name == '':
             arr = np.zeros((Nx, len(self.PSF.param_names) + 11))
             self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_mean', 'flux_sum', 'flux_integral',
                                            'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf', 'Dx_rot'] +
-                                            list(self.PSF.param_names))
+                                          list(self.PSF.param_names))
         else:
             self.table = Table.read(file_name)
         self.n_poly_params = len(self.table)
@@ -806,7 +683,7 @@ class ChromaticPSF:
                 #    profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
                 #    profile_params[profile_params[:, k] >= self.Ny, k] = self.Ny
                 if name == "alpha":
-                    profile_params[profile_params[:, k] <= 1, k] = 1
+                    profile_params[profile_params[:, k] <= 1.1, k] = 1.1
                     # profile_params[profile_params[:, k] >= 6, k] = 6
                 if name == "gamma":
                     profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
@@ -839,10 +716,9 @@ class ChromaticPSF:
         pixel_x = np.arange(self.Nx).astype(int)
         for x in pixel_x:
             p = profile_params[x, :]
-            out = self.PSF.evaluate(pixel_y, p=p)
-            fwhm = compute_fwhm(pixel_y, out, center=p[1], minimum=0)
-            integral = compute_integral(pixel_y, out)
-            self.table['flux_integral'][x] = integral
+            out = self.PSF.evaluate(self.pixels, p=p)
+            fwhm = compute_fwhm(self.pixels, out, center=p[1], minimum=0)
+            self.table['flux_integral'][x] = p[0] # if PSF1D normalized
             self.table['fwhm'][x] = fwhm
             self.table['Dy_mean'][x] = 0
 
@@ -1034,12 +910,16 @@ class ChromaticPSF:
             if truth is not None:
                 ax[0].plot(all_pixels, PSF_truth[:, i], color=p[0].get_color(), linestyle='--')
         img = np.zeros((self.Ny, self.Nx)).astype(float)
-        yy, xx = np.mgrid[:self.Ny, :self.Nx]
+        pixels = np.mgrid[:self.Nx, :self.Ny]
+        psf = PSF2D()
         for x in all_pixels[::self.Nx // 10]:
             params = [PSF_models[p][x] for p in range(len(self.PSF.param_names))]
-            psf = PSF2D.evaluate(xx, yy, 1, x, self.Ny // 2, *params[-5:])
-            psf /= np.max(psf)
-            img += psf
+            p = [1, x, self.Ny // 2]
+            for par in params[-5:]:
+                p.append(par)
+            out = psf.evaluate(pixels, p=p)
+            out /= np.max(out)
+            img += out
         ax[1].imshow(img, origin='lower')
         ax[1].set_xlabel('X [pixels]')
         ax[1].set_ylabel('Y [pixels]')
@@ -1177,17 +1057,18 @@ class ChromaticPSF:
         else:
             signal = y
         fwhm = compute_fwhm(index, signal, minimum=0)
-        guess = [2*np.nanmax(signal), middle, 0.5*fwhm, 2, 0, 0.1*fwhm, saturation]
+        guess = [2 * np.nanmax(signal), middle, 0.5 * fwhm, 2, 0, 0.1 * fwhm, saturation]
         maxi = np.abs(np.nanmax(y))
-        bounds = [(0.1 * maxi, 10 * maxi), (middle - w, middle + w), (0.1, min(fwhm, Ny // 2)), (0.1, self.alpha_max), (-1, 0),
+        bounds = [(0.1 * maxi, 10 * maxi), (middle - w, middle + w), (0.1, min(fwhm, Ny // 2)), (0.1, self.alpha_max),
+                  (-1, 0),
                   (0.1, min(Ny // 2, fwhm)),
                   (0, 2 * saturation)]
         fit = fit_moffat1d_outlier_removal(index, signal, sigma=sigma, niter=2,
                                            guess=guess[:4], bounds=np.array(bounds[:4]).T)
         moffat_guess = [getattr(fit, p).value for p in fit.param_names]
         signal_width_guess = moffat_guess[2]
-        bounds[2] = (0.1, min(Ny // 2, 5*signal_width_guess))
-        bounds[5] = (0.1, min(Ny // 2, 5*signal_width_guess))
+        bounds[2] = (0.1, min(Ny // 2, 5 * signal_width_guess))
+        bounds[5] = (0.1, min(Ny // 2, 5 * signal_width_guess))
         guess[:4] = moffat_guess
         init_guess = np.copy(guess)
         # Initialize FitWorkspace
@@ -1253,7 +1134,7 @@ class ChromaticPSF:
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
             if live_fit and parameters.DISPLAY:  # pragma: no cover
-                fit = PSF1D(p=list(best_fit)+[saturation])
+                fit = PSF1D(p=list(best_fit) + [saturation])
                 plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, fit, bgd_model_func, best_fit,
                                               PSF_guess, w.outliers, sigma, live_fit)
         # interpolate the skipped pixels with splines
@@ -1269,6 +1150,67 @@ class ChromaticPSF:
                                           fill_value='extrapolate')(x)
         self.poly_params = self.from_profile_params_to_poly_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
+
+    def fit_chromatic_psf(self, w, data, bgd_model_func=None, data_errors=None):
+        """
+        Fit a chromatic PSF model on 2D data.
+
+        Parameters
+        ----------
+        w: ChromaticPSFFitWorkspaceFitWorkspace
+            The FitWorkspace.
+        data: array_like
+            2D array containing the image data.
+        bgd_model_func: callable, optional
+            A 2D function to model the extracted background (default: None -> null background)
+        data_errors: np.array
+            the 2D array uncertainties.
+
+        Examples
+        --------
+
+        # Set the parameters
+        >>> parameters.PIXDIST_BACKGROUND = 40
+        >>> parameters.PIXWIDTH_BACKGROUND = 10
+        >>> parameters.PIXWIDTH_SIGNAL = 30
+        >>> parameters.VERBOSE = True
+
+        # Build a mock spectrogram with random Poisson noise:
+        >>> s0 = ChromaticPSF1D(Nx=120, Ny=100, deg=4, saturation=1000)
+        >>> params = s0.generate_test_poly_params()
+        >>> s0.poly_params = params
+        >>> saturation = params[-1]
+        >>> data = s0.evaluate(params)
+        >>> bgd = 10*np.ones_like(data)
+        >>> data += bgd
+        >>> data = np.random.poisson(data)
+        >>> data_errors = np.sqrt(data+1)
+
+        # Extract the background
+        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+
+        # Estimate the first guess values
+        >>> s = ChromaticPSF1D(Nx=120, Ny=100, deg=4, saturation=saturation)
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+        >>> s.plot_summary(truth=s0)
+
+        # Fit the data:
+        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func)
+        >>> s.fit_chromatic_psf(w, data, bgd_model_func=bgd_model_func, data_errors=data_errors)
+        >>> s.plot_summary(truth=s0)
+        """
+        guess = np.copy(self.poly_params)
+        run_minimisation(w, method="newton", ftol=1e-5, xtol=1e-6, niter=50)
+
+        self.poly_params = w.poly_params
+        self.profile_params = self.from_poly_params_to_profile_params(self.poly_params, force_positive=True)
+        self.fill_table_with_profile_params(self.profile_params)
+        self.from_profile_params_to_shape_params(self.profile_params)
+        if parameters.DEBUG or True:
+            # Plot data, best fit model and residuals:
+            self.plot_summary()
+            self.plot_chromatic_PSF1D_residuals(w.bgd, data, data_errors, guess=guess, title='Best fit')
 
 
 class ChromaticPSF1D(ChromaticPSF):
@@ -1356,6 +1298,55 @@ class ChromaticPSF1D(ChromaticPSF):
             # output[:, k] = PSF1D.evaluate(y, *profile_params[k])
             output[:, k] = self.PSF.evaluate(y, p=profile_params[k])
         return output
+
+    def fit_chromatic_PSF1D(self, data, bgd_model_func=None, data_errors=None):
+        """
+        Fit a chromatic PSF model on 2D data.
+
+        Parameters
+        ----------
+        data: array_like
+            2D array containing the image data.
+        bgd_model_func: callable, optional
+            A 2D function to model the extracted background (default: None -> null background)
+        data_errors: np.array
+            the 2D array uncertainties.
+
+        Examples
+        --------
+
+        # Set the parameters
+        >>> parameters.PIXDIST_BACKGROUND = 40
+        >>> parameters.PIXWIDTH_BACKGROUND = 10
+        >>> parameters.PIXWIDTH_SIGNAL = 30
+        >>> parameters.VERBOSE = True
+
+        # Build a mock spectrogram with random Poisson noise:
+        >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
+        >>> params = s0.generate_test_poly_params()
+        >>> s0.poly_params = params
+        >>> saturation = params[-1]
+        >>> data = s0.evaluate(params)
+        >>> bgd = 10*np.ones_like(data)
+        >>> data += bgd
+        >>> data = np.random.poisson(data)
+        >>> data_errors = np.sqrt(data+1)
+
+        # Extract the background
+        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+
+        # Estimate the first guess values
+        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+        >>> s.plot_summary(truth=s0)
+
+        # Fit the data:
+        >>> s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
+        >>> s.plot_summary(truth=s0)
+        """
+        w = ChromaticPSF1DFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func)
+        self.fit_chromatic_psf(w, data, data_errors=data_errors, bgd_model_func=bgd_model_func)
 
     @deprecated(reason="Use fit_chromatic_PSF1D instead.")
     def fit_chromatic_PSF1D_minuit(self, data, bgd_model_func=None, data_errors=None):
@@ -1475,68 +1466,8 @@ class ChromaticPSF1D(ChromaticPSF):
             self.plot_summary()
             self.plot_chromatic_PSF1D_residuals(bgd, data, data_errors, guess=guess, title='Best fit')
 
-    def fit_chromatic_PSF1D(self, data, bgd_model_func=None, data_errors=None):
-        """
-        Fit a chromatic PSF model on 2D data.
 
-        Parameters
-        ----------
-        data: array_like
-            2D array containing the image data.
-        bgd_model_func: callable, optional
-            A 2D function to model the extracted background (default: None -> null background)
-        data_errors: np.array
-            the 2D array uncertainties.
-
-        Examples
-        --------
-
-        # Set the parameters
-        >>> parameters.PIXDIST_BACKGROUND = 40
-        >>> parameters.PIXWIDTH_BACKGROUND = 10
-        >>> parameters.PIXWIDTH_SIGNAL = 30
-        >>> parameters.VERBOSE = True
-
-        # Build a mock spectrogram with random Poisson noise:
-        >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
-        >>> params = s0.generate_test_poly_params()
-        >>> s0.poly_params = params
-        >>> saturation = params[-1]
-        >>> data = s0.evaluate(params)
-        >>> bgd = 10*np.ones_like(data)
-        >>> data += bgd
-        >>> data = np.random.poisson(data)
-        >>> data_errors = np.sqrt(data+1)
-
-        # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
-
-        # Estimate the first guess values
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
-        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
-        >>> s.plot_summary(truth=s0)
-
-        # Fit the data:
-        >>> s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
-        >>> s.plot_summary(truth=s0)
-        """
-        w = ChromaticPSF1DFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func)
-
-        guess = np.copy(self.poly_params)
-        run_minimisation(w, method="newton", ftol=1e-4, xtol=1e-4)
-
-        self.poly_params = w.poly_params
-        self.profile_params = self.from_poly_params_to_profile_params(self.poly_params, force_positive=True)
-        self.fill_table_with_profile_params(self.profile_params)
-        self.from_profile_params_to_shape_params(self.profile_params)
-        if parameters.DEBUG or True:
-            # Plot data, best fit model and residuals:
-            self.plot_summary()
-            self.plot_chromatic_PSF1D_residuals(w.bgd, data, data_errors, guess=guess, title='Best fit')
-
-
-class ChromaticPSF1DFitWorkspace(FitWorkspace):
+class ChromaticPSFFitWorkspace(FitWorkspace):
 
     def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="",
                  nwalkers=18, nsteps=1000, burnin=100, nbins=10,
@@ -1559,9 +1490,11 @@ class ChromaticPSF1DFitWorkspace(FitWorkspace):
         # prepare the fit
         self.Ny, self.Nx = self.data.shape
         if self.Ny != self.chromatic_psf.Ny:
-            self.my_logger.error(f"\n\tData y shape {self.Ny} different from ChromaticPSF input Ny {self.chromatic_psf.Ny}.")
+            self.my_logger.error(
+                f"\n\tData y shape {self.Ny} different from ChromaticPSF input Ny {self.chromatic_psf.Ny}.")
         if self.Nx != self.chromatic_psf.Nx:
-            self.my_logger.error(f"\n\tData x shape {self.Nx} different from ChromaticPSF input Nx {self.chromatic_psf.Nx}.")
+            self.my_logger.error(
+                f"\n\tData x shape {self.Nx} different from ChromaticPSF input Nx {self.chromatic_psf.Nx}.")
         self.pixels = np.arange(self.Ny)
 
         # prepare the background, data and errors
@@ -1577,6 +1510,68 @@ class ChromaticPSF1DFitWorkspace(FitWorkspace):
         self.data = self.data[self.bgd_width:-self.bgd_width, :]
         self.pixels = np.arange(self.data.shape[0])
         self.err = np.copy(self.err[self.bgd_width:-self.bgd_width, :])
+        self.Ny, self.Nx = self.data.shape
+
+        # error matrix
+        self.W = 1. / (self.err * self.err)
+        self.W = self.W.flatten()
+        self.W_dot_data = np.diag(self.W) @ self.data.flatten()
+
+    def plot_fit(self):
+        gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
+        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), constrained_layout=True, gridspec_kw=gs_kw)
+        norm = np.max(self.data)
+        plot_image_simple(ax[0, 0], data=self.model / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
+                          units='1/max(data)')
+        ax[0, 0].set_title("Model", fontsize=10, loc='center', color='white', y=0.8)
+        plot_image_simple(ax[1, 0], data=self.data / norm, title='Data', aspect='auto',
+                          cax=ax[1, 1], vmin=0, vmax=1, units='1/max(data)')
+        ax[1, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+        residuals = (self.data - self.model)
+        # residuals_err = self.spectrum.spectrogram_err / self.model
+        norm = self.err
+        residuals /= norm
+        std = float(np.std(residuals))
+        plot_image_simple(ax[2, 0], data=residuals, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
+                          aspect='auto', cax=ax[2, 1], units='', cmap="bwr")
+        ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
+        ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals):.3f}\nstd={np.std(residuals):.3f}',
+                      horizontalalignment='left', verticalalignment='bottom',
+                      color='black', transform=ax[2, 0].transAxes)
+        ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
+        ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
+        ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
+        ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
+        ax[3, 1].remove()
+        ax[3, 0].plot(np.arange(self.Nx), self.data.sum(axis=0), label='Data')
+        ax[3, 0].plot(np.arange(self.Nx), self.model.sum(axis=0), label='Model')
+        ax[3, 0].set_ylabel('Transverse sum')
+        ax[3, 0].set_xlabel(r'X [pixels]')
+        ax[3, 0].legend(fontsize=7)
+        ax[3, 0].grid(True)
+        if self.live_fit:  # pragma: no cover
+            plt.draw()
+            plt.pause(1e-8)
+            plt.close()
+        else:
+            if parameters.DISPLAY and self.verbose:
+                plt.show()
+        if parameters.SAVE:  # pragma: no cover
+            figname = self.filename.replace(self.filename.split('.')[-1], "_bestfit.pdf")
+            self.my_logger.info(f"\n\tSave figure {figname}.")
+            fig.savefig(figname, dpi=100, bbox_inches='tight')
+
+
+class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
+
+    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="",
+                 nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False, truth=None):
+        ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
+                                          file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                                          live_fit, truth=truth)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.pixels = np.arange(self.Ny)
 
         # error matrix
         self.W = 1. / (self.err * self.err)
@@ -1643,50 +1638,6 @@ class ChromaticPSF1DFitWorkspace(FitWorkspace):
         self.model_err = np.zeros_like(self.model)
         self.poly_params = np.copy(poly_params)
         return self.pixels, self.model, self.model_err
-
-    def plot_fit(self):
-        gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
-        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), constrained_layout=True, gridspec_kw=gs_kw)
-        norm = np.max(self.data)
-        plot_image_simple(ax[0, 0], data=self.model / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
-                          units='1/max(data)')
-        ax[0, 0].set_title("Model", fontsize=10, loc='center', color='white', y=0.8)
-        plot_image_simple(ax[1, 0], data=self.data / norm, title='Data', aspect='auto',
-                          cax=ax[1, 1], vmin=0, vmax=1, units='1/max(data)')
-        ax[1, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
-        residuals = (self.data - self.model)
-        # residuals_err = self.spectrum.spectrogram_err / self.model
-        norm = self.err
-        residuals /= norm
-        std = float(np.std(residuals))
-        plot_image_simple(ax[2, 0], data=residuals, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
-                          aspect='auto', cax=ax[2, 1], units='', cmap="bwr")
-        ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
-        ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals):.3f}\nstd={np.std(residuals):.3f}',
-                      horizontalalignment='left', verticalalignment='bottom',
-                      color='black', transform=ax[2, 0].transAxes)
-        ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
-        ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        ax[3, 1].remove()
-        ax[3, 0].plot(np.arange(self.Nx), self.data.sum(axis=0), label='Data')
-        ax[3, 0].plot(np.arange(self.Nx), self.model.sum(axis=0), label='Model')
-        ax[3, 0].set_ylabel('Transverse sum')
-        ax[3, 0].set_xlabel(r'X [pixels]')
-        ax[3, 0].legend(fontsize=7)
-        ax[3, 0].grid(True)
-        if self.live_fit:  # pragma: no cover
-            plt.draw()
-            plt.pause(1e-8)
-            plt.close()
-        else:
-            if parameters.DISPLAY and self.verbose:
-                plt.show()
-        if parameters.SAVE:  # pragma: no cover
-            figname = self.filename.replace(self.filename.split('.')[-1], "_bestfit.pdf")
-            self.my_logger.info(f"\n\tSave figure {figname}.")
-            fig.savefig(figname, dpi=100, bbox_inches='tight')
 
 
 class ChromaticPSF2D(ChromaticPSF):
@@ -1770,13 +1721,64 @@ class ChromaticPSF2D(ChromaticPSF):
         profile_params = self.from_poly_params_to_profile_params(poly_params)
         # replace x_mean
         profile_params[:, 1] = np.arange(self.Nx)
-        yy, xx = np.mgrid[:self.Ny, :self.Nx]
+        pixels = np.mgrid[:self.Nx, :self.Ny]
         output = np.zeros((self.Ny, self.Nx))
+        psf = PSF2D()
         for k in range(self.Nx):
-            output += PSF2D.evaluate(xx, yy, *profile_params[k,])
+            output += psf.evaluate(pixels, p=profile_params[k, :])
         return output
 
     def fit_chromatic_PSF2D(self, data, bgd_model_func=None, data_errors=None):
+        """
+        Fit a chromatic PSF model on 2D data.
+
+        Parameters
+        ----------
+        data: array_like
+            2D array containing the image data.
+        bgd_model_func: callable, optional
+            A 2D function to model the extracted background (default: None -> null background)
+        data_errors: np.array
+            the 2D array uncertainties.
+
+        Examples
+        --------
+
+        # Set the parameters
+        >>> parameters.PIXDIST_BACKGROUND = 40
+        >>> parameters.PIXWIDTH_BACKGROUND = 10
+        >>> parameters.PIXWIDTH_SIGNAL = 30
+        >>> parameters.VERBOSE = True
+
+        # Build a mock spectrogram with random Poisson noise:
+        >>> s0 = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=1000)
+        >>> params = s0.generate_test_poly_params()
+        >>> s0.poly_params = params
+        >>> saturation = params[-1]
+        >>> data = s0.evaluate(params)
+        >>> bgd = 10*np.ones_like(data)
+        >>> data += bgd
+        >>> data = np.random.poisson(data)
+        >>> data_errors = np.sqrt(data+1)
+
+        # Extract the background
+        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+
+        # Estimate the first guess values
+        >>> s = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=saturation)
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+        >>> s.plot_summary(truth=s0)
+
+        # Fit the data:
+        >>> s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
+        >>> s.plot_summary(truth=s0)
+        """
+        w = ChromaticPSF2DFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func,live_fit=True)
+        self.fit_chromatic_psf(w, data, data_errors=data_errors, bgd_model_func=bgd_model_func)
+
+    @deprecated(reason="Has never worked... Use fit_chromatic_PSF2D instead.")
+    def fit_chromatic_PSF2D_minuit(self, data, bgd_model_func=None, data_errors=None):
         """
         Fit a chromatic PSF2D model on 2D data.
 
@@ -1812,15 +1814,14 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
         # Estimate the first guess values
-        # >>> s = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=saturation)
-        # >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-        # ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
-        # >>> s.plot_summary(truth=s0)
+        >>> s = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=saturation)
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
 
         # Fit the data:
-        # >>> parameters.DEBUG = True
-        # >>> s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
-        # >>> s.plot_summary(truth=s0)
+        >>> parameters.DEBUG = True
+        >>> s.fit_chromatic_PSF2D_minuit(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
+        >>> s.plot_summary(truth=s0)
         """
         my_logger = set_logger(__name__)
         Ny, Nx = data.shape
@@ -1843,7 +1844,7 @@ class ChromaticPSF2D(ChromaticPSF):
         bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         data_subtracted = data_subtracted[bgd_width:-bgd_width, :]
         Ny = data_subtracted.shape[0]
-        yy, xx = np.mgrid[:Ny,:Nx]
+        pixels = np.mgrid[:Nx, :Ny]
         data_errors_cropped = np.copy(data_errors[bgd_width:-bgd_width, :])
 
         # error matrix
@@ -1862,18 +1863,22 @@ class ChromaticPSF2D(ChromaticPSF):
             profile_params = self.from_poly_params_to_profile_params(poly_params, force_positive=True)
             profile_params[:Nx, 0] = 1
             profile_params[:Nx, 1] = np.arange(Nx)
-            profile_params[:Nx, 2] -= bgd_width
+            # profile_params[:Nx, 2] -= bgd_width
             for x in range(Nx):
                 # self.my_logger.warning(f'\n\t{x} {profile_params[x, :]}')
-                J[:, x] = self.PSF.evaluate(xx, yy, *profile_params[x, :]).flatten()
+                J[:, x] = self.PSF.evaluate(pixels, p=profile_params[x, :]).flatten()
                 W_dot_J[:, x] = J[:, x] * W
+                # plt.imshow(self.PSF.evaluate(self.pixels, p=profile_params[x, :]), origin="lower")
+                # plt.imshow(data, origin="lower")
+                # plt.title(f"{x}")
+                # plt.show()
             J_dot_W_dot_J = J.T @ W_dot_J
-            #self.my_logger.warning(f'\n\tJWJ {J_dot_W_dot_J}')
+            # self.my_logger.warning(f'\n\tJWJ {J_dot_W_dot_J}')
             L = np.linalg.inv(np.linalg.cholesky(J_dot_W_dot_J))
-            inv_J_dot_W_dot_J = L.T @ L # np.linalg.inv(J_dot_W_dot_J)
+            inv_J_dot_W_dot_J = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
             amplitude_params = inv_J_dot_W_dot_J @ (J.T @ W_dot_data)
-            amplitude_params[np.diagonal(J_dot_W_dot_J) <= 0] = 0.1 * bgd_std
-            amplitude_params[amplitude_params < 0.1 * bgd_std] = 0.1 * bgd_std
+            # amplitude_params[np.diagonal(J_dot_W_dot_J) <= 0] = 0.1 * bgd_std
+            # amplitude_params[amplitude_params < 0.1 * bgd_std] = 0.1 * bgd_std
             poly_params[:Nx] = amplitude_params
             in_bounds, penalty, name = self.check_bounds(poly_params, noise_level=bgd_std)
             mod = self.evaluate(poly_params)[bgd_width:-bgd_width, :]
@@ -1888,7 +1893,10 @@ class ChromaticPSF2D(ChromaticPSF):
         my_logger.debug(f'\n\tStart chisq: {spectrogram_chisq(guess[Nx:])} with {guess[Nx:]}')
         error = 0.01 * np.abs(guess) * np.ones_like(guess)
         fix = [False] * (self.n_poly_params - Nx)
-        fix[Nx+self.degrees['amplitude_moffat']:Nx+self.degrees['amplitude_moffat']+self.degrees['x_mean']] = [True] * self.degrees['x_mean']
+        fix[Nx + self.degrees['amplitude_moffat']:Nx + self.degrees['amplitude_moffat'] + self.degrees['x_mean']] = [
+                                                                                                                        True] * \
+                                                                                                                    self.degrees[
+                                                                                                                        'x_mean']
         fix[-1] = True
         bounds = self.set_bounds(data)
         # noinspection PyArgumentList
@@ -1904,6 +1912,101 @@ class ChromaticPSF2D(ChromaticPSF):
             # Plot data, best fit model and residuals:
             self.plot_summary()
             self.plot_chromatic_PSF1D_residuals(bgd, data, data_errors, guess=guess, title='Best fit')
+
+
+class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
+
+    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="",
+                 nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False, truth=None):
+        ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
+                                            file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                                            live_fit, truth=truth)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.pixels = np.mgrid[:self.Nx,:self.Ny]
+
+        # error matrix
+        self.W = 1. / (self.err * self.err)
+        self.W = self.W.flatten()
+        self.W_dot_data = np.diag(self.W) @ self.data.flatten()
+
+    def simulate(self, *shape_params):
+        """
+        Compute a ChromaticPSF model given PSF shape parameters and minimizing
+        amplitude parameters given a spectrogram data array.
+
+        Parameters
+        ----------
+        shape_params: array_like
+            PSF shape polynomial parameter array.
+
+        Examples
+        --------
+
+        # Set the parameters
+        >>> parameters.PIXDIST_BACKGROUND = 40
+        >>> parameters.PIXWIDTH_BACKGROUND = 10
+        >>> parameters.PIXWIDTH_SIGNAL = 30
+
+        # Build a mock spectrogram with random Poisson noise:
+        >>> s0 = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=1000)
+        >>> params = s0.generate_test_poly_params()
+        >>> s0.poly_params = params
+        >>> saturation = params[-1]
+        >>> data = s0.evaluate(params)
+        >>> bgd = 10*np.ones_like(data)
+        >>> data += bgd
+        >>> data = np.random.poisson(data)
+        >>> data_errors = np.sqrt(data+1)
+
+        # Extract the background
+        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+
+        # Estimate the first guess values
+        >>> s = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=saturation)
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+        >>> s.plot_summary(truth=s0)
+
+        # Simulate the data:
+        >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
+        >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:-1])
+        >>> assert mod is not None
+        >>> w.plot_fit()
+        """
+        # linear regression for the amplitude parameters
+        # prepare the vectors
+        poly_params = np.copy(self.chromatic_psf.poly_params)
+        poly_params[self.Nx:-1] = np.copy(shape_params)
+        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
+        profile_params[:self.Nx, 0] = 1
+        profile_params[:self.Nx, 1] = np.arange(self.Nx)
+        profile_params[:self.Nx, 2] -= self.bgd_width
+
+        # Matrix filling
+        W_dot_J = np.zeros((self.Ny * self.Nx, self.Nx))
+        J = np.zeros((self.Ny * self.Nx, self.Nx))
+        for x in range(self.Nx):
+            # self.my_logger.warning(f'\n\t{x} {profile_params[x, :]}')
+            J[:, x] = self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]).flatten()
+            # plt.imshow(self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]), origin="lower")
+            # plt.imshow(self.data, origin="lower")
+            # plt.title(f"{x}")
+            # plt.show()
+            W_dot_J[:, x] = J[:, x] * self.W
+        # Compute the minimizing amplitudes
+        J_dot_W_dot_J = J.T @ W_dot_J
+        L = np.linalg.inv(np.linalg.cholesky(J_dot_W_dot_J))
+        inv_J_dot_W_dot_J = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
+        amplitude_params = inv_J_dot_W_dot_J @ (J.T @ self.W_dot_data)
+        # amplitude_params[np.diagonal(J_dot_W_dot_J) <= 0] = 0.1 * self.bgd_std
+        # amplitude_params[amplitude_params < 0.1 * self.bgd_std] = 0.1 * self.bgd_std
+        poly_params[:self.Nx] = amplitude_params
+        # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
+        self.model = self.chromatic_psf.evaluate(poly_params)[self.bgd_width:-self.bgd_width, :]
+        self.model_err = np.zeros_like(self.model)
+        self.poly_params = np.copy(poly_params)
+        return self.pixels, self.model, self.model_err
 
 
 def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, bgd_model_func=None, params=None,
@@ -1976,7 +2079,8 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
         ax[0].plot(bgd_indices, bgd_model_func(x, bgd_indices)[:, 0], 'b--', label="fitted bgd")
     if PSF_guess is not None:
         if bgd_model_func is not None:
-            ax[0].plot(indices, PSF_guess.evaluate(indices) + bgd_model_func(x, indices)[:, 0], 'k--', label="guessed profile")
+            ax[0].plot(indices, PSF_guess.evaluate(indices) + bgd_model_func(x, indices)[:, 0], 'k--',
+                       label="guessed profile")
         else:
             ax[0].plot(indices, PSF_guess.evaluate(indices), 'k--', label="guessed profile")
     if fit is not None and bgd_model_func is not None:
@@ -2235,9 +2339,9 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     Create the model:
     >>> import numpy as np
     >>> X, Y = np.mgrid[:50,:50]
-    >>> PSF = PSF2D()
+    >>> psf = PSF2DAstropy()
     >>> p = (50, 25, 25, 5, 1, -0.4, 1, 60)
-    >>> Z = PSF.evaluate(X, Y, *p)
+    >>> Z = psf.evaluate(X, Y, *p)
     >>> Z_err = np.sqrt(Z)/10.
 
     Prepare the fit:
@@ -2255,7 +2359,7 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
     """
 
-    model = PSF2D()
+    model = PSF2DAstropy()
     my_logger = set_logger(__name__)
 
     if bounds is not None:
@@ -2285,9 +2389,9 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     popt = m.np_values()
 
     my_logger.debug(f'\n{popt}')
-    PSF = PSF2D(*popt)
-    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF
+    psf = PSF2DAstropy(*popt)
+    my_logger.debug(f'\n\tPSF best fitting parameters:\n{psf}')
+    return psf
 
 
 @deprecated(reason='Use PSF1D class instead.')
@@ -2876,6 +2980,81 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
 
     # my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
     return psf, consecutive_outliers
+
+
+@deprecated(reason="Use new PSF2D class.")
+class PSF2DAstropy(Fittable2DModel):
+    inputs = ('x', 'y',)
+    outputs = ('z',)
+
+    amplitude_moffat = Parameter('amplitude_moffat', default=1)
+    x_mean = Parameter('x_mean', default=0)
+    y_mean = Parameter('y_mean', default=0)
+    gamma = Parameter('gamma', default=3)
+    alpha = Parameter('alpha', default=3)
+    eta_gauss = Parameter('eta_gauss', default=0.)
+    stddev = Parameter('stddev', default=1)
+    saturation = Parameter('saturation', default=1)
+
+    param_titles = ["A", "x", "y", "\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
+
+    @staticmethod
+    def evaluate(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation):
+        rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
+        rr_gg = rr / (gamma * gamma)
+        a = amplitude * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
+        return np.clip(a, 0, saturation)
+
+    @staticmethod
+    def normalisation(amplitude, gamma, alpha, eta_gauss, stddev):
+        return amplitude * ((np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * stddev * stddev)
+
+    @staticmethod
+    def fit_deriv(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation):
+        rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
+        rr_gg = rr / (gamma * gamma)
+        gauss_norm = np.exp(-(rr / (2. * stddev * stddev)))
+        d_eta_gauss = amplitude * gauss_norm
+        moffat_norm = (1 + rr_gg) ** (-alpha)
+        d_amplitude = moffat_norm + eta_gauss * gauss_norm
+        d_x_mean = amplitude * eta_gauss * (x - x_mean) / (stddev * stddev) * gauss_norm \
+                   - amplitude * alpha * moffat_norm * (-2 * x + 2 * x_mean) / (gamma ** 2 * (1 + rr_gg))
+        d_y_mean = amplitude * eta_gauss * (y - y_mean) / (stddev * stddev) * gauss_norm \
+                   - amplitude * alpha * moffat_norm * (-2 * y + 2 * y_mean) / (gamma ** 2 * (1 + rr_gg))
+        d_stddev = amplitude * eta_gauss * rr / (stddev ** 3) * gauss_norm
+        d_alpha = - amplitude * moffat_norm * np.log(1 + rr_gg)
+        d_gamma = 2 * amplitude * alpha * moffat_norm * (rr_gg / (gamma * (1 + rr_gg)))
+        d_saturation = saturation * np.zeros_like(x)
+        return [d_amplitude, d_x_mean, d_y_mean, d_gamma, d_alpha, d_eta_gauss, d_stddev, d_saturation]
+
+    def interpolation(self, x_array, y_array):
+        """
+
+        Parameters
+        ----------
+        x_array: array_like
+            The x array to interpolate the model.
+        y_array: array_like
+            The y array to interpolate the model.
+
+        Returns
+        -------
+        interp: callable
+            Function corresponding to the interpolated model on the (x_array,y_array) array.
+
+        Examples
+        --------
+        >>> x = np.arange(0, 60, 1)
+        >>> y = np.arange(0, 30, 1)
+        >>> p = [2,30,15,2,2,1,2,10]
+        >>> psf = PSF2DAstropy(*p)
+        >>> interp = psf.interpolation(x, y)
+        >>> assert np.isclose(interp(p[1], p[2]), psf.evaluate(p[1], p[2], *p))
+
+        """
+        params = [getattr(self, p).value for p in self.param_names]
+        xx, yy = np.meshgrid(x_array, y_array)
+        return interp2d(x_array, y_array, self.evaluate(xx, yy, *params), fill_value=0, bounds_error=False)
 
 
 if __name__ == "__main__":
