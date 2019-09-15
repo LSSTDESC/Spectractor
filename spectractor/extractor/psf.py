@@ -12,7 +12,8 @@ from astropy.modeling import Fittable1DModel, Fittable2DModel, Parameter
 from astropy.modeling.models import Moffat1D
 from astropy.table import Table
 
-from spectractor.tools import dichotomie, fit_poly1d, fit_moffat1d_outlier_removal, plot_image_simple
+from spectractor.tools import (dichotomie, fit_poly1d, fit_moffat1d_outlier_removal, plot_image_simple,
+                               compute_fwhm, compute_integral)
 from spectractor.extractor.background import extract_background_photutils
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -62,13 +63,12 @@ class PSF1D(PSF):
 
         Examples
         --------
-        >>> p = [2,30,4,2,-0.5,1,10]
+        >>> p = [2,40,4,2,-0.5,1,10]
         >>> psf = PSF1D(p)
-        >>> x = np.arange(60)
+        >>> x = np.arange(100)
         >>> out = psf.evaluate(x)
-        >>> fwhm = psf.fwhm()
-        >>> print(fwhm, psf.integrate(bounds=(-10*fwhm,10*fwhm)) )
-        >>> print(np.max(out), np.sum(out))
+        >>> integral = compute_integral(x, out)
+        >>> assert np.isclose(integral, p[0])
         """
         if p is not None:
             self.p = p
@@ -84,132 +84,9 @@ class PSF1D(PSF):
             my_logger = set_logger(__name__)
             my_logger.warning(f"{[amplitude_moffat, mean, gamma, alpha, eta_gauss, stddev, saturation]}")
             a = eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
-        # fwhm = self.fwhm()
-        # norm = amplitude_moffat / self.integrate(bounds=(-10*fwhm, 10*fwhm))
-        # a *= norm
-        a *= amplitude_moffat
+        norm = amplitude_moffat / compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
+        a *= norm
         return np.clip(a, 0, saturation)
-
-    def interpolation(self, x_array):
-        """
-
-        Parameters
-        ----------
-        x_array: array_like
-            The abscisse array to interpolate the model.
-
-        Returns
-        -------
-        interp: callable
-            Function corresponding to the interpolated model on the x_array array.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> p = [2,0,2,2,1,2,10]
-        >>> psf = PSF1D(p)
-        >>> interp = psf.interpolation(x)
-        >>> assert np.isclose(interp(p[1]), psf.evaluate(p[1], p))
-
-        """
-        return interp1d(x_array, self.evaluate(x_array), fill_value=0, bounds_error=False)
-
-    def integrate(self, bounds=(-np.inf, np.inf), x_array=None):
-        """
-        Compute the integral of the PSF model. Bounds are -np.inf, np.inf by default, or provided
-        if no x_array is provided. Otherwise the bounds comes from x_array edges.
-
-        Parameters
-        ----------
-        x_array: array_like, optional
-            If not None, the interpoalted PSF modelis used for integration (default: None).
-        bounds: array_like, optional
-            The bounds of the integral (default bounds=(-np.inf, np.inf)).
-
-        Returns
-        -------
-        result: float
-            The integral of the PSF model.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> p = [2,30,4,2,-0.5,1,10]
-        >>> psf = PSF1D(p)
-        >>> i = psf.integrate()
-        >>> assert np.isclose(i, 10.059742339728174)
-        >>> i = psf.integrate(bounds=(0,60), x_array=x)
-        >>> assert np.isclose(i, 10.046698028728645)
-
-        >>> import matplotlib.pyplot as plt
-        >>> xx = np.arange(0, 60, 0.01)
-        >>> plt.plot(xx, psf.evaluate(xx, p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> plt.plot(x, psf.evaluate(x, p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> if parameters.DISPLAY: plt.show()
-
-        """
-        if x_array is None:
-            i = quad(self.evaluate, bounds[0], bounds[1], limit=200)
-            return i[0]
-        else:
-            return np.trapz(self.evaluate(x_array), x_array)
-
-    def fwhm(self, x_array=None):
-        """
-        Compute the full width half maximum of the PSF model with a dichotomie method.
-
-        Parameters
-        ----------
-        x_array: array_like, optional
-            An abscisse array is one wants to find FWHM on the interpolated PSF model
-            (to smooth the spikes from spurious parameter sets).
-
-        Returns
-        -------
-        FWHM: float
-            The full width half maximum of the PSF model.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> p = [2,30,4,2,-0.4,1,10]
-        >>> psf = PSF1D(p)
-        >>> a, b =  p[1], p[1]+3*max(p[-2], p[2])
-        >>> fwhm = psf.fwhm(x_array=None)
-        >>> assert np.isclose(fwhm, 7.25390625)
-        >>> fwhm = psf.fwhm(x_array=x)
-        >>> assert np.isclose(fwhm, 7.083984375)
-        >>> print(fwhm)
-        7.083984375
-        >>> import matplotlib.pyplot as plt
-        >>> x = np.arange(0, 60, 0.01)
-        >>> plt.plot(x, psf.evaluate(x, p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> if parameters.DISPLAY: plt.show()
-        """
-        interp = None
-        if x_array is not None:
-            interp = self.interpolation(x_array)
-            values = self.evaluate(x_array)
-            maximum = np.max(values)
-            imax = np.argmax(values)
-            a = imax + np.argmin(np.abs(values[imax:] - 0.95 * maximum))
-            b = imax + np.argmin(np.abs(values[imax:] - 0.05 * maximum))
-
-            def eq(x):
-                return interp(x) - 0.5 * maximum
-        else:
-            maximum = self.p[0] * (1 + self.p[4])
-            a = self.p[1]
-            b = self.p[1] + 3 * max(self.p[2], self.p[5])
-
-            def eq(x):
-                return self.evaluate(x) - 0.5 * maximum
-        res = dichotomie(eq, a, b, 1e-2)
-        # res = newton()
-        return abs(2 * (res - self.p[1]))
 
 
 class PSF2D(Fittable2DModel):
