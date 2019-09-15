@@ -90,7 +90,7 @@ class PSF1DAstropy(Fittable1DModel):
         --------
         >>> x = np.arange(0, 60, 1)
         >>> p = [2,0,2,2,1,2,10]
-        >>> psf = PSF1D(*p)
+        >>> psf = PSF1DAstropy(*p)
         >>> interp = psf.interpolation(x)
         >>> assert np.isclose(interp(p[1]), psf.evaluate(p[1], *p))
 
@@ -119,7 +119,7 @@ class PSF1DAstropy(Fittable1DModel):
         --------
         >>> x = np.arange(0, 60, 1)
         >>> p = [2,30,4,2,-0.5,1,10]
-        >>> psf = PSF1D(*p)
+        >>> psf = PSF1DAstropy(*p)
         >>> i = psf.integrate()
         >>> assert np.isclose(i, 10.059742339728174)
         >>> i = psf.integrate(bounds=(0,60), x_array=x)
@@ -160,7 +160,7 @@ class PSF1DAstropy(Fittable1DModel):
         --------
         >>> x = np.arange(0, 60, 1)
         >>> p = [2,30,4,2,-0.4,1,10]
-        >>> psf = PSF1D(*p)
+        >>> psf = PSF1DAstropy(*p)
         >>> a, b =  p[1], p[1]+3*max(p[-2], p[2])
         >>> fwhm = psf.fwhm(x_array=None)
         >>> assert np.isclose(fwhm, 7.25390625)
@@ -1108,7 +1108,6 @@ class ChromaticPSF:
             self.PSF.p = p
             fwhm = self.PSF.fwhm(x_array=pixel_y)
             integral = self.PSF.integrate(bounds=(-10 * fwhm + p[1], 10 * fwhm + p[1]), x_array=pixel_y)
-            self.my_logger.warning(f"\n\t{x} {integral} {fwhm}")
             self.table['flux_integral'][x] = integral
             self.table['fwhm'][x] = fwhm
             self.table['Dy_mean'][x] = 0
@@ -1699,7 +1698,7 @@ class ChromaticPSF1D(ChromaticPSF):
             profile_params = self.from_poly_params_to_profile_params(poly_params, force_positive=True)
             profile_params[:Nx, 0] = 1
             profile_params[:Nx, 1] -= bgd_width
-            J = np.array([self.PSF.evaluate(pixels, *profile_params[x, :]) for x in range(Nx)])
+            J = np.array([self.PSF.evaluate(pixels, p=profile_params[x, :]) for x in range(Nx)])
             J_dot_W_dot_J = np.array([J[x].T @ W[x] @ J[x] for x in range(Nx)])
             amplitude_params = [
                 J[x].T @ W_dot_data[x] / (J_dot_W_dot_J[x]) if J_dot_W_dot_J[x] > 0 else 0.1 * bgd_std
@@ -2266,7 +2265,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     if bgd_model_func is not None:
         model += bgd_model_func(x, indices)[:, 0]
         if len(outliers) > 0:
-            model_outliers += bgd_model_func(x, outliers)[:, 0]
+            model_outliers += bgd_model_func(x, indices)[outliers, 0]
     if fit is not None or bgd_model_func is not None:
         residuals = (y - model) / err[:, x]  # / model
         residuals_err = err[:, x] / err[:, x]  # / model
@@ -2575,7 +2574,7 @@ def PSF1D_chisq_jac(params, model, xx, yy, yy_err=None):
 
 
 def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimize'):
-    """Fit a PSF 1D model with parameters :
+    """Fit a PSF 1D Astropy model with parameters :
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
     using basin hopping global minimization method.
 
@@ -2596,7 +2595,7 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
 
     Returns
     -------
-    fitted_model: PSF1D
+    fitted_model: PSF1DAstropy
         the PSF fitted model.
 
     Examples
@@ -2605,7 +2604,7 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
     Create the model:
     >>> import numpy as np
     >>> X = np.arange(0, 50)
-    >>> psf = PSF1D()
+    >>> psf = PSF1DAstropy()
     >>> p = (50, 25, 5, 1, -0.2, 1, 60)
     >>> Y = psf.evaluate(X, *p)
     >>> Y_err = np.sqrt(Y)/10.
@@ -2631,7 +2630,7 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
 
     """
     my_logger = set_logger(__name__)
-    model = PSF1D()
+    model = PSF1DAstropy()
     if method == 'minimize':
         res = minimize(PSF1D_chisq, guess, method="L-BFGS-B", bounds=bounds,
                        args=(model, x, data, data_errors), jac=PSF1D_chisq_jac)
@@ -2643,14 +2642,14 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
         my_logger.error(f'\n\tUnknown method {method}.')
         sys.exit()
     my_logger.debug(f'\n{res}')
-    PSF = PSF1D(*res.x)
-    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF
+    psf = PSF1DAstropy(*res.x)
+    my_logger.debug(f'\n\tPSF best fitting parameters:\n{psf}')
+    return psf
 
 
 def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, guess=None, bounds=None, method='minimize',
                               niter_basinhopping=5, T_basinhopping=0.2):
-    """Fit a PSF 1D model with parameters:
+    """Fit a PSF 1D Astropy model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
     using scipy. Find outliers data point above sigma*data_errors from the fit over niter iterations.
 
@@ -2679,7 +2678,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
 
     Returns
     -------
-    fitted_model: PSF1D
+    fitted_model: PSF1DAstropy
         the PSF fitted model.
     outliers: list
         the list of the outlier indices.
@@ -2690,9 +2689,9 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
     Create the model:
     >>> import numpy as np
     >>> X = np.arange(0, 50)
-    >>> PSF = PSF1D()
+    >>> psf = PSF1DAstropy()
     >>> p = (1000, 25, 5, 1, -0.2, 1, 6000)
-    >>> Y = PSF.evaluate(X, *p)
+    >>> Y = psf.evaluate(X, *p)
     >>> Y += 100*np.exp(-((X-10)/2)**2)
     >>> Y_err = np.sqrt(1+Y)
 
@@ -2722,7 +2721,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
     my_logger = set_logger(__name__)
     indices = np.mgrid[:x.shape[0]]
     outliers = np.array([])
-    model = PSF1D()
+    model = PSF1DAstropy()
 
     for step in range(niter):
         # first fit
@@ -2764,7 +2763,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
 
 
 def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
-    """Fit a PSF 1D model with parameters:
+    """Fit a PSF 1D Astropy model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
     using Minuit.
 
@@ -2783,7 +2782,7 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
 
     Returns
     -------
-    fitted_model: PSF1D
+    fitted_model: PSF1DAstropy
         the PSF fitted model.
 
     Examples
@@ -2792,9 +2791,9 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     Create the model:
     >>> import numpy as np
     >>> X = np.arange(0, 50)
-    >>> PSF = PSF1D()
+    >>> psf = PSF1DAstropy()
     >>> p = (50, 25, 5, 1, -0.2, 1, 60)
-    >>> Y = PSF.evaluate(X, *p)
+    >>> Y = psf.evaluate(X, *p)
     >>> Y_err = np.sqrt(1+Y)
 
     Prepare the fit:
@@ -2814,7 +2813,7 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     """
 
     my_logger = set_logger(__name__)
-    model = PSF1D()
+    model = PSF1DAstropy()
 
     def PSF1D_chisq_v2(params):
         mod = model.evaluate(x, *params)
@@ -2832,14 +2831,14 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
                                print_level=parameters.DEBUG)
     m.migrad()
-    PSF = PSF1D(*m.np_values())
+    psf = PSF1DAstropy(*m.np_values())
 
-    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF
+    my_logger.debug(f'\n\tPSF best fitting parameters:\n{psf}')
+    return psf
 
 
 def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=None, sigma=3, niter=2, consecutive=3):
-    """Fit a PSF 1D model with parameters:
+    """Fit a PSF Astropy 1D model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
     using Minuit. Find outliers data point above sigma*data_errors from the fit over niter iterations.
     Only at least 3 consecutive outliers are considered.
@@ -2865,7 +2864,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
 
     Returns
     -------
-    fitted_model: PSF1D
+    fitted_model: PSF1DAstropy
         the PSF fitted model.
     outliers: list
         the list of the outlier indices.
@@ -2876,9 +2875,9 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     Create the model:
     >>> import numpy as np
     >>> X = np.arange(0, 50)
-    >>> PSF = PSF1D()
+    >>> psf = PSF1DAstropy()
     >>> p = (1000, 25, 5, 1, -0.2, 1, 6000)
-    >>> Y = PSF.evaluate(X, *p)
+    >>> Y = psf.evaluate(X, *p)
     >>> Y += 100*np.exp(-((X-10)/2)**2)
     >>> Y_err = np.sqrt(1+Y)
 
@@ -2893,9 +2892,8 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
     """
 
-    my_logger = set_logger(__name__)
-    PSF = PSF1D(*guess)
-    model = PSF1D()
+    psf = PSF1DAstropy(*guess)
+    model = PSF1DAstropy()
     outliers = np.array([])
     indices = [i for i in range(x.shape[0]) if i not in outliers]
 
@@ -2919,7 +2917,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
                                    print_level=0, grad=None)
         m.migrad()
         guess = m.np_values()
-        PSF = PSF1D(*m.np_values())
+        psf = PSF1DAstropy(*m.np_values())
         for ip, p in enumerate(model.param_names):
             setattr(model, p, guess[ip])
         # remove outliers
@@ -2950,7 +2948,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
             break
 
     # my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF, consecutive_outliers
+    return psf, consecutive_outliers
 
 
 if __name__ == "__main__":
