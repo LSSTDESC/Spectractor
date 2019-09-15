@@ -494,9 +494,6 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         JT_W_J = JT_W @ J
         L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
         inv_JT_W_J = L.T @ L
-        if fit_workspace.live_fit:
-            fit_workspace.cov = inv_JT_W_J
-            fit_workspace.plot_correlation_matrix(ipar)
         JT_W_R0 = JT_W @ residuals
         dparams = - inv_JT_W_J @ JT_W_R0
 
@@ -529,6 +526,10 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                        f"\n\tParameter shifts: {alpha_min * dparams}"
                        f"\n\tNew parameters: {tmp_params[ipar]}"
                        f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} computed in {time.time() - start:.2f}s")
+        if fit_workspace.live_fit:
+            fit_workspace.plot_fit()
+            fit_workspace.cov = inv_JT_W_J
+            # fit_workspace.plot_correlation_matrix(ipar)
         if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol :
             my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
                            f"relative to the sum of the parameters is below xtol={xtol}.")
