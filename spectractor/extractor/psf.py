@@ -27,6 +27,9 @@ class PSF:
         self.axis_names = []
         self.bounds = [[]]
 
+    def evaluate(self, x, p=None):
+        return np.zeros_like(x)
+
 
 class PSF1D(PSF):
 
@@ -40,6 +43,33 @@ class PSF1D(PSF):
         self.axis_names = ["A", r"m", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
 
     def evaluate(self, x, p=None):
+        """Evaluate the PSF1D function.
+
+        The function is normalized to have an integral equal to amplitude_moffat parameter.
+
+        Parameters
+        ----------
+        x: array_like
+            The abscisse array.
+        p: array_like
+            The parameter array. If None, the array used to instanciate the class is taken.
+            If given, the class instance parameter array is updated.
+
+        Returns
+        -------
+        output: array_like
+            The PSF function evaluated.
+
+        Examples
+        --------
+        >>> p = [2,30,4,2,-0.5,1,10]
+        >>> psf = PSF1D(p)
+        >>> x = np.arange(60)
+        >>> out = psf.evaluate(x)
+        >>> fwhm = psf.fwhm()
+        >>> print(fwhm, psf.integrate(bounds=(-10*fwhm,10*fwhm)) )
+        >>> print(np.max(out), np.sum(out))
+        """
         if p is not None:
             self.p = p
         amplitude_moffat, mean, gamma, alpha, eta_gauss, stddev, saturation = self.p
@@ -49,11 +79,15 @@ class PSF1D(PSF):
         # import warnings
         # warnings.filterwarnings('error')
         try:
-            a = amplitude_moffat * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
+            a = ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
         except RuntimeWarning:  # pragma: no cover
             my_logger = set_logger(__name__)
             my_logger.warning(f"{[amplitude_moffat, mean, gamma, alpha, eta_gauss, stddev, saturation]}")
-            a = amplitude_moffat * eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
+            a = eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
+        # fwhm = self.fwhm()
+        # norm = amplitude_moffat / self.integrate(bounds=(-10*fwhm, 10*fwhm))
+        # a *= norm
+        a *= amplitude_moffat
         return np.clip(a, 0, saturation)
 
     def interpolation(self, x_array):
