@@ -615,6 +615,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
     nll = lambda params: -fit_workspace.lnlike(params)
 
     guess = fit_workspace.p.astype('float64')
+    my_logger.debug(f"\n\tStart guess: {guess}")
 
     if method == "minimize":
         start = time.time()
@@ -624,13 +625,13 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
                                             'maxls': 50, 'maxcor': 30},
                                    bounds=bounds)
         fit_workspace.p = result['x']
-        my_logger.info(f"\n\tMinimize: total computation time: {time.time() - start}s")
+        my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
     elif method == 'basinhopping':
         start = time.time()
         minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds)
         result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs)
         fit_workspace.p = result['x']
-        my_logger.info(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
+        my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
     elif method == "least_squares":
         start = time.time()
         x_scale = np.abs(guess)
@@ -638,7 +639,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         p = optimize.least_squares(fit_workspace.weighted_residuals, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
                                    diff_step=0.001, bounds=bounds.T)
         fit_workspace.p = p.x  # m.np_values()
-        my_logger.info(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
+        my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
     elif method == "minuit":
         start = time.time()
         # fit_workspace.simulation.fix_psf_cube = False
@@ -653,9 +654,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         m.tol = 10
         m.migrad()
         fit_workspace.p = m.np_values()
-        my_logger.info(f"\n\tMinuit: total computation time: {time.time() - start}s")
+        my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
     elif method == "newton":
-        my_logger.info(f"\n\tStart guess: {guess}")
         costs = np.array([fit_workspace.chisq(guess)])
 
         params_table = np.array([guess])
@@ -669,7 +669,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
                                                    fix=fix, xtol=xtol, ftol=ftol, niter=niter)
         fit_workspace.costs = costs
-        my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
+        my_logger.debug(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             fit_workspace.save_parameters_summary()
             save_gradient_descent(fit_workspace, costs, params_table)
