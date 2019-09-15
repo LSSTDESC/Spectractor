@@ -1106,7 +1106,7 @@ def compute_integral(x, y, bounds=None):
     --------
 
     # Gaussian example
-    >>> x = np.arange(0, 100, 1)
+    >>> x = np.arange(0, 100, 0.5)
     >>> stddev = 4
     >>> middle = 40
     >>> psf = gauss(x, 1/(stddev*np.sqrt(2*np.pi)), middle, stddev)
@@ -1120,7 +1120,7 @@ def compute_integral(x, y, bounds=None):
     >>> p = [2,30,4,2,-0.5,1,10]
     >>> psf = PSF1D(p)
     >>> integral = compute_integral(x, psf.evaluate(x))
-    >>> assert np.isclose(integral, 6.218299864507171, atol=1e-3)
+    >>> assert np.isclose(integral, p[0], atol=1e-3)
 
     """
     if bounds is None:
