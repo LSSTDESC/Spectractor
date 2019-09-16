@@ -86,7 +86,7 @@ class PSF1D(PSF):
             a = eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
         # integral = compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
         dx = np.gradient(x)[0]
-        integral = float(np.sum(a) * dx)
+        integral = np.sum(a) * dx
         norm = amplitude_moffat
         if integral != 0:
             norm /= integral
@@ -711,10 +711,11 @@ class ChromaticPSF:
         >>> poly_params_test = s.generate_test_poly_params()
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
         >>> s.from_profile_params_to_shape_params(profile_params)
-        >>> assert s.table['fwhm'][-1] > 0)
+        >>> assert s.table['fwhm'][-1] > 0
         """
         self.fill_table_with_profile_params(profile_params)
         pixel_x = np.arange(self.Nx).astype(int)
+        pixel_y = np.arange(self.Ny).astype(int)
         for x in pixel_x:
             p = profile_params[x, :]
             out = self.PSF.evaluate(self.pixels, p=p)
@@ -1219,6 +1220,7 @@ class ChromaticPSF1D(ChromaticPSF):
         psf = PSF1D()
         ChromaticPSF.__init__(self, psf, Nx=Nx, Ny=Ny, deg=deg, saturation=saturation, file_name=file_name)
         self.my_logger = set_logger(self.__class__.__name__)
+        self.pixels = np.arange(self.Ny)
 
     def generate_test_poly_params(self):
         """
