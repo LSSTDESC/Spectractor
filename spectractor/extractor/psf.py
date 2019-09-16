@@ -1515,6 +1515,10 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.W = self.W.flatten()
         self.W_dot_data = np.diag(self.W) @ self.data.flatten()
 
+        # prepare results
+        self.amplitude_params =  np.zeros(self.Nx)
+        self.amplitude_params_err =  np.zeros(self.Nx)
+
     def plot_fit(self):
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), constrained_layout=True, gridspec_kw=gs_kw)
@@ -1625,12 +1629,15 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
         profile_params[:self.Nx, 0] = 1
         profile_params[:self.Nx, 1] -= self.bgd_width
-        J = np.array([self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]) for x in range(self.Nx)])
-        J_dot_W_dot_J = np.array([J[x].T @ self.W[x] @ J[x] for x in range(self.Nx)])
+        M = np.array([self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]) for x in range(self.Nx)])
+        M_dot_W_dot_M = np.array([M[x].T @ self.W[x] @ M[x] for x in range(self.Nx)])
         amplitude_params = np.array([
-            J[x].T @ self.W_dot_data[x] / (J_dot_W_dot_J[x]) if J_dot_W_dot_J[x] > 0 else 0.1 * self.bgd_std
+            M[x].T @ self.W_dot_data[x] / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
             for x in range(self.Nx)])
         amplitude_params[amplitude_params < 0] = 0
+        self.amplitude_params = np.copy(amplitude_params)
+        self.amplitude_params_err = np.array([np.sqrt(1 / M_dot_W_dot_M[x]) for x in range(self.Nx)
+                                              if M_dot_W_dot_M[x] > 0 else 0])
         poly_params[:self.Nx] = amplitude_params
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         self.model = self.chromatic_psf.evaluate(poly_params)[self.bgd_width:-self.bgd_width, :]
@@ -1665,6 +1672,8 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> assert(np.all(np.isclose(params, [ 0, 50, 100, 150, 200, 0, 1, 2, 0, 2, 0, 2, 0, -0.4, -0.4, 1, 0, 20000])))
         """
         params = [50 * i for i in range(self.Nx)]
+        if self.Nx > 80:
+            params = list(np.array(params) - 2000 * np.exp(-((np.arange(self.Nx) - 70)/2)**2))
         params += [0.] * (self.degrees['x_mean'] - 1) + [1, 0]  # y mean
         params += [0.] * (self.degrees['y_mean'] - 1) + [0, self.Ny / 2]  # y mean
         params += [0.] * (self.degrees['gamma'] - 1) + [0, 2]  # gamma
@@ -1930,9 +1939,59 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W_dot_data = np.diag(self.W) @ self.data.flatten()
 
     def simulate(self, *shape_params):
-        """
-        Compute a ChromaticPSF model given PSF shape parameters and minimizing
-        amplitude parameters given a spectrogram data array.
+        r"""
+        Compute a ChromaticPSF2D model given PSF shape parameters and minimizing
+        amplitude parameters using a spectrogram data array.
+
+        The ChromaticPSF2D model :math:`\vec{m}(\vec{x},\vec{p})` can be written as
+
+        .. math ::
+            :label: chromaticpsf2d
+
+            \vec{m}(\vec{x},\vec{p}) = \sum_{i=0}^{N_x} A_i \phi\left(\vec{x},\vec{p}_i\right)
+
+        with :math:`\vec{x}` the 2D array  of the pixel coordinates, :math:`\vec{A}` the amplitude parameter array
+        along the x axis of the spectrogram, :math:`\phi\left(\vec{x},\vec{p}_i\right)` the 2D PSF kernel whose integral
+        is normalised to one parametrized with the :math:`\vec{p}_i` non-linear parameter array. If the :math:`\vec{x}`
+         2D array is flatten in 1D, equation :eq:`chromaticpsf2d` is
+
+        .. math ::
+            :label: chromaticpsf2d_matrix
+
+            \vec{m}(\vec{x},\vec{p}) = \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A}
+
+            \mathbf{M}\left(\vec{x},\vec{p}\right) = \left(\begin{array}{cccc}
+             \phi\left(\vec{x}_1,\vec{p}_1\right) & \phi\left(\vec{x}_2,\vec{p}_1\right) & ... & \phi\left(\vec{x}_{N_x},\vec{p}_1\right) \\
+             ... & ... & ... & ...\\
+             \phi\left(\vec{x}_1,\vec{p}_{N_x}\right) & \phi\left(\vec{x}_2,\vec{p}_{N_x}\right) & ... & \phi\left(\vec{x}_{N_x},\vec{p}_{N_x}\right) \\
+            \end{array}\right)
+
+        with :math:`\mathbf{M}` the design matrix.
+
+        The goal of this function is to perform a minimisation of the amplitude vector :math:`\mathbf{A}` given a set of non-linear parameters
+        :math:`\mathbf{p}` and a spectrogram data array :math:`mathbf{y}` modelise as
+
+        .. math :: \mathbf{y} = \mathbf{m}(\vec{x},\vec{p}) + \epsilon
+
+        with :math:`epsilon` a random noise. The :math:`\chi^2` function to minimise is
+
+        .. math ::
+            :label:chromaticspsf2d_chi2
+
+            \chi^2(\mathbf{A})= \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)^T \mathbf{W}
+            \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)
+
+        with :math:`\mathbf{W}` the weight matrix, inverse of the covariance matrix. In our case this matrix is diagonal
+        as the pixels are considered all independant. The minimum of equation :eq:`chromaticspsf2d_chi2` is reached for
+        a the set of amplitude parameters :math:`\hat{\mathbf{A}}` given by
+
+        .. math ::
+
+            \hat{\mathbf{A}} =  `(\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}` \mathbf{M}^T \mathbf{W} \mathbf{y}
+
+        The error matrix on the :math:`\hat{\mathbf{A}}` coefficient is simply
+        :math:`(\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}`.
+
 
         Parameters
         ----------
@@ -1983,25 +2042,27 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         profile_params[:self.Nx, 2] -= self.bgd_width
 
         # Matrix filling
-        W_dot_J = np.zeros((self.Ny * self.Nx, self.Nx))
-        J = np.zeros((self.Ny * self.Nx, self.Nx))
+        W_dot_M = np.zeros((self.Ny * self.Nx, self.Nx))
+        M = np.zeros((self.Ny * self.Nx, self.Nx))
         for x in range(self.Nx):
             # self.my_logger.warning(f'\n\t{x} {profile_params[x, :]}')
-            J[:, x] = self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]).flatten()
+            M[:, x] = self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]).flatten()
             # plt.imshow(self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]), origin="lower")
             # plt.imshow(self.data, origin="lower")
             # plt.title(f"{x}")
             # plt.show()
-            W_dot_J[:, x] = J[:, x] * self.W
+            W_dot_M[:, x] = M[:, x] * self.W
         # Compute the minimizing amplitudes
-        J_dot_W_dot_J = J.T @ W_dot_J
-        L = np.linalg.inv(np.linalg.cholesky(J_dot_W_dot_J))
+        M_dot_W_dot_M = M.T @ W_dot_M
+        L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
         inv_J_dot_W_dot_J = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
-        amplitude_params = inv_J_dot_W_dot_J @ (J.T @ self.W_dot_data)
+        amplitude_params = inv_J_dot_W_dot_J @ (M.T @ self.W_dot_data)
         amplitude_params[amplitude_params < 0] = 0
         # amplitude_params[np.diagonal(J_dot_W_dot_J) <= 0] = 0.1 * self.bgd_std
         # amplitude_params[amplitude_params < 0.1 * self.bgd_std] = 0.1 * self.bgd_std
         poly_params[:self.Nx] = amplitude_params
+        self.amplitude_params = np.copy(amplitude_params)
+        self.amplitude_params_err = np.array([np.sqrt(inv_J_dot_W_dot_J[i,i]) for i in range(self.Nx)])
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         self.model = self.chromatic_psf.evaluate(poly_params)[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
