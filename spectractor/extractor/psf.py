@@ -86,7 +86,7 @@ class PSF1D(PSF):
             a = eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
         # integral = compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
         dx = np.gradient(x)[0]
-        integral = np.sum(a) * dx
+        integral = float(np.sum(a) * dx)
         norm = amplitude_moffat
         if integral != 0:
             norm /= integral
