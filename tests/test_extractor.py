@@ -38,7 +38,7 @@ def test_extractor():
         assert np.isclose(spectrum.lambdas[-1], 1083.9470213, atol=0.5)
         assert np.all(np.isclose(spectrum.x0 , [743.6651370068676, 683.0577836601408], atol=0.2))
         assert np.isclose(spectrum.spectrogram_x0, -239.3348629931324, atol=0.2)
-        assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3
+        assert 2.5 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3.5
         assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrum.fits')) is True
         assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrogram.fits')) is True
 
