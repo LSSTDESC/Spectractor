@@ -1636,8 +1636,8 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
             for x in range(self.Nx)])
         amplitude_params[amplitude_params < 0] = 0
         self.amplitude_params = np.copy(amplitude_params)
-        self.amplitude_params_err = np.array([np.sqrt(1 / M_dot_W_dot_M[x]) for x in range(self.Nx)
-                                              if M_dot_W_dot_M[x] > 0 else 0])
+        self.amplitude_params_err = np.array([np.sqrt(1 / M_dot_W_dot_M[x])
+                                              if M_dot_W_dot_M[x] > 0 else 0 for x in range(self.Nx)])
         poly_params[:self.Nx] = amplitude_params
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         self.model = self.chromatic_psf.evaluate(poly_params)[self.bgd_width:-self.bgd_width, :]
