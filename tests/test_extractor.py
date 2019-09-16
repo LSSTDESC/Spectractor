@@ -34,8 +34,9 @@ def test_extractor():
                               config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10
+        print(spectrum.lambdas)
         assert np.isclose(spectrum.lambdas[0], 296.56935941, atol=0.2)
-        assert np.isclose(spectrum.lambdas[-1], 1083.9470213, atol=0.2)
+        assert np.isclose(spectrum.lambdas[-1], 1083.9470213, atol=0.5)
         assert np.all(np.isclose(spectrum.x0 , [743.6651370068676, 683.0577836601408], atol=0.2))
         assert np.isclose(spectrum.spectrogram_x0, -239.3348629931324, atol=0.2)
         assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3
