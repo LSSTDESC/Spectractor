@@ -591,7 +591,7 @@ def save_gradient_descent(fit_workspace, costs, params_table):
     fit_workspace.my_logger.info(f"\n\tSave gradient descent log {output_filename}.")
 
 
-def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix, xtol, ftol, niter):
+def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix, xtol, ftol, niter, verbose=False):
     fit_workspace.p, fit_workspace.cov, tmp_costs, tmp_params_table = gradient_descent(fit_workspace, guess,
                                                                                        epsilon, niter=niter,
                                                                                        fixed_params=fix,
@@ -608,7 +608,7 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
     return params_table, costs
 
 
-def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50):
+def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50, verbose=False):
     my_logger = set_logger(__name__)
 
     bounds = fit_workspace.bounds
@@ -626,13 +626,15 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
                                             'maxls': 50, 'maxcor': 30},
                                    bounds=bounds)
         fit_workspace.p = result['x']
-        my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
+        if verbose:
+            my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
     elif method == 'basinhopping':
         start = time.time()
         minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds)
         result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs)
         fit_workspace.p = result['x']
-        my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
+        if verbose:
+            my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
     elif method == "least_squares":
         start = time.time()
         x_scale = np.abs(guess)
@@ -640,7 +642,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         p = optimize.least_squares(fit_workspace.weighted_residuals, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
                                    diff_step=0.001, bounds=bounds.T)
         fit_workspace.p = p.x  # m.np_values()
-        my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
+        if verbose:
+            my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
     elif method == "minuit":
         start = time.time()
         # fit_workspace.simulation.fix_psf_cube = False
@@ -651,11 +654,12 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         fix = [False] * guess.size
         # noinspection PyArgumentList
         m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
-                                   fix=fix, print_level=False, limit=bounds)
+                                   fix=fix, print_level=verbose, limit=bounds)
         m.tol = 10
         m.migrad()
         fit_workspace.p = m.np_values()
-        my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
+        if verbose:
+            my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
     elif method == "newton":
         costs = np.array([fit_workspace.chisq(guess)])
 
@@ -668,20 +672,23 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
 
         start = time.time()
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fix, xtol=xtol, ftol=ftol, niter=niter)
+                                                   fix=fix, xtol=xtol, ftol=ftol, niter=niter, verbose=verbose)
         fit_workspace.costs = costs
-        my_logger.debug(f"\n\tNewton: total computation time: {time.time() - start}s")
+        if verbose:
+            my_logger.debug(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             fit_workspace.save_parameters_summary()
             save_gradient_descent(fit_workspace, costs, params_table)
 
 
-def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50, sigma=5.0, clip_niter=3):
+def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50, sigma=5.0, clip_niter=3, verbose=False):
     my_logger = set_logger(__name__)
     for step in range(clip_niter):
-        my_logger.debug(f"\n\tSigma-clipping step {step}/{clip_niter} (sigma={sigma})")
+        if verbose:
+            my_logger.debug(f"\n\tSigma-clipping step {step}/{clip_niter} (sigma={sigma})")
         run_minimisation(fit_workspace, method=method, epsilon=epsilon, fix=fix, xtol=xtol, ftol=ftol, niter=niter)
-        my_logger.debug(f'\n\tBest fitting parameters:\n{fit_workspace.p}')
+        if verbose:
+            my_logger.debug(f'\n\tBest fitting parameters:\n{fit_workspace.p}')
         # remove outliers
         indices_no_nan = ~np.isnan(fit_workspace.data)
         residuals = np.abs(fit_workspace.model[indices_no_nan] - fit_workspace.data[indices_no_nan]) / fit_workspace.err[indices_no_nan]
@@ -689,15 +696,18 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
         outliers.sort()
         if len(outliers) > 0:
-            my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
+            if verbose:
+                my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
             if np.all(fit_workspace.outliers == outliers):
-                my_logger.debug(f'\n\tOutliers flat index list unchanged since last iteration: '
+                if verbose:
+                    my_logger.debug(f'\n\tOutliers flat index list unchanged since last iteration: '
                                f'break the sigma clipping iterations.')
                 break
             else:
                 fit_workspace.outliers = outliers
         else:
-            my_logger.debug(f'\n\tNo outliers detected at first iteration: '
+            if verbose:
+                 my_logger.debug(f'\n\tNo outliers detected at first iteration: '
                            f'break the sigma clipping iterations.')
             break
 
