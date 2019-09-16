@@ -68,7 +68,7 @@ class PSF1D(PSF):
         >>> x = np.arange(100)
         >>> out = psf.evaluate(x)
         >>> integral = compute_integral(x, out)
-        >>> assert np.isclose(integral, p[0])
+        >>> assert np.isclose(integral, p[0], rtol=1e-4)
         """
         if p is not None:
             self.p = p
@@ -87,7 +87,9 @@ class PSF1D(PSF):
         # integral = compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
         dx = np.gradient(x)[0]
         integral = np.sum(a) * dx
-        norm = amplitude_moffat / integral
+        norm = amplitude_moffat
+        if integral != 0:
+            norm /= integral
         a *= norm
         return np.clip(a, 0, saturation)
 
@@ -2352,7 +2354,7 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
 
     """
 
-    model = PSF2D()
+    model = PSF2DAstropy()
     my_logger = set_logger(__name__)
     if method == 'minimize':
         res = minimize(PSF2D_chisq, guess, method="L-BFGS-B", bounds=bounds,
@@ -2365,9 +2367,9 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
         my_logger.error(f'\n\tUnknown method {method}.')
         sys.exit()
     my_logger.debug(f'\n{res}')
-    PSF = PSF2D(*res.x)
-    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF
+    psf = PSF2DAstropy(*res.x)
+    my_logger.debug(f'\n\tPSF best fitting parameters:\n{psf}')
+    return psf
 
 
 def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
