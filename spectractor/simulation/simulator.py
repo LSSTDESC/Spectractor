@@ -29,7 +29,7 @@ from spectractor.extractor.images import Image
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import Target
-from spectractor.extractor.psf import PSF2D
+from spectractor.extractor.psf import PSF2DAstropy
 from spectractor.tools import fftconvolve_gaussian, ensure_dir, rebin
 from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
@@ -324,8 +324,9 @@ class SpectrogramModel(Spectrum):
         nlbda = dispersion_law.size
         # TODO: increase rapidity (multithreading, optimisation...)
         for i in range(0, nlbda, 1):
-            psf_lambda = PSF2D.evaluate(xx, yy, 1, dispersion_law[i].real, dispersion_law[i].imag, *profile_params[i, 2:])
-            norm = PSF2D.normalisation(1, *profile_params[i, 2:-1])
+            # TODO: replace and test  with new PSF2D or chromaticpsf2D
+            psf_lambda = PSF2DAstropy.evaluate(xx, yy, 1, dispersion_law[i].real, dispersion_law[i].imag, *profile_params[i, 2:])
+            norm = PSF2DAstropy.normalisation(1, *profile_params[i, 2:-1])
             if norm > 0:
                 psf_lambda /= norm
             # here spectrum is in ADU/s

@@ -616,7 +616,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
     nll = lambda params: -fit_workspace.lnlike(params)
 
     guess = fit_workspace.p.astype('float64')
-    my_logger.debug(f"\n\tStart guess: {guess}")
+    if verbose:
+        my_logger.debug(f"\n\tStart guess: {guess}")
 
     if method == "minimize":
         start = time.time()
