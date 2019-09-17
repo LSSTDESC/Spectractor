@@ -19,3 +19,4 @@ coverage
 configparser
 coveralls
 pysynphot
+deprecated

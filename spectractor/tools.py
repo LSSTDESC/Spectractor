@@ -13,6 +13,8 @@ import warnings
 from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
+from scipy.interpolate import interp1d
+from scipy.integrate import quad
 
 from skimage.feature import hessian_matrix
 from spectractor.config import set_logger
@@ -891,7 +893,7 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y)
-        my_logger.info(f'\n\t{or_fitted_model}')
+        my_logger.debug(f'\n\t{or_fitted_model}')
         # my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
@@ -984,6 +986,155 @@ class LevMarLSQFitterWithNan(fitting.LevMarLSQFitter):
             a = np.ravel(weights * (model(*args[2: -1]) - meas))
             a[~np.isfinite(a)] = 0
             return a
+
+
+def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
+    """
+    Compute the full width half maximum of y(x) curve,
+    using an interpolation of the data points and dichotomie method.
+
+    Parameters
+    ----------
+    x: array_like
+        The abscisse array.
+    y: array_like
+        The function array.
+    minimum: float, optional
+        The minimum reference from which to compyte half the height (default: 0).
+    center: float, optional
+        The center of the curve. If None, the weighted averageof the y(x) distribution is computed (default: None).
+    full_output: bool, optional
+        If True, half maximum, the edges of the curve and the curve center are given in output (default: False).
+
+    Returns
+    -------
+    FWHM: float
+        The full width half maximum of the curve.
+    half: float, optional
+        The half maximum value. Only if full_output=True.
+    center: float, optional
+        The y(x) center value. Only if full_output=True.
+    left_edge: float, optional
+        The left_edge value at half maximum. Only if full_output=True.
+    right_edge: float, optional
+        The right_edge value at half maximum. Only if full_output=True.
+
+    Examples
+    --------
+
+    # Gaussian example
+    >>> x = np.arange(0, 100, 1)
+    >>> stddev = 4
+    >>> middle = 40
+    >>> psf = gauss(x, 1, middle, stddev)
+    >>> fwhm, half, center, a, b = compute_fwhm(x, psf, full_output=True)
+    >>> print(f"{fwhm:.4f} {2.355*stddev:.4f} {center:.4f}")
+    9.4192 9.4200 40.0000
+    >>> assert np.isclose(fwhm, 2.355*stddev, atol=1e-3)
+    >>> assert np.isclose(center, middle, atol=1e-3)
+
+    .. plot ::
+        import matplotlib.pyplot as plt
+        plt.figure
+        plt.plot(x, psf, label="function")
+        plt.axvline(center, color="gray", label="center")
+        plt.axvline(a, color="k", label="edges at half max")
+        plt.axvline(b, color="k", label="edges at half max")
+        plt.axhline(half, color="r", label="half max")
+        plt.legend()
+        plt.title(f"FWHM={fwhm:.3f}")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.show()
+
+    # Defocused PSF example
+    >>> from spectractor.extractor.psf import PSF1D
+    >>> p = [2,40,4,2,-0.4,1,10]
+    >>> psf = PSF1D(p)
+    >>> fwhm, half, center, a, b = compute_fwhm(x, psf.evaluate(x), full_output=True)
+    >>> assert np.isclose(fwhm, 6.96, atol=1e-2)
+    >>> assert np.isclose(center, p[1], atol=1e-2)
+
+    .. plot ::
+        import matplotlib.pyplot as plt
+        plt.figure
+        plt.plot(x, psf.evaluate(x, p), label="function")
+        plt.axvline(center, color="gray", label="center")
+        plt.axvline(a, color="k", label="edges at half max")
+        plt.axvline(b, color="k", label="edges at half max")
+        plt.axhline(half, color="r", label="half max")
+        plt.legend()
+        plt.title(f"FWHM={fwhm:.3f}")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.show()
+    """
+    if y.ndim > 1:
+        # TODO: implement fwhm for 2D curves
+        return -1
+    interp = interp1d(x, y, kind="cubic", bounds_error=False, fill_value="extrapolate")
+    maximum = np.max(y) - minimum
+    imax = np.argmax(y)
+    a = imax + np.argmin(np.abs(y[imax:] - 0.9 * maximum))
+    b = imax + np.argmin(np.abs(y[imax:] - 0.1 * maximum))
+
+    def eq(xx):
+        return interp(xx) - 0.5 * maximum
+    res = dichotomie(eq, a, b, 1e-3)
+    if center is None:
+        center = np.average(x, weights=y)
+    fwhm = abs(2 * (res - center))
+    if not full_output:
+        return fwhm
+    else:
+        return fwhm, 0.5*maximum, center, res, center - abs(res-center)
+
+
+def compute_integral(x, y, bounds=None):
+    """
+    Compute the integral of an y(x) curve. The curve is interpolated and extrapolated with cubic splines.
+    If not provided, bounds are set to the x array edges.
+
+    Parameters
+    ----------
+    x: array_like
+        The abscisse array.
+    y: array_like
+        The function array.
+    bounds: array_like, optional
+        The bounds of the integral. If None, the edges of thex array are taken (default bounds=None).
+
+    Returns
+    -------
+    result: float
+        The integral of the PSF model.
+
+    Examples
+    --------
+
+    # Gaussian example
+    >>> x = np.arange(0, 100, 0.5)
+    >>> stddev = 4
+    >>> middle = 40
+    >>> psf = gauss(x, 1/(stddev*np.sqrt(2*np.pi)), middle, stddev)
+    >>> integral = compute_integral(x, psf)
+    >>> print(f"{integral:.6f}")
+    1.000000
+    >>> assert np.isclose(integral, 1, atol=1e-6)
+
+    # Defocused PSF example
+    >>> from spectractor.extractor.psf import PSF1D
+    >>> p = [2,30,4,2,-0.5,1,10]
+    >>> psf = PSF1D(p)
+    >>> integral = compute_integral(x, psf.evaluate(x))
+    >>> assert np.isclose(integral, p[0], atol=1e-3)
+
+    """
+    if bounds is None:
+        bounds = (np.min(x), np.max(x))
+    interp = interp1d(x, y, kind="cubic", bounds_error=False, fill_value="extrapolate")
+    integral = quad(interp, bounds[0], bounds[1], limit=200)
+    return integral[0]
 
 
 def find_nearest(array, value):
