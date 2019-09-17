@@ -1,32 +1,42 @@
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from spectractor.simulation.simulator import *
-from spectractor.fit.statistics import *
-
-from scipy.optimize import minimize
-from spectractor.parameters import FIT_WORKSPACE as fit_workspace
-
 from iminuit import Minuit
-
+from scipy import optimize
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from schwimmbad import MPIPool
 import emcee
-from emcee.utils import MPIPool
-
 import time
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+import multiprocessing
+
+from spectractor import parameters
+from spectractor.config import set_logger
+from spectractor.tools import formatting_numbers, plot_image_simple, from_lambda_to_colormap
+from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation, SpectrogramModel
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
+from spectractor.fit.statistics import Likelihood
+
+plot_counter = 0
 
 
 class FitWorkspace:
 
-    def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False):
+    def __init__(self, file_name, nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False, truth=None):
         self.my_logger = set_logger(self.__class__.__name__)
-        self.filename = filename
+        self.filename = file_name
         self.ndim = 0
-        self.truth = None
+        self.truth = truth
         self.verbose = verbose
         self.plot = plot
         self.live_fit = live_fit
         self.p = np.array([])
+        self.cov = np.array([[]])
+        self.rho = np.array([[]])
         self.ndim = len(self.p)
-        self.lambdas = None
+        self.data = None
+        self.err = None
+        self.x = None
         self.model = None
         self.model_err = None
         self.model_noconv = None
@@ -40,68 +50,120 @@ class FitWorkspace:
         self.nbins = nbins
         self.burnin = burnin
         self.start = []
+        self.likelihood = np.array([[]])
+        self.gelmans = np.array([])
         self.chains = np.array([[]])
         self.lnprobs = np.array([[]])
         self.flat_chains = np.array([[]])
         self.valid_chains = [False] * self.nwalkers
+        self.global_average = None
+        self.global_std = None
         self.title = ""
-        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
-        self.airmass = self.spectrum.header['AIRMASS']
-        self.pressure = self.spectrum.header['OUTPRESS']
-        self.temperature = self.spectrum.header['OUTTEMP']
         self.use_grid = False
-        if atmgrid_file_name == "":
-            self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
+        if "." in self.filename:
+            self.emcee_filename = self.filename.split('.')[0] + "_emcee.h5"
         else:
-            self.use_grid = True
-            self.atmosphere = AtmosphereGrid(file_name, atmgrid_file_name)
-            if parameters.VERBOSE:
-                self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_filename}. ')
-        self.truth = None
-        self.simulation = None
-        if parameters.DEBUG:
-            for k in range(10):
-                atmo = self.atmosphere.simulate(300, k, 0.05)
-                plt.plot(self.atmosphere.lambdas, atmo, label='pwv=%dmm' % k)
-            plt.grid()
-            plt.xlabel('$\lambda$ [nm]')
-            plt.ylabel('Atmospheric transmission')
-            plt.legend(loc='best')
-            if parameters.DISPLAY:
-                plt.show()
+            self.my_logger.warning("\n\tFile name must have an extension.")
 
     def set_start(self):
         self.start = np.array(
-            [np.random.uniform(self.p[i] - 0.02 * (self.bounds[1][i] - self.bounds[0][i]),
-                               self.p[i] + 0.02 * (self.bounds[1][i] - self.bounds[0][i]),
-                               self.nwalkers)
+            [np.random.uniform(self.p[i] - 0.02 * self.p[i], self.p[i] + 0.02 * self.p[i], self.nwalkers)
              for i in range(self.ndim)]).T
+        self.start[self.start == 0] = 1e-5 * np.random.uniform(0, 1)
         return self.start
 
+    def load_chains(self):
+        self.chains = [[]]
+        self.lnprobs = [[]]
+        self.nsteps = 0
+        # tau = -1
+        reader = emcee.backends.HDFBackend(self.emcee_filename)
+        try:
+            tau = reader.get_autocorr_time()
+        except emcee.autocorr.AutocorrError:
+            tau = -1
+        self.chains = reader.get_chain(discard=0, flat=False, thin=1)
+        self.lnprobs = reader.get_log_prob(discard=0, flat=False, thin=1)
+        self.nsteps = self.chains.shape[0]
+        self.nwalkers = self.chains.shape[1]
+        print(f"Auto-correlation time: {tau}")
+        print(f"Burn-in: {self.burnin}")
+        print(f"Chains shape: {self.chains.shape}")
+        print(f"Log prob shape: {self.lnprobs.shape}")
+        return self.chains, self.lnprobs
+
     def build_flat_chains(self):
-        self.flat_chains = self.chains[self.valid_chains, self.burnin:, :].reshape((-1, self.ndim))
+        self.flat_chains = self.chains[self.burnin:, self.valid_chains, :].reshape((-1, self.ndim))
         return self.flat_chains
 
+    def simulate(self, *p):
+        """Compute the model prediction given a set of parameters.
+
+        Parameters
+        ----------
+        p: array_like
+            Array of parameters for the computation of the model.
+
+        Returns
+        -------
+        x: array_like
+            The abscisse of the model prediction.
+        model: array_like
+            The model prediction.
+        model_err: array_like
+            The uncertainty on the model prediction.
+
+        Examples
+        --------
+        >>> w = FitWorkspace("filename.txt")
+        >>> p = np.zeros(3)
+        >>> x, model, model_err = w.simulate(*p)
+        >>> assert x is not None
+
+        """
+        x = np.array([])
+        self.model = np.array([])
+        self.model_err = np.array([])
+        return x, self.model, self.model_err
+
     def analyze_chains(self):
+        self.load_chains()
         self.set_chain_validity()
         self.convergence_tests()
         self.build_flat_chains()
-        likelihood = self.chain2likelihood()
-        self.p = likelihood.mean_vec
-        simulate(*self.p)
-        if isinstance(self, SpectrumFitWorkspace):
-            self.plot_fit()
-        elif isinstance(self, SpectrogramFitWorkspace):
-            self.plot_spectrogram_fit()
-        figure_name = self.filename.replace('.fits', '_triangle.pdf')
-        likelihood.triangle_plots(output_filename=figure_name)
+        self.likelihood = self.chain2likelihood()
+        self.cov = self.likelihood.cov_matrix
+        self.rho = self.likelihood.rho_matrix
+        self.p = self.likelihood.mean_vec
+        self.simulate(*self.p)
+        self.plot_fit()
+        figure_name = self.emcee_filename.replace('.h5', '_triangle.pdf')
+        self.likelihood.triangle_plots(output_filename=figure_name)
 
-    def save_bestfit_parameters(self, likelihood):
-        pass
+    def plot_fit(self):
+        plt.errorbar(self.x, self.data, yerr=self.err, fmt='ko', label='Data')
+        plt.plot(self.x, self.model, label='Best fitting model')
+        if self.truth is not None:
+            x, truth, truth_err = self.simulate(*self.truth)
+            plt.plot(self.x, truth, label="Truth")
+        plt.xlabel('$x$')
+        plt.ylabel('$y$')
+        title = ""
+        for i, label in enumerate(self.input_labels):
+            title += f"{label} = {self.p[i]:.3g}"
+            if self.cov.size > 0:
+                title += rf" $\pm$ {np.sqrt(self.cov[i, i]):.3g}"
+            if i < len(self.input_labels)-1:
+                title += ", "
+        plt.title(title)
+        plt.legend()
+        plt.grid()
+        if parameters.DISPLAY:
+            plt.show()
 
     def chain2likelihood(self, pdfonly=False, walker_index=-1):
         if walker_index >= 0:
-            chains = self.chains[walker_index, self.burnin:, :]
+            chains = self.chains[self.burnin:, walker_index, :]
         else:
             chains = self.flat_chains
         rangedim = range(chains.shape[1])
@@ -118,14 +180,17 @@ class FitWorkspace:
                             likelihood.contours[i][j].fill_histogram(chains[:, i], chains[:, j], weights=None)
             output_file = self.filename.replace('.fits', '_bestfit.txt')
             likelihood.stats(output=output_file)
+        else:
+            for i in rangedim:
+                likelihood.pdfs[i].fill_histogram(chains[:, i], weights=None)
         return likelihood
 
     def compute_local_acceptance_rate(self, start_index, last_index, walker_index):
         frequences = []
-        test = -2 * self.lnprobs[walker_index, start_index]
+        test = -2 * self.lnprobs[start_index, walker_index]
         counts = 1
         for index in range(start_index + 1, last_index):
-            chi2 = -2 * self.lnprobs[walker_index, index]
+            chi2 = -2 * self.lnprobs[index, walker_index]
             if np.isclose(chi2, test):
                 counts += 1
             else:
@@ -140,27 +205,27 @@ class FitWorkspace:
         chisq_averages = []
         chisq_std = []
         for k in nchains:
-            chisqs = -2 * self.lnprobs[k, self.burnin:]
-            if np.mean(chisqs) < 1e5:
-                chisq_averages.append(np.mean(chisqs))
-                chisq_std.append(np.std(chisqs))
-        global_average = np.mean(chisq_averages)
-        global_std = np.mean(chisq_std)
+            chisqs = -2 * self.lnprobs[self.burnin:, k]
+            # if np.mean(chisqs) < 1e5:
+            chisq_averages.append(np.mean(chisqs))
+            chisq_std.append(np.std(chisqs))
+        self.global_average = np.mean(chisq_averages)
+        self.global_std = np.mean(chisq_std)
         self.valid_chains = [False] * self.nwalkers
         for k in nchains:
-            chisqs = -2 * self.lnprobs[k, self.burnin:]
+            chisqs = -2 * self.lnprobs[self.burnin:, k]
             chisq_average = np.mean(chisqs)
             chisq_std = np.std(chisqs)
-            if chisq_average > 3 * global_std + global_average:
+            if 3 * self.global_std + self.global_average < chisq_average < 1e5:
                 self.valid_chains[k] = False
-            elif chisq_std < 0.1 * global_std:
+            elif chisq_std < 0.1 * self.global_std:
                 self.valid_chains[k] = False
             else:
                 self.valid_chains[k] = True
         return self.valid_chains
 
     def convergence_tests(self):
-        chains = self.chains[:, self.burnin:, :]  # .reshape((-1, self.ndim))
+        chains = self.chains[self.burnin:, :, :]  # .reshape((-1, self.ndim))
         nchains = [k for k in range(self.nwalkers)]
         fig, ax = plt.subplots(self.ndim + 1, 2, figsize=(16, 7), sharex='all')
         fontsize = 8
@@ -168,7 +233,7 @@ class FitWorkspace:
         # Chi2 vs Index
         print("Chisq statistics:")
         for k in nchains:
-            chisqs = -2 * self.lnprobs[k, self.burnin:]
+            chisqs = -2 * self.lnprobs[self.burnin:, k]
             text = f"\tWalker {k:d}: {float(np.mean(chisqs)):.3f} +/- {float(np.std(chisqs)):.3f}"
             if not self.valid_chains[k]:
                 text += " -> excluded"
@@ -176,18 +241,19 @@ class FitWorkspace:
             else:
                 ax[self.ndim, 0].plot(steps, chisqs)
             print(text)
-        global_average = np.mean(-2 * self.lnprobs[self.valid_chains, self.burnin:])
-        global_std = np.std(-2 * self.lnprobs[self.valid_chains, self.burnin:])
-        ax[self.ndim, 0].set_ylim([global_average - 5 * global_std, global_average + 5 * global_std])
+        # global_average = np.mean(-2*self.lnprobs[self.valid_chains, self.burnin:])
+        # global_std = np.std(-2*self.lnprobs[self.valid_chains, self.burnin:])
+        ax[self.ndim, 0].set_ylim(
+            [self.global_average - 5 * self.global_std, self.global_average + 5 * self.global_std])
         # Parameter vs Index
         print("Computing Parameter vs Index plots...")
         for i in range(self.ndim):
             ax[i, 0].set_ylabel(self.axis_names[i], fontsize=fontsize)
             for k in nchains:
                 if self.valid_chains[k]:
-                    ax[i, 0].plot(steps, chains[k, :, i])
+                    ax[i, 0].plot(steps, chains[:, k, i])
                 else:
-                    ax[i, 0].plot(steps, chains[k, :, i], c='0.5', linestyle='--')
+                    ax[i, 0].plot(steps, chains[:, k, i], c='0.5', linestyle='--')
                 ax[i, 0].get_yaxis().set_label_coords(-0.05, 0.5)
         ax[self.ndim, 0].set_ylabel(r'$\chi^2$', fontsize=fontsize)
         ax[self.ndim, 0].set_xlabel('Steps', fontsize=fontsize)
@@ -215,10 +281,16 @@ class FitWorkspace:
         for k in nchains:
             likelihood = self.chain2likelihood(pdfonly=True, walker_index=k)
             likelihood.stats(pdfonly=True, verbose=False)
-        # Gelman-Rubin test
+            # for i in range(self.dim):
+            # ax[i, 1].plot(likelihood.pdfs[i].axe.axis, likelihood.pdfs[i].grid, lw=var.LINEWIDTH,
+            #               label=f'Walker {k:d}')
+            # ax[i, 1].set_xlabel(self.axis_names[i])
+            # ax[i, 1].set_ylabel('PDF')
+            # ax[i, 1].legend(loc='upper right', ncol=2, fontsize=10)
+        # Gelman-Rubin test.py
         if len(nchains) > 1:
             step = max(1, (self.nsteps - self.burnin) // 20)
-            gelman_rubins = []
+            self.gelmans = []
             print(f'Gelman-Rubin tests (burnin={self.burnin:d}, step={step:d}, nsteps={self.nsteps:d}):')
             for i in range(self.ndim):
                 Rs = []
@@ -226,12 +298,12 @@ class FitWorkspace:
                 for l in range(self.burnin + step, self.nsteps, step):
                     chain_averages = []
                     chain_variances = []
-                    global_average = np.mean(self.chains[self.valid_chains, self.burnin:l, i])
+                    global_average = np.mean(self.chains[self.burnin:l, self.valid_chains, i])
                     for k in nchains:
                         if not self.valid_chains[k]:
                             continue
-                        chain_averages.append(np.mean(self.chains[k, self.burnin:l, i]))
-                        chain_variances.append(np.var(self.chains[k, self.burnin:l, i], ddof=1))
+                        chain_averages.append(np.mean(self.chains[self.burnin:l, k, i]))
+                        chain_variances.append(np.var(self.chains[self.burnin:l, k, i], ddof=1))
                     W = np.mean(chain_variances)
                     B = 0
                     for n in range(len(chain_averages)):
@@ -240,43 +312,147 @@ class FitWorkspace:
                     R = (W * l / (l + 1) + B / (l + 1) * (len(chain_averages) + 1) / len(chain_averages)) / W
                     Rs.append(R - 1)
                     lens.append(l)
-                gelman_rubins.append(Rs[-1])
                 print(f'\t{self.input_labels[i]}: R-1 = {Rs[-1]:.3f} (l = {lens[-1] - 1:d})')
-                ax[i, 1].plot(lens, Rs, lw=2, label=self.axis_names[i])
+                self.gelmans.append(Rs[-1])
+                ax[i, 1].plot(lens, Rs, lw=1, label=self.axis_names[i])
                 ax[i, 1].axhline(0.03, c='k', linestyle='--')
                 ax[i, 1].set_xlabel('Walker length', fontsize=fontsize)
                 ax[i, 1].set_ylabel('$R-1$', fontsize=fontsize)
                 ax[i, 1].set_ylim(0, 0.6)
                 # ax[self.dim, 3].legend(loc='best', ncol=2, fontsize=10)
+        self.gelmans = np.array(self.gelmans)
         fig.tight_layout()
         plt.subplots_adjust(hspace=0)
-        if parameters.DISPLAY and parameters.VERBOSE:
+        if parameters.DISPLAY:
             plt.show()
-        figure_name = self.filename.replace('.fits', '_convergence.pdf')
+        figure_name = self.emcee_filename.replace('.h5', '_convergence.pdf')
         print(f'Save figure: {figure_name}')
         fig.savefig(figure_name, dpi=100)
-        output_file = self.filename.replace('.fits', '_convergence.txt')
-        print(f'Save: {output_file}')
-        txt = ''
-        for i in range(self.ndim):
-            txt += f'{self.input_labels[i]} {gelman_rubins[i]}\n'
-        f = open(output_file, 'w')
-        f.write(txt)
-        f.close()
 
     def print_settings(self):
         print('************************************')
-        print(f"Input file: {self.file_name}\nWalkers: {self.nwalkers}\t Steps: {self.nsteps}")
+        print(f"Input file: {self.filename}\nWalkers: {self.nwalkers}\t Steps: {self.nsteps}")
+        print(f"Output file: {self.emcee_filename}")
         print('************************************')
+
+    def save_parameters_summary(self, header=""):
+        output_filename = self.filename.replace(self.filename.split('.')[-1], "_bestfit.txt")
+        f = open(output_filename, 'w')
+        txt = self.filename + "\n"
+        if header != "":
+            txt += header + "\n"
+        for ip in np.arange(0, self.cov.shape[0]).astype(int):
+            txt += "%s: %s +%s -%s\n" % formatting_numbers(self.p[ip], np.sqrt(self.cov[ip, ip]),
+                                                           np.sqrt(self.cov[ip, ip]),
+                                                           label=self.input_labels[ip])
+        for row in self.cov:
+            txt += np.array_str(row, max_line_width=20 * self.cov.shape[0]) + '\n'
+        self.my_logger.info(f"\n\tSave best fit parameters in {output_filename}.")
+        f.write(txt)
+        f.close()
+
+    def compute_correlation_matrix(self):
+        rho = np.zeros_like(self.cov)
+        for i in range(self.cov.shape[0]):
+            for j in range(self.cov.shape[1]):
+                rho[i, j] = self.cov[i, j] / np.sqrt(self.cov[i, i] * self.cov[j, j])
+        self.rho = rho
+        return rho
+
+    def plot_correlation_matrix(self, ipar=None):
+        fig = plt.figure()
+        rho = self.compute_correlation_matrix()
+        im = plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
+        if ipar is None:
+            ipar = np.arange(0, self.cov.shape[0]).astype(int)
+        self.rho = rho
+        plt.title("Correlation matrix")
+        axis_names = [self.axis_names[ip] for ip in ipar]
+        plt.xticks(np.arange(ipar.size), axis_names, rotation='vertical', fontsize=11)
+        plt.yticks(np.arange(ipar.size), axis_names, fontsize=11)
+        cbar = fig.colorbar(im)
+        cbar.ax.tick_params(labelsize=9)
+        fig.tight_layout()
+        if parameters.SAVE:
+            figname = self.filename.replace(self.filename.split('.')[-1], "_correlation.pdf")
+            self.my_logger.info(f"Save figure {figname}.")
+            fig.savefig(figname, dpi=100, bbox_inches='tight')
+        if parameters.DISPLAY:
+            if self.live_fit:
+                plt.draw()
+                plt.pause(1e-8)
+            else:
+                plt.show()
+
+    def weighted_residuals(self, p):
+        lambdas, model, model_err = self.simulate(*p)
+        res = ((model - self.data) / np.sqrt(model_err ** 2 + self.err ** 2)).flatten()
+        return res
+
+    def chisq(self, p):
+        res = self.weighted_residuals(p)
+        chisq = np.sum(res ** 2)
+        return chisq
+
+    def lnlike(self, p):
+        return -0.5 * self.chisq(p)
+
+    def lnprior(self, p):
+        in_bounds = True
+        for npar, par in enumerate(p):
+            if par < self.bounds[npar][0] or par > self.bounds[npar][1]:
+                in_bounds = False
+                break
+        if in_bounds:
+            return 0.0
+        else:
+            return -np.inf
+
+    def jacobian(self, params, epsilon, fixed_params=None):
+        lambdas, model, model_err = self.simulate(*params)
+        model = model.flatten()
+        J = np.zeros((params.size, model.size))
+        for ip, p in enumerate(params):
+            if fixed_params[ip]:
+                continue
+            tmp_p = np.copy(params)
+            if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
+                epsilon[ip] = - epsilon[ip]
+            tmp_p[ip] += epsilon[ip]
+            tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
+            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+        return J
+
+    @staticmethod
+    def hessian(J, W):
+        # algebra
+        JT_W = J.T * W
+        JT_W_J = JT_W @ J
+        L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
+        inv_JT_W_J = L.T @ L
+        return inv_JT_W_J
 
 
 class SpectrumFitWorkspace(FitWorkspace):
 
-    def __init__(self, filename, atmgrid_filename="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False):
-        FitWorkspace.__init__(self, filename, atmgrid_filename, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                              live_fit)
+    def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False, truth=None):
+        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
+        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
+        self.airmass = self.spectrum.header['AIRMASS']
+        self.pressure = self.spectrum.header['OUTPRESS']
+        self.temperature = self.spectrum.header['OUTTEMP']
+        if atmgrid_file_name == "":
+            self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
+        else:
+            self.use_grid = True
+            self.atmosphere = AtmosphereGrid(file_name, atmgrid_file_name)
+            if parameters.VERBOSE:
+                self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
+        self.lambdas = self.spectrum.lambdas
+        self.data = self.spectrum.data
+        self.err = self.spectrum.err
         self.A1 = 1.0
         self.A2 = 0.05
         self.ozone = 300.
@@ -291,7 +467,11 @@ class SpectrumFitWorkspace(FitWorkspace):
                              r"alpha_pix [pix]"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]"]
-        self.bounds = ((0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1), (1, 10), (50, 60), (-20, 20))
+        self.bounds = [(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1), (1, 10), (50, 60), (-20, 20)]
+        if atmgrid_filename != "":
+            self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
+            self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+            self.bounds[4] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
         self.get_truth()
@@ -318,8 +498,8 @@ class SpectrumFitWorkspace(FitWorkspace):
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))
         self.spectrum.plot_spectrum_simple(ax, lambdas=lambdas)
         p0 = ax.plot(lambdas, self.model(lambdas), label='model')
-        ax.fill_between(lambdas, self.model(lambdas) - self.model_err(lambdas),
-                        self.model(lambdas) + self.model_err(lambdas), alpha=0.3, color=p0[0].get_color())
+        ax.fill_between(lambdas, self.model - self.model_err,
+                        self.model(lambdas) + self.model_err, alpha=0.3, color=p0[0].get_color())
         # ax.plot(self.lambdas, self.model_noconv, label='before conv')
         if title != '':
             ax.set_title(title, fontsize=10)
@@ -332,7 +512,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax2.errorbar(lambdas, residuals, yerr=residuals_err, fmt='ro', markersize=2)
         ax2.axhline(0, color=p0[0].get_color())
         ax2.grid(True)
-        residuals_model = self.model_err(lambdas) / self.model(lambdas)
+        residuals_model = self.model_err / self.model(lambdas)
         ax2.fill_between(lambdas, -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
         std = np.std(residuals[sub])
         ax2.set_ylim([-2. * std, 2. * std])
@@ -344,6 +524,14 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax.set_xticks(ax2.get_xticks()[1:-1])
         ax.get_yaxis().set_label_coords(-0.15, 0.6)
         ax2.get_yaxis().set_label_coords(-0.15, 0.5)
+
+    def simulate(self, A1, A2, ozone, pwv, aerosols, reso, D, shift):
+        lambdas, model, model_err = self.simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift)
+        # if self.live_fit:
+        #    self.plot_fit()
+        self.model = model
+        self.model_err = model_err
+        return model, model_err
 
     def plot_fit(self):
         fig = plt.figure(figsize=(12, 6))
@@ -367,46 +555,87 @@ class SpectrumFitWorkspace(FitWorkspace):
         else:
             if parameters.DISPLAY and parameters.VERBOSE:
                 plt.show()
-            figname = fit_workspace.filename.replace('.fits', '_bestfit.pdf')
-            print(f'Save figure: {figname}')
-            fig.savefig(figname, dpi=100)
+            if parameters.SAVE:
+                figname = self.filename.replace('.fits', '_bestfit.pdf')
+                self.my_logger.info(f'Save figure {figname}.')
+                fig.savefig(figname, dpi=100, bbox_inches='tight')
 
 
 class SpectrogramFitWorkspace(FitWorkspace):
 
-    def __init__(self, filename, atmgrid_filename="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False):
-        FitWorkspace.__init__(self, filename, atmgrid_filename, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                              live_fit)
+    def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False, truth=None):
+        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                              live_fit, truth=truth)
+        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
+        self.airmass = self.spectrum.header['AIRMASS']
+        self.pressure = self.spectrum.header['OUTPRESS']
+        self.temperature = self.spectrum.header['OUTTEMP']
         self.my_logger = set_logger(self.__class__.__name__)
+        if atmgrid_file_name == "":
+            self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
+        else:
+            self.use_grid = True
+            self.atmosphere = AtmosphereGrid(file_name, atmgrid_file_name)
+            if parameters.VERBOSE:
+                self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
+        self.crop_spectrogram()
+        self.lambdas = self.spectrum.lambdas
+        self.data = self.spectrum.spectrogram
+        self.err = self.spectrum.spectrogram_err
         self.A1 = 1.0
-        self.A2 = 0.05
-        self.ozone = 300.
+        self.A2 = 0.01
+        self.ozone = 400.
         self.pwv = 3
-        self.aerosols = 0.03
+        self.aerosols = 0.05
         self.D = self.spectrum.header['D2CCD']
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
-        self.psf_poly_params = self.psf_poly_params[self.spectrum.spectrogram_Nx:]
-        self.psf_poly_params_labels = [f"a{k}" for k in range(self.psf_poly_params.size)]
-        self.psf_poly_params_names = [f"$a_{k}$" for k in range(self.psf_poly_params.size)]
+        length = len(self.spectrum.chromatic_psf.table)
+        self.psf_poly_params = self.psf_poly_params[length:-1]  # remove saturation (fixed parameter)
+        self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:-1])
+        self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:-1])
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds(data=None)
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
-        self.shift_t = 0.
         self.angle = self.spectrum.rotation_angle
+        self.saturation = self.spectrum.spectrogram_saturation
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols,
-                           self.D, self.shift_x, self.shift_y, self.shift_t, self.angle] + list(self.psf_poly_params))
+                           self.D, self.shift_x, self.shift_y, self.angle])
+        self.psf_params_start_index = self.p.size
+        self.p = np.concatenate([self.p, self.psf_poly_params])
         self.ndim = self.p.size
-        self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", r"D_CCD [mm]",
-                             r"shift_x [pix]", r"shift_y [pix]", r"shift_T [nm]", r"angle"] + self.psf_poly_params_labels
-        self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", r"$D_{CCD}$ [mm]",
-                           r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\Delta_{\mathrm{T}}$ [nm]", r"\theta"] + \
-                          self.psf_poly_params_names
-        self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1),
-                                                (50, 60), (-2, 2), (-2, 2), (-40, 40), (-3, 3)]), self.psf_poly_params_bounds])
+        self.input_labels = ["A1", "A2", "ozone [db]", "PWV [mm]", "VAOD", r"D_CCD [mm]",
+                             r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]"] + list(self.psf_poly_params_labels)
+        self.axis_names = ["$A_1$", "$A_2$", "ozone [db]", "PWV [mm]", "VAOD", r"$D_{CCD}$ [mm]",
+                           r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
+                           r"$\theta$ [deg]"] + list(self.psf_poly_params_names)
+        self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (1, 10), (0, 1),
+                                                (50, 60), (-3, 3), (-3, 3), (-90, 90)]),
+                                      self.psf_poly_params_bounds[:-1]])  # remove saturation
+        if atmgrid_file_name != "":
+            self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
+            self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+            self.bounds[4] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
         self.nwalkers = max(2 * self.ndim, nwalkers)
-        self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser)
+        self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
+                                           with_background=True, fast_sim=False)
         self.get_spectrogram_truth()
+
+    def crop_spectrogram(self):
+        bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
+        # spectrogram must have odd size in y for the fourier simulation
+        yeven = 0
+        if (self.spectrum.spectrogram_Ny - 2 * bgd_width) % 2 == 0:
+            yeven = 1
+        self.spectrum.spectrogram_ymax = self.spectrum.spectrogram_ymax - bgd_width + yeven
+        self.spectrum.spectrogram_ymin += bgd_width
+        self.spectrum.spectrogram_bgd = self.spectrum.spectrogram_bgd[bgd_width:-bgd_width + yeven, :]
+        self.spectrum.spectrogram = self.spectrum.spectrogram[bgd_width:-bgd_width + yeven, :]
+        self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width + yeven, :]
+        self.spectrum.spectrogram_y0 -= bgd_width
+        self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram.shape
+        self.my_logger.debug(f'\n\tSize of the spectrogram region after cropping: '
+                             f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')
 
     def get_spectrogram_truth(self):
         if 'A1' in list(self.spectrum.header.keys()):
@@ -423,72 +652,121 @@ class SpectrogramFitWorkspace(FitWorkspace):
                           D_truth, angle_truth)
         else:
             self.truth = None
+        self.truth = None
 
     def plot_spectrogram_comparison_simple(self, ax, title='', extent=None, dispersion=False):
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
+        sub = np.where(sub < self.spectrum.spectrogram_Nx)[0]
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
-        norm = np.max(self.spectrum.spectrogram[:, sub])
-        plot_image_simple(ax[0, 0], data=self.model[:, sub]/norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
-                          units='1/max(data)')
-        if dispersion:
-            y = self.spectrum.chromatic_psf.table['Dy'][sub[2:-3]] + self.spectrum.spectrogram_y0
-            x = self.spectrum.chromatic_psf.table['Dx'][sub[2:-3]] + self.spectrum.spectrogram_x0 - sub[0]
-            y = np.ones_like(x)
-            ax[0, 0].scatter(x, y, cmap=from_lambda_to_colormap(self.lambdas[sub[2:-3]]), edgecolors='None',
-                             c=self.lambdas[sub[2:-3]],
-                             label='', marker='o', s=10)
-        # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
-        # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
-        if title != '':
-            ax[0, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
-        residuals = (self.spectrum.spectrogram - self.model)
-        residuals_err = self.spectrum.spectrogram_err / self.model
-        std = np.std(residuals[:, sub]/norm)
-        plot_image_simple(ax[2, 0], data=residuals[:, sub]/norm, vmin=-5 * std, vmax=5 * std, title='Data-Model',
-                          aspect='auto', cax=ax[2, 1], units='1/max(data)')
-        ax[2, 0].set_title('Data-Model',  fontsize=10, loc='center', color='white', y=0.8)
-        ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
-        ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        # ax[0, 0].get_yaxis().set_label_coords(-0.15, 0.6)
-        # ax[2, 0].get_yaxis().set_label_coords(-0.15, 0.5)
-        plot_image_simple(ax[1, 0], data=self.spectrum.spectrogram[:, sub]/norm, title='Data', aspect='auto',
-                          cax=ax[1, 1], vmin=0, vmax=1, units='1/max(data)')
-        ax[1, 0].set_title('Data',  fontsize=10, loc='center', color='white', y=0.8)
-        # remove the underlying axes
-        #for ax in ax[3, 1]:
-        ax[3, 1].remove()
-        ax[3, 0].plot(self.lambdas[sub], self.spectrum.spectrogram.sum(axis=0)[sub], label='Data')
-        ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
-        ax[3, 0].set_ylabel('Cross spectrum')
-        ax[3, 0].set_xlabel('$\lambda$ [nm]')
-        ax[3, 0].legend(fontsize=7)
-        ax[3, 0].grid(True)
+        if len(sub) > 0:
+            norm = np.max(self.spectrum.spectrogram[:, sub])
+            plot_image_simple(ax[0, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
+                              units='1/max(data)')
+            if dispersion:
+                x = self.spectrum.chromatic_psf.table['Dx'][sub[2:-3]] + self.spectrum.spectrogram_x0 - sub[0]
+                y = np.ones_like(x)
+                ax[0, 0].scatter(x, y, cmap=from_lambda_to_colormap(self.lambdas[sub[2:-3]]), edgecolors='None',
+                                 c=self.lambdas[sub[2:-3]],
+                                 label='', marker='o', s=10)
+            # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
+            # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
+            if title != '':
+                ax[0, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
+            plot_image_simple(ax[1, 0], data=self.spectrum.spectrogram[:, sub] / norm, title='Data', aspect='auto',
+                              cax=ax[1, 1], vmin=0, vmax=1, units='1/max(data)')
+            ax[1, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+            residuals = (self.spectrum.spectrogram - self.model)
+            # residuals_err = self.spectrum.spectrogram_err / self.model
+            norm = self.spectrum.spectrogram_err
+            residuals /= norm
+            std = float(np.std(residuals[:, sub]))
+            plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
+                              aspect='auto', cax=ax[2, 1], units='', cmap="bwr")
+            ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
+            ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals[:, sub]):.3f}\nstd={np.std(residuals[:, sub]):.3f}',
+                          horizontalalignment='left', verticalalignment='bottom',
+                          color='black', transform=ax[2, 0].transAxes)
+            ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
+            ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
+            ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
+            ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
+            # ax[0, 0].get_yaxis().set_label_coords(-0.15, 0.6)
+            # ax[2, 0].get_yaxis().set_label_coords(-0.15, 0.5)
+            # remove the underlying axes
+            # for ax in ax[3, 1]:
+            ax[3, 1].remove()
+            ax[3, 0].plot(self.lambdas[sub], self.spectrum.spectrogram.sum(axis=0)[sub], label='Data')
+            ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
+            ax[3, 0].set_ylabel('Cross spectrum')
+            ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
+            ax[3, 0].legend(fontsize=7)
+            ax[3, 0].grid(True)
 
-    def plot_spectrogram_fit(self):
+    def simulate(self, A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, *psf_poly_params):
+        global plot_counter
+        self.simulation.fix_psf_cube = False
+        if np.all(np.isclose(psf_poly_params, self.p[self.psf_params_start_index:], rtol=1e-6)):
+            self.simulation.fix_psf_cube = True
+        lambdas, model, model_err = \
+            self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, psf_poly_params)
+        self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle] + list(psf_poly_params))
+        self.lambdas = lambdas
+        self.model = model
+        self.model_err = model_err
+        if self.live_fit and (plot_counter % 30) == 0:
+            self.plot_fit()
+        plot_counter += 1
+        return lambdas, model, model_err
+
+    def jacobian(self, params, epsilon, fixed_params=None):
+        start = time.time()
+        lambdas, model, model_err = self.simulate(*params)
+        model = model.flatten()
+        J = np.zeros((params.size, model.size))
+        for ip, p in enumerate(params):
+            if fixed_params[ip]:
+                continue
+            if ip < self.psf_params_start_index:
+                self.simulation.fix_psf_cube = True
+            else:
+                self.simulation.fix_psf_cube = False
+            tmp_p = np.copy(params)
+            if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
+                epsilon[ip] = - epsilon[ip]
+            tmp_p[ip] += epsilon[ip]
+            tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
+            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+            # print(ip, self.input_labels[ip], p, tmp_p[ip] + epsilon[ip], J[ip])
+        # if False:
+        #     plt.imshow(J, origin="lower", aspect="auto")
+        #     plt.show()
+        print(f"\tjacobian time computation = {time.time() - start:.1f}s")
+        return J
+
+    def plot_fit(self):
         """
         Examples
         --------
         >>> file_name = 'outputs/reduc_20170530_130_spectrum.fits'
         >>> atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-        >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000, burnin=10000,
-        ... nbins=10, verbose=1, plot=True, live_fit=False)
+        >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_filename=atmgrid_filename,
+        ... nwalkers=28, nsteps=20000, burnin=10000, nbins=10, verbose=1, plot=True, live_fit=False)
         >>> A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, *psf = fit_workspace.p
-        >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, psf)
+        >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols,
+        ... D, shift_x, shift_y, shift_t, angle, psf)
         >>> fit_workspace.lambdas = lambdas
         >>> fit_workspace.model = model
         >>> fit_workspace.model_err = model_err
-        >>> fit_workspace.plot_spectrogram_fit()
+        >>> fit_workspace.plot_fit()
         """
         gs_kw = dict(width_ratios=[3, 0.15, 1, 0.15, 1, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(12, 8), constrained_layout=True, gridspec_kw=gs_kw)
 
-        A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, *psf = self.p
+        A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, *psf = self.p
         plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
-                     f'D={D:.2f}mm, shift_x={shift_x:.2f}pix, shift_y={shift_y:.2f}pix, shift_t={shift_t:.2f}nm, angle={angle:.2f} ')
+                     f'D={D:.2f}mm, shift_x={shift_x:.2f}pix, shift_y={shift_y:.2f}pix')
         # main plot
         self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
         # zoom O2
@@ -503,228 +781,392 @@ class SpectrogramFitWorkspace(FitWorkspace):
         else:
             if parameters.DISPLAY and self.verbose:
                 plt.show()
-        figname = self.filename.replace('.fits', '_bestfit.pdf')
-        self.my_logger.info(f'\n\tSave figure: {figname}')
-        fig.savefig(figname, dpi=100)
-
-
-def simulate_spectrogram(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, *psf_poly_params):
-    print('tttt', A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, psf_poly_params)
-    start = time.time()
-    fit_workspace.simulation.fix_psf_cube = False
-    if np.all(np.isclose(psf_poly_params, fit_workspace.p[10:], rtol=1e-6)):
-        fit_workspace.simulation.fix_psf_cube = True
-    lambdas, model, model_err = \
-        fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, psf_poly_params)
-    fit_workspace.p = [A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle] + list(psf_poly_params)
-    fit_workspace.lambdas = lambdas
-    fit_workspace.model = model
-    fit_workspace.model_err = model_err
-    print('oooo after computation', time.time()-start)
-    if fit_workspace.live_fit:
-        #fit_workspace.plot_spectrogram_fit()
-        print('oooo after plot', time.time()-start)
-    return lambdas, model, model_err
-
-
-def spectrogram_weighted_res(p):
-    lambdas, model, model_err = simulate_spectrogram(*p)
-    res = ((model - fit_workspace.spectrum.spectrogram)  / fit_workspace.spectrum.spectrogram_err).flatten()
-    print('cc', np.sum(res ** 2))
-    return res
-
-def chisq_spectrogram(p):
-    res = spectrogram_weighted_res(p)
-    chisq = np.sum(res ** 2)
-    print('cc', chisq)
-    return chisq
-
-
-def lnlike_spectrogram(p):
-    return -0.5 * chisq_spectrogram(p)
+        if parameters.SAVE:
+            figname = self.filename.replace(self.filename.split('.')[-1], "_bestfit.pdf")
+            self.my_logger.info(f"\n\tSave figure {figname}.")
+            fig.savefig(figname, dpi=100, bbox_inches='tight')
 
 
 def lnprob_spectrogram(p):
-    lp = lnprior(p, fit_workspace.bounds)
+    global fit_workspace
+    lp = fit_workspace.lnprior(p)
     if not np.isfinite(lp):
         return -1e20
-    return lp + lnlike_spectrogram(p)
-
-
-def simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift):
-    lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift)
-    # if fit_workspace.live_fit:
-    #    fit_workspace.plot_fit()
-    fit_workspace.model = model
-    fit_workspace.model_err = model_err
-    return model(fit_workspace.spectrum.lambdas), model_err(fit_workspace.spectrum.lambdas)
-
-
-def chisq(p):
-    model, err = simulate(*p)
-    chisquare = np.sum((model - fit_workspace.spectrum.data) ** 2 / (err ** 2 + fit_workspace.spectrum.err ** 2))
-    # chisq /= self.spectrum.data.size
-    # print '\tReduced chisq =',chisq/self.spectrum.data.size
-    return chisquare
-
-
-def lnprior(p, bounds):
-    in_bounds = True
-    for npar, par in enumerate(p):
-        if par < bounds[0][npar] or par > bounds[1][npar]:
-            in_bounds = False
-            break
-    if in_bounds:
-        return 0.0
-    else:
-        return -np.inf
-
-
-def lnlike(p):
-    return -0.5 * chisq(p)
+    return lp + fit_workspace.lnlike_spectrogram(p)
 
 
 def lnprob(p):
-    lp = lnprior(p, fit_workspace.bounds)
+    global fit_workspace
+    lp = fit_workspace.lnprior(p)
     if not np.isfinite(lp):
         return -1e20
-    return lp + lnlike(p)
+    return lp + fit_workspace.lnlike(p)
 
 
-def sort_on_runtime(p, depth_index=5):
-    p = np.atleast_2d(p)
-    idx = np.argsort(p[:, depth_index])[::-1]
-    return p[idx], idx
+def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
+    tmp_params = np.copy(params)
+    W = 1 / fit_workspace.err.flatten() ** 2
+    ipar = np.arange(params.size)
+    if fixed_params is not None:
+        ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
+    costs = []
+    params_table = []
+    inv_JT_W_J = np.zeros((len(ipar), len(ipar)))
+    for i in range(niter):
+        print(f"start iteration={i}", end=' ')  # , tmp_params)
+        start = time.time()
+        tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
+        # if fit_workspace.live_fit:
+        #    fit_workspace.plot_fit()
+        residuals = (tmp_model - fit_workspace.data).flatten()
+        cost = np.sum((residuals ** 2) * W)
+        print(f"cost={cost:.3f} chisq_red={cost / tmp_model.size:.3f}")
+        J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
+        # remove parameters with unexpected null Jacobian vectors
+        for ip in range(J.shape[0]):
+            if ip not in ipar:
+                continue
+            if np.all(J[ip] == np.zeros(J.shape[1])):
+                ipar = np.delete(ipar, list(ipar).index(ip))
+                tmp_params[ip] = 0
+                print(f"Step {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed at 0 "
+                      f"in the following instead of its current value ({tmp_params[ip]}).")
+        # remove fixed parameters
+        J = J[ipar].T
+        # algebra
+        JT_W = J.T * W
+        JT_W_J = JT_W @ J
+        L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
+        inv_JT_W_J = L.T @ L
+        if fit_workspace.live_fit:
+            fit_workspace.cov = inv_JT_W_J
+            fit_workspace.plot_correlation_matrix(ipar)
+        JT_W_R0 = JT_W @ residuals
+        dparams = - inv_JT_W_J @ JT_W_R0
+
+        def line_search(alpha):
+            tmp_params_2 = np.copy(tmp_params)
+            tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
+            lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
+            return np.sum(((mod - fit_workspace.data) / fit_workspace.err) ** 2)
+
+        # tol parameter acts on alpha (not func)
+        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2)
+        print(f"\talpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}")
+        tmp_params[ipar] += alpha_min * dparams
+        print(f"shift: {alpha_min * dparams}")
+        print(f"new params: {tmp_params[ipar]}")
+        # check bounds
+        for ip, p in enumerate(tmp_params):
+            if p < fit_workspace.bounds[ip][0]:
+                # print(ip, fit_workspace.axis_names[ip], tmp_params[ip], fit_workspace.bounds[ip][0])
+                tmp_params[ip] = fit_workspace.bounds[ip][0]
+            if p > fit_workspace.bounds[ip][1]:
+                # print(ip, fit_workspace.axis_names[ip], tmp_params[ip], fit_workspace.bounds[ip][1])
+                tmp_params[ip] = fit_workspace.bounds[ip][1]
+        # in_bounds, penalty, outbound_parameter_name = \
+        #     fit_workspace.spectrum.chromatic_psf.check_bounds(tmp_params[fit_workspace.psf_params_start_index:])
+        # prepare outputs
+        costs.append(fval)
+        params_table.append(np.copy(tmp_params))
+        print(f"end iteration={i} in {time.time() - start:.2f}s cost={fval:.3f}")
+        # if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol \
+        #         or (len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2]), 1]) < ftol):
+        #     break
+        if len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2]), 1]) < ftol:
+            break
+    plt.close()
+    return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
 
 
-def run_minimisation():
+def plot_psf_poly_params(psf_poly_params):
+    from spectractor.extractor.psf import PSF1D
+    psf = PSF1D()
+    truth_psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
+                             -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
+                             0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
+                             528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
+
+    x = np.linspace(-1, 1, 100)
+    for i in range(5):
+        plt.plot(x, np.polynomial.legendre.legval(x, truth_psf_poly_params[3 * i:3 * i + 3]),
+                 label="truth " + psf.param_names[1 + i])
+        plt.plot(x, np.polynomial.legendre.legval(x, psf_poly_params[3 * i:3 * i + 3]),
+                 label="fit " + psf.param_names[1 + i])
+
+        plt.legend()
+        plt.show()
+
+
+def print_parameter_summary(params, cov, labels):
+    for ip in np.arange(0, cov.shape[0]).astype(int):
+        txt = "%s: %s +%s -%s" % formatting_numbers(params[ip], np.sqrt(cov[ip, ip]), np.sqrt(cov[ip, ip]),
+                                                    label=labels[ip])
+        print(txt)
+
+
+def plot_gradient_descent(fit_workspace, costs, params_table):
+    fig, ax = plt.subplots(2, 1, figsize=(10, 6), sharex="all")
+    iterations = np.arange(params_table.shape[0])
+    ax[0].plot(iterations, costs, lw=2)
+    for ip in range(params_table.shape[1]):
+        ax[1].plot(iterations, params_table[:, ip], label=f"{fit_workspace.axis_names[ip]}")
+    ax[1].set_yscale("symlog")
+    ax[1].legend(ncol=6, loc=9)
+    ax[1].grid()
+    ax[0].set_yscale("log")
+    ax[0].set_ylabel(r"$\chi^2$")
+    ax[1].set_ylabel("Parameters")
+    ax[0].grid()
+    ax[1].set_xlabel("Iterations")
+    fig.tight_layout()
+    plt.subplots_adjust(wspace=0, hspace=0)
+    if parameters.SAVE:
+        figname = fit_workspace.filename.replace(fit_workspace.filename.split('.')[-1], "_fitting.pdf")
+        fit_workspace.my_logger.info(f"\n\tSave figure {figname}.")
+        fig.savefig(figname, dpi=100, bbox_inches='tight')
+    if parameters.DISPLAY:
+        plt.show()
+
+    fit_workspace.simulate(*fit_workspace.p)
+    fit_workspace.live_fit = False
+    fit_workspace.plot_fit()
+
+
+def save_gradient_descent(fit_workspace, costs, params_table):
+    iterations = np.arange(params_table.shape[0]).astype(int)
+    t = np.zeros((params_table.shape[1] + 2, params_table.shape[0]))
+    t[0] = iterations
+    t[1] = costs
+    t[2:] = params_table.T
+    h = 'iter,costs,' + ','.join(fit_workspace.input_labels)
+    output_filename = fit_workspace.filename.replace(fit_workspace.filename.split('.')[-1], "_fitting.txt")
+    np.savetxt(output_filename, t.T, header=h, delimiter=",")
+    fit_workspace.my_logger.info(f"\n\tSave gradient descent log {output_filename}.")
+
+
+def run_minimisation(fit_workspace, method="newton"):
     my_logger = set_logger(__name__)
     bounds = fit_workspace.bounds
-    if isinstance(fit_workspace, SpectrumFitWorkspace):
-        nll = lambda p: -lnlike(p)
-    elif isinstance(fit_workspace, SpectrogramFitWorkspace):
-        nll = lambda p: -lnlike_spectrogram(p)
-    else:
-        my_logger.error(f'\n\tUnknown fit_workspace class type {type(fit_workspace)}.\n'
-                        f'Choose either "SpectrumFitWorkspace" of "SpectrogramFitWorkspace"')
-        sys.exit()
-    # result = minimize(nll, fit_workspace.p, method='L-BFGS-B',
-    #                   options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True, 'maxiter': 100000,
-    #                            'maxls': 50, 'maxcor': 30},
-    #                   bounds=bounds)
-    # fit_workspace.p = result['x']
-    # reduc_134
-    guess = np.array([1.1999374575144732, 0.05, 300.0, 3.0, 0.03, 55.082071522198056, 0.0, 0.0, -13.9, -0.6305218866359683, 1.0395299151149904, 0.1275725960085727, 0.5280831133684005, 6.235160344247447, 6.784917251773036, 4.2369845643653115, 3.448993463233748, 1.6421707683237179, 1.9074156099667425, -0.09281914503246441, -0.27894475572169325, 0.12240788960743397, 3.9261326346235434, 2.7938537263795604, 0.43486802733644325, 999.9999999999964])
-    guess = np.array([1.2045483348683912, 0.05, 300.0, 3.0, 0.03, 55.07937441283125, 0.0, 0.0, -13.9, -0.6305218866359683, 1.042808541712434, 0.13530636527489748, 0.5503986690804731, 5.33368295428954, 5.0841705471792755, 3.7713637509390625, 3.063271361527012, 0.8486787059487655, 1.9719045741976886, -0.05858775474963545, -0.16956856815728952, 0.06644620580104998, 4.319269043951657, 2.866341144875256, -0.08709501136597646, 520.5744613957937])
-    guess = np.array([1.2045483348683912, 0.05, 300.0, 3.0, 0.03, 55.07937441283125, 0.0, 0.0, -13.9, -0.6305218866359683, 1.042808541712434, 0.13530636527489748, 0.5503986690804731, 5.33368295428954, 5.0841705471792755, 3.7713637509390625, 3.063271361527012, 0.8486787059487655, 1.9719045741976886, -0.05858775474963545, -0.16956856815728952, 0.06644620580104998, 4.319269043951657, 2.866341144875256, -0.08709501136597646, 520.5744613957937])
-    guess = np.array([1.1783004945625857, 0.028771175829755774, 300.0, 3.5788603010605713, 0.03, 56.31035877782502, 0.001324080414817609, 0.0, -27.69406155413207, -1.542396612306326, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835])
-    # for _130.fits
-    # guess = np.array(
-    #     [1.0221355184586634, 0.05, 300.0, 3.0, 0.03, 55.45, 0.0, 0.0, -13.9, -0.6305218866359683, 0.9697783937167165,
-    #      -0.23418568011585317, 0.33884422382705437, 6.491300580087118, 7.23813399139167, 3.4442522038396097,
-    #      3.2040421136282338, 2.3246058070491347, 0.8560985887811235, -0.24436185918630957, -0.24696445586018434,
-    #      -0.0028070102515497844, 3.028241966129593, 2.8582943432553085, -0.3948830196355327, 999.9999999999964])
-    guess = np.array(
-        [1.0739594429903858, 0.05, 300.0, 3.0, 0.03, 55.45, 0.0, 0.0, -13.9, -0.6305218866359683, 0.9697783937167165,
-        -0.23418568011585317, 0.33884422382705437, 6.446415469477438,
-                             7.729767353344003, 3.398518168281213, 3.246584721057184, 2.1288614628936395,
-                             0.878365118777165, -0.22805156531233226, -0.26791683345602524, -0.03629293223130861,
-                             3.570264949549503, 2.498371135708351, -0.29661704517488957, 999.9999999999964])
+
+    nll = lambda params: -fit_workspace.lnlike(params)
+
     # sim_134
-    # guess = np.array([1.0200367670106933, 0.0363572740671097, 237.88100163825928, 9.99985583070645, 0.04881224044620258, 55.19390495103511, -1.18481117217888, -0.15902033562208118, 1.720820828790302, -1.681859821533847, 1.4118025344599496, 0.5302750543501547, 0.05486954668604792, 3.72604016525854, -1.296968852142376, 1.0703672456033204, 3.0205592886126813, -0.06300056342451373, 0.9697073189216313, -0.37263561988400884, -0.1330268748184035, -0.05678495440244433, 2.1345811085002606, -0.9857266387263521, -0.07773569454909918, 499.99999999999835])
-    # guess = np.array([1.0177449875857436, 0.03273899280095122, 244.28900108972238, 9.99985328071115, 0.05574572930987309, 55.2113222597155, -1.9999934481655455, -0.16588415261849976, 1.3518973026372976, -1.681859821533847, 1.418683896878165, 0.5533962728465286, 0.06744270896451146, 3.7242663590096523, -1.2946316193457752, 1.0714560991986213, 3.027495524307809, -0.07472328983133317, 0.9555378331632957, -0.3653217756888738, -0.1428741221990274, -0.06995171218400704, 2.1270602543705697, -0.9765558807737923, -0.05544098513783982, 499.99999999999835])
-    # guess = np.array([1.008504591340807, 0.01608223007207482, 360.55203093205034, 9.999396124992284, 0.07408687185771112, 55.278549773179, -1.9999880367300542, -0.19831397139122675 ,1.731835570968407, -1.681859821533847, 1.4512075119943928, 0.6298897489162698, 0.1715121918150413, 3.6949934638991815, -1.2787266139872775, 1.1050818585131204, 3.0678599353279385, -0.141000223367532, 0.8878220330543275, -0.34365173970314067, -0.17666624793314062, -0.0778543688708959, 2.0961259559036165, -0.912009316148657, 0.058847183286068916, 499.99999999999835])
-    # guess = np.array([1.021105038594662, 0.004522557159414742, 399.1804795838472, 7.151266092418873, 0.06532628682748798, 55.28129937643125, -1.5796083498014732, -0.214022484422576, 1.5532729238980494, -1.681859821533847, 1.4669017969146076, 0.6167895273613202, 0.2240612421558033, 3.636185977901238, -1.252269816889516, 1.2319551727230675, 3.1212613617244513, -0.15132200936139598, 0.8692478333014879, -0.34168336262027477, -0.21066308766825492, 0.08067864362906049, 1.9588266937720888, -0.7975072607096434, 0.32389616177447655, 499.99999999999835])
-    # guess = np.array([1.0366998266719039, 0.004507639176858286, 399.4198145877904, 7.215159083565414, 0.08266331155696338, 55.280677934039204, -1.5564540460823222, -0.21652809896889513, 1.250962900742465, -1.681859821533847, 1.470425366924636, 0.6161148577211758, 0.2421533852584033, 3.561778492416353, -1.059725547707348, 1.4931481207457546, 3.1170667497250073, -0.05919930769817048, 1.1566057476874898, -0.3515353556779109, -0.2075394603290166, 0.009817803444294074, 1.8852361491878789, -0.6617678455884933, 0.3016531226564242, 499.99999999999835])
-    # guess = np.array([1.0366998266719039, 0.004507639176858286, 399.4198145877904, 7.215159083565414, 0.08266331155696338, 55.280677934039204, 0, 0, 0, -1.681859821533847, 1.470425366924636, 0.6161148577211758, 0.2421533852584033, 3.561778492416353, -1.059725547707348, 1.4931481207457546, 3.1170667497250073, -0.05919930769817048, 1.1566057476874898, -0.3515353556779109, -0.2075394603290166, 0.009817803444294074, 1.8852361491878789, -0.6617678455884933, 0.3016531226564242, 499.99999999999835])
-    # guess = np.array([1.038693017194872, 0.014983232888026998, 359.2518435660411, 6.6262238673287, 0.08480281237510423, 55.47387105727235, 0.0, 0.0, 0.0, -1.681859821533847, 1.730748597544949, 0.612373940323533, 0.24547646456941183, 3.564350412174735, -1.0642369170107189, 1.4935151575387235, 3.1141507499206753, -0.05129722758108418, 1.1577838137704235, -0.34873907926191927, -0.21087528505338857, 0.011817195823953307, 1.8888212027868385, -0.6645364716921955, 0.2974984385969018, 499.99999999999835])
-    # guess = np.array([1.0394618294886782, 0.01004317609147179, 364.0477305040566, 6.59911786795859, 0.09779530546529702, 55.47729830849739, 0.0, 0.0, 0.0, -1.681859821533847, 1.7273809469430867, 0.6268937806919278, 0.24119541144075615, 3.5687624173038226, -1.0642904069090242, 1.4986372379043165, 3.1034564816834247, -0.039422282485462944, 1.1652241960873397, -0.35544149646334117, -0.20554803472490044, 0.009000631817785203, 1.8938325433914882, -0.6647492390942517, 0.2886232193756685, 499.99999999999835])
-    # guess = np.array([1.0036791021833857, 0.018833770558709745, 338.0547800297367, 5.124495024795957, 0.06127554029880766, 55.47083973084643, 0.28104903491901023, -0.006396963559360369, 0.0, -1.54, 0.12601115569947202, -0.44177500169633965, 0.22784612458938883, 2.068571403099914, -1.336193340868478, 0.907309563186542, 1.704138680609022, -0.6802496108217749, 0.3669189518488262, -0.002886197372409439, -0.003236137155513198, -0.003474702040937771, 541.412075889249, 612.2819103192218, 39.695980305924444, 499.99999999999835])
+    # guess = fit_workspace.p
     # truth sim_134
-    # guess = np.array([1., 0.01, 300, 5, 0.03, 55.45, 0.0, 0.0, 0.0, -1.54, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835])
+    # guess = np.array([1., 0.05, 300, 5, 0.03, 55.45, 0.0, 0.0, -1.54, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
+    guess = np.array(
+        [1., 0.05, 300, 5, 0.03, 55.45, -0.275, 0.0, -1.54, -1.47570237e-01, -5.00195918e-01, 4.74296776e-01,
+         2.85776501e+00, -1.86436219e+00, 1.83899390e+00, 1.89342052e+00,
+         -9.43239034e-01, 1.06985560e+00, 0.00000000e+00, 0.00000000e+00,
+         0.00000000e+00, 1.44368271e+00, -9.95896258e-01, 1.59015965e+00])
+    # 5.00000000e+02
     guess = fit_workspace.p
-    fix = [True] * guess.size
-    fix[0] = True # A1
-    fix[1] = True # A2
-    fix[2:5] = [True, True, True] # LIBRADTRAN
-    # fix[3] = False
-    fix[5] = True #DCCD
-    fix[5:8] = [True, True, True] #DCCD
-    # fix[10:13] = [False, False, False] # centers
-    fix[10:] = [False] * (guess.size-10)
-    fix[8] = True # shift_t
-    fix[9] = True # angle
-    fix[-1] = True
-    fit_workspace.simulation.fix_psf_cube = False
-    error = 0.1 * np.abs(guess) * np.ones_like(guess)
-    z = np.where(np.isclose(error,0.0,1e-6))
-    error[2:5] = 0.3*np.abs(guess[2:5]) * np.ones_like(guess[2:5])
-    error[z] = 1.
-    # noinspection PyArgumentList
-    # m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
-    #                            fix=fix, print_level=2, limit=bounds)
-    # m.tol = 10
-    # m.migrad()
-    from scipy import optimize
-    p = optimize.least_squares(spectrogram_weighted_res, guess, bounds=bounds.T, verbose=2)
-    fit_workspace.p = p.x # m.np_values()
-    print(fit_workspace.p)
-    if isinstance(fit_workspace, SpectrumFitWorkspace):
-        simulate(*fit_workspace.p)
-    elif isinstance(fit_workspace, SpectrogramFitWorkspace):
-        simulate_spectrogram(*fit_workspace.p)
-    fit_workspace.live_fit = False
-    fit_workspace.plot_spectrogram_fit()
+    if method == "minimize":
+        start = time.time()
+        result = optimize.minimize(nll, fit_workspace.p, method='L-BFGS-B',
+                                   options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True,
+                                            'maxiter': 100000,
+                                            'maxls': 50, 'maxcor': 30},
+                                   bounds=bounds)
+        fit_workspace.p = result['x']
+        print(f"Minimize: total computation time: {time.time() - start}s")
+        fit_workspace.simulate(*fit_workspace.p)
+        fit_workspace.live_fit = False
+        fit_workspace.plot_fit()
+
+    elif method == "least_squares":
+        start = time.time()
+        x_scale = np.abs(guess)
+        x_scale[x_scale == 0] = 0.1
+        p = optimize.least_squares(fit_workspace.weighted_residuals, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
+                                   diff_step=0.001, bounds=bounds.T)
+        fit_workspace.p = p.x  # m.np_values()
+        print(f"Least_squares: total computation time: {time.time() - start}s")
+        fit_workspace.simulate(*fit_workspace.p)
+        fit_workspace.live_fit = False
+        fit_workspace.plot_fit()
+    elif method == "minuit":
+        start = time.time()
+        # fit_workspace.simulation.fix_psf_cube = False
+        error = 0.1 * np.abs(guess) * np.ones_like(guess)
+        error[2:5] = 0.3 * np.abs(guess[2:5]) * np.ones_like(guess[2:5])
+        z = np.where(np.isclose(error, 0.0, 1e-6))
+        error[z] = 1.
+        fix = [False] * guess.size
+        # noinspection PyArgumentList
+        m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
+                                   fix=fix, print_level=2, limit=bounds)
+        m.tol = 10
+        m.migrad()
+        fit_workspace.p = m.np_values()
+        print(f"Minuit: total computation time: {time.time() - start}s")
+        fit_workspace.simulate(*fit_workspace.p)
+        fit_workspace.live_fit = False
+        fit_workspace.plot_fit()
+    elif method == "newton":
+
+        def bloc_gradient_descent(guess, epsilon, params_table, costs, fix, xtol, ftol, niter):
+            fit_workspace.p, fit_workspace.cov, tmp_costs, tmp_params_table = gradient_descent(fit_workspace, guess,
+                                                                                               epsilon, niter=niter,
+                                                                                               fixed_params=fix,
+                                                                                               xtol=xtol, ftol=ftol)
+            params_table = np.concatenate([params_table, tmp_params_table])
+            costs = np.concatenate([costs, tmp_costs])
+            ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
+            print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
+                                    [fit_workspace.input_labels[ip] for ip in ipar])
+            if True:
+                # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
+                plot_gradient_descent(fit_workspace, costs, params_table)
+                fit_workspace.plot_correlation_matrix(ipar=ipar)
+            return params_table, costs
+
+        fit_workspace.simulation.fast_sim = True
+        costs = np.array([fit_workspace.chisq_spectrogram(guess)])
+        if parameters.DISPLAY:
+            fit_workspace.plot_fit()
+        params_table = np.array([guess])
+        start = time.time()
+        epsilon = 1e-4 * guess
+        epsilon[epsilon == 0] = 1e-3
+        epsilon[0] = 1e-3  # A1
+        epsilon[1] = 1e-4  # A2
+        epsilon[2] = 1  # ozone
+        epsilon[3] = 0.01  # pwv
+        epsilon[4] = 0.001  # aerosols
+        epsilon[5] = 0.001  # DCCD
+        epsilon[6] = 0.0005  # shift_x
+        my_logger.info(f"\n\tStart guess: {guess}")
+
+        # cancel the Gaussian part of the PSF
+        # TODO: solve this Gaussian PSF part issue
+        guess[-6:] = 0
+
+        # fit trace
+        fix = [True] * guess.size
+        fix[0] = False  # A1
+        fix[1] = False  # A2
+        fix[6] = True  # x0
+        fix[7] = True  # y0
+        fix[8] = True  # angle
+        fit_workspace.simulation.fast_sim = True
+        fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 3] = [False] * 3
+        fit_workspace.simulation.fix_psf_cube = False
+        params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
+                                                    fix=fix, xtol=1e-2, ftol=1e-2, niter=20)
+
+        # fit PSF
+        guess = np.array(fit_workspace.p)
+        fix = [True] * guess.size
+        fix[0] = False  # A1
+        fix[1] = False  # A2
+        fit_workspace.simulation.fast_sim = True
+        fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 9] = [False] * 9
+        # fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
+        fit_workspace.simulation.fix_psf_cube = False
+        params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
+                                                    fix=fix, xtol=1e-2, ftol=1e-2, niter=20)
+
+        # fit dispersion
+        guess = np.array(fit_workspace.p)
+        fix = [True] * guess.size
+        fix[0] = False
+        fix[1] = False
+        fix[5] = False  # DCCD
+        fix[6] = False  # x0
+        fit_workspace.simulation.fix_psf_cube = True
+        fit_workspace.simulation.fast_sim = True
+        params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
+                                                    fix=fix, xtol=1e-3, ftol=1e-2, niter=10)
+
+        # fit all except Gaussian part of the PSF
+        # TODO: solve this Gaussian PSF part issue
+        guess = np.array(fit_workspace.p)
+        fit_workspace.simulation.fast_sim = False
+        fix = [False] * guess.size
+        fix[6] = False  # x0
+        fix[7] = True  # y0
+        fix[8] = True  # angle
+        fix[-6:] = [True] * 6  # gaussian part
+        parameters.SAVE = True
+        fit_workspace.simulation.fix_psf_cube = False
+        params_table, costs = bloc_gradient_descent(guess, epsilon, params_table, costs,
+                                                    fix=fix, xtol=1e-5, ftol=1e-5, niter=40)
+        fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
+        save_gradient_descent(fit_workspace, costs, params_table)
+        print(f"Newton: total computation time: {time.time() - start}s")
 
 
-def run_emcee(w):
-    global fit_workspace
+def run_emcee(fit_workspace, ln=lnprob):
     my_logger = set_logger(__name__)
-    fit_workspace = w
     fit_workspace.print_settings()
     nsamples = fit_workspace.nsteps
     p0 = fit_workspace.set_start()
+    filename = fit_workspace.emcee_filename
+    backend = emcee.backends.HDFBackend(filename)
     try:
-        pool = MPIPool(loadbalance=True, debug=False)
+        pool = MPIPool()
         if not pool.is_master():
             pool.wait()
             sys.exit(0)
-        sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob, args=(), pool=pool,
-                                        runtime_sortingfn=sort_on_runtime)
-        for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples), storechain=True)):
-            if pool.is_master():
-                if (i + 1) % 100 == 0:
-                    print("{0:5.1%}".format(float(i) / nsamples))
+        sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, ln, args=(),
+                                        pool=pool, backend=backend)
+        print(f"Initial size: {backend.iteration}")
+        if backend.iteration > 0:
+            p0 = backend.get_last_sample()
+        if nsamples - backend.iteration > 0:
+            sampler.run_mcmc(p0, nsteps=max(0, nsamples - backend.iteration), progress=True)
         pool.close()
     except ValueError:
-        sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, lnprob, args=(), threads=8,
-                                        runtime_sortingfn=sort_on_runtime)
-        for i, result in enumerate(sampler.sample(p0, iterations=max(0, nsamples), storechain=True)):
-            if (i + 1) % 100 == 0:
-                print("{0:5.1%}".format(float(i) / nsamples))
+        sampler = emcee.EnsembleSampler(fit_workspace.nwalkers, fit_workspace.ndim, ln, args=(),
+                                        threads=multiprocessing.cpu_count(), backend=backend)
+        print(f"Initial size: {backend.iteration}")
+        if backend.iteration > 0:
+            p0 = sampler.get_last_sample()
+        for _ in sampler.sample(p0, iterations=max(0, nsamples - backend.iteration), progress=True, store=True):
+            continue
     fit_workspace.chains = sampler.chain
     fit_workspace.lnprobs = sampler.lnprobability
 
 
 if __name__ == "__main__":
-    from optparse import OptionParser
+    from argparse import ArgumentParser
+    from spectractor.config import load_config
 
-    parser = OptionParser()
-    parser.add_option("-d", "--debug", dest="debug", action="store_true",
-                      help="Enter debug mode (more verbose and plots).", default=False)
-    parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
-                      help="Enter verbose (print more stuff).", default=False)
-    parser.add_option("-o", "--output_directory", dest="output_directory", default="./outputs/",
-                      help="Write results in given output directory (default: ./outputs/).")
-    (opts, args) = parser.parse_args()
+    parser = ArgumentParser()
+    parser.add_argument(dest="input", metavar='path', default=["tests/data/reduc_20170530_134_spectrum.fits"],
+                        help="Input fits file name. It can be a list separated by spaces, or it can use * as wildcard.",
+                        nargs='*')
+    parser.add_argument("-d", "--debug", dest="debug", action="store_true",
+                        help="Enter debug mode (more verbose and plots).", default=False)
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
+                        help="Enter verbose (print more stuff).", default=False)
+    parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
+                        help="Write results in given output directory (default: ./outputs/).")
+    parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
+                        help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
+    parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
+                        help="INI config file. (default: config.ctio.ini).")
+    args = parser.parse_args()
 
-    filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    filename = 'outputs/sim_20170530_134_spectrum.fits'
+    parameters.VERBOSE = args.verbose
+    if args.debug:
+        parameters.DEBUG = True
+        parameters.VERBOSE = True
+
+    file_names = args.input
+
+    load_config(args.config)
+
+    # filename = 'outputs/reduc_20170530_130_spectrum.fits'
+    # filename = 'outputs/sim_20170530_134_spectrum.fits'
+    # 062
+    filename = 'CTIODataJune2017_reduced_RG715_v2_prod6/data_30may17/sim_20170530_067_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-    fit_workspace = SpectrogramFitWorkspace(filename, atmgrid_filename=atmgrid_filename, nwalkers=28, nsteps=20000,
-                                            burnin=10000,
-                                            nbins=10, verbose=1, plot=True, live_fit=True)
-    run_minimisation()
-    # run_emcee()
-    # fit_workspace.analyze_chains()
+    w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
+                                burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
+    run_minimisation(w, method="newton")
+    # run_emcee(w, ln=lnprob_spectrogram)
+    # w.analyze_chains()

@@ -12,3 +12,6 @@
 *.xlsx
 .idea
 randomseed
+Spectractor.egg-info/
+build/
+dist/

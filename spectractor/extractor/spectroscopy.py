@@ -1,8 +1,10 @@
 from astropy.table import Table
 from scipy.interpolate import interp1d
+import numpy as np
 
-from spectractor.tools import *
 from spectractor import parameters
+from spectractor.config import set_logger
+from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_for_legendre
 
 
 class Line:
@@ -295,6 +297,8 @@ class Lines:
         >>> assert(global_chisq < 1)
 
         Plot the result
+        >>> import matplotlib.pyplot as plt
+        >>> from spectractor.tools import plot_spectrum_simple
         >>> spec.lines = lines
         >>> fig = plt.figure()
         >>> plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
@@ -351,10 +355,10 @@ FE3 = Line(438.355, atmospheric=True, label=r'$Fe$',
            label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 CAII1 = Line(393.366, atmospheric=True, label=r'$Ca_{II}$',
              label_pos=[0.007, 0.02],
-             use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+             use_for_calibration=False)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 CAII2 = Line(396.847, atmospheric=True, label=r'$Ca_{II}$',
              label_pos=[0.007, 0.02],
-             use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+             use_for_calibration=False)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
           label_pos=[0.007, 0.02],
           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf

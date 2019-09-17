@@ -1,6 +1,10 @@
-from spectractor.config import *
+from spectractor import parameters
+from spectractor.config import set_logger
+
 import matplotlib.pyplot as plt
 import pandas as pd
+import os
+import numpy as np
 
 
 class LogBook:
@@ -96,7 +100,7 @@ class LogBook:
                     'Fits file %s in logbook %s has no target x position. Skip file.' % (filename, self.logbook))
                 skip = True
             if np.isnan(row['Obj-posYpix']):
-                self.my_logger.warning(
+                self.my_logger.error(
                     'Fits file %s in logbook %s has no target y position. Skip file.' % (filename, self.logbook))
                 skip = True
             if not np.isnan(row['Dx']):
@@ -137,7 +141,6 @@ class LogBook:
 
 if __name__ == "__main__":
     import doctest
-    import numpy as np
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
 

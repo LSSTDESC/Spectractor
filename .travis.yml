@@ -11,9 +11,11 @@ addons: # for libradtran library
         - gfortran
         - libgsl0-dev
         - libhdf5-dev
+        - libopenmpi-dev
+        - openmpi-bin
 
 python:
-  - "3.6"
+  - "3.7"
 
 install:
   - sudo apt-get update
@@ -46,7 +48,7 @@ before_script:
   - "gzip -d netcdf-4.6.1.tar.gz"
   - "tar -xf netcdf-4.6.1.tar"
   - "cd netcdf-4.6.1"
-  - "./configure  --prefix=$TRAVIS_BUILD_DIR/NETCDF"
+  - "./configure  --prefix=$TRAVIS_BUILD_DIR/NETCDF --disable-netcdf-4"
   - "make"
   - "make install"
   - "cd ../"
@@ -60,17 +62,17 @@ before_script:
   - "make uvspec"
   - "cd ../"
   - "export LIBRADTRANDIR=libRadtran-2.0.2/"
-  - conda create -n py36 python=3.6 pip
-  - source activate py36
+  - conda create -n py37 python=3.7 pip
+  - source activate py37
   - python --version
-  - "git clone https://$CI_USER_TOKEN@github.com/jeremyneveu/slitless.git slitless"
-  - "cd slitless"
+  # - "git clone https://$CI_USER_TOKEN@github.com/jeremyneveu/slitless.git slitless"
+  # - "cd slitless"
   # - git checkout spectractor
-  - "pip install ."
-  - "cd ../"
+  # - "pip install ."
+  # - "cd ../"
 
 script:
-  - pip install numpy nose coloredlogs coverage coveralls
+  - pip install numpy nose coloredlogs coverage coveralls six
   - pip install -r requirements.txt
   # - python setup.py build
   # - python setup.py install

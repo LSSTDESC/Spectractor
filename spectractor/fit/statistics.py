@@ -1,8 +1,12 @@
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy import interpolate
+import numpy as np
+import sys
 
-from spectractor.tools import *
+
+from spectractor import parameters
+from spectractor.tools import formatting_numbers
 
 
 class Axis(object):
@@ -413,7 +417,7 @@ class Likelihood(Grid):
                             if j < i:
                                 self.contours[i][j].grid = self.grid
 
-    def triangle_plots(self,output_filename=''):
+    def triangle_plots(self, output_filename=''):
         n = self.dim
         fig = plt.figure(1, figsize=(16, 9))
         if parameters.PAPER:
@@ -465,7 +469,7 @@ class Likelihood(Grid):
         cbar.ax.tick_params(labelsize=9)
         # plot the triangle
         fig.subplots_adjust(hspace=0, wspace=0)
-        if parameters.DISPLAY and parameters.VERBOSE:
+        if parameters.DISPLAY:
             plt.show()
         if output_filename != '':
             print(f'Save figure: {output_filename}')
