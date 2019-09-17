@@ -1,0 +1,545 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>spectractor.extractor.targets &mdash; Spectractor 1.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'../../../',
+              VERSION:'1.1',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> Spectractor
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Spectractor</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>spectractor.extractor.targets</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for spectractor.extractor.targets</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">astropy.coordinates</span> <span class="k">import</span> <span class="n">SkyCoord</span>
+<span class="kn">from</span> <span class="nn">astroquery.ned</span> <span class="k">import</span> <span class="n">Ned</span>
+<span class="kn">from</span> <span class="nn">astroquery.simbad</span> <span class="k">import</span> <span class="n">Simbad</span>
+
+<span class="kn">from</span> <span class="nn">spectractor.extractor.spectroscopy</span> <span class="k">import</span> <span class="o">*</span>
+
+<span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;PYSYN_CDBS&quot;</span><span class="p">):</span>
+    <span class="kn">import</span> <span class="nn">pysynphot</span> <span class="k">as</span> <span class="nn">S</span>
+
+
+<div class="viewcode-block" id="load_target"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.load_target">[docs]</a><span class="k">def</span> <span class="nf">load_target</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Load the target properties according to the type set by parameters.OBS_OBJECT_TYPE.</span>
+
+<span class="sd">    Currently, the type can be either &quot;STAR&quot;, &quot;HG-AR&quot; or &quot;MONOCHROMATOR&quot;. The label parameter gives the</span>
+<span class="sd">    name of the source and allows to load its specific properties.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    label: str</span>
+<span class="sd">        The label of the target.</span>
+<span class="sd">    verbose: bool, optional</span>
+<span class="sd">        If True, more verbosity (default: False).</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; parameters.OBS_OBJECT_TYPE = &quot;STAR&quot;</span>
+<span class="sd">    &gt;&gt;&gt; t = load_target(&quot;HD111980&quot;, verbose=False)</span>
+<span class="sd">    &gt;&gt;&gt; print(t.label)</span>
+<span class="sd">    HD111980</span>
+<span class="sd">    &gt;&gt;&gt; print(t.coord.dec)</span>
+<span class="sd">    -18d31m20.009s</span>
+<span class="sd">    &gt;&gt;&gt; parameters.OBS_OBJECT_TYPE = &quot;MONOCHROMATOR&quot;</span>
+<span class="sd">    &gt;&gt;&gt; t = load_target(&quot;XX&quot;, verbose=False)</span>
+<span class="sd">    &gt;&gt;&gt; print(t.label)</span>
+<span class="sd">    XX</span>
+<span class="sd">    &gt;&gt;&gt; parameters.OBS_OBJECT_TYPE = &quot;HG-AR&quot;</span>
+<span class="sd">    &gt;&gt;&gt; t = load_target(&quot;XX&quot;, verbose=False)</span>
+<span class="sd">    &gt;&gt;&gt; print([l.wavelength for l in t.lines.lines][:5])</span>
+<span class="sd">    [253.652, 296.728, 302.15, 313.155, 334.148]</span>
+<span class="sd">    &gt;&gt;&gt; parameters.OBS_OBJECT_TYPE = &quot;OTHER&quot;</span>
+<span class="sd">    &gt;&gt;&gt; t = load_target(&quot;XX&quot;, verbose=False)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">OBS_OBJECT_TYPE</span> <span class="o">==</span> <span class="s1">&#39;STAR&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Star</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">parameters</span><span class="o">.</span><span class="n">OBS_OBJECT_TYPE</span> <span class="o">==</span> <span class="s1">&#39;HG-AR&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ArcLamp</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">parameters</span><span class="o">.</span><span class="n">OBS_OBJECT_TYPE</span> <span class="o">==</span> <span class="s1">&#39;MONOCHROMATOR&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Monochromator</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">Target</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span>
+        <span class="n">t</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Unknown parameters.OBS_OBJECT_TYPE: </span><span class="si">{parameters.OBS_OBJECT_TYPE}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Target"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.Target">[docs]</a><span class="k">class</span> <span class="nc">Target</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize Target class.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        label: str</span>
+<span class="sd">            String label to name the target</span>
+<span class="sd">        verbose: bool, optional</span>
+<span class="sd">            Set True to increase verbosity (default: False)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">label</span> <span class="o">=</span> <span class="n">label</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wavelengths</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectra</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="n">verbose</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hydrogen_only</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sed</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lines</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">coord</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">redshift</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="ArcLamp"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.ArcLamp">[docs]</a><span class="k">class</span> <span class="nc">ArcLamp</span><span class="p">(</span><span class="n">Target</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize ArcLamp class.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        label: str</span>
+<span class="sd">            String label to name the lamp.</span>
+<span class="sd">        verbose: bool, optional</span>
+<span class="sd">            Set True to increase verbosity (default: False)</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+
+<span class="sd">        Mercury-Argon lamp:</span>
+<span class="sd">        &gt;&gt;&gt; t = ArcLamp(&quot;HG-AR&quot;, verbose=False)</span>
+<span class="sd">        &gt;&gt;&gt; print([l.wavelength for l in t.lines.lines][:5])</span>
+<span class="sd">        [253.652, 296.728, 302.15, 313.155, 334.148]</span>
+<span class="sd">        &gt;&gt;&gt; print(t.emission_spectrum)</span>
+<span class="sd">        True</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Target</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lines</span> <span class="o">=</span> <span class="n">Lines</span><span class="p">(</span><span class="n">HGAR_LINES</span><span class="p">,</span> <span class="n">emission_spectrum</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ArcLamp.load"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.ArcLamp.load">[docs]</a>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span></div></div>
+
+
+<div class="viewcode-block" id="Monochromator"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.Monochromator">[docs]</a><span class="k">class</span> <span class="nc">Monochromator</span><span class="p">(</span><span class="n">Target</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize Monochromator class.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        label: str</span>
+<span class="sd">            String label to name the monochromator.</span>
+<span class="sd">        verbose: bool, optional</span>
+<span class="sd">            Set True to increase verbosity (default: False)</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+
+<span class="sd">        &gt;&gt;&gt; t = Monochromator(&quot;XX&quot;, verbose=False)</span>
+<span class="sd">        &gt;&gt;&gt; print(t.label)</span>
+<span class="sd">        XX</span>
+<span class="sd">        &gt;&gt;&gt; print(t.emission_spectrum)</span>
+<span class="sd">        True</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Target</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lines</span> <span class="o">=</span> <span class="n">Lines</span><span class="p">([],</span> <span class="n">emission_spectrum</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Monochromator.load"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.Monochromator.load">[docs]</a>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span></div></div>
+
+
+<div class="viewcode-block" id="Star"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.Star">[docs]</a><span class="k">class</span> <span class="nc">Star</span><span class="p">(</span><span class="n">Target</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize Star class.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        label: str</span>
+<span class="sd">            String label to name the target</span>
+<span class="sd">        verbose: bool, optional</span>
+<span class="sd">            Set True to increase verbosity (default: False)</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+
+<span class="sd">        Emission line object:</span>
+<span class="sd">        &gt;&gt;&gt; s = Star(&#39;3C273&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; print(s.label)</span>
+<span class="sd">        3C273</span>
+<span class="sd">        &gt;&gt;&gt; print(s.coord.dec)</span>
+<span class="sd">        2d03m08.598s</span>
+<span class="sd">        &gt;&gt;&gt; print(s.emission_spectrum)</span>
+<span class="sd">        True</span>
+
+<span class="sd">        Standard star:</span>
+<span class="sd">        &gt;&gt;&gt; s = Star(&#39;HD111980&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; print(s.label)</span>
+<span class="sd">        HD111980</span>
+<span class="sd">        &gt;&gt;&gt; print(s.coord.dec)</span>
+<span class="sd">        -18d31m20.009s</span>
+<span class="sd">        &gt;&gt;&gt; print(s.emission_spectrum)</span>
+<span class="sd">        False</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Target</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+
+<div class="viewcode-block" id="Star.load"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.Star.load">[docs]</a>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load the coordinates of the target.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; s = Star(&#39;3C273&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; print(s.coord.dec)</span>
+<span class="sd">        2d03m08.598s</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Simbad</span><span class="o">.</span><span class="n">add_votable_fields</span><span class="p">(</span><span class="s1">&#39;flux(U)&#39;</span><span class="p">,</span> <span class="s1">&#39;flux(B)&#39;</span><span class="p">,</span> <span class="s1">&#39;flux(V)&#39;</span><span class="p">,</span> <span class="s1">&#39;flux(R)&#39;</span><span class="p">,</span> <span class="s1">&#39;flux(I)&#39;</span><span class="p">,</span> <span class="s1">&#39;flux(J)&#39;</span><span class="p">,</span> <span class="s1">&#39;sptype&#39;</span><span class="p">)</span>
+        <span class="n">simbad</span> <span class="o">=</span> <span class="n">Simbad</span><span class="o">.</span><span class="n">query_object</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">simbad</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Simbad: </span><span class="si">{simbad}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">coord</span> <span class="o">=</span> <span class="n">SkyCoord</span><span class="p">(</span><span class="n">simbad</span><span class="p">[</span><span class="s1">&#39;RA&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39; &#39;</span> <span class="o">+</span> <span class="n">simbad</span><span class="p">[</span><span class="s1">&#39;DEC&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">unit</span><span class="o">=</span><span class="p">(</span><span class="n">units</span><span class="o">.</span><span class="n">hourangle</span><span class="p">,</span> <span class="n">units</span><span class="o">.</span><span class="n">deg</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Target </span><span class="si">{}</span><span class="s1"> not found in Simbad&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">load_spectra</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Star.load_spectra"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.Star.load_spectra">[docs]</a>    <span class="k">def</span> <span class="nf">load_spectra</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load reference spectra from Pysynphot database or NED database.</span>
+
+<span class="sd">        If the object redshift is &gt;0.2, the LAMBDA_MIN and LAMBDA_MAX parameters</span>
+<span class="sd">        are redshifted accordingly.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; s = Star(&#39;3C273&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; print(s.spectra[0][:4])</span>
+<span class="sd">        [  0.00000000e+00   2.50485769e-14   2.42380612e-14   2.40887886e-14]</span>
+<span class="sd">        &gt;&gt;&gt; s = Star(&#39;HD111980&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; print(s.spectra[0][:4])</span>
+<span class="sd">        [  2.16890002e-13   2.66480010e-13   2.03540011e-13   2.38780004e-13]</span>
+<span class="sd">        &gt;&gt;&gt; s = Star(&#39;PKS1510-089&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; print(s.redshift)</span>
+<span class="sd">        0.36</span>
+<span class="sd">        &gt;&gt;&gt; print(f&#39;{parameters.LAMBDA_MIN:.1f}, {parameters.LAMBDA_MAX:.1f}&#39;)</span>
+<span class="sd">        408.0, 1496.0</span>
+<span class="sd">        &gt;&gt;&gt; print(s.spectra[0][:4])</span>
+<span class="sd">        [ 117.34012  139.27621   87.38032  143.0816 ]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wavelengths</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># in nm</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectra</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># first try with pysynphot</span>
+        <span class="n">file_names</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;PYSYN_CDBS&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">dirname</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span><span class="s1">&#39;$PYSYN_CDBS/calspec/&#39;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">dirname</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">dirname</span> <span class="o">+</span> <span class="n">fname</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="n">fname</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+                        <span class="n">file_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dirname</span> <span class="o">+</span> <span class="n">fname</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">file_names</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">hydrogen_only</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lines</span> <span class="o">=</span> <span class="n">Lines</span><span class="p">(</span><span class="n">HYDROGEN_LINES</span><span class="o">+</span><span class="n">ATMOSPHERIC_LINES</span><span class="p">,</span>
+                               <span class="n">redshift</span><span class="o">=</span><span class="mf">0.</span><span class="p">,</span> <span class="n">emission_spectrum</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span><span class="p">,</span>
+                               <span class="n">hydrogen_only</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hydrogen_only</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">file_names</span><span class="p">):</span>
+                <span class="k">if</span> <span class="s1">&#39;_mod_&#39;</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Loading </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">f</span><span class="p">)</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">S</span><span class="o">.</span><span class="n">FileSpectrum</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">keepneg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">waveunits</span><span class="p">,</span> <span class="n">S</span><span class="o">.</span><span class="n">units</span><span class="o">.</span><span class="n">Angstrom</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">wavelengths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">wave</span> <span class="o">/</span> <span class="mf">10.</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">spectra</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">flux</span> <span class="o">*</span> <span class="mf">10.</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">wavelengths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">wave</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">spectra</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">flux</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;PNG&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">:</span>
+                <span class="c1"># Try with NED query</span>
+                <span class="c1"># print &#39;Loading target %s from NED...&#39; % self.label</span>
+                <span class="n">ned</span> <span class="o">=</span> <span class="n">Ned</span><span class="o">.</span><span class="n">query_object</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
+                <span class="n">hdulists</span> <span class="o">=</span> <span class="n">Ned</span><span class="o">.</span><span class="n">get_spectra</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">,</span> <span class="n">show_progress</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">redshift</span> <span class="o">=</span> <span class="n">ned</span><span class="p">[</span><span class="s1">&#39;Redshift&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hydrogen_only</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">redshift</span> <span class="o">&gt;</span> <span class="mf">0.2</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">hydrogen_only</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">*=</span> <span class="mi">1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">redshift</span>
+                    <span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MAX</span> <span class="o">*=</span> <span class="mi">1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">redshift</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">lines</span> <span class="o">=</span> <span class="n">Lines</span><span class="p">(</span><span class="n">ATMOSPHERIC_LINES</span><span class="o">+</span><span class="n">ISM_LINES</span><span class="o">+</span><span class="n">HYDROGEN_LINES</span><span class="p">,</span>
+                                   <span class="n">redshift</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">redshift</span><span class="p">,</span> <span class="n">emission_spectrum</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span><span class="p">,</span>
+                                   <span class="n">hydrogen_only</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hydrogen_only</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">h</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">hdulists</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;NAXIS&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">spectra</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">spectra</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+                    <span class="n">wave_n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;NAXIS&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="n">wave_n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+                    <span class="n">wave_step</span> <span class="o">=</span> <span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;CDELT1&#39;</span><span class="p">]</span>
+                    <span class="n">wave_start</span> <span class="o">=</span> <span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;CRVAL1&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;CRPIX1&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">wave_step</span>
+                    <span class="n">wave_end</span> <span class="o">=</span> <span class="n">wave_start</span> <span class="o">+</span> <span class="n">wave_n</span> <span class="o">*</span> <span class="n">wave_step</span>
+                    <span class="n">waves</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">wave_start</span><span class="p">,</span> <span class="n">wave_end</span><span class="p">,</span> <span class="n">wave_n</span><span class="p">)</span>
+                    <span class="n">is_angstrom</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+                        <span class="k">if</span> <span class="s1">&#39;angstrom&#39;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="n">key</span><span class="p">])</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+                            <span class="n">is_angstrom</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">if</span> <span class="n">is_angstrom</span><span class="p">:</span>
+                        <span class="n">waves</span> <span class="o">*=</span> <span class="mf">0.1</span>
+                    <span class="k">if</span> <span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;NAXIS&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;NAXIS&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">wavelengths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">waves</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">wavelengths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">waves</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">lines</span> <span class="o">=</span> <span class="n">Lines</span><span class="p">(</span><span class="n">ATMOSPHERIC_LINES</span><span class="o">+</span><span class="n">ISM_LINES</span><span class="o">+</span><span class="n">HYDROGEN_LINES</span><span class="p">,</span>
+                                   <span class="n">redshift</span><span class="o">=</span><span class="mf">0.</span><span class="p">,</span> <span class="n">emission_spectrum</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span><span class="p">,</span>
+                                   <span class="n">hydrogen_only</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hydrogen_only</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">build_sed</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Star.build_sed"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.Star.build_sed">[docs]</a>    <span class="k">def</span> <span class="nf">build_sed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Interpolate the database reference spectra and return self.sed as a function of the wavelength.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        index: int</span>
+<span class="sd">            Index of the spectrum stored in the self.spectra list</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; s = Star(&#39;HD111980&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; s.build_sed(index=0)</span>
+<span class="sd">        &gt;&gt;&gt; s.sed(550)</span>
+<span class="sd">        array(1.676051129017069e-11)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spectra</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sed</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sed</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wavelengths</span><span class="p">[</span><span class="n">index</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">spectra</span><span class="p">[</span><span class="n">index</span><span class="p">],</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">bounds_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">fill_value</span><span class="o">=</span><span class="mf">0.</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Star.plot_spectra"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.Star.plot_spectra">[docs]</a>    <span class="k">def</span> <span class="nf">plot_spectra</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Plot the spectra stored in the self.spectra list.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; s = Star(&#39;HD111980&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; s.plot_spectra()</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># target.load_spectra()  ## No global target object available  here (SDC)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>  <span class="c1"># necessary to create a new plot (SDC)</span>
+        <span class="k">for</span> <span class="n">isp</span><span class="p">,</span> <span class="n">sp</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spectra</span><span class="p">):</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wavelengths</span><span class="p">[</span><span class="n">isp</span><span class="p">],</span> <span class="n">sp</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Spectrum </span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">isp</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">((</span><span class="mi">300</span><span class="p">,</span> <span class="mi">1100</span><span class="p">))</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;$\lambda$ [nm]&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Flux&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">doctest</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">&quot;1.14.0&quot;</span><span class="p">:</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">legacy</span><span class="o">=</span><span class="s2">&quot;1.13&quot;</span><span class="p">)</span>
+
+    <span class="n">doctest</span><span class="o">.</span><span class="n">testmod</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Jeremy Neveu
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

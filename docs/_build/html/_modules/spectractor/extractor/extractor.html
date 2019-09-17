@@ -1,0 +1,302 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>spectractor.extractor.extractor &mdash; Spectractor 1.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'../../../',
+              VERSION:'1.1',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> Spectractor
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Spectractor</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>spectractor.extractor.extractor</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for spectractor.extractor.extractor</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">spectractor.extractor.spectrum</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="n">ensure_dir</span>
+
+
+<div class="viewcode-block" id="Spectractor"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.extractor.Spectractor">[docs]</a><span class="k">def</span> <span class="nf">Spectractor</span><span class="p">(</span><span class="n">file_name</span><span class="p">,</span> <span class="n">output_directory</span><span class="p">,</span> <span class="n">guess</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">disperser_label</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="s1">&#39;./config/ctio.ini&#39;</span><span class="p">,</span>
+                <span class="n">atmospheric_lines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">line_detection</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Spectractor</span>
+<span class="sd">    Main function to extract a spectrum from an image</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    file_name: str</span>
+<span class="sd">        Input file nam of the image to analyse</span>
+<span class="sd">    output_directory: str</span>
+<span class="sd">        Output directory</span>
+<span class="sd">    guess: [int,int]</span>
+<span class="sd">        [x0,y0] list of the guessed pixel positions of the target in the image (must be integers)</span>
+<span class="sd">    target: str</span>
+<span class="sd">        The name of the targeted object</span>
+<span class="sd">    disperser_label: str</span>
+<span class="sd">        The name of the disperser</span>
+<span class="sd">    config: str</span>
+<span class="sd">        The config file name</span>
+<span class="sd">    atmospheric_lines: bool</span>
+<span class="sd">        If True atmospheric lines are used in the calibration fit</span>
+<span class="sd">    line_detection: bool</span>
+<span class="sd">        If True the absorption or emission lines are</span>
+<span class="sd">            used to calibrate the pixel to wavelength relationship</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    spectrum: Spectrum</span>
+<span class="sd">        The extracted spectrum object</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Extract the spectrogram and its characteristics from the image:</span>
+<span class="sd">    &gt;&gt;&gt; import os</span>
+<span class="sd">    &gt;&gt;&gt; from spectractor.logbook import LogBook</span>
+<span class="sd">    &gt;&gt;&gt; logbook = LogBook(logbook=&#39;./ctiofulllogbook_jun2017_v5.csv&#39;)</span>
+<span class="sd">    &gt;&gt;&gt; file_names = [&#39;./tests/data/reduc_20170605_028.fits&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; for file_name in file_names:</span>
+<span class="sd">    ...     tag = file_name.split(&#39;/&#39;)[-1]</span>
+<span class="sd">    ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)</span>
+<span class="sd">    ...     if target is None or xpos is None or ypos is None:</span>
+<span class="sd">    ...         continue</span>
+<span class="sd">    ...     spectrum = Spectractor(file_name, &#39;./tests/data/&#39;, [xpos, ypos], target, disperser_label, &#39;./config/ctio.ini&#39;)</span>
+<span class="sd">    ...     assert spectrum is not None</span>
+<span class="sd">    ...     assert os.path.isfile(&#39;tests/data/reduc_20170605_028_spectrum.fits&#39;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+    <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Start SPECTRACTOR&#39;</span><span class="p">)</span>
+    <span class="c1"># Load config file</span>
+    <span class="n">load_config</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+    <span class="c1"># Load reduced image</span>
+    <span class="n">image</span> <span class="o">=</span> <span class="n">Image</span><span class="p">(</span><span class="n">file_name</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">,</span> <span class="n">disperser_label</span><span class="o">=</span><span class="n">disperser_label</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+        <span class="n">image</span><span class="o">.</span><span class="n">plot_image</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="s1">&#39;log10&#39;</span><span class="p">,</span> <span class="n">target_pixcoords</span><span class="o">=</span><span class="n">guess</span><span class="p">)</span>
+    <span class="c1"># Set output path</span>
+    <span class="n">ensure_dir</span><span class="p">(</span><span class="n">output_directory</span><span class="p">)</span>
+    <span class="n">output_filename</span> <span class="o">=</span> <span class="n">file_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">output_filename</span> <span class="o">=</span> <span class="n">output_filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;_spectrum.fits&#39;</span><span class="p">)</span>
+    <span class="n">output_filename</span> <span class="o">=</span> <span class="n">output_filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.fz&#39;</span><span class="p">,</span> <span class="s1">&#39;_spectrum.fits&#39;</span><span class="p">)</span>
+    <span class="n">output_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_directory</span><span class="p">,</span> <span class="n">output_filename</span><span class="p">)</span>
+    <span class="n">output_filename_spectrogram</span> <span class="o">=</span> <span class="n">output_filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;spectrum&#39;</span><span class="p">,</span><span class="s1">&#39;spectrogram&#39;</span><span class="p">)</span>
+    <span class="n">output_filename_psf</span> <span class="o">=</span> <span class="n">output_filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;spectrum.fits&#39;</span><span class="p">,</span><span class="s1">&#39;table.csv&#39;</span><span class="p">)</span>
+    <span class="c1"># Find the exact target position in the raw cut image: several methods</span>
+    <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Search for the target in the image...&#39;</span><span class="p">)</span>
+    <span class="n">target_pixcoords</span> <span class="o">=</span> <span class="n">find_target</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">guess</span><span class="p">)</span>
+    <span class="c1"># Rotate the image: several methods</span>
+    <span class="n">turn_image</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+    <span class="c1"># Find the exact target position in the rotated image: several methods</span>
+    <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Search for the target in the rotated image...&#39;</span><span class="p">)</span>
+    <span class="n">target_pixcoords_rotated</span> <span class="o">=</span> <span class="n">find_target</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">guess</span><span class="p">,</span> <span class="n">rotated</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># Create Spectrum object</span>
+    <span class="n">spectrum</span> <span class="o">=</span> <span class="n">Spectrum</span><span class="p">(</span><span class="n">image</span><span class="o">=</span><span class="n">image</span><span class="p">)</span>
+    <span class="c1"># Subtract background and bad pixels</span>
+    <span class="n">extract_spectrum_from_image</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">spectrum</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">PIXWIDTH_SIGNAL</span><span class="p">,</span>
+                                <span class="n">ws</span> <span class="o">=</span> <span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">PIXDIST_BACKGROUND</span><span class="p">,</span>
+                                      <span class="n">parameters</span><span class="o">.</span><span class="n">PIXDIST_BACKGROUND</span><span class="o">+</span><span class="n">parameters</span><span class="o">.</span><span class="n">PIXWIDTH_BACKGROUND</span><span class="p">),</span>
+                                <span class="n">right_edge</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="o">-</span><span class="mi">200</span><span class="p">)</span>
+    <span class="n">spectrum</span><span class="o">.</span><span class="n">atmospheric_lines</span> <span class="o">=</span> <span class="n">atmospheric_lines</span>
+    <span class="c1"># Calibrate the spectrum</span>
+    <span class="n">calibrate_spectrum</span><span class="p">(</span><span class="n">spectrum</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">line_detection</span><span class="p">:</span>
+        <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Calibrating order </span><span class="si">%d</span><span class="s1"> spectrum...&#39;</span> <span class="o">%</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">order</span><span class="p">)</span>
+        <span class="n">calibrate_spectrum_with_lines</span><span class="p">(</span><span class="n">spectrum</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">spectrum</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;WARNINGS&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;No calibration procedure with spectral features.&#39;</span>
+    <span class="c1"># Save the spectrum</span>
+    <span class="n">spectrum</span><span class="o">.</span><span class="n">save_spectrum</span><span class="p">(</span><span class="n">output_filename</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">spectrum</span><span class="o">.</span><span class="n">save_spectrogram</span><span class="p">(</span><span class="n">output_filename_spectrogram</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># Plot the spectrum</span>
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">VERBOSE</span> <span class="ow">and</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+        <span class="n">spectrum</span><span class="o">.</span><span class="n">plot_spectrum</span><span class="p">(</span><span class="n">xlim</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">distance</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">chromatic_psf</span><span class="o">.</span><span class="n">get_distance_along_dispersion_axis</span><span class="p">()</span>
+    <span class="n">spectrum</span><span class="o">.</span><span class="n">lambdas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">distance</span><span class="p">,</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">pixels</span><span class="p">,</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">lambdas</span><span class="p">)</span>
+    <span class="n">spectrum</span><span class="o">.</span><span class="n">chromatic_psf</span><span class="o">.</span><span class="n">table</span><span class="p">[</span><span class="s1">&#39;lambdas&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">lambdas</span>
+    <span class="n">spectrum</span><span class="o">.</span><span class="n">chromatic_psf</span><span class="o">.</span><span class="n">table</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">output_filename_psf</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">spectrum</span></div>
+
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Jeremy Neveu
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
