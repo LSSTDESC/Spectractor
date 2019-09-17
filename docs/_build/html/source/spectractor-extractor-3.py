@@ -1,0 +1,1 @@
+im.plot_image(target_pixcoords=[820, 580])

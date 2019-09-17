@@ -1,0 +1,297 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>spectractor.config &mdash; Spectractor 1.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'../../',
+              VERSION:'1.1',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Spectractor
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Spectractor</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>spectractor.config</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for spectractor.config</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">configparser</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">coloredlogs</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">astropy.units</span> <span class="k">as</span> <span class="nn">units</span>
+
+<span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;matplotlib&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="load_config"><a class="viewcode-back" href="../../source/spectractor.html#spectractor.config.load_config">[docs]</a><span class="k">def</span> <span class="nf">load_config</span><span class="p">(</span><span class="n">config_filename</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">config_filename</span><span class="p">):</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="s1">&#39;Config file </span><span class="si">%s</span><span class="s1"> does not exist.&#39;</span> <span class="o">%</span> <span class="n">config_filename</span><span class="p">)</span>
+    <span class="c1"># Load the configuration file</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">configparser</span><span class="o">.</span><span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="n">config</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">config_filename</span><span class="p">)</span>
+
+    <span class="c1"># List all contents</span>
+    <span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">sections</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">options</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="n">section</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="s2">&quot;[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+                <span class="k">if</span> <span class="s1">&#39; &#39;</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="s1">&#39;.&#39;</span> <span class="ow">in</span> <span class="n">value</span> <span class="ow">or</span> <span class="s1">&#39;e&#39;</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">value</span> <span class="o">==</span> <span class="s1">&#39;True&#39;</span> <span class="ow">or</span> <span class="n">value</span> <span class="o">==</span> <span class="s1">&#39;False&#39;</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">getboolean</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="n">parameters</span><span class="p">,</span> <span class="n">options</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="c1"># Derive other parameters</span>
+    <span class="n">parameters</span><span class="o">.</span><span class="n">MY_FORMAT</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%(asctime)-20s</span><span class="s2"> </span><span class="si">%(name)-10s</span><span class="s2"> </span><span class="si">%(funcName)-20s</span><span class="s2"> </span><span class="si">%(levelname)-6s</span><span class="s2"> </span><span class="si">%(message)s</span><span class="s2">&quot;</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="nb">format</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">MY_FORMAT</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+    <span class="n">mypath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span>
+    <span class="n">parameters</span><span class="o">.</span><span class="n">HOLO_DIR</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">mypath</span><span class="p">,</span> <span class="n">parameters</span><span class="o">.</span><span class="n">HOLO_DIR</span><span class="p">)</span>
+    <span class="n">parameters</span><span class="o">.</span><span class="n">THROUGHPUT_DIR</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">mypath</span><span class="p">,</span> <span class="n">parameters</span><span class="o">.</span><span class="n">THROUGHPUT_DIR</span><span class="p">)</span>
+    <span class="n">parameters</span><span class="o">.</span><span class="n">CCD_ARCSEC2RADIANS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="p">(</span><span class="mf">180.</span> <span class="o">*</span> <span class="mf">3600.</span><span class="p">)</span>  <span class="c1"># conversion factor from arcsec to radians</span>
+    <span class="n">parameters</span><span class="o">.</span><span class="n">OBS_DIAMETER</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">OBS_DIAMETER</span> <span class="o">*</span> <span class="n">units</span><span class="o">.</span><span class="n">m</span>  <span class="c1"># Diameter of the telescope</span>
+    <span class="n">parameters</span><span class="o">.</span><span class="n">OBS_SURFACE</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">OBS_DIAMETER</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">/</span> <span class="mf">4.</span>  <span class="c1"># Surface of telescope</span>
+    <span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDAS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span><span class="p">,</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MAX</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">parameters</span><span class="o">.</span><span class="n">FLAM_TO_ADURATE</span> <span class="o">=</span> <span class="p">((</span><span class="n">parameters</span><span class="o">.</span><span class="n">OBS_SURFACE</span> <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">SED_UNIT</span> <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">TIME_UNIT</span>
+                                   <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">wl_dwl_unit</span> <span class="o">/</span> <span class="n">parameters</span><span class="o">.</span><span class="n">hc</span> <span class="o">/</span> <span class="n">parameters</span><span class="o">.</span><span class="n">CCD_GAIN</span>
+                                   <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">g_disperser_ronchi</span><span class="p">)</span><span class="o">.</span><span class="n">decompose</span><span class="p">())</span><span class="o">.</span><span class="n">value</span>
+    <span class="n">parameters</span><span class="o">.</span><span class="n">CALIB_BGD_NPARAMS</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">CALIB_BGD_ORDER</span> <span class="o">+</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">sections</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Section: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">section</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">options</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">options</span><span class="p">(</span><span class="n">section</span><span class="p">):</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">section</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+                <span class="n">par</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">parameters</span><span class="p">,</span> <span class="n">options</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;x </span><span class="si">{options}</span><span class="s2">: </span><span class="si">{value}</span><span class="se">\t</span><span class="s2"> =&gt; parameters.{options.upper()}: </span><span class="si">{par}</span><span class="se">\t</span><span class="s2"> {type(par)}&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="set_logger"><a class="viewcode-back" href="../../source/spectractor.html#spectractor.config.set_logger">[docs]</a><span class="k">def</span> <span class="nf">set_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Logger function for all classes.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    logger: str</span>
+<span class="sd">        Name of the class, usually self.__class__.__name__</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    my_logger: logging</span>
+<span class="sd">        Logging object</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; class Test:</span>
+<span class="sd">    ...     def __init__(self):</span>
+<span class="sd">    ...         self.my_logger = set_logger(self.__class__.__name__)</span>
+<span class="sd">    ...     def log(self):</span>
+<span class="sd">    ...         self.my_logger.info(&#39;This info test function works.&#39;)</span>
+<span class="sd">    ...         self.my_logger.debug(&#39;This debug test function works.&#39;)</span>
+<span class="sd">    ...         self.my_logger.warning(&#39;This warning test function works.&#39;)</span>
+<span class="sd">    &gt;&gt;&gt; test = Test()</span>
+<span class="sd">    &gt;&gt;&gt; test.log()</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">my_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">VERBOSE</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">my_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+        <span class="n">coloredlogs</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">fmt</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">MY_FORMAT</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">my_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+        <span class="n">coloredlogs</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">fmt</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">MY_FORMAT</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+        <span class="n">my_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+        <span class="n">coloredlogs</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">fmt</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">MY_FORMAT</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">my_logger</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Jeremy Neveu
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

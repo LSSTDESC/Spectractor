@@ -1,0 +1,564 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>spectractor.simulation.image_simulation &mdash; Spectractor 1.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'../../../',
+              VERSION:'1.1',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> Spectractor
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Spectractor</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>spectractor.simulation.image_simulation</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for spectractor.simulation.image_simulation</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">spectractor.extractor.spectrum</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">spectractor.simulation.simulator</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="kn">import</span> <span class="nn">copy</span>
+
+<span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="k">import</span> <span class="n">gaussian</span>
+
+
+<span class="c1"># from astroquery.gaia import Gaia, TapPlus, GaiaClass</span>
+<span class="c1"># Gaia = GaiaClass(TapPlus(url=&#39;http://gaia.ari.uni-heidelberg.de/tap&#39;))</span>
+
+
+<div class="viewcode-block" id="StarModel"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.StarModel">[docs]</a><span class="k">class</span> <span class="nc">StarModel</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixcoords</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">amplitude</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; [x0, y0] coords in pixels, sigma width in pixels, A height in image units&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">x0</span> <span class="o">=</span> <span class="n">pixcoords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y0</span> <span class="o">=</span> <span class="n">pixcoords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">amplitude</span> <span class="o">=</span> <span class="n">amplitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="n">target</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">x_mean</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">y_mean</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">amplitude</span> <span class="o">=</span> <span class="n">amplitude</span>
+        <span class="c1"># to be realistic, usually fitted fwhm is too big, divide by 2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fwhm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">gamma</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">stddev</span> <span class="o">/</span> <span class="mi">2</span>
+
+<div class="viewcode-block" id="StarModel.plot_model"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.StarModel.plot_model">[docs]</a>    <span class="k">def</span> <span class="nf">plot_model</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">yy</span><span class="p">,</span> <span class="n">xx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y0</span> <span class="o">-</span> <span class="mi">10</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">fwhm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0</span> <span class="o">+</span> <span class="mi">10</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">fwhm</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span>
+                             <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x0</span> <span class="o">-</span> <span class="mi">10</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">fwhm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">x0</span> <span class="o">+</span> <span class="mi">10</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">fwhm</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
+        <span class="n">star</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">im</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">star</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s1">&#39;lower&#39;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;jet&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;white&#39;</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;solid&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;X [pixels]&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Y [pixels]&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Star model: A=</span><span class="si">%.2f</span><span class="s1">, fwhm=</span><span class="si">%.2f</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">amplitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fwhm</span><span class="p">))</span>
+        <span class="n">cb</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">formatter</span><span class="o">.</span><span class="n">set_powerlimits</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">locator</span> <span class="o">=</span> <span class="n">MaxNLocator</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="n">prune</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">update_ticks</span><span class="p">()</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="s1">&#39;Arbitrary units&#39;</span><span class="p">)</span>  <span class="c1"># ,fontsize=16)</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div></div>
+
+
+<div class="viewcode-block" id="StarFieldModel"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.StarFieldModel">[docs]</a><span class="k">class</span> <span class="nc">StarFieldModel</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">base_image</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="n">base_image</span><span class="o">.</span><span class="n">target</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stars</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pixcoords</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span> <span class="o">=</span> <span class="n">base_image</span><span class="o">.</span><span class="n">target_pixcoords</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        result = Gaia.query_object_async(self.target.coord, </span>
+<span class="sd">            width=CCD_IMSIZE*CCD_PIXEL2ARCSEC*units.arcsec/np.cos(self.target.coord.dec.radian), </span>
+<span class="sd">            height=CCD_IMSIZE*CCD_PIXEL2ARCSEC*units.arcsec)</span>
+<span class="sd">        if parameters.DEBUG:</span>
+<span class="sd">            print result.pprint()</span>
+<span class="sd">        for o in result:</span>
+<span class="sd">            if o[&#39;dist&#39;] &lt; 0.005 : continue</span>
+<span class="sd">            radec = SkyCoord(ra=float(o[&#39;ra&#39;]),dec=float(o[&#39;dec&#39;]), frame=&#39;icrs&#39;, unit=&#39;deg&#39;)</span>
+<span class="sd">            y = int(y0 - (radec.dec.arcsec - self.target.coord.dec.arcsec)/CCD_PIXEL2ARCSEC)</span>
+<span class="sd">            x = int(x0 - (radec.ra.arcsec - self.target.coord.ra.arcsec)*np.cos(radec.dec.radian)/CCD_PIXEL2ARCSEC)</span>
+<span class="sd">            w = 10 # search windows in pixels</span>
+<span class="sd">            if x&lt;w or x&gt;CCD_IMSIZE-w: continue</span>
+<span class="sd">            if y&lt;w or y&gt;CCD_IMSIZE-w: continue</span>
+<span class="sd">            sub =  base_image.data[y-w:y+w,x-w:x+w]</span>
+<span class="sd">            A = np.max(sub) - np.min(sub)</span>
+<span class="sd">            if A &lt; threshold: continue</span>
+<span class="sd">            self.stars.append( StarModel([x,y],base_image.target_star2D,A) )</span>
+<span class="sd">            self.pixcoords.append([x,y])</span>
+<span class="sd">        self.pixcoords = np.array(self.pixcoords).T</span>
+<span class="sd">        np.savetxt(&#39;starfield.txt&#39;,self.pixcoords)</span>
+<span class="sd">&#39;&#39;&#39;</span>
+        <span class="c1"># mask background, faint stars, and saturated pixels</span>
+        <span class="n">image_thresholded</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">base_image</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">saturation</span> <span class="o">=</span> <span class="mf">0.99</span> <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">CCD_MAXADU</span> <span class="o">/</span> <span class="n">base_image</span><span class="o">.</span><span class="n">expo</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">saturated_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">image_thresholded</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">saturation</span><span class="p">)</span>
+        <span class="n">image_thresholded</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">saturated_pixels</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.</span>
+        <span class="n">image_thresholded</span> <span class="o">-=</span> <span class="n">threshold</span>
+        <span class="n">image_thresholded</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">image_thresholded</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)]</span> <span class="o">=</span> <span class="mf">0.</span>
+        <span class="c1"># mask order0 and spectrum</span>
+        <span class="n">margin</span> <span class="o">=</span> <span class="mi">30</span>
+        <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">y0</span><span class="p">)</span> <span class="o">-</span> <span class="mi">100</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">y0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">100</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">):</span>
+                <span class="n">u</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">pixel_rotation</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">base_image</span><span class="o">.</span><span class="n">disperser</span><span class="o">.</span><span class="n">theta</span><span class="p">([</span><span class="n">x0</span><span class="p">,</span> <span class="n">y0</span><span class="p">])</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">180.</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">margin</span> <span class="o">&gt;</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="o">-</span><span class="n">margin</span><span class="p">:</span>
+                    <span class="n">image_thresholded</span><span class="p">[</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.</span>
+        <span class="c1"># look for local maxima and create stars</span>
+        <span class="n">peak_positions</span> <span class="o">=</span> <span class="n">detect_peaks</span><span class="p">(</span><span class="n">image_thresholded</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">peak_positions</span><span class="p">[</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">((</span><span class="n">y</span> <span class="o">-</span> <span class="n">y0</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">x0</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">base_image</span><span class="o">.</span><span class="n">target_star2D</span><span class="o">.</span><span class="n">gamma</span><span class="p">:</span>
+                        <span class="k">continue</span>  <span class="c1"># no double star</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">stars</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">StarModel</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">],</span> <span class="n">base_image</span><span class="o">.</span><span class="n">target_star2D</span><span class="p">,</span> <span class="n">image_thresholded</span><span class="p">[</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">]))</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">pixcoords</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pixcoords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pixcoords</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fwhm</span> <span class="o">=</span> <span class="n">base_image</span><span class="o">.</span><span class="n">target_star2D</span><span class="o">.</span><span class="n">gamma</span>
+
+<div class="viewcode-block" id="StarFieldModel.model"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.StarFieldModel.model">[docs]</a>    <span class="k">def</span> <span class="nf">model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">window</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">10</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">fwhm</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stars</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stars</span><span class="p">)):</span>
+                <span class="n">left</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pixcoords</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">k</span><span class="p">])</span> <span class="o">-</span> <span class="n">window</span><span class="p">)</span>
+                <span class="n">right</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pixcoords</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">k</span><span class="p">])</span> <span class="o">+</span> <span class="n">window</span><span class="p">)</span>
+                <span class="n">low</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pixcoords</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">k</span><span class="p">])</span> <span class="o">-</span> <span class="n">window</span><span class="p">)</span>
+                <span class="n">up</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pixcoords</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">k</span><span class="p">])</span> <span class="o">+</span> <span class="n">window</span><span class="p">)</span>
+                <span class="n">yy</span><span class="p">,</span> <span class="n">xx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mgrid</span><span class="p">[</span><span class="n">low</span><span class="p">:</span><span class="n">up</span><span class="p">,</span> <span class="n">left</span><span class="p">:</span><span class="n">right</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="p">[</span><span class="n">low</span><span class="p">:</span><span class="n">up</span><span class="p">,</span> <span class="n">left</span><span class="p">:</span><span class="n">right</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stars</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">field</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">saturated_pixels</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">saturation</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">field</span></div>
+
+<div class="viewcode-block" id="StarFieldModel.plot_model"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.StarFieldModel.plot_model">[docs]</a>    <span class="k">def</span> <span class="nf">plot_model</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">yy</span><span class="p">,</span> <span class="n">xx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mgrid</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">:</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">:</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">starfield</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">im</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">starfield</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s1">&#39;lower&#39;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;jet&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;white&#39;</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;solid&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;X [pixels]&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Y [pixels]&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Star field model: fwhm=</span><span class="si">{self.fwhm.value:.2f}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">cb</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">formatter</span><span class="o">.</span><span class="n">set_powerlimits</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">locator</span> <span class="o">=</span> <span class="n">MaxNLocator</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="n">prune</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">update_ticks</span><span class="p">()</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="s1">&#39;Arbitrary units&#39;</span><span class="p">)</span>  <span class="c1"># ,fontsize=16)</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div></div>
+
+
+<div class="viewcode-block" id="BackgroundModel"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.BackgroundModel">[docs]</a><span class="k">class</span> <span class="nc">BackgroundModel</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">frame</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="n">level</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Background level must be strictly positive.&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span>
+
+<div class="viewcode-block" id="BackgroundModel.model"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.BackgroundModel.model">[docs]</a>    <span class="k">def</span> <span class="nf">model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Background model for the image simulation.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            x:</span>
+<span class="sd">            y:</span>
+
+<span class="sd">        Returns:</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">bkgd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">bkgd</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">xlim</span><span class="p">,</span> <span class="n">ylim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame</span>
+            <span class="n">bkgd</span><span class="p">[</span><span class="n">ylim</span><span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">/</span> <span class="mi">100</span>
+            <span class="n">bkgd</span><span class="p">[:,</span> <span class="n">xlim</span><span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">/</span> <span class="mi">100</span>
+            <span class="n">kernel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">gaussian</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span> <span class="n">gaussian</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
+            <span class="n">bkgd</span> <span class="o">=</span> <span class="n">fftconvolve</span><span class="p">(</span><span class="n">bkgd</span><span class="p">,</span> <span class="n">kernel</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)</span>
+            <span class="n">bkgd</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">/</span> <span class="n">bkgd</span><span class="p">[</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span> <span class="o">//</span> <span class="mi">2</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">bkgd</span></div>
+
+<div class="viewcode-block" id="BackgroundModel.plot_model"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.BackgroundModel.plot_model">[docs]</a>    <span class="k">def</span> <span class="nf">plot_model</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">yy</span><span class="p">,</span> <span class="n">xx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mgrid</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">:</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">:</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">bkgd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">im</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">bkgd</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s1">&#39;lower&#39;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;jet&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;white&#39;</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;solid&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;X [pixels]&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Y [pixels]&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Background model&#39;</span><span class="p">)</span>
+        <span class="n">cb</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">formatter</span><span class="o">.</span><span class="n">set_powerlimits</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">locator</span> <span class="o">=</span> <span class="n">MaxNLocator</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="n">prune</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">update_ticks</span><span class="p">()</span>
+        <span class="n">cb</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="s1">&#39;Arbitrary units&#39;</span><span class="p">)</span>  <span class="c1"># ,fontsize=16)</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div></div>
+
+
+<div class="viewcode-block" id="SpectrumModel"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.SpectrumModel">[docs]</a><span class="k">class</span> <span class="nc">SpectrumModel</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">base_image</span><span class="p">,</span> <span class="n">spectrumsim</span><span class="p">,</span> <span class="n">sigma</span><span class="p">,</span> <span class="n">A1</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">A2</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">reso</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">base_image</span> <span class="o">=</span> <span class="n">base_image</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectrumsim</span> <span class="o">=</span> <span class="n">spectrumsim</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">disperser</span> <span class="o">=</span> <span class="n">base_image</span><span class="o">.</span><span class="n">disperser</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span> <span class="o">=</span> <span class="n">sigma</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">A1</span> <span class="o">=</span> <span class="n">A1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">A2</span> <span class="o">=</span> <span class="n">A2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reso</span> <span class="o">=</span> <span class="n">reso</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rotation</span> <span class="o">=</span> <span class="n">rotation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">yprofile</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">Gaussian1D</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">sigma</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_lambdas</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_spectrum</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="SpectrumModel.model"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.SpectrumModel.model">[docs]</a>    <span class="k">def</span> <span class="nf">model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_lambdas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span><span class="p">,</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MAX</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_spectrum</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spectrumsim</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">true_lambdas</span><span class="p">))</span>
+        <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_image</span><span class="o">.</span><span class="n">target_pixcoords</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rotation</span><span class="p">:</span>
+            <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">disperser</span><span class="o">.</span><span class="n">theta</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_image</span><span class="o">.</span><span class="n">target_pixcoords</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">180.</span>
+            <span class="n">u</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">x0</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">y0</span><span class="p">)</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">x0</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">y0</span><span class="p">)</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">u</span> <span class="o">+</span> <span class="n">x0</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">v</span> <span class="o">+</span> <span class="n">y0</span>
+        <span class="n">l</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">disperser</span><span class="o">.</span><span class="n">grating_pixel_to_lambda</span><span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">x0</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">base_image</span><span class="o">.</span><span class="n">target_pixcoords</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">amp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">A1</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">spectrumsim</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">yprofile</span><span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">y0</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">A1</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">A2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">spectrumsim</span><span class="o">.</span><span class="n">model</span><span class="p">(</span>
+            <span class="n">l</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">yprofile</span><span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">y0</span><span class="p">)</span>
+        <span class="n">amp</span> <span class="o">=</span> <span class="n">amp</span> <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">FLAM_TO_ADURATE</span> <span class="o">*</span> <span class="n">l</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">gradient</span><span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">reso</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">amp</span> <span class="o">=</span> <span class="n">fftconvolve_gaussian</span><span class="p">(</span><span class="n">amp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">reso</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">amp</span></div></div>
+
+
+<div class="viewcode-block" id="ImageModel"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.ImageModel">[docs]</a><span class="k">class</span> <span class="nc">ImageModel</span><span class="p">(</span><span class="n">Image</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="n">Image</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_lambdas</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_spectrum</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="ImageModel.compute"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.ImageModel.compute">[docs]</a>    <span class="k">def</span> <span class="nf">compute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">star</span><span class="p">,</span> <span class="n">background</span><span class="p">,</span> <span class="n">spectrogram</span><span class="p">,</span> <span class="n">starfield</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">yy</span><span class="p">,</span> <span class="n">xx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mgrid</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">:</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span><span class="p">:</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">star</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span> <span class="o">+</span> <span class="n">background</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">spectrogram</span><span class="o">.</span><span class="n">spectrogram_ymin</span><span class="p">:</span><span class="n">spectrogram</span><span class="o">.</span><span class="n">spectrogram_ymax</span><span class="p">,</span>
+        <span class="n">spectrogram</span><span class="o">.</span><span class="n">spectrogram_xmin</span><span class="p">:</span><span class="n">spectrogram</span><span class="o">.</span><span class="n">spectrogram_xmax</span><span class="p">]</span> <span class="o">+=</span> <span class="p">(</span><span class="n">spectrogram</span><span class="o">.</span><span class="n">data</span> <span class="o">-</span> <span class="n">spectrogram</span><span class="o">.</span><span class="n">spectrogram_bgd</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_lambdas</span> <span class="o">=</span> <span class="n">spectrogram</span><span class="o">.</span><span class="n">lambdas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_spectrum</span> <span class="o">=</span> <span class="n">spectrogram</span><span class="o">.</span><span class="n">true_spectrum</span>
+        <span class="k">if</span> <span class="n">starfield</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">+=</span> <span class="n">starfield</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">yy</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ImageModel.add_poisson_and_read_out_noise"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.ImageModel.add_poisson_and_read_out_noise">[docs]</a>    <span class="k">def</span> <span class="nf">add_poisson_and_read_out_noise</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">units</span> <span class="o">==</span> <span class="s1">&#39;ADU&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Poisson noise procedure has to be applied on map in ADU/s units&#39;</span><span class="p">)</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+        <span class="n">d</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">expo</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">gain</span>
+        <span class="n">noisy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">poisson</span><span class="p">(</span><span class="n">d</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">noisy</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">expo</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">gain</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ImageModel.save_image"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.ImageModel.save_image">[docs]</a>    <span class="k">def</span> <span class="nf">save_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_filename</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">hdu0</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">PrimaryHDU</span><span class="p">()</span>
+        <span class="n">hdu0</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span>
+        <span class="n">hdu0</span><span class="o">.</span><span class="n">header</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">header</span>
+        <span class="n">hdu1</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">ImageHDU</span><span class="p">()</span>
+        <span class="n">hdu1</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">true_lambdas</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">true_spectrum</span><span class="p">]</span>
+        <span class="n">hdulist</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">HDUList</span><span class="p">([</span><span class="n">hdu0</span><span class="p">,</span> <span class="n">hdu1</span><span class="p">])</span>
+        <span class="n">hdulist</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="n">output_filename</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Image saved in </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">output_filename</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ImageModel.load_image"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.ImageModel.load_image">[docs]</a>    <span class="k">def</span> <span class="nf">load_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ImageModel</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">load_image</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span></div></div>
+        <span class="c1"># hdu_list = fits.open(filename)</span>
+        <span class="c1"># self.true_lambdas, self.true_spectrum = hdu_list[1].data</span>
+
+
+<div class="viewcode-block" id="ImageSim"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.image_simulation.ImageSim">[docs]</a><span class="k">def</span> <span class="nf">ImageSim</span><span class="p">(</span><span class="n">image_filename</span><span class="p">,</span> <span class="n">spectrum_filename</span><span class="p">,</span> <span class="n">outputdir</span><span class="p">,</span> <span class="n">pwv</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">ozone</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">aerosols</span><span class="o">=</span><span class="mf">0.03</span><span class="p">,</span> <span class="n">A1</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">A2</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+             <span class="n">psf_poly_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+             <span class="n">with_rotation</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+             <span class="n">with_stars</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; The basic use of the extractor consists first to define:</span>
+<span class="sd">    - the path to the fits image from which to extract the image, </span>
+<span class="sd">    - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),</span>
+<span class="sd">    - the rough position of the object in the image,</span>
+<span class="sd">    - the name of the target (to search for the extra-atmospheric spectrum if available).</span>
+<span class="sd">    Then different parameters and systematics can be set:</span>
+<span class="sd">    - pwv: the pressure water vapor (in mm)</span>
+<span class="sd">    - ozone: the ozone quantity (in XX)</span>
+<span class="sd">    - aerosols: the vertical aerosol optical depth</span>
+<span class="sd">    - A1: a global grey absorption parameter for the spectrum</span>
+<span class="sd">    - A2: the relative amplitude of second order compared with first order</span>
+<span class="sd">    - with_rotation: rotate the spectrum according to the disperser characteristics (True by default)</span>
+<span class="sd">    - with_stars: include stars in the image field (True by default)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+    <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Start IMAGE SIMULATOR&#39;</span><span class="p">)</span>
+    <span class="c1"># Load reduced image</span>
+    <span class="n">spectrum</span><span class="p">,</span> <span class="n">telescope</span><span class="p">,</span> <span class="n">disperser</span><span class="p">,</span> <span class="n">target</span> <span class="o">=</span> <span class="n">SimulatorInit</span><span class="p">(</span><span class="n">spectrum_filename</span><span class="p">)</span>
+    <span class="n">image</span> <span class="o">=</span> <span class="n">ImageModel</span><span class="p">(</span><span class="n">image_filename</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">)</span>
+    <span class="n">guess</span> <span class="o">=</span> <span class="p">[</span><span class="n">spectrum</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;TARGETX&#39;</span><span class="p">],</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;TARGETY&#39;</span><span class="p">]]</span>
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+        <span class="n">image</span><span class="o">.</span><span class="n">plot_image</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="s1">&#39;log10&#39;</span><span class="p">,</span> <span class="n">target_pixcoords</span><span class="o">=</span><span class="n">guess</span><span class="p">)</span>
+    <span class="c1"># Find the exact target position in the raw cut image: several methods</span>
+    <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Search for the target in the image...&#39;</span><span class="p">)</span>
+    <span class="n">target_pixcoords</span> <span class="o">=</span> <span class="n">find_target</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">guess</span><span class="p">)</span>
+    <span class="c1"># Background model</span>
+    <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Background model...&#39;</span><span class="p">)</span>
+    <span class="n">background</span> <span class="o">=</span> <span class="n">BackgroundModel</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">target_bkgd2D</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">frame</span><span class="o">=</span><span class="p">(</span><span class="mi">1600</span><span class="p">,</span> <span class="mi">1650</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+        <span class="n">background</span><span class="o">.</span><span class="n">plot_model</span><span class="p">()</span>
+    <span class="c1"># Target model</span>
+    <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Star model...&#39;</span><span class="p">)</span>
+    <span class="n">star</span> <span class="o">=</span> <span class="n">StarModel</span><span class="p">(</span><span class="n">target_pixcoords</span><span class="p">,</span> <span class="n">image</span><span class="o">.</span><span class="n">target_star2D</span><span class="p">,</span> <span class="n">image</span><span class="o">.</span><span class="n">target_star2D</span><span class="o">.</span><span class="n">amplitude</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+    <span class="n">reso</span> <span class="o">=</span> <span class="n">star</span><span class="o">.</span><span class="n">sigma</span>
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+        <span class="n">star</span><span class="o">.</span><span class="n">plot_model</span><span class="p">()</span>
+    <span class="c1"># Star field model</span>
+    <span class="n">starfield</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">with_stars</span><span class="p">:</span>
+        <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Star field model...&#39;</span><span class="p">)</span>
+        <span class="n">starfield</span> <span class="o">=</span> <span class="n">StarFieldModel</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.01</span> <span class="o">*</span> <span class="n">star</span><span class="o">.</span><span class="n">amplitude</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">:</span>
+            <span class="n">image</span><span class="o">.</span><span class="n">plot_image</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="s1">&#39;log10&#39;</span><span class="p">,</span> <span class="n">target_pixcoords</span><span class="o">=</span><span class="n">starfield</span><span class="o">.</span><span class="n">pixcoords</span><span class="p">)</span>
+            <span class="n">starfield</span><span class="o">.</span><span class="n">plot_model</span><span class="p">()</span>
+    <span class="c1"># Spectrum model</span>
+    <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Spectum model...&#39;</span><span class="p">)</span>
+    <span class="n">airmass</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;AIRMASS&#39;</span><span class="p">]</span>
+    <span class="n">pressure</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;OUTPRESS&#39;</span><span class="p">]</span>
+    <span class="n">temperature</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;OUTTEMP&#39;</span><span class="p">]</span>
+    <span class="n">telescope</span> <span class="o">=</span> <span class="n">TelescopeTransmission</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">filter</span><span class="p">)</span>
+
+    <span class="c1"># Load PSF</span>
+    <span class="k">if</span> <span class="n">psf_poly_params</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Use PSF parameters from _table.csv file.&#39;</span><span class="p">)</span>
+        <span class="n">psf_poly_params</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">chromatic_psf</span><span class="o">.</span><span class="n">from_table_to_poly_params</span><span class="p">()</span>
+
+    <span class="n">spectrogram</span> <span class="o">=</span> <span class="n">SpectrogramSimulatorCore</span><span class="p">(</span><span class="n">spectrum</span><span class="p">,</span> <span class="n">telescope</span><span class="p">,</span> <span class="n">disperser</span><span class="p">,</span> <span class="n">airmass</span><span class="p">,</span> <span class="n">pressure</span><span class="p">,</span>
+                                           <span class="n">temperature</span><span class="p">,</span> <span class="n">pwv</span><span class="o">=</span><span class="n">pwv</span><span class="p">,</span> <span class="n">ozone</span><span class="o">=</span><span class="n">ozone</span><span class="p">,</span> <span class="n">aerosols</span><span class="o">=</span><span class="n">aerosols</span><span class="p">,</span> <span class="n">A1</span><span class="o">=</span><span class="n">A1</span><span class="p">,</span> <span class="n">A2</span><span class="o">=</span><span class="n">A2</span><span class="p">,</span>
+                                           <span class="n">D</span><span class="o">=</span><span class="n">spectrum</span><span class="o">.</span><span class="n">disperser</span><span class="o">.</span><span class="n">D</span><span class="p">,</span> <span class="n">shift_x</span><span class="o">=</span><span class="mf">0.</span><span class="p">,</span> <span class="n">shift_y</span><span class="o">=</span><span class="mf">0.</span><span class="p">,</span> <span class="n">shift_t</span><span class="o">=</span><span class="mf">0.</span><span class="p">,</span>
+                                           <span class="n">angle</span><span class="o">=</span><span class="n">spectrum</span><span class="o">.</span><span class="n">rotation_angle</span><span class="p">,</span>
+                                           <span class="n">psf_poly_params</span><span class="o">=</span><span class="n">psf_poly_params</span><span class="p">)</span>
+
+    <span class="c1"># Image model</span>
+    <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Image model...&#39;</span><span class="p">)</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="n">star</span><span class="p">,</span> <span class="n">background</span><span class="p">,</span> <span class="n">spectrogram</span><span class="p">,</span> <span class="n">starfield</span><span class="o">=</span><span class="n">starfield</span><span class="p">)</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">add_poisson_and_read_out_noise</span><span class="p">()</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">convert_to_ADU_units</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">:</span>
+        <span class="n">image</span><span class="o">.</span><span class="n">plot_image</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Image simulation&quot;</span><span class="p">,</span> <span class="n">target_pixcoords</span><span class="o">=</span><span class="n">target_pixcoords</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">units</span><span class="p">)</span>
+
+    <span class="c1"># Set output path</span>
+    <span class="n">ensure_dir</span><span class="p">(</span><span class="n">outputdir</span><span class="p">)</span>
+    <span class="n">output_filename</span> <span class="o">=</span> <span class="n">image_filename</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">output_filename</span> <span class="o">=</span> <span class="p">(</span><span class="n">output_filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;reduc&#39;</span><span class="p">,</span> <span class="s1">&#39;sim&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;trim&#39;</span><span class="p">,</span> <span class="s1">&#39;sim&#39;</span><span class="p">)</span>
+    <span class="n">output_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">outputdir</span><span class="p">,</span> <span class="n">output_filename</span><span class="p">)</span>
+
+    <span class="c1"># Save images and parameters</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;A1&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">A1</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;A2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">A2</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;X0_T&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_pixcoords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;Y0_T&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_pixcoords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;D2CCD_T&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">disperser</span><span class="o">.</span><span class="n">D</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;OZONE&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ozone</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;PWV&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pwv</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;VAOD&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">aerosols</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;reso&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">reso</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;ROTATION&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">with_rotation</span><span class="p">)</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;ROTANGLE&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">rotation_angle</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;STARS&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">with_stars</span><span class="p">)</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">save_image</span><span class="p">(</span><span class="n">output_filename</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">image</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">doctest</span>
+
+    <span class="n">doctest</span><span class="o">.</span><span class="n">testmod</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Jeremy Neveu
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -1,0 +1,343 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>spectractor.logbook &mdash; Spectractor 1.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'../../',
+              VERSION:'1.1',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Spectractor
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Spectractor</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>spectractor.logbook</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for spectractor.logbook</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">spectractor.config</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+
+<div class="viewcode-block" id="LogBook"><a class="viewcode-back" href="../../source/spectractor.html#spectractor.logbook.LogBook">[docs]</a><span class="k">class</span> <span class="nc">LogBook</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Class to load_image and analyse observation logbook csv files.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">logbook</span><span class="o">=</span><span class="s2">&quot;ctiofulllogbook_jun2017_v5.csv&quot;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load and initialise the logbook</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        logbook: str</span>
+<span class="sd">            Path to the logbook. Must be a CSV file.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        ----------</span>
+<span class="sd">        &gt;&gt;&gt; logbook = LogBook(&#39;./ctiofulllogbook_jun2017_v5.csv&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; assert logbook.df is not None</span>
+<span class="sd">        &gt;&gt;&gt; print(logbook.logbook)</span>
+<span class="sd">        ./ctiofulllogbook_jun2017_v5.csv</span>
+<span class="sd">        &gt;&gt;&gt; print(logbook.df[&#39;disperser&#39;][:2])</span>
+<span class="sd">        0    Ron400</span>
+<span class="sd">        1    Ron400</span>
+<span class="sd">        Name: disperser, dtype: object</span>
+<span class="sd">        &gt;&gt;&gt; logbook = LogBook(&#39;./log.csv&#39;)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logbook</span> <span class="o">=</span> <span class="n">logbook</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">logbook</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;CSV logbook file </span><span class="si">{}</span><span class="s1"> not found.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">logbook</span><span class="p">))</span>
+            <span class="k">return</span>
+        <span class="c1"># self.csvfile = open(self.logbook, &#39;rU&#39;, encoding=&#39;latin-1&#39;)</span>
+        <span class="c1"># self.reader = csv.DictReader(self.csvfile, delimiter=&#39;;&#39;, dialect=csv.excel_tab)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">logbook</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;;&quot;</span><span class="p">,</span> <span class="n">decimal</span><span class="o">=</span><span class="s2">&quot;,&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;latin-1&#39;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="s1">&#39;infer&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;date&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">date</span><span class="p">)</span>
+
+<div class="viewcode-block" id="LogBook.search_for_image"><a class="viewcode-back" href="../../source/spectractor.html#spectractor.logbook.LogBook.search_for_image">[docs]</a>    <span class="k">def</span> <span class="nf">search_for_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Look for an image file name in the logbook and load_image properties:</span>
+<span class="sd">        * Obj-posXpix and Obj-posYpix: the [x0,y0] guessed pixel position in the image</span>
+<span class="sd">        * Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables</span>
+<span class="sd">            in parameters.py</span>
+<span class="sd">        * object: the name of the target</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        filename: str</span>
+<span class="sd">            the fits image file name (not the path, only the file name.)</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        disperser_label: str</span>
+<span class="sd">            the name of the disperser</span>
+<span class="sd">        target: str</span>
+<span class="sd">            the name of the target</span>
+<span class="sd">        xpos: int</span>
+<span class="sd">            the x position of the target (in pixel)</span>
+<span class="sd">        ypos: int</span>
+<span class="sd">            the y position of the target (in pixel)</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; logbook = LogBook(&#39;./ctiofulllogbook_jun2017_v5.csv&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; disperser_label, target, xpos, ypos = logbook.search_for_image(&quot;unknown_file.fits&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(disperser_label, target, xpos, ypos)</span>
+<span class="sd">        None None None None</span>
+<span class="sd">        &gt;&gt;&gt; disperser_label, target, xpos, ypos = logbook.search_for_image(&quot;reduc_20170605_028.fits&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(disperser_label, target, xpos, ypos)</span>
+<span class="sd">        HoloPhAg PNG321.0+3.9 814 585</span>
+<span class="sd">        &gt;&gt;&gt; disperser_label, target, xpos, ypos = logbook.search_for_image(&quot;reduc_20170608_119.fits&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(disperser_label, target, xpos, ypos)</span>
+<span class="sd">        None HD205905 None None</span>
+<span class="sd">        &gt;&gt;&gt; disperser_label, target, xpos, ypos = logbook.search_for_image(&quot;reduc_20170630_001.fits&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(disperser_label, target, xpos, ypos)</span>
+<span class="sd">        None bias None None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">disperser_label</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">xpos</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">ypos</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">skip</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;file&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">filename</span><span class="p">)]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;object&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;object&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;bias&#39;</span> <span class="ow">or</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;object&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;flat&#39;</span> <span class="ow">or</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;object&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;zero&#39;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s1">&#39;Fits file </span><span class="si">%s</span><span class="s1"> in logbook </span><span class="si">%s</span><span class="s1"> has flag </span><span class="si">%s</span><span class="s1">. Skip file.&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">logbook</span><span class="p">,</span> <span class="n">target</span><span class="p">))</span>
+                <span class="n">skip</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;skip&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;skip&#39;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Fits file </span><span class="si">%s</span><span class="s1"> in logbook has flag &quot;skip&quot;. Skip file.&#39;</span> <span class="o">%</span> <span class="n">filename</span><span class="p">)</span>
+                <span class="n">skip</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;Obj-posXpix&#39;</span><span class="p">]):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s1">&#39;Fits file </span><span class="si">%s</span><span class="s1"> in logbook </span><span class="si">%s</span><span class="s1"> has no target x position. Skip file.&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">logbook</span><span class="p">))</span>
+                <span class="n">skip</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;Obj-posYpix&#39;</span><span class="p">]):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s1">&#39;Fits file </span><span class="si">%s</span><span class="s1"> in logbook </span><span class="si">%s</span><span class="s1"> has no target y position. Skip file.&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">logbook</span><span class="p">))</span>
+                <span class="n">skip</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;Dx&#39;</span><span class="p">]):</span>
+                <span class="n">parameters</span><span class="o">.</span><span class="n">XWINDOW</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;Dx&#39;</span><span class="p">])</span>
+                <span class="n">parameters</span><span class="o">.</span><span class="n">XWINDOW_ROT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;Dx&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;Dy&#39;</span><span class="p">]):</span>
+                <span class="n">parameters</span><span class="o">.</span><span class="n">YWINDOW</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;Dy&#39;</span><span class="p">])</span>
+                <span class="n">parameters</span><span class="o">.</span><span class="n">YWINDOW_ROT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;Dy&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">skip</span><span class="p">:</span>
+                <span class="n">xpos</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;Obj-posXpix&#39;</span><span class="p">])</span>
+                <span class="n">ypos</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;Obj-posYpix&#39;</span><span class="p">])</span>
+                <span class="n">disperser_label</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;disperser&#39;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">skip</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Fits file </span><span class="si">%s</span><span class="s1"> not found in logbook </span><span class="si">%s</span><span class="s1">.&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">logbook</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">disperser_label</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">xpos</span><span class="p">,</span> <span class="n">ypos</span></div>
+
+<div class="viewcode-block" id="LogBook.plot_columns_vs_date"><a class="viewcode-back" href="../../source/spectractor.html#spectractor.logbook.LogBook.plot_columns_vs_date">[docs]</a>    <span class="k">def</span> <span class="nf">plot_columns_vs_date</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">column_names</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Plot of the column property with respect to the dates.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        column_names: list, str</span>
+<span class="sd">            List of column names to plot versus time from the log book.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; logbook = LogBook(&#39;./ctiofulllogbook_jun2017_v5.csv&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; logbook.plot_columns_vs_date([&#39;seeing&#39;])</span>
+<span class="sd">        &gt;&gt;&gt; logbook.plot_columns_vs_date([&#39;P&#39;, &#39;T&#39;])</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">column_names</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">column_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">column_names</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s1">&#39;date&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">column_names</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">doctest</span>
+    <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">&quot;1.14.0&quot;</span><span class="p">:</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">legacy</span><span class="o">=</span><span class="s2">&quot;1.13&quot;</span><span class="p">)</span>
+
+    <span class="n">doctest</span><span class="o">.</span><span class="n">testmod</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Jeremy Neveu
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
