@@ -4,6 +4,7 @@ from spectractor import parameters
 from spectractor.extractor.extractor import Spectractor
 from spectractor.logbook import LogBook
 import os
+import numpy as np
 
 
 def test_logbook():
@@ -30,10 +31,16 @@ def test_extractor():
         if target is None or xpos is None or ypos is None:
             continue
         spectrum = Spectractor(file_name, './outputs/', [xpos, ypos], target, disperser_label,
-                               config='./config/ctio.ini',
-                               line_detection=True, atmospheric_lines=True)
+                              config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
+        assert np.sum(spectrum.data) > 1e-10
+        assert np.isclose(spectrum.lambdas[0], 296.56935941, atol=0.2)
+        assert np.isclose(spectrum.lambdas[-1], 1083.9470213, atol=0.5)
+        assert np.all(np.isclose(spectrum.x0 , [743.6651370068676, 683.0577836601408], atol=0.2))
+        assert np.isclose(spectrum.spectrogram_x0, -239.3348629931324, atol=0.2)
+        assert 2.5 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3.5
         assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrum.fits')) is True
+        assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrogram.fits')) is True
 
 
 if __name__ == "__main__":
