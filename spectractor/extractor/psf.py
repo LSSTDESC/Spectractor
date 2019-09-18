@@ -132,12 +132,14 @@ class PSF2D(PSF):
         >>> out = psf.evaluate(pixels=[xx, yy])
 
         .. plot ::
+
             import matplotlib.pyplot as plt
             fig = plt.figure()
             plt.imshow(out, origin="lower")
             plt.xlabel("X [pixels]")
             plt.ylabel("Y [pixels]")
             plt.show()
+            
         """
         if p is not None:
             self.p = p
@@ -1018,7 +1020,7 @@ class ChromaticPSF:
         Examples
         --------
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> saturation = params[-1]
@@ -1030,10 +1032,10 @@ class ChromaticPSF:
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # Extract the background
+        Extract the background
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        # Fit the transverse profile:
+        Fit the transverse profile:
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
         ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
@@ -1170,13 +1172,13 @@ class ChromaticPSF:
         Examples
         --------
 
-        # Set the parameters
+        Set the parameters
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
         >>> parameters.VERBOSE = True
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> s0 = ChromaticPSF1D(Nx=120, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -1187,16 +1189,16 @@ class ChromaticPSF:
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # Extract the background
+        Extract the background
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        # Estimate the first guess values
+        Estimate the first guess values
         >>> s = ChromaticPSF1D(Nx=120, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
         >>> s.plot_summary(truth=s0)
 
-        # Fit the data:
+        Fit the data:
         >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func)
         >>> s.fit_chromatic_psf(w, data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
@@ -1317,13 +1319,13 @@ class ChromaticPSF1D(ChromaticPSF):
         Examples
         --------
 
-        # Set the parameters
+        Set the parameters
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
         >>> parameters.VERBOSE = True
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -1334,16 +1336,16 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # Extract the background
+        Extract the background
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        # Estimate the first guess values
+        Estimate the first guess values
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
         >>> s.plot_summary(truth=s0)
 
-        # Fit the data:
+        Fit the data:
         >>> s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
         """
@@ -1367,12 +1369,12 @@ class ChromaticPSF1D(ChromaticPSF):
         Examples
         --------
 
-        # Set the parameters
+        Set the parameters
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -1383,16 +1385,16 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # Extract the background
+        Extract the background
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        # Estimate the first guess values
+        Estimate the first guess values
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
         >>> s.plot_summary(truth=s0)
 
-        # Fit the data:
+        Fit the data:
         >>> s.fit_chromatic_PSF1D_minuit(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
         """
@@ -1962,9 +1964,9 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         .. math ::
             :label: chromaticpsf2d_matrix
 
-            \vec{m}(\vec{x},\vec{p}) = \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A}
+            & \vec{m}(\vec{x},\vec{p}) = \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A}
 
-            \mathbf{M}\left(\vec{x},\vec{p}\right) = \left(\begin{array}{cccc}
+            & \mathbf{M}\left(\vec{x},\vec{p}\right) = \left(\begin{array}{cccc}
              \phi\left(\vec{x}_1,\vec{p}_1\right) & \phi\left(\vec{x}_2,\vec{p}_1\right) & ... & \phi\left(\vec{x}_{N_x},\vec{p}_1\right) \\
              ... & ... & ... & ...\\
              \phi\left(\vec{x}_1,\vec{p}_{N_x}\right) & \phi\left(\vec{x}_2,\vec{p}_{N_x}\right) & ... & \phi\left(\vec{x}_{N_x},\vec{p}_{N_x}\right) \\
@@ -1980,7 +1982,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         with :math:`epsilon` a random noise. The :math:`\chi^2` function to minimise is
 
         .. math ::
-            :label:chromaticspsf2d_chi2
+            :label: chromaticspsf2d_chi2
 
             \chi^2(\mathbf{A})= \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)^T \mathbf{W}
             \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)
@@ -1991,7 +1993,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         .. math ::
 
-            \hat{\mathbf{A}} =  `(\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}` \mathbf{M}^T \mathbf{W} \mathbf{y}
+            \hat{\mathbf{A}} =  (\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1} \mathbf{M}^T \mathbf{W} \mathbf{y}
 
         The error matrix on the :math:`\hat{\mathbf{A}}` coefficient is simply
         :math:`(\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}`.
@@ -2005,12 +2007,12 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         Examples
         --------
 
-        # Set the parameters
+        Set the parameters
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> s0 = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -2021,16 +2023,16 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # Extract the background
+        Extract the background
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        # Estimate the first guess values
+        Estimate the first guess values
         >>> s = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
         >>> s.plot_summary(truth=s0)
 
-        # Simulate the data:
+        Simulate the data:
         >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
         >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:-1])
         >>> assert mod is not None
