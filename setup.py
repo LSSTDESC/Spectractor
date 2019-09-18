@@ -3,6 +3,8 @@ import os
 import re
 
 reqs = open('requirements.txt', 'r').read().strip().splitlines()
+if os.getenv('READTHEDOCS'):
+    reqs.remove('mpi4py')
 
 with open('README.md') as file:
     long_description = file.read()
