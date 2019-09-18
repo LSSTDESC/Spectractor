@@ -139,7 +139,7 @@ class PSF2D(PSF):
             plt.xlabel("X [pixels]")
             plt.ylabel("Y [pixels]")
             plt.show()
-            
+
         """
         if p is not None:
             self.p = p
@@ -239,8 +239,7 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
 
         Examples
         --------
-
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> p = np.array([100,  50, 3, 2, -0.1, 2, 200])
         >>> psf = PSF1D(p)
         >>> x = np.arange(100)
@@ -248,10 +247,10 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # Extract the background
+        Extract the background
         # >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        # Fit the data:
+        Fit the data:
         >>> w = PSF1DFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
         >>> x, mod, mod_err = w.simulate(*p[:-1])
         >>> assert mod is not None
@@ -347,8 +346,7 @@ class PSF2DFitWorkspace(PSFFitWorkspace):
 
         Examples
         --------
-
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> p = np.array([500, 20, 30, 3, 2, -0.1, 2, 400])
         >>> psf = PSF2D(p)
         >>> xx, yy = np.mgrid[:50, :60]
@@ -359,7 +357,7 @@ class PSF2DFitWorkspace(PSFFitWorkspace):
         # Extract the background
         # >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        # Fit the data:
+        Fit the data:
         >>> w = PSF2DFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
         >>> x, mod, mod_err = w.simulate(*p[:-1])
         >>> assert mod is not None
@@ -2006,7 +2004,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         Examples
         --------
-
         Set the parameters
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
