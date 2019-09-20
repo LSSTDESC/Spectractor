@@ -131,7 +131,7 @@ class PSF2D(PSF):
         >>> xx, yy = np.mgrid[:50, :60]
         >>> out = psf.evaluate(pixels=[xx, yy])
 
-        .. plot ::
+        .. plot::
 
             import matplotlib.pyplot as plt
             fig = plt.figure()
@@ -2568,13 +2568,13 @@ class PSF1DAstropy(Fittable1DModel):
         >>> i = psf.integrate(bounds=(0,60), x_array=x)
         >>> assert np.isclose(i, 10.046698028728645)
 
-        >>> import matplotlib.pyplot as plt
-        >>> xx = np.arange(0, 60, 0.01)
-        >>> plt.plot(xx, psf.evaluate(xx, *p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> plt.plot(x, psf.evaluate(x, *p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> if parameters.DISPLAY: plt.show()
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            xx = np.arange(0, 60, 0.01)
+            plt.plot(xx, psf.evaluate(xx, *p))
+            plt.plot(x, psf.evaluate(x, *p))
+            plt.show()
 
         """
         params = [getattr(self, p).value for p in self.param_names]
