@@ -2560,15 +2560,18 @@ class PSF1DAstropy(Fittable1DModel):
 
         Examples
         --------
-        >>> x = np.arange(0, 60, 1)
-        >>> p = [2,30,4,2,-0.5,1,10]
-        >>> psf = PSF1DAstropy(*p)
-        >>> xx = np.arange(0, 60, 0.01)
-        >>> plt.plot(xx, psf.evaluate(xx, *p))
-        [<matplotlib.lines.Line2D object at ...>]
-        >>> plt.plot(x, psf.evaluate(x, *p)) # doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at ...>]
-        >>> plt.show()
+
+        .. doctest::
+
+            >>> x = np.arange(0, 60, 1)
+            >>> p = [2,30,4,2,-0.5,1,10]
+            >>> psf = PSF1DAstropy(*p)
+            >>> xx = np.arange(0, 60, 0.01)
+            >>> plt.plot(xx, psf.evaluate(xx, *p))
+            [<matplotlib.lines.Line2D object at ...>]
+            >>> plt.plot(x, psf.evaluate(x, *p)) # doctest: +ELLIPSIS
+            [<matplotlib.lines.Line2D object at ...>]
+            >>> plt.show()
 
         .. plot::
 
