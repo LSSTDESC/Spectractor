@@ -2571,7 +2571,12 @@ class PSF1DAstropy(Fittable1DModel):
         .. plot::
 
             import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.psf import PSF1DAstropy
+            p = [2,30,4,2,-0.5,1,10]
+            x = np.arange(0, 60, 1)
             xx = np.arange(0, 60, 0.01)
+            psf = PSF1DAstropy(*p)
             plt.plot(xx, psf.evaluate(xx, *p))
             plt.plot(x, psf.evaluate(x, *p))
             plt.show()
