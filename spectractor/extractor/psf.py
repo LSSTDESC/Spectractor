@@ -2563,10 +2563,12 @@ class PSF1DAstropy(Fittable1DModel):
         >>> x = np.arange(0, 60, 1)
         >>> p = [2,30,4,2,-0.5,1,10]
         >>> psf = PSF1DAstropy(*p)
-        >>> i = psf.integrate()
-        >>> assert np.isclose(i, 10.059742339728174)
-        >>> i = psf.integrate(bounds=(0,60), x_array=x)
-        >>> assert np.isclose(i, 10.046698028728645)
+        >>> xx = np.arange(0, 60, 0.01)
+        >>> plt.plot(xx, psf.evaluate(xx, *p)) # doctest: +ELLIPSIS
+        [<matplotlib.lines.Line2D object at ...>]
+        >>> plt.plot(x, psf.evaluate(x, *p)) # doctest: +ELLIPSIS
+        [<matplotlib.lines.Line2D object at ...>]
+        >>> plt.show()
 
         .. plot::
 
@@ -2577,9 +2579,15 @@ class PSF1DAstropy(Fittable1DModel):
             x = np.arange(0, 60, 1)
             xx = np.arange(0, 60, 0.01)
             psf = PSF1DAstropy(*p)
+            fig = plt.figure(figsize=(5,5))
             plt.plot(xx, psf.evaluate(xx, *p))
             plt.plot(x, psf.evaluate(x, *p))
             plt.show()
+
+        >>> i = psf.integrate()
+        >>> assert np.isclose(i, 10.059742339728174)  #doctest: +SKIP
+        >>> i = psf.integrate(bounds=(0,60), x_array=x)
+        >>> assert np.isclose(i, 10.046698028728645)
 
         """
         params = [getattr(self, p).value for p in self.param_names]
