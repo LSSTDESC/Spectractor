@@ -11,6 +11,7 @@ Welcome to Spectractor's documentation!
     :caption: Contents:
 
     spectractor
+    source/spectractor.extractor
     README
 
 Indices and tables

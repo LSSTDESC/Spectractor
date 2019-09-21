@@ -2019,8 +2019,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         with :math:`\vec{x}` the 2D array  of the pixel coordinates, :math:`\vec{A}` the amplitude parameter array
         along the x axis of the spectrogram, :math:`\phi\left(\vec{x},\vec{p}_i\right)` the 2D PSF kernel whose integral
-        is normalised to one parametrized with the :math:`\vec{p}_i` non-linear parameter array. If the :math:`\vec{x}`
-         2D array is flatten in 1D, equation :eq:`chromaticpsf2d` is
+        is normalised to one parametrized with the :math:`\vec{p}_i` non-linear parameter array. If the :math:`\vec{x}` 2D array is flatten in 1D, equation :eq:`chromaticpsf2d` is
 
         .. math ::
             :label: chromaticpsf2d_matrix
@@ -2039,12 +2038,12 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         with :math:`\mathbf{M}` the design matrix.
 
-        The goal of this function is to perform a minimisation of the amplitude vector :math:`\mathbf{A}` given a set of non-linear parameters
-        :math:`\mathbf{p}` and a spectrogram data array :math:`mathbf{y}` modelise as
+        The goal of this function is to perform a minimisation of the amplitude vector :math:`\mathbf{A}` given
+        a set of non-linear parameters :math:`\mathbf{p}` and a spectrogram data array :math:`mathbf{y}` modelise as
 
-        .. math:: \mathbf{y} = \mathbf{m}(\vec{x},\vec{p}) + \epsilon
+        .. math:: \mathbf{y} = \mathbf{m}(\vec{x},\vec{p}) + \vec{\epsilon}
 
-        with :math:`epsilon` a random noise. The :math:`\chi^2` function to minimise is
+        with :math:`\vec{\epsilon}` a random noise vector. The :math:`\chi^2` function to minimise is
 
         .. math::
             :label: chromaticspsf2d_chi2
@@ -2054,7 +2053,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
 
         with :math:`\mathbf{W}` the weight matrix, inverse of the covariance matrix. In our case this matrix is diagonal
-        as the pixels are considered all independant. The minimum of equation :eq:`chromaticspsf2d_chi2` is reached for
+        as the pixels are considered all independent. The minimum of equation :eq:`chromaticspsf2d_chi2` is reached for
         a the set of amplitude parameters :math:`\hat{\mathbf{A}}` given by
 
         .. math::
