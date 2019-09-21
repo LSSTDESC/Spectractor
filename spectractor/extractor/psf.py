@@ -2605,7 +2605,6 @@ class PSF1DAstropy(Fittable1DModel):
 
         .. plot::
             :include-source:
-            :options: +SKIP
 
             >>> import matplotlib.pyplot as plt
             >>> import numpy as np
