@@ -8,10 +8,71 @@ from spectractor.config import set_logger
 from astropy.stats import SigmaClip
 from photutils import Background2D, SExtractorBackground
 from scipy.signal import medfilt2d
-from scipy.interpolate import interp2d
+from scipy.interpolate import interp2d, interp1d
 
 
-def extract_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
+def extract_background_fit1D(data, err, deg=1, ws=(20, 30), sigma=5):
+    """
+    Fit a polynomial background with outlier removal, on lateral bands defined by the ws parameter.
+
+    Parameters
+    ----------
+    data: array
+        The 2D array image. The transverse profile is fitted on the y direction for all pixels along the x direction.
+    err: array
+        The uncertainties related to the data array.
+    deg: int
+        Degree of the polynomial model for the background (default: 1).
+    ws: list
+        up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
+    sigma: int
+        Sigma for outlier rejection (default: 5).
+
+    Returns
+    -------
+    bgd_model_func: callable
+        A 1D function to model the extracted background
+
+    Examples
+    --------
+
+    Build a mock spectrogram with random Poisson noise:
+
+    .. doctest::
+
+        >>> from spectractor.extractor.psf import PSF1D
+        >>> p = np.array([300,  50, 3, 2, -0.1, 2, 200])
+        >>> psf = PSF1D(p)
+        >>> x = np.arange(100)
+        >>> data = psf.evaluate(x, p)
+        >>> bgd = 2*np.ones_like(x)
+        >>> data += bgd
+        >>> data = np.random.poisson(data)
+        >>> data_errors = np.sqrt(data+1)
+
+    Extract the background:
+
+    .. doctest::
+
+        >>> bgd_model_func = extract_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5)
+        >>> np.mean((bgd_model_func(x)-bgd)/data_errors) < 0.2
+        True
+    """
+    Ny = data.size
+    middle = Ny // 2
+    index = np.arange(Ny)
+    # Prepare the fit
+    bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
+    bgd_model = np.zeros_like(data).astype(float)
+    # Fit the background with a polynomial function
+    bgd = data[bgd_index]
+    bgd_fit, outliers = fit_poly1d_outlier_removal(bgd_index, bgd, order=deg, sigma=sigma, niter=2)
+    bgd_model = bgd_fit(index)
+    bgd_model_func = interp1d(index, bgd_model, kind='linear', bounds_error=False, fill_value=None)
+    return bgd_model_func
+
+
+def extract_background_fit1Dslices(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
     """
     Fit a polynomial background slice per slice along the x axis,
     with outlier removal, on lateral bands defined by the ws parameter.
@@ -54,9 +115,8 @@ def extract_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=
     >>> data_errors = np.sqrt(data+1)
 
     # Fit the transverse profile:
-    >>> bgd_model = extract_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5, pixel_step=1)
+    >>> bgd_model = extract_background_fit1Dslices(data, data_errors, deg=1, ws=[30,50], sigma=5, pixel_step=1)
     """
-    my_logger = set_logger(__name__)
     Ny, Nx = data.shape
     middle = Ny // 2
     index = np.arange(Ny)
@@ -70,8 +130,6 @@ def extract_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=
         bgd = data[bgd_index, x]
         bgd_fit, outliers = fit_poly1d_outlier_removal(bgd_index, bgd, order=deg, sigma=sigma, niter=2)
         bgd_model[:, x] = bgd_fit(index)
-    # Interpolate the grid on unfitted pixels
-    bgd_fit = bgd_model[:, pixel_range]
     # Filter the background model
     bgd_model = medfilt2d(bgd_model, kernel_size=[3, 9])
     bgd_model_func = interp2d(np.arange(Nx), index, bgd_model, kind='linear', bounds_error=False, fill_value=None)
