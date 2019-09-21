@@ -12,7 +12,14 @@ Welcome to Spectractor's documentation!
 
     spectractor
     source/spectractor.extractor
-    README
+    source/spectractor.simulation
+    source/spectractor.fit
+    ../README
+
+Readme File
+===========
+
+.. mdinclude:: ../README.md
 
 Indices and tables
 ==================

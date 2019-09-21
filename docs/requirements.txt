@@ -4,3 +4,4 @@ matplotlib
 pandas
 astropy>3.1
 coloredlogs
+recommonmark
