@@ -12,6 +12,15 @@ spectractor\.simulation\.atmosphere module
     :undoc-members:
     :show-inheritance:
 
+spectractor\.simulation\.libradtran module
+-------------------------------------------------
+
+.. automodule:: spectractor.simulation.libradtran
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 spectractor\.simulation\.image\_simulation module
 -------------------------------------------------
 
