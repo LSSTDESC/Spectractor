@@ -417,78 +417,6 @@ the other columns the future simulations.</p>
 </dd></dl>
 
 </div>
-<div class="section" id="module-spectractor.simulation.libradtran">
-<span id="spectractor-simulation-libradtran-module"></span><h2>spectractor.simulation.libradtran module<a class="headerlink" href="#module-spectractor.simulation.libradtran" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
-<dt id="spectractor.simulation.libradtran.Libradtran">
-<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.libradtran.</code><code class="sig-name descname">Libradtran</code><span class="sig-paren">(</span><em class="sig-param">home=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
-<dl class="method">
-<dt id="spectractor.simulation.libradtran.Libradtran.run">
-<code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">inp</em>, <em class="sig-param">out</em>, <em class="sig-param">path=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.run" title="Permalink to this definition">¶</a></dt>
-<dd><p>Run the libratran command uvpsec.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>inp</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – Input file.</p></li>
-<li><p><strong>out</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – Output file.</p></li>
-<li><p><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a><em>, </em><em>optional</em>) – Path to bin/uvpsec if necessary, otherwise use  self.home (default: “”)</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.libradtran.Libradtran.simulate">
-<code class="sig-name descname">simulate</code><span class="sig-paren">(</span><em class="sig-param">airmass</em>, <em class="sig-param">pwv</em>, <em class="sig-param">ozone</em>, <em class="sig-param">aerosol</em>, <em class="sig-param">pressure</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.simulate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Simulate the atmosphere transmission with Libratran.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>airmass</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – The airmass of the atmosphere.</p></li>
-<li><p><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor amount in mm.</p></li>
-<li><p><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson units.</p></li>
-<li><p><strong>aerosol</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD of the aerosols.</p></li>
-<li><p><strong>pressure</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Pressure of the atmosphere in hPa.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p><strong>output_file_name</strong> – The output file name relative to the current directory.</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)">str</a></p>
-</dd>
-</dl>
-<p class="rubric">Examples</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span> <span class="o">=</span> <span class="kc">True</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">lib</span> <span class="o">=</span> <span class="n">Libradtran</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">output</span> <span class="o">=</span> <span class="n">lib</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="mf">1.2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mf">0.07</span><span class="p">,</span> <span class="mi">800</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
-<span class="go">simulations/pp/us/as/rt/in/RT_CTIO_pp_us_as_rt_z12_pwv20_oz40_aer7.OUT</span>
-</pre></div>
-</div>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.libradtran.Libradtran.write_input">
-<code class="sig-name descname">write_input</code><span class="sig-paren">(</span><em class="sig-param">filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.write_input"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.write_input" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="function">
-<dt id="spectractor.simulation.libradtran.clean_simulation_directory">
-<code class="sig-prename descclassname">spectractor.simulation.libradtran.</code><code class="sig-name descname">clean_simulation_directory</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#clean_simulation_directory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.clean_simulation_directory" title="Permalink to this definition">¶</a></dt>
-<dd><p>Remove the simulations directory.</p>
-<p class="rubric">Examples</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ensure_dir</span><span class="p">(</span><span class="s1">&#39;simulations&#39;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">clean_simulation_directory</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s1">&#39;simulations&#39;</span><span class="p">)</span>
-</pre></div>
-</div>
-</dd></dl>
-
-</div>
 <div class="section" id="module-spectractor.simulation.image_simulation">
 <span id="spectractor-simulation-image-simulation-module"></span><h2>spectractor.simulation.image_simulation module<a class="headerlink" href="#module-spectractor.simulation.image_simulation" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
@@ -683,15 +611,15 @@ Then different parameters and systematics can be set:
 </dd></dl>
 
 </div>
-<div class="section" id="id1">
-<h2>spectractor.simulation.libradtran module<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
-<span class="target" id="module-spectractor.simulation.libradtran"></span><dl class="class">
-<dt>
-<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.libradtran.</code><code class="sig-name descname">Libradtran</code><span class="sig-paren">(</span><em class="sig-param">home=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran"><span class="viewcode-link">[source]</span></a></dt>
+<div class="section" id="module-spectractor.simulation.libradtran">
+<span id="spectractor-simulation-libradtran-module"></span><h2>spectractor.simulation.libradtran module<a class="headerlink" href="#module-spectractor.simulation.libradtran" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="spectractor.simulation.libradtran.Libradtran">
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.libradtran.</code><code class="sig-name descname">Libradtran</code><span class="sig-paren">(</span><em class="sig-param">home=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <dl class="method">
-<dt>
-<code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">inp</em>, <em class="sig-param">out</em>, <em class="sig-param">path=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.run"><span class="viewcode-link">[source]</span></a></dt>
+<dt id="spectractor.simulation.libradtran.Libradtran.run">
+<code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">inp</em>, <em class="sig-param">out</em>, <em class="sig-param">path=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.run" title="Permalink to this definition">¶</a></dt>
 <dd><p>Run the libratran command uvpsec.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -705,8 +633,8 @@ Then different parameters and systematics can be set:
 </dd></dl>
 
 <dl class="method">
-<dt>
-<code class="sig-name descname">simulate</code><span class="sig-paren">(</span><em class="sig-param">airmass</em>, <em class="sig-param">pwv</em>, <em class="sig-param">ozone</em>, <em class="sig-param">aerosol</em>, <em class="sig-param">pressure</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.simulate"><span class="viewcode-link">[source]</span></a></dt>
+<dt id="spectractor.simulation.libradtran.Libradtran.simulate">
+<code class="sig-name descname">simulate</code><span class="sig-paren">(</span><em class="sig-param">airmass</em>, <em class="sig-param">pwv</em>, <em class="sig-param">ozone</em>, <em class="sig-param">aerosol</em>, <em class="sig-param">pressure</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.simulate" title="Permalink to this definition">¶</a></dt>
 <dd><p>Simulate the atmosphere transmission with Libratran.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -736,15 +664,15 @@ Then different parameters and systematics can be set:
 </dd></dl>
 
 <dl class="method">
-<dt>
-<code class="sig-name descname">write_input</code><span class="sig-paren">(</span><em class="sig-param">filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.write_input"><span class="viewcode-link">[source]</span></a></dt>
+<dt id="spectractor.simulation.libradtran.Libradtran.write_input">
+<code class="sig-name descname">write_input</code><span class="sig-paren">(</span><em class="sig-param">filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.write_input"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.write_input" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="function">
-<dt>
-<code class="sig-prename descclassname">spectractor.simulation.libradtran.</code><code class="sig-name descname">clean_simulation_directory</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#clean_simulation_directory"><span class="viewcode-link">[source]</span></a></dt>
+<dt id="spectractor.simulation.libradtran.clean_simulation_directory">
+<code class="sig-prename descclassname">spectractor.simulation.libradtran.</code><code class="sig-name descname">clean_simulation_directory</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#clean_simulation_directory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.clean_simulation_directory" title="Permalink to this definition">¶</a></dt>
 <dd><p>Remove the simulations directory.</p>
 <p class="rubric">Examples</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ensure_dir</span><span class="p">(</span><span class="s1">&#39;simulations&#39;</span><span class="p">)</span>

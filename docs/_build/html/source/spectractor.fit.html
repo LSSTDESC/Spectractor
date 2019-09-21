@@ -87,34 +87,22 @@
             
               <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="spectractor.html">spectractor package</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="spectractor.html#subpackages">Subpackages</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="spectractor.extractor.html">spectractor.extractor package</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">spectractor.fit package</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#submodules">Submodules</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#module-spectractor.fit.fitter">spectractor.fit.fitter module</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#module-spectractor.fit.statistics">spectractor.fit.statistics module</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#module-spectractor.fit">Module contents</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">spectractor</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="spectractor.html">spectractor package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="spectractor.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="spectractor.extractor.html">spectractor.extractor package</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">spectractor.fit package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spectractor.simulation.html">spectractor.simulation package</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="spectractor.simulation.html">spectractor.simulation package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#module-spectractor.config">spectractor.config module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#module-spectractor.logbook">spectractor.logbook module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#module-spectractor.parameters">spectractor.parameters module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#module-spectractor.tools">spectractor.tools module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#module-spectractor">Module contents</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="spectractor.html#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="spectractor.html#module-spectractor.config">spectractor.config module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="spectractor.html#module-spectractor.logbook">spectractor.logbook module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="spectractor.html#module-spectractor.parameters">spectractor.parameters module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="spectractor.html#module-spectractor.tools">spectractor.tools module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="spectractor.html#module-spectractor">Module contents</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="spectractor.extractor.html">spectractor.extractor package</a></li>
-<li class="toctree-l1"><a class="reference internal" href="spectractor.simulation.html">spectractor.simulation package</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">spectractor.fit package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-spectractor.fit.fitter">spectractor.fit.fitter module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-spectractor.fit.statistics">spectractor.fit.statistics module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-spectractor.fit">Module contents</a></li>
 </ul>
 </li>
 </ul>
@@ -161,6 +149,8 @@
   <ul class="wy-breadcrumbs">
     
       <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="modules.html">spectractor</a> &raquo;</li>
         
           <li><a href="spectractor.html">spectractor package</a> &raquo;</li>
         
@@ -315,7 +305,6 @@
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">w</span> <span class="o">=</span> <span class="n">FitWorkspace</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">x</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">model_err</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="o">*</span><span class="n">p</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -524,6 +513,98 @@
 <dd></dd></dl>
 
 </dd></dl>
+
+</div>
+<div class="section" id="module-spectractor.fit.fit_spectrogram">
+<span id="spectractor-fit-fit-spectrogram-module"></span><h2>spectractor.fit.fit_spectrogram module<a class="headerlink" href="#module-spectractor.fit.fit_spectrogram" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace">
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.fit.fit_spectrogram.</code><code class="sig-name descname">SpectrogramFitWorkspace</code><span class="sig-paren">(</span><em class="sig-param">file_name</em>, <em class="sig-param">atmgrid_file_name=''</em>, <em class="sig-param">nwalkers=18</em>, <em class="sig-param">nsteps=1000</em>, <em class="sig-param">burnin=100</em>, <em class="sig-param">nbins=10</em>, <em class="sig-param">verbose=0</em>, <em class="sig-param">plot=False</em>, <em class="sig-param">live_fit=False</em>, <em class="sig-param">truth=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fit_spectrogram.html#SpectrogramFitWorkspace"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#spectractor.fit.fitter.FitWorkspace" title="spectractor.fit.fitter.FitWorkspace"><code class="xref py py-class docutils literal notranslate"><span class="pre">spectractor.fit.fitter.FitWorkspace</span></code></a></p>
+<dl class="method">
+<dt id="spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.crop_spectrogram">
+<code class="sig-name descname">crop_spectrogram</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fit_spectrogram.html#SpectrogramFitWorkspace.crop_spectrogram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.crop_spectrogram" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.get_spectrogram_truth">
+<code class="sig-name descname">get_spectrogram_truth</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fit_spectrogram.html#SpectrogramFitWorkspace.get_spectrogram_truth"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.get_spectrogram_truth" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.jacobian">
+<code class="sig-name descname">jacobian</code><span class="sig-paren">(</span><em class="sig-param">params</em>, <em class="sig-param">epsilon</em>, <em class="sig-param">fixed_params=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fit_spectrogram.html#SpectrogramFitWorkspace.jacobian"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.jacobian" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.plot_fit">
+<code class="sig-name descname">plot_fit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fit_spectrogram.html#SpectrogramFitWorkspace.plot_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.plot_fit" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.fit.fit_spectrogram</span> <span class="k">import</span> <span class="n">SpectrogramFitWorkspace</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">file_name</span> <span class="o">=</span> <span class="s1">&#39;tests/data/reduc_20170530_134_spectrum.fits&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">atmgrid_file_name</span> <span class="o">=</span> <span class="n">file_name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;spectrum&#39;</span><span class="p">,</span> <span class="s1">&#39;atmsim&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_workspace</span> <span class="o">=</span> <span class="n">SpectrogramFitWorkspace</span><span class="p">(</span><span class="n">file_name</span><span class="p">,</span> <span class="n">atmgrid_file_name</span><span class="o">=</span><span class="n">atmgrid_file_name</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">A1</span><span class="p">,</span> <span class="n">A2</span><span class="p">,</span> <span class="n">ozone</span><span class="p">,</span> <span class="n">pwv</span><span class="p">,</span> <span class="n">aerosols</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">shift_x</span><span class="p">,</span> <span class="n">shift_y</span><span class="p">,</span> <span class="n">angle</span><span class="p">,</span> <span class="o">*</span><span class="n">psf</span> <span class="o">=</span> <span class="n">fit_workspace</span><span class="o">.</span><span class="n">p</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">model_err</span> <span class="o">=</span> <span class="n">fit_workspace</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">A1</span><span class="p">,</span> <span class="n">A2</span><span class="p">,</span> <span class="n">ozone</span><span class="p">,</span> <span class="n">pwv</span><span class="p">,</span> <span class="n">aerosols</span><span class="p">,</span>
+<span class="gp">... </span><span class="n">D</span><span class="p">,</span> <span class="n">shift_x</span><span class="p">,</span> <span class="n">shift_y</span><span class="p">,</span> <span class="n">angle</span><span class="p">,</span> <span class="n">psf</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_workspace</span><span class="o">.</span><span class="n">lambdas</span> <span class="o">=</span> <span class="n">lambdas</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_workspace</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">model</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_workspace</span><span class="o">.</span><span class="n">model_err</span> <span class="o">=</span> <span class="n">model_err</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_workspace</span><span class="o">.</span><span class="n">plot_fit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>(<a class="reference external" href="../source/spectractor-fit-1.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-fit-1.png" src="../_images/spectractor-fit-1.png" />
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.plot_spectrogram_comparison_simple">
+<code class="sig-name descname">plot_spectrogram_comparison_simple</code><span class="sig-paren">(</span><em class="sig-param">ax</em>, <em class="sig-param">title=''</em>, <em class="sig-param">extent=None</em>, <em class="sig-param">dispersion=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fit_spectrogram.html#SpectrogramFitWorkspace.plot_spectrogram_comparison_simple"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.plot_spectrogram_comparison_simple" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.simulate">
+<code class="sig-name descname">simulate</code><span class="sig-paren">(</span><em class="sig-param">A1</em>, <em class="sig-param">A2</em>, <em class="sig-param">ozone</em>, <em class="sig-param">pwv</em>, <em class="sig-param">aerosols</em>, <em class="sig-param">D</em>, <em class="sig-param">shift_x</em>, <em class="sig-param">shift_y</em>, <em class="sig-param">angle</em>, <em class="sig-param">*psf_poly_params</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fit_spectrogram.html#SpectrogramFitWorkspace.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fit_spectrogram.SpectrogramFitWorkspace.simulate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the model prediction given a set of parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>p</strong> (<em>array_like</em>) – Array of parameters for the computation of the model.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>x</strong> (<em>array_like</em>) – The abscisse of the model prediction.</p></li>
+<li><p><strong>model</strong> (<em>array_like</em>) – The model prediction.</p></li>
+<li><p><strong>model_err</strong> (<em>array_like</em>) – The uncertainty on the model prediction.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">w</span> <span class="o">=</span> <span class="n">FitWorkspace</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">model_err</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="o">*</span><span class="n">p</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="spectractor.fit.fit_spectrogram.lnprob_spectrogram">
+<code class="sig-prename descclassname">spectractor.fit.fit_spectrogram.</code><code class="sig-name descname">lnprob_spectrogram</code><span class="sig-paren">(</span><em class="sig-param">p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fit_spectrogram.html#lnprob_spectrogram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fit_spectrogram.lnprob_spectrogram" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="spectractor.fit.fit_spectrogram.plot_psf_poly_params">
+<code class="sig-prename descclassname">spectractor.fit.fit_spectrogram.</code><code class="sig-name descname">plot_psf_poly_params</code><span class="sig-paren">(</span><em class="sig-param">psf_poly_params</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fit_spectrogram.html#plot_psf_poly_params"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fit_spectrogram.plot_psf_poly_params" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="spectractor.fit.fit_spectrogram.run_spectrogram_minimisation">
+<code class="sig-prename descclassname">spectractor.fit.fit_spectrogram.</code><code class="sig-name descname">run_spectrogram_minimisation</code><span class="sig-paren">(</span><em class="sig-param">fit_workspace</em>, <em class="sig-param">method='newton'</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fit_spectrogram.html#run_spectrogram_minimisation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fit_spectrogram.run_spectrogram_minimisation" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
 
 </div>
 <div class="section" id="module-spectractor.fit">
