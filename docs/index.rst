@@ -19,7 +19,7 @@ Welcome to Spectractor's documentation!
 Readme File
 ===========
 
-.. mdinclude:: ../README.md
+.. include:: ../README.md
 
 Indices and tables
 ==================
