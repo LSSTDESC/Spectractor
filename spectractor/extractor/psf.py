@@ -2613,11 +2613,12 @@ class PSF1DAstropy(Fittable1DModel):
             xx = np.arange(0, 60, 0.01)
             psf = PSF1DAstropy(*p)
             fig = plt.figure(figsize=(5,3))
-            plt.plot(xx, psf.evaluate(xx, *p))
-            plt.plot(x, psf.evaluate(x, *p))
+            plt.plot(xx, psf.evaluate(xx, *p), label="high sampling")
+            plt.plot(x, psf.evaluate(x, *p), label="low sampling")
             plt.grid()
             plt.xlabel('x')
             plt.ylabel('PSF(x)')
+            plt.legend()
             plt.show()
 
         .. doctest::
@@ -3117,7 +3118,7 @@ class PSF2DAstropy(Fittable2DModel):
     stddev = Parameter('stddev', default=1)
     saturation = Parameter('saturation', default=1)
 
-    param_titles = ["A", "x", "y", "\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
+    param_titles = ["A", "x", "y", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
 
     @staticmethod
     def evaluate(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation):
