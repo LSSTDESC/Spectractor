@@ -253,6 +253,7 @@
 <span class="sd">        --------</span>
 
 <span class="sd">        Mercury-Argon lamp:</span>
+
 <span class="sd">        &gt;&gt;&gt; t = ArcLamp(&quot;HG-AR&quot;, verbose=False)</span>
 <span class="sd">        &gt;&gt;&gt; print([l.wavelength for l in t.lines.lines][:5])</span>
 <span class="sd">        [253.652, 296.728, 302.15, 313.155, 334.148]</span>
@@ -316,6 +317,7 @@
 <span class="sd">        --------</span>
 
 <span class="sd">        Emission line object:</span>
+
 <span class="sd">        &gt;&gt;&gt; s = Star(&#39;3C273&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; print(s.label)</span>
 <span class="sd">        3C273</span>
@@ -325,6 +327,7 @@
 <span class="sd">        True</span>
 
 <span class="sd">        Standard star:</span>
+
 <span class="sd">        &gt;&gt;&gt; s = Star(&#39;HD111980&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; print(s.label)</span>
 <span class="sd">        HD111980</span>
@@ -489,7 +492,7 @@
         <span class="k">for</span> <span class="n">isp</span><span class="p">,</span> <span class="n">sp</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spectra</span><span class="p">):</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wavelengths</span><span class="p">[</span><span class="n">isp</span><span class="p">],</span> <span class="n">sp</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Spectrum </span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">isp</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">((</span><span class="mi">300</span><span class="p">,</span> <span class="mi">1100</span><span class="p">))</span>
-        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;$\lambda$ [nm]&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\lambda$ [nm]&#39;</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Flux&#39;</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
@@ -499,8 +502,6 @@
 
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
     <span class="kn">import</span> <span class="nn">doctest</span>
-    <span class="c1">#if np.__version__ &gt;= &quot;1.14.0&quot;:</span>
-    <span class="c1">#   np.set_printoptions(legacy=&quot;1.13&quot;)</span>
 
     <span class="n">doctest</span><span class="o">.</span><span class="n">testmod</span><span class="p">()</span>
 </pre></div>

@@ -741,6 +741,7 @@ class ChromaticPSF:
         --------
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=1, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
         >>> data = s.evaluate(poly_params_test)
@@ -748,6 +749,7 @@ class ChromaticPSF:
         >>> data_errors = np.sqrt(data+1)
 
         From the polynomial parameters to the profile parameters:
+
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
 
         ..  doctest::
@@ -756,6 +758,7 @@ class ChromaticPSF:
             >>> assert(np.all(np.isclose(profile_params[0], [0, 50, 5, 2, 0, 2, 8e3])))
 
         From the profile parameters to the polynomial parameters:
+
         >>> profile_params = s.from_profile_params_to_poly_params(profile_params)
 
         ..  doctest::
@@ -999,7 +1002,11 @@ class ChromaticPSF:
         >>> s = ChromaticPSF1D(Nx=100, Ny=20, deg=4, saturation=8000)
         >>> poly_params = s.generate_test_poly_params()
         >>> output = s.evaluate(poly_params)
-        >>> assert not np.all(np.isclose(output, 0))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert not np.all(np.isclose(output, 0))
 
         >>> import matplotlib.pyplot as plt
         >>> im = plt.imshow(output, origin='lower')  # doctest: +ELLIPSIS
