@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../../../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../../../_static/jquery.js"></script>
         <script type="text/javascript" src="../../../_static/underscore.js"></script>
         <script type="text/javascript" src="../../../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
@@ -92,8 +83,11 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../source/modules.html">spectractor</a></li>
+</ul>
+
             
           
         </div>
@@ -155,12 +149,24 @@
            <div itemprop="articleBody">
             
   <h1>Source code for spectractor.extractor.images</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">astropy.coordinates</span> <span class="k">import</span> <span class="n">Angle</span>
+<span></span><span class="kn">from</span> <span class="nn">astropy.coordinates</span> <span class="k">import</span> <span class="n">Angle</span><span class="p">,</span> <span class="n">SkyCoord</span>
+<span class="kn">from</span> <span class="nn">astropy.modeling</span> <span class="k">import</span> <span class="n">fitting</span>
+<span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="kn">import</span> <span class="nn">astropy.units</span> <span class="k">as</span> <span class="nn">units</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">ndimage</span>
 <span class="kn">from</span> <span class="nn">matplotlib</span> <span class="k">import</span> <span class="n">cm</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">os</span>
 
-<span class="kn">from</span> <span class="nn">spectractor.extractor.targets</span> <span class="k">import</span> <span class="o">*</span>
-<span class="kn">from</span> <span class="nn">spectractor.extractor.psf</span> <span class="k">import</span> <span class="o">*</span>
-<span class="kn">from</span> <span class="nn">spectractor.extractor.dispersers</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="kn">from</span> <span class="nn">spectractor.config</span> <span class="k">import</span> <span class="n">set_logger</span>
+<span class="kn">from</span> <span class="nn">spectractor.extractor.targets</span> <span class="k">import</span> <span class="n">load_target</span>
+<span class="kn">from</span> <span class="nn">spectractor.extractor.dispersers</span> <span class="k">import</span> <span class="n">Hologram</span>
+<span class="kn">from</span> <span class="nn">spectractor.extractor.psf</span> <span class="k">import</span> <span class="n">fit_PSF2D_minuit</span>
+<span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="p">(</span><span class="n">plot_image_simple</span><span class="p">,</span> <span class="n">save_fits</span><span class="p">,</span> <span class="n">load_fits</span><span class="p">,</span> <span class="n">extract_info_from_CTIO_header</span><span class="p">,</span>
+                               <span class="n">fit_poly1d</span><span class="p">,</span> <span class="n">fit_poly1d_outlier_removal</span><span class="p">,</span> <span class="n">weighted_avg_and_std</span><span class="p">,</span>
+                               <span class="n">fit_poly2d_outlier_removal</span><span class="p">,</span> <span class="n">hessian_and_theta</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="Image"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.images.Image">[docs]</a><span class="k">class</span> <span class="nc">Image</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
@@ -180,12 +186,20 @@
 
 <span class="sd">        Examples</span>
 <span class="sd">        --------</span>
-<span class="sd">        &gt;&gt;&gt; im = Image(&#39;tests/data/reduc_20170605_028.fits&#39;)</span>
-<span class="sd">        &gt;&gt;&gt; assert im.file_name == &#39;tests/data/reduc_20170605_028.fits&#39;</span>
-<span class="sd">        &gt;&gt;&gt; assert im.data is not None and np.mean(im.data) &gt; 0</span>
-<span class="sd">        &gt;&gt;&gt; assert im.stat_errors is not None and np.mean(im.stat_errors) &gt; 0</span>
-<span class="sd">        &gt;&gt;&gt; assert im.header is not None</span>
-<span class="sd">        &gt;&gt;&gt; assert im.gain is not None and np.mean(im.gain) &gt; 0</span>
+
+<span class="sd">        .. doctest::</span>
+
+<span class="sd">            &gt;&gt;&gt; im = Image(&#39;tests/data/reduc_20170605_028.fits&#39;)</span>
+
+<span class="sd">        .. doctest::</span>
+<span class="sd">            :hide:</span>
+
+<span class="sd">            &gt;&gt;&gt; assert im.file_name == &#39;tests/data/reduc_20170605_028.fits&#39;</span>
+<span class="sd">            &gt;&gt;&gt; assert im.data is not None and np.mean(im.data) &gt; 0</span>
+<span class="sd">            &gt;&gt;&gt; assert im.stat_errors is not None and np.mean(im.stat_errors) &gt; 0</span>
+<span class="sd">            &gt;&gt;&gt; assert im.header is not None</span>
+<span class="sd">            &gt;&gt;&gt; assert im.gain is not None and np.mean(im.gain) &gt; 0</span>
+
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">file_name</span> <span class="o">=</span> <span class="n">file_name</span>
@@ -200,13 +214,19 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">header</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">data_rotated</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">gain</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gain</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># in e-/ADU</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">read_out_noise</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors_rotated</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">rotation_angle</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">parallactic_angle</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">saturation</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">load_image</span><span class="p">(</span><span class="n">file_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">CALLING_CODE</span> <span class="o">!=</span> <span class="s1">&#39;LSST_DM&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">load_image</span><span class="p">(</span><span class="n">file_name</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># data provided by the LSST shim, just instantiate objects</span>
+            <span class="c1"># necessary for the following code not to fail</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">Header</span><span class="p">()</span>
         <span class="c1"># Load the target if given</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">target_pixcoords</span> <span class="o">=</span> <span class="kc">None</span>
@@ -240,8 +260,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Loading disperser </span><span class="si">{self.disperser_label}</span><span class="s1">...&#39;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">disperser</span> <span class="o">=</span> <span class="n">Hologram</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">disperser_label</span><span class="p">,</span> <span class="n">D</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">DISTANCE2CCD</span><span class="p">,</span>
                                   <span class="n">data_dir</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">HOLO_DIR</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">convert_to_ADU_rate_units</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">compute_statistical_error</span><span class="p">()</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">compute_statistical_error</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">convert_to_ADU_rate_units</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="Image.save_image"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.images.Image.save_image">[docs]</a>    <span class="k">def</span> <span class="nf">save_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_file_name</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Save the image in a fits file.</span>
@@ -271,9 +291,16 @@
 <span class="sd">        600.0</span>
 <span class="sd">        &gt;&gt;&gt; data_before = np.copy(im.data)</span>
 <span class="sd">        &gt;&gt;&gt; im.convert_to_ADU_rate_units()</span>
-<span class="sd">        &gt;&gt;&gt; assert np.all(np.isclose(data_before, im.data * im.expo))</span>
+
+<span class="sd">        .. doctest::</span>
+<span class="sd">            :hide:</span>
+
+<span class="sd">            &gt;&gt;&gt; assert np.all(np.isclose(data_before, im.data * im.expo))</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">expo</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors</span> <span class="o">/=</span> <span class="bp">self</span><span class="o">.</span><span class="n">expo</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors_rotated</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors_rotated</span> <span class="o">/=</span> <span class="bp">self</span><span class="o">.</span><span class="n">expo</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">units</span> <span class="o">=</span> <span class="s1">&#39;ADU/s&#39;</span></div>
 
 <div class="viewcode-block" id="Image.convert_to_ADU_units"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.images.Image.convert_to_ADU_units">[docs]</a>    <span class="k">def</span> <span class="nf">convert_to_ADU_units</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -288,26 +315,60 @@
 <span class="sd">        &gt;&gt;&gt; im.convert_to_ADU_rate_units()</span>
 <span class="sd">        &gt;&gt;&gt; data_after = np.copy(im.data)</span>
 <span class="sd">        &gt;&gt;&gt; im.convert_to_ADU_units()</span>
-<span class="sd">        &gt;&gt;&gt; assert np.all(np.isclose(data_before, im.data))</span>
+
+<span class="sd">        .. doctest::</span>
+<span class="sd">            :hide:</span>
+
+<span class="sd">            &gt;&gt;&gt; assert np.all(np.isclose(data_before, im.data))</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">expo</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">expo</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors_rotated</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors_rotated</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">expo</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">units</span> <span class="o">=</span> <span class="s1">&#39;ADU&#39;</span></div>
 
 <div class="viewcode-block" id="Image.compute_statistical_error"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.images.Image.compute_statistical_error">[docs]</a>    <span class="k">def</span> <span class="nf">compute_statistical_error</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Compute the image noise map from Image.data as np.sqrt(data) / np.sqrt(gain * expo).</span>
-
-<span class="sd">        The read out noise is not included</span>
-
+        <span class="sd">&quot;&quot;&quot;Compute the image noise map from Image.data. The latter must be in ADU.</span>
+<span class="sd">        The function first converts the image in electron counts units, evaluate the Poisson noise,</span>
+<span class="sd">        add in quadrature the read-out noise, takes the square root and returns a map in ADU units.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">units</span> <span class="o">!=</span> <span class="s1">&#39;ADU&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Noise must be estimated on an image in ADU units&#39;</span><span class="p">)</span>
         <span class="c1"># removes the zeros and negative pixels first</span>
         <span class="c1"># set to minimum positive value</span>
         <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
-        <span class="n">zeros</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">data</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">)</span>
-        <span class="n">min_noz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">data</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)])</span>
-        <span class="n">data</span><span class="p">[</span><span class="n">zeros</span><span class="p">]</span> <span class="o">=</span> <span class="n">min_noz</span>
-        <span class="c1"># compute poisson noise</span>
-        <span class="c1">#   TODO: add read out noise (add in square to electrons)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gain</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">expo</span><span class="p">)</span></div>
+        <span class="n">min_noz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">data</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="n">data</span><span class="p">[</span><span class="n">data</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">min_noz</span>
+        <span class="c1"># OLD: compute poisson noise in ADU/s without read-out noise</span>
+        <span class="c1"># self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)</span>
+        <span class="c1"># convert in e- counts</span>
+        <span class="n">err2</span> <span class="o">=</span> <span class="n">data</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">gain</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_out_noise</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">err2</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_out_noise</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_out_noise</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">err2</span><span class="p">)</span>
+        <span class="c1"># convert in ADU</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors</span> <span class="o">/=</span> <span class="bp">self</span><span class="o">.</span><span class="n">gain</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+            <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stat_errors</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+            <span class="n">fit</span><span class="p">,</span> <span class="n">cov</span><span class="p">,</span> <span class="n">model</span> <span class="o">=</span> <span class="n">fit_poly1d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">gain</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">fit</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">,</span> <span class="n">f</span><span class="s2">&quot;fitted gain=</span><span class="si">{gain:.3g}</span><span class="s2"> [e-/ADU]</span><span class="se">\n</span><span class="s2">intercept=</span><span class="si">{fit[1]:.3g}</span><span class="s2"> [ADU$^2$]&quot;</span>
+                                   <span class="n">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">fitted read-out={np.sqrt(fit[1]) * gain:.3g} [ADU]&quot;</span><span class="p">,</span>
+                       <span class="n">horizontalalignment</span><span class="o">=</span><span class="s1">&#39;left&#39;</span><span class="p">,</span> <span class="n">verticalalignment</span><span class="o">=</span><span class="s1">&#39;top&#39;</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">transAxes</span><span class="p">)</span>
+            <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+            <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="s2">&quot;k-&quot;</span><span class="p">)</span>
+            <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">grid</span><span class="p">()</span>
+            <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\sigma_{\mathrm</span><span class="si">{ADU}</span><span class="s2">}^2$ [ADU$^2$]&quot;</span><span class="p">)</span>
+            <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Data pixel values [ADU]&quot;</span><span class="p">)</span>
+            <span class="n">plot_image_simple</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">data</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">stat_errors</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s2">&quot;log10&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Uncertainty map&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">units</span><span class="p">,</span>
+                              <span class="n">target_pixcoords</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+            <span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">,</span> <span class="s1">&#39;uncertainty_map.png&#39;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="Image.compute_parallactic_angle"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.images.Image.compute_parallactic_angle">[docs]</a>    <span class="k">def</span> <span class="nf">compute_parallactic_angle</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Compute the parallactic angle.</span>
@@ -372,7 +433,7 @@
         <span class="n">plot_image_simple</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="n">title</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="n">units</span><span class="p">,</span> <span class="n">cax</span><span class="o">=</span><span class="n">cax</span><span class="p">,</span>
                           <span class="n">target_pixcoords</span><span class="o">=</span><span class="n">target_pixcoords</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="n">aspect</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="n">vmin</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cmap</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>   <span class="c1"># pragma: no cover</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div></div>
 
 
@@ -398,10 +459,11 @@
         <span class="n">image</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Pixel size rectangular: X=</span><span class="si">%d</span><span class="s1"> arcsec, Y=</span><span class="si">%d</span><span class="s1"> arcsec&#39;</span> <span class="o">%</span> <span class="p">(</span>
             <span class="n">parameters</span><span class="o">.</span><span class="n">CCD_PIXEL2ARCSEC</span><span class="p">,</span> <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;YPIXSIZE&#39;</span><span class="p">]))</span>
     <span class="n">image</span><span class="o">.</span><span class="n">coord</span> <span class="o">=</span> <span class="n">SkyCoord</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;RA&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39; &#39;</span> <span class="o">+</span> <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;DEC&#39;</span><span class="p">],</span> <span class="n">unit</span><span class="o">=</span><span class="p">(</span><span class="n">units</span><span class="o">.</span><span class="n">hourangle</span><span class="p">,</span> <span class="n">units</span><span class="o">.</span><span class="n">deg</span><span class="p">),</span>
-                          <span class="n">obstime</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;DATE-OBS&#39;</span><span class="p">])</span>
-    <span class="n">image</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Image loaded&#39;</span><span class="p">)</span>
+                           <span class="n">obstime</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;DATE-OBS&#39;</span><span class="p">])</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Image </span><span class="si">{image.file_name}</span><span class="s1"> loaded.&#39;</span><span class="p">)</span>
     <span class="c1"># compute CCD gain map</span>
     <span class="n">build_CTIO_gain_map</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+    <span class="n">build_CTIO_read_out_noise_map</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
     <span class="n">image</span><span class="o">.</span><span class="n">compute_parallactic_angle</span><span class="p">()</span></div>
 
 
@@ -425,7 +487,27 @@
     <span class="n">image</span><span class="o">.</span><span class="n">gain</span><span class="p">[</span><span class="n">size</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span><span class="n">size</span><span class="p">,</span> <span class="n">size</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span><span class="n">size</span><span class="p">]</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;GTGAIN22&#39;</span><span class="p">]</span></div>
 
 
-<div class="viewcode-block" id="load_LPNHE_image"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.images.load_LPNHE_image">[docs]</a><span class="k">def</span> <span class="nf">load_LPNHE_image</span><span class="p">(</span><span class="n">image</span><span class="p">):</span>
+<div class="viewcode-block" id="build_CTIO_read_out_noise_map"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.images.build_CTIO_read_out_noise_map">[docs]</a><span class="k">def</span> <span class="nf">build_CTIO_read_out_noise_map</span><span class="p">(</span><span class="n">image</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Compute the CTIO gain map according to header GAIN values.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    image: Image</span>
+<span class="sd">        The Image instance to fill with file data and header.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">size</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">read_out_noise</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+    <span class="c1"># ampli 11</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">read_out_noise</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">size</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">:</span><span class="n">size</span> <span class="o">//</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;GTRON11&#39;</span><span class="p">]</span>
+    <span class="c1"># ampli 12</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">read_out_noise</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">size</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">size</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span><span class="n">size</span><span class="p">]</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;GTRON12&#39;</span><span class="p">]</span>
+    <span class="c1"># ampli 21</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">read_out_noise</span><span class="p">[</span><span class="n">size</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span><span class="n">size</span><span class="p">,</span> <span class="mi">0</span><span class="p">:</span><span class="n">size</span><span class="p">]</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;GTRON21&#39;</span><span class="p">]</span>
+    <span class="c1"># ampli 22</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">read_out_noise</span><span class="p">[</span><span class="n">size</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span><span class="n">size</span><span class="p">,</span> <span class="n">size</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span><span class="n">size</span><span class="p">]</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;GTRON22&#39;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="load_LPNHE_image"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.images.load_LPNHE_image">[docs]</a><span class="k">def</span> <span class="nf">load_LPNHE_image</span><span class="p">(</span><span class="n">image</span><span class="p">):</span>  <span class="c1"># pragma: no cover</span>
     <span class="sd">&quot;&quot;&quot;Specific routine to load LPNHE fits files and load their data and properties for Spectractor.</span>
 
 <span class="sd">    Parameters</span>
@@ -479,11 +561,11 @@
     <span class="n">theX</span><span class="p">,</span> <span class="n">theY</span> <span class="o">=</span> <span class="n">guess</span>
     <span class="k">if</span> <span class="n">rotated</span><span class="p">:</span>
         <span class="n">angle</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">rotation_angle</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">180.</span>
-        <span class="n">rotmat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matrix</span><span class="p">([[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">angle</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">angle</span><span class="p">)],</span> <span class="p">[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">angle</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">angle</span><span class="p">)]])</span>
+        <span class="n">rotmat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">angle</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">angle</span><span class="p">)],</span> <span class="p">[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">angle</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">angle</span><span class="p">)]])</span>
         <span class="n">vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">target_pixcoords</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-        <span class="n">guess2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">rotmat</span><span class="p">,</span> <span class="n">vec</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">data_rotated</span><span class="o">.</span><span class="n">shape</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-        <span class="n">x0</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">guess2</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
-        <span class="n">y0</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">guess2</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+        <span class="n">guess2</span> <span class="o">=</span> <span class="n">rotmat</span> <span class="o">@</span> <span class="n">vec</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">data_rotated</span><span class="o">.</span><span class="n">shape</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">x0</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">guess2</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">y0</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">guess2</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
         <span class="n">guess</span> <span class="o">=</span> <span class="p">[</span><span class="n">x0</span><span class="p">,</span> <span class="n">y0</span><span class="p">]</span>
         <span class="n">Dx</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">XWINDOW_ROT</span>
         <span class="n">Dy</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">YWINDOW_ROT</span>
@@ -575,13 +657,22 @@
 
 <span class="sd">    .. plot::</span>
 
+<span class="sd">        import matplotlib.pyplot as plt</span>
+<span class="sd">        import numpy as np</span>
+<span class="sd">        from spectractor.extractor.images import Image</span>
+<span class="sd">        im = Image(&#39;tests/data/reduc_20170605_028.fits&#39;)</span>
 <span class="sd">        im.plot_image(target_pixcoords=[820, 580])</span>
 
 <span class="sd">    &gt;&gt;&gt; parameters.DEBUG = True</span>
 <span class="sd">    &gt;&gt;&gt; sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False)</span>
 <span class="sd">    &gt;&gt;&gt; x1, y1 = find_target_1Dprofile(im, sub_image, guess)</span>
-<span class="sd">    &gt;&gt;&gt; assert np.isclose(x1, np.argmax(np.nansum(sub_image, axis=0)), rtol=1e-2)</span>
-<span class="sd">    &gt;&gt;&gt; assert np.isclose(y1, np.argmax(np.nansum(sub_image, axis=1)), rtol=1e-2)</span>
+
+<span class="sd">    .. doctest::</span>
+<span class="sd">        :hide:</span>
+
+<span class="sd">        &gt;&gt;&gt; assert np.isclose(x1, np.argmax(np.nansum(sub_image, axis=0)), rtol=1e-2)</span>
+<span class="sd">        &gt;&gt;&gt; assert np.isclose(y1, np.argmax(np.nansum(sub_image, axis=1)), rtol=1e-2)</span>
+<span class="sd">        </span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">NY</span><span class="p">,</span> <span class="n">NX</span> <span class="o">=</span> <span class="n">sub_image</span><span class="o">.</span><span class="n">shape</span>
     <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">NX</span><span class="p">)</span>
@@ -624,8 +715,10 @@
         <span class="n">ax3</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Y [pixels]&#39;</span><span class="p">)</span>
         <span class="n">ax3</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="n">f</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">,</span> <span class="s1">&#39;namethisplot1.pdf&#39;</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">avX</span><span class="p">,</span> <span class="n">avY</span></div>
 
 
@@ -644,8 +737,8 @@
 <span class="sd">        The cropped image data array where the fit is performed.</span>
 <span class="sd">    guess: array_like</span>
 <span class="sd">        Two parameter array giving the estimated position of the target in the image.</span>
-<span class="sd">    sub_image: array_like</span>
-<span class="sd">        The cropped image data array where the fit is performed.</span>
+<span class="sd">    sub_errors: array_like</span>
+<span class="sd">        The image data uncertainties.</span>
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
@@ -733,8 +826,10 @@
         <span class="n">ax3</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
         <span class="n">f</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">,</span> <span class="s1">&#39;namethisplot2.pdf&#39;</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">new_avX</span><span class="p">,</span> <span class="n">new_avY</span></div>
 
 
@@ -854,8 +949,10 @@
         <span class="n">n</span><span class="p">,</span> <span class="n">bins</span><span class="p">,</span> <span class="n">patches</span> <span class="o">=</span> <span class="n">ax2</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">theta_hist</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">theta_hist</span><span class="p">))))</span>
         <span class="n">ax2</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="n">theta_median</span><span class="p">,</span> <span class="n">theta_median</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">n</span><span class="p">)])</span>
         <span class="n">ax2</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Rotation angles [degrees]&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>   <span class="c1"># pragma: no cover</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">,</span> <span class="s1">&#39;rotation_hessian.pdf&#39;</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">theta_median</span></div>
 
 
@@ -897,6 +994,7 @@
 <span class="sd">            im.data[int(y(x)), x] = 10</span>
 <span class="sd">            im.data[int(y(x))+1, x] = 10</span>
 <span class="sd">        plt.imshow(im.data, origin=&#39;lower&#39;)</span>
+<span class="sd">        plt.show()</span>
 
 <span class="sd">    &gt;&gt;&gt; im.target_pixcoords=(N//2, N//2)</span>
 <span class="sd">    &gt;&gt;&gt; parameters.DEBUG = True</span>
@@ -924,7 +1022,7 @@
 <span class="sd">        im.target_pixcoords=(N//2, N//2)</span>
 <span class="sd">        turn_image(im)</span>
 <span class="sd">        plt.imshow(im.data_rotated, origin=&#39;lower&#39;)</span>
-
+<span class="sd">        plt.show()</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">image</span><span class="o">.</span><span class="n">rotation_angle</span> <span class="o">=</span> <span class="n">compute_rotation_angle_hessian</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">width_cut</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">YWINDOW</span><span class="p">,</span>
                                                           <span class="n">right_edge</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">CCD_IMSIZE</span> <span class="o">-</span> <span class="mi">200</span><span class="p">)</span>
@@ -951,19 +1049,19 @@
         <span class="n">ax1</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="n">image</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">margin</span><span class="p">],</span> <span class="p">[</span><span class="n">parameters</span><span class="o">.</span><span class="n">YWINDOW</span><span class="p">,</span> <span class="n">parameters</span><span class="o">.</span><span class="n">YWINDOW</span><span class="p">],</span> <span class="s1">&#39;k-&#39;</span><span class="p">)</span>
         <span class="n">plot_image_simple</span><span class="p">(</span><span class="n">ax2</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">data_rotated</span><span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">y0</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">YWINDOW</span><span class="p">):</span>
                                                        <span class="nb">min</span><span class="p">(</span><span class="n">y0</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">YWINDOW</span><span class="p">,</span> <span class="n">image</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
-                                    <span class="n">margin</span><span class="p">:</span><span class="o">-</span><span class="n">margin</span><span class="p">],</span> <span class="n">scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Turned image (log10 scale)&#39;</span><span class="p">,</span>
+                                    <span class="n">margin</span><span class="p">:</span><span class="o">-</span><span class="n">margin</span><span class="p">],</span>
+                          <span class="n">scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Turned image (log10 scale)&#39;</span><span class="p">,</span>
                           <span class="n">units</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">units</span><span class="p">,</span> <span class="n">target_pixcoords</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">target_pixcoords_rotated</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span><span class="p">)</span>
         <span class="n">ax2</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="n">image</span><span class="o">.</span><span class="n">data_rotated</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">margin</span><span class="p">],</span> <span class="p">[</span><span class="mi">2</span> <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">YWINDOW</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">parameters</span><span class="o">.</span><span class="n">YWINDOW</span><span class="p">],</span> <span class="s1">&#39;k-&#39;</span><span class="p">)</span>
         <span class="n">f</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
-            <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">:</span>   <span class="c1"># pragma: no cover</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">,</span> <span class="s1">&#39;rotated_image.pdf&#39;</span><span class="p">))</span></div>
 
 
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
     <span class="kn">import</span> <span class="nn">doctest</span>
-
-    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">&quot;1.14.0&quot;</span><span class="p">:</span>
-        <span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">legacy</span><span class="o">=</span><span class="s2">&quot;1.13&quot;</span><span class="p">)</span>
 
     <span class="n">doctest</span><span class="o">.</span><span class="n">testmod</span><span class="p">()</span>
 </pre></div>

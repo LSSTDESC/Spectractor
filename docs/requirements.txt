@@ -5,3 +5,4 @@ pandas
 astropy>3.1
 coloredlogs
 recommonmark
+m2r

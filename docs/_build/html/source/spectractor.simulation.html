@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../_static/jquery.js"></script>
         <script type="text/javascript" src="../_static/underscore.js"></script>
         <script type="text/javascript" src="../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../_static/js/theme.js"></script>
 
@@ -44,7 +35,8 @@
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" /> 
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="spectractor.fit package" href="spectractor.fit.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -92,19 +84,28 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"><ul>
-<li><a class="reference internal" href="#">spectractor.simulation package</a><ul>
-<li><a class="reference internal" href="#submodules">Submodules</a></li>
-<li><a class="reference internal" href="#module-spectractor.simulation.image_simulation">spectractor.simulation.image_simulation module</a></li>
-<li><a class="reference internal" href="#module-spectractor.simulation.libradtran">spectractor.simulation.libradtran module</a></li>
-<li><a class="reference internal" href="#module-spectractor.simulation.simulator">spectractor.simulation.simulator module</a></li>
-<li><a class="reference internal" href="#module-spectractor.simulation.throughput">spectractor.simulation.throughput module</a></li>
-<li><a class="reference internal" href="#module-spectractor.simulation">Module contents</a></li>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">spectractor</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="spectractor.html">spectractor package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="spectractor.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="spectractor.extractor.html">spectractor.extractor package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="spectractor.fit.html">spectractor.fit package</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">spectractor.simulation package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#module-spectractor.config">spectractor.config module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#module-spectractor.logbook">spectractor.logbook module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#module-spectractor.parameters">spectractor.parameters module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#module-spectractor.tools">spectractor.tools module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.html#module-spectractor">Module contents</a></li>
 </ul>
 </li>
 </ul>
-</div>
+</li>
+</ul>
+
             
           
         </div>
@@ -148,6 +149,10 @@
     
       <li><a href="../index.html">Docs</a> &raquo;</li>
         
+          <li><a href="modules.html">spectractor</a> &raquo;</li>
+        
+          <li><a href="spectractor.html">spectractor package</a> &raquo;</li>
+        
       <li>spectractor.simulation package</li>
     
     
@@ -176,53 +181,107 @@
 <span id="spectractor-simulation-image-simulation-module"></span><h2>spectractor.simulation.image_simulation module<a class="headerlink" href="#module-spectractor.simulation.image_simulation" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="spectractor.simulation.image_simulation.BackgroundModel">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.image_simulation.</code><code class="descname">BackgroundModel</code><span class="sig-paren">(</span><em>level</em>, <em>frame=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#BackgroundModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.BackgroundModel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.image_simulation.</code><code class="sig-name descname">BackgroundModel</code><span class="sig-paren">(</span><em class="sig-param">level</em>, <em class="sig-param">frame=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#BackgroundModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.BackgroundModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Class to model the background of the simulated image.</p>
+<p>The background model size is set with the parameters.CCD_IMSIZE global keyword.</p>
+<dl class="attribute">
+<dt id="spectractor.simulation.image_simulation.BackgroundModel.level">
+<code class="sig-name descname">level</code><a class="headerlink" href="#spectractor.simulation.image_simulation.BackgroundModel.level" title="Permalink to this definition">¶</a></dt>
+<dd><p>The mean level of the background in image units.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="spectractor.simulation.image_simulation.BackgroundModel.frame">
+<code class="sig-name descname">frame</code><a class="headerlink" href="#spectractor.simulation.image_simulation.BackgroundModel.frame" title="Permalink to this definition">¶</a></dt>
+<dd><p>(x, y, smooth) right and upper limits in pixels of a vignetting frame,
+and the smoothing gaussian width (default: None).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>array_like</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="method">
 <dt id="spectractor.simulation.image_simulation.BackgroundModel.model">
-<code class="descname">model</code><span class="sig-paren">(</span><em>x</em>, <em>y</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#BackgroundModel.model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.BackgroundModel.model" title="Permalink to this definition">¶</a></dt>
-<dd><p>Background model for the image simulation.
-:param x:
-:param y:</p>
-<p>Returns:</p>
+<code class="sig-name descname">model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#BackgroundModel.model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.BackgroundModel.model" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the background model for the image simulation in image units.</p>
+<p>A shadowing vignetting frame is roughly simulated if self.frame is set.
+The background model size is set with the parameters.CCD_IMSIZE global keyword.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><strong>bkgd</strong> – The array of the background model.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>array_like</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.image_simulation.BackgroundModel.plot_model">
-<code class="descname">plot_model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#BackgroundModel.plot_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.BackgroundModel.plot_model" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<code class="sig-name descname">plot_model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#BackgroundModel.plot_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.BackgroundModel.plot_model" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot the background model.</p>
+</dd></dl>
 
 </dd></dl>
 
 <dl class="class">
 <dt id="spectractor.simulation.image_simulation.ImageModel">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.image_simulation.</code><code class="descname">ImageModel</code><span class="sig-paren">(</span><em>filename</em>, <em>target=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageModel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="spectractor.extractor.html#spectractor.extractor.images.Image" title="spectractor.extractor.images.Image"><code class="xref py py-class docutils literal"><span class="pre">spectractor.extractor.images.Image</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.image_simulation.</code><code class="sig-name descname">ImageModel</code><span class="sig-paren">(</span><em class="sig-param">filename</em>, <em class="sig-param">target=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="spectractor.extractor.html#spectractor.extractor.images.Image" title="spectractor.extractor.images.Image"><code class="xref py py-class docutils literal notranslate"><span class="pre">spectractor.extractor.images.Image</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.simulation.image_simulation.ImageModel.add_poisson_and_read_out_noise">
-<code class="descname">add_poisson_and_read_out_noise</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageModel.add_poisson_and_read_out_noise"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageModel.add_poisson_and_read_out_noise" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">add_poisson_and_read_out_noise</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageModel.add_poisson_and_read_out_noise"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageModel.add_poisson_and_read_out_noise" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.image_simulation.ImageModel.compute">
-<code class="descname">compute</code><span class="sig-paren">(</span><em>star</em>, <em>background</em>, <em>spectrogram</em>, <em>starfield=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageModel.compute"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageModel.compute" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">compute</code><span class="sig-paren">(</span><em class="sig-param">star</em>, <em class="sig-param">background</em>, <em class="sig-param">spectrogram</em>, <em class="sig-param">starfield=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageModel.compute"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageModel.compute" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.image_simulation.ImageModel.load_image">
-<code class="descname">load_image</code><span class="sig-paren">(</span><em>filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageModel.load_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageModel.load_image" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<code class="sig-name descname">load_image</code><span class="sig-paren">(</span><em class="sig-param">filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageModel.load_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageModel.load_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load the image and store some information from header in class attributes.
+Then load the target and disperser properties. Called when an Image instance is created.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>file_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – The fits file name.</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.image_simulation.ImageModel.save_image">
-<code class="descname">save_image</code><span class="sig-paren">(</span><em>output_filename</em>, <em>overwrite=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageModel.save_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageModel.save_image" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<code class="sig-name descname">save_image</code><span class="sig-paren">(</span><em class="sig-param">output_filename</em>, <em class="sig-param">overwrite=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageModel.save_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageModel.save_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save the image in a fits file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>output_file_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – The output file name.</p></li>
+<li><p><strong>overwrite</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.7)"><em>bool</em></a>) – If True, overwrite the file if it exists previously (default: False).</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">im</span> <span class="o">=</span> <span class="n">Image</span><span class="p">(</span><span class="s1">&#39;tests/data/reduc_20170605_028.fits&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">im</span><span class="o">.</span><span class="n">save_image</span><span class="p">(</span><span class="s1">&#39;tests/data/reduc_20170605_028_copy.fits&#39;</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
 
 </dd></dl>
 
 <dl class="function">
 <dt id="spectractor.simulation.image_simulation.ImageSim">
-<code class="descclassname">spectractor.simulation.image_simulation.</code><code class="descname">ImageSim</code><span class="sig-paren">(</span><em>image_filename</em>, <em>spectrum_filename</em>, <em>outputdir</em>, <em>pwv=5</em>, <em>ozone=300</em>, <em>aerosols=0.03</em>, <em>A1=1</em>, <em>A2=0.05</em>, <em>psf_poly_params=None</em>, <em>with_rotation=True</em>, <em>with_stars=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageSim"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageSim" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.image_simulation.</code><code class="sig-name descname">ImageSim</code><span class="sig-paren">(</span><em class="sig-param">image_filename</em>, <em class="sig-param">spectrum_filename</em>, <em class="sig-param">outputdir</em>, <em class="sig-param">pwv=5</em>, <em class="sig-param">ozone=300</em>, <em class="sig-param">aerosols=0.03</em>, <em class="sig-param">A1=1</em>, <em class="sig-param">A2=0.05</em>, <em class="sig-param">psf_poly_params=None</em>, <em class="sig-param">with_rotation=True</em>, <em class="sig-param">with_stars=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#ImageSim"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.ImageSim" title="Permalink to this definition">¶</a></dt>
 <dd><p>The basic use of the extractor consists first to define:
 - the path to the fits image from which to extract the image,
 - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -239,40 +298,75 @@ Then different parameters and systematics can be set:
 </dd></dl>
 
 <dl class="class">
-<dt id="spectractor.simulation.image_simulation.SpectrumModel">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.image_simulation.</code><code class="descname">SpectrumModel</code><span class="sig-paren">(</span><em>base_image</em>, <em>spectrumsim</em>, <em>sigma</em>, <em>A1=1</em>, <em>A2=0</em>, <em>reso=None</em>, <em>rotation=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#SpectrumModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.SpectrumModel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
-<dl class="method">
-<dt id="spectractor.simulation.image_simulation.SpectrumModel.model">
-<code class="descname">model</code><span class="sig-paren">(</span><em>x</em>, <em>y</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#SpectrumModel.model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.SpectrumModel.model" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
 <dt id="spectractor.simulation.image_simulation.StarFieldModel">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.image_simulation.</code><code class="descname">StarFieldModel</code><span class="sig-paren">(</span><em>base_image</em>, <em>threshold=0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#StarFieldModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.StarFieldModel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.image_simulation.</code><code class="sig-name descname">StarFieldModel</code><span class="sig-paren">(</span><em class="sig-param">base_image</em>, <em class="sig-param">threshold=0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#StarFieldModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.StarFieldModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.simulation.image_simulation.StarFieldModel.model">
-<code class="descname">model</code><span class="sig-paren">(</span><em>x</em>, <em>y</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#StarFieldModel.model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.StarFieldModel.model" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">model</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">y</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#StarFieldModel.model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.StarFieldModel.model" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.image_simulation.StarFieldModel.plot_model">
-<code class="descname">plot_model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#StarFieldModel.plot_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.StarFieldModel.plot_model" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">plot_model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#StarFieldModel.plot_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.StarFieldModel.plot_model" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="class">
 <dt id="spectractor.simulation.image_simulation.StarModel">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.image_simulation.</code><code class="descname">StarModel</code><span class="sig-paren">(</span><em>pixcoords</em>, <em>model</em>, <em>amplitude</em>, <em>target=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#StarModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.StarModel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.image_simulation.</code><code class="sig-name descname">StarModel</code><span class="sig-paren">(</span><em class="sig-param">pixcoords</em>, <em class="sig-param">model</em>, <em class="sig-param">amplitude</em>, <em class="sig-param">target=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#StarModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.StarModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Class to model a star in the image simulation process.</p>
+<dl class="attribute">
+<dt id="spectractor.simulation.image_simulation.StarModel.x0">
+<code class="sig-name descname">x0</code><a class="headerlink" href="#spectractor.simulation.image_simulation.StarModel.x0" title="Permalink to this definition">¶</a></dt>
+<dd><p>X position of the star centroid in pixels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="spectractor.simulation.image_simulation.StarModel.y0">
+<code class="sig-name descname">y0</code><a class="headerlink" href="#spectractor.simulation.image_simulation.StarModel.y0" title="Permalink to this definition">¶</a></dt>
+<dd><p>Y position of the star centroid in pixels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="spectractor.simulation.image_simulation.StarModel.amplitude">
+<code class="sig-name descname">amplitude</code><a class="headerlink" href="#spectractor.simulation.image_simulation.StarModel.amplitude" title="Permalink to this definition">¶</a></dt>
+<dd><p>The amplitude of the star in image units.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>amplitude</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="spectractor.simulation.image_simulation.StarModel.target">
+<code class="sig-name descname">target</code><a class="headerlink" href="#spectractor.simulation.image_simulation.StarModel.target" title="Permalink to this definition">¶</a></dt>
+<dd><p>The associated Target instance (default: None).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="spectractor.extractor.html#spectractor.extractor.targets.Target" title="spectractor.extractor.targets.Target">Target</a></p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="method">
 <dt id="spectractor.simulation.image_simulation.StarModel.plot_model">
-<code class="descname">plot_model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#StarModel.plot_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.StarModel.plot_model" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<code class="sig-name descname">plot_model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/image_simulation.html#StarModel.plot_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.image_simulation.StarModel.plot_model" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot the star model.</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -281,54 +375,46 @@ Then different parameters and systematics can be set:
 <span id="spectractor-simulation-libradtran-module"></span><h2>spectractor.simulation.libradtran module<a class="headerlink" href="#module-spectractor.simulation.libradtran" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="spectractor.simulation.libradtran.Libradtran">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.libradtran.</code><code class="descname">Libradtran</code><span class="sig-paren">(</span><em>home=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.libradtran.</code><code class="sig-name descname">Libradtran</code><span class="sig-paren">(</span><em class="sig-param">home=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.simulation.libradtran.Libradtran.run">
-<code class="descname">run</code><span class="sig-paren">(</span><em>inp</em>, <em>out</em>, <em>path=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.run" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">inp</em>, <em class="sig-param">out</em>, <em class="sig-param">path=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.run" title="Permalink to this definition">¶</a></dt>
 <dd><p>Run the libratran command uvpsec.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>inp</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – Input file.</li>
-<li><strong>out</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – Output file.</li>
-<li><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a><em>, </em><em>optional</em>) – Path to bin/uvpsec if necessary, otherwise use  self.home (default: “”)</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inp</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – Input file.</p></li>
+<li><p><strong>out</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – Output file.</p></li>
+<li><p><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a><em>, </em><em>optional</em>) – Path to bin/uvpsec if necessary, otherwise use  self.home (default: “”)</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.libradtran.Libradtran.simulate">
-<code class="descname">simulate</code><span class="sig-paren">(</span><em>airmass</em>, <em>pwv</em>, <em>ozone</em>, <em>aerosol</em>, <em>pressure</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.simulate" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">simulate</code><span class="sig-paren">(</span><em class="sig-param">airmass</em>, <em class="sig-param">pwv</em>, <em class="sig-param">ozone</em>, <em class="sig-param">aerosol</em>, <em class="sig-param">pressure</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.simulate" title="Permalink to this definition">¶</a></dt>
 <dd><p>Simulate the atmosphere transmission with Libratran.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>airmass</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – The airmass of the atmosphere.</li>
-<li><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor amount in mm.</li>
-<li><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson units.</li>
-<li><strong>aerosol</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD of the aerosols.</li>
-<li><strong>pressure</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Pressure of the atmosphere in hPa.</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>airmass</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – The airmass of the atmosphere.</p></li>
+<li><p><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor amount in mm.</p></li>
+<li><p><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson units.</p></li>
+<li><p><strong>aerosol</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD of the aerosols.</p></li>
+<li><p><strong>pressure</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Pressure of the atmosphere in hPa.</p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>output_file_name</strong> – The output file name relative to the current directory.</p>
-</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)">str</a></p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>output_file_name</strong> – The output file name relative to the current directory.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)">str</a></p>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span> <span class="o">=</span> <span class="kc">True</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span> <span class="o">=</span> <span class="kc">True</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">lib</span> <span class="o">=</span> <span class="n">Libradtran</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">output</span> <span class="o">=</span> <span class="n">lib</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="mf">1.2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mf">0.07</span><span class="p">,</span> <span class="mi">800</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
@@ -339,17 +425,17 @@ Then different parameters and systematics can be set:
 
 <dl class="method">
 <dt id="spectractor.simulation.libradtran.Libradtran.write_input">
-<code class="descname">write_input</code><span class="sig-paren">(</span><em>filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.write_input"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.write_input" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">write_input</code><span class="sig-paren">(</span><em class="sig-param">filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#Libradtran.write_input"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.Libradtran.write_input" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="function">
 <dt id="spectractor.simulation.libradtran.clean_simulation_directory">
-<code class="descclassname">spectractor.simulation.libradtran.</code><code class="descname">clean_simulation_directory</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#clean_simulation_directory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.clean_simulation_directory" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.libradtran.</code><code class="sig-name descname">clean_simulation_directory</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/libradtran.html#clean_simulation_directory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.libradtran.clean_simulation_directory" title="Permalink to this definition">¶</a></dt>
 <dd><p>Remove the simulations directory.</p>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ensure_dir</span><span class="p">(</span><span class="s1">&#39;simulations&#39;</span><span class="p">)</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ensure_dir</span><span class="p">(</span><span class="s1">&#39;simulations&#39;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">clean_simulation_directory</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s1">&#39;simulations&#39;</span><span class="p">)</span>
 </pre></div>
@@ -370,312 +456,124 @@ For each experimental spectra a fits file image is generated which holds all pos
 corresponding to different conditions in aerosols, pwv, and ozone.</p>
 <p>creation date : April 18th
 Last update : July 2018</p>
-<dl class="class">
-<dt id="spectractor.simulation.simulator.Atmosphere">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">Atmosphere</code><span class="sig-paren">(</span><em>airmass</em>, <em>pressure</em>, <em>temperature</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#Atmosphere"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.Atmosphere" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
-<dl class="method">
-<dt id="spectractor.simulation.simulator.Atmosphere.plot_transmission">
-<code class="descname">plot_transmission</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#Atmosphere.plot_transmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.Atmosphere.plot_transmission" title="Permalink to this definition">¶</a></dt>
-<dd><p>Plot the atmospheric transmission computed with Libradtran.</p>
-<p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">Atmosphere</span><span class="p">(</span><span class="n">airmass</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">pressure</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">transmission</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">ozone</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">pwv</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">aerosols</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
-</pre></div>
-</div>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.simulator.Atmosphere.set_label">
-<code class="descname">set_label</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#Atmosphere.set_label"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.Atmosphere.set_label" title="Permalink to this definition">¶</a></dt>
-<dd><p>Make a label string for the simulation.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.simulator.Atmosphere.set_title">
-<code class="descname">set_title</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#Atmosphere.set_title"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.Atmosphere.set_title" title="Permalink to this definition">¶</a></dt>
-<dd><p>Make a title string for the simulation.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.simulator.Atmosphere.simulate">
-<code class="descname">simulate</code><span class="sig-paren">(</span><em>ozone</em>, <em>pwv</em>, <em>aerosols</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#Atmosphere.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.Atmosphere.simulate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Simulate the atmosphere transparency with Libradtran given atmospheric composition.</p>
-<p>Values outside the Libradtran simulation range are set to zero.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson</li>
-<li><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor quantity in mm</li>
-<li><strong>aerosols</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD Vertical Aerosols Optical Depth</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>transmission</strong> – The transmission function of wavelengths in nm.</p>
-</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference external" href="https://docs.python.org/3/library/functions.html#callable" title="(in Python v3.7)">callable</a></p>
-</td>
-</tr>
-</tbody>
-</table>
-<p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">Atmosphere</span><span class="p">(</span><span class="n">airmass</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">pressure</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">transmission</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">ozone</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">pwv</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">aerosols</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">transmission</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">transmission</span><span class="p">(</span><span class="mi">500</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">ozone</span>
-<span class="go">400</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">pwv</span>
-<span class="go">5</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">aerosols</span>
-<span class="go">0.05</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
-</pre></div>
-</div>
-<dl class="docutils">
-<dt>..plot:</dt>
-<dd>fig = plt.figure()
-plot_transmission_simple(plt.gca(), lambdas, transmission(lambdas), title=a.title, label=a.label)
-plt.show()</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="class">
-<dt id="spectractor.simulation.simulator.AtmosphereGrid">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">AtmosphereGrid</code><span class="sig-paren">(</span><em>image_filename='', filename='', airmass=1.0, pressure=800.0, temperature=10.0, pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#AtmosphereGrid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.AtmosphereGrid" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#spectractor.simulation.simulator.Atmosphere" title="spectractor.simulation.simulator.Atmosphere"><code class="xref py py-class docutils literal"><span class="pre">spectractor.simulation.simulator.Atmosphere</span></code></a></p>
-<dl class="method">
-<dt id="spectractor.simulation.simulator.AtmosphereGrid.compute">
-<code class="descname">compute</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#AtmosphereGrid.compute"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.AtmosphereGrid.compute" title="Permalink to this definition">¶</a></dt>
-<dd><p>Compute atmospheric transmissions and fill self.atmgrid.</p>
-<p>The wavelengths used for the computation are the ones set by parameters.LAMBDAS.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><strong>atmospheric_grid</strong> – The atmospheric grid self.atmgrid.</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">array_like</td>
-</tr>
-</tbody>
-</table>
-<p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">AtmosphereGrid</span><span class="p">(</span><span class="n">image_filename</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170605_028.fits&#39;</span><span class="p">,</span>
-<span class="gp">... </span><span class="n">pwv_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">ozone_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">400</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">aerosol_grid</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">atmospheric_grid</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">atmgrid</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">index_atm_data</span><span class="p">:],</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDAS</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">atmgrid</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">index_atm_data</span><span class="p">:],</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDAS</span><span class="p">),</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">atmgrid</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">index_atm_data</span><span class="o">+</span><span class="nb">len</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDAS</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">save_file</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">image_filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;_atmsim.fits&#39;</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
-</pre></div>
-</div>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.simulator.AtmosphereGrid.load_file">
-<code class="descname">load_file</code><span class="sig-paren">(</span><em>filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#AtmosphereGrid.load_file"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.AtmosphereGrid.load_file" title="Permalink to this definition">¶</a></dt>
-<dd><p>Load the atmospheric grid from a fits file and interpolate across the points
-using RegularGridInterpolator. Automatically called from __init__.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – The input file name.</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.simulator.AtmosphereGrid.plot_transmission">
-<code class="descname">plot_transmission</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#AtmosphereGrid.plot_transmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.AtmosphereGrid.plot_transmission" title="Permalink to this definition">¶</a></dt>
-<dd><p>Plot the atmospheric transmission contained in the grid.</p>
-<p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">AtmosphereGrid</span><span class="p">(</span><span class="n">image_filename</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170605_028.fits&#39;</span><span class="p">,</span>
-<span class="gp">... </span><span class="n">pwv_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">ozone_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">400</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">aerosol_grid</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">atmospheric_grid</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
-</pre></div>
-</div>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.simulator.AtmosphereGrid.plot_transmission_image">
-<code class="descname">plot_transmission_image</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#AtmosphereGrid.plot_transmission_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.AtmosphereGrid.plot_transmission_image" title="Permalink to this definition">¶</a></dt>
-<dd><p>Plot the atmospheric transmission contained in the grid using imshow.</p>
-<p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">AtmosphereGrid</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170530_134_atmsim.fits&#39;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">plot_transmission_image</span><span class="p">()</span>
-</pre></div>
-</div>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.simulator.AtmosphereGrid.save_file">
-<code class="descname">save_file</code><span class="sig-paren">(</span><em>filename=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#AtmosphereGrid.save_file"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.AtmosphereGrid.save_file" title="Permalink to this definition">¶</a></dt>
-<dd><p>Save the atmospheric grid in a fits file.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – The output file name.</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.simulator.AtmosphereGrid.set_grid">
-<code class="descname">set_grid</code><span class="sig-paren">(</span><em>pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#AtmosphereGrid.set_grid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.AtmosphereGrid.set_grid" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the size of the simulation grid self.atmgrid before compute it.</p>
-<p>The first column of self.atmgrid will contain the wavelengths set by parameters.LAMBDAS,
-the other columns the future simulations.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>pwv_grid</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.7)"><em>list</em></a>) – List of 3 numbers for the PWV quantity: min, max, number of simulations (default: [0, 10, 10]).</li>
-<li><strong>ozone_grid</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.7)"><em>list</em></a>) – List of 3 numbers for the ozone quantity: min, max, number of simulations (default: [100, 700, 7]).</li>
-<li><strong>aerosol_grid</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.7)"><em>list</em></a>) – List of 3 numbers for the aerosol quantity: min, max, number of simulations (default: [0, 0.1, 10]).</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.simulator.AtmosphereGrid.simulate">
-<code class="descname">simulate</code><span class="sig-paren">(</span><em>ozone</em>, <em>pwv</em>, <em>aerosols</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#AtmosphereGrid.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.AtmosphereGrid.simulate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Interpolate from the atmospheric grid to get the atmospheric transmission.</p>
-<p>First ozone, second pwv, last aerosols, to respect order of loops when generating the grid</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson</li>
-<li><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor quantity in mm</li>
-<li><strong>aerosols</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD Vertical Aerosols Optical Depth</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-<p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">AtmosphereGrid</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170530_134_atmsim.fits&#39;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">1200</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">pwv</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="n">transmission</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">ozone</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">pwv</span><span class="o">=</span><span class="n">pwv</span><span class="p">,</span> <span class="n">aerosols</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
-<span class="gp">... </span>    <span class="n">plot_transmission_simple</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">(),</span> <span class="n">lambdas</span><span class="p">,</span> <span class="n">transmission</span><span class="p">(</span><span class="n">lambdas</span><span class="p">),</span>
-<span class="gp">... </span>    <span class="n">title</span><span class="o">=</span><span class="n">a</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">a</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-</pre></div>
-</div>
-</dd></dl>
-
-</dd></dl>
-
 <dl class="function">
 <dt id="spectractor.simulation.simulator.SimulatorInit">
-<code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">SimulatorInit</code><span class="sig-paren">(</span><em>filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SimulatorInit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SimulatorInit" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.simulator.</code><code class="sig-name descname">SimulatorInit</code><span class="sig-paren">(</span><em class="sig-param">filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SimulatorInit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SimulatorInit" title="Permalink to this definition">¶</a></dt>
 <dd><p>Main function to evaluate several spectra
 A grid of spectra will be produced for a given target, airmass and pressure</p>
 </dd></dl>
 
 <dl class="class">
 <dt id="spectractor.simulation.simulator.SpectrogramModel">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">SpectrogramModel</code><span class="sig-paren">(</span><em>spectrum</em>, <em>atmosphere</em>, <em>telescope</em>, <em>disperser</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="spectractor.extractor.html#spectractor.extractor.spectrum.Spectrum" title="spectractor.extractor.spectrum.Spectrum"><code class="xref py py-class docutils literal"><span class="pre">spectractor.extractor.spectrum.Spectrum</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.simulator.</code><code class="sig-name descname">SpectrogramModel</code><span class="sig-paren">(</span><em class="sig-param">spectrum</em>, <em class="sig-param">atmosphere</em>, <em class="sig-param">telescope</em>, <em class="sig-param">disperser</em>, <em class="sig-param">with_background=True</em>, <em class="sig-param">fast_sim=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="spectractor.extractor.html#spectractor.extractor.spectrum.Spectrum" title="spectractor.extractor.spectrum.Spectrum"><code class="xref py py-class docutils literal notranslate"><span class="pre">spectractor.extractor.spectrum.Spectrum</span></code></a></p>
+<dl class="method">
+<dt id="spectractor.simulation.simulator.SpectrogramModel.build_spectrogram">
+<code class="sig-name descname">build_spectrogram</code><span class="sig-paren">(</span><em class="sig-param">profile_params</em>, <em class="sig-param">spectrum</em>, <em class="sig-param">dispersion_law</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel.build_spectrogram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel.build_spectrogram" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 <dl class="method">
 <dt id="spectractor.simulation.simulator.SpectrogramModel.simulate">
-<code class="descname">simulate</code><span class="sig-paren">(</span><em>A1=1.0</em>, <em>A2=0.0</em>, <em>ozone=300</em>, <em>pwv=5</em>, <em>aerosols=0.05</em>, <em>D=55.45</em>, <em>shift_x=0.0</em>, <em>shift_y=0.0</em>, <em>shift_t=0.0</em>, <em>angle=0.0</em>, <em>psf_poly_params=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel.simulate" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>A1</strong> – </li>
-<li><strong>A2</strong> – </li>
-<li><strong>ozone</strong> – </li>
-<li><strong>pwv</strong> – </li>
-<li><strong>aerosols</strong> – </li>
-<li><strong>psf_poly_params</strong> – </li>
-<li><strong>D</strong> – </li>
-<li><strong>shift_x</strong> – </li>
-<li><strong>shift_y</strong> – </li>
-<li><strong>angle</strong> – </li>
+<code class="sig-name descname">simulate</code><span class="sig-paren">(</span><em class="sig-param">A1=1.0</em>, <em class="sig-param">A2=0.0</em>, <em class="sig-param">ozone=300</em>, <em class="sig-param">pwv=5</em>, <em class="sig-param">aerosols=0.05</em>, <em class="sig-param">D=55.45</em>, <em class="sig-param">shift_x=0.0</em>, <em class="sig-param">shift_y=0.0</em>, <em class="sig-param">angle=0.0</em>, <em class="sig-param">psf_poly_params=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel.simulate" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>A1</strong> – </p></li>
+<li><p><strong>A2</strong> – </p></li>
+<li><p><strong>ozone</strong> – </p></li>
+<li><p><strong>pwv</strong> – </p></li>
+<li><p><strong>aerosols</strong> – </p></li>
+<li><p><strong>psf_poly_params</strong> – </p></li>
+<li><p><strong>D</strong> – </p></li>
+<li><p><strong>shift_x</strong> – </p></li>
+<li><p><strong>shift_y</strong> – </p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+</dl>
 <p class="rubric">Example</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.extractor.psf</span> <span class="k">import</span>  <span class="n">ChromaticPSF1D</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">spectrum</span><span class="p">,</span> <span class="n">telescope</span><span class="p">,</span> <span class="n">disperser</span><span class="p">,</span> <span class="n">target</span> <span class="o">=</span> <span class="n">SimulatorInit</span><span class="p">(</span><span class="s1">&#39;./tests/data/reduc_20170530_134_spectrum.fits&#39;</span><span class="p">)</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.extractor.psf</span> <span class="k">import</span>  <span class="n">ChromaticPSF1D</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">spectrum</span><span class="p">,</span> <span class="n">telescope</span><span class="p">,</span> <span class="n">disperser</span><span class="p">,</span> <span class="n">target</span> <span class="o">=</span> <span class="n">SimulatorInit</span><span class="p">(</span><span class="s1">&#39;outputs/reduc_20170530_134_spectrum.fits&#39;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">airmass</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;AIRMASS&#39;</span><span class="p">]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">pressure</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;OUTPRESS&#39;</span><span class="p">]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">temperature</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;OUTTEMP&#39;</span><span class="p">]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">atmosphere</span> <span class="o">=</span> <span class="n">Atmosphere</span><span class="p">(</span><span class="n">airmass</span><span class="p">,</span> <span class="n">pressure</span><span class="p">,</span> <span class="n">temperature</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">psf_poly_params</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">chromatic_psf</span><span class="o">.</span><span class="n">from_table_to_poly_params</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">spec</span> <span class="o">=</span> <span class="n">SpectrogramModel</span><span class="p">(</span><span class="n">spectrum</span><span class="p">,</span> <span class="n">atmosphere</span><span class="p">,</span> <span class="n">telescope</span><span class="p">,</span> <span class="n">disperser</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">err</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">psf_poly_params</span><span class="o">=</span><span class="n">psf_poly_params</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">rotation_angle</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">spec</span> <span class="o">=</span> <span class="n">SpectrogramModel</span><span class="p">(</span><span class="n">spectrum</span><span class="p">,</span> <span class="n">atmosphere</span><span class="p">,</span> <span class="n">telescope</span><span class="p">,</span> <span class="n">disperser</span><span class="p">,</span> <span class="n">with_background</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">err</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">A2</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">spectrum</span><span class="o">.</span><span class="n">rotation_angle</span><span class="p">,</span> <span class="n">psf_poly_params</span><span class="o">=</span><span class="n">psf_poly_params</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
 
 <dl class="method">
+<dt id="spectractor.simulation.simulator.SpectrogramModel.simulate_FFT">
+<code class="sig-name descname">simulate_FFT</code><span class="sig-paren">(</span><em class="sig-param">A1=1.0</em>, <em class="sig-param">A2=0.0</em>, <em class="sig-param">ozone=300</em>, <em class="sig-param">pwv=5</em>, <em class="sig-param">aerosols=0.05</em>, <em class="sig-param">D=55.45</em>, <em class="sig-param">shift_x=0.0</em>, <em class="sig-param">shift_y=0.0</em>, <em class="sig-param">angle=0.0</em>, <em class="sig-param">psf_poly_params=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel.simulate_FFT"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel.simulate_FFT" title="Permalink to this definition">¶</a></dt>
+<dd><p>DEPRECATED</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>A1</strong> – </p></li>
+<li><p><strong>A2</strong> – </p></li>
+<li><p><strong>ozone</strong> – </p></li>
+<li><p><strong>pwv</strong> – </p></li>
+<li><p><strong>aerosols</strong> – </p></li>
+<li><p><strong>psf_poly_params</strong> – </p></li>
+<li><p><strong>D</strong> – </p></li>
+<li><p><strong>shift_x</strong> – </p></li>
+<li><p><strong>shift_y</strong> – </p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p># &gt;&gt;&gt; from spectractor.extractor.psf import  ChromaticPSF1D
+# &gt;&gt;&gt; spectrum, telescope, disperser, target = SimulatorInit(‘outputs/reduc_20170530_134_spectrum.fits’)
+# &gt;&gt;&gt; airmass = spectrum.header[‘AIRMASS’]
+# &gt;&gt;&gt; pressure = spectrum.header[‘OUTPRESS’]
+# &gt;&gt;&gt; temperature = spectrum.header[‘OUTTEMP’]
+# &gt;&gt;&gt; atmosphere = Atmosphere(airmass, pressure, temperature)
+# &gt;&gt;&gt; psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
+# &gt;&gt;&gt; spec = SpectrogramModel(spectrum, atmosphere, telescope, disperser)
+# &gt;&gt;&gt; lambdas, data, err = spec.simulate_FFT(psf_poly_params=psf_poly_params)</p>
+</dd></dl>
+
+<dl class="method">
 <dt id="spectractor.simulation.simulator.SpectrogramModel.simulate_dispersion">
-<code class="descname">simulate_dispersion</code><span class="sig-paren">(</span><em>D</em>, <em>shift_x</em>, <em>shift_y</em>, <em>r0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel.simulate_dispersion"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel.simulate_dispersion" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">simulate_dispersion</code><span class="sig-paren">(</span><em class="sig-param">D</em>, <em class="sig-param">shift_x</em>, <em class="sig-param">shift_y</em>, <em class="sig-param">r0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel.simulate_dispersion"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel.simulate_dispersion" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.simulator.SpectrogramModel.simulate_psf">
-<code class="descname">simulate_psf</code><span class="sig-paren">(</span><em>psf_poly_params</em>, <em>angle</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel.simulate_psf"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel.simulate_psf" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">simulate_psf</code><span class="sig-paren">(</span><em class="sig-param">psf_poly_params</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel.simulate_psf"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel.simulate_psf" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.simulator.SpectrogramModel.simulate_spectrum">
-<code class="descname">simulate_spectrum</code><span class="sig-paren">(</span><em>lambdas</em>, <em>ozone</em>, <em>pwv</em>, <em>aerosols</em>, <em>shift_t=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel.simulate_spectrum"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel.simulate_spectrum" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">simulate_spectrum</code><span class="sig-paren">(</span><em class="sig-param">lambdas</em>, <em class="sig-param">ozone</em>, <em class="sig-param">pwv</em>, <em class="sig-param">aerosols</em>, <em class="sig-param">shift_t=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramModel.simulate_spectrum"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramModel.simulate_spectrum" title="Permalink to this definition">¶</a></dt>
 <dd><p>Simulate the spectrum of the object and return the result in Target units.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>lambdas</strong> (<em>array_like</em>) – The wavelength array in nm.</li>
-<li><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson</li>
-<li><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor quantity in mm</li>
-<li><strong>aerosols</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD Vertical Aerosols Optical Depth</li>
-<li><strong>shift_t</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Shift of the transmission in nm (default: 0).</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelength array in nm.</p></li>
+<li><p><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson</p></li>
+<li><p><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor quantity in mm</p></li>
+<li><p><strong>aerosols</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD Vertical Aerosols Optical Depth</p></li>
+<li><p><strong>shift_t</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Shift of the transmission in nm (default: 0).</p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><ul class="simple">
-<li><strong>spectrum</strong> (<em>array_like</em>) – The spectrum array in Target units.</li>
-<li><strong>spectrum_err</strong> (<em>array_like</em>) – The spectrum uncertainty array in Target units.</li>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>spectrum</strong> (<em>array_like</em>) – The spectrum array in ADU/s units.</p></li>
+<li><p><strong>spectrum_err</strong> (<em>array_like</em>) – The spectrum uncertainty array in ADU/s units.</p></li>
 </ul>
 </p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
 
 <dl class="function">
 <dt id="spectractor.simulation.simulator.SpectrogramSimulator">
-<code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">SpectrogramSimulator</code><span class="sig-paren">(</span><em>filename</em>, <em>outputdir=''</em>, <em>pwv=5</em>, <em>ozone=300</em>, <em>aerosols=0.05</em>, <em>A1=1.0</em>, <em>A2=0.0</em>, <em>D=55.45</em>, <em>shift_x=0.0</em>, <em>shift_y=0.0</em>, <em>shift_t=0.0</em>, <em>angle=0.0</em>, <em>psf_poly_params=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramSimulator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramSimulator" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.simulator.</code><code class="sig-name descname">SpectrogramSimulator</code><span class="sig-paren">(</span><em class="sig-param">filename</em>, <em class="sig-param">outputdir=''</em>, <em class="sig-param">pwv=5</em>, <em class="sig-param">ozone=300</em>, <em class="sig-param">aerosols=0.05</em>, <em class="sig-param">A1=1.0</em>, <em class="sig-param">A2=0.0</em>, <em class="sig-param">D=55.45</em>, <em class="sig-param">shift_x=0.0</em>, <em class="sig-param">shift_y=0.0</em>, <em class="sig-param">shift_t=0.0</em>, <em class="sig-param">angle=0.0</em>, <em class="sig-param">psf_poly_params=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramSimulator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramSimulator" title="Permalink to this definition">¶</a></dt>
 <dd><p>Simulator
 Main function to evaluate several spectra
 A grid of spectra will be produced for a given target, airmass and pressure</p>
@@ -683,7 +581,7 @@ A grid of spectra will be produced for a given target, airmass and pressure</p>
 
 <dl class="function">
 <dt id="spectractor.simulation.simulator.SpectrogramSimulatorCore">
-<code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">SpectrogramSimulatorCore</code><span class="sig-paren">(</span><em>spectrum</em>, <em>telescope</em>, <em>disperser</em>, <em>airmass=1.0</em>, <em>pressure=800</em>, <em>temperature=10</em>, <em>pwv=5</em>, <em>ozone=300</em>, <em>aerosols=0.05</em>, <em>A1=1.0</em>, <em>A2=0.0</em>, <em>D=55.45</em>, <em>shift_x=0.0</em>, <em>shift_y=0.0</em>, <em>shift_t=0.0</em>, <em>angle=0.0</em>, <em>psf_poly_params=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramSimulatorCore"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramSimulatorCore" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.simulator.</code><code class="sig-name descname">SpectrogramSimulatorCore</code><span class="sig-paren">(</span><em class="sig-param">spectrum</em>, <em class="sig-param">telescope</em>, <em class="sig-param">disperser</em>, <em class="sig-param">airmass=1.0</em>, <em class="sig-param">pressure=800</em>, <em class="sig-param">temperature=10</em>, <em class="sig-param">pwv=5</em>, <em class="sig-param">ozone=300</em>, <em class="sig-param">aerosols=0.05</em>, <em class="sig-param">A1=1.0</em>, <em class="sig-param">A2=0.0</em>, <em class="sig-param">D=55.45</em>, <em class="sig-param">shift_x=0.0</em>, <em class="sig-param">shift_y=0.0</em>, <em class="sig-param">shift_t=0.0</em>, <em class="sig-param">angle=0.0</em>, <em class="sig-param">psf_poly_params=None</em>, <em class="sig-param">with_background=True</em>, <em class="sig-param">fast_sim=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrogramSimulatorCore"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrogramSimulatorCore" title="Permalink to this definition">¶</a></dt>
 <dd><p>SimulatorCore
 Main function to evaluate several spectra
 A grid of spectra will be produced for a given target, airmass and pressure</p>
@@ -691,97 +589,91 @@ A grid of spectra will be produced for a given target, airmass and pressure</p>
 
 <dl class="class">
 <dt id="spectractor.simulation.simulator.SpectrumSimGrid">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">SpectrumSimGrid</code><span class="sig-paren">(</span><em>spectrum</em>, <em>atmgrid</em>, <em>telescope</em>, <em>disperser</em>, <em>target</em>, <em>header</em>, <em>filename=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimGrid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimGrid" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.simulator.</code><code class="sig-name descname">SpectrumSimGrid</code><span class="sig-paren">(</span><em class="sig-param">spectrum</em>, <em class="sig-param">atmgrid</em>, <em class="sig-param">telescope</em>, <em class="sig-param">disperser</em>, <em class="sig-param">target</em>, <em class="sig-param">header</em>, <em class="sig-param">filename=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimGrid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimGrid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>SpectrumSim class used to store information and methods
 relative to spectrum simulation.
 NEED TO ADAPT THIS CLASS TO THE FULL SIMULATION WITH SYSTEMATICS.</p>
 <dl class="method">
 <dt id="spectractor.simulation.simulator.SpectrumSimGrid.compute">
-<code class="descname">compute</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimGrid.compute"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimGrid.compute" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">compute</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimGrid.compute"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimGrid.compute" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.simulator.SpectrumSimGrid.plot_spectra">
-<code class="descname">plot_spectra</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimGrid.plot_spectra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimGrid.plot_spectra" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">plot_spectra</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimGrid.plot_spectra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimGrid.plot_spectra" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.simulator.SpectrumSimGrid.plot_spectra_img">
-<code class="descname">plot_spectra_img</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimGrid.plot_spectra_img"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimGrid.plot_spectra_img" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">plot_spectra_img</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimGrid.plot_spectra_img"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimGrid.plot_spectra_img" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.simulator.SpectrumSimGrid.save_spectra">
-<code class="descname">save_spectra</code><span class="sig-paren">(</span><em>filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimGrid.save_spectra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimGrid.save_spectra" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">save_spectra</code><span class="sig-paren">(</span><em class="sig-param">filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimGrid.save_spectra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimGrid.save_spectra" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="class">
 <dt id="spectractor.simulation.simulator.SpectrumSimulation">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">SpectrumSimulation</code><span class="sig-paren">(</span><em>spectrum</em>, <em>atmosphere</em>, <em>telescope</em>, <em>disperser</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulation" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="spectractor.extractor.html#spectractor.extractor.spectrum.Spectrum" title="spectractor.extractor.spectrum.Spectrum"><code class="xref py py-class docutils literal"><span class="pre">spectractor.extractor.spectrum.Spectrum</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.simulator.</code><code class="sig-name descname">SpectrumSimulation</code><span class="sig-paren">(</span><em class="sig-param">spectrum</em>, <em class="sig-param">atmosphere</em>, <em class="sig-param">telescope</em>, <em class="sig-param">disperser</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="spectractor.extractor.html#spectractor.extractor.spectrum.Spectrum" title="spectractor.extractor.spectrum.Spectrum"><code class="xref py py-class docutils literal notranslate"><span class="pre">spectractor.extractor.spectrum.Spectrum</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.simulation.simulator.SpectrumSimulation.simulate">
-<code class="descname">simulate</code><span class="sig-paren">(</span><em>A1=1.0</em>, <em>A2=0.0</em>, <em>ozone=300</em>, <em>pwv=5</em>, <em>aerosols=0.05</em>, <em>reso=0.0</em>, <em>D=55.45</em>, <em>shift=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulation.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulation.simulate" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">simulate</code><span class="sig-paren">(</span><em class="sig-param">A1=1.0</em>, <em class="sig-param">A2=0.0</em>, <em class="sig-param">ozone=300</em>, <em class="sig-param">pwv=5</em>, <em class="sig-param">aerosols=0.05</em>, <em class="sig-param">reso=0.0</em>, <em class="sig-param">D=55.45</em>, <em class="sig-param">shift=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulation.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulation.simulate" title="Permalink to this definition">¶</a></dt>
 <dd><p>Simulate the cross spectrum of an object and its uncertainties
 after its transmission throught the instrument and the atmosphere.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>A1</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Global amplitude of the spectrum (default: 1).</li>
-<li><strong>A2</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Relative amplitude of the order 2 spectrum contamination (default: 0).</li>
-<li><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson</li>
-<li><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor quantity in mm</li>
-<li><strong>aerosols</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD Vertical Aerosols Optical Depth</li>
-<li><strong>reso</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Gaussian kernel size for the convolution (default: 0).</li>
-<li><strong>D</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Distance between the CCD and the disperser in mm (default: parameters.DISTANCE2CCD)</li>
-<li><strong>shift</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Shift in pixels of the order 0 position estimate (default: 0).</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>A1</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Global amplitude of the spectrum (default: 1).</p></li>
+<li><p><strong>A2</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Relative amplitude of the order 2 spectrum contamination (default: 0).</p></li>
+<li><p><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson</p></li>
+<li><p><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor quantity in mm</p></li>
+<li><p><strong>aerosols</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD Vertical Aerosols Optical Depth</p></li>
+<li><p><strong>reso</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Gaussian kernel size for the convolution (default: 0).</p></li>
+<li><p><strong>D</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Distance between the CCD and the disperser in mm (default: parameters.DISTANCE2CCD)</p></li>
+<li><p><strong>shift</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Shift in pixels of the order 0 position estimate (default: 0).</p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><ul class="simple">
-<li><strong>lambdas</strong> (<em>array_like</em>) – The wavelength array in nm used for the interpolation.</li>
-<li><strong>spectrum</strong> (<em>callable</em>) – The spectrum interpolated function in Target units.</li>
-<li><strong>spectrum_err</strong> (<em>array_like</em>) – The spectrum uncertainties interpolated function in Target units.</li>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelength array in nm used for the interpolation.</p></li>
+<li><p><strong>spectrum</strong> (<em>callable</em>) – The spectrum interpolated function in Target units.</p></li>
+<li><p><strong>spectrum_err</strong> (<em>array_like</em>) – The spectrum uncertainties interpolated function in Target units.</p></li>
 </ul>
 </p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="spectractor.simulation.simulator.SpectrumSimulation.simulate_without_atmosphere">
-<code class="descname">simulate_without_atmosphere</code><span class="sig-paren">(</span><em>lambdas</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulation.simulate_without_atmosphere"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulation.simulate_without_atmosphere" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">simulate_without_atmosphere</code><span class="sig-paren">(</span><em class="sig-param">lambdas</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulation.simulate_without_atmosphere"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulation.simulate_without_atmosphere" title="Permalink to this definition">¶</a></dt>
 <dd><p>Compute the spectrum of an object and its uncertainties
 after its transmission throught the instrument except the atmosphere.
 The units remains the ones of the Target instance.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>lambdas</strong> (<em>array_like</em>) – The wavelength array in nm</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><ul class="simple">
-<li><strong>spectrum</strong> (<em>array_like</em>) – The spectrum in Target units.</li>
-<li><strong>spectrum_err</strong> (<em>array_like</em>) – The spectrum uncertainties in Target units.</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelength array in nm</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>spectrum</strong> (<em>array_like</em>) – The spectrum in Target units.</p></li>
+<li><p><strong>spectrum_err</strong> (<em>array_like</em>) – The spectrum uncertainties in Target units.</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</p>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
 
 <dl class="function">
 <dt id="spectractor.simulation.simulator.SpectrumSimulator">
-<code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">SpectrumSimulator</code><span class="sig-paren">(</span><em>filename</em>, <em>outputdir=''</em>, <em>pwv=5</em>, <em>ozone=300</em>, <em>aerosols=0.05</em>, <em>A1=1.0</em>, <em>A2=0.0</em>, <em>reso=None</em>, <em>D=55.45</em>, <em>shift=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulator" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.simulator.</code><code class="sig-name descname">SpectrumSimulator</code><span class="sig-paren">(</span><em class="sig-param">filename</em>, <em class="sig-param">outputdir=''</em>, <em class="sig-param">pwv=5</em>, <em class="sig-param">ozone=300</em>, <em class="sig-param">aerosols=0.05</em>, <em class="sig-param">A1=1.0</em>, <em class="sig-param">A2=0.0</em>, <em class="sig-param">reso=None</em>, <em class="sig-param">D=55.45</em>, <em class="sig-param">shift=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulator" title="Permalink to this definition">¶</a></dt>
 <dd><p>Simulator
 Main function to evaluate several spectra
 A grid of spectra will be produced for a given target, airmass and pressure</p>
@@ -789,7 +681,7 @@ A grid of spectra will be produced for a given target, airmass and pressure</p>
 
 <dl class="function">
 <dt id="spectractor.simulation.simulator.SpectrumSimulatorCore">
-<code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">SpectrumSimulatorCore</code><span class="sig-paren">(</span><em>spectrum</em>, <em>telescope</em>, <em>disperser</em>, <em>airmass=1.0</em>, <em>pressure=800</em>, <em>temperature=10</em>, <em>pwv=5</em>, <em>ozone=300</em>, <em>aerosols=0.05</em>, <em>A1=1.0</em>, <em>A2=0.0</em>, <em>reso=0</em>, <em>D=55.45</em>, <em>shift=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulatorCore"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulatorCore" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.simulator.</code><code class="sig-name descname">SpectrumSimulatorCore</code><span class="sig-paren">(</span><em class="sig-param">spectrum</em>, <em class="sig-param">telescope</em>, <em class="sig-param">disperser</em>, <em class="sig-param">airmass=1.0</em>, <em class="sig-param">pressure=800</em>, <em class="sig-param">temperature=10</em>, <em class="sig-param">pwv=5</em>, <em class="sig-param">ozone=300</em>, <em class="sig-param">aerosols=0.05</em>, <em class="sig-param">A1=1.0</em>, <em class="sig-param">A2=0.0</em>, <em class="sig-param">reso=0</em>, <em class="sig-param">D=55.45</em>, <em class="sig-param">shift=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulatorCore"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulatorCore" title="Permalink to this definition">¶</a></dt>
 <dd><p>SimulatorCore
 Main function to evaluate several spectra
 A grid of spectra will be produced for a given target, airmass and pressure</p>
@@ -797,50 +689,10 @@ A grid of spectra will be produced for a given target, airmass and pressure</p>
 
 <dl class="function">
 <dt id="spectractor.simulation.simulator.SpectrumSimulatorSimGrid">
-<code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">SpectrumSimulatorSimGrid</code><span class="sig-paren">(</span><em>filename, outputdir, pwv_grid=[0, 10, 5], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 5]</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulatorSimGrid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulatorSimGrid" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.simulator.</code><code class="sig-name descname">SpectrumSimulatorSimGrid</code><span class="sig-paren">(</span><em class="sig-param">filename, outputdir, pwv_grid=[0, 10, 5], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 5]</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#SpectrumSimulatorSimGrid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.SpectrumSimulatorSimGrid" title="Permalink to this definition">¶</a></dt>
 <dd><p>SimulatorSimGrid
 Main function to evaluate several spectra
 A grid of spectra will be produced for a given target, airmass and pressure</p>
-</dd></dl>
-
-<dl class="class">
-<dt id="spectractor.simulation.simulator.TelescopeTransmission">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.simulator.</code><code class="descname">TelescopeTransmission</code><span class="sig-paren">(</span><em>filter_name=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#TelescopeTransmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.TelescopeTransmission" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
-<dl class="method">
-<dt id="spectractor.simulation.simulator.TelescopeTransmission.load_transmission">
-<code class="descname">load_transmission</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#TelescopeTransmission.load_transmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.TelescopeTransmission.load_transmission" title="Permalink to this definition">¶</a></dt>
-<dd><p>Load the transmission files and make a function.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><strong>transmission</strong> – The transmission function using wavelengths in nm.</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference external" href="https://docs.python.org/3/library/functions.html#callable" title="(in Python v3.7)">callable</a></td>
-</tr>
-</tbody>
-</table>
-<p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">TelescopeTransmission</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">t</span><span class="o">.</span><span class="n">transmission</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">t</span><span class="o">.</span><span class="n">transmission_err</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">t</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
-</pre></div>
-</div>
-</dd></dl>
-
-<dl class="method">
-<dt id="spectractor.simulation.simulator.TelescopeTransmission.plot_transmission">
-<code class="descname">plot_transmission</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/simulator.html#TelescopeTransmission.plot_transmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.simulator.TelescopeTransmission.plot_transmission" title="Permalink to this definition">¶</a></dt>
-<dd><p>Plot the transmission function and the associated uncertainties.</p>
-<p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">TelescopeTransmission</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">t</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
-</pre></div>
-</div>
-</dd></dl>
-
 </dd></dl>
 
 </div>
@@ -854,37 +706,71 @@ Collaboration : DESC-LSST</p>
 <p>Purpose : Provide the various useful transmission functions
 update : July 2018</p>
 <dl class="class">
+<dt id="spectractor.simulation.throughput.TelescopeTransmission">
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.throughput.</code><code class="sig-name descname">TelescopeTransmission</code><span class="sig-paren">(</span><em class="sig-param">filter_name=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#TelescopeTransmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.TelescopeTransmission" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="method">
+<dt id="spectractor.simulation.throughput.TelescopeTransmission.load_transmission">
+<code class="sig-name descname">load_transmission</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#TelescopeTransmission.load_transmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.TelescopeTransmission.load_transmission" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load the transmission files and make a function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><strong>transmission</strong> – The transmission function using wavelengths in nm.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">TelescopeTransmission</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">t</span><span class="o">.</span><span class="n">transmission</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">t</span><span class="o">.</span><span class="n">transmission_err</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">t</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.simulation.throughput.TelescopeTransmission.plot_transmission">
+<code class="sig-name descname">plot_transmission</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#TelescopeTransmission.plot_transmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.TelescopeTransmission.plot_transmission" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot the transmission function and the associated uncertainties.</p>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">TelescopeTransmission</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">t</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
 <dt id="spectractor.simulation.throughput.Throughput">
-<em class="property">class </em><code class="descclassname">spectractor.simulation.throughput.</code><code class="descname">Throughput</code><span class="sig-paren">(</span><em>input_directory='/Users/jneveu/Documents/LSST/Calibration/Spectractor/spectractor/simulation/CTIOThroughput/'</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.throughput.</code><code class="sig-name descname">Throughput</code><span class="sig-paren">(</span><em class="sig-param">input_directory='/Users/jneveu/Documents/LSST/Calibration/Spectractor/spectractor/simulation/CTIOThroughput/'</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.simulation.throughput.Throughput.load_FGB37">
-<code class="descname">load_FGB37</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_FGB37"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_FGB37" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">load_FGB37</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_FGB37"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_FGB37" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load the quantum efficiency file and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.</p>
-<dl class="docutils">
-<dt>The input file must have two or three columns:</dt>
-<dd><ol class="first last arabic simple">
-<li>wavelengths in nm</li>
-<li>transmissions between 0 and 1.</li>
-<li>uncertainties on the transmissions (optional)</li>
+<dl class="simple">
+<dt>The input file must have two or three columns:</dt><dd><ol class="arabic simple">
+<li><p>wavelengths in nm</p></li>
+<li><p>transmissions between 0 and 1.</p></li>
+<li><p>uncertainties on the transmissions (optional)</p></li>
 </ol>
 </dd>
 </dl>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><ul class="simple">
-<li><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</li>
-<li><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</li>
-<li><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</li>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</p></li>
+<li><p><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</p></li>
+<li><p><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</p>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">=</span> <span class="mi">500</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">transmissions</span><span class="p">,</span> <span class="n">errors</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">load_FGB37</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">lambdas</span><span class="p">[:</span><span class="mi">3</span><span class="p">])</span>
@@ -899,32 +785,28 @@ update : July 2018</p>
 
 <dl class="method">
 <dt id="spectractor.simulation.throughput.Throughput.load_RG715">
-<code class="descname">load_RG715</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_RG715"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_RG715" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">load_RG715</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_RG715"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_RG715" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load the quantum efficiency file and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.</p>
-<dl class="docutils">
-<dt>The input file must have two or three columns:</dt>
-<dd><ol class="first last arabic simple">
-<li>wavelengths in nm</li>
-<li>transmissions between 0 and 1.</li>
-<li>uncertainties on the transmissions (optional)</li>
+<dl class="simple">
+<dt>The input file must have two or three columns:</dt><dd><ol class="arabic simple">
+<li><p>wavelengths in nm</p></li>
+<li><p>transmissions between 0 and 1.</p></li>
+<li><p>uncertainties on the transmissions (optional)</p></li>
 </ol>
 </dd>
 </dl>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><ul class="simple">
-<li><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</li>
-<li><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</li>
-<li><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</li>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</p></li>
+<li><p><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</p></li>
+<li><p><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</p>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">=</span> <span class="mi">700</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">transmissions</span><span class="p">,</span> <span class="n">errors</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">load_RG715</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">lambdas</span><span class="p">[:</span><span class="mi">3</span><span class="p">])</span>
@@ -939,32 +821,28 @@ update : July 2018</p>
 
 <dl class="method">
 <dt id="spectractor.simulation.throughput.Throughput.load_mirror_reflectivity">
-<code class="descname">load_mirror_reflectivity</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_mirror_reflectivity"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_mirror_reflectivity" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">load_mirror_reflectivity</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_mirror_reflectivity"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_mirror_reflectivity" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load the telescope throughput file and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.</p>
-<dl class="docutils">
-<dt>The input file must have two or three columns:</dt>
-<dd><ol class="first last arabic simple">
-<li>wavelengths in nm</li>
-<li>transmissions between 0 and 1.</li>
-<li>uncertainties on the transmissions (optional)</li>
+<dl class="simple">
+<dt>The input file must have two or three columns:</dt><dd><ol class="arabic simple">
+<li><p>wavelengths in nm</p></li>
+<li><p>transmissions between 0 and 1.</p></li>
+<li><p>uncertainties on the transmissions (optional)</p></li>
 </ol>
 </dd>
 </dl>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><ul class="simple">
-<li><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</li>
-<li><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</li>
-<li><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</li>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</p></li>
+<li><p><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</p></li>
+<li><p><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</p>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">=</span> <span class="mi">500</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">transmissions</span><span class="p">,</span> <span class="n">errors</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">load_mirror_reflectivity</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">lambdas</span><span class="p">[:</span><span class="mi">3</span><span class="p">])</span>
@@ -979,32 +857,28 @@ update : July 2018</p>
 
 <dl class="method">
 <dt id="spectractor.simulation.throughput.Throughput.load_quantum_efficiency">
-<code class="descname">load_quantum_efficiency</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_quantum_efficiency"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_quantum_efficiency" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">load_quantum_efficiency</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_quantum_efficiency"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_quantum_efficiency" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load the quantum efficiency file and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.</p>
-<dl class="docutils">
-<dt>The input file must have two or three columns:</dt>
-<dd><ol class="first last arabic simple">
-<li>wavelengths in nm</li>
-<li>transmissions between 0 and 1.</li>
-<li>uncertainties on the transmissions (optional)</li>
+<dl class="simple">
+<dt>The input file must have two or three columns:</dt><dd><ol class="arabic simple">
+<li><p>wavelengths in nm</p></li>
+<li><p>transmissions between 0 and 1.</p></li>
+<li><p>uncertainties on the transmissions (optional)</p></li>
 </ol>
 </dd>
 </dl>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><ul class="simple">
-<li><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</li>
-<li><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</li>
-<li><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</li>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</p></li>
+<li><p><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</p></li>
+<li><p><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</p>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">=</span> <span class="mi">500</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">transmissions</span><span class="p">,</span> <span class="n">errors</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">load_quantum_efficiency</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">lambdas</span><span class="p">[:</span><span class="mi">3</span><span class="p">])</span>
@@ -1019,32 +893,28 @@ update : July 2018</p>
 
 <dl class="method">
 <dt id="spectractor.simulation.throughput.Throughput.load_telescope_throughput">
-<code class="descname">load_telescope_throughput</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_telescope_throughput"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_telescope_throughput" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">load_telescope_throughput</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_telescope_throughput"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_telescope_throughput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load the telescope throughput file and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.</p>
-<dl class="docutils">
-<dt>The input file must have two or three columns:</dt>
-<dd><ol class="first last arabic simple">
-<li>wavelengths in nm</li>
-<li>transmissions between 0 and 1.</li>
-<li>uncertainties on the transmissions (optional)</li>
+<dl class="simple">
+<dt>The input file must have two or three columns:</dt><dd><ol class="arabic simple">
+<li><p>wavelengths in nm</p></li>
+<li><p>transmissions between 0 and 1.</p></li>
+<li><p>uncertainties on the transmissions (optional)</p></li>
 </ol>
 </dd>
 </dl>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><ul class="simple">
-<li><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</li>
-<li><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</li>
-<li><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</li>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</p></li>
+<li><p><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</p></li>
+<li><p><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</p>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">=</span> <span class="mi">500</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">transmissions</span><span class="p">,</span> <span class="n">errors</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">load_telescope_throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">lambdas</span><span class="p">[:</span><span class="mi">3</span><span class="p">])</span>
@@ -1059,32 +929,28 @@ update : July 2018</p>
 
 <dl class="method">
 <dt id="spectractor.simulation.throughput.Throughput.load_total_throughput">
-<code class="descname">load_total_throughput</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_total_throughput"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_total_throughput" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">load_total_throughput</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#Throughput.load_total_throughput"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.Throughput.load_total_throughput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load the telescope throughput file and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.</p>
-<dl class="docutils">
-<dt>The input file must have two or three columns:</dt>
-<dd><ol class="first last arabic simple">
-<li>wavelengths in nm</li>
-<li>transmissions between 0 and 1.</li>
-<li>uncertainties on the transmissions (optional)</li>
+<dl class="simple">
+<dt>The input file must have two or three columns:</dt><dd><ol class="arabic simple">
+<li><p>wavelengths in nm</p></li>
+<li><p>transmissions between 0 and 1.</p></li>
+<li><p>uncertainties on the transmissions (optional)</p></li>
 </ol>
 </dd>
 </dl>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><ul class="simple">
-<li><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</li>
-<li><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</li>
-<li><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</li>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</p></li>
+<li><p><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</p></li>
+<li><p><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</p>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">=</span> <span class="mi">500</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">transmissions</span><span class="p">,</span> <span class="n">errors</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">load_total_throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">lambdas</span><span class="p">[:</span><span class="mi">3</span><span class="p">])</span>
@@ -1101,32 +967,28 @@ update : July 2018</p>
 
 <dl class="function">
 <dt id="spectractor.simulation.throughput.load_transmission">
-<code class="descclassname">spectractor.simulation.throughput.</code><code class="descname">load_transmission</code><span class="sig-paren">(</span><em>file_name</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#load_transmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.load_transmission" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.throughput.</code><code class="sig-name descname">load_transmission</code><span class="sig-paren">(</span><em class="sig-param">file_name</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#load_transmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.load_transmission" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load the transmission files and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.</p>
-<dl class="docutils">
-<dt>The input file must have two or three columns:</dt>
-<dd><ol class="first last arabic simple">
-<li>wavelengths in nm</li>
-<li>transmissions between 0 and 1.</li>
-<li>uncertainties on the transmissions (optional)</li>
+<dl class="simple">
+<dt>The input file must have two or three columns:</dt><dd><ol class="arabic simple">
+<li><p>wavelengths in nm</p></li>
+<li><p>transmissions between 0 and 1.</p></li>
+<li><p>uncertainties on the transmissions (optional)</p></li>
 </ol>
 </dd>
 </dl>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><ul class="simple">
-<li><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</li>
-<li><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</li>
-<li><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</li>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</p></li>
+<li><p><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</p></li>
+<li><p><strong>uncertainties</strong> (<em>array_like</em>) – The uncertainty on the transmission array (0 if file does not contain the info).</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</p>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">=</span> <span class="mi">500</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">transmissions</span><span class="p">,</span> <span class="n">errors</span> <span class="o">=</span> <span class="n">load_transmission</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">filename_quantum_efficiency</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">lambdas</span><span class="p">[:</span><span class="mi">3</span><span class="p">])</span>
@@ -1141,45 +1003,38 @@ update : July 2018</p>
 
 <dl class="function">
 <dt id="spectractor.simulation.throughput.plot_all_transmissions">
-<code class="descclassname">spectractor.simulation.throughput.</code><code class="descname">plot_all_transmissions</code><span class="sig-paren">(</span><em>title='Telescope transmissions'</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#plot_all_transmissions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.plot_all_transmissions" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.throughput.</code><code class="sig-name descname">plot_all_transmissions</code><span class="sig-paren">(</span><em class="sig-param">title='Telescope transmissions'</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#plot_all_transmissions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.plot_all_transmissions" title="Permalink to this definition">¶</a></dt>
 <dd><p>Plot the transmission files.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>title</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a><em>, </em><em>optional</em>) – The title of the plot.</td>
-</tr>
-</tbody>
-</table>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>title</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a><em>, </em><em>optional</em>) – The title of the plot.</p>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_all_transmissions</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;CTIO&quot;</span><span class="p">)</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">plot_all_transmissions</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;CTIO&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
 
 <dl class="function">
 <dt id="spectractor.simulation.throughput.plot_transmission_simple">
-<code class="descclassname">spectractor.simulation.throughput.</code><code class="descname">plot_transmission_simple</code><span class="sig-paren">(</span><em>ax</em>, <em>lambdas</em>, <em>transmissions</em>, <em>uncertainties=None</em>, <em>label=''</em>, <em>title=''</em>, <em>lw=2</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#plot_transmission_simple"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.plot_transmission_simple" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.simulation.throughput.</code><code class="sig-name descname">plot_transmission_simple</code><span class="sig-paren">(</span><em class="sig-param">ax</em>, <em class="sig-param">lambdas</em>, <em class="sig-param">transmissions</em>, <em class="sig-param">uncertainties=None</em>, <em class="sig-param">label=''</em>, <em class="sig-param">title=''</em>, <em class="sig-param">lw=2</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/throughput.html#plot_transmission_simple"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.throughput.plot_transmission_simple" title="Permalink to this definition">¶</a></dt>
 <dd><p>Plot the transmission with respect to the wavelength.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ax</strong> (<em>Axes</em>) – An Axes instance.</li>
-<li><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</li>
-<li><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</li>
-<li><strong>uncertainties</strong> (<em>array_like</em><em>, </em><em>optional</em>) – The uncertainty on the transmission array (default: None).</li>
-<li><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a><em>, </em><em>optional</em>) – The label of the curve for the legend (default: “”)</li>
-<li><strong>title</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a><em>, </em><em>optional</em>) – The title of the plot (default: “”)</li>
-<li><strong>lw</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.7)"><em>int</em></a>) – Line width (default: 2).</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ax</strong> (<em>Axes</em>) – An Axes instance.</p></li>
+<li><p><strong>lambdas</strong> (<em>array_like</em>) – The wavelengths array in nm.</p></li>
+<li><p><strong>transmissions</strong> (<em>array_like</em>) – The transmission array, values are between 0 and 1.</p></li>
+<li><p><strong>uncertainties</strong> (<em>array_like</em><em>, </em><em>optional</em>) – The uncertainty on the transmission array (default: None).</p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a><em>, </em><em>optional</em>) – The label of the curve for the legend (default: “”)</p></li>
+<li><p><strong>title</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a><em>, </em><em>optional</em>) – The title of the plot (default: “”)</p></li>
+<li><p><strong>lw</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.7)"><em>int</em></a>) – Line width (default: 2).</p></li>
 </ul>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">=</span> <span class="mi">500</span>
@@ -1209,6 +1064,13 @@ update : July 2018</p>
            
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="spectractor.fit.html" class="btn btn-neutral float-left" title="spectractor.fit package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>

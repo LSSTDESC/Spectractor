@@ -53,7 +53,8 @@ extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.githubpages',
     'sphinx.ext.napoleon',
     'matplotlib.sphinxext.plot_directive',
-    'sphinx.ext.autosummary'] #
+    'sphinx.ext.autosummary',
+              'm2r'] #
 
 plot_html_show_source_link = True
 plot_html_show_formats = False
@@ -67,13 +68,29 @@ templates_path = ['_templates']
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-from recommonmark.parser import CommonMarkParser
-source_parsers = {
-    '.md': CommonMarkParser,
-}
+# from recommonmark.parser import CommonMarkParser
+# source_parsers = {
+#     '.md': CommonMarkParser,
+# }
 
 source_suffix = ['.rst', '.md']
 # source_suffix = '.rst'
+
+# At top on conf.py (with other import statements)
+import recommonmark
+from recommonmark.transform import AutoStructify
+
+# At the bottom of conf.py
+def setup(app):
+    app.add_config_value('recommonmark_config', {
+        #'url_resolver': lambda url: github_doc_root + url,
+        'auto_toc_tree_section': 'Contents',
+        'enable_math': False,
+        'enable_inline_math': False,
+        'enable_eval_rst': True,
+    }, True)
+    app.add_transform(AutoStructify)
+
 
 # The master toctree document.
 master_doc = 'index'

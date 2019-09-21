@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../../../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../../../_static/jquery.js"></script>
         <script type="text/javascript" src="../../../_static/underscore.js"></script>
         <script type="text/javascript" src="../../../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
@@ -92,8 +83,11 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../source/modules.html">spectractor</a></li>
+</ul>
+
             
           
         </div>
@@ -158,8 +152,12 @@
 <span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="kn">from</span> <span class="nn">matplotlib.ticker</span> <span class="k">import</span> <span class="n">MaxNLocator</span>
 <span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">interpolate</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">sys</span>
 
-<span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="o">*</span>
+
+<span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="n">formatting_numbers</span>
 
 
 <div class="viewcode-block" id="Axis"><a class="viewcode-back" href="../../../source/spectractor.fit.html#spectractor.fit.statistics.Axis">[docs]</a><span class="k">class</span> <span class="nc">Axis</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
@@ -570,7 +568,7 @@
                             <span class="k">if</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">i</span><span class="p">:</span>
                                 <span class="bp">self</span><span class="o">.</span><span class="n">contours</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span><span class="o">.</span><span class="n">grid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">grid</span></div>
 
-<div class="viewcode-block" id="Likelihood.triangle_plots"><a class="viewcode-back" href="../../../source/spectractor.fit.html#spectractor.fit.statistics.Likelihood.triangle_plots">[docs]</a>    <span class="k">def</span> <span class="nf">triangle_plots</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">output_filename</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+<div class="viewcode-block" id="Likelihood.triangle_plots"><a class="viewcode-back" href="../../../source/spectractor.fit.html#spectractor.fit.statistics.Likelihood.triangle_plots">[docs]</a>    <span class="k">def</span> <span class="nf">triangle_plots</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_filename</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
         <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dim</span>
         <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">9</span><span class="p">))</span>
         <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">PAPER</span><span class="p">:</span>
@@ -622,7 +620,7 @@
         <span class="n">cbar</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">labelsize</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
         <span class="c1"># plot the triangle</span>
         <span class="n">fig</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">hspace</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">wspace</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span> <span class="ow">and</span> <span class="n">parameters</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">output_filename</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
             <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Save figure: </span><span class="si">{output_filename}</span><span class="s1">&#39;</span><span class="p">)</span>

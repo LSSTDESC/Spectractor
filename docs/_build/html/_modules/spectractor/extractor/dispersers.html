@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../../../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../../../_static/jquery.js"></script>
         <script type="text/javascript" src="../../../_static/underscore.js"></script>
         <script type="text/javascript" src="../../../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
@@ -92,8 +83,11 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../source/modules.html">spectractor</a></li>
+</ul>
+
             
           
         </div>
@@ -157,8 +151,12 @@
   <h1>Source code for spectractor.extractor.dispersers</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">interpolate</span>
 <span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">ndimage</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">os</span>
 
-<span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="n">fit_poly2d</span>
 
 
 <div class="viewcode-block" id="build_hologram"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.dispersers.build_hologram">[docs]</a><span class="k">def</span> <span class="nf">build_hologram</span><span class="p">(</span><span class="n">order0_position</span><span class="p">,</span> <span class="n">order1_position</span><span class="p">,</span> <span class="n">theta_tilt</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">lambda_plot</span><span class="o">=</span><span class="mi">256000</span><span class="p">):</span>
@@ -297,7 +295,7 @@
 <span class="sd">    &gt;&gt;&gt; get_delta_pix_ortho(delta, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2], D=D)</span>
 <span class="sd">    500.0</span>
 <span class="sd">    &gt;&gt;&gt; get_delta_pix_ortho(delta, [500,500], D=D)</span>
-<span class="sd">    497.66545567320992</span>
+<span class="sd">    497.6654556732099</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">theta0</span> <span class="o">=</span> <span class="n">get_theta0</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
     <span class="n">deltaX0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tan</span><span class="p">(</span><span class="n">theta0</span><span class="p">)</span> <span class="o">*</span> <span class="n">D</span> <span class="o">/</span> <span class="n">parameters</span><span class="o">.</span><span class="n">CCD_PIXEL2MM</span>
@@ -442,8 +440,8 @@
 <span class="sd">        &gt;&gt;&gt; print(g.N_input)</span>
 <span class="sd">        400</span>
 <span class="sd">        &gt;&gt;&gt; g = Grating(400, label=&quot;Ron400&quot;, data_dir=parameters.HOLO_DIR)</span>
-<span class="sd">        &gt;&gt;&gt; print(g.N_input)</span>
-<span class="sd">        400.869182487</span>
+<span class="sd">        &gt;&gt;&gt; print(f&quot;{g.N_input:6f}&quot;)</span>
+<span class="sd">        400.869182</span>
 <span class="sd">        &gt;&gt;&gt; assert g.D is parameters.DISTANCE2CCD</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">N_input</span> <span class="o">=</span> <span class="n">N</span>
@@ -492,6 +490,7 @@
 <span class="sd">        --------</span>
 
 <span class="sd">        The files exist:</span>
+
 <span class="sd">        &gt;&gt;&gt; g = Grating(400, label=&#39;Ron400&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; g.N_input</span>
 <span class="sd">        400.86918248709316</span>
@@ -499,6 +498,7 @@
 <span class="sd">        -0.277</span>
 
 <span class="sd">        The files do not exist:</span>
+
 <span class="sd">        &gt;&gt;&gt; g = Grating(400, label=&#39;XXX&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; g.N_input</span>
 <span class="sd">        400</span>
@@ -606,10 +606,10 @@
 <span class="sd">        &gt;&gt;&gt; deltaX = np.arange(0,1000,1).astype(float)</span>
 <span class="sd">        &gt;&gt;&gt; lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, order=1)</span>
 <span class="sd">        &gt;&gt;&gt; print(lambdas[:5])</span>
-<span class="sd">        [ 0.          1.45454532  2.90909063  4.36363511  5.81817793]</span>
+<span class="sd">        [0.         1.45454532 2.90909063 4.36363511 5.81817793]</span>
 <span class="sd">        &gt;&gt;&gt; pixels = disperser.grating_lambda_to_pixel(lambdas, x0, order=1)</span>
 <span class="sd">        &gt;&gt;&gt; print(pixels[:5])</span>
-<span class="sd">        [ 0.  1.  2.  3.  4.]</span>
+<span class="sd">        [0. 1. 2. 3. 4.]</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">refraction_angle</span><span class="p">(</span><span class="n">deltaX</span><span class="p">,</span> <span class="n">x0</span><span class="p">)</span>
         <span class="n">theta0</span> <span class="o">=</span> <span class="n">get_theta0</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
@@ -635,10 +635,10 @@
 <span class="sd">        &gt;&gt;&gt; deltaX = np.arange(0,1000,1).astype(float)</span>
 <span class="sd">        &gt;&gt;&gt; lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, order=1)</span>
 <span class="sd">        &gt;&gt;&gt; print(lambdas[:5])</span>
-<span class="sd">        [ 0.          1.45454532  2.90909063  4.36363511  5.81817793]</span>
+<span class="sd">        [0.         1.45454532 2.90909063 4.36363511 5.81817793]</span>
 <span class="sd">        &gt;&gt;&gt; pixels = disperser.grating_lambda_to_pixel(lambdas, x0, order=1)</span>
 <span class="sd">        &gt;&gt;&gt; print(pixels[:5])</span>
-<span class="sd">        [ 0.  1.  2.  3.  4.]</span>
+<span class="sd">        [0. 1. 2. 3. 4.]</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">lambdas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">lambdas</span><span class="p">)</span>
         <span class="n">theta0</span> <span class="o">=</span> <span class="n">get_theta0</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
@@ -779,6 +779,7 @@
 <span class="sd">        --------</span>
 
 <span class="sd">        The files exist:</span>
+
 <span class="sd">        &gt;&gt;&gt; h = Hologram(label=&#39;HoloPhP&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; h.N((500,500))</span>
 <span class="sd">        345.4794168822986</span>
@@ -788,6 +789,7 @@
 <span class="sd">        [856.004, 562.34]</span>
 
 <span class="sd">        The files do not exist:</span>
+
 <span class="sd">        &gt;&gt;&gt; h = Hologram(label=&#39;XXX&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; h.N((500,500))</span>
 <span class="sd">        350</span>
@@ -859,9 +861,6 @@
 
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
     <span class="kn">import</span> <span class="nn">doctest</span>
-
-    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">&quot;1.14.0&quot;</span><span class="p">:</span>
-        <span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">legacy</span><span class="o">=</span><span class="s2">&quot;1.13&quot;</span><span class="p">)</span>
 
     <span class="n">doctest</span><span class="o">.</span><span class="n">testmod</span><span class="p">()</span>
 </pre></div>

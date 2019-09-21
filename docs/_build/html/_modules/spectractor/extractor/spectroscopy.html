@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../../../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../../../_static/jquery.js"></script>
         <script type="text/javascript" src="../../../_static/underscore.js"></script>
         <script type="text/javascript" src="../../../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
@@ -92,8 +83,11 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../source/modules.html">spectractor</a></li>
+</ul>
+
             
           
         </div>
@@ -157,9 +151,11 @@
   <h1>Source code for spectractor.extractor.spectroscopy</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span> <span class="nn">astropy.table</span> <span class="k">import</span> <span class="n">Table</span>
 <span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="k">import</span> <span class="n">interp1d</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 
-<span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="o">*</span>
 <span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="kn">from</span> <span class="nn">spectractor.config</span> <span class="k">import</span> <span class="n">set_logger</span>
+<span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="n">gauss</span><span class="p">,</span> <span class="n">multigauss_and_bgd</span><span class="p">,</span> <span class="n">rescale_x_for_legendre</span>
 
 
 <div class="viewcode-block" id="Line"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.spectroscopy.Line">[docs]</a><span class="k">class</span> <span class="nc">Line</span><span class="p">:</span>
@@ -452,6 +448,8 @@
 <span class="sd">        &gt;&gt;&gt; assert(global_chisq &lt; 1)</span>
 
 <span class="sd">        Plot the result</span>
+<span class="sd">        &gt;&gt;&gt; import matplotlib.pyplot as plt</span>
+<span class="sd">        &gt;&gt;&gt; from spectractor.tools import plot_spectrum_simple</span>
 <span class="sd">        &gt;&gt;&gt; spec.lines = lines</span>
 <span class="sd">        &gt;&gt;&gt; fig = plt.figure()</span>
 <span class="sd">        &gt;&gt;&gt; plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)</span>
@@ -508,10 +506,10 @@
            <span class="n">label_pos</span><span class="o">=</span><span class="p">[</span><span class="mf">0.007</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">])</span>  <span class="c1"># https://en.wikipedia.org/wiki/Fraunhofer_lines</span>
 <span class="n">CAII1</span> <span class="o">=</span> <span class="n">Line</span><span class="p">(</span><span class="mf">393.366</span><span class="p">,</span> <span class="n">atmospheric</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;$Ca_</span><span class="si">{II}</span><span class="s1">$&#39;</span><span class="p">,</span>
              <span class="n">label_pos</span><span class="o">=</span><span class="p">[</span><span class="mf">0.007</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">],</span>
-             <span class="n">use_for_calibration</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># https://en.wikipedia.org/wiki/Fraunhofer_lines</span>
+             <span class="n">use_for_calibration</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># https://en.wikipedia.org/wiki/Fraunhofer_lines</span>
 <span class="n">CAII2</span> <span class="o">=</span> <span class="n">Line</span><span class="p">(</span><span class="mf">396.847</span><span class="p">,</span> <span class="n">atmospheric</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;$Ca_</span><span class="si">{II}</span><span class="s1">$&#39;</span><span class="p">,</span>
              <span class="n">label_pos</span><span class="o">=</span><span class="p">[</span><span class="mf">0.007</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">],</span>
-             <span class="n">use_for_calibration</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># https://en.wikipedia.org/wiki/Fraunhofer_lines</span>
+             <span class="n">use_for_calibration</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># https://en.wikipedia.org/wiki/Fraunhofer_lines</span>
 <span class="n">O2</span> <span class="o">=</span> <span class="n">Line</span><span class="p">(</span><span class="mf">762.1</span><span class="p">,</span> <span class="n">atmospheric</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;$O_2$&#39;</span><span class="p">,</span>
           <span class="n">label_pos</span><span class="o">=</span><span class="p">[</span><span class="mf">0.007</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">],</span>
           <span class="n">use_for_calibration</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf</span>

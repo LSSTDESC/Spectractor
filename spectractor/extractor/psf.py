@@ -68,7 +68,11 @@ class PSF1D(PSF):
         >>> x = np.arange(100)
         >>> out = psf.evaluate(x)
         >>> integral = compute_integral(x, out)
-        >>> assert np.isclose(integral, p[0], rtol=1e-4)
+
+        ..  doctest::
+            :hide:
+
+            >>> assert np.isclose(integral, p[0], rtol=1e-4)
         """
         if p is not None:
             self.p = p
@@ -189,12 +193,14 @@ class PSFFitWorkspace(FitWorkspace):
         --------
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> p = np.array([100,  50, 3, 2, -0.1, 2, 200])
         >>> psf = PSF1D(p)
         >>> data = psf.evaluate(p)
         >>> data_errors = np.sqrt(data+1)
 
         Fit the data:
+
         >>> w = PSFFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
 
         """
@@ -405,6 +411,7 @@ class PSF2DFitWorkspace(PSFFitWorkspace):
         --------
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> p = np.array([500, 20, 30, 3, 2, -0.1, 2, 400])
         >>> psf = PSF2D(p)
         >>> xx, yy = np.mgrid[:50, :60]
@@ -416,11 +423,16 @@ class PSF2DFitWorkspace(PSFFitWorkspace):
         # >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
         Fit the data:
+
         >>> w = PSF2DFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
         >>> x, mod, mod_err = w.simulate(*p[:-1])
-        >>> assert mod is not None
-        >>> assert np.mean(np.abs(mod-data)/data_errors) < 0.5
         >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-data)/data_errors) < 0.5
 
         """
         params = [amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev]
@@ -536,7 +548,11 @@ class ChromaticPSF:
         >>> poly_params_test = s.generate_test_poly_params()
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
         >>> s.fill_table_with_profile_params(profile_params)
-        >>> assert(np.all(np.isclose(s.table['stddev'], 2*np.ones(100))))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(np.all(np.isclose(s.table['stddev'], 2*np.ones(100))))
         """
         for k, name in enumerate(self.PSF.param_names):
             self.table[name] = profile_params[:, k]
@@ -557,10 +573,14 @@ class ChromaticPSF:
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=8000)
         >>> s.table['Dx_rot'] = np.arange(100)
         >>> s.rotate_table(45)
-        >>> assert(np.all(np.isclose(s.table['Dy'], -np.arange(100)/np.sqrt(2))))
-        >>> assert(np.all(np.isclose(s.table['Dx'], np.arange(100)/np.sqrt(2))))
-        >>> assert(np.all(np.isclose(s.table['Dy_fwhm_inf'], -np.arange(100)/np.sqrt(2))))
-        >>> assert(np.all(np.isclose(s.table['Dy_fwhm_sup'], -np.arange(100)/np.sqrt(2))))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(np.all(np.isclose(s.table['Dy'], -np.arange(100)/np.sqrt(2))))
+            >>> assert(np.all(np.isclose(s.table['Dx'], np.arange(100)/np.sqrt(2))))
+            >>> assert(np.all(np.isclose(s.table['Dy_fwhm_inf'], -np.arange(100)/np.sqrt(2))))
+            >>> assert(np.all(np.isclose(s.table['Dy_fwhm_sup'], -np.arange(100)/np.sqrt(2))))
         """
         angle = angle_degree * np.pi / 180.
         rotmat = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
@@ -592,6 +612,7 @@ class ChromaticPSF:
         --------
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
         >>> data = s.evaluate(poly_params_test)
@@ -599,12 +620,22 @@ class ChromaticPSF:
         >>> data_errors = np.sqrt(data+1)
 
         From the polynomial parameters to the profile parameters:
+
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
-        >>> assert(np.all(np.isclose(profile_params[0], [0, 50, 5, 2, 0, 2, 8e3])))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(np.all(np.isclose(profile_params[0], [0, 50, 5, 2, 0, 2, 8e3])))
 
         From the profile parameters to the polynomial parameters:
+
         >>> profile_params = s.from_profile_params_to_poly_params(profile_params)
-        >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
         """
         pixels = np.linspace(-1, 1, len(self.table))
         poly_params = np.array([])
@@ -644,8 +675,12 @@ class ChromaticPSF:
         >>> from spectractor.extractor.spectrum import Spectrum
         >>> s = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
         >>> profile_params = s.chromatic_psf.from_table_to_profile_params()
-        >>> assert(profile_params.shape == (s.chromatic_psf.Nx, len(s.chromatic_psf.PSF.param_names)))
-        >>> assert not np.all(np.isclose(profile_params, np.zeros_like(profile_params)))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(profile_params.shape == (s.chromatic_psf.Nx, len(s.chromatic_psf.PSF.param_names)))
+            >>> assert not np.all(np.isclose(profile_params, np.zeros_like(profile_params)))
         """
         profile_params = np.zeros((len(self.table), len(self.PSF.param_names)))
         for k, name in enumerate(self.PSF.param_names):
@@ -670,9 +705,13 @@ class ChromaticPSF:
         >>> from spectractor.extractor.spectrum import Spectrum
         >>> s = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
         >>> poly_params = s.chromatic_psf.from_table_to_poly_params()
-        >>> assert(poly_params.size > s.chromatic_psf.Nx)
-        >>> assert(len(poly_params.shape)==1)
-        >>> assert not np.all(np.isclose(poly_params, np.zeros_like(poly_params)))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(poly_params.size > s.chromatic_psf.Nx)
+            >>> assert(len(poly_params.shape)==1)
+            >>> assert not np.all(np.isclose(poly_params, np.zeros_like(poly_params)))
         """
         profile_params = self.from_table_to_profile_params()
         poly_params = self.from_profile_params_to_poly_params(profile_params)
@@ -710,15 +749,27 @@ class ChromaticPSF:
 
         From the polynomial parameters to the profile parameters:
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
-        >>> assert(np.all(np.isclose(profile_params[0], [0, 50, 5, 2, 0, 2, 8e3])))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(np.all(np.isclose(profile_params[0], [0, 50, 5, 2, 0, 2, 8e3])))
 
         From the profile parameters to the polynomial parameters:
         >>> profile_params = s.from_profile_params_to_poly_params(profile_params)
-        >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
 
         From the polynomial parameters to the profile parameters without Moffat amplitudes:
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test[100:])
-        >>> assert(np.all(np.isclose(profile_params[0], [1, 50, 5, 2, 0, 2, 8e3])))
+
+        ..  doctest::
+            :hide:
+
+           >>> assert(np.all(np.isclose(profile_params[0], [1, 50, 5, 2, 0, 2, 8e3])))
 
         """
         l = len(self.table)
@@ -774,7 +825,11 @@ class ChromaticPSF:
         >>> poly_params_test = s.generate_test_poly_params()
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
         >>> s.from_profile_params_to_shape_params(profile_params)
-        >>> assert s.table['fwhm'][-1] > 0
+
+        ..  doctest::
+            :hide:
+
+            >>> assert s.table['fwhm'][-1] > 0
         """
         self.fill_table_with_profile_params(profile_params)
         pixel_x = np.arange(self.Nx).astype(int)
@@ -947,8 +1002,8 @@ class ChromaticPSF:
         >>> assert not np.all(np.isclose(output, 0))
 
         >>> import matplotlib.pyplot as plt
-        >>> im = plt.imshow(output, origin='lower')  #doctest: +ELLIPSIS
-        >>> plt.colorbar(im)  #doctest: +ELLIPSIS
+        >>> im = plt.imshow(output, origin='lower')  # doctest: +ELLIPSIS
+        >>> plt.colorbar(im)  # doctest: +ELLIPSIS
         <matplotlib.colorbar.Colorbar object at 0x...>
         >>> if parameters.DISPLAY: plt.show()
 
@@ -1082,6 +1137,7 @@ class ChromaticPSF:
         --------
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> saturation = params[-1]
@@ -1093,16 +1149,22 @@ class ChromaticPSF:
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        Extract the background
+        Extract the background:
+
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
         Fit the transverse profile:
+
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
         ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
-        >>> assert(not np.any(np.isclose(s.table['flux_sum'][3:6], np.zeros(s.Nx)[3:6], rtol=1e-3)))
-        >>> assert(np.all(np.isclose(s.table['Dy'][-10:-1], np.zeros(s.Nx)[-10:-1], rtol=1e-2)))
         >>> s.plot_summary(truth=s0)
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(not np.any(np.isclose(s.table['flux_sum'][3:6], np.zeros(s.Nx)[3:6], rtol=1e-3)))
+            >>> assert(np.all(np.isclose(s.table['Dy'][-10:-1], np.zeros(s.Nx)[-10:-1], rtol=1e-2)))
         """
         if saturation is None:
             saturation = 2 * np.max(data)
@@ -1233,13 +1295,15 @@ class ChromaticPSF:
         Examples
         --------
 
-        Set the parameters
+        Set the parameters:
+
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
         >>> parameters.VERBOSE = True
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> s0 = ChromaticPSF1D(Nx=120, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -1250,16 +1314,19 @@ class ChromaticPSF:
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        Extract the background
+        Extract the background:
+
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        Estimate the first guess values
+        Estimate the first guess values:
+
         >>> s = ChromaticPSF1D(Nx=120, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
         >>> s.plot_summary(truth=s0)
 
         Fit the data:
+
         >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func)
         >>> s.fit_chromatic_psf(w, data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
@@ -1301,7 +1368,11 @@ class ChromaticPSF1D(ChromaticPSF):
         --------
         >>> s = ChromaticPSF1D(Nx=5, Ny=4, deg=1, saturation=8000)
         >>> params = s.generate_test_poly_params()
-        >>> assert(np.all(np.isclose(params, [ 0, 50, 100, 150, 200, 2, 0, 5, 0, 2, 0, -0.4, -0.4, 2, 0, 8000])))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(np.all(np.isclose(params, [ 0, 50, 100, 150, 200, 2, 0, 5, 0, 2, 0, -0.4, -0.4, 2, 0, 8000])))
         """
         params = [50 * i for i in range(self.Nx)]
         params += [0.] * (self.degrees['x_mean'] - 1) + [0, self.Ny / 2]  # y mean
@@ -1350,8 +1421,8 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> output = s.evaluate(poly_params)
 
         >>> import matplotlib.pyplot as plt
-        >>> im = plt.imshow(output, origin='lower')  #doctest: +ELLIPSIS
-        >>> plt.colorbar(im)  #doctest: +ELLIPSIS
+        >>> im = plt.imshow(output, origin='lower')  # doctest: +ELLIPSIS
+        >>> plt.colorbar(im)  # doctest: +ELLIPSIS
         <matplotlib.colorbar.Colorbar object at 0x...>
         >>> if parameters.DISPLAY: plt.show()
 
@@ -1380,13 +1451,15 @@ class ChromaticPSF1D(ChromaticPSF):
         Examples
         --------
 
-        Set the parameters
+        Set the parameters:
+
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
         >>> parameters.VERBOSE = True
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -1397,16 +1470,19 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        Extract the background
+        Extract the background:
+
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        Estimate the first guess values
+        Estimate the first guess values:
+
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
         >>> s.plot_summary(truth=s0)
 
         Fit the data:
+
         >>> s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
         """
@@ -1430,12 +1506,14 @@ class ChromaticPSF1D(ChromaticPSF):
         Examples
         --------
 
-        Set the parameters
+        Set the parameters:
+
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -1446,16 +1524,19 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        Extract the background
+        Extract the background:
+
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        Estimate the first guess values
+        Estimate the first guess values:
+
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
         >>> s.plot_summary(truth=s0)
 
         Fit the data:
+
         >>> s.fit_chromatic_PSF1D_minuit(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
         """
@@ -1660,12 +1741,14 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         Examples
         --------
 
-        Set the parameters
+        Set the parameters:
+
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -1676,19 +1759,27 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        Extract the background
+        Extract the background:
+
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        Estimate the first guess values
+        Estimate the first guess values:
+
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
 
         Simulate the data:
+
         >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
         >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:-1])
-        >>> assert mod is not None
         >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+
         """
         # linear regression for the amplitude parameters
         poly_params = np.copy(self.chromatic_psf.poly_params)
@@ -1736,7 +1827,11 @@ class ChromaticPSF2D(ChromaticPSF):
         --------
         >>> s = ChromaticPSF2D(Nx=5, Ny=4, deg=1, saturation=20000)
         >>> params = s.generate_test_poly_params()
-        >>> assert(np.all(np.isclose(params, [ 0, 50, 100, 150, 200, 0, 1, 2, 0, 2, 0, 2, 0, -0.4, -0.4, 1, 0, 20000])))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert(np.all(np.isclose(params, [ 0, 50, 100, 150, 200, 0, 1, 2, 0, 2, 0, 2, 0, -0.4, -0.4, 1, 0, 20000])))
         """
         params = [50 * i for i in range(self.Nx)]
         if self.Nx > 80:
@@ -1787,8 +1882,8 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> output = s.evaluate(poly_params)
 
         >>> import matplotlib.pyplot as plt
-        >>> im = plt.imshow(output, origin='lower')  #doctest: +ELLIPSIS
-        >>> plt.colorbar(im)  #doctest: +ELLIPSIS
+        >>> im = plt.imshow(output, origin='lower')  # doctest: +ELLIPSIS
+        >>> plt.colorbar(im)  # doctest: +ELLIPSIS
         <matplotlib.colorbar.Colorbar object at 0x...>
         >>> if parameters.DISPLAY: plt.show()
 
@@ -1820,12 +1915,14 @@ class ChromaticPSF2D(ChromaticPSF):
         --------
 
         Set the parameters:
+
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
         >>> parameters.VERBOSE = True
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> s0 = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -1837,15 +1934,18 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> data_errors = np.sqrt(data+1)
 
         Extract the background:
+
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
+
         >>> s = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
         >>> s.plot_summary(truth=s0)
 
         Fit the data:
+
         >>> s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
         """
@@ -1870,11 +1970,13 @@ class ChromaticPSF2D(ChromaticPSF):
         --------
 
         Set the parameters:
+
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
 
         Build a mock spectrogram with random Poisson noise:
+
         >>> s0 = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=20000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -2200,6 +2302,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     --------
 
     Build a mock spectrogram with random Poisson noise:
+
     >>> s0 = ChromaticPSF1D(Nx=80, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
@@ -2209,10 +2312,12 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
-    Extract the background
+    Extract the background:
+
     >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
     Fit the transverse profile:
+
     >>> s = ChromaticPSF1D(Nx=80, Ny=100, deg=4, saturation=saturation)
     >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
     ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
@@ -2431,17 +2536,29 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
     Fit with error bars:
     >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, data_errors=Z_err)
     >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
+    ..  doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
 
     Fit without error bars:
     >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, data_errors=None)
     >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
+    ..  doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
 
     Fit with error bars and basin hopping method:
     >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, data_errors=Z_err, method='basinhopping')
     >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
+    ..  doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
 
     """
 
@@ -2506,12 +2623,20 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     Fit with error bars:
     >>> model = fit_PSF2D_minuit(X, Y, Z, guess=guess, bounds=bounds, data_errors=Z_err)
     >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
+    ..  doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
 
     Fit without error bars:
     >>> model = fit_PSF2D_minuit(X, Y, Z, guess=guess, bounds=bounds, data_errors=None)
     >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
+
+    ..  doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
     """
 
     model = PSF2DAstropy()
@@ -2624,7 +2749,11 @@ class PSF1DAstropy(Fittable1DModel):
         >>> p = [2,0,2,2,1,2,10]
         >>> psf = PSF1DAstropy(*p)
         >>> interp = psf.interpolation(x)
-        >>> assert np.isclose(interp(p[1]), psf.evaluate(p[1], *p))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert np.isclose(interp(p[1]), psf.evaluate(p[1], *p))
 
         """
         params = [getattr(self, p).value for p in self.param_names]
@@ -2808,6 +2937,7 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
     --------
 
     Create the model:
+
     >>> import numpy as np
     >>> X = np.arange(0, 50)
     >>> psf = PSF1DAstropy()
@@ -2816,6 +2946,7 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
     >>> Y_err = np.sqrt(Y)/10.
 
     Prepare the fit:
+
     >>> guess = (60, 20, 3.2, 1.2, -0.1, 2,  60)
     >>> bounds = ((0, 200), (10, 40), (0.5, 10), (0.5, 5), (-10, 200), (0.01, 10), (0, 400))
 
@@ -2895,6 +3026,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
     --------
 
     Create the model:
+
     >>> import numpy as np
     >>> X = np.arange(0, 50)
     >>> psf = PSF1DAstropy()
@@ -2904,6 +3036,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
     >>> Y_err = np.sqrt(1+Y)
 
     Prepare the fit:
+
     >>> guess = (600, 27, 3.2, 1.2, -0.1, 2,  6000)
     >>> bounds = ((0, 6000), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000))
 
@@ -2999,6 +3132,7 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     --------
 
     Create the model:
+
     >>> import numpy as np
     >>> X = np.arange(0, 50)
     >>> psf = PSF1DAstropy()
@@ -3007,6 +3141,7 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
     >>> Y_err = np.sqrt(1+Y)
 
     Prepare the fit:
+
     >>> guess = (60, 20, 3.2, 1.2, -0.1, 2,  60)
     >>> bounds = ((0, 200), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 400))
 
@@ -3085,6 +3220,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     --------
 
     Create the model:
+
     >>> import numpy as np
     >>> X = np.arange(0, 50)
     >>> psf = PSF1DAstropy()
@@ -3094,6 +3230,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     >>> Y_err = np.sqrt(1+Y)
 
     Prepare the fit:
+
     >>> guess = (600, 20, 3.2, 1.2, -0.1, 2,  6000)
     >>> bounds = ((0, 6000), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000))
 
@@ -3230,7 +3367,11 @@ class PSF2DAstropy(Fittable2DModel):
         >>> p = [2,30,15,2,2,1,2,10]
         >>> psf = PSF2DAstropy(*p)
         >>> interp = psf.interpolation(x, y)
-        >>> assert np.isclose(interp(p[1], p[2]), psf.evaluate(p[1], p[2], *p))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert np.isclose(interp(p[1], p[2]), psf.evaluate(p[1], p[2], *p))
 
         """
         params = [getattr(self, p).value for p in self.param_names]
