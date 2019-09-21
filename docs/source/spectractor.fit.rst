@@ -21,7 +21,7 @@ spectractor\.fit\.statistics module
     :show-inheritance:
 
 spectractor\.fit\.fit_spectrogram module
------------------------------------
+----------------------------------------
 
 .. automodule:: spectractor.fit.fit_spectrogram
     :members:

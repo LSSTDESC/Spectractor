@@ -203,6 +203,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         .. plot::
             :include-source:
 
+            >>> from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace
             >>> file_name = 'tests/data/reduc_20170530_134_spectrum.fits'
             >>> atmgrid_file_name = file_name.replace('spectrum', 'atmsim')
             >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_file_name, verbose=True)
