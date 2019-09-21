@@ -829,11 +829,10 @@ def turn_image(image):
     Examples
     --------
 
-    Create of False spectrogram
+    Create of False spectrogram:
 
     >>> im=Image('tests/data/reduc_20170605_028.fits', disperser_label='HoloPhAg')
     >>> N = parameters.CCD_IMSIZE
-
     >>> im.data = np.ones((N, N))
     >>> slope = -0.1
     >>> y = lambda x: slope * (x - 0.5*N) + 0.5*N

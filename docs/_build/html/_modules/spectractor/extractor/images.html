@@ -672,7 +672,7 @@
 
 <span class="sd">        &gt;&gt;&gt; assert np.isclose(x1, np.argmax(np.nansum(sub_image, axis=0)), rtol=1e-2)</span>
 <span class="sd">        &gt;&gt;&gt; assert np.isclose(y1, np.argmax(np.nansum(sub_image, axis=1)), rtol=1e-2)</span>
-<span class="sd">        </span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">NY</span><span class="p">,</span> <span class="n">NX</span> <span class="o">=</span> <span class="n">sub_image</span><span class="o">.</span><span class="n">shape</span>
     <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">NX</span><span class="p">)</span>
@@ -747,6 +747,10 @@
 
 <span class="sd">    .. plot::</span>
 
+<span class="sd">        import matplotlib.pyplot as plt</span>
+<span class="sd">        import numpy as np</span>
+<span class="sd">        from spectractor.extractor.images import Image</span>
+<span class="sd">        im = Image(&#39;tests/data/reduc_20170605_028.fits&#39;)</span>
 <span class="sd">        im.plot_image(target_pixcoords=[820, 580])</span>
 
 <span class="sd">    &gt;&gt;&gt; parameters.DEBUG = True</span>
@@ -754,8 +758,13 @@
 <span class="sd">    &gt;&gt;&gt; xmax = np.argmax(np.sum(sub_image, axis=0))</span>
 <span class="sd">    &gt;&gt;&gt; ymax = np.argmax(np.sum(sub_image, axis=1))</span>
 <span class="sd">    &gt;&gt;&gt; x1, y1 = find_target_2Dprofile(im, sub_image, guess)</span>
-<span class="sd">    &gt;&gt;&gt; assert np.isclose(x1, xmax, rtol=1e-2)</span>
-<span class="sd">    &gt;&gt;&gt; assert np.isclose(y1, ymax, rtol=1e-2)</span>
+
+<span class="sd">    .. doctest::</span>
+<span class="sd">        :hide:</span>
+
+<span class="sd">        &gt;&gt;&gt; assert np.isclose(x1, xmax, rtol=1e-2)</span>
+<span class="sd">        &gt;&gt;&gt; assert np.isclose(y1, ymax, rtol=1e-2)</span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># TODO: replace with minuit and test on image _133.fits or decrease mean_prior</span>
     <span class="c1"># fit and subtract smooth polynomial background</span>
@@ -887,6 +896,7 @@
 <span class="sd">            im.data[int(y(x)), x] = 10</span>
 <span class="sd">            im.data[int(y(x))+1, x] = 10</span>
 <span class="sd">        plt.imshow(im.data, origin=&#39;lower&#39;)</span>
+<span class="sd">        plt.show()</span>
 
 <span class="sd">    &gt;&gt;&gt; im.target_pixcoords=(N//2, N//2)</span>
 <span class="sd">    &gt;&gt;&gt; parameters.DEBUG = True</span>
@@ -898,6 +908,7 @@
 <span class="sd">        :hide:</span>
 
 <span class="sd">        &gt;&gt;&gt; assert np.isclose(theta, np.arctan(slope)*180/np.pi, rtol=1e-2)</span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">x0</span><span class="p">,</span> <span class="n">y0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">target_pixcoords</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
     <span class="c1"># extract a region</span>
@@ -969,11 +980,10 @@
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
 
-<span class="sd">    Create of False spectrogram</span>
+<span class="sd">    Create of False spectrogram:</span>
 
 <span class="sd">    &gt;&gt;&gt; im=Image(&#39;tests/data/reduc_20170605_028.fits&#39;, disperser_label=&#39;HoloPhAg&#39;)</span>
 <span class="sd">    &gt;&gt;&gt; N = parameters.CCD_IMSIZE</span>
-
 <span class="sd">    &gt;&gt;&gt; im.data = np.ones((N, N))</span>
 <span class="sd">    &gt;&gt;&gt; slope = -0.1</span>
 <span class="sd">    &gt;&gt;&gt; y = lambda x: slope * (x - 0.5*N) + 0.5*N</span>

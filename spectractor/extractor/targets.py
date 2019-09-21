@@ -102,6 +102,7 @@ class ArcLamp(Target):
         --------
 
         Mercury-Argon lamp:
+
         >>> t = ArcLamp("HG-AR", verbose=False)
         >>> print([l.wavelength for l in t.lines.lines][:5])
         [253.652, 296.728, 302.15, 313.155, 334.148]
@@ -165,6 +166,7 @@ class Star(Target):
         --------
 
         Emission line object:
+
         >>> s = Star('3C273')
         >>> print(s.label)
         3C273
@@ -174,6 +176,7 @@ class Star(Target):
         True
 
         Standard star:
+
         >>> s = Star('HD111980')
         >>> print(s.label)
         HD111980
@@ -338,7 +341,7 @@ class Star(Target):
         for isp, sp in enumerate(self.spectra):
             plt.plot(self.wavelengths[isp], sp, label='Spectrum %d' % isp)
         plt.xlim((300, 1100))
-        plt.xlabel('$\lambda$ [nm]')
+        plt.xlabel(r'$\lambda$ [nm]')
         plt.ylabel('Flux')
         plt.title(self.label)
         plt.legend()
@@ -348,7 +351,5 @@ class Star(Target):
 
 if __name__ == "__main__":
     import doctest
-    #if np.__version__ >= "1.14.0":
-    #   np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
