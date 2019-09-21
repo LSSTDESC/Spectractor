@@ -43,6 +43,7 @@ def gauss(x, A, x0, sigma):
 
     Examples
     --------
+    
     >>> x = np.arange(50)
     >>> y = gauss(x, 10, 25, 3)
     >>> print(y.shape)
@@ -74,6 +75,7 @@ def gauss_jacobian(x, A, x0, sigma):
 
     Examples
     --------
+
     >>> x = np.arange(50)
     >>> jac = gauss_jacobian(x, 10, 25, 3)
     >>> print(jac.shape)
@@ -116,6 +118,7 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> x = np.arange(600.,700.,2)
@@ -152,6 +155,7 @@ def multigauss_and_line(x, *params):
 
     Examples
     --------
+
     >>> x = np.arange(600.,800.,1)
     >>> y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)
     >>> print(y[0])
@@ -191,6 +195,7 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
 
     Examples
     --------
+
     >>> x = np.arange(600.,800.,1)
     >>> y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)
     >>> print(y[0])
@@ -252,6 +257,7 @@ def multigauss_and_bgd(x, *params):
         p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
         y = multigauss_and_bgd(x, *p)
         plt.plot(x,y,'r-')
+        plt.show()
 
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
@@ -284,6 +290,7 @@ def multigauss_and_bgd_jacobian(x, *params):
 
     Examples
     --------
+
     >>> import spectractor.parameters as parameters
     >>> parameters.CALIB_BGD_NPARAMS = 4
     >>> x = np.arange(600.,800.,1)
@@ -340,6 +347,7 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
 
     Examples
     --------
+
     >>> x = np.arange(600.,800.,1)
     >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
@@ -352,7 +360,8 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     >>> assert np.all(np.isclose(p,popt,rtol=1e-4))
     >>> fit = multigauss_and_bgd(x, *popt)
 
-    ..plot:
+    .. plot::
+
         import matplotlib.pyplot as plt
         plt.errorbar(x,y,yerr=err,linestyle='None')
         plt.plot(x,fit,'r-')
@@ -429,6 +438,7 @@ def fit_poly1d(x, y, order, w=None):
 
     Examples
     --------
+
     >>> x = np.arange(500., 1000., 1)
     >>> p = [3, 2, 1, 1]
     >>> y = np.polyval(p, x)
@@ -482,6 +492,7 @@ def fit_poly1d_legendre(x, y, order, w=None):
 
     Examples
     --------
+
     >>> x = np.arange(500., 1000., 1)
     >>> p = [-1e-6, -1e-4, 1, 1]
     >>> y = np.polyval(p, x)
@@ -494,7 +505,8 @@ def fit_poly1d_legendre(x, y, order, w=None):
     >>> print(fit)
     [0 0 0 0]
 
-    ..plot:
+    .. plot::
+
         import matplotlib.pyplot as plt
         plt.errorbar(x,y,yerr=err,fmt='ro')
         plt.plot(x,model2)
@@ -533,6 +545,7 @@ def fit_poly2d(x, y, z, order):
 
     Examples
     --------
+
     >>> x, y = np.mgrid[:50,:50]
     >>> z = x**2 + y**2 - 2*x*y
     >>> fit = fit_poly2d(x, y, z, order=2)
@@ -577,6 +590,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
 
     Examples
     --------
+
     >>> x = np.arange(500., 1000., 1)
     >>> p = [3,2,1,0]
     >>> y = np.polyval(p, x)
@@ -646,6 +660,7 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
 
     Examples
     --------
+
     >>> x, y = np.mgrid[:50,:50]
     >>> z = x**2 + y**2 - 2*x*y
     >>> z[::10,::10] = 0.
@@ -710,6 +725,7 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -718,9 +734,11 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
     >>> p = (50, 25, 25, 5, 5, 0)
     >>> Z = PSF.evaluate(X, Y, *p)
 
-    ..plot:
+    .. plot::
+
         plt.imshow(Z, origin='loxer') #doctest: +ELLIPSIS
         plt.show()
+
     >>> guess = (45, 20, 20, 7, 7, 0)
     >>> bounds = ((1, 10, 10, 1, 1, -90), (100, 40, 40, 10, 10, 90))
     >>> fit = fit_gauss2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, circular=True)
@@ -728,9 +746,9 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
     >>> print(res)
     [50.0, 25.0, 25.0, 5.0, 5.0, 0.0]
 
-    ..plot:
-        plt.imshow(Z-fit(X, Y), origin='loxer') #doctest: +ELLIPSIS
-        <matplotlib.image.AxesImage object at 0x...>
+    .. plot::
+
+        plt.imshow(Z-fit(X, Y), origin='loxer')
         plt.show()
 
     """
@@ -787,6 +805,7 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -795,16 +814,19 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
     >>> p = (50, 50, 50, 5, 2)
     >>> Z = PSF.evaluate(X, Y, *p)
 
-    ..plot:
+    .. plot::
+
         plt.imshow(Z, origin='loxer')
         plt.show()
+
     >>> guess = (45, 48, 52, 4, 2)
     >>> bounds = ((1, 10, 10, 1, 1), (100, 90, 90, 10, 10))
     >>> fit = fit_moffat2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, niter=3)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
     >>> assert(np.all(np.isclose(p, res, 1e-1)))
 
-    ..plot:
+    .. plot::
+
         plt.imshow(Z-fit(X, Y), origin='loxer')
         plt.show()
     """
@@ -856,6 +878,7 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -864,16 +887,19 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
     >>> p = (50, 50, 5, 2)
     >>> Y = PSF.evaluate(X, *p)
 
-    ..plot:
+    .. plot::
+
         plt.imshow(Z, origin='loxer')
         plt.show()
+
     >>> guess = (45, 48, 4, 2)
     >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
     >>> fit = fit_moffat1d_outlier_removal(X, Y, guess=guess, bounds=bounds, niter=3)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
     >>> assert(np.all(np.isclose(p, res, 1e-6)))
 
-    ..plot:
+    .. plot::
+
         plt.imshow(Z-fit(X, Y), origin='loxer')
         plt.show()
     """
@@ -920,6 +946,7 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -928,17 +955,20 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
     >>> p = (50, 50, 5, 2)
     >>> Y = PSF.evaluate(X, *p)
 
-    ..plot:
-        plt.imshow(Z, origin='loxer')
+    .. plot::
+
+        plt.imshow(Z, origin='lower')
         plt.show()
+
     >>> guess = (45, 48, 4, 2)
     >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
     >>> fit = fit_moffat1d(X, Y, guess=guess, bounds=bounds)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
     >>> assert(np.all(np.isclose(p, res, 1e-6)))
 
-    ..plot:
-        plt.imshow(Z-fit(X, Y), origin='loxer')
+    .. plot::
+
+        plt.imshow(Z-fit(X, Y), origin='lower')
         plt.show()
     """
     my_logger = set_logger(__name__)
@@ -1057,7 +1087,7 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
     >>> assert np.isclose(center, p[1], atol=1e-2)
 
     .. plot ::
-    
+
         import matplotlib.pyplot as plt
         plt.figure
         plt.plot(x, psf.evaluate(x, p), label="function")
@@ -1114,22 +1144,25 @@ def compute_integral(x, y, bounds=None):
     Examples
     --------
 
-    # Gaussian example
-    >>> x = np.arange(0, 100, 0.5)
-    >>> stddev = 4
-    >>> middle = 40
-    >>> psf = gauss(x, 1/(stddev*np.sqrt(2*np.pi)), middle, stddev)
-    >>> integral = compute_integral(x, psf)
-    >>> print(f"{integral:.6f}")
-    1.000000
-    >>> assert np.isclose(integral, 1, atol=1e-6)
+    Gaussian example
+    .. doctest::
 
-    # Defocused PSF example
-    >>> from spectractor.extractor.psf import PSF1D
-    >>> p = [2,30,4,2,-0.5,1,10]
-    >>> psf = PSF1D(p)
-    >>> integral = compute_integral(x, psf.evaluate(x))
-    >>> assert np.isclose(integral, p[0], atol=1e-3)
+        >>> x = np.arange(0, 100, 0.5)
+        >>> stddev = 4
+        >>> middle = 40
+        >>> psf = gauss(x, 1/(stddev*np.sqrt(2*np.pi)), middle, stddev)
+        >>> integral = compute_integral(x, psf)
+        >>> print(f"{integral:.6f}")
+        1.000000
+
+    Defocused PSF example
+    .. doctest::
+
+        >>> from spectractor.extractor.psf import PSF1D
+        >>> p = [2,30,4,2,-0.5,1,10]
+        >>> psf = PSF1D(p)
+        >>> integral = compute_integral(x, psf.evaluate(x))
+        >>> assert np.isclose(integral, p[0], atol=1e-3)
 
     """
     if bounds is None:
