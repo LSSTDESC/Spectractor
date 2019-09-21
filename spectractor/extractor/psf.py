@@ -2585,15 +2585,17 @@ class PSF1DAstropy(Fittable1DModel):
             fig = plt.figure(figsize=(5,3))
             plt.plot(xx, psf.evaluate(xx, *p))
             plt.plot(x, psf.evaluate(x, *p))
+            plt.grid()
+            plt.xlabel('x')
+            plt.ylabel('PSF(x)')
             plt.show()
 
         .. doctest::
 
             >>> psf.integrate()  # doctest: +ELLIPSIS
             10.0597...
-            >>> assert np.isclose(i, 10.059742339728174)  # doctest: +SKIP
-            >>> i = psf.integrate(bounds=(0,60), x_array=x)
-            >>> assert np.isclose(i, 10.046698028728645)
+            >>> psf.integrate(bounds=(0,60), x_array=x)  # doctest: +ELLIPSIS
+            10.0466...
 
         """
         params = [getattr(self, p).value for p in self.param_names]
