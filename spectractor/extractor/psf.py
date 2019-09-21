@@ -134,7 +134,13 @@ class PSF2D(PSF):
         .. plot::
 
             import matplotlib.pyplot as plt
-            fig = plt.figure()
+            import numpy as np
+            from spectractor.extractor.psf import PSF2D
+            p = [2,20,30,4,2,-0.5,1,10]
+            psf = PSF2D(p)
+            xx, yy = np.mgrid[:50, :60]
+            ut = psf.evaluate(pixels=[xx, yy])
+            fig = plt.figure(figsize=(5,5))
             plt.imshow(out, origin="lower")
             plt.xlabel("X [pixels]")
             plt.ylabel("Y [pixels]")
@@ -182,13 +188,13 @@ class PSFFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> p = np.array([100,  50, 3, 2, -0.1, 2, 200])
         >>> psf = PSF1D(p)
         >>> data = psf.evaluate(p)
         >>> data_errors = np.sqrt(data+1)
 
-        # Fit the data:
+        Fit the data:
         >>> w = PSFFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
 
         """
@@ -227,14 +233,24 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
         self.data = self.data - self.bgd
         self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
 
-    def simulate(self, amplitude_moffat, mean, gamma, alpha, eta_gauss, stddev):
+    def simulate(self, amplitude, mean, gamma, alpha, eta_gauss, stddev):
         """
         Evaluate a PSF model.
 
         Parameters
         ----------
-        params: array_like
-            PSF parameter array.
+        amplitude: float
+            Amplitude of the PSF model.
+        mean: float
+            Center of the PSF model.
+        gamma: float
+            Gamma of the Moffat part of the PSF model (width).
+        alpha: float
+            Alpha of the Moffat part of the PSF model (exponent).
+        eta_gauss: float
+            Negative amplitude of the Gaussian part of the PSF model.
+        stddev: float
+            Standard deviation of the Gaussian part of the PSF model.
 
         Examples
         --------
@@ -287,7 +303,7 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
             w.plot_fit()
 
         """
-        params = [amplitude_moffat, mean, gamma, alpha, eta_gauss, stddev]
+        params = [amplitude, mean, gamma, alpha, eta_gauss, stddev]
         self.model = self.psf.evaluate(self.pixels, p=np.array(params + [self.saturation]))
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
@@ -365,17 +381,29 @@ class PSF2DFitWorkspace(PSFFitWorkspace):
         # self.data = self.data - self.bgd
         # self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
 
-    def simulate(self, amplitude_moffat, x_mean, y_mean, gamma, alpha, eta_gauss, stddev):
+    def simulate(self, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev):
         """
         Evaluate a PSF model.
 
         Parameters
         ----------
-        params: array_like
-            PSF parameter array.
-
+        amplitude: float
+            Amplitude of the PSF model.
+        x_mean: float
+            Center of the PSF model on X axis.
+        y_mean: float
+            Center of the PSF model on Y axis.
+        gamma: float
+            Gamma of the Moffat part of the PSF model (width).
+        alpha: float
+            Alpha of the Moffat part of the PSF model (exponent).
+        eta_gauss: float
+            Negative amplitude of the Gaussian part of the PSF model.
+        stddev: float
+            Standard deviation of the Gaussian part of the PSF model.
         Examples
         --------
+
         Build a mock spectrogram with random Poisson noise:
         >>> p = np.array([500, 20, 30, 3, 2, -0.1, 2, 400])
         >>> psf = PSF2D(p)
@@ -393,8 +421,9 @@ class PSF2DFitWorkspace(PSFFitWorkspace):
         >>> assert mod is not None
         >>> assert np.mean(np.abs(mod-data)/data_errors) < 0.5
         >>> w.plot_fit()
+
         """
-        params = [amplitude_moffat, x_mean, y_mean, gamma, alpha, eta_gauss, stddev]
+        params = [amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev]
         self.model = self.psf.evaluate(self.pixels, p=np.array(params + [self.saturation]))
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
@@ -502,6 +531,7 @@ class ChromaticPSF:
 
         Examples
         --------
+
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
@@ -523,6 +553,7 @@ class ChromaticPSF:
 
         Examples
         --------
+
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=8000)
         >>> s.table['Dx_rot'] = np.arange(100)
         >>> s.rotate_table(45)
@@ -560,18 +591,18 @@ class ChromaticPSF:
         Examples
         --------
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
         >>> data = s.evaluate(poly_params_test)
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # From the polynomial parameters to the profile parameters:
+        From the polynomial parameters to the profile parameters:
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
         >>> assert(np.all(np.isclose(profile_params[0], [0, 50, 5, 2, 0, 2, 8e3])))
 
-        # From the profile parameters to the polynomial parameters:
+        From the profile parameters to the polynomial parameters:
         >>> profile_params = s.from_profile_params_to_poly_params(profile_params)
         >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
         """
@@ -609,6 +640,7 @@ class ChromaticPSF:
 
         Examples
         --------
+
         >>> from spectractor.extractor.spectrum import Spectrum
         >>> s = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
         >>> profile_params = s.chromatic_psf.from_table_to_profile_params()
@@ -634,6 +666,7 @@ class ChromaticPSF:
 
         Examples
         --------
+
         >>> from spectractor.extractor.spectrum import Spectrum
         >>> s = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
         >>> poly_params = s.chromatic_psf.from_table_to_poly_params()
@@ -668,22 +701,22 @@ class ChromaticPSF:
         Examples
         --------
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=1, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
         >>> data = s.evaluate(poly_params_test)
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # From the polynomial parameters to the profile parameters:
+        From the polynomial parameters to the profile parameters:
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
         >>> assert(np.all(np.isclose(profile_params[0], [0, 50, 5, 2, 0, 2, 8e3])))
 
-        # From the profile parameters to the polynomial parameters:
+        From the profile parameters to the polynomial parameters:
         >>> profile_params = s.from_profile_params_to_poly_params(profile_params)
         >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
 
-        # From the polynomial parameters to the profile parameters without Moffat amplitudes:
+        From the polynomial parameters to the profile parameters without Moffat amplitudes:
         >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test[100:])
         >>> assert(np.all(np.isclose(profile_params[0], [1, 50, 5, 2, 0, 2, 8e3])))
 
@@ -1627,12 +1660,12 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         Examples
         --------
 
-        # Set the parameters
+        Set the parameters
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -1643,15 +1676,15 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # Extract the background
+        Extract the background
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        # Estimate the first guess values
+        Estimate the first guess values
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
 
-        # Simulate the data:
+        Simulate the data:
         >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
         >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:-1])
         >>> assert mod is not None
@@ -1786,13 +1819,13 @@ class ChromaticPSF2D(ChromaticPSF):
         Examples
         --------
 
-        # Set the parameters
+        Set the parameters
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
         >>> parameters.VERBOSE = True
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> s0 = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -1803,16 +1836,16 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # Extract the background
+        Extract the background
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        # Estimate the first guess values
+        Estimate the first guess values
         >>> s = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
         >>> s.plot_summary(truth=s0)
 
-        # Fit the data:
+        Fit the data:
         >>> s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
         """
@@ -1836,12 +1869,12 @@ class ChromaticPSF2D(ChromaticPSF):
         Examples
         --------
 
-        # Set the parameters
+        Set the parameters
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
 
-        # Build a mock spectrogram with random Poisson noise:
+        Build a mock spectrogram with random Poisson noise:
         >>> s0 = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=20000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -2034,6 +2067,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         Examples
         --------
+
         Set the parameters
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
@@ -2140,7 +2174,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     Examples
     --------
 
-    # Build a mock spectrogram with random Poisson noise:
+    Build a mock spectrogram with random Poisson noise:
     >>> s0 = ChromaticPSF1D(Nx=80, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
@@ -2150,10 +2184,10 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
-    # Extract the background
+    Extract the background
     >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-    # Fit the transverse profile:
+    Fit the transverse profile:
     >>> s = ChromaticPSF1D(Nx=80, Ny=100, deg=4, saturation=saturation)
     >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
     ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
@@ -2665,7 +2699,7 @@ class PSF1DAstropy(Fittable1DModel):
         7.083984375
         >>> import matplotlib.pyplot as plt
         >>> x = np.arange(0, 60, 0.01)
-        >>> plt.plot(x, psf.evaluate(x, *p)) #doctest: +ELLIPSIS
+        >>> plt.plot(x, psf.evaluate(x, *p)) # doctest: +ELLIPSIS
         [<matplotlib.lines.Line2D object at 0x...>]
         >>> if parameters.DISPLAY: plt.show()
         """
