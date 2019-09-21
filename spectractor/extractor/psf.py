@@ -2023,7 +2023,10 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
          2D array is flatten in 1D, equation :eq:`chromaticpsf2d` is
 
         .. math ::
+            :label: chromaticpsf2d_matrix
+            :nowrap:
 
+            \begin{align}
             \vec{m}(\vec{x},\vec{p}) & = \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \\
 
             \mathbf{M}\left(\vec{x},\vec{p}\right) & = \left(\begin{array}{cccc}
@@ -2031,8 +2034,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
              ... & ... & ... & ...\\
              \phi\left(\vec{x}_1,\vec{p}_{N_x}\right) & \phi\left(\vec{x}_2,\vec{p}_{N_x}\right) & ... & \phi\left(\vec{x}_{N_x},\vec{p}_{N_x}\right) \\
             \end{array}\right)
+            \end{align}
 
-            :label: chromaticpsf2d_matrix
 
         with :math:`\mathbf{M}` the design matrix.
 
@@ -2044,11 +2047,11 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         with :math:`epsilon` a random noise. The :math:`\chi^2` function to minimise is
 
         .. math::
+            :label: chromaticspsf2d_chi2
 
             \chi^2(\mathbf{A})= \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)^T \mathbf{W}
             \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)
 
-            :label: chromaticspsf2d_chi2
 
         with :math:`\mathbf{W}` the weight matrix, inverse of the covariance matrix. In our case this matrix is diagonal
         as the pixels are considered all independant. The minimum of equation :eq:`chromaticspsf2d_chi2` is reached for
