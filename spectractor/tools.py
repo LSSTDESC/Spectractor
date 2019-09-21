@@ -1034,6 +1034,7 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
     >>> assert np.isclose(center, middle, atol=1e-3)
 
     .. plot ::
+
         import matplotlib.pyplot as plt
         plt.figure
         plt.plot(x, psf, label="function")
@@ -1056,6 +1057,7 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
     >>> assert np.isclose(center, p[1], atol=1e-2)
 
     .. plot ::
+    
         import matplotlib.pyplot as plt
         plt.figure
         plt.plot(x, psf.evaluate(x, p), label="function")
