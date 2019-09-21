@@ -143,7 +143,7 @@ class PSF2D(PSF):
             p = [2,20,30,4,2,-0.5,1,10]
             psf = PSF2D(p)
             xx, yy = np.mgrid[:50, :60]
-            ut = psf.evaluate(pixels=[xx, yy])
+            out = psf.evaluate(pixels=[xx, yy])
             fig = plt.figure(figsize=(5,5))
             plt.imshow(out, origin="lower")
             plt.xlabel("X [pixels]")
@@ -726,9 +726,9 @@ class ChromaticPSF:
         ----------
         poly_params: array_like
             Parameter array of the model, in the form:
-                * Nx first parameters are amplitudes for the Moffat transverse profiles
-                * next parameters are polynomial coefficients for all the PSF parameters
-                in the same order as in PSF definition, except amplitude_moffat
+                - Nx first parameters are amplitudes for the Moffat transverse profiles
+                - next parameters are polynomial coefficients for all the PSF parameters in the same order as in PSF definition, except amplitude_moffat
+
         force_positive: bool, optional
             Force some profile parameters to be positive despite the polynomial coefficients (default: False)
 
@@ -906,9 +906,9 @@ class ChromaticPSF:
         ----------
         poly_params: array_like
             Parameter array of the model, in the form:
-                * Nx first parameters are amplitudes for the Moffat transverse profiles
-                * next parameters are polynomial coefficients for all the PSF parameters
-                in the same order as in PSF definition, except amplitude_moffat
+            - Nx first parameters are amplitudes for the Moffat transverse profiles
+            - next parameters are polynomial coefficients for all the PSF parameters in the same order as in PSF definition, except amplitude_moffat
+
         noise_level: float, optional
             Noise level to set minimal boundary for amplitudes (negatively).
 
@@ -988,9 +988,8 @@ class ChromaticPSF:
         ----------
         poly_params: array_like
             Parameter array of the model, in the form:
-                * Nx first parameters are amplitudes for the Moffat transverse profiles
-                * next parameters are polynomial coefficients for all the PSF parameters
-                in the same order as in PSF definition, except amplitude_moffat
+            - Nx first parameters are amplitudes for the Moffat transverse profiles
+            - next parameters are polynomial coefficients for all the PSF parameters in the same order as in PSF definition, except amplitude_moffat
 
         Returns
         -------
@@ -1412,9 +1411,8 @@ class ChromaticPSF1D(ChromaticPSF):
         ----------
         poly_params: array_like
             Parameter array of the model, in the form:
-                * Nx first parameters are amplitudes for the Moffat transverse profiles
-                * next parameters are polynomial coefficients for all the PSF parameters
-                in the same order as in PSF definition, except amplitude_moffat
+            - Nx first parameters are amplitudes for the Moffat transverse profiles
+            - next parameters are polynomial coefficients for all the PSF parameters in the same order as in PSF definition, except amplitude_moffat
 
         Returns
         -------
@@ -1873,9 +1871,8 @@ class ChromaticPSF2D(ChromaticPSF):
         ----------
         poly_params: array_like
             Parameter array of the model, in the form:
-                * Nx first parameters are amplitudes for the Moffat transverse profiles
-                * next parameters are polynomial coefficients for all the PSF parameters
-                in the same order as in PSF definition, except amplitude_moffat
+            - Nx first parameters are amplitudes for the Moffat transverse profiles
+            - next parameters are polynomial coefficients for all the PSF parameters in the same order as in PSF definition, except amplitude_moffat
 
         Returns
         -------
@@ -2498,9 +2495,8 @@ def PSF2D_chisq_jac(params, model, xx, yy, zz, zz_err=None):
 
 
 def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='minimize'):
-    """Fit a PSF 2D model with parameters :
-        amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
-
+    """
+    Fit a PSF 2D model with parameters: amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
     using basin hopping global minimization method.
 
     Parameters
@@ -2528,7 +2524,8 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
     Examples
     --------
 
-    Create the model:
+    Create the model
+
     >>> import numpy as np
     >>> X, Y = np.mgrid[:50,:50]
     >>> psf = PSF2DAstropy()
@@ -2536,11 +2533,13 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
     >>> Z = psf.evaluate(X, Y, *p)
     >>> Z_err = np.sqrt(Z)/10.
 
-    Prepare the fit:
+    Prepare the fit
+
     >>> guess = (52, 22, 22, 3.2, 1.2, -0.1, 2, 60)
     >>> bounds = ((1, 200), (10, 40), (10, 40), (0.5, 10), (0.5, 5), (-100, 200), (0.01, 10), (0, 400))
 
-    Fit with error bars:
+    Fit with error bars
+
     >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, data_errors=Z_err)
     >>> res = [getattr(model, p).value for p in model.param_names]
 
@@ -2549,7 +2548,8 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
 
         >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
 
-    Fit without error bars:
+    Fit without error bars
+
     >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, data_errors=None)
     >>> res = [getattr(model, p).value for p in model.param_names]
 
@@ -2558,7 +2558,8 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
 
         >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
 
-    Fit with error bars and basin hopping method:
+    Fit with error bars and basin hopping method
+
     >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, data_errors=Z_err, method='basinhopping')
     >>> res = [getattr(model, p).value for p in model.param_names]
 
@@ -2588,8 +2589,8 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
 
 
 def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
-    """Fit a PSF 2D model with parameters :
-        amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
+    """
+    Fit a PSF 2D model with parameters: amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
     using basin hopping global minimization method.
 
     Parameters
@@ -2615,7 +2616,8 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     Examples
     --------
 
-    Create the model:
+    Create the model
+
     >>> import numpy as np
     >>> X, Y = np.mgrid[:50,:50]
     >>> psf = PSF2DAstropy()
@@ -2623,11 +2625,13 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     >>> Z = psf.evaluate(X, Y, *p)
     >>> Z_err = np.sqrt(Z)/10.
 
-    Prepare the fit:
+    Prepare the fit
+
     >>> guess = (52, 22, 22, 3.2, 1.2, -0.1, 2, 60)
     >>> bounds = ((1, 200), (10, 40), (10, 40), (0.5, 10), (0.5, 5), (-100, 200), (0.01, 10), (0, 400))
 
-    Fit with error bars:
+    Fit with error bars
+
     >>> model = fit_PSF2D_minuit(X, Y, Z, guess=guess, bounds=bounds, data_errors=Z_err)
     >>> res = [getattr(model, p).value for p in model.param_names]
 
@@ -2636,7 +2640,8 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
 
         >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
 
-    Fit without error bars:
+    Fit without error bars
+
     >>> model = fit_PSF2D_minuit(X, Y, Z, guess=guess, bounds=bounds, data_errors=None)
     >>> res = [getattr(model, p).value for p in model.param_names]
 
