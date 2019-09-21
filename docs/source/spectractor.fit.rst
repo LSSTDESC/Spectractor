@@ -20,6 +20,14 @@ spectractor\.fit\.statistics module
     :undoc-members:
     :show-inheritance:
 
+spectractor\.fit\.fit_spectrogram module
+-----------------------------------
+
+.. automodule:: spectractor.fit.fit_spectrogram
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 
 Module contents
 ---------------
