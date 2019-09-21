@@ -238,28 +238,36 @@ class Lines:
         Examples
         --------
 
-        .. plot::
-            :include-source:
-
-            >>> import matplotlib.pyplot as plt
-            >>> import numpy as np
-            >>> from spectractor.extractor.spectroscopy import *
-            >>> from spectractor import parameters
-            >>> f, ax = plt.subplots(1,1)
-            >>> ax.set_xlim(300,1000)
-            (300, 1000)
-            >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
-            >>> lines.lines[5].fitted = True
-            >>> lines.lines[5].high_snr = True
-            >>> lines.lines[-1].fitted = True
-            >>> lines.lines[-1].high_snr = True
-            >>> ax = lines.plot_atomic_lines(ax)
-            >>> if parameters.DISPLAY: plt.show()
+        >>> f, ax = plt.subplots(1,1)
+        >>> ax.set_xlim(300,1000)
+        (300, 1000)
+        >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
+        >>> lines.lines[5].fitted = True
+        >>> lines.lines[5].high_snr = True
+        >>> lines.lines[-1].fitted = True
+        >>> lines.lines[-1].high_snr = True
+        >>> ax = lines.plot_atomic_lines(ax)
+        >>> if parameters.DISPLAY: plt.show()
 
         .. doctest::
             :hide:
 
             >>> assert ax is not None
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.spectroscopy import *
+            f, ax = plt.subplots(1,1)
+            ax.set_xlim(300,1000)
+            lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
+            lines.lines[5].fitted = True
+            lines.lines[5].high_snr = True
+            lines.lines[-1].fitted = True
+            lines.lines[-1].high_snr = True
+            ax = lines.plot_atomic_lines(ax)
+            plt.show()
 
         """
         xlim = ax.get_xlim()
@@ -322,6 +330,13 @@ class Lines:
             >>> assert(global_chisq < 1)
 
         Plot the result:
+
+        >>> spec.lines = lines
+        >>> fig = plt.figure()
+        >>> plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
+        >>> lines.plot_detected_lines(plt.gca())
+        >>> plt.show()
+
 
         .. plot::
 
