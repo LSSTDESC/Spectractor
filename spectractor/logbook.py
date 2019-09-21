@@ -20,6 +20,7 @@ class LogBook:
 
         Examples
         ----------
+
         >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
         >>> assert logbook.df is not None
         >>> print(logbook.logbook)
@@ -42,11 +43,13 @@ class LogBook:
         self.df['date'] = pd.to_datetime(self.df.date)
 
     def search_for_image(self, filename):
-        """Look for an image file name in the logbook and load_image properties:
-        * Obj-posXpix and Obj-posYpix: the [x0,y0] guessed pixel position in the image
-        * Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables
-            in parameters.py
-        * object: the name of the target
+        """
+        Look for an image file name in the logbook and load_image properties:
+
+        - Obj-posXpix and Obj-posYpix: the [x0,y0] guessed pixel position in the image
+        - Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables in parameters.py
+        - object: the name of the target
+
 
         Parameters
         ----------
@@ -66,6 +69,7 @@ class LogBook:
 
         Examples
         --------
+
         >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
         >>> disperser_label, target, xpos, ypos = logbook.search_for_image("unknown_file.fits")
         >>> print(disperser_label, target, xpos, ypos)
@@ -79,6 +83,7 @@ class LogBook:
         >>> disperser_label, target, xpos, ypos = logbook.search_for_image("reduc_20170630_001.fits")
         >>> print(disperser_label, target, xpos, ypos)
         None bias None None
+
         """
         disperser_label = None
         target = None

@@ -1,0 +1,8 @@
+numpy>1.15
+scipy
+matplotlib
+pandas
+astropy>3.1
+coloredlogs
+recommonmark
+m2r
