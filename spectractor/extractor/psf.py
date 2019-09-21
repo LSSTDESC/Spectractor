@@ -2604,6 +2604,8 @@ class PSF1DAstropy(Fittable1DModel):
             # >>> if parameters.DISPLAY: plt.show()
 
         .. plot::
+            :include-source:
+            :options: +SKIP
 
             >>> import matplotlib.pyplot as plt
             >>> import numpy as np
@@ -2617,7 +2619,7 @@ class PSF1DAstropy(Fittable1DModel):
             >>> plt.plot(x, psf.evaluate(x, *p))
             >>> plt.grid()
             >>> plt.xlabel('x')
-            >>> plt.ylabel('PSF(x)')
+            >>> plt.ylabel('PSF(x)')  # doctest: +SKIP
             >>> plt.show()
 
         .. doctest::
