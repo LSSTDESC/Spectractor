@@ -818,6 +818,7 @@ def turn_image(image):
             im.data[int(y(x)), x] = 10
             im.data[int(y(x))+1, x] = 10
         plt.imshow(im.data, origin='lower')
+        plt.show()
 
     >>> im.target_pixcoords=(N//2, N//2)
     >>> parameters.DEBUG = True
@@ -845,7 +846,7 @@ def turn_image(image):
         im.target_pixcoords=(N//2, N//2)
         turn_image(im)
         plt.imshow(im.data_rotated, origin='lower')
-
+        plt.show()
     """
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
                                                           right_edge=parameters.CCD_IMSIZE - 200)

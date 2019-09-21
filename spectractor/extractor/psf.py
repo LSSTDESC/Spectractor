@@ -1819,7 +1819,7 @@ class ChromaticPSF2D(ChromaticPSF):
         Examples
         --------
 
-        Set the parameters
+        Set the parameters:
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
@@ -1836,10 +1836,10 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        Extract the background
+        Extract the background:
         >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-        Estimate the first guess values
+        Estimate the first guess values:
         >>> s = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
@@ -1869,7 +1869,7 @@ class ChromaticPSF2D(ChromaticPSF):
         Examples
         --------
 
-        Set the parameters
+        Set the parameters:
         >>> parameters.PIXDIST_BACKGROUND = 40
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
@@ -2068,36 +2068,56 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         Examples
         --------
 
-        Set the parameters
-        >>> parameters.PIXDIST_BACKGROUND = 40
-        >>> parameters.PIXWIDTH_BACKGROUND = 10
-        >>> parameters.PIXWIDTH_SIGNAL = 30
+        Set the parameters:
+        .. doctest::
+
+            >>> parameters.PIXDIST_BACKGROUND = 40
+            >>> parameters.PIXWIDTH_BACKGROUND = 10
+            >>> parameters.PIXWIDTH_SIGNAL = 30
 
         Build a mock spectrogram with random Poisson noise:
-        >>> s0 = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=1000)
-        >>> params = s0.generate_test_poly_params()
-        >>> s0.poly_params = params
-        >>> saturation = params[-1]
-        >>> data = s0.evaluate(params)
-        >>> bgd = 10*np.ones_like(data)
-        >>> data += bgd
-        >>> data = np.random.poisson(data)
-        >>> data_errors = np.sqrt(data+1)
 
-        Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        .. doctest::
 
-        Estimate the first guess values
-        >>> s = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=saturation)
-        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
-        >>> s.plot_summary(truth=s0)
+            >>> s0 = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=1000)
+            >>> params = s0.generate_test_poly_params()
+            >>> s0.poly_params = params
+            >>> saturation = params[-1]
+            >>> data = s0.evaluate(params)
+            >>> bgd = 10*np.ones_like(data)
+            >>> data += bgd
+            >>> data = np.random.poisson(data)
+            >>> data_errors = np.sqrt(data+1)
+
+        Extract the background:
+
+        .. doctest::
+
+            >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+
+        Estimate the first guess values:
+
+        .. doctest::
+
+            >>> s = ChromaticPSF2D(Nx=120, Ny=100, deg=4, saturation=saturation)
+            >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+            ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+            >>> s.plot_summary(truth=s0)
 
         Simulate the data:
-        >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
-        >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:-1])
-        >>> assert mod is not None
-        >>> w.plot_fit()
+
+        .. doctest::
+
+            >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
+            >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:-1])
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None # doctest:
+
+        .. doctest::
+            >>> w.plot_fit()
         """
         # linear regression for the amplitude parameters
         # prepare the vectors
