@@ -240,9 +240,10 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
         Examples
         --------
 
-        .. doctest::
+        Build a mock spectrogram with random Poisson noise:
 
-            Build a mock spectrogram with random Poisson noise:
+        .. doctest::
+        
             >>> p = np.array([100,  50, 3, 2, -0.1, 2, 200])
             >>> psf = PSF1D(p)
             >>> x = np.arange(100)
@@ -250,20 +251,23 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
             >>> data = np.random.poisson(data)
             >>> data_errors = np.sqrt(data+1)
 
-            Extract the background
-            # >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        Extract the background
+        # >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
 
-            Fit the data:
+        Fit the data:
+
+        .. doctest::
+
             >>> w = PSF1DFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
             >>> x, mod, mod_err = w.simulate(*p[:-1])
-            >>> np.mean(np.abs(mod-data)/data_errors) # doctest: +ELLIPSIS
-            0.114614...
+            >>> np.mean(np.abs(mod-data)/data_errors) < 0.2
+            True
             >>> w.plot_fit()
 
         .. plot::
 
             w.plot_fit()
-            
+
         """
         params = [amplitude_moffat, mean, gamma, alpha, eta_gauss, stddev]
         self.model = self.psf.evaluate(self.pixels, p=np.array(params + [self.saturation]))
