@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../_static/jquery.js"></script>
         <script type="text/javascript" src="../_static/underscore.js"></script>
         <script type="text/javascript" src="../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../_static/js/theme.js"></script>
 
@@ -44,7 +35,9 @@
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" /> 
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="spectractor.simulation package" href="spectractor.simulation.html" />
+    <link rel="prev" title="spectractor.extractor package" href="spectractor.extractor.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -92,17 +85,40 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"><ul>
-<li><a class="reference internal" href="#">spectractor.fit package</a><ul>
-<li><a class="reference internal" href="#submodules">Submodules</a></li>
-<li><a class="reference internal" href="#module-spectractor.fit.fitter">spectractor.fit.fitter module</a></li>
-<li><a class="reference internal" href="#module-spectractor.fit.statistics">spectractor.fit.statistics module</a></li>
-<li><a class="reference internal" href="#module-spectractor.fit">Module contents</a></li>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="spectractor.html">spectractor package</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="spectractor.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="spectractor.extractor.html">spectractor.extractor package</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">spectractor.fit package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-spectractor.fit.fitter">spectractor.fit.fitter module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-spectractor.fit.statistics">spectractor.fit.statistics module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-spectractor.fit">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="spectractor.simulation.html">spectractor.simulation package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="spectractor.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="spectractor.html#module-spectractor.config">spectractor.config module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="spectractor.html#module-spectractor.logbook">spectractor.logbook module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="spectractor.html#module-spectractor.parameters">spectractor.parameters module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="spectractor.html#module-spectractor.tools">spectractor.tools module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="spectractor.html#module-spectractor">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="spectractor.extractor.html">spectractor.extractor package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="spectractor.simulation.html">spectractor.simulation package</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">spectractor.fit package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-spectractor.fit.fitter">spectractor.fit.fitter module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-spectractor.fit.statistics">spectractor.fit.statistics module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-spectractor.fit">Module contents</a></li>
 </ul>
 </li>
 </ul>
-</div>
+
             
           
         </div>
@@ -146,6 +162,8 @@
     
       <li><a href="../index.html">Docs</a> &raquo;</li>
         
+          <li><a href="spectractor.html">spectractor package</a> &raquo;</li>
+        
       <li>spectractor.fit package</li>
     
     
@@ -174,173 +192,184 @@
 <span id="spectractor-fit-fitter-module"></span><h2>spectractor.fit.fitter module<a class="headerlink" href="#module-spectractor.fit.fitter" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="spectractor.fit.fitter.FitWorkspace">
-<em class="property">class </em><code class="descclassname">spectractor.fit.fitter.</code><code class="descname">FitWorkspace</code><span class="sig-paren">(</span><em>file_name</em>, <em>atmgrid_file_name=''</em>, <em>nwalkers=18</em>, <em>nsteps=1000</em>, <em>burnin=100</em>, <em>nbins=10</em>, <em>verbose=0</em>, <em>plot=False</em>, <em>live_fit=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.fit.fitter.</code><code class="sig-name descname">FitWorkspace</code><span class="sig-paren">(</span><em class="sig-param">file_name=''</em>, <em class="sig-param">nwalkers=18</em>, <em class="sig-param">nsteps=1000</em>, <em class="sig-param">burnin=100</em>, <em class="sig-param">nbins=10</em>, <em class="sig-param">verbose=0</em>, <em class="sig-param">plot=False</em>, <em class="sig-param">live_fit=False</em>, <em class="sig-param">truth=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.fit.fitter.FitWorkspace.analyze_chains">
-<code class="descname">analyze_chains</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.analyze_chains"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.analyze_chains" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">analyze_chains</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.analyze_chains"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.analyze_chains" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.fitter.FitWorkspace.build_flat_chains">
-<code class="descname">build_flat_chains</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.build_flat_chains"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.build_flat_chains" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">build_flat_chains</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.build_flat_chains"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.build_flat_chains" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.fitter.FitWorkspace.chain2likelihood">
-<code class="descname">chain2likelihood</code><span class="sig-paren">(</span><em>pdfonly=False</em>, <em>walker_index=-1</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.chain2likelihood"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.chain2likelihood" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">chain2likelihood</code><span class="sig-paren">(</span><em class="sig-param">pdfonly=False</em>, <em class="sig-param">walker_index=-1</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.chain2likelihood"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.chain2likelihood" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.chisq">
+<code class="sig-name descname">chisq</code><span class="sig-paren">(</span><em class="sig-param">p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.chisq"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.chisq" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.compute_correlation_matrix">
+<code class="sig-name descname">compute_correlation_matrix</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.compute_correlation_matrix"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.compute_correlation_matrix" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.fitter.FitWorkspace.compute_local_acceptance_rate">
-<code class="descname">compute_local_acceptance_rate</code><span class="sig-paren">(</span><em>start_index</em>, <em>last_index</em>, <em>walker_index</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.compute_local_acceptance_rate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.compute_local_acceptance_rate" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">compute_local_acceptance_rate</code><span class="sig-paren">(</span><em class="sig-param">start_index</em>, <em class="sig-param">last_index</em>, <em class="sig-param">walker_index</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.compute_local_acceptance_rate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.compute_local_acceptance_rate" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.fitter.FitWorkspace.convergence_tests">
-<code class="descname">convergence_tests</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.convergence_tests"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.convergence_tests" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">convergence_tests</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.convergence_tests"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.convergence_tests" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.hessian">
+<em class="property">static </em><code class="sig-name descname">hessian</code><span class="sig-paren">(</span><em class="sig-param">J</em>, <em class="sig-param">W</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.hessian"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.hessian" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.jacobian">
+<code class="sig-name descname">jacobian</code><span class="sig-paren">(</span><em class="sig-param">params</em>, <em class="sig-param">epsilon</em>, <em class="sig-param">fixed_params=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.jacobian"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.jacobian" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.lnlike">
+<code class="sig-name descname">lnlike</code><span class="sig-paren">(</span><em class="sig-param">p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.lnlike"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.lnlike" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.lnprior">
+<code class="sig-name descname">lnprior</code><span class="sig-paren">(</span><em class="sig-param">p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.lnprior"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.lnprior" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.load_chains">
+<code class="sig-name descname">load_chains</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.load_chains"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.load_chains" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.ndim">
+<em class="property">property </em><code class="sig-name descname">ndim</code><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.ndim" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.not_outliers">
+<em class="property">property </em><code class="sig-name descname">not_outliers</code><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.not_outliers" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.plot_correlation_matrix">
+<code class="sig-name descname">plot_correlation_matrix</code><span class="sig-paren">(</span><em class="sig-param">ipar=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.plot_correlation_matrix"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.plot_correlation_matrix" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="spectractor.fit.fitter.FitWorkspace.plot_fit">
+<code class="sig-name descname">plot_fit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.plot_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.plot_fit" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.fitter.FitWorkspace.print_settings">
-<code class="descname">print_settings</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.print_settings"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.print_settings" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">print_settings</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.print_settings"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.print_settings" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
-<dt id="spectractor.fit.fitter.FitWorkspace.save_bestfit_parameters">
-<code class="descname">save_bestfit_parameters</code><span class="sig-paren">(</span><em>likelihood</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.save_bestfit_parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.save_bestfit_parameters" title="Permalink to this definition">¶</a></dt>
+<dt id="spectractor.fit.fitter.FitWorkspace.save_parameters_summary">
+<code class="sig-name descname">save_parameters_summary</code><span class="sig-paren">(</span><em class="sig-param">header=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.save_parameters_summary"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.save_parameters_summary" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.fitter.FitWorkspace.set_chain_validity">
-<code class="descname">set_chain_validity</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.set_chain_validity"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.set_chain_validity" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">set_chain_validity</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.set_chain_validity"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.set_chain_validity" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.fitter.FitWorkspace.set_start">
-<code class="descname">set_start</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.set_start"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.set_start" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
-<dt id="spectractor.fit.fitter.SpectrogramFitWorkspace">
-<em class="property">class </em><code class="descclassname">spectractor.fit.fitter.</code><code class="descname">SpectrogramFitWorkspace</code><span class="sig-paren">(</span><em>filename</em>, <em>atmgrid_filename=''</em>, <em>nwalkers=18</em>, <em>nsteps=1000</em>, <em>burnin=100</em>, <em>nbins=10</em>, <em>verbose=0</em>, <em>plot=False</em>, <em>live_fit=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#SpectrogramFitWorkspace"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.SpectrogramFitWorkspace" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#spectractor.fit.fitter.FitWorkspace" title="spectractor.fit.fitter.FitWorkspace"><code class="xref py py-class docutils literal"><span class="pre">spectractor.fit.fitter.FitWorkspace</span></code></a></p>
-<dl class="method">
-<dt id="spectractor.fit.fitter.SpectrogramFitWorkspace.get_spectrogram_truth">
-<code class="descname">get_spectrogram_truth</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#SpectrogramFitWorkspace.get_spectrogram_truth"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.SpectrogramFitWorkspace.get_spectrogram_truth" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">set_start</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.set_start"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.set_start" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
-<dt id="spectractor.fit.fitter.SpectrogramFitWorkspace.plot_spectrogram_comparison_simple">
-<code class="descname">plot_spectrogram_comparison_simple</code><span class="sig-paren">(</span><em>ax</em>, <em>title=''</em>, <em>extent=None</em>, <em>dispersion=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#SpectrogramFitWorkspace.plot_spectrogram_comparison_simple"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.SpectrogramFitWorkspace.plot_spectrogram_comparison_simple" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="spectractor.fit.fitter.SpectrogramFitWorkspace.plot_fit">
-<code class="descname">plot_fit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#SpectrogramFitWorkspace.plot_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.SpectrogramFitWorkspace.plot_fit" title="Permalink to this definition">¶</a></dt>
-<dd><p class="rubric">Examples</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">file_name</span> <span class="o">=</span> <span class="s1">&#39;outputs/reduc_20170530_130_spectrum.fits&#39;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">atmgrid_filename</span> <span class="o">=</span> <span class="n">file_name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;sim&#39;</span><span class="p">,</span> <span class="s1">&#39;reduc&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;spectrum&#39;</span><span class="p">,</span> <span class="s1">&#39;atmsim&#39;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_workspace</span> <span class="o">=</span> <span class="n">SpectrogramFitWorkspace</span><span class="p">(</span><span class="n">file_name</span><span class="p">,</span> <span class="n">atmgrid_filename</span><span class="o">=</span><span class="n">atmgrid_filename</span><span class="p">,</span> <span class="n">nwalkers</span><span class="o">=</span><span class="mi">28</span><span class="p">,</span> <span class="n">nsteps</span><span class="o">=</span><span class="mi">20000</span><span class="p">,</span> <span class="n">burnin</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
-<span class="gp">... </span><span class="n">nbins</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">live_fit</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">A1</span><span class="p">,</span> <span class="n">A2</span><span class="p">,</span> <span class="n">ozone</span><span class="p">,</span> <span class="n">pwv</span><span class="p">,</span> <span class="n">aerosols</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">shift_x</span><span class="p">,</span> <span class="n">shift_y</span><span class="p">,</span> <span class="n">shift_t</span><span class="p">,</span> <span class="n">angle</span><span class="p">,</span> <span class="o">*</span><span class="n">psf</span> <span class="o">=</span> <span class="n">fit_workspace</span><span class="o">.</span><span class="n">p</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">model_err</span> <span class="o">=</span> <span class="n">fit_workspace</span><span class="o">.</span><span class="n">simulation</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">A1</span><span class="p">,</span> <span class="n">A2</span><span class="p">,</span> <span class="n">ozone</span><span class="p">,</span> <span class="n">pwv</span><span class="p">,</span> <span class="n">aerosols</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">shift_x</span><span class="p">,</span> <span class="n">shift_y</span><span class="p">,</span> <span class="n">shift_t</span><span class="p">,</span> <span class="n">angle</span><span class="p">,</span> <span class="n">psf</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_workspace</span><span class="o">.</span><span class="n">lambdas</span> <span class="o">=</span> <span class="n">lambdas</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_workspace</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">model</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_workspace</span><span class="o">.</span><span class="n">model_err</span> <span class="o">=</span> <span class="n">model_err</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fit_workspace</span><span class="o">.</span><span class="n">plot_fit</span><span class="p">()</span>
+<dt id="spectractor.fit.fitter.FitWorkspace.simulate">
+<code class="sig-name descname">simulate</code><span class="sig-paren">(</span><em class="sig-param">*p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.simulate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the model prediction given a set of parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>p</strong> (<em>array_like</em>) – Array of parameters for the computation of the model.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>x</strong> (<em>array_like</em>) – The abscisse of the model prediction.</p></li>
+<li><p><strong>model</strong> (<em>array_like</em>) – The model prediction.</p></li>
+<li><p><strong>model_err</strong> (<em>array_like</em>) – The uncertainty on the model prediction.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">w</span> <span class="o">=</span> <span class="n">FitWorkspace</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">model_err</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="o">*</span><span class="n">p</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 </pre></div>
 </div>
 </dd></dl>
 
-</dd></dl>
-
-<dl class="class">
-<dt id="spectractor.fit.fitter.SpectrumFitWorkspace">
-<em class="property">class </em><code class="descclassname">spectractor.fit.fitter.</code><code class="descname">SpectrumFitWorkspace</code><span class="sig-paren">(</span><em>filename</em>, <em>atmgrid_filename=''</em>, <em>nwalkers=18</em>, <em>nsteps=1000</em>, <em>burnin=100</em>, <em>nbins=10</em>, <em>verbose=0</em>, <em>plot=False</em>, <em>live_fit=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#SpectrumFitWorkspace"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.SpectrumFitWorkspace" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#spectractor.fit.fitter.FitWorkspace" title="spectractor.fit.fitter.FitWorkspace"><code class="xref py py-class docutils literal"><span class="pre">spectractor.fit.fitter.FitWorkspace</span></code></a></p>
 <dl class="method">
-<dt id="spectractor.fit.fitter.SpectrumFitWorkspace.get_truth">
-<code class="descname">get_truth</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#SpectrumFitWorkspace.get_truth"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.SpectrumFitWorkspace.get_truth" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="spectractor.fit.fitter.SpectrumFitWorkspace.plot_fit">
-<code class="descname">plot_fit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#SpectrumFitWorkspace.plot_fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.SpectrumFitWorkspace.plot_fit" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="spectractor.fit.fitter.SpectrumFitWorkspace.plot_spectrum_comparison_simple">
-<code class="descname">plot_spectrum_comparison_simple</code><span class="sig-paren">(</span><em>ax</em>, <em>title=''</em>, <em>extent=None</em>, <em>size=0.4</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#SpectrumFitWorkspace.plot_spectrum_comparison_simple"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.SpectrumFitWorkspace.plot_spectrum_comparison_simple" title="Permalink to this definition">¶</a></dt>
+<dt id="spectractor.fit.fitter.FitWorkspace.weighted_residuals">
+<code class="sig-name descname">weighted_residuals</code><span class="sig-paren">(</span><em class="sig-param">p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#FitWorkspace.weighted_residuals"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.FitWorkspace.weighted_residuals" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="function">
-<dt id="spectractor.fit.fitter.chisq">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">chisq</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#chisq"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.chisq" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="spectractor.fit.fitter.chisq_spectrogram">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">chisq_spectrogram</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#chisq_spectrogram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.chisq_spectrogram" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="spectractor.fit.fitter.lnlike">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">lnlike</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#lnlike"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.lnlike" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="spectractor.fit.fitter.lnlike_spectrogram">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">lnlike_spectrogram</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#lnlike_spectrogram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.lnlike_spectrogram" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="spectractor.fit.fitter.lnprior">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">lnprior</code><span class="sig-paren">(</span><em>p</em>, <em>bounds</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#lnprior"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.lnprior" title="Permalink to this definition">¶</a></dt>
+<dt id="spectractor.fit.fitter.gradient_descent">
+<code class="sig-prename descclassname">spectractor.fit.fitter.</code><code class="sig-name descname">gradient_descent</code><span class="sig-paren">(</span><em class="sig-param">fit_workspace</em>, <em class="sig-param">params</em>, <em class="sig-param">epsilon</em>, <em class="sig-param">niter=10</em>, <em class="sig-param">fixed_params=None</em>, <em class="sig-param">xtol=0.001</em>, <em class="sig-param">ftol=0.001</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#gradient_descent"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.gradient_descent" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="spectractor.fit.fitter.lnprob">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">lnprob</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#lnprob"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.lnprob" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.fit.fitter.</code><code class="sig-name descname">lnprob</code><span class="sig-paren">(</span><em class="sig-param">p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#lnprob"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.lnprob" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
-<dt id="spectractor.fit.fitter.lnprob_spectrogram">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">lnprob_spectrogram</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#lnprob_spectrogram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.lnprob_spectrogram" title="Permalink to this definition">¶</a></dt>
+<dt id="spectractor.fit.fitter.plot_gradient_descent">
+<code class="sig-prename descclassname">spectractor.fit.fitter.</code><code class="sig-name descname">plot_gradient_descent</code><span class="sig-paren">(</span><em class="sig-param">fit_workspace</em>, <em class="sig-param">costs</em>, <em class="sig-param">params_table</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#plot_gradient_descent"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.plot_gradient_descent" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="spectractor.fit.fitter.print_parameter_summary">
+<code class="sig-prename descclassname">spectractor.fit.fitter.</code><code class="sig-name descname">print_parameter_summary</code><span class="sig-paren">(</span><em class="sig-param">params</em>, <em class="sig-param">cov</em>, <em class="sig-param">labels</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#print_parameter_summary"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.print_parameter_summary" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="spectractor.fit.fitter.run_emcee">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">run_emcee</code><span class="sig-paren">(</span><em>w</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#run_emcee"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.run_emcee" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.fit.fitter.</code><code class="sig-name descname">run_emcee</code><span class="sig-paren">(</span><em class="sig-param">fit_workspace</em>, <em class="sig-param">ln=&lt;function lnprob&gt;</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#run_emcee"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.run_emcee" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="spectractor.fit.fitter.run_gradient_descent">
+<code class="sig-prename descclassname">spectractor.fit.fitter.</code><code class="sig-name descname">run_gradient_descent</code><span class="sig-paren">(</span><em class="sig-param">fit_workspace</em>, <em class="sig-param">guess</em>, <em class="sig-param">epsilon</em>, <em class="sig-param">params_table</em>, <em class="sig-param">costs</em>, <em class="sig-param">fix</em>, <em class="sig-param">xtol</em>, <em class="sig-param">ftol</em>, <em class="sig-param">niter</em>, <em class="sig-param">verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#run_gradient_descent"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.run_gradient_descent" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
 <dt id="spectractor.fit.fitter.run_minimisation">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">run_minimisation</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#run_minimisation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.run_minimisation" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">spectractor.fit.fitter.</code><code class="sig-name descname">run_minimisation</code><span class="sig-paren">(</span><em class="sig-param">fit_workspace</em>, <em class="sig-param">method='newton'</em>, <em class="sig-param">epsilon=None</em>, <em class="sig-param">fix=None</em>, <em class="sig-param">xtol=0.0001</em>, <em class="sig-param">ftol=0.0001</em>, <em class="sig-param">niter=50</em>, <em class="sig-param">verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#run_minimisation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.run_minimisation" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
-<dt id="spectractor.fit.fitter.simulate">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">simulate</code><span class="sig-paren">(</span><em>A1</em>, <em>A2</em>, <em>ozone</em>, <em>pwv</em>, <em>aerosols</em>, <em>reso</em>, <em>D</em>, <em>shift</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.simulate" title="Permalink to this definition">¶</a></dt>
+<dt id="spectractor.fit.fitter.run_minimisation_sigma_clipping">
+<code class="sig-prename descclassname">spectractor.fit.fitter.</code><code class="sig-name descname">run_minimisation_sigma_clipping</code><span class="sig-paren">(</span><em class="sig-param">fit_workspace</em>, <em class="sig-param">method='newton'</em>, <em class="sig-param">epsilon=None</em>, <em class="sig-param">fix=None</em>, <em class="sig-param">xtol=0.0001</em>, <em class="sig-param">ftol=0.0001</em>, <em class="sig-param">niter=50</em>, <em class="sig-param">sigma=5.0</em>, <em class="sig-param">clip_niter=3</em>, <em class="sig-param">verbose=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#run_minimisation_sigma_clipping"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.run_minimisation_sigma_clipping" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="function">
-<dt id="spectractor.fit.fitter.simulate">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">simulate</code><span class="sig-paren">(</span><em>A1</em>, <em>A2</em>, <em>ozone</em>, <em>pwv</em>, <em>aerosols</em>, <em>D</em>, <em>shift_x</em>, <em>shift_y</em>, <em>shift_t</em>, <em>angle</em>, <em>*psf_poly_params</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.simulate" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="spectractor.fit.fitter.sort_on_runtime">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">sort_on_runtime</code><span class="sig-paren">(</span><em>p</em>, <em>depth_index=5</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#sort_on_runtime"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.sort_on_runtime" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="spectractor.fit.fitter.weighted_residuals">
-<code class="descclassname">spectractor.fit.fitter.</code><code class="descname">weighted_residuals</code><span class="sig-paren">(</span><em>p</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#weighted_residuals"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.weighted_residuals" title="Permalink to this definition">¶</a></dt>
+<dt id="spectractor.fit.fitter.save_gradient_descent">
+<code class="sig-prename descclassname">spectractor.fit.fitter.</code><code class="sig-name descname">save_gradient_descent</code><span class="sig-paren">(</span><em class="sig-param">fit_workspace</em>, <em class="sig-param">costs</em>, <em class="sig-param">params_table</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/fitter.html#save_gradient_descent"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.fitter.save_gradient_descent" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </div>
@@ -348,156 +377,150 @@
 <span id="spectractor-fit-statistics-module"></span><h2>spectractor.fit.statistics module<a class="headerlink" href="#module-spectractor.fit.statistics" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="spectractor.fit.statistics.Axis">
-<em class="property">class </em><code class="descclassname">spectractor.fit.statistics.</code><code class="descname">Axis</code><span class="sig-paren">(</span><em>axis</em>, <em>axisname</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Axis"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Axis" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.fit.statistics.</code><code class="sig-name descname">Axis</code><span class="sig-paren">(</span><em class="sig-param">axis</em>, <em class="sig-param">axisname</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Axis"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Axis" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.fit.statistics.Axis.getAxisIndex">
-<code class="descname">getAxisIndex</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Axis.getAxisIndex"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Axis.getAxisIndex" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">getAxisIndex</code><span class="sig-paren">(</span><em class="sig-param">x</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Axis.getAxisIndex"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Axis.getAxisIndex" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Axis.getAxisVal">
-<code class="descname">getAxisVal</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Axis.getAxisVal"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Axis.getAxisVal" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">getAxisVal</code><span class="sig-paren">(</span><em class="sig-param">index</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Axis.getAxisVal"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Axis.getAxisVal" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Axis.set_axis">
-<code class="descname">set_axis</code><span class="sig-paren">(</span><em>axis</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Axis.set_axis"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Axis.set_axis" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">set_axis</code><span class="sig-paren">(</span><em class="sig-param">axis</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Axis.set_axis"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Axis.set_axis" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="class">
 <dt id="spectractor.fit.statistics.Contours">
-<em class="property">class </em><code class="descclassname">spectractor.fit.statistics.</code><code class="descname">Contours</code><span class="sig-paren">(</span><em>list0</em>, <em>list1</em>, <em>labels</em>, <em>axisnames</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Contours"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Contours" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#spectractor.fit.statistics.Grid" title="spectractor.fit.statistics.Grid"><code class="xref py py-class docutils literal"><span class="pre">spectractor.fit.statistics.Grid</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.fit.statistics.</code><code class="sig-name descname">Contours</code><span class="sig-paren">(</span><em class="sig-param">list0</em>, <em class="sig-param">list1</em>, <em class="sig-param">labels</em>, <em class="sig-param">axisnames</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Contours"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Contours" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#spectractor.fit.statistics.Grid" title="spectractor.fit.statistics.Grid"><code class="xref py py-class docutils literal notranslate"><span class="pre">spectractor.fit.statistics.Grid</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.fit.statistics.Contours.covariance">
-<code class="descname">covariance</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Contours.covariance"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Contours.covariance" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">covariance</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Contours.covariance"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Contours.covariance" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Contours.fill_histogram">
-<code class="descname">fill_histogram</code><span class="sig-paren">(</span><em>data1</em>, <em>data2</em>, <em>weights=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Contours.fill_histogram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Contours.fill_histogram" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">fill_histogram</code><span class="sig-paren">(</span><em class="sig-param">data1</em>, <em class="sig-param">data2</em>, <em class="sig-param">weights=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Contours.fill_histogram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Contours.fill_histogram" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Contours.plot">
-<code class="descname">plot</code><span class="sig-paren">(</span><em>plot=False</em>, <em>truth=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Contours.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Contours.plot" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<code class="sig-name descname">plot</code><span class="sig-paren">(</span><em class="sig-param">plot=False</em>, <em class="sig-param">truth=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Contours.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Contours.plot" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
 
 <dl class="class">
 <dt id="spectractor.fit.statistics.Grid">
-<em class="property">class </em><code class="descclassname">spectractor.fit.statistics.</code><code class="descname">Grid</code><span class="sig-paren">(</span><em>dim</em>, <em>ranges</em>, <em>axis_names</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.fit.statistics.</code><code class="sig-name descname">Grid</code><span class="sig-paren">(</span><em class="sig-param">dim</em>, <em class="sig-param">ranges</em>, <em class="sig-param">axis_names</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.fit.statistics.Grid.getAxisIndex">
-<code class="descname">getAxisIndex</code><span class="sig-paren">(</span><em>axis_index</em>, <em>value</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.getAxisIndex"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.getAxisIndex" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">getAxisIndex</code><span class="sig-paren">(</span><em class="sig-param">axis_index</em>, <em class="sig-param">value</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.getAxisIndex"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.getAxisIndex" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Grid.getAxisIndices">
-<code class="descname">getAxisIndices</code><span class="sig-paren">(</span><em>values</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.getAxisIndices"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.getAxisIndices" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">getAxisIndices</code><span class="sig-paren">(</span><em class="sig-param">values</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.getAxisIndices"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.getAxisIndices" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Grid.getAxisVal">
-<code class="descname">getAxisVal</code><span class="sig-paren">(</span><em>axis_index</em>, <em>index</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.getAxisVal"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.getAxisVal" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">getAxisVal</code><span class="sig-paren">(</span><em class="sig-param">axis_index</em>, <em class="sig-param">index</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.getAxisVal"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.getAxisVal" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Grid.getMaximum">
-<code class="descname">getMaximum</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.getMaximum"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.getMaximum" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">getMaximum</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.getMaximum"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.getMaximum" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Grid.getTotal">
-<code class="descname">getTotal</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.getTotal"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.getTotal" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">getTotal</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.getTotal"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.getTotal" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Grid.marginalizeAlongAxis">
-<code class="descname">marginalizeAlongAxis</code><span class="sig-paren">(</span><em>axis_index</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.marginalizeAlongAxis"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.marginalizeAlongAxis" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">marginalizeAlongAxis</code><span class="sig-paren">(</span><em class="sig-param">axis_index</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.marginalizeAlongAxis"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.marginalizeAlongAxis" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Grid.normalize">
-<code class="descname">normalize</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.normalize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.normalize" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">normalize</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Grid.normalize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Grid.normalize" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="class">
 <dt id="spectractor.fit.statistics.Likelihood">
-<em class="property">class </em><code class="descclassname">spectractor.fit.statistics.</code><code class="descname">Likelihood</code><span class="sig-paren">(</span><em>ranges</em>, <em>labels=[]</em>, <em>axis_names=[]</em>, <em>truth=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#spectractor.fit.statistics.Grid" title="spectractor.fit.statistics.Grid"><code class="xref py py-class docutils literal"><span class="pre">spectractor.fit.statistics.Grid</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.fit.statistics.</code><code class="sig-name descname">Likelihood</code><span class="sig-paren">(</span><em class="sig-param">ranges</em>, <em class="sig-param">labels=[]</em>, <em class="sig-param">axis_names=[]</em>, <em class="sig-param">truth=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#spectractor.fit.statistics.Grid" title="spectractor.fit.statistics.Grid"><code class="xref py py-class docutils literal notranslate"><span class="pre">spectractor.fit.statistics.Grid</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.fit.statistics.Likelihood.marginalize">
-<code class="descname">marginalize</code><span class="sig-paren">(</span><em>pdfonly=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood.marginalize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood.marginalize" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">marginalize</code><span class="sig-paren">(</span><em class="sig-param">pdfonly=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood.marginalize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood.marginalize" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Likelihood.max_likelihood_stats">
-<code class="descname">max_likelihood_stats</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood.max_likelihood_stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood.max_likelihood_stats" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">max_likelihood_stats</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood.max_likelihood_stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood.max_likelihood_stats" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Likelihood.setValue">
-<code class="descname">setValue</code><span class="sig-paren">(</span><em>indices</em>, <em>value</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood.setValue"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood.setValue" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">setValue</code><span class="sig-paren">(</span><em class="sig-param">indices</em>, <em class="sig-param">value</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood.setValue"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood.setValue" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Likelihood.stats">
-<code class="descname">stats</code><span class="sig-paren">(</span><em>output=''</em>, <em>pdfonly=False</em>, <em>verbose=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood.stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood.stats" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">stats</code><span class="sig-paren">(</span><em class="sig-param">output=''</em>, <em class="sig-param">pdfonly=False</em>, <em class="sig-param">verbose=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood.stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood.stats" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.Likelihood.triangle_plots">
-<code class="descname">triangle_plots</code><span class="sig-paren">(</span><em>output_filename=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood.triangle_plots"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood.triangle_plots" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">triangle_plots</code><span class="sig-paren">(</span><em class="sig-param">output_filename=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#Likelihood.triangle_plots"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.Likelihood.triangle_plots" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="class">
 <dt id="spectractor.fit.statistics.PDF">
-<em class="property">class </em><code class="descclassname">spectractor.fit.statistics.</code><code class="descname">PDF</code><span class="sig-paren">(</span><em>ticks</em>, <em>label=''</em>, <em>axis_name=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#PDF"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.PDF" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#spectractor.fit.statistics.Grid" title="spectractor.fit.statistics.Grid"><code class="xref py py-class docutils literal"><span class="pre">spectractor.fit.statistics.Grid</span></code></a></p>
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.fit.statistics.</code><code class="sig-name descname">PDF</code><span class="sig-paren">(</span><em class="sig-param">ticks</em>, <em class="sig-param">label=''</em>, <em class="sig-param">axis_name=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#PDF"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.PDF" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#spectractor.fit.statistics.Grid" title="spectractor.fit.statistics.Grid"><code class="xref py py-class docutils literal notranslate"><span class="pre">spectractor.fit.statistics.Grid</span></code></a></p>
 <dl class="method">
 <dt id="spectractor.fit.statistics.PDF.fill">
-<code class="descname">fill</code><span class="sig-paren">(</span><em>pdf</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#PDF.fill"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.PDF.fill" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">fill</code><span class="sig-paren">(</span><em class="sig-param">pdf</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#PDF.fill"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.PDF.fill" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.PDF.fill_histogram">
-<code class="descname">fill_histogram</code><span class="sig-paren">(</span><em>data</em>, <em>weights=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#PDF.fill_histogram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.PDF.fill_histogram" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">fill_histogram</code><span class="sig-paren">(</span><em class="sig-param">data</em>, <em class="sig-param">weights=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#PDF.fill_histogram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.PDF.fill_histogram" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.PDF.plot">
-<code class="descname">plot</code><span class="sig-paren">(</span><em>truth=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#PDF.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.PDF.plot" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<code class="sig-name descname">plot</code><span class="sig-paren">(</span><em class="sig-param">truth=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#PDF.plot"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.PDF.plot" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="method">
 <dt id="spectractor.fit.statistics.PDF.stats">
-<code class="descname">stats</code><span class="sig-paren">(</span><em>verbose=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#PDF.stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.PDF.stats" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">stats</code><span class="sig-paren">(</span><em class="sig-param">verbose=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/fit/statistics.html#PDF.stats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.fit.statistics.PDF.stats" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
@@ -513,6 +536,15 @@
            
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="spectractor.simulation.html" class="btn btn-neutral float-right" title="spectractor.simulation package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="spectractor.extractor.html" class="btn btn-neutral float-left" title="spectractor.extractor package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>

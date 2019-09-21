@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../../_static/jquery.js"></script>
         <script type="text/javascript" src="../../_static/underscore.js"></script>
         <script type="text/javascript" src="../../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
@@ -92,8 +83,11 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../source/modules.html">spectractor</a></li>
+</ul>
+
             
           
         </div>
@@ -239,10 +233,15 @@
 <span class="sd">    ...         self.my_logger.info(&#39;This info test function works.&#39;)</span>
 <span class="sd">    ...         self.my_logger.debug(&#39;This debug test function works.&#39;)</span>
 <span class="sd">    ...         self.my_logger.warning(&#39;This warning test function works.&#39;)</span>
+<span class="sd">    &gt;&gt;&gt; from spectractor import parameters</span>
+<span class="sd">    &gt;&gt;&gt; parameters.VERBOSE = True</span>
+<span class="sd">    &gt;&gt;&gt; parameters.DEBUG = True</span>
 <span class="sd">    &gt;&gt;&gt; test = Test()</span>
 <span class="sd">    &gt;&gt;&gt; test.log()</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">my_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+    <span class="n">coloredlogs</span><span class="o">.</span><span class="n">DEFAULT_LEVEL_STYLES</span><span class="p">[</span><span class="s1">&#39;warn&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="s1">&#39;yellow&#39;</span><span class="p">}</span>
+    <span class="n">coloredlogs</span><span class="o">.</span><span class="n">DEFAULT_FIELD_STYLES</span><span class="p">[</span><span class="s1">&#39;levelname&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;color&#39;</span><span class="p">:</span>  <span class="s1">&#39;white&#39;</span><span class="p">,</span> <span class="s1">&#39;bold&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
     <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">VERBOSE</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
         <span class="n">my_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
         <span class="n">coloredlogs</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">fmt</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">MY_FORMAT</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>

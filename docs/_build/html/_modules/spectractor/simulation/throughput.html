@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../../../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../../../_static/jquery.js"></script>
         <script type="text/javascript" src="../../../_static/underscore.js"></script>
         <script type="text/javascript" src="../../../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
@@ -92,8 +83,11 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../source/modules.html">spectractor</a></li>
+</ul>
+
             
           
         </div>
@@ -169,9 +163,12 @@
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="k">import</span> <span class="n">interp1d</span>
+
+<span class="kn">from</span> <span class="nn">spectractor.config</span> <span class="k">import</span> <span class="n">set_logger</span>
 <span class="kn">import</span> <span class="nn">spectractor.parameters</span> <span class="k">as</span> <span class="nn">parameters</span>
 
 
@@ -519,6 +516,106 @@
                              <span class="n">title</span><span class="o">=</span><span class="n">title</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TelescopeTransmission"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.throughput.TelescopeTransmission">[docs]</a><span class="k">class</span> <span class="nc">TelescopeTransmission</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filter_name</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Transmission of the telescope as product of the following transmissions:</span>
+
+<span class="sd">        - mirrors</span>
+<span class="sd">        - throughput</span>
+<span class="sd">        - quantum efficiency</span>
+<span class="sd">        - Filter</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        filter_name: str, optional</span>
+<span class="sd">            The filter string name.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; t = TelescopeTransmission()</span>
+<span class="sd">        &gt;&gt;&gt; t.plot_transmission()</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filter_name</span> <span class="o">=</span> <span class="n">filter_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transmission</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transmission_err</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">load_transmission</span><span class="p">()</span>
+
+<div class="viewcode-block" id="TelescopeTransmission.load_transmission"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.throughput.TelescopeTransmission.load_transmission">[docs]</a>    <span class="k">def</span> <span class="nf">load_transmission</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load the transmission files and make a function.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        transmission: callable</span>
+<span class="sd">            The transmission function using wavelengths in nm.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; t = TelescopeTransmission()</span>
+<span class="sd">        &gt;&gt;&gt; assert t.transmission is not None</span>
+<span class="sd">        &gt;&gt;&gt; assert t.transmission_err is not None</span>
+<span class="sd">        &gt;&gt;&gt; t.plot_transmission()</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        # QE</span>
+<span class="sd">        wl,qe=ctio.load_quantum_efficiency(datapath)</span>
+<span class="sd">        self.qe=interp1d(wl,qe,kind=&#39;linear&#39;,bounds_error=False,fill_value=0.)</span>
+
+<span class="sd">        #  Throughput</span>
+<span class="sd">        wl,trt=ctio.load_telescope_throughput(datapath)</span>
+<span class="sd">        self.to=interp1d(wl,trt,kind=&#39;linear&#39;,bounds_error=False,fill_value=0.)</span>
+
+<span class="sd">        # Mirrors</span>
+<span class="sd">        wl,trm=ctio.load_mirror_reflectivity(datapath)</span>
+<span class="sd">        self.tm=interp1d(wl,trm,kind=&#39;linear&#39;,bounds_error=False,fill_value=0.)</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">throughput</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
+        <span class="n">wl</span><span class="p">,</span> <span class="n">trm</span><span class="p">,</span> <span class="n">err</span> <span class="o">=</span> <span class="n">throughput</span><span class="o">.</span><span class="n">load_total_throughput</span><span class="p">()</span>
+        <span class="n">to</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">wl</span><span class="p">,</span> <span class="n">trm</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">bounds_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="mf">0.</span><span class="p">)</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">err</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">parameters</span><span class="o">.</span><span class="n">OBS_TRANSMISSION_SYSTEMATICS</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">to_err</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">wl</span><span class="p">,</span> <span class="n">err</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">bounds_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="mf">0.</span><span class="p">)</span>
+
+        <span class="c1"># Filter RG715</span>
+        <span class="n">wl</span><span class="p">,</span> <span class="n">trg</span><span class="p">,</span> <span class="n">err</span> <span class="o">=</span> <span class="n">throughput</span><span class="o">.</span><span class="n">load_RG715</span><span class="p">()</span>
+        <span class="n">tfr</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">wl</span><span class="p">,</span> <span class="n">trg</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">bounds_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="mf">0.</span><span class="p">)</span>
+
+        <span class="c1"># Filter FGB37</span>
+        <span class="n">wl</span><span class="p">,</span> <span class="n">trb</span><span class="p">,</span> <span class="n">err</span> <span class="o">=</span> <span class="n">throughput</span><span class="o">.</span><span class="n">load_FGB37</span><span class="p">()</span>
+        <span class="n">tfb</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">wl</span><span class="p">,</span> <span class="n">trb</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">bounds_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="mf">0.</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter_name</span> <span class="o">==</span> <span class="s2">&quot;RG715&quot;</span><span class="p">:</span>
+            <span class="n">TF</span> <span class="o">=</span> <span class="n">tfr</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter_name</span> <span class="o">==</span> <span class="s2">&quot;FGB37&quot;</span><span class="p">:</span>
+            <span class="n">TF</span> <span class="o">=</span> <span class="n">tfb</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">TF</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+
+        <span class="n">tf</span> <span class="o">=</span> <span class="n">TF</span>
+
+        <span class="c1"># self.transmission=lambda x: self.qe(x)*self.to(x)*(self.tm(x)**2)*self.tf(x)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transmission</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">to</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">tf</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transmission_err</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">to_err</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transmission</span></div>
+
+<div class="viewcode-block" id="TelescopeTransmission.plot_transmission"><a class="viewcode-back" href="../../../source/spectractor.simulation.html#spectractor.simulation.throughput.TelescopeTransmission.plot_transmission">[docs]</a>    <span class="k">def</span> <span class="nf">plot_transmission</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Plot the transmission function and the associated uncertainties.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; t = TelescopeTransmission()</span>
+<span class="sd">        &gt;&gt;&gt; t.plot_transmission()</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+        <span class="n">plot_transmission_simple</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">(),</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDAS</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">transmission</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDAS</span><span class="p">),</span>
+                                 <span class="n">uncertainties</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">transmission_err</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDAS</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div></div>
 
 
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>

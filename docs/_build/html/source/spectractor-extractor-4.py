@@ -9,3 +9,4 @@ for x in np.arange(N):
     im.data[int(y(x)), x] = 10
     im.data[int(y(x))+1, x] = 10
 plt.imshow(im.data, origin='lower')
+plt.show()

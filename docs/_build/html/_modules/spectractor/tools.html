@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../../_static/jquery.js"></script>
         <script type="text/javascript" src="../../_static/underscore.js"></script>
         <script type="text/javascript" src="../../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
@@ -92,8 +83,11 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../source/modules.html">spectractor</a></li>
+</ul>
+
             
           
         </div>
@@ -170,9 +164,11 @@
 <span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="k">import</span> <span class="n">fftconvolve</span><span class="p">,</span> <span class="n">gaussian</span>
 <span class="kn">from</span> <span class="nn">scipy.ndimage.filters</span> <span class="k">import</span> <span class="n">maximum_filter</span>
 <span class="kn">from</span> <span class="nn">scipy.ndimage.morphology</span> <span class="k">import</span> <span class="n">generate_binary_structure</span><span class="p">,</span> <span class="n">binary_erosion</span>
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="k">import</span> <span class="n">interp1d</span>
+<span class="kn">from</span> <span class="nn">scipy.integrate</span> <span class="k">import</span> <span class="n">quad</span>
 
 <span class="kn">from</span> <span class="nn">skimage.feature</span> <span class="k">import</span> <span class="n">hessian_matrix</span>
-<span class="kn">from</span> <span class="nn">spectractor.config</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">spectractor.config</span> <span class="k">import</span> <span class="n">set_logger</span>
 <span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
 <span class="kn">from</span> <span class="nn">math</span> <span class="k">import</span> <span class="n">floor</span>
 
@@ -198,6 +194,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; x = np.arange(50)</span>
 <span class="sd">    &gt;&gt;&gt; y = gauss(x, 10, 25, 3)</span>
 <span class="sd">    &gt;&gt;&gt; print(y.shape)</span>
@@ -229,6 +226,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; x = np.arange(50)</span>
 <span class="sd">    &gt;&gt;&gt; jac = gauss_jacobian(x, 10, 25, 3)</span>
 <span class="sd">    &gt;&gt;&gt; print(jac.shape)</span>
@@ -271,6 +269,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; import numpy as np</span>
 <span class="sd">    &gt;&gt;&gt; import matplotlib.pyplot as plt</span>
 <span class="sd">    &gt;&gt;&gt; x = np.arange(600.,700.,2)</span>
@@ -307,6 +306,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; x = np.arange(600.,800.,1)</span>
 <span class="sd">    &gt;&gt;&gt; y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)</span>
 <span class="sd">    &gt;&gt;&gt; print(y[0])</span>
@@ -346,6 +346,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; x = np.arange(600.,800.,1)</span>
 <span class="sd">    &gt;&gt;&gt; y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)</span>
 <span class="sd">    &gt;&gt;&gt; print(y[0])</span>
@@ -353,7 +354,7 @@
 <span class="sd">    &gt;&gt;&gt; bounds = ((-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,100,800,100,100,800,100))</span>
 <span class="sd">    &gt;&gt;&gt; popt, pcov = fit_multigauss_and_line(x, y, guess=(0,1,3,630,3,3,770,3), bounds=bounds)</span>
 <span class="sd">    &gt;&gt;&gt; print(popt)</span>
-<span class="sd">    [   1.   10.   20.  650.    3.   40.  750.   10.]</span>
+<span class="sd">    [  1.  10.  20. 650.   3.  40. 750.  10.]</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">maxfev</span> <span class="o">=</span> <span class="mi">1000</span>
     <span class="n">popt</span><span class="p">,</span> <span class="n">pcov</span> <span class="o">=</span> <span class="n">curve_fit</span><span class="p">(</span><span class="n">multigauss_and_line</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">p0</span><span class="o">=</span><span class="n">guess</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">maxfev</span><span class="o">=</span><span class="n">maxfev</span><span class="p">,</span> <span class="n">absolute_sigma</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -407,6 +408,7 @@
 <span class="sd">        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]</span>
 <span class="sd">        y = multigauss_and_bgd(x, *p)</span>
 <span class="sd">        plt.plot(x,y,&#39;r-&#39;)</span>
+<span class="sd">        plt.show()</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">bgd_nparams</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">CALIB_BGD_NPARAMS</span>
@@ -439,6 +441,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; import spectractor.parameters as parameters</span>
 <span class="sd">    &gt;&gt;&gt; parameters.CALIB_BGD_NPARAMS = 4</span>
 <span class="sd">    &gt;&gt;&gt; x = np.arange(600.,800.,1)</span>
@@ -495,6 +498,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; x = np.arange(600.,800.,1)</span>
 <span class="sd">    &gt;&gt;&gt; p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]</span>
 <span class="sd">    &gt;&gt;&gt; y = multigauss_and_bgd(x, *p)</span>
@@ -507,7 +511,8 @@
 <span class="sd">    &gt;&gt;&gt; assert np.all(np.isclose(p,popt,rtol=1e-4))</span>
 <span class="sd">    &gt;&gt;&gt; fit = multigauss_and_bgd(x, *popt)</span>
 
-<span class="sd">    ..plot:</span>
+<span class="sd">    .. plot::</span>
+
 <span class="sd">        import matplotlib.pyplot as plt</span>
 <span class="sd">        plt.errorbar(x,y,yerr=err,linestyle=&#39;None&#39;)</span>
 <span class="sd">        plt.plot(x,fit,&#39;r-&#39;)</span>
@@ -584,6 +589,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; x = np.arange(500., 1000., 1)</span>
 <span class="sd">    &gt;&gt;&gt; p = [3, 2, 1, 1]</span>
 <span class="sd">    &gt;&gt;&gt; y = np.polyval(p, x)</span>
@@ -637,6 +643,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; x = np.arange(500., 1000., 1)</span>
 <span class="sd">    &gt;&gt;&gt; p = [-1e-6, -1e-4, 1, 1]</span>
 <span class="sd">    &gt;&gt;&gt; y = np.polyval(p, x)</span>
@@ -649,7 +656,8 @@
 <span class="sd">    &gt;&gt;&gt; print(fit)</span>
 <span class="sd">    [0 0 0 0]</span>
 
-<span class="sd">    ..plot:</span>
+<span class="sd">    .. plot::</span>
+
 <span class="sd">        import matplotlib.pyplot as plt</span>
 <span class="sd">        plt.errorbar(x,y,yerr=err,fmt=&#39;ro&#39;)</span>
 <span class="sd">        plt.plot(x,model2)</span>
@@ -658,10 +666,7 @@
     <span class="n">cov</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
     <span class="n">x_norm</span> <span class="o">=</span> <span class="n">rescale_x_for_legendre</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">order</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">w</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">fit</span><span class="p">,</span> <span class="n">cov</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polynomial</span><span class="o">.</span><span class="n">legendre</span><span class="o">.</span><span class="n">legfit</span><span class="p">(</span><span class="n">x_norm</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">deg</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">full</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">fit</span><span class="p">,</span> <span class="n">cov</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polynomial</span><span class="o">.</span><span class="n">legendre</span><span class="o">.</span><span class="n">legfit</span><span class="p">(</span><span class="n">x_norm</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">deg</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">full</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="n">w</span><span class="p">)</span>
+        <span class="n">fit</span><span class="p">,</span> <span class="n">cov</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polynomial</span><span class="o">.</span><span class="n">legendre</span><span class="o">.</span><span class="n">legfit</span><span class="p">(</span><span class="n">x_norm</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">deg</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">full</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="n">w</span><span class="p">)</span>
         <span class="n">model</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polynomial</span><span class="o">.</span><span class="n">legendre</span><span class="o">.</span><span class="n">legval</span><span class="p">(</span><span class="n">x_norm</span><span class="p">,</span> <span class="n">fit</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">fit</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
@@ -691,6 +696,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; x, y = np.mgrid[:50,:50]</span>
 <span class="sd">    &gt;&gt;&gt; z = x**2 + y**2 - 2*x*y</span>
 <span class="sd">    &gt;&gt;&gt; fit = fit_poly2d(x, y, z, order=2)</span>
@@ -735,6 +741,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; x = np.arange(500., 1000., 1)</span>
 <span class="sd">    &gt;&gt;&gt; p = [3,2,1,0]</span>
 <span class="sd">    &gt;&gt;&gt; y = np.polyval(p, x)</span>
@@ -804,6 +811,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; x, y = np.mgrid[:50,:50]</span>
 <span class="sd">    &gt;&gt;&gt; z = x**2 + y**2 - 2*x*y</span>
 <span class="sd">    &gt;&gt;&gt; z[::10,::10] = 0.</span>
@@ -868,6 +876,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; import numpy as np</span>
 <span class="sd">    &gt;&gt;&gt; import matplotlib.pyplot as plt</span>
 <span class="sd">    &gt;&gt;&gt; from astropy.modeling import models</span>
@@ -876,9 +885,11 @@
 <span class="sd">    &gt;&gt;&gt; p = (50, 25, 25, 5, 5, 0)</span>
 <span class="sd">    &gt;&gt;&gt; Z = PSF.evaluate(X, Y, *p)</span>
 
-<span class="sd">    ..plot:</span>
+<span class="sd">    .. plot::</span>
+
 <span class="sd">        plt.imshow(Z, origin=&#39;loxer&#39;) #doctest: +ELLIPSIS</span>
 <span class="sd">        plt.show()</span>
+
 <span class="sd">    &gt;&gt;&gt; guess = (45, 20, 20, 7, 7, 0)</span>
 <span class="sd">    &gt;&gt;&gt; bounds = ((1, 10, 10, 1, 1, -90), (100, 40, 40, 10, 10, 90))</span>
 <span class="sd">    &gt;&gt;&gt; fit = fit_gauss2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, circular=True)</span>
@@ -886,9 +897,9 @@
 <span class="sd">    &gt;&gt;&gt; print(res)</span>
 <span class="sd">    [50.0, 25.0, 25.0, 5.0, 5.0, 0.0]</span>
 
-<span class="sd">    ..plot:</span>
-<span class="sd">        plt.imshow(Z-fit(X, Y), origin=&#39;loxer&#39;) #doctest: +ELLIPSIS</span>
-<span class="sd">        &lt;matplotlib.image.AxesImage object at 0x...&gt;</span>
+<span class="sd">    .. plot::</span>
+
+<span class="sd">        plt.imshow(Z-fit(X, Y), origin=&#39;loxer&#39;)</span>
 <span class="sd">        plt.show()</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -945,6 +956,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; import numpy as np</span>
 <span class="sd">    &gt;&gt;&gt; import matplotlib.pyplot as plt</span>
 <span class="sd">    &gt;&gt;&gt; from astropy.modeling import models</span>
@@ -953,16 +965,19 @@
 <span class="sd">    &gt;&gt;&gt; p = (50, 50, 50, 5, 2)</span>
 <span class="sd">    &gt;&gt;&gt; Z = PSF.evaluate(X, Y, *p)</span>
 
-<span class="sd">    ..plot:</span>
+<span class="sd">    .. plot::</span>
+
 <span class="sd">        plt.imshow(Z, origin=&#39;loxer&#39;)</span>
 <span class="sd">        plt.show()</span>
+
 <span class="sd">    &gt;&gt;&gt; guess = (45, 48, 52, 4, 2)</span>
 <span class="sd">    &gt;&gt;&gt; bounds = ((1, 10, 10, 1, 1), (100, 90, 90, 10, 10))</span>
 <span class="sd">    &gt;&gt;&gt; fit = fit_moffat2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, niter=3)</span>
 <span class="sd">    &gt;&gt;&gt; res = [getattr(fit, p).value for p in fit.param_names]</span>
 <span class="sd">    &gt;&gt;&gt; assert(np.all(np.isclose(p, res, 1e-1)))</span>
 
-<span class="sd">    ..plot:</span>
+<span class="sd">    .. plot::</span>
+
 <span class="sd">        plt.imshow(Z-fit(X, Y), origin=&#39;loxer&#39;)</span>
 <span class="sd">        plt.show()</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -1014,6 +1029,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; import numpy as np</span>
 <span class="sd">    &gt;&gt;&gt; import matplotlib.pyplot as plt</span>
 <span class="sd">    &gt;&gt;&gt; from astropy.modeling import models</span>
@@ -1022,16 +1038,19 @@
 <span class="sd">    &gt;&gt;&gt; p = (50, 50, 5, 2)</span>
 <span class="sd">    &gt;&gt;&gt; Y = PSF.evaluate(X, *p)</span>
 
-<span class="sd">    ..plot:</span>
+<span class="sd">    .. plot::</span>
+
 <span class="sd">        plt.imshow(Z, origin=&#39;loxer&#39;)</span>
 <span class="sd">        plt.show()</span>
+
 <span class="sd">    &gt;&gt;&gt; guess = (45, 48, 4, 2)</span>
 <span class="sd">    &gt;&gt;&gt; bounds = ((1, 10, 1, 1), (100, 90, 10, 10))</span>
 <span class="sd">    &gt;&gt;&gt; fit = fit_moffat1d_outlier_removal(X, Y, guess=guess, bounds=bounds, niter=3)</span>
 <span class="sd">    &gt;&gt;&gt; res = [getattr(fit, p).value for p in fit.param_names]</span>
 <span class="sd">    &gt;&gt;&gt; assert(np.all(np.isclose(p, res, 1e-6)))</span>
 
-<span class="sd">    ..plot:</span>
+<span class="sd">    .. plot::</span>
+
 <span class="sd">        plt.imshow(Z-fit(X, Y), origin=&#39;loxer&#39;)</span>
 <span class="sd">        plt.show()</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -1051,7 +1070,7 @@
         <span class="n">or_fit</span> <span class="o">=</span> <span class="n">fitting</span><span class="o">.</span><span class="n">FittingWithOutlierRemoval</span><span class="p">(</span><span class="n">fit</span><span class="p">,</span> <span class="n">sigma_clip</span><span class="p">,</span> <span class="n">niter</span><span class="o">=</span><span class="n">niter</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="n">sigma</span><span class="p">)</span>
         <span class="c1"># get fitted model and filtered data</span>
         <span class="n">or_fitted_model</span><span class="p">,</span> <span class="n">filtered_data</span> <span class="o">=</span> <span class="n">or_fit</span><span class="p">(</span><span class="n">gg_init</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
-        <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="si">{or_fitted_model}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">my_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="si">{or_fitted_model}</span><span class="s1">&#39;</span><span class="p">)</span>
         <span class="c1"># my_logger.debug(f&#39;\n\t{fit.fit_info}&#39;)</span>
         <span class="k">return</span> <span class="n">or_fitted_model</span></div>
 
@@ -1078,6 +1097,7 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    &gt;&gt;&gt; import numpy as np</span>
 <span class="sd">    &gt;&gt;&gt; import matplotlib.pyplot as plt</span>
 <span class="sd">    &gt;&gt;&gt; from astropy.modeling import models</span>
@@ -1086,17 +1106,20 @@
 <span class="sd">    &gt;&gt;&gt; p = (50, 50, 5, 2)</span>
 <span class="sd">    &gt;&gt;&gt; Y = PSF.evaluate(X, *p)</span>
 
-<span class="sd">    ..plot:</span>
-<span class="sd">        plt.imshow(Z, origin=&#39;loxer&#39;)</span>
+<span class="sd">    .. plot::</span>
+
+<span class="sd">        plt.imshow(Z, origin=&#39;lower&#39;)</span>
 <span class="sd">        plt.show()</span>
+
 <span class="sd">    &gt;&gt;&gt; guess = (45, 48, 4, 2)</span>
 <span class="sd">    &gt;&gt;&gt; bounds = ((1, 10, 1, 1), (100, 90, 10, 10))</span>
 <span class="sd">    &gt;&gt;&gt; fit = fit_moffat1d(X, Y, guess=guess, bounds=bounds)</span>
 <span class="sd">    &gt;&gt;&gt; res = [getattr(fit, p).value for p in fit.param_names]</span>
 <span class="sd">    &gt;&gt;&gt; assert(np.all(np.isclose(p, res, 1e-6)))</span>
 
-<span class="sd">    ..plot:</span>
-<span class="sd">        plt.imshow(Z-fit(X, Y), origin=&#39;loxer&#39;)</span>
+<span class="sd">    .. plot::</span>
+
+<span class="sd">        plt.imshow(Z-fit(X, Y), origin=&#39;lower&#39;)</span>
 <span class="sd">        plt.show()</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
@@ -1144,6 +1167,160 @@
             <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">weights</span> <span class="o">*</span> <span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">-</span> <span class="n">meas</span><span class="p">))</span>
             <span class="n">a</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">a</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">0</span>
             <span class="k">return</span> <span class="n">a</span></div></div>
+
+
+<div class="viewcode-block" id="compute_fwhm"><a class="viewcode-back" href="../../source/spectractor.html#spectractor.tools.compute_fwhm">[docs]</a><span class="k">def</span> <span class="nf">compute_fwhm</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">minimum</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">full_output</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the full width half maximum of y(x) curve,</span>
+<span class="sd">    using an interpolation of the data points and dichotomie method.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    x: array_like</span>
+<span class="sd">        The abscisse array.</span>
+<span class="sd">    y: array_like</span>
+<span class="sd">        The function array.</span>
+<span class="sd">    minimum: float, optional</span>
+<span class="sd">        The minimum reference from which to compyte half the height (default: 0).</span>
+<span class="sd">    center: float, optional</span>
+<span class="sd">        The center of the curve. If None, the weighted averageof the y(x) distribution is computed (default: None).</span>
+<span class="sd">    full_output: bool, optional</span>
+<span class="sd">        If True, half maximum, the edges of the curve and the curve center are given in output (default: False).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    FWHM: float</span>
+<span class="sd">        The full width half maximum of the curve.</span>
+<span class="sd">    half: float, optional</span>
+<span class="sd">        The half maximum value. Only if full_output=True.</span>
+<span class="sd">    center: float, optional</span>
+<span class="sd">        The y(x) center value. Only if full_output=True.</span>
+<span class="sd">    left_edge: float, optional</span>
+<span class="sd">        The left_edge value at half maximum. Only if full_output=True.</span>
+<span class="sd">    right_edge: float, optional</span>
+<span class="sd">        The right_edge value at half maximum. Only if full_output=True.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    # Gaussian example</span>
+<span class="sd">    &gt;&gt;&gt; x = np.arange(0, 100, 1)</span>
+<span class="sd">    &gt;&gt;&gt; stddev = 4</span>
+<span class="sd">    &gt;&gt;&gt; middle = 40</span>
+<span class="sd">    &gt;&gt;&gt; psf = gauss(x, 1, middle, stddev)</span>
+<span class="sd">    &gt;&gt;&gt; fwhm, half, center, a, b = compute_fwhm(x, psf, full_output=True)</span>
+<span class="sd">    &gt;&gt;&gt; print(f&quot;{fwhm:.4f} {2.355*stddev:.4f} {center:.4f}&quot;)</span>
+<span class="sd">    9.4192 9.4200 40.0000</span>
+<span class="sd">    &gt;&gt;&gt; assert np.isclose(fwhm, 2.355*stddev, atol=1e-3)</span>
+<span class="sd">    &gt;&gt;&gt; assert np.isclose(center, middle, atol=1e-3)</span>
+
+<span class="sd">    .. plot ::</span>
+
+<span class="sd">        import matplotlib.pyplot as plt</span>
+<span class="sd">        plt.figure</span>
+<span class="sd">        plt.plot(x, psf, label=&quot;function&quot;)</span>
+<span class="sd">        plt.axvline(center, color=&quot;gray&quot;, label=&quot;center&quot;)</span>
+<span class="sd">        plt.axvline(a, color=&quot;k&quot;, label=&quot;edges at half max&quot;)</span>
+<span class="sd">        plt.axvline(b, color=&quot;k&quot;, label=&quot;edges at half max&quot;)</span>
+<span class="sd">        plt.axhline(half, color=&quot;r&quot;, label=&quot;half max&quot;)</span>
+<span class="sd">        plt.legend()</span>
+<span class="sd">        plt.title(f&quot;FWHM={fwhm:.3f}&quot;)</span>
+<span class="sd">        plt.xlabel(&quot;x&quot;)</span>
+<span class="sd">        plt.ylabel(&quot;y&quot;)</span>
+<span class="sd">        plt.show()</span>
+
+<span class="sd">    # Defocused PSF example</span>
+<span class="sd">    &gt;&gt;&gt; from spectractor.extractor.psf import PSF1D</span>
+<span class="sd">    &gt;&gt;&gt; p = [2,40,4,2,-0.4,1,10]</span>
+<span class="sd">    &gt;&gt;&gt; psf = PSF1D(p)</span>
+<span class="sd">    &gt;&gt;&gt; fwhm, half, center, a, b = compute_fwhm(x, psf.evaluate(x), full_output=True)</span>
+<span class="sd">    &gt;&gt;&gt; assert np.isclose(fwhm, 6.96, atol=1e-2)</span>
+<span class="sd">    &gt;&gt;&gt; assert np.isclose(center, p[1], atol=1e-2)</span>
+
+<span class="sd">    .. plot ::</span>
+
+<span class="sd">        import matplotlib.pyplot as plt</span>
+<span class="sd">        plt.figure</span>
+<span class="sd">        plt.plot(x, psf.evaluate(x, p), label=&quot;function&quot;)</span>
+<span class="sd">        plt.axvline(center, color=&quot;gray&quot;, label=&quot;center&quot;)</span>
+<span class="sd">        plt.axvline(a, color=&quot;k&quot;, label=&quot;edges at half max&quot;)</span>
+<span class="sd">        plt.axvline(b, color=&quot;k&quot;, label=&quot;edges at half max&quot;)</span>
+<span class="sd">        plt.axhline(half, color=&quot;r&quot;, label=&quot;half max&quot;)</span>
+<span class="sd">        plt.legend()</span>
+<span class="sd">        plt.title(f&quot;FWHM={fwhm:.3f}&quot;)</span>
+<span class="sd">        plt.xlabel(&quot;x&quot;)</span>
+<span class="sd">        plt.ylabel(&quot;y&quot;)</span>
+<span class="sd">        plt.show()</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">y</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1"># TODO: implement fwhm for 2D curves</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">interp</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;cubic&quot;</span><span class="p">,</span> <span class="n">bounds_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="s2">&quot;extrapolate&quot;</span><span class="p">)</span>
+    <span class="n">maximum</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">y</span><span class="p">)</span> <span class="o">-</span> <span class="n">minimum</span>
+    <span class="n">imax</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">imax</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="n">imax</span><span class="p">:]</span> <span class="o">-</span> <span class="mf">0.9</span> <span class="o">*</span> <span class="n">maximum</span><span class="p">))</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">imax</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="n">imax</span><span class="p">:]</span> <span class="o">-</span> <span class="mf">0.1</span> <span class="o">*</span> <span class="n">maximum</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">eq</span><span class="p">(</span><span class="n">xx</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">interp</span><span class="p">(</span><span class="n">xx</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">maximum</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">dichotomie</span><span class="p">(</span><span class="n">eq</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="mf">1e-3</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">center</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">center</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">average</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">y</span><span class="p">)</span>
+    <span class="n">fwhm</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">res</span> <span class="o">-</span> <span class="n">center</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">full_output</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">fwhm</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">fwhm</span><span class="p">,</span> <span class="mf">0.5</span><span class="o">*</span><span class="n">maximum</span><span class="p">,</span> <span class="n">center</span><span class="p">,</span> <span class="n">res</span><span class="p">,</span> <span class="n">center</span> <span class="o">-</span> <span class="nb">abs</span><span class="p">(</span><span class="n">res</span><span class="o">-</span><span class="n">center</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="compute_integral"><a class="viewcode-back" href="../../source/spectractor.html#spectractor.tools.compute_integral">[docs]</a><span class="k">def</span> <span class="nf">compute_integral</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the integral of an y(x) curve. The curve is interpolated and extrapolated with cubic splines.</span>
+<span class="sd">    If not provided, bounds are set to the x array edges.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    x: array_like</span>
+<span class="sd">        The abscisse array.</span>
+<span class="sd">    y: array_like</span>
+<span class="sd">        The function array.</span>
+<span class="sd">    bounds: array_like, optional</span>
+<span class="sd">        The bounds of the integral. If None, the edges of thex array are taken (default bounds=None).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    result: float</span>
+<span class="sd">        The integral of the PSF model.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    Gaussian example</span>
+<span class="sd">    .. doctest::</span>
+
+<span class="sd">        &gt;&gt;&gt; x = np.arange(0, 100, 0.5)</span>
+<span class="sd">        &gt;&gt;&gt; stddev = 4</span>
+<span class="sd">        &gt;&gt;&gt; middle = 40</span>
+<span class="sd">        &gt;&gt;&gt; psf = gauss(x, 1/(stddev*np.sqrt(2*np.pi)), middle, stddev)</span>
+<span class="sd">        &gt;&gt;&gt; integral = compute_integral(x, psf)</span>
+<span class="sd">        &gt;&gt;&gt; print(f&quot;{integral:.6f}&quot;)</span>
+<span class="sd">        1.000000</span>
+
+<span class="sd">    Defocused PSF example</span>
+<span class="sd">    .. doctest::</span>
+
+<span class="sd">        &gt;&gt;&gt; from spectractor.extractor.psf import PSF1D</span>
+<span class="sd">        &gt;&gt;&gt; p = [2,30,4,2,-0.5,1,10]</span>
+<span class="sd">        &gt;&gt;&gt; psf = PSF1D(p)</span>
+<span class="sd">        &gt;&gt;&gt; integral = compute_integral(x, psf.evaluate(x))</span>
+<span class="sd">        &gt;&gt;&gt; assert np.isclose(integral, p[0], atol=1e-3)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">bounds</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">bounds</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+    <span class="n">interp</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;cubic&quot;</span><span class="p">,</span> <span class="n">bounds_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="s2">&quot;extrapolate&quot;</span><span class="p">)</span>
+    <span class="n">integral</span> <span class="o">=</span> <span class="n">quad</span><span class="p">(</span><span class="n">interp</span><span class="p">,</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">limit</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">integral</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="find_nearest"><a class="viewcode-back" href="../../source/spectractor.html#spectractor.tools.find_nearest">[docs]</a><span class="k">def</span> <span class="nf">find_nearest</span><span class="p">(</span><span class="n">array</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
@@ -1258,11 +1435,11 @@
 <span class="sd">    &gt;&gt;&gt; array = np.ones(100)</span>
 <span class="sd">    &gt;&gt;&gt; output = fftconvolve_gaussian(array, 3)</span>
 <span class="sd">    &gt;&gt;&gt; print(output[:3])</span>
-<span class="sd">    [ 0.5         0.63114657  0.74850168]</span>
+<span class="sd">    [0.5        0.63114657 0.74850168]</span>
 <span class="sd">    &gt;&gt;&gt; array = np.ones((100, 100))</span>
 <span class="sd">    &gt;&gt;&gt; output = fftconvolve_gaussian(array, 3)</span>
 <span class="sd">    &gt;&gt;&gt; print(output[0][:3])</span>
-<span class="sd">    [ 0.5         0.63114657  0.74850168]</span>
+<span class="sd">    [0.5        0.63114657 0.74850168]</span>
 <span class="sd">    &gt;&gt;&gt; array = np.ones((100, 100, 100))</span>
 <span class="sd">    &gt;&gt;&gt; output = fftconvolve_gaussian(array, 3)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -1355,8 +1532,8 @@
             <span class="k">if</span> <span class="n">std</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">str_std</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;</span><span class="si">{std:.2g}</span><span class="s2">&quot;</span>
     <span class="n">out</span> <span class="o">+=</span> <span class="p">[</span><span class="n">str_value</span><span class="p">,</span> <span class="n">str_error_high</span><span class="p">]</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">error_high</span><span class="p">,</span> <span class="n">error_low</span><span class="p">):</span>
-        <span class="n">out</span> <span class="o">+=</span> <span class="p">[</span><span class="n">str_error_low</span><span class="p">]</span>
+    <span class="c1">#if not np.isclose(error_high, error_low):</span>
+    <span class="n">out</span> <span class="o">+=</span> <span class="p">[</span><span class="n">str_error_low</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">std</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">out</span> <span class="o">+=</span> <span class="p">[</span><span class="n">str_std</span><span class="p">]</span>
     <span class="n">out</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
@@ -1605,7 +1782,7 @@
     <span class="n">obj</span><span class="o">.</span><span class="n">airmass</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="s1">&#39;AIRMASS&#39;</span><span class="p">]</span>
     <span class="n">obj</span><span class="o">.</span><span class="n">expo</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="s1">&#39;EXPTIME&#39;</span><span class="p">]</span>
     <span class="n">obj</span><span class="o">.</span><span class="n">filters</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="s1">&#39;FILTERS&#39;</span><span class="p">]</span>
-    <span class="n">obj</span><span class="o">.</span><span class="n">filter_label</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="s1">&#39;FILTER1&#39;</span><span class="p">]</span>
+    <span class="n">obj</span><span class="o">.</span><span class="n">filter</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="s1">&#39;FILTER1&#39;</span><span class="p">]</span>
     <span class="n">obj</span><span class="o">.</span><span class="n">disperser_label</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="s1">&#39;FILTER2&#39;</span><span class="p">]</span></div>
 
 
@@ -1721,10 +1898,16 @@
     <span class="k">return</span> <span class="n">spectralmap</span></div>
 
 
+<div class="viewcode-block" id="rebin"><a class="viewcode-back" href="../../source/spectractor.html#spectractor.tools.rebin">[docs]</a><span class="k">def</span> <span class="nf">rebin</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">new_shape</span><span class="p">):</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">new_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">//</span> <span class="n">new_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+             <span class="n">new_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">//</span> <span class="n">new_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">arr</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
     <span class="kn">import</span> <span class="nn">doctest</span>
-    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">&quot;1.14.0&quot;</span><span class="p">:</span>
-        <span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">legacy</span><span class="o">=</span><span class="s2">&quot;1.13&quot;</span><span class="p">)</span>
+    <span class="c1"># if np.__version__ &gt;= &quot;1.14.0&quot;:</span>
+    <span class="c1">#    np.set_printoptions(legacy=&quot;1.13&quot;)</span>
 
     <span class="n">doctest</span><span class="o">.</span><span class="n">testmod</span><span class="p">()</span>
 

@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../../../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../../../_static/jquery.js"></script>
         <script type="text/javascript" src="../../../_static/underscore.js"></script>
         <script type="text/javascript" src="../../../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
@@ -92,8 +83,11 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../source/modules.html">spectractor</a></li>
+</ul>
+
             
           
         </div>
@@ -156,10 +150,18 @@
             
   <h1>Source code for spectractor.extractor.targets</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span> <span class="nn">astropy.coordinates</span> <span class="k">import</span> <span class="n">SkyCoord</span>
+<span class="kn">import</span> <span class="nn">astropy.units</span> <span class="k">as</span> <span class="nn">units</span>
 <span class="kn">from</span> <span class="nn">astroquery.ned</span> <span class="k">import</span> <span class="n">Ned</span>
 <span class="kn">from</span> <span class="nn">astroquery.simbad</span> <span class="k">import</span> <span class="n">Simbad</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="k">import</span> <span class="n">interp1d</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 
-<span class="kn">from</span> <span class="nn">spectractor.extractor.spectroscopy</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="kn">from</span> <span class="nn">spectractor.config</span> <span class="k">import</span> <span class="n">set_logger</span>
+<span class="kn">from</span> <span class="nn">spectractor.extractor.spectroscopy</span> <span class="k">import</span> <span class="p">(</span><span class="n">Lines</span><span class="p">,</span> <span class="n">HGAR_LINES</span><span class="p">,</span> <span class="n">HYDROGEN_LINES</span><span class="p">,</span> <span class="n">ATMOSPHERIC_LINES</span><span class="p">,</span>
+                                                <span class="n">ISM_LINES</span><span class="p">)</span>
 
 <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;PYSYN_CDBS&quot;</span><span class="p">):</span>
     <span class="kn">import</span> <span class="nn">pysynphot</span> <span class="k">as</span> <span class="nn">S</span>
@@ -263,7 +265,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">lines</span> <span class="o">=</span> <span class="n">Lines</span><span class="p">(</span><span class="n">HGAR_LINES</span><span class="p">,</span> <span class="n">emission_spectrum</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<div class="viewcode-block" id="ArcLamp.load"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.ArcLamp.load">[docs]</a>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="ArcLamp.load"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.ArcLamp.load">[docs]</a>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>  <span class="c1"># pragma: no cover</span>
         <span class="k">pass</span></div></div>
 
 
@@ -294,7 +296,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">emission_spectrum</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">lines</span> <span class="o">=</span> <span class="n">Lines</span><span class="p">([],</span> <span class="n">emission_spectrum</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<div class="viewcode-block" id="Monochromator.load"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.Monochromator.load">[docs]</a>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Monochromator.load"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.targets.Monochromator.load">[docs]</a>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>  <span class="c1"># pragma: no cover</span>
         <span class="k">pass</span></div></div>
 
 
@@ -366,17 +368,17 @@
 <span class="sd">        --------</span>
 <span class="sd">        &gt;&gt;&gt; s = Star(&#39;3C273&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; print(s.spectra[0][:4])</span>
-<span class="sd">        [  0.00000000e+00   2.50485769e-14   2.42380612e-14   2.40887886e-14]</span>
+<span class="sd">        [0.0000000e+00 2.5048577e-14 2.4238061e-14 2.4088789e-14]</span>
 <span class="sd">        &gt;&gt;&gt; s = Star(&#39;HD111980&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; print(s.spectra[0][:4])</span>
-<span class="sd">        [  2.16890002e-13   2.66480010e-13   2.03540011e-13   2.38780004e-13]</span>
+<span class="sd">        [2.16890002e-13 2.66480010e-13 2.03540011e-13 2.38780004e-13]</span>
 <span class="sd">        &gt;&gt;&gt; s = Star(&#39;PKS1510-089&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; print(s.redshift)</span>
 <span class="sd">        0.36</span>
 <span class="sd">        &gt;&gt;&gt; print(f&#39;{parameters.LAMBDA_MIN:.1f}, {parameters.LAMBDA_MAX:.1f}&#39;)</span>
 <span class="sd">        408.0, 1496.0</span>
 <span class="sd">        &gt;&gt;&gt; print(s.spectra[0][:4])</span>
-<span class="sd">        [ 117.34012  139.27621   87.38032  143.0816 ]</span>
+<span class="sd">        [117.34012 139.27621  87.38032 143.0816 ]</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">wavelengths</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># in nm</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">spectra</span> <span class="o">=</span> <span class="p">[]</span>
@@ -466,7 +468,7 @@
 <span class="sd">        &gt;&gt;&gt; s = Star(&#39;HD111980&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; s.build_sed(index=0)</span>
 <span class="sd">        &gt;&gt;&gt; s.sed(550)</span>
-<span class="sd">        array(1.676051129017069e-11)</span>
+<span class="sd">        array(1.67605113e-11)</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spectra</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">sed</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
@@ -491,14 +493,14 @@
         <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Flux&#39;</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div></div>
 
 
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
     <span class="kn">import</span> <span class="nn">doctest</span>
-    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">&quot;1.14.0&quot;</span><span class="p">:</span>
-        <span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">legacy</span><span class="o">=</span><span class="s2">&quot;1.13&quot;</span><span class="p">)</span>
+    <span class="c1">#if np.__version__ &gt;= &quot;1.14.0&quot;:</span>
+    <span class="c1">#   np.set_printoptions(legacy=&quot;1.13&quot;)</span>
 
     <span class="n">doctest</span><span class="o">.</span><span class="n">testmod</span><span class="p">()</span>
 </pre></div>

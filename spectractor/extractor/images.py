@@ -35,12 +35,20 @@ class Image(object):
 
         Examples
         --------
-        >>> im = Image('tests/data/reduc_20170605_028.fits')
-        >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
-        >>> assert im.data is not None and np.mean(im.data) > 0
-        >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
-        >>> assert im.header is not None
-        >>> assert im.gain is not None and np.mean(im.gain) > 0
+
+        .. doctest::
+
+            >>> im = Image('tests/data/reduc_20170605_028.fits')
+
+        .. doctest::
+            :hide:
+
+            >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
+            >>> assert im.data is not None and np.mean(im.data) > 0
+            >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
+            >>> assert im.header is not None
+            >>> assert im.gain is not None and np.mean(im.gain) > 0
+
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.file_name = file_name
@@ -132,7 +140,11 @@ class Image(object):
         600.0
         >>> data_before = np.copy(im.data)
         >>> im.convert_to_ADU_rate_units()
-        >>> assert np.all(np.isclose(data_before, im.data * im.expo))
+
+        .. doctest::
+            :hide:
+
+            >>> assert np.all(np.isclose(data_before, im.data * im.expo))
         """
         self.data = self.data.astype(np.float64) / self.expo
         self.stat_errors /= self.expo
@@ -152,7 +164,11 @@ class Image(object):
         >>> im.convert_to_ADU_rate_units()
         >>> data_after = np.copy(im.data)
         >>> im.convert_to_ADU_units()
-        >>> assert np.all(np.isclose(data_before, im.data))
+
+        .. doctest::
+            :hide:
+
+            >>> assert np.all(np.isclose(data_before, im.data))
         """
         self.data *= self.expo
         self.stat_errors *= self.expo
@@ -490,13 +506,22 @@ def find_target_1Dprofile(image, sub_image, guess):
 
     .. plot::
 
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from spectractor.extractor.images import Image
+        im = Image('tests/data/reduc_20170605_028.fits')
         im.plot_image(target_pixcoords=[820, 580])
 
     >>> parameters.DEBUG = True
     >>> sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False)
     >>> x1, y1 = find_target_1Dprofile(im, sub_image, guess)
-    >>> assert np.isclose(x1, np.argmax(np.nansum(sub_image, axis=0)), rtol=1e-2)
-    >>> assert np.isclose(y1, np.argmax(np.nansum(sub_image, axis=1)), rtol=1e-2)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(x1, np.argmax(np.nansum(sub_image, axis=0)), rtol=1e-2)
+        >>> assert np.isclose(y1, np.argmax(np.nansum(sub_image, axis=1)), rtol=1e-2)
+
     """
     NY, NX = sub_image.shape
     X = np.arange(NX)
@@ -571,6 +596,10 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
 
     .. plot::
 
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from spectractor.extractor.images import Image
+        im = Image('tests/data/reduc_20170605_028.fits')
         im.plot_image(target_pixcoords=[820, 580])
 
     >>> parameters.DEBUG = True
@@ -578,8 +607,13 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     >>> xmax = np.argmax(np.sum(sub_image, axis=0))
     >>> ymax = np.argmax(np.sum(sub_image, axis=1))
     >>> x1, y1 = find_target_2Dprofile(im, sub_image, guess)
-    >>> assert np.isclose(x1, xmax, rtol=1e-2)
-    >>> assert np.isclose(y1, ymax, rtol=1e-2)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(x1, xmax, rtol=1e-2)
+        >>> assert np.isclose(y1, ymax, rtol=1e-2)
+
     """
     # TODO: replace with minuit and test on image _133.fits or decrease mean_prior
     # fit and subtract smooth polynomial background
@@ -711,6 +745,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
             im.data[int(y(x)), x] = 10
             im.data[int(y(x))+1, x] = 10
         plt.imshow(im.data, origin='lower')
+        plt.show()
 
     >>> im.target_pixcoords=(N//2, N//2)
     >>> parameters.DEBUG = True
@@ -722,6 +757,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         :hide:
 
         >>> assert np.isclose(theta, np.arctan(slope)*180/np.pi, rtol=1e-2)
+
     """
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region

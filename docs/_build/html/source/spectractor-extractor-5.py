@@ -12,3 +12,4 @@ for x in np.arange(N):
 im.target_pixcoords=(N//2, N//2)
 turn_image(im)
 plt.imshow(im.data_rotated, origin='lower')
+plt.show()

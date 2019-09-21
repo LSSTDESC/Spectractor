@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../../../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../../../_static/jquery.js"></script>
         <script type="text/javascript" src="../../../_static/underscore.js"></script>
         <script type="text/javascript" src="../../../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
@@ -92,8 +83,11 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../source/modules.html">spectractor</a></li>
+</ul>
+
             
           
         </div>
@@ -155,9 +149,24 @@
            <div itemprop="articleBody">
             
   <h1>Source code for spectractor.extractor.spectrum</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="k">import</span> <span class="n">argrelextrema</span>
+<span></span><span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="k">import</span> <span class="n">argrelextrema</span><span class="p">,</span> <span class="n">savgol_filter</span>
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="k">import</span> <span class="n">interp1d</span>
+<span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="kn">from</span> <span class="nn">iminuit</span> <span class="k">import</span> <span class="n">Minuit</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">os</span>
 
-<span class="kn">from</span> <span class="nn">spectractor.extractor.images</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="kn">from</span> <span class="nn">spectractor.config</span> <span class="k">import</span> <span class="n">set_logger</span>
+<span class="kn">from</span> <span class="nn">spectractor.extractor.dispersers</span> <span class="k">import</span> <span class="n">Hologram</span>
+<span class="kn">from</span> <span class="nn">spectractor.extractor.targets</span> <span class="k">import</span> <span class="n">load_target</span>
+<span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="p">(</span><span class="n">ensure_dir</span><span class="p">,</span> <span class="n">load_fits</span><span class="p">,</span> <span class="n">extract_info_from_CTIO_header</span><span class="p">,</span> <span class="n">plot_image_simple</span><span class="p">,</span>
+                               <span class="n">find_nearest</span><span class="p">,</span> <span class="n">plot_spectrum_simple</span><span class="p">,</span> <span class="n">fit_poly1d_legendre</span><span class="p">,</span> <span class="n">gauss</span><span class="p">,</span>
+                               <span class="n">rescale_x_for_legendre</span><span class="p">,</span> <span class="n">fit_multigauss_and_bgd</span><span class="p">,</span> <span class="n">multigauss_and_bgd</span><span class="p">,</span>
+                               <span class="n">from_lambda_to_colormap</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">spectractor.extractor.psf</span> <span class="k">import</span> <span class="n">ChromaticPSF1D</span>
+<span class="kn">from</span> <span class="nn">spectractor.extractor.background</span> <span class="k">import</span> <span class="n">extract_background_photutils</span>
 
 
 <div class="viewcode-block" id="Spectrum"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.spectrum.Spectrum">[docs]</a><span class="k">class</span> <span class="nc">Spectrum</span><span class="p">:</span>
@@ -190,10 +199,11 @@
 <span class="sd">        HoloPhAg</span>
 
 <span class="sd">        Load a spectrum from a fits image file</span>
-<span class="sd">        &gt;&gt;&gt; image = Image(&#39;tests/data/reduc_20170605_028.fits&#39;, target=&#39;3C273&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; from spectractor.extractor.images import Image</span>
+<span class="sd">        &gt;&gt;&gt; image = Image(&#39;tests/data/reduc_20170605_028.fits&#39;, target=&#39;PNG321.0+3.9&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; s = Spectrum(image=image)</span>
 <span class="sd">        &gt;&gt;&gt; print(s.target.label)</span>
-<span class="sd">        3C273</span>
+<span class="sd">        PNG321.0+3.9</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="n">target</span>
@@ -212,6 +222,11 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">gain</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">CCD_GAIN</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">chromatic_psf</span> <span class="o">=</span> <span class="n">ChromaticPSF1D</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">deg</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">saturation</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">rotation_angle</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectrogram</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_bgd</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_err</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_residuals</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_fit</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="n">file_name</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">file_name</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">load_spectrum</span><span class="p">(</span><span class="n">file_name</span><span class="p">)</span>
@@ -406,7 +421,7 @@
 <span class="sd">        Examples</span>
 <span class="sd">        --------</span>
 <span class="sd">        &gt;&gt;&gt; import os</span>
-<span class="sd">        &gt;&gt;&gt; s = Spectrum(file_name=&#39;tests/data/reduc_20170605_028_spectrum.fits&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; s = Spectrum(file_name=&#39;tests/data/reduc_20170530_134_spectrum.fits&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; s.save_spectrum(&#39;./tests/test.fits&#39;)</span>
 <span class="sd">        &gt;&gt;&gt; assert os.path.isfile(&#39;./tests/test.fits&#39;)</span>
 
@@ -420,7 +435,18 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;COMMENTS&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;First column gives the wavelength in unit UNIT1, &#39;</span> \
                                   <span class="s1">&#39;second column gives the spectrum in unit UNIT2, &#39;</span> \
                                   <span class="s1">&#39;third column the corresponding errors.&#39;</span>
-        <span class="n">save_fits</span><span class="p">(</span><span class="n">output_file_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">header</span><span class="p">,</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lambdas</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">err</span><span class="p">],</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">)</span>
+        <span class="n">hdu1</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">PrimaryHDU</span><span class="p">()</span>
+        <span class="n">hdu2</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">ImageHDU</span><span class="p">()</span>
+        <span class="n">hdu3</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">ImageHDU</span><span class="p">()</span>
+        <span class="n">hdu1</span><span class="o">.</span><span class="n">header</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">header</span>
+        <span class="n">hdu1</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lambdas</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">err</span><span class="p">]</span>
+        <span class="n">hdu2</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_fit</span>
+        <span class="n">hdu3</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_residuals</span>
+        <span class="n">hdu</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">HDUList</span><span class="p">([</span><span class="n">hdu1</span><span class="p">,</span> <span class="n">hdu2</span><span class="p">,</span> <span class="n">hdu3</span><span class="p">])</span>
+        <span class="n">output_directory</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_file_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">ensure_dir</span><span class="p">(</span><span class="n">output_directory</span><span class="p">)</span>
+        <span class="n">hdu</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="n">output_file_name</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">)</span>
+        <span class="c1"># OLD: save_fits(output_file_name, self.header, [self.lambdas, self.data, self.err], overwrite=overwrite)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Spectrum saved in </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">output_file_name</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Spectrum.save_spectrogram"><a class="viewcode-back" href="../../../source/spectractor.extractor.html#spectractor.extractor.spectrum.Spectrum.save_spectrogram">[docs]</a>    <span class="k">def</span> <span class="nf">save_spectrogram</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_file_name</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
@@ -498,6 +524,10 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Spectrum loaded from </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">input_file_name</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">load_spectrogram</span><span class="p">(</span><span class="n">input_file_name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;spectrum&#39;</span><span class="p">,</span> <span class="s1">&#39;spectrogram&#39;</span><span class="p">))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">load_chromatic_psf</span><span class="p">(</span><span class="n">input_file_name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;spectrum.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;table.csv&#39;</span><span class="p">))</span>
+            <span class="n">hdu_list</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">input_file_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">hdu_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_fit</span> <span class="o">=</span> <span class="n">hdu_list</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">data</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_residuals</span> <span class="o">=</span> <span class="n">hdu_list</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">data</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Spectrum file </span><span class="si">%s</span><span class="s1"> not found&#39;</span> <span class="o">%</span> <span class="n">input_file_name</span><span class="p">)</span></div>
 
@@ -550,8 +580,9 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">input_file_name</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">chromatic_psf</span> <span class="o">=</span> <span class="n">ChromaticPSF1D</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_Nx</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_Ny</span><span class="p">,</span>
-                                                <span class="n">deg</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_deg</span><span class="p">,</span> <span class="n">saturation</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_saturation</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">chromatic_psf</span><span class="o">.</span><span class="n">table</span> <span class="o">=</span> <span class="n">Table</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">input_file_name</span><span class="p">)</span>
+                                                <span class="n">deg</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_deg</span><span class="p">,</span> <span class="n">saturation</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">spectrogram_saturation</span><span class="p">,</span>
+                                                <span class="n">file_name</span><span class="o">=</span><span class="n">input_file_name</span><span class="p">)</span>
+            <span class="c1"># self.chromatic_psf.table = Table.read(input_file_name)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Spectrogram loaded from </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">input_file_name</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">my_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Spectrogram file </span><span class="si">%s</span><span class="s1"> not found&#39;</span> <span class="o">%</span> <span class="n">input_file_name</span><span class="p">)</span></div></div>
@@ -633,12 +664,14 @@
 
 <span class="sd">    Creation of a mock spectrum with emission and absorption lines</span>
 <span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; from spectractor.extractor.spectroscopy import Lines, HALPHA, HBETA, O2</span>
 <span class="sd">    &gt;&gt;&gt; lambdas = np.arange(300,1000,1)</span>
 <span class="sd">    &gt;&gt;&gt; spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)</span>
 <span class="sd">    &gt;&gt;&gt; spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)</span>
 <span class="sd">    &gt;&gt;&gt; spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)</span>
 <span class="sd">    &gt;&gt;&gt; spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)</span>
 <span class="sd">    &gt;&gt;&gt; spectrum_err = np.sqrt(spectrum)</span>
+<span class="sd">    &gt;&gt;&gt; spectrum = np.random.poisson(spectrum)</span>
 <span class="sd">    &gt;&gt;&gt; spec = Spectrum()</span>
 <span class="sd">    &gt;&gt;&gt; spec.lambdas = lambdas</span>
 <span class="sd">    &gt;&gt;&gt; spec.data = spectrum</span>
@@ -649,9 +682,10 @@
 <span class="sd">    &gt;&gt;&gt; lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,</span>
 <span class="sd">    ... atmospheric_lines=True, redshift=0, emission_spectrum=True)</span>
 <span class="sd">    &gt;&gt;&gt; global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)</span>
-<span class="sd">    &gt;&gt;&gt; assert(global_chisq &lt; 1)</span>
+<span class="sd">    &gt;&gt;&gt; assert(global_chisq &lt; 2)</span>
 
 <span class="sd">    Plot the result</span>
+<span class="sd">    &gt;&gt;&gt; import matplotlib.pyplot as plt</span>
 <span class="sd">    &gt;&gt;&gt; spec.lines = lines</span>
 <span class="sd">    &gt;&gt;&gt; fig = plt.figure()</span>
 <span class="sd">    &gt;&gt;&gt; plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)</span>
@@ -670,6 +704,12 @@
     <span class="n">fwhm_to_peak_width_factor</span> <span class="o">=</span> <span class="mi">3</span>
     <span class="n">len_index_to_bgd_npar_factor</span> <span class="o">=</span> <span class="mf">0.12</span>
     <span class="n">baseline_prior</span> <span class="o">=</span> <span class="mf">0.1</span>  <span class="c1"># *sigma gaussian prior on base line fit</span>
+    <span class="c1"># filter the noise</span>
+    <span class="c1"># plt.errorbar(lambdas,spec,yerr=spec_err)</span>
+    <span class="n">spec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+    <span class="n">spec</span> <span class="o">=</span> <span class="n">savgol_filter</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="c1"># plt.plot(lambdas,spec)</span>
+    <span class="c1"># plt.show()</span>
     <span class="c1"># initialisation</span>
     <span class="n">lambda_shifts</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">snrs</span> <span class="o">=</span> <span class="p">[]</span>
@@ -764,6 +804,7 @@
         <span class="n">guess</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">bgd_npar</span> <span class="o">+</span> <span class="p">[</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="n">index</span><span class="p">]),</span> <span class="n">line_wavelength</span><span class="p">,</span>
                                   <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">width_bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">line</span><span class="o">.</span><span class="n">width_bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
         <span class="k">if</span> <span class="n">line_strategy</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">less</span><span class="p">:</span>
+            <span class="c1"># noinspection PyTypeChecker</span>
             <span class="n">guess</span><span class="p">[</span><span class="n">bgd_npar</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>  <span class="c1"># look for abosrption under bgd</span>
         <span class="c1"># bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), lambdas[index_inf], line.width_bounds[0]],</span>
         <span class="c1">#          [np.inf] * bgd_npar + [abs(np.max(spec[index])), lambdas[index_sup], line.width_bounds[1]]]</span>
@@ -885,7 +926,7 @@
             <span class="c1"># guess[n] = getattr(bgd, bgd.param_names[parameters.CALIB_BGD_ORDER - n]).value</span>
             <span class="n">guess</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">=</span> <span class="n">fit</span><span class="p">[</span><span class="n">n</span><span class="p">]</span>
             <span class="n">b</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">baseline_prior</span> <span class="o">*</span> <span class="n">guess</span><span class="p">[</span><span class="n">n</span><span class="p">])</span>
-            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-2</span><span class="o">*</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="n">bgd_index</span><span class="p">]))):</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-2</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="n">bgd_index</span><span class="p">]))):</span>
                 <span class="n">b</span> <span class="o">=</span> <span class="n">baseline_prior</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="n">bgd_index</span><span class="p">])</span>
                 <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-2</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="n">bgd_index</span><span class="p">]))):</span>
                     <span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
@@ -998,6 +1039,7 @@
     <span class="k">if</span> <span class="n">x0</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">x0</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">target_pixcoords</span>
         <span class="n">spectrum</span><span class="o">.</span><span class="n">x0</span> <span class="o">=</span> <span class="n">x0</span>
+    <span class="c1"># MFL notes: the logic with D seems confused here</span>
     <span class="n">D</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISTANCE2CCD</span>
     <span class="k">if</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;D2CCD&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
         <span class="n">D</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s1">&#39;D2CCD&#39;</span><span class="p">]</span>
@@ -1019,8 +1061,9 @@
                              <span class="n">fwhm_func</span><span class="o">=</span><span class="n">fwhm_func</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
         <span class="n">chisq</span> <span class="o">+=</span> <span class="p">(</span><span class="n">shift</span> <span class="o">*</span> <span class="n">shift</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">PIXSHIFT_PRIOR</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
         <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span> <span class="ow">and</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
-            <span class="n">spectrum</span><span class="o">.</span><span class="n">lambdas</span> <span class="o">=</span> <span class="n">lambdas_test</span>
-            <span class="n">spectrum</span><span class="o">.</span><span class="n">plot_spectrum</span><span class="p">(</span><span class="n">live_fit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">f</span><span class="s1">&#39;Order </span><span class="si">{spectrum.order:d}</span><span class="s1"> spectrum&#39;</span>
+            <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LIVE_FIT</span><span class="p">:</span>
+                <span class="n">spectrum</span><span class="o">.</span><span class="n">lambdas</span> <span class="o">=</span> <span class="n">lambdas_test</span>
+                <span class="n">spectrum</span><span class="o">.</span><span class="n">plot_spectrum</span><span class="p">(</span><span class="n">live_fit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">f</span><span class="s1">&#39;Order </span><span class="si">{spectrum.order:d}</span><span class="s1"> spectrum&#39;</span>
                                                         <span class="n">f</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">D=</span><span class="si">{D:.2f}</span><span class="s1">mm, shift=</span><span class="si">{shift:.2f}</span><span class="s1">pix&#39;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">chisq</span>
 
@@ -1136,8 +1179,8 @@
     <span class="n">ymax</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">Ny</span><span class="p">,</span> <span class="n">y0</span> <span class="o">+</span> <span class="n">ws</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
     <span class="n">ymin</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">y0</span> <span class="o">-</span> <span class="n">ws</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
 
-    <span class="c1"># Roughly estimates the wavelengths and set start 50 nm before parameters.LAMBDA_MIN</span>
-    <span class="c1"># and end 50 nm after parameters.LAMBDA_MAX</span>
+    <span class="c1"># Roughly estimates the wavelengths and set start 0 nm before parameters.LAMBDA_MIN</span>
+    <span class="c1"># and end 0 nm after parameters.LAMBDA_MAX</span>
     <span class="n">lambdas</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">disperser</span><span class="o">.</span><span class="n">grating_pixel_to_lambda</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">Nx</span><span class="p">)</span> <span class="o">-</span> <span class="n">image</span><span class="o">.</span><span class="n">target_pixcoords_rotated</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
                                                       <span class="n">x0</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">target_pixcoords</span><span class="p">)</span>
     <span class="n">pixel_start</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">lambdas</span> <span class="o">-</span> <span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">-</span> <span class="mi">0</span><span class="p">))))</span>
@@ -1152,10 +1195,15 @@
     <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
         <span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Extract spectrogram: crop rotated image [</span><span class="si">{pixel_start}</span><span class="s1">:</span><span class="si">{pixel_end}</span><span class="s1">,</span><span class="si">{ymin}</span><span class="s1">:</span><span class="si">{ymax}</span><span class="s1">] (size (</span><span class="si">{Nx}</span><span class="s1">, </span><span class="si">{Ny}</span><span class="s1">))&#39;</span><span class="p">)</span>
 
+    <span class="c1"># Extract the background on the rotated image</span>
+    <span class="n">bgd_model_func</span> <span class="o">=</span> <span class="n">extract_background_photutils</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">err</span><span class="p">,</span> <span class="n">ws</span><span class="o">=</span><span class="n">ws</span><span class="p">)</span>
+    <span class="c1"># bgd_model_func = extract_background_poly2D(data, ws=ws)</span>
+
     <span class="c1"># Fit the transverse profile</span>
     <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Start PSF1D transverse fit...&#39;</span><span class="p">)</span>
-    <span class="n">s</span><span class="p">,</span> <span class="n">bgd_model_func</span> <span class="o">=</span> <span class="n">fit_transverse_PSF1D_profile</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">err</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">ws</span><span class="p">,</span> <span class="n">pixel_step</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">deg</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-                                                     <span class="n">saturation</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">saturation</span><span class="p">,</span> <span class="n">live_fit</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">ChromaticPSF1D</span><span class="p">(</span><span class="n">Nx</span><span class="o">=</span><span class="n">Nx</span><span class="p">,</span> <span class="n">Ny</span><span class="o">=</span><span class="n">Ny</span><span class="p">,</span> <span class="n">deg</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">PSF_POLY_ORDER</span><span class="p">,</span> <span class="n">saturation</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">saturation</span><span class="p">)</span>
+    <span class="n">s</span><span class="o">.</span><span class="n">fit_transverse_PSF1D_profile</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">err</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">ws</span><span class="p">,</span> <span class="n">pixel_step</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">bgd_model_func</span><span class="o">=</span><span class="n">bgd_model_func</span><span class="p">,</span>
+                                   <span class="n">saturation</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">saturation</span><span class="p">,</span> <span class="n">live_fit</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
     <span class="c1"># Fill spectrum object</span>
     <span class="n">spectrum</span><span class="o">.</span><span class="n">pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">pixel_start</span><span class="p">,</span> <span class="n">pixel_end</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
@@ -1167,7 +1215,10 @@
 
     <span class="c1"># Fit the data:</span>
     <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Start ChromaticPSF1D polynomial fit...&#39;</span><span class="p">)</span>
-    <span class="n">s</span> <span class="o">=</span> <span class="n">fit_chromatic_PSF1D</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">bgd_model_func</span><span class="o">=</span><span class="n">bgd_model_func</span><span class="p">,</span> <span class="n">data_errors</span><span class="o">=</span><span class="n">err</span><span class="p">)</span>
+    <span class="n">s</span><span class="o">.</span><span class="n">fit_chromatic_PSF1D</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">bgd_model_func</span><span class="o">=</span><span class="n">bgd_model_func</span><span class="p">,</span> <span class="n">data_errors</span><span class="o">=</span><span class="n">err</span><span class="p">)</span>
+    <span class="n">spectrum</span><span class="o">.</span><span class="n">spectrogram_fit</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">poly_params</span><span class="p">)</span>
+    <span class="n">spectrum</span><span class="o">.</span><span class="n">spectrogram_residuals</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span> <span class="o">-</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">spectrogram_fit</span> <span class="o">-</span> <span class="n">bgd_model_func</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">Nx</span><span class="p">),</span>
+                                                                                       <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">Ny</span><span class="p">)))</span> <span class="o">/</span> <span class="n">err</span>
     <span class="n">spectrum</span><span class="o">.</span><span class="n">chromatic_psf</span> <span class="o">=</span> <span class="n">s</span>
     <span class="n">spectrum</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">table</span><span class="p">[</span><span class="s1">&#39;flux_integral&#39;</span><span class="p">])</span>
     <span class="n">s</span><span class="o">.</span><span class="n">table</span><span class="p">[</span><span class="s1">&#39;Dx_rot&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">pixels</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span> <span class="o">-</span> <span class="n">image</span><span class="o">.</span><span class="n">target_pixcoords_rotated</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -1199,7 +1250,6 @@
     <span class="k">if</span> <span class="p">(</span><span class="n">xmax</span> <span class="o">-</span> <span class="n">xmin</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># spectrogram must have odd size in x for the fourier simulation</span>
         <span class="n">xmax</span> <span class="o">-=</span> <span class="mi">1</span>
         <span class="n">s</span><span class="o">.</span><span class="n">table</span><span class="o">.</span><span class="n">remove_row</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
-
     <span class="c1"># Position of the order 0 in the spectrogram coordinates</span>
     <span class="n">target_pixcoords_spectrogram</span> <span class="o">=</span> <span class="p">[</span><span class="n">image</span><span class="o">.</span><span class="n">target_pixcoords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">xmin</span><span class="p">,</span> <span class="n">image</span><span class="o">.</span><span class="n">target_pixcoords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">ymin</span><span class="p">]</span>
 
@@ -1207,21 +1257,32 @@
     <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">ymin</span><span class="p">:</span><span class="n">ymax</span><span class="p">,</span> <span class="n">xmin</span><span class="p">:</span><span class="n">xmax</span><span class="p">]</span>
     <span class="n">err</span> <span class="o">=</span> <span class="n">err</span><span class="p">[</span><span class="n">ymin</span><span class="p">:</span><span class="n">ymax</span><span class="p">,</span> <span class="n">xmin</span><span class="p">:</span><span class="n">xmax</span><span class="p">]</span>
     <span class="n">Ny</span><span class="p">,</span> <span class="n">Nx</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span>
+
     <span class="c1"># Extract the non rotated background</span>
-    <span class="n">bgd_model_func</span> <span class="o">=</span> <span class="n">extract_background</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">err</span><span class="p">,</span> <span class="n">deg</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">BGD_ORDER</span><span class="p">,</span> <span class="n">ws</span><span class="o">=</span><span class="n">ws</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">live_fit</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">bgd_model_func</span> <span class="o">=</span> <span class="n">extract_background_photutils</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">err</span><span class="p">,</span> <span class="n">ws</span><span class="o">=</span><span class="n">ws</span><span class="p">)</span>
     <span class="n">bgd</span> <span class="o">=</span> <span class="n">bgd_model_func</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">Nx</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">Ny</span><span class="p">))</span>
 
     <span class="c1"># Crop the background lateral regions</span>
-    <span class="n">bgd_width</span> <span class="o">=</span> <span class="n">ws</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">w</span>
-    <span class="n">yeven</span> <span class="o">=</span> <span class="mi">0</span>
-    <span class="k">if</span> <span class="p">(</span><span class="n">Ny</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">bgd_width</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># spectrogram must have odd size in y for the fourier simulation</span>
-        <span class="n">yeven</span> <span class="o">=</span> <span class="mi">1</span>
-    <span class="n">ymax</span> <span class="o">=</span> <span class="n">ymax</span> <span class="o">-</span> <span class="n">bgd_width</span> <span class="o">+</span> <span class="n">yeven</span>
-    <span class="n">ymin</span> <span class="o">+=</span> <span class="n">bgd_width</span>
-    <span class="n">bgd</span> <span class="o">=</span> <span class="n">bgd</span><span class="p">[</span><span class="n">bgd_width</span><span class="p">:</span><span class="o">-</span><span class="n">bgd_width</span> <span class="o">+</span> <span class="n">yeven</span><span class="p">,</span> <span class="p">:]</span>
-    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">bgd_width</span><span class="p">:</span><span class="o">-</span><span class="n">bgd_width</span> <span class="o">+</span> <span class="n">yeven</span><span class="p">,</span> <span class="p">:]</span>
-    <span class="n">err</span> <span class="o">=</span> <span class="n">err</span><span class="p">[</span><span class="n">bgd_width</span><span class="p">:</span><span class="o">-</span><span class="n">bgd_width</span> <span class="o">+</span> <span class="n">yeven</span><span class="p">,</span> <span class="p">:]</span>
-    <span class="n">Ny</span><span class="p">,</span> <span class="n">Nx</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span>
+    <span class="c1"># bgd_width = ws[1] - w</span>
+    <span class="c1"># yeven = 0</span>
+    <span class="c1"># if (Ny - 2 * bgd_width) % 2 == 0:  # spectrogram must have odd size in y for the fourier simulation</span>
+    <span class="c1">#     yeven = 1</span>
+    <span class="c1"># ymax = ymax - bgd_width + yeven</span>
+    <span class="c1"># ymin += bgd_width</span>
+    <span class="c1"># bgd = bgd[bgd_width:-bgd_width + yeven, :]</span>
+    <span class="c1"># data = data[bgd_width:-bgd_width + yeven, :]</span>
+    <span class="c1"># err = err[bgd_width:-bgd_width + yeven, :]</span>
+    <span class="c1"># Ny, Nx = data.shape</span>
+    <span class="c1"># target_pixcoords_spectrogram[1] -= bgd_width</span>
+
+    <span class="c1"># Spectrogram must have odd size in y for the fourier simulation</span>
+    <span class="k">if</span> <span class="n">Ny</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">ymax</span> <span class="o">=</span> <span class="n">ymax</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">bgd</span> <span class="o">=</span> <span class="n">bgd</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">err</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">Ny</span><span class="p">,</span> <span class="n">Nx</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span>
+
     <span class="c1"># First guess for lambdas</span>
     <span class="n">first_guess_lambdas</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">disperser</span><span class="o">.</span><span class="n">grating_pixel_to_lambda</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">get_distance_along_dispersion_axis</span><span class="p">(),</span>
                                                                   <span class="n">x0</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">target_pixcoords</span><span class="p">)</span>
@@ -1230,7 +1291,6 @@
     <span class="n">my_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;</span><span class="se">\n\t</span><span class="s2">Transverse fit table after derotation:</span><span class="se">\n</span><span class="s2">{s.table[[&#39;lambdas&#39;, &#39;Dx_rot&#39;, &#39;Dx&#39;]]}&quot;</span><span class="p">)</span>
 
     <span class="c1"># Position of the order 0 in the spectrogram coordinates</span>
-    <span class="n">target_pixcoords_spectrogram</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="n">bgd_width</span>
     <span class="n">my_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">Extract spectrogram: crop image [</span><span class="si">{xmin}</span><span class="s1">:</span><span class="si">{xmax}</span><span class="s1">,</span><span class="si">{ymin}</span><span class="s1">:</span><span class="si">{ymax}</span><span class="s1">] (size (</span><span class="si">{Nx}</span><span class="s1">, </span><span class="si">{Ny}</span><span class="s1">))&#39;</span>
                    <span class="n">f</span><span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">New target position in spectrogram frame: </span><span class="si">{target_pixcoords_spectrogram}</span><span class="s1">&#39;</span><span class="p">)</span>
 
@@ -1248,9 +1308,8 @@
     <span class="n">spectrum</span><span class="o">.</span><span class="n">spectrogram_saturation</span> <span class="o">=</span> <span class="n">spectrum</span><span class="o">.</span><span class="n">chromatic_psf</span><span class="o">.</span><span class="n">saturation</span>
 
     <span class="c1"># Summary plot</span>
-    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DEBUG</span> <span class="ow">or</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">:</span>
         <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">sharex</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">Nx</span><span class="p">)</span>
         <span class="n">xx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">table</span><span class="p">[</span><span class="s1">&#39;Dx_rot&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
         <span class="n">plot_image_simple</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">units</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span><span class="p">)</span>
         <span class="n">ax</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">target_pixcoords_spectrogram</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">s</span><span class="o">.</span><span class="n">table</span><span class="p">[</span><span class="s1">&#39;Dy_mean&#39;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Dispersion axis&#39;</span><span class="p">)</span>
@@ -1282,11 +1341,14 @@
         <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">([</span><span class="n">pos2</span><span class="o">.</span><span class="n">x0</span><span class="p">,</span> <span class="n">pos1</span><span class="o">.</span><span class="n">y0</span><span class="p">,</span> <span class="n">pos2</span><span class="o">.</span><span class="n">width</span><span class="p">,</span> <span class="n">pos1</span><span class="o">.</span><span class="n">height</span><span class="p">])</span>
         <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">:</span>
+            <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">LSST_SAVEFIGPATH</span><span class="p">,</span> <span class="s1">&#39;spectrum.pdf&#39;</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">spectrum</span></div>
 
 
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
     <span class="kn">import</span> <span class="nn">doctest</span>
+
     <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">__version__</span> <span class="o">&gt;=</span> <span class="s2">&quot;1.14.0&quot;</span><span class="p">:</span>
         <span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">legacy</span><span class="o">=</span><span class="s2">&quot;1.13&quot;</span><span class="p">)</span>
 

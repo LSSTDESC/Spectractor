@@ -20,21 +20,12 @@
   <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'../../../',
-              VERSION:'1.1',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
         <script type="text/javascript" src="../../../_static/jquery.js"></script>
         <script type="text/javascript" src="../../../_static/underscore.js"></script>
         <script type="text/javascript" src="../../../_static/doctools.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
@@ -92,8 +83,11 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"></div>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../source/modules.html">spectractor</a></li>
+</ul>
+
             
           
         </div>
@@ -155,8 +149,14 @@
            <div itemprop="articleBody">
             
   <h1>Source code for spectractor.extractor.extractor</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">spectractor.extractor.spectrum</span> <span class="k">import</span> <span class="o">*</span>
+<span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
 <span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="kn">from</span> <span class="nn">spectractor.config</span> <span class="k">import</span> <span class="n">set_logger</span><span class="p">,</span> <span class="n">load_config</span>
+<span class="kn">from</span> <span class="nn">spectractor.extractor.images</span> <span class="k">import</span> <span class="n">Image</span><span class="p">,</span> <span class="n">find_target</span><span class="p">,</span> <span class="n">turn_image</span>
+<span class="kn">from</span> <span class="nn">spectractor.extractor.spectrum</span> <span class="k">import</span> <span class="p">(</span><span class="n">Spectrum</span><span class="p">,</span> <span class="n">extract_spectrum_from_image</span><span class="p">,</span> <span class="n">calibrate_spectrum</span><span class="p">,</span>
+                                            <span class="n">calibrate_spectrum_with_lines</span><span class="p">)</span>
 <span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="n">ensure_dir</span>
 
 
@@ -192,19 +192,28 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
+
 <span class="sd">    Extract the spectrogram and its characteristics from the image:</span>
-<span class="sd">    &gt;&gt;&gt; import os</span>
-<span class="sd">    &gt;&gt;&gt; from spectractor.logbook import LogBook</span>
-<span class="sd">    &gt;&gt;&gt; logbook = LogBook(logbook=&#39;./ctiofulllogbook_jun2017_v5.csv&#39;)</span>
-<span class="sd">    &gt;&gt;&gt; file_names = [&#39;./tests/data/reduc_20170605_028.fits&#39;]</span>
-<span class="sd">    &gt;&gt;&gt; for file_name in file_names:</span>
-<span class="sd">    ...     tag = file_name.split(&#39;/&#39;)[-1]</span>
-<span class="sd">    ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)</span>
-<span class="sd">    ...     if target is None or xpos is None or ypos is None:</span>
-<span class="sd">    ...         continue</span>
-<span class="sd">    ...     spectrum = Spectractor(file_name, &#39;./tests/data/&#39;, [xpos, ypos], target, disperser_label, &#39;./config/ctio.ini&#39;)</span>
-<span class="sd">    ...     assert spectrum is not None</span>
-<span class="sd">    ...     assert os.path.isfile(&#39;tests/data/reduc_20170605_028_spectrum.fits&#39;)</span>
+
+<span class="sd">    .. doctest::</span>
+
+<span class="sd">        &gt;&gt;&gt; import os</span>
+<span class="sd">        &gt;&gt;&gt; from spectractor.logbook import LogBook</span>
+<span class="sd">        &gt;&gt;&gt; logbook = LogBook(logbook=&#39;./ctiofulllogbook_jun2017_v5.csv&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; file_names = [&#39;./tests/data/reduc_20170530_134.fits&#39;]</span>
+<span class="sd">        &gt;&gt;&gt; for file_name in file_names:</span>
+<span class="sd">        ...     tag = file_name.split(&#39;/&#39;)[-1]</span>
+<span class="sd">        ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)</span>
+<span class="sd">        ...     if target is None or xpos is None or ypos is None:</span>
+<span class="sd">        ...         continue</span>
+<span class="sd">        ...     spectrum = Spectractor(file_name, &#39;./tests/data/&#39;, [xpos, ypos], target, disperser_label, &#39;./config/ctio.ini&#39;)</span>
+
+<span class="sd">    .. doctest::</span>
+<span class="sd">        :hide:</span>
+
+<span class="sd">        &gt;&gt;&gt; assert spectrum is not None</span>
+<span class="sd">        &gt;&gt;&gt; assert os.path.isfile(&#39;tests/data/educ_20170530_134_spectrum.fits&#39;)</span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">my_logger</span> <span class="o">=</span> <span class="n">set_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>

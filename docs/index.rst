@@ -7,19 +7,15 @@ Welcome to Spectractor's documentation!
 =======================================
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 4
     :caption: Contents:
 
-    spectractor
-    source/spectractor.extractor
-    source/spectractor.simulation
-    source/spectractor.fit
-    ../README
+    source/modules
 
 Readme File
 ===========
 
-.. include:: ../README.md
+.. mdinclude:: ../README.md
 
 Indices and tables
 ==================
