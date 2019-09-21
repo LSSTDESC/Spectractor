@@ -303,21 +303,28 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
 
     Examples
     --------
-    >>> fig = plt.figure()
-    >>> ax = plt.gca()
-    >>> t = Throughput()
-    >>> parameters.LAMBDA_MIN = 500
-    >>> lambdas, transmissions, errors = t.load_quantum_efficiency()
-    >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Quantum efficiency")
-    >>> lambdas, transmissions, errors = t.load_mirror_reflectivity()
-    >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Mirror 1")
-    >>> lambdas, transmissions, errors = t.load_FGB37()
-    >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="FGB37")
-    >>> lambdas, transmissions, errors = t.load_RG715()
-    >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="RG715")
-    >>> lambdas, transmissions, errors = t.load_telescope_throughput()
-    >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Telescope")
-    >>> if parameters.DISPLAY: plt.show()
+
+    .. plot::
+        :include-source:
+
+        >>> from spectractor.simulation.throughput import Throughput
+        >>> from spectractor.simulation.atmosphere import plot_transmission_simple
+        >>> from spectractor import parameters
+        >>> fig = plt.figure()
+        >>> ax = plt.gca()
+        >>> t = Throughput()
+        >>> parameters.LAMBDA_MIN = 500
+        >>> lambdas, transmissions, errors = t.load_quantum_efficiency()
+        >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Quantum efficiency")
+        >>> lambdas, transmissions, errors = t.load_mirror_reflectivity()
+        >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Mirror 1")
+        >>> lambdas, transmissions, errors = t.load_FGB37()
+        >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="FGB37")
+        >>> lambdas, transmissions, errors = t.load_RG715()
+        >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="RG715")
+        >>> lambdas, transmissions, errors = t.load_telescope_throughput()
+        >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Telescope")
+        >>> if parameters.DISPLAY: plt.show()
     """
     if uncertainties is None or np.all(np.isclose(uncertainties, np.zeros_like(transmissions))):
         ax.plot(lambdas, transmissions, "-", label=label, lw=lw)

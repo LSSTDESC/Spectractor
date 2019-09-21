@@ -454,21 +454,28 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
-<span class="sd">    &gt;&gt;&gt; fig = plt.figure()</span>
-<span class="sd">    &gt;&gt;&gt; ax = plt.gca()</span>
-<span class="sd">    &gt;&gt;&gt; t = Throughput()</span>
-<span class="sd">    &gt;&gt;&gt; parameters.LAMBDA_MIN = 500</span>
-<span class="sd">    &gt;&gt;&gt; lambdas, transmissions, errors = t.load_quantum_efficiency()</span>
-<span class="sd">    &gt;&gt;&gt; plot_transmission_simple(ax, lambdas, transmissions, errors, title=&quot;CTIO&quot;, label=&quot;Quantum efficiency&quot;)</span>
-<span class="sd">    &gt;&gt;&gt; lambdas, transmissions, errors = t.load_mirror_reflectivity()</span>
-<span class="sd">    &gt;&gt;&gt; plot_transmission_simple(ax, lambdas, transmissions, errors, title=&quot;CTIO&quot;, label=&quot;Mirror 1&quot;)</span>
-<span class="sd">    &gt;&gt;&gt; lambdas, transmissions, errors = t.load_FGB37()</span>
-<span class="sd">    &gt;&gt;&gt; plot_transmission_simple(ax, lambdas, transmissions, errors, title=&quot;CTIO&quot;, label=&quot;FGB37&quot;)</span>
-<span class="sd">    &gt;&gt;&gt; lambdas, transmissions, errors = t.load_RG715()</span>
-<span class="sd">    &gt;&gt;&gt; plot_transmission_simple(ax, lambdas, transmissions, errors, title=&quot;CTIO&quot;, label=&quot;RG715&quot;)</span>
-<span class="sd">    &gt;&gt;&gt; lambdas, transmissions, errors = t.load_telescope_throughput()</span>
-<span class="sd">    &gt;&gt;&gt; plot_transmission_simple(ax, lambdas, transmissions, errors, title=&quot;CTIO&quot;, label=&quot;Telescope&quot;)</span>
-<span class="sd">    &gt;&gt;&gt; if parameters.DISPLAY: plt.show()</span>
+
+<span class="sd">    .. plot::</span>
+<span class="sd">        :include-source:</span>
+
+<span class="sd">        &gt;&gt;&gt; from spectractor.simulation.throughput import Throughput</span>
+<span class="sd">        &gt;&gt;&gt; from spectractor.simulation.atmosphere import plot_transmission_simple</span>
+<span class="sd">        &gt;&gt;&gt; from spectractor import parameters</span>
+<span class="sd">        &gt;&gt;&gt; fig = plt.figure()</span>
+<span class="sd">        &gt;&gt;&gt; ax = plt.gca()</span>
+<span class="sd">        &gt;&gt;&gt; t = Throughput()</span>
+<span class="sd">        &gt;&gt;&gt; parameters.LAMBDA_MIN = 500</span>
+<span class="sd">        &gt;&gt;&gt; lambdas, transmissions, errors = t.load_quantum_efficiency()</span>
+<span class="sd">        &gt;&gt;&gt; plot_transmission_simple(ax, lambdas, transmissions, errors, title=&quot;CTIO&quot;, label=&quot;Quantum efficiency&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; lambdas, transmissions, errors = t.load_mirror_reflectivity()</span>
+<span class="sd">        &gt;&gt;&gt; plot_transmission_simple(ax, lambdas, transmissions, errors, title=&quot;CTIO&quot;, label=&quot;Mirror 1&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; lambdas, transmissions, errors = t.load_FGB37()</span>
+<span class="sd">        &gt;&gt;&gt; plot_transmission_simple(ax, lambdas, transmissions, errors, title=&quot;CTIO&quot;, label=&quot;FGB37&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; lambdas, transmissions, errors = t.load_RG715()</span>
+<span class="sd">        &gt;&gt;&gt; plot_transmission_simple(ax, lambdas, transmissions, errors, title=&quot;CTIO&quot;, label=&quot;RG715&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; lambdas, transmissions, errors = t.load_telescope_throughput()</span>
+<span class="sd">        &gt;&gt;&gt; plot_transmission_simple(ax, lambdas, transmissions, errors, title=&quot;CTIO&quot;, label=&quot;Telescope&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; if parameters.DISPLAY: plt.show()</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">uncertainties</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">uncertainties</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">transmissions</span><span class="p">))):</span>
         <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">lambdas</span><span class="p">,</span> <span class="n">transmissions</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="n">lw</span><span class="p">)</span>
