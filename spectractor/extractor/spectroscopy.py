@@ -324,7 +324,7 @@ class Lines:
         ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
         >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
 
-        ..  doctest::
+        .. doctest::
             :hide:
 
             >>> assert(global_chisq < 1)
@@ -336,7 +336,6 @@ class Lines:
         >>> plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
         >>> lines.plot_detected_lines(plt.gca())
         >>> plt.show()
-
 
         .. plot::
 
