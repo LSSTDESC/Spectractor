@@ -46,10 +46,9 @@ class LogBook:
         """
         Look for an image file name in the logbook and load_image properties:
 
-            * Obj-posXpix and Obj-posYpix: the [x0,y0] guessed pixel position in the image
-            * Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables
-            in parameters.py
-            * object: the name of the target
+        - Obj-posXpix and Obj-posYpix: the [x0,y0] guessed pixel position in the image
+        - Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables in parameters.py
+        - object: the name of the target
 
 
         Parameters

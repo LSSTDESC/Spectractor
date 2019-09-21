@@ -10,7 +10,6 @@ Welcome to Spectractor's documentation!
     :maxdepth: 4
     :caption: Contents:
 
-    source/spectractor.extractor
     source/modules
 
 Readme File

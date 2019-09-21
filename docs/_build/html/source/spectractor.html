@@ -281,14 +281,11 @@
 <dt id="spectractor.logbook.LogBook.search_for_image">
 <code class="sig-name descname">search_for_image</code><span class="sig-paren">(</span><em class="sig-param">filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/logbook.html#LogBook.search_for_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.logbook.LogBook.search_for_image" title="Permalink to this definition">¶</a></dt>
 <dd><p>Look for an image file name in the logbook and load_image properties:</p>
-<blockquote>
-<div><ul class="simple">
+<ul class="simple">
 <li><p>Obj-posXpix and Obj-posYpix: the [x0,y0] guessed pixel position in the image</p></li>
-<li><p>Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables</p></li>
+<li><p>Dx and Dy: the x and y windows in pixel to search for the target; set XWINDOW and YWINDOW variables in parameters.py</p></li>
+<li><p>object: the name of the target</p></li>
 </ul>
-<p>in parameters.py
-* object: the name of the target</p>
-</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – the fits image file name (not the path, only the file name.)</p>
@@ -381,25 +378,31 @@ using an interpolation of the data points and dichotomie method.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<p># Gaussian example
-&gt;&gt;&gt; x = np.arange(0, 100, 1)
-&gt;&gt;&gt; stddev = 4
-&gt;&gt;&gt; middle = 40
-&gt;&gt;&gt; psf = gauss(x, 1, middle, stddev)
-&gt;&gt;&gt; fwhm, half, center, a, b = compute_fwhm(x, psf, full_output=True)
-&gt;&gt;&gt; print(f”{fwhm:.4f} {2.355*stddev:.4f} {center:.4f}”)
-9.4192 9.4200 40.0000
-&gt;&gt;&gt; assert np.isclose(fwhm, 2.355*stddev, atol=1e-3)
-&gt;&gt;&gt; assert np.isclose(center, middle, atol=1e-3)</p>
+<p>Gaussian example</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">stddev</span> <span class="o">=</span> <span class="mi">4</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">middle</span> <span class="o">=</span> <span class="mi">40</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">psf</span> <span class="o">=</span> <span class="n">gauss</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">middle</span><span class="p">,</span> <span class="n">stddev</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fwhm</span><span class="p">,</span> <span class="n">half</span><span class="p">,</span> <span class="n">center</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">compute_fwhm</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">psf</span><span class="p">,</span> <span class="n">full_output</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;</span><span class="si">{fwhm:.4f}</span><span class="s2"> {2.355*stddev:.4f} </span><span class="si">{center:.4f}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="go">9.4192 9.4200 40.0000</span>
+</pre></div>
+</div>
 <p>(<a class="reference external" href="../source/spectractor-1.py">Source code</a>)</p>
-<p># Defocused PSF example
-&gt;&gt;&gt; from spectractor.extractor.psf import PSF1D
-&gt;&gt;&gt; p = [2,40,4,2,-0.4,1,10]
-&gt;&gt;&gt; psf = PSF1D(p)
-&gt;&gt;&gt; fwhm, half, center, a, b = compute_fwhm(x, psf.evaluate(x), full_output=True)
-&gt;&gt;&gt; assert np.isclose(fwhm, 6.96, atol=1e-2)
-&gt;&gt;&gt; assert np.isclose(center, p[1], atol=1e-2)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-1.png" src="../_images/spectractor-1.png" />
+</div>
+<p>Defocused PSF example</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.extractor.psf</span> <span class="k">import</span> <span class="n">PSF1D</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">40</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="o">-</span><span class="mf">0.4</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">10</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">psf</span> <span class="o">=</span> <span class="n">PSF1D</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fwhm</span><span class="p">,</span> <span class="n">half</span><span class="p">,</span> <span class="n">center</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">compute_fwhm</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">psf</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">full_output</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
 <p>(<a class="reference external" href="../source/spectractor-2.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-2.png" src="../_images/spectractor-2.png" />
+</div>
 </dd></dl>
 
 <dl class="function">
@@ -423,9 +426,8 @@ If not provided, bounds are set to the x array edges.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<p>Gaussian example
-.. doctest:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span>
+<p>Gaussian example</p>
+<div class="highlight-pycon3 notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">stddev</span> <span class="o">=</span> <span class="mi">4</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">middle</span> <span class="o">=</span> <span class="mi">40</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">psf</span> <span class="o">=</span> <span class="n">gauss</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="n">stddev</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)),</span> <span class="n">middle</span><span class="p">,</span> <span class="n">stddev</span><span class="p">)</span>
@@ -434,9 +436,8 @@ If not provided, bounds are set to the x array edges.</p>
 <span class="go">1.000000</span>
 </pre></div>
 </div>
-<p>Defocused PSF example
-.. doctest:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.extractor.psf</span> <span class="k">import</span> <span class="n">PSF1D</span>
+<p>Defocused PSF example</p>
+<div class="highlight-pycon3 notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.extractor.psf</span> <span class="k">import</span> <span class="n">PSF1D</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">30</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">10</span><span class="p">]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">psf</span> <span class="o">=</span> <span class="n">PSF1D</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">integral</span> <span class="o">=</span> <span class="n">compute_integral</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">psf</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
@@ -470,9 +471,6 @@ image to detect the negative ones).</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">im</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span><span class="mi">20</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">3</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">im</span><span class="p">[</span><span class="mi">49</span><span class="p">,</span><span class="mi">49</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">detected_peaks</span> <span class="o">=</span> <span class="n">detect_peaks</span><span class="p">(</span><span class="n">im</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">detected_peaks</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="ow">not</span> <span class="n">detected_peaks</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span><span class="mi">20</span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">detected_peaks</span><span class="p">[</span><span class="mi">49</span><span class="p">,</span><span class="mi">49</span><span class="p">]</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -498,14 +496,16 @@ image to detect the negative ones).</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<p>Search for the Gaussian FWHM:
-&gt;&gt;&gt; p = [1,0,1]
-&gt;&gt;&gt; xx = np.arange(-10,10,0.1)
-&gt;&gt;&gt; PSF = gauss(xx, <a href="#id1"><span class="problematic" id="id2">*</span></a>p)
-&gt;&gt;&gt; def eq(x):
-…     return np.interp(x, xx, PSF) - 0.5
-&gt;&gt;&gt; root = dichotomie(eq, 0, 10, 1e-6)
-&gt;&gt;&gt; assert np.isclose(2*root, 2.355*p[2], 1e-3)</p>
+<p>Search for the Gaussian FWHM:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">xx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mi">10</span><span class="p">,</span><span class="mi">10</span><span class="p">,</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">PSF</span> <span class="o">=</span> <span class="n">gauss</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">eq</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">xx</span><span class="p">,</span> <span class="n">PSF</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">root</span> <span class="o">=</span> <span class="n">dichotomie</span><span class="p">(</span><span class="n">eq</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">root</span><span class="p">,</span> <span class="mf">2.355</span><span class="o">*</span><span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="mf">1e-3</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="function">
@@ -634,7 +634,6 @@ must not be far from the truth values. Boundaries helps a lot also.</p>
 <span class="go">10.0</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">guess</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">630</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">popt</span><span class="p">,</span> <span class="n">pcov</span> <span class="o">=</span> <span class="n">fit_gauss</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">guess</span><span class="o">=</span><span class="n">guess</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span><span class="mi">600</span><span class="p">,</span><span class="mi">1</span><span class="p">),(</span><span class="mi">100</span><span class="p">,</span><span class="mi">700</span><span class="p">,</span><span class="mi">100</span><span class="p">)),</span> <span class="n">sigma</span><span class="o">=</span><span class="n">y_err</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="n">popt</span><span class="p">))</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -642,11 +641,8 @@ must not be far from the truth values. Boundaries helps a lot also.</p>
 <dl class="function">
 <dt id="spectractor.tools.fit_gauss2d_outlier_removal">
 <code class="sig-prename descclassname">spectractor.tools.</code><code class="sig-name descname">fit_gauss2d_outlier_removal</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">y</em>, <em class="sig-param">z</em>, <em class="sig-param">sigma=3.0</em>, <em class="sig-param">niter=3</em>, <em class="sig-param">guess=None</em>, <em class="sig-param">bounds=None</em>, <em class="sig-param">circular=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/tools.html#fit_gauss2d_outlier_removal"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.tools.fit_gauss2d_outlier_removal" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="simple">
-<dt>Fit an astropy Gaussian 2D model with parameters :</dt><dd><p>amplitude, x_mean,y_mean,x_stddev, y_stddev,theta</p>
-</dd>
-</dl>
-<p>using outlier removal methods.</p>
+<dd><p>Fit an astropy Gaussian 2D model with parameters : amplitude, x_mean, y_mean, x_stddev, y_stddev, theta
+using outlier removal methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
@@ -678,6 +674,9 @@ must not be far from the truth values. Boundaries helps a lot also.</p>
 </pre></div>
 </div>
 <p>(<a class="reference external" href="../source/spectractor-3.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-3.png" src="../_images/spectractor-3.png" />
+</div>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">guess</span> <span class="o">=</span> <span class="p">(</span><span class="mi">45</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">bounds</span> <span class="o">=</span> <span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">90</span><span class="p">),</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">90</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span> <span class="o">=</span> <span class="n">fit_gauss2d_outlier_removal</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">Z</span><span class="p">,</span> <span class="n">guess</span><span class="o">=</span><span class="n">guess</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">circular</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -687,6 +686,9 @@ must not be far from the truth values. Boundaries helps a lot also.</p>
 </pre></div>
 </div>
 <p>(<a class="reference external" href="../source/spectractor-4.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-4.png" src="../_images/spectractor-4.png" />
+</div>
 </dd></dl>
 
 <dl class="function">
@@ -723,6 +725,9 @@ must not be far from the truth values. Boundaries helps a lot also.</p>
 </pre></div>
 </div>
 <p>(<a class="reference external" href="../source/spectractor-5.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-5.png" src="../_images/spectractor-5.png" />
+</div>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">guess</span> <span class="o">=</span> <span class="p">(</span><span class="mi">45</span><span class="p">,</span> <span class="mi">48</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">bounds</span> <span class="o">=</span> <span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">90</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span> <span class="o">=</span> <span class="n">fit_moffat1d</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">guess</span><span class="o">=</span><span class="n">guess</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">)</span>
@@ -731,16 +736,16 @@ must not be far from the truth values. Boundaries helps a lot also.</p>
 </pre></div>
 </div>
 <p>(<a class="reference external" href="../source/spectractor-6.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-6.png" src="../_images/spectractor-6.png" />
+</div>
 </dd></dl>
 
 <dl class="function">
 <dt id="spectractor.tools.fit_moffat1d_outlier_removal">
 <code class="sig-prename descclassname">spectractor.tools.</code><code class="sig-name descname">fit_moffat1d_outlier_removal</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">y</em>, <em class="sig-param">sigma=3.0</em>, <em class="sig-param">niter=3</em>, <em class="sig-param">guess=None</em>, <em class="sig-param">bounds=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/tools.html#fit_moffat1d_outlier_removal"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.tools.fit_moffat1d_outlier_removal" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="simple">
-<dt>Fit an astropy Moffat 1D model with parameters :</dt><dd><p>amplitude, x_mean, gamma, alpha</p>
-</dd>
-</dl>
-<p>using outlier removal methods.</p>
+<dd><p>Fit an astropy Moffat 1D model with parameters: amplitude, x_mean, gamma, alpha
+using outlier removal methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
@@ -770,24 +775,26 @@ must not be far from the truth values. Boundaries helps a lot also.</p>
 </pre></div>
 </div>
 <p>(<a class="reference external" href="../source/spectractor-7.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-7.png" src="../_images/spectractor-7.png" />
+</div>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">guess</span> <span class="o">=</span> <span class="p">(</span><span class="mi">45</span><span class="p">,</span> <span class="mi">48</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">bounds</span> <span class="o">=</span> <span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">90</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span> <span class="o">=</span> <span class="n">fit_moffat1d_outlier_removal</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">guess</span><span class="o">=</span><span class="n">guess</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">niter</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">res</span> <span class="o">=</span> <span class="p">[</span><span class="nb">getattr</span><span class="p">(</span><span class="n">fit</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">fit</span><span class="o">.</span><span class="n">param_names</span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">res</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)))</span>
 </pre></div>
 </div>
 <p>(<a class="reference external" href="../source/spectractor-8.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-8.png" src="../_images/spectractor-8.png" />
+</div>
 </dd></dl>
 
 <dl class="function">
 <dt id="spectractor.tools.fit_moffat2d_outlier_removal">
 <code class="sig-prename descclassname">spectractor.tools.</code><code class="sig-name descname">fit_moffat2d_outlier_removal</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">y</em>, <em class="sig-param">z</em>, <em class="sig-param">sigma=3.0</em>, <em class="sig-param">niter=3</em>, <em class="sig-param">guess=None</em>, <em class="sig-param">bounds=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/tools.html#fit_moffat2d_outlier_removal"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.tools.fit_moffat2d_outlier_removal" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="simple">
-<dt>Fit an astropy Moffat 2D model with parameters :</dt><dd><p>amplitude, x_mean, y_mean, gamma, alpha</p>
-</dd>
-</dl>
-<p>using outlier removal methods.</p>
+<dd><p>Fit an astropy Moffat 2D model with parameters: amplitude, x_mean, y_mean, gamma, alpha
+using outlier removal methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
@@ -818,14 +825,19 @@ must not be far from the truth values. Boundaries helps a lot also.</p>
 </pre></div>
 </div>
 <p>(<a class="reference external" href="../source/spectractor-9.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-9.png" src="../_images/spectractor-9.png" />
+</div>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">guess</span> <span class="o">=</span> <span class="p">(</span><span class="mi">45</span><span class="p">,</span> <span class="mi">48</span><span class="p">,</span> <span class="mi">52</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">bounds</span> <span class="o">=</span> <span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">90</span><span class="p">,</span> <span class="mi">90</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span> <span class="o">=</span> <span class="n">fit_moffat2d_outlier_removal</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">Z</span><span class="p">,</span> <span class="n">guess</span><span class="o">=</span><span class="n">guess</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">niter</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">res</span> <span class="o">=</span> <span class="p">[</span><span class="nb">getattr</span><span class="p">(</span><span class="n">fit</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">fit</span><span class="o">.</span><span class="n">param_names</span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">res</span><span class="p">,</span> <span class="mf">1e-1</span><span class="p">)))</span>
 </pre></div>
 </div>
 <p>(<a class="reference external" href="../source/spectractor-10.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-10.png" src="../_images/spectractor-10.png" />
+</div>
 </dd></dl>
 
 <dl class="function">
@@ -870,6 +882,9 @@ deviation. x values are renormalised on the [-1, 1] interval for the background.
 </pre></div>
 </div>
 <p>(<a class="reference external" href="../source/spectractor-11.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-11.png" src="../_images/spectractor-11.png" />
+</div>
 </dd></dl>
 
 <dl class="function">
@@ -938,12 +953,13 @@ deviation.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyval</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">err</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span><span class="p">,</span> <span class="n">cov</span><span class="p">,</span> <span class="n">model</span> <span class="o">=</span> <span class="n">fit_poly1d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">fit</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">cov</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span><span class="p">,</span> <span class="n">cov2</span><span class="p">,</span> <span class="n">model2</span> <span class="o">=</span> <span class="n">fit_poly1d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="n">err</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">fit</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span><span class="p">,</span> <span class="n">cov3</span><span class="p">,</span> <span class="n">model3</span> <span class="o">=</span> <span class="n">fit_poly1d</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">order</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="n">err</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>With uncertainties:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span><span class="p">,</span> <span class="n">cov2</span><span class="p">,</span> <span class="n">model2</span> <span class="o">=</span> <span class="n">fit_poly1d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="n">err</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span><span class="p">,</span> <span class="n">cov3</span><span class="p">,</span> <span class="n">model3</span> <span class="o">=</span> <span class="n">fit_poly1d</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">order</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">w</span><span class="o">=</span><span class="n">err</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">fit</span><span class="p">)</span>
 <span class="go">[0 0 0 0]</span>
 </pre></div>
@@ -987,6 +1003,9 @@ deviation.</p>
 </pre></div>
 </div>
 <p>(<a class="reference external" href="../source/spectractor-12.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-12.png" src="../_images/spectractor-12.png" />
+</div>
 </dd></dl>
 
 <dl class="function">
@@ -1053,12 +1072,6 @@ deviation.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mgrid</span><span class="p">[:</span><span class="mi">50</span><span class="p">,:</span><span class="mi">50</span><span class="p">]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">z</span> <span class="o">=</span> <span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">2</span><span class="o">*</span><span class="n">x</span><span class="o">*</span><span class="n">y</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span> <span class="o">=</span> <span class="n">fit_poly2d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c0_0</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c1_0</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c2_0</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c0_1</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c0_2</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c1_1</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1090,12 +1103,6 @@ deviation.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">z</span> <span class="o">=</span> <span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">2</span><span class="o">*</span><span class="n">x</span><span class="o">*</span><span class="n">y</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">z</span><span class="p">[::</span><span class="mi">10</span><span class="p">,::</span><span class="mi">10</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">fit</span> <span class="o">=</span> <span class="n">fit_poly2d_outlier_removal</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="n">z</span><span class="p">,</span><span class="n">order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">sigma</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c0_0</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c1_0</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c2_0</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c0_1</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c0_2</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">c1_1</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1348,11 +1355,6 @@ deviation.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pixel_rotation</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">45</span><span class="p">)</span>
 <span class="go">(0.0, 0.0)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">u</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">pixel_rotation</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">4</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">u</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">pixel_rotation</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">y0</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1381,12 +1383,18 @@ deviation.</p>
 <p class="rubric">Examples</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.extractor.images</span> <span class="k">import</span> <span class="n">Image</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="n">plot_image_simple</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">f</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">im</span> <span class="o">=</span> <span class="n">Image</span><span class="p">(</span><span class="s1">&#39;tests/data/reduc_20170605_028.fits&#39;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">plot_image_simple</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">im</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s2">&quot;log10&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s2">&quot;ADU&quot;</span><span class="p">,</span> <span class="n">target_pixcoords</span><span class="o">=</span><span class="p">(</span><span class="mi">815</span><span class="p">,</span><span class="mi">580</span><span class="p">),</span>
 <span class="gp">... </span>                    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;tests/data/reduc_20170605_028.fits&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
+</div>
+<p>(<a class="reference external" href="../source/spectractor-14.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-14.png" src="../_images/spectractor-14.png" />
 </div>
 </dd></dl>
 
@@ -1408,11 +1416,17 @@ deviation.</p>
 <p class="rubric">Examples</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.extractor.spectrum</span> <span class="k">import</span> <span class="n">Spectrum</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.tools</span> <span class="k">import</span> <span class="n">plot_spectrum_simple</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">f</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">s</span> <span class="o">=</span> <span class="n">Spectrum</span><span class="p">(</span><span class="n">file_name</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170605_028_spectrum.fits&#39;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">plot_spectrum_simple</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">s</span><span class="o">.</span><span class="n">lambdas</span><span class="p">,</span> <span class="n">s</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">data_err</span><span class="o">=</span><span class="n">s</span><span class="o">.</span><span class="n">err</span><span class="p">,</span> <span class="n">xlim</span><span class="o">=</span><span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">700</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;test&#39;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
+</div>
+<p>(<a class="reference external" href="../source/spectractor-15.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-15.png" src="../_images/spectractor-15.png" />
 </div>
 </dd></dl>
 

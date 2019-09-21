@@ -369,10 +369,16 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
 
         import matplotlib.pyplot as plt
         import numpy as np
-        from spectractor.tools import multigauss_and_bgd
-        guess = (15,0,0,0,10,640,2,20,750,7)
+        from spectractor.tools import multigauss_and_bgd, fit_multigauss_and_bgd
         x = np.arange(600.,800.,1)
+        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
         y = multigauss_and_bgd(x, *p)
+        err = 0.1 * np.sqrt(y)
+        guess = (15,0,0,0,10,640,2,20,750,7)
+        bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
+        popt, pcov = fit_multigauss_and_bgd(x, y, guess=guess, bounds=bounds, sigma=err)
+        fit = multigauss_and_bgd(x, *popt)
+        fig = plt.figure()
         plt.errorbar(x,y,yerr=err,linestyle='None')
         plt.plot(x,fit,'r-')
         plt.plot(x,multigauss_and_bgd(x, *guess),'k--')
@@ -732,8 +738,8 @@ def tied_circular_gauss2d(g1):
 
 
 def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=None, circular=False):
-    """Fit an astropy Gaussian 2D model with parameters :
-        amplitude, x_mean,y_mean,x_stddev, y_stddev,theta
+    """
+    Fit an astropy Gaussian 2D model with parameters : amplitude, x_mean, y_mean, x_stddev, y_stddev, theta
     using outlier removal methods.
 
     Parameters
@@ -832,8 +838,8 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
 
 
 def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=None):
-    """Fit an astropy Moffat 2D model with parameters :
-        amplitude, x_mean, y_mean, gamma, alpha
+    """
+    Fit an astropy Moffat 2D model with parameters: amplitude, x_mean, y_mean, gamma, alpha
     using outlier removal methods.
 
     Parameters
@@ -896,7 +902,7 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
         import numpy as np
         import matplotlib.pyplot as plt
         from astropy.modeling import models
-        from spectractor.tools import fit_gauss2d_outlier_removal
+        from spectractor.tools import fit_moffat2d_outlier_removal
         X, Y = np.mgrid[:100,:100]
         PSF = models.Moffat2D()
         p = (50, 50, 50, 5, 2)
@@ -929,8 +935,8 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
 
 
 def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=None):
-    """Fit an astropy Moffat 1D model with parameters :
-        amplitude, x_mean, gamma, alpha
+    """
+    Fit an astropy Moffat 1D model with parameters: amplitude, x_mean, gamma, alpha
     using outlier removal methods.
 
     Parameters
