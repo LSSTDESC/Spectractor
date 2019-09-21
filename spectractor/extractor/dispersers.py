@@ -144,7 +144,7 @@ def get_delta_pix_ortho(deltaX, x0, D=parameters.DISTANCE2CCD):
     >>> get_delta_pix_ortho(delta, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2], D=D)
     500.0
     >>> get_delta_pix_ortho(delta, [500,500], D=D)
-    497.66545567320992
+    497.6654556732099
     """
     theta0 = get_theta0(x0)
     deltaX0 = np.tan(theta0) * D / parameters.CCD_PIXEL2MM
@@ -289,8 +289,8 @@ class Grating:
         >>> print(g.N_input)
         400
         >>> g = Grating(400, label="Ron400", data_dir=parameters.HOLO_DIR)
-        >>> print(g.N_input)
-        400.869182487
+        >>> print(f"{g.N_input:6f}")
+        400.869182
         >>> assert g.D is parameters.DISTANCE2CCD
         """
         self.N_input = N
@@ -339,6 +339,7 @@ class Grating:
         --------
 
         The files exist:
+
         >>> g = Grating(400, label='Ron400')
         >>> g.N_input
         400.86918248709316
@@ -346,6 +347,7 @@ class Grating:
         -0.277
 
         The files do not exist:
+
         >>> g = Grating(400, label='XXX')
         >>> g.N_input
         400
@@ -453,10 +455,10 @@ class Grating:
         >>> deltaX = np.arange(0,1000,1).astype(float)
         >>> lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, order=1)
         >>> print(lambdas[:5])
-        [ 0.          1.45454532  2.90909063  4.36363511  5.81817793]
+        [0.         1.45454532 2.90909063 4.36363511 5.81817793]
         >>> pixels = disperser.grating_lambda_to_pixel(lambdas, x0, order=1)
         >>> print(pixels[:5])
-        [ 0.  1.  2.  3.  4.]
+        [0. 1. 2. 3. 4.]
         """
         theta = self.refraction_angle(deltaX, x0)
         theta0 = get_theta0(x0)
@@ -482,10 +484,10 @@ class Grating:
         >>> deltaX = np.arange(0,1000,1).astype(float)
         >>> lambdas = disperser.grating_pixel_to_lambda(deltaX, x0, order=1)
         >>> print(lambdas[:5])
-        [ 0.          1.45454532  2.90909063  4.36363511  5.81817793]
+        [0.         1.45454532 2.90909063 4.36363511 5.81817793]
         >>> pixels = disperser.grating_lambda_to_pixel(lambdas, x0, order=1)
         >>> print(pixels[:5])
-        [ 0.  1.  2.  3.  4.]
+        [0. 1. 2. 3. 4.]
         """
         lambdas = np.copy(lambdas)
         theta0 = get_theta0(x0)
@@ -626,6 +628,7 @@ class Hologram(Grating):
         --------
 
         The files exist:
+
         >>> h = Hologram(label='HoloPhP')
         >>> h.N((500,500))
         345.4794168822986
@@ -635,6 +638,7 @@ class Hologram(Grating):
         [856.004, 562.34]
 
         The files do not exist:
+
         >>> h = Hologram(label='XXX')
         >>> h.N((500,500))
         350
@@ -706,8 +710,5 @@ class Hologram(Grating):
 
 if __name__ == "__main__":
     import doctest
-
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
 
     doctest.testmod()

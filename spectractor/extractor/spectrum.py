@@ -106,8 +106,12 @@ class Spectrum:
         --------
         >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s.convert_from_ADUrate_to_flam()
-        >>> assert np.max(s.data) < 1e-2
-        >>> assert np.max(s.err) < 1e-2
+
+        .. doctest::
+            :hide:
+
+            >>> assert np.max(s.data) < 1e-2
+            >>> assert np.max(s.err) < 1e-2
 
         """
 
@@ -126,8 +130,12 @@ class Spectrum:
         --------
         >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s.convert_from_flam_to_ADUrate()
-        >>> assert np.max(s.data) > 1e-2
-        >>> assert np.max(s.err) > 1e-2
+
+        .. doctest::
+            :hide:
+
+            >>> assert np.max(s.data) > 1e-2
+            >>> assert np.max(s.err) > 1e-2
 
         """
         self.data = self.data * parameters.FLAM_TO_ADURATE
@@ -145,8 +153,12 @@ class Spectrum:
         >>> s = Spectrum()
         >>> s.filter = 'FGB37'
         >>> s.load_filter()
-        >>> assert parameters.LAMBDA_MIN == parameters.FGB37['min']
-        >>> assert parameters.LAMBDA_MAX == parameters.FGB37['max']
+
+        .. doctest::
+            :hide:
+
+            >>> assert parameters.LAMBDA_MIN == parameters.FGB37['min']
+            >>> assert parameters.LAMBDA_MAX == parameters.FGB37['max']
 
         """
         for f in parameters.FILTERS:
@@ -245,6 +257,13 @@ class Spectrum:
         >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s.plot_spectrogram()
         >>> if parameters.DISPLAY: plt.show()
+
+        .. plot::
+
+            from spectractor.extractor.spectrum import Spectrum
+            s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+            s.plot_spectrogram()
+
         """
         if ax is None:
             plt.figure(figsize=figsize)
@@ -272,12 +291,20 @@ class Spectrum:
         >>> import os
         >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
         >>> s.save_spectrum('./tests/test.fits')
-        >>> assert os.path.isfile('./tests/test.fits')
+
+        .. doctest::
+            :hide:
+
+            >>> assert os.path.isfile('./tests/test.fits')
 
         Overwrite previous file:
         >>> s.save_spectrum('./tests/test.fits', overwrite=True)
-        >>> assert os.path.isfile('./tests/test.fits')
-        >>> os.remove('./tests/test.fits')
+
+        .. doctest::
+            :hide:
+
+            >>> assert os.path.isfile('./tests/test.fits')
+            >>> os.remove('./tests/test.fits')
         """
         self.header['UNIT1'] = "nanometer"
         self.header['UNIT2'] = self.units
@@ -511,7 +538,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     Examples
     --------
 
-    Creation of a mock spectrum with emission and absorption lines
+    Creation of a mock spectrum with emission and absorption lines:
+
     >>> import numpy as np
     >>> from spectractor.extractor.spectroscopy import Lines, HALPHA, HBETA, O2
     >>> lambdas = np.arange(300,1000,1)
@@ -527,13 +555,19 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     >>> spec.err = spectrum_err
     >>> fwhm_func = interp1d(lambdas, 0.01 * lambdas)
 
-    Detect the lines
+    Detect the lines:
+
     >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
     ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
     >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
-    >>> assert(global_chisq < 2)
 
-    Plot the result
+    .. doctest::
+        :hide:
+
+        >>> assert(global_chisq < 2)
+
+    Plot the result:
+
     >>> import matplotlib.pyplot as plt
     >>> spec.lines = lines
     >>> fig = plt.figure()
@@ -1197,8 +1231,5 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
 if __name__ == "__main__":
     import doctest
-
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
 
     doctest.testmod()

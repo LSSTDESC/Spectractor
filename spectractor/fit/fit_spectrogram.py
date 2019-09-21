@@ -199,17 +199,22 @@ class SpectrogramFitWorkspace(FitWorkspace):
         """
         Examples
         --------
-        >>> file_name = 'outputs/reduc_20170530_130_spectrum.fits'
-        >>> atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-        >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_filename=atmgrid_filename,
-        ... nwalkers=28, nsteps=20000, burnin=10000, nbins=10, verbose=1, plot=True, live_fit=False)
-        >>> A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, *psf = fit_workspace.p
-        >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols,
-        ... D, shift_x, shift_y, shift_t, angle, psf)
-        >>> fit_workspace.lambdas = lambdas
-        >>> fit_workspace.model = model
-        >>> fit_workspace.model_err = model_err
-        >>> fit_workspace.plot_fit()
+
+        .. plot::
+            :include-source:
+
+            >>> from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace
+            >>> file_name = 'tests/data/reduc_20170530_134_spectrum.fits'
+            >>> atmgrid_file_name = file_name.replace('spectrum', 'atmsim')
+            >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_file_name, verbose=True)
+            >>> A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, *psf = fit_workspace.p
+            >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols,
+            ... D, shift_x, shift_y, angle, psf)
+            >>> fit_workspace.lambdas = lambdas
+            >>> fit_workspace.model = model
+            >>> fit_workspace.model_err = model_err
+            >>> fit_workspace.plot_fit()
+
         """
         gs_kw = dict(width_ratios=[3, 0.15, 1, 0.15, 1, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(12, 8), constrained_layout=True, gridspec_kw=gs_kw)

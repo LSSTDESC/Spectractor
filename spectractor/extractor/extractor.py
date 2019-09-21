@@ -41,19 +41,28 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
 
     Examples
     --------
+
     Extract the spectrogram and its characteristics from the image:
-    >>> import os
-    >>> from spectractor.logbook import LogBook
-    >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
-    >>> file_names = ['./tests/data/reduc_20170530_134.fits']
-    >>> for file_name in file_names:
-    ...     tag = file_name.split('/')[-1]
-    ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-    ...     if target is None or xpos is None or ypos is None:
-    ...         continue
-    ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target, disperser_label, './config/ctio.ini')
-    ...     assert spectrum is not None
-    ...     assert os.path.isfile('tests/data/educ_20170530_134_spectrum.fits')
+
+    .. doctest::
+
+        >>> import os
+        >>> from spectractor.logbook import LogBook
+        >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+        >>> file_names = ['./tests/data/reduc_20170530_134.fits']
+        >>> for file_name in file_names:
+        ...     tag = file_name.split('/')[-1]
+        ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
+        ...     if target is None or xpos is None or ypos is None:
+        ...         continue
+        ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target, disperser_label, './config/ctio.ini')
+
+    .. doctest::
+        :hide:
+
+        >>> assert spectrum is not None
+        >>> assert os.path.isfile('tests/data/educ_20170530_134_spectrum.fits')
+
     """
 
     my_logger = set_logger(__name__)
