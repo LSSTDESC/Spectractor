@@ -177,6 +177,246 @@
 <div class="section" id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
 </div>
+<div class="section" id="module-spectractor.simulation.atmosphere">
+<span id="spectractor-simulation-atmosphere-module"></span><h2>spectractor.simulation.atmosphere module<a class="headerlink" href="#module-spectractor.simulation.atmosphere" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="spectractor.simulation.atmosphere.Atmosphere">
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.atmosphere.</code><code class="sig-name descname">Atmosphere</code><span class="sig-paren">(</span><em class="sig-param">airmass</em>, <em class="sig-param">pressure</em>, <em class="sig-param">temperature</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#Atmosphere"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.Atmosphere" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.Atmosphere.plot_transmission">
+<code class="sig-name descname">plot_transmission</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#Atmosphere.plot_transmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.Atmosphere.plot_transmission" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot the atmospheric transmission computed with Libradtran.</p>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">Atmosphere</span><span class="p">(</span><span class="n">airmass</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">pressure</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transmission</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">ozone</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">pwv</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">aerosols</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.Atmosphere.set_label">
+<code class="sig-name descname">set_label</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#Atmosphere.set_label"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.Atmosphere.set_label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a label string for the simulation.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.Atmosphere.set_title">
+<code class="sig-name descname">set_title</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#Atmosphere.set_title"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.Atmosphere.set_title" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a title string for the simulation.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.Atmosphere.simulate">
+<code class="sig-name descname">simulate</code><span class="sig-paren">(</span><em class="sig-param">ozone</em>, <em class="sig-param">pwv</em>, <em class="sig-param">aerosols</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#Atmosphere.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.Atmosphere.simulate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simulate the atmosphere transparency with Libradtran given atmospheric composition.</p>
+<p>Values outside the Libradtran simulation range are set to zero.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson</p></li>
+<li><p><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor quantity in mm</p></li>
+<li><p><strong>aerosols</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD Vertical Aerosols Optical Depth</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>transmission</strong> – The transmission function of wavelengths in nm.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">Atmosphere</span><span class="p">(</span><span class="n">airmass</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">pressure</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transmission</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">ozone</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">pwv</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">aerosols</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">ozone</span>
+<span class="go">400</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">pwv</span>
+<span class="go">5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">aerosols</span>
+<span class="go">0.05</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>(<a class="reference external" href="../source/spectractor-simulation-1.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-simulation-1.png" src="../_images/spectractor-simulation-1.png" />
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="spectractor.simulation.atmosphere.AtmosphereGrid">
+<em class="property">class </em><code class="sig-prename descclassname">spectractor.simulation.atmosphere.</code><code class="sig-name descname">AtmosphereGrid</code><span class="sig-paren">(</span><em class="sig-param">image_filename='', filename='', airmass=1.0, pressure=800.0, temperature=10.0, pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#AtmosphereGrid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.AtmosphereGrid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#spectractor.simulation.atmosphere.Atmosphere" title="spectractor.simulation.atmosphere.Atmosphere"><code class="xref py py-class docutils literal notranslate"><span class="pre">spectractor.simulation.atmosphere.Atmosphere</span></code></a></p>
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.AtmosphereGrid.compute">
+<code class="sig-name descname">compute</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#AtmosphereGrid.compute"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.AtmosphereGrid.compute" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute atmospheric transmissions and fill self.atmgrid.</p>
+<p>The wavelengths used for the computation are the ones set by parameters.LAMBDAS.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><strong>atmospheric_grid</strong> – The atmospheric grid self.atmgrid.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>array_like</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">AtmosphereGrid</span><span class="p">(</span><span class="n">image_filename</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170605_028.fits&#39;</span><span class="p">,</span>
+<span class="gp">... </span><span class="n">pwv_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">ozone_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">400</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">aerosol_grid</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">atmospheric_grid</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">atmospheric_grid</span>
+<span class="go">array([[0.000000e+00, 0.000000e+00, 0.000000e+00, ..., 1.099400e+03,</span>
+<span class="go">        1.099600e+03, 1.099800e+03],</span>
+<span class="go">       [1.000000e+00, 0.000000e+00, 5.000000e+00, ..., 9.520733e-01,</span>
+<span class="go">        9.520733e-01, 9.520733e-01],</span>
+<span class="go">       [2.000000e+00, 1.000000e-01, 5.000000e+00, ..., 9.213718e-01,</span>
+<span class="go">        9.213718e-01, 9.213718e-01]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">save_file</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">image_filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;_atmsim.fits&#39;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>(<a class="reference external" href="../source/spectractor-simulation-2.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-simulation-2.png" src="../_images/spectractor-simulation-2.png" />
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.AtmosphereGrid.load_file">
+<code class="sig-name descname">load_file</code><span class="sig-paren">(</span><em class="sig-param">filename</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#AtmosphereGrid.load_file"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.AtmosphereGrid.load_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load the atmospheric grid from a fits file and interpolate across the points
+using RegularGridInterpolator. Automatically called from __init__.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – The input file name.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">AtmosphereGrid</span><span class="p">(</span><span class="n">image_filename</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170605_028.fits&#39;</span><span class="p">,</span>
+<span class="gp">... </span><span class="n">pwv_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">ozone_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">400</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">aerosol_grid</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">atmospheric_grid</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">save_file</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">image_filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;_atmsim.fits&#39;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s1">&#39;tests/data/reduc_20170605_028_atmsim.fits&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">load_file</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">image_filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;_atmsim.fits&#39;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">AER_Points</span>
+<span class="go">array([0. , 0.1])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">PWV_Points</span>
+<span class="go">array([5.])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">OZ_Points</span>
+<span class="go">array([400.])</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.AtmosphereGrid.plot_transmission">
+<code class="sig-name descname">plot_transmission</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#AtmosphereGrid.plot_transmission"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.AtmosphereGrid.plot_transmission" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot the atmospheric transmission contained in the grid.</p>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">AtmosphereGrid</span><span class="p">(</span><span class="n">image_filename</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170605_028.fits&#39;</span><span class="p">,</span>
+<span class="gp">... </span><span class="n">pwv_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">ozone_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">400</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">aerosol_grid</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">atmospheric_grid</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">plot_transmission</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>(<a class="reference external" href="../source/spectractor-simulation-3.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-simulation-3.png" src="../_images/spectractor-simulation-3.png" />
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.AtmosphereGrid.plot_transmission_image">
+<code class="sig-name descname">plot_transmission_image</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#AtmosphereGrid.plot_transmission_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.AtmosphereGrid.plot_transmission_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot the atmospheric transmission contained in the grid using imshow.</p>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">AtmosphereGrid</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170530_134_atmsim.fits&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">plot_transmission_image</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>(<a class="reference external" href="../source/spectractor-simulation-4.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-simulation-4.png" src="../_images/spectractor-simulation-4.png" />
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.AtmosphereGrid.save_file">
+<code class="sig-name descname">save_file</code><span class="sig-paren">(</span><em class="sig-param">filename=''</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#AtmosphereGrid.save_file"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.AtmosphereGrid.save_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save the atmospheric grid in a fits file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – The output file name.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">AtmosphereGrid</span><span class="p">(</span><span class="n">image_filename</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170605_028.fits&#39;</span><span class="p">,</span>
+<span class="gp">... </span><span class="n">pwv_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">ozone_grid</span><span class="o">=</span><span class="p">[</span><span class="mi">400</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">aerosol_grid</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">atmospheric_grid</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="o">.</span><span class="n">save_file</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">image_filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;_atmsim.fits&#39;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.AtmosphereGrid.set_grid">
+<code class="sig-name descname">set_grid</code><span class="sig-paren">(</span><em class="sig-param">pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#AtmosphereGrid.set_grid"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.AtmosphereGrid.set_grid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the size of the simulation grid self.atmgrid before compute it.</p>
+<p>The first column of self.atmgrid will contain the wavelengths set by parameters.LAMBDAS,
+the other columns the future simulations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pwv_grid</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.7)"><em>list</em></a>) – List of 3 numbers for the PWV quantity: min, max, number of simulations (default: [0, 10, 10]).</p></li>
+<li><p><strong>ozone_grid</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.7)"><em>list</em></a>) – List of 3 numbers for the ozone quantity: min, max, number of simulations (default: [100, 700, 7]).</p></li>
+<li><p><strong>aerosol_grid</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.7)"><em>list</em></a>) – List of 3 numbers for the aerosol quantity: min, max, number of simulations (default: [0, 0.1, 10]).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="spectractor.simulation.atmosphere.AtmosphereGrid.simulate">
+<code class="sig-name descname">simulate</code><span class="sig-paren">(</span><em class="sig-param">ozone</em>, <em class="sig-param">pwv</em>, <em class="sig-param">aerosols</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/spectractor/simulation/atmosphere.html#AtmosphereGrid.simulate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#spectractor.simulation.atmosphere.AtmosphereGrid.simulate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interpolate from the atmospheric grid to get the atmospheric transmission.</p>
+<p>First ozone, second pwv, last aerosols, to respect order of loops when generating the grid</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ozone</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Ozone quantity in Dobson</p></li>
+<li><p><strong>pwv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – Precipitable Water Vapor quantity in mm</p></li>
+<li><p><strong>aerosols</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.7)"><em>float</em></a>) – VAOD Vertical Aerosols Optical Depth</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.simulation.atmosphere</span> <span class="k">import</span> <span class="n">AtmosphereGrid</span><span class="p">,</span> <span class="n">plot_transmission_simple</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">AtmosphereGrid</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="s1">&#39;tests/data/reduc_20170530_134_atmsim.fits&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lambdas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">1200</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">pwv</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">transmission</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">ozone</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">pwv</span><span class="o">=</span><span class="n">pwv</span><span class="p">,</span> <span class="n">aerosols</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="n">plot_transmission_simple</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">(),</span> <span class="n">lambdas</span><span class="p">,</span> <span class="n">transmission</span><span class="p">(</span><span class="n">lambdas</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="n">title</span><span class="o">=</span><span class="n">a</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">a</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>(<a class="reference external" href="../source/spectractor-simulation-5.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-simulation-5.png" src="../_images/spectractor-simulation-5.png" />
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</div>
 <div class="section" id="module-spectractor.simulation.image_simulation">
 <span id="spectractor-simulation-image-simulation-module"></span><h2>spectractor.simulation.image_simulation module<a class="headerlink" href="#module-spectractor.simulation.image_simulation" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
@@ -1034,7 +1274,10 @@ update : July 2018</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.simulation.throughput</span> <span class="k">import</span> <span class="n">Throughput</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor.simulation.atmosphere</span> <span class="k">import</span> <span class="n">plot_transmission_simple</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">spectractor</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">t</span> <span class="o">=</span> <span class="n">Throughput</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span><span class="o">.</span><span class="n">LAMBDA_MIN</span> <span class="o">=</span> <span class="mi">500</span>
@@ -1050,6 +1293,10 @@ update : July 2018</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">plot_transmission_simple</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">lambdas</span><span class="p">,</span> <span class="n">transmissions</span><span class="p">,</span> <span class="n">errors</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;CTIO&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Telescope&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">parameters</span><span class="o">.</span><span class="n">DISPLAY</span><span class="p">:</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
+</div>
+<p>(<a class="reference external" href="../source/spectractor-simulation-6.py">Source code</a>)</p>
+<div class="figure align-default">
+<img alt="../_images/spectractor-simulation-6.png" src="../_images/spectractor-simulation-6.png" />
 </div>
 </dd></dl>
 

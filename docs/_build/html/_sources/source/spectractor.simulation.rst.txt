@@ -4,6 +4,14 @@ spectractor\.simulation package
 Submodules
 ----------
 
+spectractor\.simulation\.atmosphere module
+-------------------------------------------------
+
+.. automodule:: spectractor.simulation.atmosphere
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 spectractor\.simulation\.image\_simulation module
 -------------------------------------------------
 
