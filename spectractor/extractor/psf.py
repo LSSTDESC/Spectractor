@@ -14,7 +14,7 @@ from astropy.table import Table
 
 from spectractor.tools import (dichotomie, fit_poly1d, fit_moffat1d_outlier_removal, plot_image_simple,
                                compute_fwhm, compute_integral)
-from spectractor.extractor.background import extract_background_photutils
+from spectractor.extractor.background import extract_background_photutils, extract_background_fit1D
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping
@@ -221,12 +221,11 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
         self.pixels = np.arange(self.Nx)
 
         # prepare the background, data and errors
-        # self.bgd = np.zeros_like(self.data)
-        # if self.bgd_model_func is not None:
-        #     # xx, yy = np.meshgrid(np.arange(Nx), pixels)
-        #     self.bgd = self.bgd_model_func(np.arange(self.Nx), self.pixels)
-        # self.data = self.data - self.bgd
-        # self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
+        self.bgd = np.zeros_like(self.data)
+        if self.bgd_model_func is not None:
+             self.bgd = self.bgd_model_func(self.pixels)
+        self.data = self.data - self.bgd
+        self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
 
     def simulate(self, amplitude_moffat, mean, gamma, alpha, eta_gauss, stddev):
         """
@@ -244,23 +243,27 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
 
         .. doctest::
 
-            >>> p = np.array([100,  50, 3, 2, -0.1, 2, 200])
+            >>> p = np.array([300,  50, 3, 2, -0.1, 2, 200])
             >>> psf = PSF1D(p)
             >>> x = np.arange(100)
             >>> data = psf.evaluate(x, p)
+            >>> bgd = 2*np.ones_like(x)
+            >>> data += bgd
             >>> data = np.random.poisson(data)
             >>> data_errors = np.sqrt(data+1)
 
         Extract the background
-        # >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+
+        .. doctest::
+            >>> bgd_model_func = extract_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5)
 
         Fit the data:
 
         .. doctest::
 
-            >>> w = PSF1DFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
+            >>> w = PSF1DFitWorkspace(psf, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
             >>> x, mod, mod_err = w.simulate(*p[:-1])
-            >>> np.mean(np.abs(mod-data)/data_errors) < 0.2
+            >>> np.mean(np.abs(mod+bgd_model_func(x)-data)/data_errors) < 1
             True
             >>> w.plot_fit()
 
@@ -273,9 +276,12 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
             psf = PSF1D(p)
             x = np.arange(100)
             data = psf.evaluate(x, p)
+            bgd = 2*np.ones_like(x)
+            data += bgd
             data = np.random.poisson(data)
             data_errors = np.sqrt(data+1)
-            w = PSF1DFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
+            bgd_model_func = extract_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5)
+            w = PSF1DFitWorkspace(psf, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
             x, mod, mod_err = w.simulate(*p[:-1])
             w.plot_fit()
 
