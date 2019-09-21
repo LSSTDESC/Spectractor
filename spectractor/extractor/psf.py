@@ -2597,29 +2597,28 @@ class PSF1DAstropy(Fittable1DModel):
             >>> p = [2,30,4,2,-0.5,1,10]
             >>> psf = PSF1DAstropy(*p)
             >>> xx = np.arange(0, 60, 0.01)
-            # >>> plt.plot(xx, psf.evaluate(xx, *p)) # doctest: +ELLIPSIS
+            >>> plt.plot(xx, psf.evaluate(xx, *p)) # doctest: +ELLIPSIS
             [<matplotlib.lines.Line2D object at ...>]
-            # >>> plt.plot(x, psf.evaluate(x, *p)) # doctest: +ELLIPSIS
+            >>> plt.plot(x, psf.evaluate(x, *p)) # doctest: +ELLIPSIS
             [<matplotlib.lines.Line2D object at ...>]
-            # >>> if parameters.DISPLAY: plt.show()
+            >>> if parameters.DISPLAY: plt.show()
 
         .. plot::
-            :include-source:
 
-            >>> import matplotlib.pyplot as plt
-            >>> import numpy as np
-            >>> from spectractor.extractor.psf import PSF1DAstropy
-            >>> p = [2,30,4,2,-0.5,1,10]
-            >>> x = np.arange(0, 60, 1)
-            >>> xx = np.arange(0, 60, 0.01)
-            >>> psf = PSF1DAstropy(*p)
-            >>> fig = plt.figure(figsize=(5,3))
-            >>> plt.plot(xx, psf.evaluate(xx, *p))
-            >>> plt.plot(x, psf.evaluate(x, *p))
-            >>> plt.grid()
-            >>> plt.xlabel('x')
-            >>> plt.ylabel('PSF(x)')  # doctest: +SKIP
-            >>> plt.show()
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.psf import PSF1DAstropy
+            p = [2,30,4,2,-0.5,1,10]
+            x = np.arange(0, 60, 1)
+            xx = np.arange(0, 60, 0.01)
+            psf = PSF1DAstropy(*p)
+            fig = plt.figure(figsize=(5,3))
+            plt.plot(xx, psf.evaluate(xx, *p))
+            plt.plot(x, psf.evaluate(x, *p))
+            plt.grid()
+            plt.xlabel('x')
+            plt.ylabel('PSF(x)')
+            plt.show()
 
         .. doctest::
 
