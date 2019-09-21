@@ -2023,36 +2023,38 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
          2D array is flatten in 1D, equation :eq:`chromaticpsf2d` is
 
         .. math ::
-            :label: chromaticpsf2d_matrix
 
-            & \vec{m}(\vec{x},\vec{p}) = \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A}
+            \vec{m}(\vec{x},\vec{p}) & = \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \\
 
-            & \mathbf{M}\left(\vec{x},\vec{p}\right) = \left(\begin{array}{cccc}
+            \mathbf{M}\left(\vec{x},\vec{p}\right) & = \left(\begin{array}{cccc}
              \phi\left(\vec{x}_1,\vec{p}_1\right) & \phi\left(\vec{x}_2,\vec{p}_1\right) & ... & \phi\left(\vec{x}_{N_x},\vec{p}_1\right) \\
              ... & ... & ... & ...\\
              \phi\left(\vec{x}_1,\vec{p}_{N_x}\right) & \phi\left(\vec{x}_2,\vec{p}_{N_x}\right) & ... & \phi\left(\vec{x}_{N_x},\vec{p}_{N_x}\right) \\
             \end{array}\right)
+
+            :label: chromaticpsf2d_matrix
 
         with :math:`\mathbf{M}` the design matrix.
 
         The goal of this function is to perform a minimisation of the amplitude vector :math:`\mathbf{A}` given a set of non-linear parameters
         :math:`\mathbf{p}` and a spectrogram data array :math:`mathbf{y}` modelise as
 
-        .. math :: \mathbf{y} = \mathbf{m}(\vec{x},\vec{p}) + \epsilon
+        .. math:: \mathbf{y} = \mathbf{m}(\vec{x},\vec{p}) + \epsilon
 
         with :math:`epsilon` a random noise. The :math:`\chi^2` function to minimise is
 
-        .. math ::
-            :label: chromaticspsf2d_chi2
+        .. math::
 
             \chi^2(\mathbf{A})= \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)^T \mathbf{W}
             \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)
+
+            :label: chromaticspsf2d_chi2
 
         with :math:`\mathbf{W}` the weight matrix, inverse of the covariance matrix. In our case this matrix is diagonal
         as the pixels are considered all independant. The minimum of equation :eq:`chromaticspsf2d_chi2` is reached for
         a the set of amplitude parameters :math:`\hat{\mathbf{A}}` given by
 
-        .. math ::
+        .. math::
 
             \hat{\mathbf{A}} =  (\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1} \mathbf{M}^T \mathbf{W} \mathbf{y}
 
@@ -2069,6 +2071,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         --------
 
         Set the parameters:
+
         .. doctest::
 
             >>> parameters.PIXDIST_BACKGROUND = 40
@@ -2110,14 +2113,14 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
             >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
             >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:-1])
+            >>> w.plot_fit()
 
         .. doctest::
             :hide:
 
-            >>> assert mod is not None # doctest:
+            >>> assert mod is not None
 
-        .. doctest::
-            >>> w.plot_fit()
+
         """
         # linear regression for the amplitude parameters
         # prepare the vectors
