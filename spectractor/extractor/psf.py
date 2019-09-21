@@ -243,7 +243,7 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
         Build a mock spectrogram with random Poisson noise:
 
         .. doctest::
-        
+
             >>> p = np.array([100,  50, 3, 2, -0.1, 2, 200])
             >>> psf = PSF1D(p)
             >>> x = np.arange(100)
@@ -266,6 +266,17 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
 
         .. plot::
 
+            import numpy as np
+            import matplotlib.pyplot as plt
+            from spectractor.extractor.psf import *
+            p = np.array([100,  50, 3, 2, -0.1, 2, 200])
+            psf = PSF1D(p)
+            x = np.arange(100)
+            data = psf.evaluate(x, p)
+            data = np.random.poisson(data)
+            data_errors = np.sqrt(data+1)
+            w = PSF1DFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
+            x, mod, mod_err = w.simulate(*p[:-1])
             w.plot_fit()
 
         """
