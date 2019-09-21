@@ -1703,6 +1703,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         ax[3, 0].set_ylabel('Transverse sum')
         ax[3, 0].set_xlabel(r'X [pixels]')
         ax[3, 0].legend(fontsize=7)
+        ax[3, 0].set_xlim((0, self.data.shape[1]))
         ax[3, 0].grid(True)
         if self.live_fit:  # pragma: no cover
             plt.draw()
