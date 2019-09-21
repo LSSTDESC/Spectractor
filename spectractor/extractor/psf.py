@@ -255,6 +255,7 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
         Extract the background
 
         .. doctest::
+
             >>> bgd_model_func = extract_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5)
 
         Fit the data:
@@ -292,26 +293,26 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
         return self.pixels, self.model, self.model_err
 
     def plot_fit(self):
-        # bgd = data[bgd_indices, x]
-        # bgd_err = err[bgd_indices, x]
-        x = np.arange(self.Nx)
         fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex='all', gridspec_kw={'height_ratios': [5, 1]})
-        ax[0].errorbar(x, self.data, yerr=self.err, fmt='ro', label="Data")
-        # ax[0].errorbar(bgd_indices, bgd, yerr=bgd_err, fmt='bo', label="bgd data")
+        data = np.copy(self.data)
+        if self.bgd_model_func is not None:
+            data = data + self.bgd_model_func(self.pixels)
+        ax[0].errorbar(self.pixels, data, yerr=self.err, fmt='ro', label="Data")
         if len(self.outliers) > 0:
-            ax[0].errorbar(self.outliers, self.data[self.outliers], yerr=self.err[self.outliers], fmt='go',
+            ax[0].errorbar(self.outliers, data[self.outliers], yerr=self.err[self.outliers], fmt='go',
                            label=f"Outliers")
-        # if self.bgd_model_func is not None:
-        #    ax[0].plot(bgd_indices, bgd_model_func(x, bgd_indices)[:, 0], 'b--', label="fitted bgd")
+        if self.bgd_model_func is not None:
+           ax[0].plot(self.pixels, self.bgd_model_func(self.pixels), 'b--', label="fitted bgd")
         # if PSF_guess is not None:
         #     if bgd_model_func is not None:
         #         ax[0].plot(indices, PSF_guess(indices) + bgd_model_func(x, indices)[:, 0], 'k--',
         #                    label="guessed profile")
         #     else:
         #         ax[0].plot(indices, PSF_guess(indices), 'k--', label="guessed profile")
-        # if fit is not None and bgd_model_func is not None:
-        # model = fit(indices) + bgd_model_func(x, indices)[:, 0]
-        ax[0].plot(x, self.model, 'b-', label="Model")
+        model = np.copy(self.model)
+        if self.bgd_model_func is not None:
+            model = self.model + self.bgd_model_func(self.pixels)
+        ax[0].plot(self.pixels, model, 'b-', label="Model")
         ylim = ax[0].get_ylim()
         ax[0].set_ylim(ylim)
         ax[0].set_ylabel('Transverse profile')
@@ -322,11 +323,11 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
             txt += f'{p}: {self.p[ip]:.4g}\n'
         ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
         # residuals
-        residuals = (self.data - self.model) / self.err
+        residuals = (data - model) / self.err
         residuals_err = np.ones_like(self.err)
-        ax[1].errorbar(x, residuals, yerr=residuals_err, fmt='ro')
+        ax[1].errorbar(self.pixels, residuals, yerr=residuals_err, fmt='ro')
         if len(self.outliers) > 0:
-            residuals_outliers = (self.data[self.outliers] - self.model[self.outliers]) / self.err[self.outliers]
+            residuals_outliers = (data[self.outliers] - model[self.outliers]) / self.err[self.outliers]
             residuals_outliers_err = np.ones_like(residuals_outliers)
             ax[1].errorbar(self.outliers, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
         ax[1].axhline(0, color='b')
