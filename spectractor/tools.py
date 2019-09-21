@@ -43,7 +43,7 @@ def gauss(x, A, x0, sigma):
 
     Examples
     --------
-    
+
     >>> x = np.arange(50)
     >>> y = gauss(x, 10, 25, 3)
     >>> print(y.shape)
