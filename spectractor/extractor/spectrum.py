@@ -1136,7 +1136,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                                                                   x0=image.target_pixcoords)
     s.table['lambdas'] = first_guess_lambdas
     spectrum.lambdas = np.array(first_guess_lambdas)
-    my_logger.warning(f"\n\tTransverse fit table after derotation:\n{s.table[['lambdas', 'Dx_rot', 'Dx']]}")
+    my_logger.debug(f"\n\tTransverse fit table after derotation:\n{s.table[['lambdas', 'Dx_rot', 'Dx']]}")
 
     # Position of the order 0 in the spectrogram coordinates
     my_logger.info(f'\n\tExtract spectrogram: crop image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))'
