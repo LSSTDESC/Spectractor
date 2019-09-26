@@ -2,16 +2,16 @@ from numpy.testing import run_module_suite
 import numpy as np
 from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_emcee
 from spectractor.config import set_logger
+from spectractor import parameters
 
 import os
 
 
 class LineFitWorkspace(FitWorkspace):
 
-    def __init__(self, file_name, x, y, yerr, nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+    def __init__(self, x, y, yerr, file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
-        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                              live_fit, truth=truth)
+        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.x = x
         self.data = y
@@ -42,15 +42,21 @@ def test_fitworkspace():
     y = a * x + b
     yerr = sigma * np.ones_like(y)
     y += np.random.normal(scale=sigma, size=N)
+    parameters.VERBOSE = True
 
     # Do the fits
     file_name = "test_linefitworkspace.txt"
-    w = LineFitWorkspace(file_name, x, y, yerr, truth=truth, nwalkers=20, nsteps=3000, burnin=500, nbins=20)
+    w = LineFitWorkspace(x, y, yerr, file_name, truth=truth, nwalkers=20, nsteps=5000, burnin=1000, nbins=20)
     run_minimisation(w, method="minimize")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    w.p = np.array([1, 1])
     run_minimisation(w, method="least_squares")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    w.p = np.array([1, 1])
     run_minimisation(w, method="minuit")
+    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    w.p = np.array([1, 1])
+    run_minimisation(w, method="newton")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
 
     def lnprob(p):
@@ -62,7 +68,7 @@ def test_fitworkspace():
     run_emcee(w, ln=lnprob)
     w.analyze_chains()
 
-    assert w.chains.shape == (3000, 20, 2)
+    assert w.chains.shape == (5000, 20, 2)
     assert np.all(w.gelmans < 0.03)
     assert os.path.exists("test_linefitworkspace.txt")
     assert os.path.exists(file_name.replace(".txt", "_emcee.h5"))

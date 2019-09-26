@@ -1,5 +1,5 @@
 from spectractor import parameters
-from spectractor.fit.fitter import run_minimisation, SpectrogramFitWorkspace
+from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace, run_spectrogram_minimisation
 from spectractor.config import load_config
 
 
@@ -36,6 +36,6 @@ if __name__ == "__main__":
 
         w = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=2000,
                                                 burnin=1000, nbins=10, verbose=0, plot=False, live_fit=False)
-        run_minimisation(w, method="newton")
+        run_spectrogram_minimisation(w, method="newton")
         # run_emcee(fit_workspace)
         # fit_workspace.analyze_chains()
