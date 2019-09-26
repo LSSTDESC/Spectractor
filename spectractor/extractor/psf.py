@@ -1896,7 +1896,7 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> if parameters.DISPLAY: plt.show()
 
         """
-        profile_params = self.from_poly_params_to_profile_params(poly_params)
+        profile_params = self.from_poly_params_to_profile_params(poly_params, force_positive=True)
         # replace x_mean
         profile_params[:, 1] = np.arange(self.Nx)
         pixels = np.mgrid[:self.Nx, :self.Ny]
