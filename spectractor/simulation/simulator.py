@@ -29,7 +29,7 @@ from spectractor.extractor.images import Image
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import Target
-from spectractor.extractor.psf import PSF2DAstropy
+from spectractor.extractor.psf import PSF2D
 from spectractor.tools import fftconvolve_gaussian, ensure_dir, rebin
 from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
@@ -242,8 +242,8 @@ class SpectrogramModel(Spectrum):
             for i in range(len(lambdas)-1):
                 spectrum[i] = parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i+1])[0]
 
-        self.data = spectrum
-        self.err = np.zeros_like(spectrum)
+        # self.data = spectrum
+        # self.err = np.zeros_like(spectrum)
 
         # fig = plt.figure()
         # plt.plot(lambdas, spectrum/np.max(spectrum), label="spec")
@@ -251,7 +251,7 @@ class SpectrogramModel(Spectrum):
         # plt.plot(lambdas, self.disperser.transmission(lambdas-shift_t), label="disperser trans")
         # plt.legend()
         # plt.show()
-        return self.data, self.err
+        return spectrum, np.zeros_like(spectrum)
 
     def simulate_psf(self, psf_poly_params):
         psf_poly_params_with_saturation = np.concatenate([psf_poly_params, [self.spectrogram_saturation]])
@@ -319,18 +319,16 @@ class SpectrogramModel(Spectrum):
 
     def build_spectrogram(self, profile_params, spectrum, dispersion_law):
         # Spectrum units must in ADU/s
-        yy, xx = np.mgrid[:self.spectrogram_Ny, :self.spectrogram_Nx]
+        pixels = np.mgrid[:self.spectrogram_Nx, :self.spectrogram_Ny]
         simul = np.zeros((self.spectrogram_Ny, self.spectrogram_Nx))
         nlbda = dispersion_law.size
+        # cannot use directly ChromaticPSF2D class because it does not include the rotation of the spectrogram
+        psf = PSF2D()
         # TODO: increase rapidity (multithreading, optimisation...)
         for i in range(0, nlbda, 1):
-            # TODO: replace and test  with new PSF2D or chromaticpsf2D
-            psf_lambda = PSF2DAstropy.evaluate(xx, yy, 1, dispersion_law[i].real, dispersion_law[i].imag, *profile_params[i, 2:])
-            norm = PSF2DAstropy.normalisation(1, *profile_params[i, 2:-1])
-            if norm > 0:
-                psf_lambda /= norm
-            # here spectrum is in ADU/s
-            psf_lambda *= spectrum[i]
+            # here spectrum[i] is in ADU/s
+            p = np.array([spectrum[i], dispersion_law[i].real, dispersion_law[i].imag] + list(profile_params[i, 2:]))
+            psf_lambda = psf.evaluate(pixels, p=p)
             simul += psf_lambda
         return simul
 

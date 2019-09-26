@@ -398,6 +398,12 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     temperature = image.header['OUTTEMP']
     telescope = TelescopeTransmission(image.filter)
 
+    # Rotation
+    if not with_rotation:
+        rotation_angle = 0
+    else:
+        rotation_angle = spectrum.rotation_angle
+
     # Load PSF
     if psf_poly_params is None:
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
@@ -409,7 +415,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0.,
-                                           angle=spectrum.rotation_angle,
+                                           angle=rotation_angle,
                                            psf_poly_params=psf_poly_params, with_background=False, fast_sim=False)
 
     # now we include effects related to the wrong extraction of the spectrum:
@@ -441,34 +447,26 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     output_filename = (output_filename.replace('reduc', 'sim')).replace('trim', 'sim')
     output_filename = os.path.join(outputdir, output_filename)
 
-    # # Save truth file
-    # txt = f"pwv {pwv}\nozone {ozone}\naerosols{aerosols}\nA1 {A1}\nA2 {A2}\n" \
-    #       f"D {spectrum.disperser.D}\nshift_x 0\nshift_y 0\nshift_t 0\nangle {spectrum.rotation_angle}\n"
-    # for ip, p in enumerate(spectrum.chromatic_psf.poly_params_labels[spectrogram.spectrogram_Nx:]):
-    #     txt += f"{p} {psf_poly_params[ip]}\n"
-    # f = open(output_filename.replace('.fits','_truth.txt'), 'w')
-    # f.write(txt)
-    # f.close()
-    # if parameters.VERBOSE:
-    #     my_logger.info(f"\t\nWrite truth parameters in {output_filename.replace('.fits','_truth.txt')}.")
-
     # Save images and parameters
     image.header['A1'] = A1
     image.header['A2'] = A2
     image.header['X0_T'] = spectrum.x0[0]
     image.header['Y0_T'] = spectrum.x0[1]
     image.header['D2CCD_T'] = spectrum.disperser.D
-    image.header['OZONE'] = ozone
-    image.header['PWV'] = pwv
-    image.header['VAOD'] = aerosols
+    image.header['OZONE_T'] = ozone
+    image.header['PWV_T'] = pwv
+    image.header['VAOD_T'] = aerosols
     image.header['PSF_DEG'] = spectrum.spectrogram_deg
     psf_poly_params_truth = np.array(psf_poly_params)
     if psf_poly_params_truth.size > spectrum.spectrogram_Nx:
         psf_poly_params_truth = psf_poly_params_truth[spectrum.spectrogram_Nx:]
-    image.header['PSF_POLY'] = np.array_str(psf_poly_params_truth, max_line_width=1000, precision=4)
+    else:
+        psf_poly_params_truth = np.array(list(spectrogram.true_spectrum) + list(psf_poly_params_truth))
+    image.header['PSF_POLY'] = np.array_str(psf_poly_params_truth, max_line_width=1000000, precision=4)
+    image.header['LAMBDAS'] = np.array_str(spectrogram.lambdas, max_line_width=1000000, precision=2)
     image.header['RESO'] = reso
     image.header['ROTATION'] = int(with_rotation)
-    image.header['ROTANGLE'] = spectrum.rotation_angle
+    image.header['ROTANGLE'] = rotation_angle
     image.header['STARS'] = int(with_stars)
     image.header['BKGD_LEV'] = background.level
     image.save_image(output_filename, overwrite=True)
