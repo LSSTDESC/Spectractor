@@ -300,8 +300,6 @@ class ImageModel(Image):
         self.data = star.model(xx, yy) + background.model()
         self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
         spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data  # - spectrogram.spectrogram_bgd)
-        self.true_lambdas = spectrogram.lambdas
-        self.true_spectrum = spectrogram.true_spectrum
         if starfield is not None:
             self.data += starfield.model(xx, yy)
 
@@ -327,7 +325,7 @@ class ImageModel(Image):
         hdu0.data = self.data
         hdu0.header = self.header
         hdu1 = fits.ImageHDU()
-        hdu1.data = [self.true_lambdas, self.true_spectrum]
+        # hdu1.data = [self.true_lambdas, self.true_spectrum]
         hdulist = fits.HDUList([hdu0, hdu1])
         hdulist.writeto(output_filename, overwrite=overwrite)
         self.my_logger.info('\n\tImage saved in %s' % output_filename)
@@ -428,6 +426,10 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info('\n\tImage model...')
     image.compute(star, background, spectrogram, starfield=starfield)
 
+    # Recover true spectrum
+    true_lambdas = np.copy(spectrogram.lambdas)
+    true_spectrum = spectrogram.set_true_spectrum(true_lambdas, ozone, pwv, aerosols, shift_t=0)
+
     # Convert data from ADU/s in ADU
     image.convert_to_ADU_units()
 
@@ -461,9 +463,9 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     if psf_poly_params_truth.size > spectrum.spectrogram_Nx:
         psf_poly_params_truth = psf_poly_params_truth[spectrum.spectrogram_Nx:]
     else:
-        psf_poly_params_truth = np.array(list(spectrogram.true_spectrum) + list(psf_poly_params_truth))
+        psf_poly_params_truth = np.array(list(true_spectrum) + list(psf_poly_params_truth))
     image.header['PSF_POLY'] = np.array_str(psf_poly_params_truth, max_line_width=1000000, precision=4)
-    image.header['LAMBDAS'] = np.array_str(spectrogram.lambdas, max_line_width=1000000, precision=2)
+    image.header['LAMBDAS'] = np.array_str(true_lambdas, max_line_width=1000000, precision=2)
     image.header['RESO'] = reso
     image.header['ROTATION'] = int(with_rotation)
     image.header['ROTANGLE'] = rotation_angle

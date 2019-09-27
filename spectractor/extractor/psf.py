@@ -2125,11 +2125,11 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.amplitude_priors_method = amplitude_priors_method
         if amplitude_priors_method not in self.amplitude_priors_list:
             self.my_logger.error(f"\n\tUnknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
-                                   f"Must be either {self.amplitude_priors_list}.")
+                                 f"Must be either {self.amplitude_priors_list}.")
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
             # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
-            self.Q = 0.3 * np.diag([1/np.sum(self.err[:, i]**2) for i in range(self.Nx)])
+            self.Q = 0.1 * np.diag([1/np.sum(self.err[:, i]**2) for i in range(self.Nx)])
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
 
     def simulate(self, *shape_params):
