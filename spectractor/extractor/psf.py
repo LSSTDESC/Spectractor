@@ -235,7 +235,7 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
         # prepare the background, data and errors
         self.bgd = np.zeros_like(self.data)
         if self.bgd_model_func is not None:
-             self.bgd = self.bgd_model_func(self.pixels)
+            self.bgd = self.bgd_model_func(self.pixels)
         self.data = self.data - self.bgd
         self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
 
@@ -324,7 +324,7 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
             ax[0].errorbar(self.outliers, data[self.outliers], yerr=self.err[self.outliers], fmt='go',
                            label=f"Outliers")
         if self.bgd_model_func is not None:
-           ax[0].plot(self.pixels, self.bgd_model_func(self.pixels), 'b--', label="fitted bgd")
+            ax[0].plot(self.pixels, self.bgd_model_func(self.pixels), 'b--', label="fitted bgd")
         # if PSF_guess is not None:
         #     if bgd_model_func is not None:
         #         ax[0].plot(indices, PSF_guess(indices) + bgd_model_func(x, indices)[:, 0], 'k--',
@@ -1254,7 +1254,8 @@ class ChromaticPSF:
             epsilon = 1e-4 * guess
             epsilon[epsilon == 0] = 1e-4
             epsilon[-1] = 0.1
-            run_minimisation_sigma_clipping(w, method="minuit", sigma=sigma, clip_niter=2, epsilon=epsilon, verbose=False)
+            run_minimisation_sigma_clipping(w, method="minuit", sigma=sigma, clip_niter=2, epsilon=epsilon,
+                                            verbose=False)
             # It is better not to propagate the guess to further pixel columns
             # otherwise fit_chromatic_psf1D is more likely to get trapped in a local minimum
             # Randomness of the slice fit is better :
@@ -1669,8 +1670,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.W_dot_data = np.diag(self.W) @ self.data.flatten()
 
         # prepare results
-        self.amplitude_params =  np.zeros(self.Nx)
-        self.amplitude_params_err =  np.zeros(self.Nx)
+        self.amplitude_params = np.zeros(self.Nx)
+        self.amplitude_params_err = np.zeros(self.Nx)
 
     def plot_fit(self):
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
@@ -1698,7 +1699,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
         ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
         ax[3, 1].remove()
-        ax[3, 0].errorbar(np.arange(self.Nx), self.data.sum(axis=0), yerr=np.sqrt(np.sum(self.err**2, axis=0)),
+        ax[3, 0].errorbar(np.arange(self.Nx), self.data.sum(axis=0), yerr=np.sqrt(np.sum(self.err ** 2, axis=0)),
                           label='Data', fmt='k.', markersize=0.1)
         ax[3, 0].plot(np.arange(self.Nx), self.model.sum(axis=0), label='Model')
         ax[3, 0].set_ylabel('Transverse sum')
@@ -1843,8 +1844,8 @@ class ChromaticPSF2D(ChromaticPSF):
         params = [50 * i for i in range(self.Nx)]
         if self.Nx > 80:
             params = list(np.array(params)
-                          - 3000 * np.exp(-((np.arange(self.Nx) - 70)/2)**2)
-                          - 2000 * np.exp(-((np.arange(self.Nx) - 50)/2)**2))
+                          - 3000 * np.exp(-((np.arange(self.Nx) - 70) / 2) ** 2)
+                          - 2000 * np.exp(-((np.arange(self.Nx) - 50) / 2) ** 2))
         params += [0.] * (self.degrees['x_mean'] - 1) + [1, 0]  # y mean
         params += [0.] * (self.degrees['y_mean'] - 1) + [0, self.Ny / 2]  # y mean
         params += [0.] * (self.degrees['gamma'] - 1) + [0, 2]  # gamma
@@ -2121,7 +2122,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W_dot_data = np.diag(self.W) @ self.data.flatten()
 
         # priors on amplitude parameters
-        self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d']
+        self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed']
         self.amplitude_priors_method = amplitude_priors_method
         if amplitude_priors_method not in self.amplitude_priors_list:
             self.my_logger.error(f"\n\tUnknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
@@ -2129,8 +2130,10 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
             # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
-            self.Q = 0.1 * np.diag([1/np.sum(self.err[:, i]**2) for i in range(self.Nx)])
+            self.Q = 0.1 * np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
+        if self.amplitude_priors_method == "fixed":
+            self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
 
     def simulate(self, *shape_params):
         r"""
@@ -2261,46 +2264,52 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         profile_params[:self.Nx, 1] = np.arange(self.Nx)
         profile_params[:self.Nx, 2] -= self.bgd_width
 
-        # Matrix filling
-        W_dot_M = np.zeros((self.Ny * self.Nx, self.Nx))
-        M = np.zeros((self.Ny * self.Nx, self.Nx))
-        for x in range(self.Nx):
-            # self.my_logger.warning(f'\n\t{x} {profile_params[x, :]}')
-            M[:, x] = self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]).flatten()
-            # plt.imshow(self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]), origin="lower")
-            # plt.imshow(self.data, origin="lower")
-            # plt.title(f"{x}")
-            # plt.show()
-            W_dot_M[:, x] = M[:, x] * self.W
-        # Compute the minimizing amplitudes
-        M_dot_W_dot_M = M.T @ W_dot_M
-        if self.amplitude_priors_method != "psf1d":
-            L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-            cov_matrix = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
-            amplitude_params = cov_matrix @ (M.T @ self.W_dot_data)
-            if self.amplitude_priors_method == "positive":
-                amplitude_params[amplitude_params < 0] = 0
-            elif self.amplitude_priors_method == "smooth":
-                null_indices = np.where(amplitude_params < 0)[0]
-                for index in null_indices:
-                    right = amplitude_params[index]
-                    for i in range(index, min(index+10,self.Nx)):
-                        right = amplitude_params[i]
-                        if i not in null_indices:
-                            break
-                    left = amplitude_params[index]
-                    for i in range(index,  max(0, index - 10), -1):
-                        left = amplitude_params[i]
-                        if i not in null_indices:
-                            break
-                    amplitude_params[ index ] = 0.5*(right+left)
-            elif self.amplitude_priors_method == "noprior":
-                pass
+        if self.amplitude_priors_method != "fixed":
+            # Matrix filling
+            W_dot_M = np.zeros((self.Ny * self.Nx, self.Nx))
+            M = np.zeros((self.Ny * self.Nx, self.Nx))
+            for x in range(self.Nx):
+                # self.my_logger.warning(f'\n\t{x} {profile_params[x, :]}')
+                M[:, x] = self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]).flatten()
+                # plt.imshow(self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]), origin="lower")
+                # plt.imshow(self.data, origin="lower")
+                # plt.title(f"{x}")
+                # plt.show()
+                W_dot_M[:, x] = M[:, x] * self.W
+            # Compute the minimizing amplitudes
+            M_dot_W_dot_M = M.T @ W_dot_M
+            if self.amplitude_priors_method != "psf1d":
+                L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
+                cov_matrix = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
+                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data)
+                if self.amplitude_priors_method == "positive":
+                    amplitude_params[amplitude_params < 0] = 0
+                elif self.amplitude_priors_method == "smooth":
+                    null_indices = np.where(amplitude_params < 0)[0]
+                    for index in null_indices:
+                        right = amplitude_params[index]
+                        for i in range(index, min(index + 10, self.Nx)):
+                            right = amplitude_params[i]
+                            if i not in null_indices:
+                                break
+                        left = amplitude_params[index]
+                        for i in range(index, max(0, index - 10), -1):
+                            left = amplitude_params[i]
+                            if i not in null_indices:
+                                break
+                        amplitude_params[index] = 0.5 * (right + left)
+                elif self.amplitude_priors_method == "noprior":
+                    pass
+            else:
+                M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.Q
+                L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
+                cov_matrix = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
+                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + self.Q_dot_A0)
         else:
-            M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.Q
-            L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-            cov_matrix = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
-            amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + self.Q_dot_A0)
+            amplitude_params = np.copy(self.amplitude_priors)
+            err2 = np.copy(amplitude_params)
+            err2[err2 <= 0] = np.min(np.abs(err2[err2 > 0]))
+            cov_matrix = np.diag(err2)
         poly_params[:self.Nx] = amplitude_params
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[i, i]) for i in range(self.Nx)])
