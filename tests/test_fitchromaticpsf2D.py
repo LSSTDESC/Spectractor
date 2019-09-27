@@ -45,11 +45,13 @@ def test_fitchromaticpsf2d():
     plt.plot(spectrum.data)
     plt.show()
 
-    print(float(image.header['X0_T']), float(image.header['Y0_T']), spectrum.target_pixcoords)
-    print(float(image.header['ROTANGLE']), spectrum.rotation_angle)
+    assert np.isclose(float(image.header['X0_T']), spectrum.target_pixcoords[0], atol=0.01)
+    assert np.isclose(float(image.header['Y0_T']), spectrum.target_pixcoords[1], atol=0.01)
+    assert np.isclose(float(image.header['ROTANGLE']), spectrum.rotation_angle, atol=180/np.pi*1/parameters.CCD_IMSIZE)
     assert np.isclose(float(image.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), atol=2e-3)
-    print(spectrum.chromatic_psf.poly_params, PSF_POLY_PARAMS_TRUTH)
-    print(amplitude_truth, spectrum.data)
+    assert np.isclose(float(image.header['D2CCD_T']), spectrum.disperser.D, atol=0.05)
+    print(spectrum.chromatic_psf.poly_params[spectrum.lambdas.size+3:]-np.array(PSF_POLY_PARAMS_TRUTH)[3:])
+    print(np.std((amplitude_truth-spectrum.data)/spectrum.err))
 
 
 if __name__ == "__main__":
