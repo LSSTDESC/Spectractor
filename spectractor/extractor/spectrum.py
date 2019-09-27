@@ -1000,7 +1000,7 @@ def calibrate_spectrum_with_lines(spectrum):
     spectrum.disperser.D = D
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
-    # check success, xO ou D sur les bords du prior
+    # check success, xO or D on the edge of their priors
     lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.pixels = delta_pixels - pixel_shift
