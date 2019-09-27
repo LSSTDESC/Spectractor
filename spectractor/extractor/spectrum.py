@@ -14,7 +14,7 @@ from spectractor.tools import (ensure_dir, load_fits, extract_info_from_CTIO_hea
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
                                from_lambda_to_colormap)
-from spectractor.extractor.psf import ChromaticPSF1D, ChromaticPSF2D
+from spectractor.extractor.psf import ChromaticPSF1D, ChromaticPSF2D, ChromaticPSF
 from spectractor.extractor.background import extract_background_photutils
 
 
@@ -1084,7 +1084,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    s = ChromaticPSF1D(Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
+    s = ChromaticPSF2D(Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
     s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, bgd_model_func=bgd_model_func,
                                    saturation=image.saturation, live_fit=False)
 
@@ -1097,8 +1097,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         s.plot_summary()
 
     # Fit the data:
-    my_logger.info(f'\n\tStart ChromaticPSF1D polynomial fit...')
-    s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=err) #, amplitude_priors_method="psf1d")
+    method = "fixed"
+    my_logger.info(f'\n\tStart ChromaticPSF2D polynomial fit with amplitude_priors_method={method}...')
+    s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=err, amplitude_priors_method=method)
     spectrum.spectrogram_fit = s.evaluate(s.poly_params)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
