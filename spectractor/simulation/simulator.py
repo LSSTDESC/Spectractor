@@ -186,6 +186,7 @@ class SpectrogramModel(Spectrum):
         self.atmosphere = atmosphere
         #self.pixels_x = np.arange(self.chromatic_psf.Nx).astype(int)
         #self.pixels_y = np.arange(self.chromatic_psf.Ny).astype(int)
+        self.true_lambdas = None
         self.true_spectrum = None
         self.lambdas = None
         self.data = None
@@ -196,6 +197,16 @@ class SpectrogramModel(Spectrum):
         self.fix_psf_cube = False
         self.fast_sim = fast_sim
         self.with_background = with_background
+
+    def set_true_spectrum(self, lambdas, ozone, pwv, aerosols, shift_t=0.):
+        atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
+        spectrum = self.target.sed(lambdas)
+        spectrum *= self.disperser.transmission(lambdas - shift_t)
+        spectrum *= self.telescope.transmission(lambdas - shift_t)
+        spectrum *= atmosphere(lambdas)
+        self.true_spectrum = spectrum
+        self.true_lambdas = lambdas
+        return spectrum
 
     def simulate_spectrum(self, lambdas, ozone, pwv, aerosols, shift_t=0.):
         """
@@ -225,6 +236,7 @@ class SpectrogramModel(Spectrum):
         spectrum = np.zeros_like(lambdas)
         atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
         if self.fast_sim:
+            # TODO: evaluate impact of fast-sim on rapidity/quality of the fit
             spectrum = self.target.sed(lambdas)
             spectrum *= self.disperser.transmission(lambdas - shift_t)
             telescope_transmission = self.telescope.transmission(lambdas - shift_t)
@@ -242,15 +254,6 @@ class SpectrogramModel(Spectrum):
             for i in range(len(lambdas)-1):
                 spectrum[i] = parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i+1])[0]
 
-        # self.data = spectrum
-        # self.err = np.zeros_like(spectrum)
-
-        # fig = plt.figure()
-        # plt.plot(lambdas, spectrum/np.max(spectrum), label="spec")
-        # plt.plot(lambdas, telescope_transmission/np.max(telescope_transmission), label="transmission")
-        # plt.plot(lambdas, self.disperser.transmission(lambdas-shift_t), label="disperser trans")
-        # plt.legend()
-        # plt.show()
         return spectrum, np.zeros_like(spectrum)
 
     def simulate_psf(self, psf_poly_params):
@@ -375,7 +378,6 @@ class SpectrogramModel(Spectrum):
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time()-start}')
         start=time.time()
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
-        self.true_spectrum = spectrum
         self.my_logger.debug(f'\n\tAfter spectrum: {time.time()-start}')
         start=time.time()
         ima1 = self.build_spectrogram(profile_params, spectrum, dispersion_law)
@@ -468,7 +470,6 @@ class SpectrogramModel(Spectrum):
         self.my_logger.debug(f'\n\tTime after simulate disp: {time.time()-start}')
         start = time.time()
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
-        self.true_spectrum = spectrum
         self.my_logger.debug(f'\n\tTime after simulate spec: {time.time()-start}')
         start = time.time()
         nlbda = lambdas.size

@@ -27,15 +27,14 @@ def make_test_image():
 
 def test_fitchromaticpsf2d():
     parameters.VERBOSE = True
-    parameters.DEBUG = True
-    sim_image = "tests/data/sim_20170530_134.fits"
+    # parameters.DEBUG = True
+    sim_image = "./tests/data/sim_20170530_134.fits"
     if not os.path.isfile(sim_image):
         make_test_image()
     image = Image(sim_image)
     lambdas_truth = np.fromstring(image.header['LAMBDAS'][1:-1], sep=' ')
     amplitude_truth = np.fromstring(image.header['PSF_POLY'][1:-1], sep=' ', dtype=float)[:lambdas_truth.size]
     parameters.PSF_POLY_ORDER = int(image.header['PSF_DEG'])
-    image.plot_image(scale="log")
 
     tag = sim_image.split('/')[-1]
     tag = tag.replace('sim_', 'reduc_')
@@ -43,8 +42,14 @@ def test_fitchromaticpsf2d():
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     spectrum = Spectractor(sim_image, "./tests/data", [xpos, ypos], target, disperser_label, "./config/ctio.ini")
     plt.plot(amplitude_truth)
-    plt.plot(spectrum.data * parameters.FLAM_TO_ADURATE)
+    plt.plot(spectrum.data)
     plt.show()
+
+    print(float(image.header['X0_T']), float(image.header['Y0_T']), spectrum.target_pixcoords)
+    print(float(image.header['ROTANGLE']), spectrum.rotation_angle)
+    assert np.isclose(float(image.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), atol=2e-3)
+    print(spectrum.chromatic_psf.poly_params, PSF_POLY_PARAMS_TRUTH)
+    print(amplitude_truth, spectrum.data)
 
 
 if __name__ == "__main__":
