@@ -1099,7 +1099,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Fit the data:
     method = "fixed"
     my_logger.info(f'\n\tStart ChromaticPSF2D polynomial fit with amplitude_priors_method={method}...')
-    s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=err, amplitude_priors_method=method)
+    # s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=err, amplitude_priors_method=method)
     spectrum.spectrogram_fit = s.evaluate(s.poly_params)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
