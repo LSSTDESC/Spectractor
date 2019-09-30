@@ -1404,7 +1404,7 @@ class ChromaticPSF1D(ChromaticPSF):
                 index = index + shift
         return poly_params
 
-    def evaluate(self, poly_params):
+    def evaluate(self, poly_params, pixels=None):
         """
         Simulate a 2D spectrogram of size Nx times Ny with transverse 1D PSF profiles.
 
@@ -1434,9 +1434,13 @@ class ChromaticPSF1D(ChromaticPSF):
 
         """
         profile_params = self.from_poly_params_to_profile_params(poly_params)
-        y = np.arange(self.Ny)
-        output = np.zeros((self.Ny, self.Nx))
-        for k in range(self.Nx):
+        if pixels is None:
+            Ny, Nx = self.Ny, self.Nx
+        else:
+            Ny, Nx = pixels.size, self.Nx
+        output = np.zeros((Ny, Nx))
+        y = np.arange(Ny)
+        for k in range(Nx):
             # output[:, k] = PSF1D.evaluate(y, *profile_params[k])
             output[:, k] = self.PSF.evaluate(y, p=profile_params[k])
         return output
@@ -1691,7 +1695,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         if self.amplitude_priors_method == "fixed":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
 
-
     def plot_fit(self):
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), constrained_layout=True, gridspec_kw=gs_kw)
@@ -1816,6 +1819,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
         profile_params[:self.Nx, 0] = 1
         profile_params[:self.Nx, 1] -= self.bgd_width
+        poly_params[self.Nx] -= self.bgd_width
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
             M = np.array([self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]) for x in range(self.Nx)])
@@ -1860,7 +1864,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                                               if cov_matrix[x, x] > 0 else 0 for x in range(self.Nx)])
         poly_params[:self.Nx] = amplitude_params
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
-        self.model = self.chromatic_psf.evaluate(poly_params)[self.bgd_width:-self.bgd_width, :]
+        self.model = self.chromatic_psf.evaluate(poly_params, pixels=self.pixels) #[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         self.poly_params = np.copy(poly_params)
         return self.pixels, self.model, self.model_err
@@ -1922,7 +1926,7 @@ class ChromaticPSF2D(ChromaticPSF):
                 index = index + shift
         return poly_params
 
-    def evaluate(self, poly_params):
+    def evaluate(self, poly_params, pixels=None):
         """
         Simulate a 2D spectrogram of size Nx times Ny.
 
@@ -1952,12 +1956,16 @@ class ChromaticPSF2D(ChromaticPSF):
 
         """
         profile_params = self.from_poly_params_to_profile_params(poly_params, force_positive=True)
+        if pixels is None:
+            Ny, Nx = self.Ny, self.Nx
+            pixels = np.mgrid[:Nx, :Ny]
+        else:
+            dim, Nx, Ny = pixels.shape
         # replace x_mean
-        profile_params[:, 1] = np.arange(self.Nx)
-        pixels = np.mgrid[:self.Nx, :self.Ny]
-        output = np.zeros((self.Ny, self.Nx))
+        profile_params[:, 1] = np.arange(Nx)
+        output = np.zeros((Ny, Nx))
         psf = PSF2D()
-        for k in range(self.Nx):
+        for k in range(Nx):
             output += psf.evaluate(pixels, p=profile_params[k, :])
         return output
 
@@ -2311,13 +2319,15 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         """
         # linear regression for the amplitude parameters
         # prepare the vectors
+        import time
+        start = time.time()
         poly_params = np.copy(self.chromatic_psf.poly_params)
         poly_params[self.Nx:-1] = np.copy(shape_params)
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
         profile_params[:self.Nx, 0] = 1
         profile_params[:self.Nx, 1] = np.arange(self.Nx)
         profile_params[:self.Nx, 2] -= self.bgd_width
-
+        poly_params[self.Nx+self.chromatic_psf.degrees['x_mean']+1] -= self.bgd_width
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
             W_dot_M = np.zeros((self.Ny * self.Nx, self.Nx))
@@ -2368,9 +2378,14 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[i, i]) for i in range(self.Nx)])
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
-        self.model = self.chromatic_psf.evaluate(poly_params)[self.bgd_width:-self.bgd_width, :]
+        self.my_logger.warning(f"end amplitude priors: {time.time()-start} {self.bgd_width} {self.Ny} {self.pixels.shape}")
+        start = time.time()
+        self.model = self.chromatic_psf.evaluate(poly_params, pixels=self.pixels) #[self.bgd_width:-self.bgd_width, :]
+        self.my_logger.warning(f"end evaluate: {time.time()-start} {poly_params[self.Nx:]}")
+        start = time.time()
         self.model_err = np.zeros_like(self.model)
         self.poly_params = np.copy(poly_params)
+        self.my_logger.warning(f"end: {time.time()-start}")
         return self.pixels, self.model, self.model_err
 
 
