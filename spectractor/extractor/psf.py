@@ -1441,7 +1441,7 @@ class ChromaticPSF1D(ChromaticPSF):
             output[:, k] = self.PSF.evaluate(y, p=profile_params[k])
         return output
 
-    def fit_chromatic_PSF1D(self, data, bgd_model_func=None, data_errors=None):
+    def fit_chromatic_PSF1D(self, data, bgd_model_func=None, data_errors=None, amplitude_priors_method="noprior"):
         """
         Fit a chromatic PSF model on 2D data.
 
@@ -1451,8 +1451,10 @@ class ChromaticPSF1D(ChromaticPSF):
             2D array containing the image data.
         bgd_model_func: callable, optional
             A 2D function to model the extracted background (default: None -> null background)
-        data_errors: np.array
-            the 2D array uncertainties.
+        data_errors: np.array, optional
+            The 2D array of uncertainties.
+        amplitude_priors_method: str, optional
+            Prior method to use to constrain the amplitude parameters of the PSF (default: "noprior").
 
         Examples
         --------
@@ -1492,7 +1494,8 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
         """
-        w = ChromaticPSF1DFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func)
+        w = ChromaticPSF1DFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func,
+                                       amplitude_priors_method=amplitude_priors_method)
         self.fit_chromatic_psf(w, data, data_errors=data_errors, bgd_model_func=bgd_model_func)
 
     @deprecated(reason="Use fit_chromatic_PSF1D instead.")
@@ -1622,6 +1625,7 @@ class ChromaticPSF1D(ChromaticPSF):
 class ChromaticPSFFitWorkspace(FitWorkspace):
 
     def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="",
+                 amplitude_priors_method="noprior",
                  nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
@@ -1673,6 +1677,21 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.amplitude_params = np.zeros(self.Nx)
         self.amplitude_params_err = np.zeros(self.Nx)
 
+        # priors on amplitude parameters
+        self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed']
+        self.amplitude_priors_method = amplitude_priors_method
+        if amplitude_priors_method not in self.amplitude_priors_list:
+            self.my_logger.error(f"\n\tUnknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
+                                 f"Must be either {self.amplitude_priors_list}.")
+        if self.amplitude_priors_method == "psf1d":
+            self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
+            # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
+            self.Q = np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
+            self.Q_dot_A0 = self.Q @ self.amplitude_priors
+        if self.amplitude_priors_method == "fixed":
+            self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
+
+
     def plot_fit(self):
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), constrained_layout=True, gridspec_kw=gs_kw)
@@ -1723,10 +1742,11 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
 class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
 
     def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="",
+                 amplitude_priors_method="noprior",
                  nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                          file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                                          file_name, amplitude_priors_method, nwalkers, nsteps, burnin, nbins, verbose, plot,
                                           live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.pixels = np.arange(self.Ny)
@@ -1779,7 +1799,8 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
 
         Simulate the data:
 
-        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
+        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True,
+        ... amplitude_priors_method="psf1d")
         >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:-1])
         >>> w.plot_fit()
 
@@ -1795,15 +1816,48 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
         profile_params[:self.Nx, 0] = 1
         profile_params[:self.Nx, 1] -= self.bgd_width
-        M = np.array([self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]) for x in range(self.Nx)])
-        M_dot_W_dot_M = np.array([M[x].T @ self.W[x] @ M[x] for x in range(self.Nx)])
-        amplitude_params = np.array([
-            M[x].T @ self.W_dot_data[x] / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
-            for x in range(self.Nx)])
-        amplitude_params[amplitude_params < 0] = 0
+        if self.amplitude_priors_method != "fixed":
+            # Matrix filling
+            M = np.array([self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]) for x in range(self.Nx)])
+            M_dot_W_dot_M = np.array([M[x].T @ self.W[x] @ M[x] for x in range(self.Nx)])
+            if self.amplitude_priors_method != "psf1d":
+                cov_matrix = np.diag([1/M_dot_W_dot_M[x] if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
+                                      for x in range(self.Nx)])
+                amplitude_params = np.array([
+                    M[x].T @ self.W_dot_data[x] / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
+                    for x in range(self.Nx)])
+                if self.amplitude_priors_method == "positive":
+                    amplitude_params[amplitude_params < 0] = 0
+                elif self.amplitude_priors_method == "smooth":
+                    null_indices = np.where(amplitude_params < 0)[0]
+                    for index in null_indices:
+                        right = amplitude_params[index]
+                        for i in range(index, min(index + 10, self.Nx)):
+                            right = amplitude_params[i]
+                            if i not in null_indices:
+                                break
+                        left = amplitude_params[index]
+                        for i in range(index, max(0, index - 10), -1):
+                            left = amplitude_params[i]
+                            if i not in null_indices:
+                                break
+                        amplitude_params[index] = 0.5 * (right + left)
+                elif self.amplitude_priors_method == "noprior":
+                    pass
+            else:
+                M_dot_W_dot_M_plus_Q = [M_dot_W_dot_M[x] + self.Q[x, x] for x in range(self.Nx)]
+                cov_matrix = np.diag([1/M_dot_W_dot_M_plus_Q[x] if M_dot_W_dot_M_plus_Q[x] > 0 else 0.1 * self.bgd_std
+                                      for x in range(self.Nx)])
+                amplitude_params = [cov_matrix[x, x] * (M[x].T @ self.W_dot_data[x] + self.Q_dot_A0[x])
+                                    for x in range(self.Nx)]
+        else:
+            amplitude_params = np.copy(self.amplitude_priors)
+            err2 = np.copy(amplitude_params)
+            err2[err2 <= 0] = np.min(np.abs(err2[err2 > 0]))
+            cov_matrix = np.diag(err2)
         self.amplitude_params = np.copy(amplitude_params)
-        self.amplitude_params_err = np.array([np.sqrt(1 / M_dot_W_dot_M[x])
-                                              if M_dot_W_dot_M[x] > 0 else 0 for x in range(self.Nx)])
+        self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x])
+                                              if cov_matrix[x, x] > 0 else 0 for x in range(self.Nx)])
         poly_params[:self.Nx] = amplitude_params
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         self.model = self.chromatic_psf.evaluate(poly_params)[self.bgd_width:-self.bgd_width, :]
@@ -1958,7 +2012,7 @@ class ChromaticPSF2D(ChromaticPSF):
         Fit the data:
 
         >>> s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors,
-        ... amplitude_priors_method="psf1d")
+        ... amplitude_priors_method="fixed")
         >>> s.plot_summary(truth=s0)
         """
         # TODO: move amplitude_priors_method to mother class ChromaticPSFFitWorkspace ?
@@ -2111,7 +2165,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                  file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                          file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                                          file_name, amplitude_priors_method, nwalkers, nsteps, burnin, nbins, verbose, plot,
                                           live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.pixels = np.mgrid[:self.Nx, :self.Ny]
@@ -2122,18 +2176,18 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W_dot_data = np.diag(self.W) @ self.data.flatten()
 
         # priors on amplitude parameters
-        self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed']
-        self.amplitude_priors_method = amplitude_priors_method
-        if amplitude_priors_method not in self.amplitude_priors_list:
-            self.my_logger.error(f"\n\tUnknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
-                                 f"Must be either {self.amplitude_priors_list}.")
-        if self.amplitude_priors_method == "psf1d":
-            self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
-            # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
-            self.Q = 0.1 * np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
-            self.Q_dot_A0 = self.Q @ self.amplitude_priors
-        if self.amplitude_priors_method == "fixed":
-            self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
+        # self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed']
+        # self.amplitude_priors_method = amplitude_priors_method
+        # if amplitude_priors_method not in self.amplitude_priors_list:
+        #     self.my_logger.error(f"\n\tUnknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
+        #                          f"Must be either {self.amplitude_priors_list}.")
+        # if self.amplitude_priors_method == "psf1d":
+        #     self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
+        #     # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
+        #     self.Q = 0.1 * np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
+        #     self.Q_dot_A0 = self.Q @ self.amplitude_priors
+        # if self.amplitude_priors_method == "fixed":
+        #     self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
 
     def simulate(self, *shape_params):
         r"""
