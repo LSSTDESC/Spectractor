@@ -2319,8 +2319,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         """
         # linear regression for the amplitude parameters
         # prepare the vectors
-        import time
-        start = time.time()
         poly_params = np.copy(self.chromatic_psf.poly_params)
         poly_params[self.Nx:-1] = np.copy(shape_params)
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
@@ -2381,7 +2379,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.model = self.chromatic_psf.evaluate(poly_params, pixels=self.pixels) #[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         self.poly_params = np.copy(poly_params)
-        self.my_logger.warning(f"end: {time.time()-start}")
         return self.pixels, self.model, self.model_err
 
 
