@@ -81,7 +81,7 @@ def test_fitchromaticpsf2d():
     logbook = LogBook(logbook="./ctiofulllogbook_jun2017_v5.csv")
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     spectrum = Spectractor(sim_image, "./tests/data", [xpos, ypos], target, disperser_label, "./config/ctio.ini")
-    plot_residulls(spectrum, amplitude_truth)
+    plot_residuals(spectrum, lambdas_truth, amplitude_truth)
 
     assert np.isclose(float(image.header['X0_T']), spectrum.target_pixcoords[0], atol=0.01)
     assert np.isclose(float(image.header['Y0_T']), spectrum.target_pixcoords[1], atol=0.01)
