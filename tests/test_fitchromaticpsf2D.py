@@ -49,6 +49,10 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
                          units=spectrum.units)
     # spectrum.lines.plot_atomic_lines(ax[0], fontsize=12, force=True)
     ax[0].plot(lambdas_truth, amplitude_truth, label="Truth")
+    # transverse_sum = np.mean((spectrum.spectrogram-spectrum.spectrogram_bgd)*spectrum.expo
+    # /(parameters.FLAM_TO_ADURATE*spectrum.lambdas*spectrum.lambdas_binwidths), axis=0)
+    # transverse_sum *= np.max(spectrum.data)/np.max(transverse_sum)
+    # ax[0].plot(spectrum.lambdas, transverse_sum, label="Transverse sum")
     ax[0].set_ylabel(f"Spectrum [{spectrum.units}]")
     ax[0].legend()
     residuals = (spectrum.data - amplitude_truth)/spectrum.err
