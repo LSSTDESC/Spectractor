@@ -2378,11 +2378,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[i, i]) for i in range(self.Nx)])
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
-        self.my_logger.warning(f"end amplitude priors: {time.time()-start} {self.bgd_width} {self.Ny} {self.pixels.shape}")
-        start = time.time()
         self.model = self.chromatic_psf.evaluate(poly_params, pixels=self.pixels) #[self.bgd_width:-self.bgd_width, :]
-        self.my_logger.warning(f"end evaluate: {time.time()-start} {poly_params[self.Nx:]}")
-        start = time.time()
         self.model_err = np.zeros_like(self.model)
         self.poly_params = np.copy(poly_params)
         self.my_logger.warning(f"end: {time.time()-start}")
