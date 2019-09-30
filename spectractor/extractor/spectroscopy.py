@@ -1,10 +1,11 @@
 from astropy.table import Table
 from scipy.interpolate import interp1d
 import numpy as np
+import matplotlib.pyplot as plt
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_for_legendre
+from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_for_legendre, plot_spectrum_simple
 
 
 class Line:
@@ -396,6 +397,7 @@ class Lines:
             t[t.colnames[-1]].unit = 'reduced'
             print(t)
 
+
 # Line catalog
 
 # Hydrogen lines
@@ -503,7 +505,7 @@ AR15 = Line(866.794, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR16 = Line(912.297, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR17 = Line(922.450, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 HGAR_LINES = [HG1, HG2, HG3, HG4, HG5, HG6, HG7, HG8, HG9, HG10, HG11, HG12,
-               AR1, AR2, AR3, AR4, AR5, AR6, AR7, AR8, AR9, AR10, AR11, AR12, AR13, AR14, AR15, AR16, AR17 ]
+               AR1, AR2, AR3, AR4, AR5, AR6, AR7, AR8, AR9, AR10, AR11, AR12, AR13, AR14, AR15, AR16, AR17]
 
 
 if __name__ == "__main__":
