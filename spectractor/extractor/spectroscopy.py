@@ -238,6 +238,7 @@ class Lines:
         Examples
         --------
 
+        >>> import matplotlib.pyplot as plt
         >>> f, ax = plt.subplots(1,1)
         >>> ax.set_xlim(300,1000)
         (300, 1000)
