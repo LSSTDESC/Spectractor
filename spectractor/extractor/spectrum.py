@@ -1107,15 +1107,15 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.data = np.copy(s.table['flux_integral'])
     s.table['Dx_rot'] = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
     s.table['Dx'] = np.copy(s.table['Dx_rot'])
-    s.table['Dy'] = s.table['x_mean'] - (image.target_pixcoords_rotated[1] - ymin)
+    s.table['Dy'] = s.table['y_mean'] - (image.target_pixcoords_rotated[1] - ymin)
     s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
     s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
-    s.table['x_mean'] = s.table['x_mean'] - (image.target_pixcoords_rotated[1] - ymin)
-    my_logger.debug(f"\n\tTransverse fit table before derotation:\n{s.table[['Dx_rot', 'Dx', 'x_mean', 'Dy']]}")
+    s.table['y_mean'] = s.table['y_mean'] - (image.target_pixcoords_rotated[1] - ymin)
+    my_logger.debug(f"\n\tTransverse fit table before derotation:\n{s.table[['Dx_rot', 'Dx', 'y_mean', 'Dy']]}")
 
     # rotate and save the table
     s.rotate_table(-image.rotation_angle)
-    my_logger.debug(f"\n\tTransverse fit table after derotation:\n{s.table[['Dx_rot', 'Dx', 'x_mean', 'Dy']]}")
+    my_logger.debug(f"\n\tTransverse fit table after derotation:\n{s.table[['Dx_rot', 'Dx', 'y_mean', 'Dy']]}")
 
     # Extract the spectrogram edges
     data = np.copy(image.data)[:, 0:right_edge]
