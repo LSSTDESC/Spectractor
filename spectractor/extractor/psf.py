@@ -40,7 +40,7 @@ class PSF1D(PSF):
             self.p = p
         else:
             self.p = [0.5, 0, 3, 3, 1, 1, 1]
-        self.param_names = ["amplitude_moffat", "x_mean", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
+        self.param_names = ["amplitude_moffat", "y_mean", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
         self.axis_names = ["A", r"m", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
 
     def evaluate(self, x, p=None):
@@ -1337,11 +1337,31 @@ class ChromaticPSF:
         >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func)
         >>> s.fit_chromatic_psf(w, data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
+
+        ..  doctest::
+            :hide:
+
+            >>> residuals = (w.data-w.model)/w.err
+            >>> assert w.costs[-1] /(w.Nx*w.Ny) < 1.1
+            >>> assert np.abs(np.mean(residuals)) < 0.1
+            >>> assert np.std(residuals) < 1.2
         """
         guess = np.copy(self.poly_params)
-        run_minimisation(w, method="newton", ftol=1e-4, xtol=1e-6, niter=50)
-
+        run_minimisation(w, method="newton", ftol=1/(w.Nx*w.Ny), xtol=1e-6, niter=50)
         self.poly_params = w.poly_params
+
+        # add background crop to y_mean
+        ymean_index = w.Nx
+        for label in self.PSF.param_names:
+            if label == "amplitude_moffat":
+                continue
+            if label != "y_mean":
+                ymean_index += self.degrees[label]+1
+            else:
+                break
+        self.poly_params[ymean_index] += w.bgd_width
+
+        # fill results
         self.profile_params = self.from_poly_params_to_profile_params(self.poly_params, force_positive=True)
         self.fill_table_with_profile_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
@@ -1382,7 +1402,7 @@ class ChromaticPSF1D(ChromaticPSF):
             >>> assert(np.all(np.isclose(params, [ 0, 50, 100, 150, 200, 2, 0, 5, 0, 2, 0, -0.4, -0.4, 2, 0, 8000])))
         """
         params = [50 * i for i in range(self.Nx)]
-        params += [0.] * (self.degrees['x_mean'] - 1) + [0, self.Ny / 2]  # y mean
+        params += [0.] * (self.degrees['y_mean'] - 1) + [0, self.Ny / 2]  # y mean
         params += [0.] * (self.degrees['gamma'] - 1) + [0, 5]  # gamma
         params += [0.] * (self.degrees['alpha'] - 1) + [0, 2]  # alpha
         params += [0.] * (self.degrees['eta_gauss'] - 1) + [-0.4, -0.4]  # eta_gauss
@@ -1460,6 +1480,11 @@ class ChromaticPSF1D(ChromaticPSF):
         amplitude_priors_method: str, optional
             Prior method to use to constrain the amplitude parameters of the PSF (default: "noprior").
 
+        Returns
+        -------
+        fit_workspace: ChromaticPSFFitWorkspace
+            The ChromaticPSFFitWorkspace instance to get info about the fitting.
+
         Examples
         --------
 
@@ -1495,12 +1520,21 @@ class ChromaticPSF1D(ChromaticPSF):
 
         Fit the data:
 
-        >>> s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
+        >>> w = s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
         >>> s.plot_summary(truth=s0)
+
+        ..  doctest::
+            :hide:
+
+            >>> residuals = (w.data-w.model)/w.err
+            >>> assert w.costs[-1] /(w.Nx*w.Ny) < 1.1
+            >>> assert np.abs(np.mean(residuals)) < 0.1
+            >>> assert np.std(residuals) < 1.2
         """
         w = ChromaticPSF1DFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func,
                                        amplitude_priors_method=amplitude_priors_method)
         self.fit_chromatic_psf(w, data, data_errors=data_errors, bgd_model_func=bgd_model_func)
+        return w
 
     @deprecated(reason="Use fit_chromatic_PSF1D instead.")
     def fit_chromatic_PSF1D_minuit(self, data, bgd_model_func=None, data_errors=None):
@@ -1690,7 +1724,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
             # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
-            self.Q = np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
+            self.Q = 0.01*np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
         if self.amplitude_priors_method == "fixed":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
@@ -1814,7 +1848,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
 
         """
         # linear regression for the amplitude parameters
-        poly_params = np.copy(self.chromatic_psf.poly_params)
+        poly_params = np.copy(self.poly_params)
         poly_params[self.Nx:-1] = np.copy(shape_params)
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
         profile_params[:self.Nx, 0] = 1
@@ -1984,6 +2018,11 @@ class ChromaticPSF2D(ChromaticPSF):
         amplitude_priors_method: str, optional
             Prior method to use to constrain the amplitude parameters of the PSF (default: "noprior").
 
+        Returns
+        -------
+        fit_workspace: ChromaticPSFFitWorkspace
+            The ChromaticPSFFitWorkspace instance to get info about the fitting.
+
         Examples
         --------
 
@@ -2019,14 +2058,23 @@ class ChromaticPSF2D(ChromaticPSF):
 
         Fit the data:
 
-        >>> s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors,
+        >>> w = s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors,
         ... amplitude_priors_method="fixed")
         >>> s.plot_summary(truth=s0)
+
+        ..  doctest::
+            :hide:
+
+            >>> residuals = (w.data-w.model)/w.err
+            >>> assert w.costs[-1] /(w.Nx*w.Ny) < 1.3
+            >>> assert np.abs(np.mean(residuals)) < 0.2
+            >>> assert np.std(residuals) < 1.2
         """
         # TODO: move amplitude_priors_method to mother class ChromaticPSFFitWorkspace ?
         w = ChromaticPSF2DFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func, live_fit=True,
                                        amplitude_priors_method=amplitude_priors_method)
         self.fit_chromatic_psf(w, data, data_errors=data_errors, bgd_model_func=bgd_model_func)
+        return w
 
     @deprecated(reason="Has never worked... Use fit_chromatic_PSF2D instead.")
     def fit_chromatic_PSF2D_minuit(self, data, bgd_model_func=None, data_errors=None):
@@ -2183,20 +2231,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W = self.W.flatten()
         self.W_dot_data = np.diag(self.W) @ self.data.flatten()
 
-        # priors on amplitude parameters
-        # self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed']
-        # self.amplitude_priors_method = amplitude_priors_method
-        # if amplitude_priors_method not in self.amplitude_priors_list:
-        #     self.my_logger.error(f"\n\tUnknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
-        #                          f"Must be either {self.amplitude_priors_list}.")
-        # if self.amplitude_priors_method == "psf1d":
-        #     self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
-        #     # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
-        #     self.Q = 0.1 * np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
-        #     self.Q_dot_A0 = self.Q @ self.amplitude_priors
-        # if self.amplitude_priors_method == "fixed":
-        #     self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
-
     def simulate(self, *shape_params):
         r"""
         Compute a ChromaticPSF2D model given PSF shape parameters and minimizing
@@ -2319,7 +2353,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         """
         # linear regression for the amplitude parameters
         # prepare the vectors
-        poly_params = np.copy(self.chromatic_psf.poly_params)
+        poly_params = np.copy(self.poly_params)
         poly_params[self.Nx:-1] = np.copy(shape_params)
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
         profile_params[:self.Nx, 0] = 1
