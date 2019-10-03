@@ -1724,7 +1724,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
             # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
-            self.Q = 0.01*np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
+            self.Q = parameters.PSF_FIT_REG_PARAM*np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
         if self.amplitude_priors_method == "fixed":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
