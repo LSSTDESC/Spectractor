@@ -1245,7 +1245,7 @@ class ChromaticPSF:
             #     guess = [0.9 * maxi, mean, std, 2, 0, std, saturation]
             # PSF_guess = PSF1D(*guess)
             # fit, outliers = fit_PSF1D_minuit_outlier_removal(index, signal, guess=guess, bounds=bounds,
-            #                                                  data_errors=err[:, x], sigma=sigma, niter=2, consecutive=4)
+            #                                               data_errors=err[:, x], sigma=sigma, niter=2, consecutive=4)
             PSF_guess = PSF1D(p=guess)
             w.p = guess[:-1]
             w.bounds = bounds[:-1]
@@ -1714,6 +1714,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # prepare results
         self.amplitude_params = np.zeros(self.Nx)
         self.amplitude_params_err = np.zeros(self.Nx)
+        self.cov_matrix = np.zeros((self.Nx, self.Nx))
 
         # priors on amplitude parameters
         self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed']
@@ -1896,6 +1897,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x])
                                               if cov_matrix[x, x] > 0 else 0 for x in range(self.Nx)])
+        self.cov_matrix = np.copy(cov_matrix)
         poly_params[:self.Nx] = amplitude_params
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         self.model = self.chromatic_psf.evaluate(poly_params, pixels=self.pixels) #[self.bgd_width:-self.bgd_width, :]
@@ -2409,6 +2411,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         poly_params[:self.Nx] = amplitude_params
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[i, i]) for i in range(self.Nx)])
+        self.cov_matrix = np.copy(cov_matrix)
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         self.model = self.chromatic_psf.evaluate(poly_params, pixels=self.pixels) #[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
