@@ -947,7 +947,7 @@ def calibrate_spectrum_with_lines(spectrum):
             if parameters.LIVE_FIT:
                 spectrum.lambdas = lambdas_test
                 spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
-                                                        f'\nD={D:.2f}mm, shift={shift:.2f}pix')
+                                                            f'\nD={D:.2f}mm, shift={shift:.2f}pix')
         return chisq
 
     # grid exploration of the parameters
@@ -1099,12 +1099,40 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Fit the data:
     method = "psf1d"
     my_logger.info(f'\n\tStart ChromaticPSF2D polynomial fit with amplitude_priors_method={method}...')
-    s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=err, amplitude_priors_method=method)
+    w = s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=err, amplitude_priors_method=method)
     spectrum.spectrogram_fit = s.evaluate(s.poly_params)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
     spectrum.chromatic_psf = s
     spectrum.data = np.copy(s.table['flux_integral'])
+
+    fig, ax = plt.subplots(3, 1, figsize=(9, 9), sharex="all")
+    x = np.arange(spectrum.data.size)
+    ax[0].errorbar(x, s.table['flux_sum'], yerr=s.table['flux_err'], fmt="k.", label="flux_sum")
+    ax[0].errorbar(x, w.amplitude_params, yerr=w.amplitude_params_err, fmt="r.", label="amplitudes")
+    truth = parameters.AMPLITUDE_TRUTH*parameters.LAMBDA_TRUTH*np.gradient(parameters.LAMBDA_TRUTH)
+    truth *= parameters.FLAM_TO_ADURATE
+    ax[0].plot(np.arange(parameters.AMPLITUDE_TRUTH.size), truth, label="Truth")
+    ax[0].grid()
+    ax[0].legend()
+    ax[0].set_xlabel("X [pixels]")
+    ax[0].set_title(f"lambda={parameters.PSF_FIT_REG_PARAM}")
+    ax[0].set_ylabel('Spectrum amplitudes')
+    ax[1].errorbar(x, s.table['flux_sum']-truth, yerr=s.table['flux_err'], fmt="k.", label="flux_sum")
+    ax[1].axhline(0, color="k")
+    ax[1].grid()
+    ax[1].legend()
+    ax[1].set_xlabel("X [pixels]")
+    ax[1].set_ylabel('Sum-Truth')
+    ax[2].errorbar(x, w.amplitude_params-truth, yerr=w.amplitude_params_err, fmt="r.", label="amplitudes")
+    ax[2].axhline(0, color="k")
+    ax[2].grid()
+    ax[2].legend()
+    ax[2].set_xlabel("X [pixels]")
+    ax[2].set_ylabel('Amplitudes-Truth')
+    fig.tight_layout()
+    plt.show()
+
     s.table['Dx_rot'] = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
     s.table['Dx'] = np.copy(s.table['Dx_rot'])
     s.table['Dy'] = s.table['y_mean'] - (image.target_pixcoords_rotated[1] - ymin)
