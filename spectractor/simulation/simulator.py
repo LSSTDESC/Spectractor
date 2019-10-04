@@ -264,7 +264,7 @@ class SpectrogramModel(Spectrum):
         # self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
         # self.chromatic_psf.table['Dx'] = np.arange(self.spectrogram_Nx) - self.spec
         self.chromatic_psf.table['Dy_mean'] = 0
-        self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['x_mean'])
+        self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['y_mean'])
         # derotate
         # self.my_logger.warning(f"\n\tbefore\n {self.chromatic_psf.table[['Dx_rot', 'Dx', 'Dy', 'Dy_mean']][:5]} {angle}")
         self.chromatic_psf.rotate_table(-self.rotation_angle)
