@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 parameters.PSF_POLY_ORDER = 2
 PSF_POLY_PARAMS_TRUTH = [0, 0, 0,
-                         3, 0, 0,
+                         3, 2, 0,
                          2, 0, 0,
                          0, -0.5, 0,
                          1, 0, 0,
@@ -23,7 +23,7 @@ def make_test_image():
     spectrum_filename = "tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = spectrum_filename.replace("_spectrum.fits", ".fits")
     ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=1, A2=0.05,
-             psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=False)
+             psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=True)
 
 
 def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
@@ -32,6 +32,7 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
     Parameters
     ----------
     spectrum
+    lambdas_truth
     amplitude_truth
 
     Examples
@@ -56,7 +57,7 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
     ax[0].set_ylabel(f"Spectrum [{spectrum.units}]")
     ax[0].legend()
     residuals = (spectrum.data - amplitude_truth)/spectrum.err
-    ax[1].errorbar(spectrum.lambdas, residuals, yerr=np.ones_like(spectrum.data), label="Fit", fmt="ro")
+    ax[1].errorbar(spectrum.lambdas, residuals, yerr=np.ones_like(spectrum.data), label="Fit", fmt="r.")
     ax[1].set_ylabel(f"Residuals")
     ax[1].set_xlabel(r"$\lambda$ [nm]")
     ax[1].grid()
@@ -78,7 +79,10 @@ def test_fitchromaticpsf2d():
     image = Image(sim_image)
     lambdas_truth = np.fromstring(image.header['LAMBDAS'][1:-1], sep=' ')
     amplitude_truth = np.fromstring(image.header['PSF_POLY'][1:-1], sep=' ', dtype=float)[:lambdas_truth.size]
+    parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
+    parameters.LAMBDA_TRUTH = np.copy(lambdas_truth)
     parameters.PSF_POLY_ORDER = int(image.header['PSF_DEG'])
+    print(parameters.AMPLITUDE_TRUTH)
 
     tag = sim_image.split('/')[-1]
     tag = tag.replace('sim_', 'reduc_')
