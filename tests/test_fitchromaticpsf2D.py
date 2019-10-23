@@ -84,6 +84,7 @@ def test_fitchromaticpsf2d():
     parameters.PSF_POLY_ORDER = int(image.header['PSF_DEG'])
     print(parameters.AMPLITUDE_TRUTH)
 
+    parameters.PSF_POLY_ORDER = 2
     tag = sim_image.split('/')[-1]
     tag = tag.replace('sim_', 'reduc_')
     logbook = LogBook(logbook="./ctiofulllogbook_jun2017_v5.csv")
