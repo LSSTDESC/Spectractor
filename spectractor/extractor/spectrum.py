@@ -110,7 +110,9 @@ class Spectrum:
         >>> assert np.max(s.err) < 1e-2
 
         """
-
+        if self.units == "ADU/s":
+            self.my_logger.warning(f"You ask to convert spectrum already in {self.units} in ADU/s... check your code !")
+            return
         self.data = self.data / parameters.FLAM_TO_ADURATE
         self.data /= self.lambdas * self.lambdas_binwidths
         if self.err is not None:
@@ -130,6 +132,10 @@ class Spectrum:
         >>> assert np.max(s.err) > 1e-2
 
         """
+        if self.units == 'erg/s/cm$^2$/nm':
+            self.my_logger.warning(f"You ask to convert spectrum already in {self.units}"
+                                   f" in erg/s/cm^2/nm... check your code !")
+            return
         self.data = self.data * parameters.FLAM_TO_ADURATE
         self.data *= self.lambdas_binwidths * self.lambdas
         if self.err is not None:
@@ -883,6 +889,8 @@ def calibrate_spectrum_with_lines(spectrum):
     """
     my_logger = set_logger(__name__)
 
+    # Convert back to ADU rate units because of lambda*dlambda normalisation in flam units
+    spectrum.convert_from_flam_to_ADUrate()
     # Convert wavelength array into original pixels
     x0 = spectrum.x0
     if x0 is None:
@@ -969,6 +977,8 @@ def calibrate_spectrum_with_lines(spectrum):
     lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.pixels = delta_pixels - pixel_shift
+    # Convert back to flam units
+    spectrum.convert_from_ADUrate_to_flam()
     spectrum.my_logger.info(
         '\n\tOrder0 total shift: {:.2f}pix'
         '\n\tD = {:.2f} mm (default: DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
