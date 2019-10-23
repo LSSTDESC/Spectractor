@@ -127,10 +127,10 @@ class Atmosphere:
         >>> a.plot_transmission()
 
         """
-        plt.figure()
+        fig = plt.figure()
         plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.transmission(parameters.LAMBDAS),
                                  title=self.title, label=self.label)
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
 
@@ -261,6 +261,13 @@ class AtmosphereGrid(Atmosphere):
         >>> a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits',
         ... pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
         >>> atmospheric_grid = a.compute()
+        >>> atmospheric_grid
+        array([[0.000000e+00, 0.000000e+00, 0.000000e+00, ..., 1.099400e+03,
+                1.099600e+03, 1.099800e+03],
+               [1.000000e+00, 0.000000e+00, 5.000000e+00, ..., 9.520733e-01,
+                9.520733e-01, 9.520733e-01],
+               [2.000000e+00, 1.000000e-01, 5.000000e+00, ..., 9.213718e-01,
+                9.213718e-01, 9.213718e-01]])
         >>> assert np.all(np.isclose(a.atmgrid[0, a.index_atm_data:], parameters.LAMBDAS))
         >>> assert not np.any(np.isclose(a.atmgrid[1, a.index_atm_data:], np.zeros_like(parameters.LAMBDAS), rtol=1e-6))
         >>> assert a.atmgrid.shape == (3, a.index_atm_data+len(parameters.LAMBDAS))
@@ -304,7 +311,7 @@ class AtmosphereGrid(Atmosphere):
                     f'VAOD={self.atmgrid[int(count), self.index_atm_aer]}'
             plot_transmission_simple(plt.gca(), self.lambdas, self.atmgrid[int(count), self.index_atm_data:],
                                      title="Atmospheric grid", label=label)
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
     def plot_transmission_image(self):
@@ -333,6 +340,14 @@ class AtmosphereGrid(Atmosphere):
         ----------
         filename: str
             The output file name.
+
+        Examples
+        --------
+        >>> a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits',
+        ... pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
+        >>> atmospheric_grid = a.compute()
+        >>> a.save_file(a.image_filename.replace('.fits', '_atmsim.fits'))
+        >>> assert os.path.isfile('tests/data/reduc_20170605_028_atmsim.fits')
         """
         hdr = fits.Header()
 
@@ -390,6 +405,21 @@ class AtmosphereGrid(Atmosphere):
         ----------
         filename: str
             The input file name.
+
+        Examples
+        --------
+        >>> a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits',
+        ... pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
+        >>> atmospheric_grid = a.compute()
+        >>> a.save_file(a.image_filename.replace('.fits', '_atmsim.fits'))
+        >>> assert os.path.isfile('tests/data/reduc_20170605_028_atmsim.fits')
+        >>> a.load_file(a.image_filename.replace('.fits', '_atmsim.fits'))
+        >>> a.AER_Points
+        array([0. , 0.1])
+        >>> a.PWV_Points
+        array([5.])
+        >>> a.OZ_Points
+        array([400.])
         """
 
         if filename != "":
