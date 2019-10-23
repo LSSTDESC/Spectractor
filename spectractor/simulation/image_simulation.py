@@ -20,9 +20,55 @@ import os
 
 
 class StarModel:
+    """Class to model a star in the image simulation process.
+
+    Attributes
+    ----------
+    x0: float
+        X position of the star centroid in pixels.
+    y0: float
+        Y position of the star centroid in pixels.
+    amplitude: amplitude
+        The amplitude of the star in image units.
+    target: Target
+        The associated Target instance (default: None).
+    """
 
     def __init__(self, pixcoords, model, amplitude, target=None):
-        """ [x0, y0] coords in pixels, sigma width in pixels, A height in image units"""
+        """Create a StarModel instance.
+
+        The model is based on an Astropy Fittable2DModel. The centroid and amplitude
+        parameters of the given model are updated by the dedicated arguments.
+
+        Parameters
+        ----------
+        pixcoords: array_like
+            Tuple of (x,y) coordinates of the desired star centroid in pixels.
+        model: Fittable2DModel
+            Astropy fittable 2D model
+        amplitude: float
+            The desired amplitude of the star in image units.
+        target: Target
+            The associated Target instance (default: None).
+
+        Examples
+        --------
+        >>> from spectractor.extractor.psf import PSF2D
+        >>> from spectractor.extractor.images import fit_PSF2D_minuit
+        >>> p = (100, 50, 50, 3, 2, -0.1, 1, 200)
+        >>> psf = PSF2D(*p)
+        >>> yy, xx = np.mgrid[:100,:100]
+        >>> data = psf.evaluate(xx, yy, *p)
+        >>> model = fit_PSF2D_minuit(xx, yy, data, guess=p)
+        >>> s = StarModel((20, 20), model, 200, target=None)
+        >>> s.plot_model()
+        >>> s.x0
+        20
+        >>> s.y0
+        20
+        >>> s.model.amplitude
+        200
+        """
         self.my_logger = set_logger(self.__class__.__name__)
         self.x0 = pixcoords[0]
         self.y0 = pixcoords[1]
@@ -37,6 +83,9 @@ class StarModel:
         self.sigma = self.model.stddev / 2
 
     def plot_model(self):
+        """
+        Plot the star model.
+        """
         x = np.linspace(self.x0 - 10 * self.fwhm, self.x0 + 10 * self.fwhm, 50)
         y = np.linspace(self.y0 - 10 * self.fwhm, self.y0 + 10 * self.fwhm, 50)
         yy, xx = np.meshgrid(x, y)
@@ -147,38 +196,81 @@ class StarFieldModel:
 
 
 class BackgroundModel:
+    """Class to model the background of the simulated image.
+
+    The background model size is set with the parameters.CCD_IMSIZE global keyword.
+
+    Attributes
+    ----------
+    level: float
+        The mean level of the background in image units.
+    frame: array_like
+        (x, y, smooth) right and upper limits in pixels of a vignetting frame,
+        and the smoothing gaussian width (default: None).
+    """
 
     def __init__(self, level, frame=None):
+        """Create a BackgroundModel instance.
+
+        The background model size is set with the parameters.CCD_IMSIZE global keyword.
+
+        Parameters
+        ----------
+        level: float
+            The mean level of the background in image units.
+        frame: array_like, None
+            (x, y, smooth) right and upper limits in pixels of a vignetting frame,
+            and the smoothing gaussian width (default: None).
+
+        Examples
+        --------
+        >>> from spectractor import parameters
+        >>> parameters.CCD_IMSIZE = 200
+        >>> bgd = BackgroundModel(10)
+        >>> model = bgd.model()
+        >>> np.all(model==10)
+        True
+        >>> model.shape
+        (200, 200)
+        >>> bgd = BackgroundModel(10, frame=(160, 180, 3))
+        >>> bgd.plot_model()
+        """
         self.my_logger = set_logger(self.__class__.__name__)
         self.level = level
         if self.level <= 0:
             self.my_logger.warning('\n\tBackground level must be strictly positive.')
         self.frame = frame
 
-    def model(self, x, y):
-        """Background model for the image simulation.
-        Args:
-            x:
-            y:
+    def model(self):
+        """Compute the background model for the image simulation in image units.
 
-        Returns:
+        A shadowing vignetting frame is roughly simulated if self.frame is set.
+        The background model size is set with the parameters.CCD_IMSIZE global keyword.
+
+        Returns
+        -------
+        bkgd: array_like
+            The array of the background model.
 
         """
-        bkgd = self.level * np.ones_like(x)
+        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
+        bkgd = self.level * np.ones_like(xx)
         if self.frame is None:
             return bkgd
         else:
-            xlim, ylim = self.frame
+            xlim, ylim, width = self.frame
             bkgd[ylim:, :] = self.level / 100
             bkgd[:, xlim:] = self.level / 100
-            kernel = np.outer(gaussian(parameters.CCD_IMSIZE, 50), gaussian(parameters.CCD_IMSIZE, 50))
+            kernel = np.outer(gaussian(parameters.CCD_IMSIZE, width), gaussian(parameters.CCD_IMSIZE, width))
             bkgd = fftconvolve(bkgd, kernel, mode='same')
             bkgd *= self.level / bkgd[parameters.CCD_IMSIZE // 2, parameters.CCD_IMSIZE // 2]
             return bkgd
 
     def plot_model(self):
-        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
-        bkgd = self.model(xx, yy)
+        """Plot the background model.
+
+        """
+        bkgd = self.model()
         fig, ax = plt.subplots(1, 1)
         im = plt.imshow(bkgd, origin='lower', cmap='jet')
         ax.grid(color='white', ls='solid')
@@ -195,41 +287,6 @@ class BackgroundModel:
             plt.show()
 
 
-class SpectrumModel:
-
-    def __init__(self, base_image, spectrumsim, sigma, A1=1, A2=0, reso=None, rotation=False):
-        self.my_logger = set_logger(self.__class__.__name__)
-        self.base_image = base_image
-        self.spectrumsim = spectrumsim
-        self.disperser = base_image.disperser
-        self.sigma = sigma
-        self.A1 = A1
-        self.A2 = A2
-        self.reso = reso
-        self.rotation = rotation
-        self.yprofile = models.Gaussian1D(1, 0, sigma)
-        self.true_lambdas = None
-        self.true_spectrum = None
-
-    def model(self, x, y):
-        self.true_lambdas = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)
-        self.true_spectrum = np.copy(self.spectrumsim.model(self.true_lambdas))
-        x0, y0 = self.base_image.target_pixcoords
-        if self.rotation:
-            theta = self.disperser.theta(self.base_image.target_pixcoords) * np.pi / 180.
-            u = np.cos(theta) * (x - x0) + np.sin(theta) * (y - y0)
-            v = -np.sin(theta) * (x - x0) + np.cos(theta) * (y - y0)
-            x = u + x0
-            y = v + y0
-        l = self.disperser.grating_pixel_to_lambda(x - x0, x0=self.base_image.target_pixcoords, order=1)
-        amp = self.A1 * self.spectrumsim.model(l) * self.yprofile(y - y0) + self.A1 * self.A2 * self.spectrumsim.model(
-            l / 2) * self.yprofile(y - y0)
-        amp = amp * parameters.FLAM_TO_ADURATE * l * np.gradient(l, axis=1)
-        if self.reso is not None:
-            amp = fftconvolve_gaussian(amp, self.reso)
-        return amp
-
-
 class ImageModel(Image):
 
     def __init__(self, filename, target=None):
@@ -240,7 +297,7 @@ class ImageModel(Image):
 
     def compute(self, star, background, spectrogram, starfield=None):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
-        self.data = star.model(xx, yy) + background.model(xx, yy)
+        self.data = star.model(xx, yy) + background.model()
         self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
         spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data  # - spectrogram.spectrogram_bgd)
         self.true_lambdas = spectrogram.lambdas
@@ -313,7 +370,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Background model
     my_logger.info('\n\tBackground model...')
     yy, xx = np.mgrid[:parameters.XWINDOW, :parameters.YWINDOW]
-    bgd_level = np.mean(image.target_bkgd2D(xx, yy))
+    bgd_level = float(np.mean(image.target_bkgd2D(xx, yy)))
     background = BackgroundModel(level=bgd_level, frame=None)  # frame=(1600, 1650))
     if parameters.DEBUG:
         background.plot_model()
@@ -375,7 +432,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.data = np.around(image.data)
 
     # Plot
-    if parameters.VERBOSE and parameters.DISPLAY:
+    if parameters.VERBOSE and parameters.DISPLAY:  # pragma: no cover
         image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
 
     # Set output path
