@@ -14,7 +14,7 @@ from spectractor.tools import (ensure_dir, load_fits, extract_info_from_CTIO_hea
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
                                from_lambda_to_colormap)
-from spectractor.extractor.psf import ChromaticPSF1D, ChromaticPSF2D, ChromaticPSF
+from spectractor.extractor.psf import ChromaticPSF1D, ChromaticPSF2D
 from spectractor.extractor.background import extract_background_photutils
 
 
