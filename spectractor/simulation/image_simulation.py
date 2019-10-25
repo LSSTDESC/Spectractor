@@ -369,8 +369,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     target_pixcoords = find_target(image, guess)
     # Background model
     my_logger.info('\n\tBackground model...')
-    yy, xx = np.mgrid[:parameters.XWINDOW, :parameters.YWINDOW]
-    bgd_level = float(np.mean(image.target_bkgd2D(xx, yy)))
+    bgd_level = float(np.mean(image.target_bkgd2D))
     background = BackgroundModel(level=bgd_level, frame=None)  # frame=(1600, 1650))
     if parameters.DEBUG:
         background.plot_model()
