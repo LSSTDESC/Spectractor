@@ -266,7 +266,7 @@ class Image(object):
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         plt.legend()
-        if parameters.DISPLAY:   # pragma: no cover
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
 
@@ -366,7 +366,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     parameters.CCD_IMSIZE = image.data.shape[1]
 
 
-def find_target(image, guess, rotated=False):
+def find_target(image, guess, rotated=False, full_output=False):
     """Find the target in the Image instance.
 
     The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
@@ -380,7 +380,9 @@ def find_target(image, guess, rotated=False):
     guess: array_like
         Two parameter array giving the estimated position of the target in the image.
     rotated: bool
-        If True, the target is searched in the rotated image.
+        If True, the target is searched in the rotated image (default: False).
+    full_output: bool
+        If True, the sub image and the fitted model of the target is returned (default: False).
 
     Returns
     -------
@@ -388,10 +390,20 @@ def find_target(image, guess, rotated=False):
         The x position of the target.
     y0: float
         The y position of the target.
+
+    Examples
+    --------
+
+    >>> im = Image('tests/data/reduc_20170605_028.fits')
+    >>> guess = [820, 580]
+    >>> parameters.DEBUG = True
+    >>> target_pixcoords = find_target(im, guess)
+    >>> x1, y1 = target_pixcoords
+    >>> assert np.isclose(x1, 816.86, rtol=1e-3)
+    >>> assert np.isclose(y1, 587.75, rtol=1e-3)
     """
     Dx = parameters.XWINDOW
     Dy = parameters.YWINDOW
-    theX, theY = guess
     if rotated:
         angle = image.rotation_angle * np.pi / 180.
         rotmat = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
@@ -402,18 +414,32 @@ def find_target(image, guess, rotated=False):
         guess = [x0, y0]
         Dx = parameters.XWINDOW_ROT
         Dy = parameters.YWINDOW_ROT
-    niter = 2
+    # Remove background
+    sub_image_subtracted, x_left, y_down, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess,
+                                                                                rotated=rotated, widths=[Dx, Dy])
+    # Fit a 2D model
+    star2D = None
+    niter = 3
+    avY, avX = 0.5 * np.array(sub_image_subtracted.shape)
+    NY, NX = sub_image_subtracted.shape
     for i in range(niter):
-        sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
-                                                                 widths=[Dx, Dy])
         # find the target
-        avX, avY = find_target_2Dprofile(image, sub_image, guess, sub_errors=sub_errors)
-        # compute target position
-        theX = x0 - Dx + avX
-        theY = y0 - Dy + avY
-        guess = [int(theX), int(theY)]
-        Dx = Dx // (i + 2)
-        Dy = Dy // (i + 2)
+        avX, avY, star2D = find_target_2Dprofile(image, sub_image_subtracted, sub_errors=sub_errors)
+        # crop the image for next iteration
+        if i < niter - 1:
+            Dx = Dx // 2
+            Dy = Dy // 2
+            sub_image_subtracted = sub_image_subtracted[max(0, int(avY) - Dy):min(NY, int(avY) + Dy),
+                                   max(0, int(avX) - Dx):min(NX, int(avX) + Dx)]
+            x_left += max(0, int(avX) - Dx)
+            y_down += max(0, int(avY) - Dy)
+            NY, NX = sub_image_subtracted.shape
+            if Dx < 10 or Dy < 10:
+                break
+    # compute the target position
+    theX = x_left + avX
+    theY = y_down + avY
+    image.my_logger.warning(f"{x_left} {y_down} {avX} {avY}")
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
@@ -423,11 +449,15 @@ def find_target(image, guess, rotated=False):
         image.header.comments['TARGETX'] = 'target position on X axis'
         image.header['TARGETY'] = theY
         image.header.comments['TARGETY'] = 'target position on Y axis'
-    return [theX, theY]
+    if full_output is True:
+        return [theX, theY], sub_image_subtracted, star2D
+    else:
+        return [theX, theY]
 
 
 def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
     """Initialize the search of the target cropping the image and setting the saturation level.
+    Fit and remove a 2D polynomial background on the cropped image.
 
     Parameters
     ----------
@@ -442,12 +472,12 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
 
     Returns
     -------
-    sub_image: array_like
-        The cropped image data array where the fit has to be performed.
-    x0: float
-        The x position of the target.
-    y0: float
-        The y position of the target.
+    sub_image_subtracted: array_like
+        The cropped image data array without background where the fit has to be performed.
+    x_left: float
+        The x position of the left-down corner in full image pixel coordinates.
+    y_down: float
+        The y position of the left-down corner in full image pixel coordinates.
     Dx: int
         The width of the cropped image.
     Dy: int
@@ -464,12 +494,21 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     else:
         sub_image = np.copy(image.data[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
         sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
+    x_left = x0 - Dx
+    y_down = y0 - Dy
     image.saturation = parameters.CCD_MAXADU / image.expo
     # sub_image = clean_target_spikes(sub_image, image.saturation)
-    return sub_image, x0, y0, Dx, Dy, sub_errors
+    # fit and subtract smooth polynomial background
+    # with 3sigma rejection of outliers (star peaks)
+    NY, NX = sub_image.shape
+    Y, X = np.mgrid[:NY, :NX]
+    bkgd_2D = fit_poly2d_outlier_removal(X, Y, sub_image, order=2, sigma=3)
+    image.target_bkgd2D = bkgd_2D(X, Y)
+    sub_image_subtracted = sub_image - bkgd_2D(X, Y)
+    return sub_image_subtracted, x_left, y_down, Dx, Dy, sub_errors
 
 
-def find_target_1Dprofile(image, sub_image, guess):
+def find_target_1Dprofile(image, sub_image_subtracted):
     """
     Find precisely the position of the targeted object fitting a PSF1D model
     on each projection of the image along x and y, using outlier removal.
@@ -478,10 +517,8 @@ def find_target_1Dprofile(image, sub_image, guess):
     ----------
     image: Image
         The Image instance.
-    sub_image: array_like
+    sub_image_subtracted: array_like
         The cropped image data array where the fit is performed.
-    guess: array_like
-        Two parameter array giving the estimated position of the target in the image.
 
     Examples
     --------
@@ -492,23 +529,22 @@ def find_target_1Dprofile(image, sub_image, guess):
         im.plot_image(target_pixcoords=[820, 580])
 
     >>> parameters.DEBUG = True
-    >>> sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False)
-    >>> x1, y1 = find_target_1Dprofile(im, sub_image, guess)
-    >>> assert np.isclose(x1, np.argmax(np.nansum(sub_image, axis=0)), rtol=1e-2)
-    >>> assert np.isclose(y1, np.argmax(np.nansum(sub_image, axis=1)), rtol=1e-2)
+    >>> sub_image_subtracted, x_left, y_down, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False)
+    >>> x1, y1 = find_target_1Dprofile(im, sub_image_subtracted)
+    >>> assert np.isclose(x1, np.argmax(np.nansum(sub_image_subtracted, axis=0)), rtol=1e-2)
+    >>> assert np.isclose(y1, np.argmax(np.nansum(sub_image_subtracted, axis=1)), rtol=1e-2)
     """
-    NY, NX = sub_image.shape
+    NY, NX = sub_image_subtracted.shape
     X = np.arange(NX)
     Y = np.arange(NY)
     # Mask aigrette
-    saturated_pixels = np.where(sub_image >= image.saturation)
+    saturated_pixels = np.where(sub_image_subtracted >= image.saturation)
     if parameters.DEBUG:
         image.my_logger.info('\n\t%d saturated pixels: set saturation level to %d %s.' % (
             len(saturated_pixels[0]), image.saturation, image.units))
-        # sub_image[sub_image >= 0.5*image.saturation] = np.nan
     # compute profiles
-    profile_X_raw = np.sum(sub_image, axis=0)
-    profile_Y_raw = np.sum(sub_image, axis=1)
+    profile_X_raw = np.sum(sub_image_subtracted, axis=0)
+    profile_Y_raw = np.sum(sub_image_subtracted, axis=1)
     # fit and subtract smooth polynomial background
     # with 3sigma rejection of outliers (star peaks)
     bkgd_X, outliers = fit_poly1d_outlier_removal(X, profile_X_raw, order=2)
@@ -523,7 +559,8 @@ def find_target_1Dprofile(image, sub_image, guess):
         image.my_logger.warning('\n\tY position determination of the target probably wrong')
     if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
-        plot_image_simple(ax1, data=sub_image, scale="log", title="", units=image.units, target_pixcoords=[avX, avY])
+        plot_image_simple(ax1, data=sub_image_subtracted, scale="log", title="", units=image.units,
+                          target_pixcoords=[avX, avY])
         ax1.legend(loc=1)
         ax2.plot(X, profile_X_raw, 'r-', lw=2)
         ax2.plot(X, bkgd_X(X), 'g--', lw=2, label='bkgd')
@@ -545,10 +582,10 @@ def find_target_1Dprofile(image, sub_image, guess):
     return avX, avY
 
 
-def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
+def find_target_2Dprofile(image, sub_image_subtracted, sub_errors=None):
     """
     Find precisely the position of the targeted object fitting a PSF2D model.
-    A polynomial 2D background is subtracted first. Saturated pixels are masked with np.nan values.
+    A polynomial 2D background has been subtracted previously. Saturated pixels are masked with np.nan values.
 
     THE ERROR ARRAY IS NOT USED FOR THE MOMENT.
 
@@ -556,48 +593,43 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     ----------
     image: Image
         The Image instance.
-    sub_image: array_like
+    sub_image_subtracted: array_like
         The cropped image data array where the fit is performed.
-    guess: array_like
-        Two parameter array giving the estimated position of the target in the image.
     sub_errors: array_like
         The image data uncertainties.
 
     Examples
     --------
-    >>> im = Image('tests/data/reduc_20170605_028.fits')
-    >>> guess = [820, 580]
+    >>> im = Image('tests/data/sim_20170530_134.fits')
+    >>> guess = [790, 700]
 
     ..plot:
-        im.plot_image(target_pixcoords=[820, 580])
+        im.plot_image(target_pixcoords=[790, 700])
 
     >>> parameters.DEBUG = True
-    >>> sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False)
-    >>> xmax = np.argmax(np.sum(sub_image, axis=0))
-    >>> ymax = np.argmax(np.sum(sub_image, axis=1))
-    >>> x1, y1 = find_target_2Dprofile(im, sub_image, guess)
+    >>> sub_image_subtracted, x_left, y_down, Dx, Dy, sub_errors = find_target_init(im, guess,rotated=False)
+    >>> xmax = np.argmax(np.sum(sub_image_subtracted, axis=0))
+    >>> ymax = np.argmax(np.sum(sub_image_subtracted, axis=1))
+    >>> x1, y1, star2D = find_target_2Dprofile(im, sub_image_subtracted)
     >>> assert np.isclose(x1, xmax, rtol=1e-2)
     >>> assert np.isclose(y1, ymax, rtol=1e-2)
     """
     # TODO: replace with minuit and test on image _133.fits or decrease mean_prior
-    # fit and subtract smooth polynomial background
-    # with 3sigma rejection of outliers (star peaks)
-    NY, NX = sub_image.shape
+    # corrected saturation for background subtracted data
+    saturation = image.saturation - np.mean(image.target_bkgd2D)
+    # find a first guess of the target position
+    NY, NX = sub_image_subtracted.shape
     XX = np.arange(NX)
     YY = np.arange(NY)
     Y, X = np.mgrid[:NY, :NX]
-    bkgd_2D = fit_poly2d_outlier_removal(X, Y, sub_image, order=2, sigma=3)
-    image.target_bkgd2D = bkgd_2D
-    sub_image_subtracted = sub_image - bkgd_2D(X, Y)
-    # find a first guess of the target position
     avX, sigX = weighted_avg_and_std(XX, np.sum(sub_image_subtracted, axis=0) ** 4)
     avY, sigY = weighted_avg_and_std(YY, np.sum(sub_image_subtracted, axis=1) ** 4)
     # fit a 2D star profile close to this position
     # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2D
     # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
-    guess = [np.max(sub_image_subtracted), avX, avY, 1, 1, 0.1, 2, image.saturation]
+    guess = [np.max(sub_image_subtracted), avX, avY, 1, 1, 0.1, 2, saturation]
     if image.target_star2D is not None:
-        guess = fitting._model_to_fit_params(image.target_star2D)[0]
+        guess = image.target_star2D.parameters  # fitting._model_to_fit_params(image.target_star2D)[0]
         guess[1] = avX
         guess[2] = avY
     mean_prior = 10  # in pixels
@@ -608,20 +640,18 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation],
     # [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
     bounds = [[0.1 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 1, 0, -100, 1,
-               0.9 * image.saturation],
-              [10 * image.saturation, avX + mean_prior, avY + mean_prior, 30, 10, 200, 15, 1.1 * image.saturation]]
-    saturated_pixels = np.where(sub_image >= image.saturation)
-    if len(saturated_pixels[0]) > 0:
-        if parameters.DEBUG:
-            image.my_logger.info(
-                f'\n\t{len(saturated_pixels[0])} saturated pixels: set saturation level '
-                f'to {image.saturation} {image.units}.')
-        sub_image_subtracted[sub_image >= 0.9 * image.saturation] = np.nan
-        sub_image[sub_image >= 0.9 * image.saturation] = np.nan
+               0.9 * saturation],
+              [10 * saturation, avX + mean_prior, avY + mean_prior, 30, 10, 200, 15, 1.1 * saturation]]
+    saturated_pixels = np.where(sub_image_subtracted >= saturation)
+    sub_image_subtracted_masked = np.copy(sub_image_subtracted)
+    if parameters.DEBUG and len(saturated_pixels[0]) > 0:
+        image.my_logger.info(
+            f'\n\t{len(saturated_pixels[0])} saturated pixels with saturation level '
+            f'at {saturation} {image.units} (background subtracted).')
+    sub_image_subtracted_masked[sub_image_subtracted >= 0.95*saturation] = np.nan
     # fit
     bounds = list(np.array(bounds).T)
-    # star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
-    star2D = fit_PSF2D_minuit(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
+    star2D = fit_PSF2D_minuit(X, Y, sub_image_subtracted_masked, guess=guess, bounds=bounds)
     new_avX = star2D.x_mean.value
     new_avY = star2D.y_mean.value
     image.target_star2D = star2D
@@ -635,15 +665,15 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     if parameters.DEBUG:
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
         vmin = 0
-        vmax = float(np.nanmax(sub_image))
-        plot_image_simple(ax1, data=sub_image, scale="lin", title="", units=image.units,
+        vmax = float(np.nanmax(sub_image_subtracted))
+        plot_image_simple(ax1, data=sub_image_subtracted, scale="lin", title="", units=image.units,
                           target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax1.legend(loc=1)
 
-        plot_image_simple(ax2, data=star2D(X, Y) + bkgd_2D(X, Y), scale="lin", title="",
+        plot_image_simple(ax2, data=star2D(X, Y), scale="lin", title="",
                           units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
-        plot_image_simple(ax3, data=sub_image - star2D(X, Y) - bkgd_2D(X, Y), scale="lin", title="",
-                          units=f'Background+Star2D subtracted image\n({image.units})',
+        plot_image_simple(ax3, data=sub_image_subtracted_masked - star2D(X, Y), scale="lin", title="",
+                          units=f'Background+Star2D subtracted image\nSaturated values masked\n({image.units})',
                           target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax3.legend(loc=1)
 
@@ -652,7 +682,7 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot2.pdf'))
-    return new_avX, new_avY
+    return new_avX, new_avY, star2D
 
 
 def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters.YWINDOW,
@@ -753,7 +783,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         n, bins, patches = ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
         ax2.plot([theta_median, theta_median], [0, np.max(n)])
         ax2.set_xlabel("Rotation angles [degrees]")
-        if parameters.DISPLAY:   # pragma: no cover
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotation_hessian.pdf'))
@@ -825,7 +855,7 @@ def turn_image(image):
         f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:   # pragma: no cover
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotated_image.pdf'))
 
 
