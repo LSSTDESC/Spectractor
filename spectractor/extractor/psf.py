@@ -1978,7 +1978,7 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
     return PSF
 
 
-def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
+def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None, fix=None):
     """Fit a PSF 2D model with parameters :
         amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
     using basin hopping global minimization method.
@@ -1997,6 +1997,8 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
         2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
     data_errors: np.array
         the 2D array uncertainties.
+    fix: array_like, optional
+        A list of boolean to keep fix some parameters, in the same order as the list of parameters (default: None)
 
     Returns
     -------
@@ -2048,7 +2050,8 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     def chisq_PSF2D_jac(params):
         return PSF2D_chisq_jac(params, model, x, y, data, data_errors)
 
-    fix = [False] * error.size
+    if fix is None:
+        fix = [False] * error.size
     fix[-1] = True
     # noinspection PyArgumentList
     m = Minuit.from_array_func(fcn=chisq_PSF2D, start=guess, error=error, errordef=1,
@@ -2058,7 +2061,6 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     m.migrad()
     popt = m.np_values()
 
-    my_logger.debug(f'\n{popt}')
     PSF = PSF2D(*popt)
     my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
     return PSF
