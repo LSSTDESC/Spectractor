@@ -908,11 +908,12 @@ def calibrate_spectrum_with_lines(spectrum):
                                                                   x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None)
+        print("chi2", chisq, (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2, chisq+(shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2)
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             spectrum.lambdas = lambdas_test
             spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
-                                                        f'\nD={D:.2f}mm, shift={shift:.2f}pix')
+                                                        f'\nD={spectrum.disperser.D:.2f}mm, shift={shift:.2f}pix')
         return chisq
 
     # grid exploration of the parameters
@@ -952,7 +953,7 @@ def calibrate_spectrum_with_lines(spectrum):
     #                    bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
     error = [parameters.DISTANCE2CCD_ERR, pixel_shift_step]
     fix = [False, False]
-    m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1, fix=fix, print_level=0,
+    m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1, fix=fix, print_level=3,
                                limit=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR),
                                       (-2, 2)))
     m.migrad()
@@ -962,6 +963,11 @@ def calibrate_spectrum_with_lines(spectrum):
     #     spectrum.my_logger.warning('\n\tMinimizer failed.')
     #     print(res)
     D, pixel_shift = m.np_values()
+
+    print(m.np_values(), shift_minimizer(m.np_values()))
+    D = 55.45
+    pixel_shift = 0
+    print( shift_minimizer([55.45,  0]))
     spectrum.disperser.D = D
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
