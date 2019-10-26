@@ -239,8 +239,8 @@ class SpectrogramModel(Spectrum):
                 return lbda * self.target.sed(lbda) * self.telescope.transmission(lbda - shift_t) \
                        * self.disperser.transmission(lbda - shift_t) * atmosphere(lbda)
 
-            for i in range(len(lambdas)-1):
-                spectrum[i] = parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i+1])[0]
+            spectrum = [parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i+1])[0]
+                        for i in range(len(lambdas)-1)]
 
         self.data = spectrum
         self.err = np.zeros_like(spectrum)
@@ -278,6 +278,7 @@ class SpectrogramModel(Spectrum):
         if distance.size % 2 == 0:
             distance = distance[:-1]
         self.disperser.D = D
+        print(distance)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
