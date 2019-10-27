@@ -39,7 +39,7 @@ import spectractor.parameters as parameters
 import pyfftw
 
 
-class SpectrumSimulation(Spectrum):
+class SpectrumModel(Spectrum):
 
     def __init__(self, spectrum, atmosphere, telescope, disperser):
         """Class to simulate cross spectrum.
@@ -98,7 +98,7 @@ class SpectrumSimulation(Spectrum):
         # self.data *= self.lambdas*self.lambdas_binwidths
         return self.data, self.err
 
-    def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0., D=parameters.DISTANCE2CCD, shift=0.):
+    def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD, shift=0., reso=0.):
         """Simulate the cross spectrum of an object and its uncertainties
         after its transmission throught the instrument and the atmosphere.
 
@@ -114,12 +114,12 @@ class SpectrumSimulation(Spectrum):
             Precipitable Water Vapor quantity in mm
         aerosols: float
             VAOD Vertical Aerosols Optical Depth
-        reso: float
-            Gaussian kernel size for the convolution (default: 0).
         D: float
             Distance between the CCD and the disperser in mm (default: parameters.DISTANCE2CCD)
         shift: float
             Shift in pixels of the order 0 position estimate (default: 0).
+        reso: float
+            Gaussian kernel size for the convolution (default: 0).
 
         Returns
         -------
@@ -131,13 +131,16 @@ class SpectrumSimulation(Spectrum):
             The spectrum uncertainties interpolated function in Target units.
 
         """
-        pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0] - shift
+        self.disperser.D = D
+        distance = np.array(self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift, shift_y=0))
+        # must have odd size
+        # if distance.size % 2 == 0:
+        #     distance = distance[:-1]
         new_x0 = [self.x0[0] - shift, self.x0[1]]
         self.disperser.D = D
-        lambdas = self.disperser.grating_pixel_to_lambda(pixels, x0=new_x0, order=1)
+        lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
-        # np.savetxt('atmospheric_transmission_20170530_130.txt', np.array([lambdas, atmospheric_transmission(lambdas)]).T)
         self.data *= A1 * atmospheric_transmission
         self.err *= A1 * atmospheric_transmission
         # Now add the systematics
@@ -151,13 +154,10 @@ class SpectrumSimulation(Spectrum):
             self.model_err = lambda x: np.sqrt(np.abs((err_conv(x)) ** 2 + (0.5 * A2 * err_conv(x / 2)) ** 2))
             self.data = self.model(lambdas)
             self.err = self.model_err(lambdas)
-        # now we include effects related to the wrong extraction of the spectrum:
-        # wrong estimation of the order 0 position and wrong DISTANCE2CCD
-        pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0]
-        self.disperser.D = parameters.DISTANCE2CCD
-        self.lambdas = self.disperser.grating_pixel_to_lambda(pixels, self.x0, order=1)
-        self.model = interp1d(self.lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
-        self.model_err = interp1d(self.lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
+        self.lambdas = lambdas
+        self.lambdas_binwidths = np.gradient(lambdas)
+        self.model = interp1d(lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
+        self.model_err = interp1d(lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
         return self.lambdas, self.model, self.model_err
 
 
@@ -278,7 +278,6 @@ class SpectrogramModel(Spectrum):
         if distance.size % 2 == 0:
             distance = distance[:-1]
         self.disperser.D = D
-        print(distance)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
@@ -588,7 +587,6 @@ class SpectrogramModel(Spectrum):
         return self.lambdas, self.data, self.err
 
 
-
 class SpectrumSimGrid():
     """ SpectrumSim class used to store information and methods
     relative to spectrum simulation.
@@ -620,7 +618,7 @@ class SpectrumSimGrid():
             self.spectrum.load_spectrum(filename)
 
     def compute(self):
-        sim = SpectrumSimulation(self.spectrum, self.atmgrid.atmgrid, self.telescope, self.disperser)
+        sim = SpectrumModel(self.spectrum, self.atmgrid.atmgrid, self.telescope, self.disperser)
         # product of all sed and transmissions except atmosphere
         all_transm, all_transm_err = sim.simulate_without_atmosphere(self.lambdas)
         # copy atmospheric grid parameters into spectra grid
@@ -687,10 +685,10 @@ def SimulatorInit(filename):
     # TELESCOPE TRANSMISSION
     # ------------------------
     telescope = TelescopeTransmission(spectrum.filter)
-    if parameters.DEBUG:
-        infostring = '\n\t ========= Telescope transmission :  ==============='
-        my_logger.info(infostring)
-        telescope.plot_transmission()
+    # if parameters.DEBUG:
+    #     infostring = '\n\t ========= Telescope transmission :  ==============='
+    #     my_logger.info(infostring)
+    #     telescope.plot_transmission()
 
     # DISPERSER TRANSMISSION
     # ------------------------
@@ -698,10 +696,10 @@ def SimulatorInit(filename):
         disperser = spectrum.disperser
     else:
         disperser = Hologram(spectrum.disperser)
-    if parameters.DEBUG:
-        infostring = '\n\t ========= Disperser transmission :  ==============='
-        my_logger.info(infostring)
-        disperser.plot_transmission()
+    # if parameters.DEBUG:
+    #     infostring = '\n\t ========= Disperser transmission :  ==============='
+    #     my_logger.info(infostring)
+    #     disperser.plot_transmission()
 
     # STAR SPECTRUM
     # ------------------------
@@ -710,10 +708,10 @@ def SimulatorInit(filename):
         target = spectrum.target
     else:
         target = Target(spectrum.target)
-    if parameters.DEBUG:
-        infostring = '\n\t ========= SED : %s  ===============' % target.label
-        my_logger.info(infostring)
-        target.plot_spectra()
+    # if parameters.DEBUG:
+    #     infostring = '\n\t ========= SED : %s  ===============' % target.label
+    #     my_logger.info(infostring)
+    #     target.plot_spectra()
 
     return spectrum, telescope, disperser, target
 
@@ -732,11 +730,11 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
 
     # SPECTRUM SIMULATION
     # --------------------
-    spectrum_simulation = SpectrumSimulation(spectrum, atmosphere, telescope, disperser)
+    spectrum_simulation = SpectrumModel(spectrum, atmosphere, telescope, disperser)
     spectrum_simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift)
-    if parameters.DEBUG:
-        infostring = '\n\t ========= Spectra simulation :  ==============='
-        spectrum_simulation.plot_spectrum()
+    # if parameters.DEBUG:
+    #     infostring = '\n\t ========= Spectra simulation :  ==============='
+    #     spectrum_simulation.plot_spectrum()
     return spectrum_simulation
 
 
