@@ -20,6 +20,11 @@ class SpectrumFitWorkspace(FitWorkspace):
         FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
+        plt.plot(parameters.LAMBDA_TRUTH, parameters.AMPLITUDE_TRUTH)
+        plt.plot(self.spectrum.lambdas, self.spectrum.data)
+        plt.show()
+        self.spectrum.data = parameters.AMPLITUDE_TRUTH
+        self.spectrum.lambdas = parameters.LAMBDA_TRUTH
         self.airmass = self.spectrum.header['AIRMASS']
         self.pressure = self.spectrum.header['OUTPRESS']
         self.temperature = self.spectrum.header['OUTTEMP']
@@ -246,6 +251,13 @@ if __name__ == "__main__":
                         help="INI config file. (default: config.ctio.ini).")
     args = parser.parse_args()
 
+    from spectractor.extractor.images import Image
+    image = Image("tests/data/sim_20170530_134.fits")
+    lambda_truth = np.fromstring(image.header['LAMBDAS'][1:-1], sep=' ', dtype=float)
+    amplitude_truth = np.fromstring(image.header['PSF_POLY'][1:-1], sep=' ', dtype=float)[:lambda_truth.size]
+    parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
+    parameters.LAMBDA_TRUTH = np.copy(lambda_truth)
+
     parameters.VERBOSE = args.verbose
     if args.debug:
         parameters.DEBUG = True
@@ -260,6 +272,7 @@ if __name__ == "__main__":
     # 062
     filename = "tests/data/sim_20170530_134_spectrum.fits"
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+
 
     w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                              burnin=2, nbins=10, verbose=1, plot=True, live_fit=True)
