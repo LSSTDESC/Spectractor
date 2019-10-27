@@ -840,10 +840,12 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     if ax is not None:
         lines.plot_detected_lines(ax, print_table=parameters.DEBUG)
     if len(lambda_shifts) > 0:
+        print("details", global_chisq, len(lambda_shifts), global_chisq /len(lambda_shifts), np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2), lambda_shifts)
         global_chisq /= len(lambda_shifts)
         shift = np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2)
         # if guess values on tabulated lines have not moved: penalize the chisq
         global_chisq += shift
+        print("total",global_chisq)
         # lines.my_logger.debug(f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}'
         #                      f'\n\tTotal chisq: {global_chisq:.3f} with shift {shift:.3f}pix')
     else:
@@ -908,7 +910,7 @@ def calibrate_spectrum_with_lines(spectrum):
                                                                   x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None)
-        print("chi2", chisq, (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2, chisq+(shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2)
+        print("D=",spectrum.disperser.D, "shift=",shift,"chi2", chisq, (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2, chisq+(shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2)
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             spectrum.lambdas = lambdas_test
@@ -965,13 +967,13 @@ def calibrate_spectrum_with_lines(spectrum):
     D, pixel_shift = m.np_values()
 
     print(m.np_values(), shift_minimizer(m.np_values()))
-    D = 55.45
-    pixel_shift = 0
-    print( shift_minimizer([55.45,  0]))
+    #D = 55.45
+    #pixel_shift = 0
+    #print( shift_minimizer([55.45,  0]))
     spectrum.disperser.D = D
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
-    # check success, xO ou D sur les bords du prior
+    # check success, xO or D on the edges of their prior ranges
     lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.pixels = delta_pixels - pixel_shift
