@@ -337,6 +337,7 @@ class Lines:
             t[t.colnames[-1]].unit = 'reduced'
             print(t)
 
+
 # Line catalog
 
 # Hydrogen lines
@@ -359,11 +360,13 @@ CAII1 = Line(393.366, atmospheric=True, label=r'$Ca_{II}$',
 CAII2 = Line(396.847, atmospheric=True, label=r'$Ca_{II}$',
              label_pos=[0.007, 0.02],
              use_for_calibration=False)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
-          label_pos=[0.007, 0.02],
-          use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
-# O2_1 = Line( 760.6,atmospheric=True,label='',label_pos=[0.007,0.02]) # libradtran paper fig.3
-# O2_2 = Line( 763.2,atmospheric=True,label='$O_2$',label_pos=[0.007,0.02])  # libradtran paper fig.3
+# O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
+#           label_pos=[0.007, 0.02],
+#           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
+O2_1 = Line(760.6, atmospheric=True, label='', label_pos=[0.007, 0.02],
+            use_for_calibration=True)  # libradtran paper fig.3
+O2_2 = Line(763.2, atmospheric=True, label='$O_2$', label_pos=[0.007, 0.02],
+            use_for_calibration=True)  # libradtran paper fig.3
 O2B = Line(686.719, atmospheric=True, label=r'$O_2(B)$',
            label_pos=[0.007, 0.02], use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 O2Y = Line(898.765, atmospheric=True, label=r'$O_2(Y)$',
@@ -375,7 +378,7 @@ H2O_1 = Line(935, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
 H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2, CAII1, CAII2, FE1, FE2, FE3]
+ATMOSPHERIC_LINES = [O2_1, O2_2, O2B, O2Y, O2Z, H2O_1, H2O_2, CAII1, CAII2, FE1, FE2, FE3]
 
 # ISM lines
 OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
@@ -411,7 +414,7 @@ HEII3 = Line(617.1, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.0
 HEII4 = Line(856.7, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
 HI = Line(833.9, atmospheric=False, label=r'$H_{I}$', label_pos=[0.007, 0.02])
 ISM_LINES = [OIII, CII1, CII2, CIV, CII3, CIII1, CIII2, CIII3, HEI1, HEI2, HEI3, HEI4, HEI5, HEI6, HEI7, HEI8,
-             HEI9, HEI10, HEI11, HEI12, HEI13, OI, OII, HEII1, HEII2, HEII3, HEII4,  HI, FEII1, FEII2, FEII3, FEII4]
+             HEI9, HEI10, HEI11, HEI12, HEI13, OI, OII, HEII1, HEII2, HEII3, HEII4, HI, FEII1, FEII2, FEII3, FEII4]
 
 # HG-AR lines https://oceanoptics.com/wp-content/uploads/hg1.pdf
 HG1 = Line(253.652, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
@@ -444,11 +447,11 @@ AR15 = Line(866.794, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR16 = Line(912.297, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR17 = Line(922.450, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 HGAR_LINES = [HG1, HG2, HG3, HG4, HG5, HG6, HG7, HG8, HG9, HG10, HG11, HG12,
-               AR1, AR2, AR3, AR4, AR5, AR6, AR7, AR8, AR9, AR10, AR11, AR12, AR13, AR14, AR15, AR16, AR17 ]
-
+              AR1, AR2, AR3, AR4, AR5, AR6, AR7, AR8, AR9, AR10, AR11, AR12, AR13, AR14, AR15, AR16, AR17]
 
 if __name__ == "__main__":
     import doctest
+
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
 
