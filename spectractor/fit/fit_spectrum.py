@@ -20,11 +20,6 @@ class SpectrumFitWorkspace(FitWorkspace):
         FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
-        plt.plot(parameters.LAMBDA_TRUTH, parameters.AMPLITUDE_TRUTH)
-        plt.plot(self.spectrum.lambdas, self.spectrum.data)
-        plt.show()
-        self.spectrum.data = parameters.AMPLITUDE_TRUTH
-        self.spectrum.lambdas = parameters.LAMBDA_TRUTH
         self.airmass = self.spectrum.header['AIRMASS']
         self.pressure = self.spectrum.header['OUTPRESS']
         self.temperature = self.spectrum.header['OUTTEMP']
@@ -52,7 +47,7 @@ class SpectrumFitWorkspace(FitWorkspace):
                              r"alpha_pix [pix]", "reso [pix]"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "reso [pix]"]
-        self.bounds = [(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1), (50, 60), (-2, 2), (1, 10)]
+        self.bounds = [(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1), (50, 60), (-2, 2), (0.2, 10)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -273,9 +268,8 @@ if __name__ == "__main__":
     filename = "tests/data/sim_20170530_134_spectrum.fits"
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-
     w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                             burnin=2, nbins=10, verbose=1, plot=True, live_fit=True)
+                             burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
     run_spectrum_minimisation(w, method="minimize")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()
