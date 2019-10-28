@@ -141,10 +141,33 @@ class SpectrumModel(Spectrum):
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
+        # atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
+        # self.fast_sim = True
+        # if self.fast_sim:
+        #     spectrum = self.target.sed(lambdas)
+        #     spectrum *= self.disperser.transmission(lambdas)
+        #     telescope_transmission = self.telescope.transmission(lambdas)
+        #     spectrum *= telescope_transmission
+        #     spectrum *= atmosphere(lambdas)
+        #     spectrum_err = np.zeros_like(spectrum)
+        #     idx = np.where(telescope_transmission > 0)[0]
+        #     spectrum *= parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas)
+        #     spectrum_err[idx] = self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[idx]
+        # else:
+        #     def integrand(lbda):
+        #         return lbda * self.target.sed(lbda) * self.telescope.transmission(lbda) \
+        #                * self.disperser.transmission(lbda) * atmosphere(lbda)
+        #
+        #     spectrum = [parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i+1])[0]
+        #                 for i in range(len(lambdas)-1)]
+        #     spectrum += [spectrum[-1]]
+        #     spectrum = np.array(spectrum)
+        # self.data = A1 * spectrum
+        # self.err = A1 * np.zeros_like(spectrum)
         self.data *= A1 * atmospheric_transmission
         self.err *= A1 * atmospheric_transmission
         # Now add the systematics
-        if reso > 1:
+        if reso > 0:
             self.data = fftconvolve_gaussian(self.data, reso)
             self.err = np.sqrt(np.abs(fftconvolve_gaussian(self.err ** 2, reso)))
         if A2 > 0.:
