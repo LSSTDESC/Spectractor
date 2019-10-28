@@ -336,7 +336,7 @@ class FitWorkspace:
         print('************************************')
 
     def save_parameters_summary(self, header=""):
-        output_filename = self.filename.replace(self.filename.split('.')[-1], "_bestfit.txt")
+        output_filename = self.filename.split('.')[0] + "_bestfit.txt"
         f = open(output_filename, 'w')
         txt = self.filename + "\n"
         if header != "":
@@ -374,7 +374,7 @@ class FitWorkspace:
         cbar.ax.tick_params(labelsize=9)
         fig.tight_layout()
         if parameters.SAVE and self.filename != "":
-            figname = self.filename.replace(self.filename.split('.')[-1], "_correlation.pdf")
+            figname = self.filename.split('.')[0] + "_correlation.pdf"
             self.my_logger.info(f"Save figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
         if parameters.DISPLAY:
@@ -484,6 +484,8 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         def line_search(alpha):
             tmp_params_2 = np.copy(tmp_params)
             tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
+            tmp_params_2[ipar] = np.clip(tmp_params_2[ipar], a_min=np.array(fit_workspace.bounds)[ipar].T[0],
+                                         a_max=np.array(fit_workspace.bounds)[ipar].T[1])
             lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
             return np.sum(((mod - fit_workspace.data) / fit_workspace.err) ** 2)
 
@@ -546,7 +548,7 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
     fig.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
     if parameters.SAVE and fit_workspace.filename != "":
-        figname = fit_workspace.filename.replace(fit_workspace.filename.split('.')[-1], "_fitting.pdf")
+        figname = fit_workspace.filename.split('.')[0] + "_fitting.pdf"
         fit_workspace.my_logger.info(f"\n\tSave figure {figname}.")
         fig.savefig(figname, dpi=100, bbox_inches='tight')
     if parameters.DISPLAY:
@@ -564,7 +566,7 @@ def save_gradient_descent(fit_workspace, costs, params_table):
     t[1] = costs
     t[2:] = params_table.T
     h = 'iter,costs,' + ','.join(fit_workspace.input_labels)
-    output_filename = fit_workspace.filename.replace(fit_workspace.filename.split('.')[-1], "_fitting.txt")
+    output_filename = fit_workspace.filename.split('.')[0] + "_fitting.txt"
     np.savetxt(output_filename, t.T, header=h, delimiter=",")
     fit_workspace.my_logger.info(f"\n\tSave gradient descent log {output_filename}.")
 

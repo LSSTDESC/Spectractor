@@ -73,12 +73,14 @@ class SpectrumFitWorkspace(FitWorkspace):
 
     def simulate(self, A1, A2, ozone, pwv, aerosols, D, shift_x, reso):
         global plot_counter
-        lambdas, model, model_err = \
-            self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, reso)
+        lambdas, model, model_err = self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, reso)
         self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, reso])
-
-        if lambdas.size > self.data.size:
-            lambdas = lambdas[lambdas.size-self.data.size:]
+        txt = ""
+        for p in self.p:
+            txt += f"{p:.3g} "
+        self.my_logger.warning(txt)
+        # if lambdas.size > self.data.size:
+        #     lambdas = lambdas[lambdas.size-self.data.size:]
         self.lambdas = lambdas
         self.model = model(lambdas)
         self.model_err = model_err(lambdas)
@@ -270,7 +272,7 @@ if __name__ == "__main__":
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                             burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-    run_spectrum_minimisation(w, method="minimize")
+                             burnin=2, nbins=10, verbose=1, plot=True, live_fit=True)
+    run_spectrum_minimisation(w, method="newton")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()
