@@ -34,7 +34,6 @@ class FitWorkspace:
         self.x = None
         self.model = None
         self.model_err = None
-        self.model_noconv = None
         self.input_labels = []
         self.axis_names = []
         self.input_labels = []
@@ -385,8 +384,8 @@ class FitWorkspace:
                 plt.show()
 
     def weighted_residuals(self, p):
-        lambdas, model, model_err = self.simulate(*p)
-        res = ((model - self.data) / np.sqrt(model_err ** 2 + self.err ** 2)).flatten()
+        self.x, self.model, self.model_err = self.simulate(*p)
+        res = ((self.model - self.data) / np.sqrt(self.model_err ** 2 + self.err ** 2)).flatten()
         return res
 
     def chisq(self, p):
@@ -444,6 +443,7 @@ def lnprob(p):
 def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
     my_logger = set_logger(__name__)
     tmp_params = np.copy(params)
+    my_logger.warning(f"START {tmp_params}")
     W = 1 / fit_workspace.err.flatten() ** 2
     ipar = np.arange(params.size)
     if fixed_params is not None:
@@ -453,11 +453,12 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     inv_JT_W_J = np.zeros((len(ipar), len(ipar)))
     for i in range(niter):
         start = time.time()
-        tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
-        # if fit_workspace.live_fit:
-        #    fit_workspace.plot_fit()
-        residuals = (tmp_model - fit_workspace.data).flatten()
-        cost = np.sum((residuals ** 2) * W)
+        # tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
+        # # if fit_workspace.live_fit:
+        # #    fit_workspace.plot_fit()
+        # residuals = (tmp_model - fit_workspace.data).flatten()
+        # cost = np.sum((residuals ** 2) * W)
+        cost = fit_workspace.chisq(tmp_params)
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):
@@ -478,6 +479,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         if fit_workspace.live_fit:
             fit_workspace.cov = inv_JT_W_J
             fit_workspace.plot_correlation_matrix(ipar)
+        residuals = (fit_workspace.model -  fit_workspace.data).flatten()
         JT_W_R0 = JT_W @ residuals
         dparams = - inv_JT_W_J @ JT_W_R0
 
@@ -486,8 +488,9 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
             tmp_params_2[ipar] = np.clip(tmp_params_2[ipar], a_min=np.array(fit_workspace.bounds)[ipar].T[0],
                                          a_max=np.array(fit_workspace.bounds)[ipar].T[1])
-            lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
-            return np.sum(((mod - fit_workspace.data) / fit_workspace.err) ** 2)
+            # lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
+            # return np.sum(((mod - fit_workspace.data) / fit_workspace.err) ** 2)
+            return fit_workspace.chisq(tmp_params_2)
 
         # tol parameter acts on alpha (not func)
         alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2)
@@ -505,11 +508,11 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # prepare outputs
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
-        my_logger.info(f"\n\tIteration={i}: initial cost={cost:.3f} initial chisq_red={cost / tmp_model.size:.3f}"
+        my_logger.info(f"\n\tIteration={i}: initial cost={cost:.3f} initial chisq_red={cost / residuals.size:.3f}"
                        f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
                        f"\n\tParameter shifts: {alpha_min * dparams}"
                        f"\n\tNew parameters: {tmp_params[ipar]}"
-                       f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} computed in {time.time() - start:.2f}s")
+                       f"\n\tFinal cost={fval:.3f} final chisq_red={fval / residuals.size:.3f} computed in {time.time() - start:.2f}s")
         if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol :
             my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
                            f"relative to the sum of the parameters is below xtol={xtol}.")
