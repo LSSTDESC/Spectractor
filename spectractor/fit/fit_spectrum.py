@@ -76,6 +76,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         lambdas, model, model_err = \
             self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, reso)
         self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, reso])
+
         if lambdas.size > self.data.size:
             lambdas = lambdas[lambdas.size-self.data.size:]
         self.lambdas = lambdas
