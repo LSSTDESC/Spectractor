@@ -15,6 +15,8 @@ from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINE
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
 
+Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype')
+
 
 def load_target(label, verbose=False):
     """Load the target properties according to the type set by parameters.OBS_OBJECT_TYPE.
@@ -200,14 +202,13 @@ class Star(Target):
         2d03m08.598s
 
         """
-        Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype')
         simbad = Simbad.query_object(self.label)
         if simbad is not None:
             if self.verbose:
                 self.my_logger.info(f'\n\tSimbad: {simbad}')
             self.coord = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(units.hourangle, units.deg))
         else:
-            self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
+            self.my_logger.warning(f'\n\tTarget {self.label} not found in Simbad')
         self.load_spectra()
 
     def load_spectra(self):
