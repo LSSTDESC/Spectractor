@@ -36,6 +36,7 @@ def __getattr__(name):
 mypath = os.path.dirname(__file__)
 HOLO_DIR = os.path.join(mypath, "extractor/dispersers/")
 THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
+ASTROMETRYNET_BINDIR = "/usr/local/astrometry/bin/"
 
 # CCD characteristics
 CCD_IMSIZE = 2048  # size of the image in pixel
