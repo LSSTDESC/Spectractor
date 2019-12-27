@@ -36,8 +36,6 @@ from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 import spectractor.parameters as parameters
 
-import pyfftw
-
 
 class SpectrumSimulation(Spectrum):
 
