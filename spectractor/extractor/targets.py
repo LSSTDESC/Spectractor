@@ -185,6 +185,7 @@ class Star(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
+        self.simbad = None
         self.load()
 
     def load(self):
@@ -197,8 +198,10 @@ class Star(Target):
         2d03m08.598s
 
         """
-        Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype')
+        Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
+                                  'parallax', 'pm')
         simbad = Simbad.query_object(self.label)
+        self.simbad = simbad
         if simbad is not None:
             if self.verbose:
                 self.my_logger.info(f'\n\tSimbad: {simbad}')
