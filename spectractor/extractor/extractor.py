@@ -17,15 +17,15 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     Parameters
     ----------
     file_name: str
-        Input file nam of the image to analyse
+        Input file nam of the image to analyse.
     output_directory: str
-        Output directory
+        Output directory.
     guess: [int,int]
-        [x0,y0] list of the guessed pixel positions of the target in the image (must be integers)
+        [x0,y0] list of the guessed pixel positions of the target in the image (must be integers).
     target: str
-        The name of the targeted object
+        The name of the targeted object.
     disperser_label: str
-        The name of the disperser
+        The name of the disperser (default: "").
     config: str
         The config file name
     atmospheric_lines: bool
@@ -53,7 +53,7 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     ...         continue
     ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target, disperser_label, './config/ctio.ini')
     ...     assert spectrum is not None
-    ...     assert os.path.isfile('tests/data/educ_20170530_134_spectrum.fits')
+    ...     assert os.path.isfile('./tests/data/reduc_20170530_134_spectrum.fits')
     """
 
     my_logger = set_logger(__name__)
