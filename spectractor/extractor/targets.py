@@ -249,7 +249,7 @@ class Star(Target):
                 if '_mod_' in f:
                     continue
                 if self.verbose:
-                    print('Loading %s' % f)
+                    self.my_logger.info('\n\tLoading %s' % f)
                 data = S.FileSpectrum(f, keepneg=True)
                 if isinstance(data.waveunits, S.units.Angstrom):
                     self.wavelengths.append(data.wave / 10.)
