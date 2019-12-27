@@ -712,4 +712,7 @@ class Hologram(Grating):
 if __name__ == "__main__":
     import doctest
 
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
+
     doctest.testmod()
