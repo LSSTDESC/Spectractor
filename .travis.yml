@@ -54,14 +54,14 @@ before_script:
   - "cd ../"
   - "echo $LD_LIBRARY_PATH"
   - "export LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/NETCDF/lib/"
-  - "wget -L http://www.libradtran.org/download/history/libRadtran-2.0.3.tar.gz"
-  - "gzip -d libRadtran-2.0.3.tar.gz"
-  - "tar -xf libRadtran-2.0.3.tar"
-  - "cd libRadtran-2.0.3"
+  - "wget -L http://www.libradtran.org/download/history/libRadtran-2.0.2.tar.gz"
+  - "gzip -d libRadtran-2.0.2.tar.gz"
+  - "tar -xf libRadtran-2.0.2.tar"
+  - "cd libRadtran-2.0.2"
   - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN --with-libnetcdf=$TRAVIS_BUILD_DIR/NETCDF/"
   - "make uvspec"
   - "cd ../"
-  - "export LIBRADTRANDIR=libRadtran-2.0.3/"
+  - "export LIBRADTRANDIR=libRadtran-2.0.2/"
   - conda create -n py37 python=3.7 pip
   - source activate py37
   - python --version
