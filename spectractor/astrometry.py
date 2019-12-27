@@ -90,8 +90,8 @@ def run_astrometry(file_name, guess, target, disperser_label="", extent=None):
     # load image
     im = Image(file_name, target=target, disperser_label=disperser_label)
     # prepare outputs
-    output_directory = os.path.join(os.path.dirname(file_name), os.path.splitext(os.path.basename(file_name))[0]) \
-                       + "_wcs"
+    output_directory = os.path.join(os.path.dirname(file_name),
+                                    os.path.splitext(os.path.basename(file_name))[0]) + "_wcs"
     my_logger.info(f"\n\tIntermediate outputs will be stored in {output_directory}")
     ensure_dir(output_directory)
     tag = os.path.splitext(os.path.basename(file_name))[0]
@@ -120,7 +120,7 @@ def run_astrometry(file_name, guess, target, disperser_label="", extent=None):
     hdu.writeto(output_sources_fitsfile, overwrite=True)
     my_logger.info(f'\n\tSources positions saved in {output_sources_fitsfile}')
     # run astrometry.net
-    command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR,'solve-field')} --scale-unit arcsecperpix " \
+    command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR, 'solve-field')} --scale-unit arcsecperpix " \
               f"--scale-low {0.9 * parameters.CCD_PIXEL2ARCSEC} " \
               f"--scale-high {1.1 * parameters.CCD_PIXEL2ARCSEC} " \
               f"--ra {im.target.coord.ra.value} --dec {im.target.coord.dec.value} " \
@@ -130,16 +130,15 @@ def run_astrometry(file_name, guess, target, disperser_label="", extent=None):
     my_logger.info(f'\n\tRun astrometry.net solve_field command:\n\t{command}')
     log = subprocess.check_output(command, shell=True)
     log_file = open(f"{output_directory}/{tag}.log", "w+")
-    log_file.write(command+"\n")
-    log_file.write(log.decode("utf-8")+"\n")
+    log_file.write(command + "\n")
+    log_file.write(log.decode("utf-8") + "\n")
     # save new WCS in original fits file
-    new_file_name = file_name.replace('.fits','_new.fits')
+    new_file_name = file_name.replace('.fits', '_new.fits')
     command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR, 'new-wcs')} -v -d -i {file_name} " \
-              f"-w {os.path.join(output_directory, tag+'.wcs')} -o {new_file_name}\n"
+              f"-w {os.path.join(output_directory, tag + '.wcs')} -o {new_file_name}\n"
     # f"mv {new_file_name} {file_name}"
     my_logger.info(f'\n\tSave WCS in original file:\n\t{command}')
     log = subprocess.check_output(command, shell=True)
-    log_file.write(command+"\n")
-    log_file.write(log.decode("utf-8")+"\n")
+    log_file.write(command + "\n")
+    log_file.write(log.decode("utf-8") + "\n")
     log_file.close()
-
