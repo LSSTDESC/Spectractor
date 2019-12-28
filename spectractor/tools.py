@@ -1335,7 +1335,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     cmap: colormap
         Color map label (default: None)
     target_pixcoords: array_like, optional
-        2D array  giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
+        2D array giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
     vmin: float
         Minimum value of the image (default: None)
     vmax: float
