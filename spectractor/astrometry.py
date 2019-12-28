@@ -17,24 +17,13 @@ from spectractor.config import set_logger
 from spectractor.extractor.images import Image
 
 
-def set_wcs_output_directory(file_name):
-    output_directory = os.path.join(os.path.dirname(file_name),
-                                    os.path.splitext(os.path.basename(file_name))[0]) + "_wcs"
-    ensure_dir(output_directory)
-    return output_directory
-
-
-def set_file_tag(file_name):
-    tag = os.path.splitext(os.path.basename(file_name))[0]
-    return tag
-
-
 def remove_background(data, sigma=3.0, box_size=(50, 50), filter_size=(3, 3)):
     sigma_clip = SigmaClip(sigma=sigma)
     bkg_estimator = SExtractorBackground()
     bkg = Background2D(data, box_size, filter_size=filter_size,
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator)
     data_wo_bkg = data - bkg.background
+    data_wo_bkg -= np.min(data_wo_bkg)
     if parameters.DEBUG:
         fig, ax = plt.subplots(1, 2, figsize=(10, 10))
         ax[0].imshow(bkg.background, origin='lower')
@@ -51,19 +40,19 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=3.5)
     for col in sources.colnames:
         sources[col].info.format = '%.8g'  # for consistent table output
     sources.sort('mag')
-    if parameters.DEBUG:
-        print(sources)
-        positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
-        plt.figure(figsize=(10, 10))
+    if parameters.DEBUG or True:
+        positions = np.array((sources['xcentroid'], sources['ycentroid']))
+        fig = plt.figure(figsize=(8, 8))
         plot_image_simple(plt.gca(), data_wo_bkg, scale="log10", target_pixcoords=positions)
+        fig.tight_layout()
         plt.show()
     return sources
 
 
-def load_gaia_catalog(target):
+def load_gaia_catalog(target, radius=10*u.arcmin):
     from astroquery.gaia import Gaia
-
-    job = Gaia.cone_search_async(target.coord, radius=5 * u.arcmin)
+    job = Gaia.cone_search_async(target.coord,
+                                 radius=0.5 * parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC * u.arcsec)
     gaia_catalog = job.get_results()
     gaia_catalog.fill_value = 0
     gaia_catalog['parallax'].fill_value = np.min(gaia_catalog['parallax'])
@@ -92,8 +81,6 @@ def update_target_coord_with_proper_motion(target, date_obs):
                             pm_ra_cosdec=target_pmra, pm_dec=target_pmdec, frame='icrs', equinox="J2000",
                             obstime="J2000")
     target_coord_after_proper_motion = target_coord.apply_space_motion(new_obstime=Time(date_obs))
-    # c_list = target_coord.apply_space_motion(
-    # new_obstime=Time(np.arange(2000,Time(date_obs.byear, 1), format='decimalyear)) * u.yr)
     return target_coord_after_proper_motion
 
 
@@ -101,141 +88,254 @@ def update_gaia_catalog_with_proper_motion(gaia_catalog, date_obs):
     parallax = np.array(gaia_catalog['parallax'].filled(np.nanmin(np.abs(gaia_catalog['parallax']))))
     parallax[parallax < 0] = np.min(parallax[parallax > 0])
     gaia_stars = SkyCoord(ra=gaia_catalog['ra'], dec=gaia_catalog['dec'], frame='icrs', equinox="J2000",
-                          obstime=Time(gaia_catalog['ref_epoch'], format='decimalyear'),
-                          pm_ra_cosdec=gaia_catalog['pmra'].filled(0)
-                                       * np.cos(np.array(gaia_catalog['dec']) * np.pi / 180),
+                          obstime=Time(np.array(gaia_catalog['ref_epoch']), format='decimalyear'),
+                          pm_ra_cosdec=gaia_catalog['pmra'].filled(0) * np.cos(
+                              np.array(gaia_catalog['dec']) * np.pi / 180),
                           pm_dec=gaia_catalog['pmdec'].filled(0),
                           distance=Distance(parallax=parallax * u.mas, allow_negative=True))
     gaia_stars_after_proper_motion = gaia_stars.apply_space_motion(new_obstime=Time(date_obs))
     return gaia_stars_after_proper_motion
 
 
-def plot_sources_and_gaia_catalog(im, wcs, sources, target_coord, gaia_coord):
-    target_x, target_y = wcs.all_world2pix(target_coord.ra, target_coord.dec, 0)
-    gaia_x, gaia_y = wcs.all_world2pix(gaia_coord.ra, gaia_coord.dec, 0)
+class Astrometry(Image):
 
-    fig = plt.figure(figsize=(10, 10))
+    def __init__(self, file_name, target="", disperser_label="", wcs_file_name=""):
+        """
+        Parameters
+        ----------
+        file_name: str
+            Input file name of the image to analyse.
+        target: str
+            The name of the targeted object.
+        disperser_label: str
+            The name of the disperser (default: "").
+        """
+        Image.__init__(self, file_name, target=target, disperser_label=disperser_label)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.output_directory = ""
+        self.tag = file_name
+        self.set_wcs_output_directory()
+        self.set_file_tag()
+        self.output_sources_fitsfile = ""
+        self.new_file_name = ""
+        self.wcs_file_name = wcs_file_name
+        self.my_logger.info(f"\n\tIntermediate outputs will be stored in {self.output_directory}")
+        self.wcs = None
+        if self.wcs_file_name != "":
+            self.wcs = load_wcs_from_file(self.wcs_file_name)
+        self.sources = None
+        self.gaia_catalog = None
+        self.gaia_index = None
+        self.dist_2d = None
+        self.dist_ra = 0 * u.arcsec
+        self.dist_dec = 0 * u.arcsec
+        self.target_coord_after_motion = update_target_coord_with_proper_motion(self.target, date_obs=self.date_obs)
 
-    fig.add_subplot(111, projection=wcs)
+    def set_wcs_output_directory(self):
+        output_directory = os.path.join(os.path.dirname(self.file_name),
+                                        os.path.splitext(os.path.basename(self.file_name))[0]) + "_wcs"
+        ensure_dir(output_directory)
+        self.output_directory = output_directory
+        return output_directory
 
-    plot_image_simple(plt.gca(), im.data, scale="log10")
-    plt.xlabel('RA')
-    plt.ylabel('Dec')
-    # plt.grid(color='white', ls='solid')
-    plt.scatter(sources[0], sources[1], s=300, lw=3,
-                edgecolor='yellow', facecolor='none', label="all detected sources")
-    plt.scatter(target_x, target_y, s=300,
-                edgecolor='cyan', facecolor='none', label=f"the target {target} after motion", lw=3)
-    # plt.scatter(c_list.ra, c_list.dec, transform=plt.gca().get_transform('icrs'), s=30,
-    #             edgecolor='red', facecolor='none', label=f"motion", lw=3)
-    # plt.scatter(x_field, y_field, s=300,
-    #             edgecolor='green', facecolor='none', label=f"gaia stars", lw=3)
-    plt.scatter(gaia_x, gaia_y, s=300,
-                edgecolor='blue', facecolor='none', label=f"gaia stars after motion", lw=3)
-    # plt.scatter(x_list, y_list, s=30,
-    #             edgecolor='cyan', facecolor='none', label=f"motion", lw=3)
-    plt.legend()
-    margin = 100
-    plt.xlim(target_x - margin + 0, target_x + margin + 0)
-    plt.ylim(target_y - margin + 0, target_y + margin + 0)
-    plt.show()
+    def set_file_tag(self):
+        tag = os.path.splitext(os.path.basename(self.file_name))[0]
+        self.tag = tag
+        return tag
 
+    def write_sources(self):
+        colx = fits.Column(name='X', format='D', array=self.sources['xcentroid'])
+        coly = fits.Column(name='Y', format='D', array=self.sources['ycentroid'])
+        colflux = fits.Column(name='FLUX', format='D', array=self.sources['flux'])
+        coldefs = fits.ColDefs([colx, coly, colflux])
+        hdu = fits.BinTableHDU.from_columns(coldefs)
+        hdu.header['IMAGEW'] = self.data.shape[1]
+        hdu.header['IMAGEH'] = self.data.shape[0]
+        self.output_sources_fitsfile = f"{os.path.join(self.output_directory,self.tag)}_sources.fits"
+        hdu.writeto(self.output_sources_fitsfile, overwrite=True)
+        self.my_logger.info(f'\n\tSources positions saved in {self.output_sources_fitsfile}')
 
-def run_simple_astrometry(file_name, target, disperser_label="", extent=None):
-    """Build a World Coordinate System (WCS) using astrometry.net library given an exposure as a FITS file.
+    def plot_sources_and_gaia_catalog(self, wcs=None, sources=None, gaia_coord=None):
+        fig = plt.figure(figsize=(8, 8))
 
-    The name of the target must be given to get its RA,DEC coordinates via a Simbad query.
-    First the background of the exposure is removed using the astropy SExtractorBackground() method.
-    Then photutils source_detection() is used to get the positions in pixels en flux of the objects in the field.
-    The results are saved in the {file_name}_sources.fits file and used by the solve_field command from the
-    astrometry.net library. The solve_field path must be set using the spectractor.parameters.ASTROMETRYNET_BINDIR
-    variable. A new WCS is created and merged with the given exposure.
-    The intermediate results are saved in a new directory named as the FITS file name with a _wcs suffix.
+        if wcs is None:
+            wcs = self.wcs
+            if wcs is not None:
+                fig.add_subplot(111, projection=wcs)
 
-    Parameters
-    ----------
-    file_name: str
-        Input file nam of the image to analyse.
-    target: str
-        The name of the targeted object.
-    disperser_label: str
-        The name of the disperser (default: "").
-    extent: 2-tuple
-        ((ymin,ymax),(xmin,xmax)) 2 dimensional typle to crop the exposure before any operation (default: None).
+        plot_image_simple(plt.gca(), self.data, scale="log10")
+        if wcs is not None:
+            plt.xlabel('RA')
+            plt.ylabel('Dec')
+        if sources is not None:
+            plt.scatter(sources[0], sources[1], s=300, lw=3,
+                        edgecolor='yellow', facecolor='none', label="all detected sources")
+        target_x, target_y = wcs.all_world2pix(self.target_coord_after_motion.ra, self.target_coord_after_motion.dec, 0)
+        plt.scatter(target_x, target_y, s=300,
+                    edgecolor='cyan', facecolor='none', label=f"the target {self.target.label} after motion", lw=3)
+        if gaia_coord is not None:
+            gaia_x, gaia_y = wcs.all_world2pix(gaia_coord.ra, gaia_coord.dec, 0, maxiter=50, quiet=True)
+            plt.scatter(gaia_x, gaia_y, s=300,
+                        edgecolor='blue', facecolor='none', label=f"gaia stars after motion", lw=3)
+        plt.legend()
+        #margin = 1000
+        #plt.xlim(max(0, target_x - margin), min(target_x + margin, im.data.shape[1]))
+        #plt.ylim(max(0, target_y - margin), min(target_y + margin, im.data.shape[0]))
+        #fig.tight_layout()
+        plt.show()
 
-    Examples
-    --------
+    def shift_wcs_center_fit_gaia_catalog(self, wcs, sources, gaia_coord):
+        sources_coord = wcs.all_pix2world(sources[0], sources[1], 0)
+        sources_coord = SkyCoord(ra=sources_coord[0] * u.deg, dec=sources_coord[1] * u.deg,
+                                 frame="icrs", obstime=self.date_obs, equinox="J2000")
+        self.gaia_index, self.dist_2d, dist_3d = sources_coord.match_to_catalog_sky(gaia_coord)
+        matches = gaia_coord[self.gaia_index]
+        self.dist_ra, self.dist_dec = sources_coord.spherical_offsets_to(matches)
+        return self.gaia_index, self.dist_ra, self.dist_dec
 
-    >>> import os
-    >>> from spectractor.logbook import LogBook
-    >>> from spectractor import parameters
-    >>> parameters.VERBOSE = True
-    >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
-    >>> file_names = ['./tests/data/reduc_20170530_134.fits']
-    >>> for file_name in file_names:
-    ...     tag = file_name.split('/')[-1]
-    ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-    ...     if target is None or xpos is None or ypos is None:
-    ...         continue
-    ...     run_simple_astrometry(file_name, target, disperser_label)
-    ...     assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
+    def plot_astrometry_shifts(self, vmax=3):
+        target_x, target_y = self.wcs.all_world2pix(self.target_coord_after_motion.ra,
+                                                    self.target_coord_after_motion.dec, 0)
+        gaia_x, gaia_y = self.wcs.all_world2pix(self.gaia_coord[self.gaia_index].ra,
+                                                self.gaia_coord[self.gaia_index].dec, 0, maxiter=50, quiet=True)
 
+        fig = plt.figure(figsize=(6, 8))
 
-    """
-    my_logger = set_logger(__name__)
-    # load image
-    im = Image(file_name, target=target, disperser_label=disperser_label)
-    # prepare outputs
-    output_directory = set_wcs_output_directory(file_name)
-    tag = set_file_tag(file_name)
-    my_logger.info(f"\n\tIntermediate outputs will be stored in {output_directory}")
-    # crop data
-    if extent is not None:
-        data = im.data[extent[0][0]:extent[0][1], extent[1][0]:extent[1][1]]
-    else:
-        data = np.copy(im.data)
-    if parameters.DEBUG:
-        im.plot_image(scale="log10")
-    # remove background
-    my_logger.info('\n\tRemove background using astropy SExtractorBackground()...')
-    data_wo_bkg = remove_background(data)
-    # extract source positions and fluxes
-    my_logger.info('\n\tDetect sources using photutils source_detection()...')
-    sources = source_detection(data_wo_bkg)
-    # write results in fits file
-    colx = fits.Column(name='X', format='D', array=sources['xcentroid'])
-    coly = fits.Column(name='Y', format='D', array=sources['ycentroid'])
-    colflux = fits.Column(name='FLUX', format='D', array=sources['flux'])
-    coldefs = fits.ColDefs([colx, coly, colflux])
-    hdu = fits.BinTableHDU.from_columns(coldefs)
-    hdu.header['IMAGEW'] = data.shape[1]
-    hdu.header['IMAGEH'] = data.shape[0]
-    output_sources_fitsfile = f"{output_directory}/{tag}_sources.fits"
-    hdu.writeto(output_sources_fitsfile, overwrite=True)
-    my_logger.info(f'\n\tSources positions saved in {output_sources_fitsfile}')
-    # run astrometry.net
-    command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR, 'solve-field')} --scale-unit arcsecperpix " \
-              f"--scale-low {0.9 * parameters.CCD_PIXEL2ARCSEC} " \
-              f"--scale-high {1.1 * parameters.CCD_PIXEL2ARCSEC} " \
-              f"--ra {im.target.coord.ra.value} --dec {im.target.coord.dec.value} " \
-              f"--radius {2 * parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
-              f"--dir {output_directory} --out {tag} " \
-              f"--overwrite --x-column X --y-column Y {output_sources_fitsfile}"
-    my_logger.info(f'\n\tRun astrometry.net solve_field command:\n\t{command}')
-    log = subprocess.check_output(command, shell=True)
-    log_file = open(f"{output_directory}/{tag}.log", "w+")
-    log_file.write(command + "\n")
-    log_file.write(log.decode("utf-8") + "\n")
-    # save new WCS in original fits file
-    new_file_name = file_name.replace('.fits', '_new.fits')
-    command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR, 'new-wcs')} -v -d -i {file_name} " \
-              f"-w {os.path.join(output_directory, tag + '.wcs')} -o {new_file_name}\n"
-    # f"mv {new_file_name} {file_name}"
-    my_logger.info(f'\n\tSave WCS in original file:\n\t{command}')
-    log = subprocess.check_output(command, shell=True)
-    log_file.write(command + "\n")
-    log_file.write(log.decode("utf-8") + "\n")
-    log_file.close()
+        fig.add_subplot(211, projection=self.wcs)
+
+        plot_image_simple(plt.gca(), self.data, scale="log10")
+        plt.xlabel('RA')
+        plt.ylabel('Dec')
+        if self.sources is not None:
+            plt.scatter(self.sources[0], self.sources[1], s=100, lw=3,
+                        edgecolor='yellow', facecolor='none', label="all sources")
+        sc = plt.scatter(gaia_x, gaia_y, s=100, c=self.dist_ra.to(u.arcsec).value,
+                         cmap="bwr", vmin=-vmax, vmax=vmax,
+                         label=f"gaia stars after motion", lw=3)
+        margin = 1000
+        plt.xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
+        plt.ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
+        plt.colorbar(sc, label="Shift in RA [arcsec]")
+        plt.legend()
+
+        fig.add_subplot(212, projection=self.wcs)
+        plot_image_simple(plt.gca(), self.data, scale="log10")
+        plt.xlabel('RA')
+        plt.ylabel('Dec')
+        plt.grid(color='white', ls='solid')
+        if self.sources is not None:
+            plt.scatter(self.sources[0], self.sources[1], s=100, lw=3,
+                        edgecolor='yellow', facecolor='none', label="all sources")
+        sc = plt.scatter(gaia_x, gaia_y, s=100, c=self.dist_dec.to(u.arcsec).value,
+                         cmap="bwr", vmin=-vmax, vmax=vmax,
+                         label=f"gaia stars after motion", lw=3)
+        plt.xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
+        plt.ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
+        plt.colorbar(sc, label="Shift in DEC [arcsec]")
+        plt.legend()
+        #fig.tight_layout()
+        plt.show()
+
+    def set_constraints(self, min_stars=50, flux_log10_threshold=0.1, max_range=5 * u.arcmin, max_sep=3 * u.arcsec):
+        sep = self.dist_2d < max_sep
+        print(np.sum(sep))
+        sep *= np.log10(self.sources_flux) > flux_log10_threshold
+        sep *= origin.separation(self.target_coord_after_motion) < max_range
+        # bright_sources_constraint = np.log10(sources_flux) > flux_log10_threshold
+        print(np.sum(sep))
+        if np.sum(sep) > min_stars:
+            for r in np.arange(0, max_range.value, 0.1)[::-1]:
+                range_constraint = origin.separation(t.coord) < r * u.arcmin
+                if np.sum(sep * range_constraint) < min_stars:
+                    break
+                else:
+                    sep *= range_constraint
+        print(np.sum(sep))
+        return sep
+
+    def run_simple_astrometry(self, extent=None):
+        """Build a World Coordinate System (WCS) using astrometry.net library given an exposure as a FITS file.
+
+        The name of the target must be given to get its RA,DEC coordinates via a Simbad query.
+        First the background of the exposure is removed using the astropy SExtractorBackground() method.
+        Then photutils source_detection() is used to get the positions in pixels en flux of the objects in the field.
+        The results are saved in the {file_name}_sources.fits file and used by the solve_field command from the
+        astrometry.net library. The solve_field path must be set using the spectractor.parameters.ASTROMETRYNET_BINDIR
+        variable. A new WCS is created and merged with the given exposure.
+        The intermediate results are saved in a new directory named as the FITS file name with a _wcs suffix.
+
+        Parameters
+        ----------
+        extent: 2-tuple
+            ((xmin,xmax),(ymin,ymax)) 2 dimensional typle to crop the exposure before any operation (default: None).
+
+        Examples
+        --------
+
+        >>> import os
+        >>> from spectractor.logbook import LogBook
+        >>> from spectractor.astrometry import Astrometry
+        >>> from spectractor import parameters
+        >>> parameters.VERBOSE = True
+        >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+        >>> file_names = ['./tests/data/reduc_20170530_134.fits']
+        >>> for file_name in file_names:
+        ...     tag = file_name.split('/')[-1]
+        ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
+        ...     if target is None or xpos is None or ypos is None:
+        ...         continue
+        ...     a = Astrometry(file_name, target, disperser_label)
+        ...     a.run_simple_astrometry(extent=((300,1400),(300,1400)))
+        ...     assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
+
+        """
+        # crop data
+        if extent is not None:
+            data = self.data[extent[1][0]:extent[1][1], extent[0][0]:extent[0][1]]
+        else:
+            data = np.copy(self.data)
+        if parameters.DEBUG:
+            self.plot_image(scale="log10")
+        # remove background
+        self.my_logger.info('\n\tRemove background using astropy SExtractorBackground()...')
+        data_wo_bkg = remove_background(data)
+        # extract source positions and fluxes
+        self.my_logger.info('\n\tDetect sources using photutils source_detection()...')
+        self.sources = source_detection(data_wo_bkg)
+        if extent is not None:
+            self.sources['xcentroid'] += extent[0][0]
+            self.sources['ycentroid'] += extent[1][0]
+        self.my_logger.info(f'\n\t{self.sources}')
+
+        # write results in fits file
+        self.write_sources()
+        # run astrometry.net
+        command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR, 'solve-field')} --scale-unit arcsecperpix " \
+                  f"--scale-low {0.95 * parameters.CCD_PIXEL2ARCSEC} " \
+                  f"--scale-high {1.05 * parameters.CCD_PIXEL2ARCSEC} " \
+                  f"--ra {self.target.coord.ra.value} --dec {self.target.coord.dec.value} " \
+                  f"--radius {2 * parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
+                  f"--dir {self.output_directory} --out {self.tag} " \
+                  f"--overwrite --x-column X --y-column Y {self.output_sources_fitsfile}"
+        self.my_logger.info(f'\n\tRun astrometry.net solve_field command:\n\t{command}')
+        log = subprocess.check_output(command, shell=True)
+        log_file = open(f"{os.path.join(self.output_directory, self.tag)}.log", "w+")
+        log_file.write(command + "\n")
+        log_file.write(log.decode("utf-8") + "\n")
+        # save new WCS in original fits file
+        self.new_file_name = self.file_name.replace('.fits', '_new.fits')
+        self.wcs_file_name = os.path.join(self.output_directory, self.tag + '.wcs')
+        command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR, 'new-wcs')} -v -d -i {self.file_name} " \
+                  f"-w {self.wcs_file_name} -o {self.new_file_name}\n"
+        # f"mv {new_file_name} {file_name}"
+        self.my_logger.info(f'\n\tSave WCS in original file:\n\t{command}')
+        log = subprocess.check_output(command, shell=True)
+        log_file.write(command + "\n")
+        log_file.write(log.decode("utf-8") + "\n")
+        log_file.close()
+        # load WCS
+        self.wcs = load_wcs_from_file(self.wcs_file_name)
+        return self.wcs
 
 
 def run_gaia_astrometry(file_name, target, disperser_label=""):
@@ -252,7 +352,7 @@ def run_gaia_astrometry(file_name, target, disperser_label=""):
     Parameters
     ----------
     file_name: str
-        Input file nam of the image to analyse.
+        Input file name of the image to analyse.
     target: str
         The name of the targeted object.
     disperser_label: str
@@ -287,13 +387,30 @@ def run_gaia_astrometry(file_name, target, disperser_label=""):
     my_logger.info(f"\n\tIntermediate outputs will be stored in {output_directory}")
 
     # load detected sources
+    my_logger.info(f"\n\tLoad source positions from {os.path.join(output_directory, tag)}_sources.fits")
     hdu = fits.open(f"{os.path.join(output_directory, tag)}_sources.fits")
     sources = np.array([hdu[1].data[i][:2] for i in range(hdu[1].data.size)]).T
 
     # now refine the astrometry with the Gaia catalog
     wcs = load_wcs_from_file(new_file_name)
+    my_logger.info(f"\n\tLoading Gaia catalog...")
     gaia_catalog = load_gaia_catalog(im.target)
+    #from astropy.io import ascii
+    #ascii.write(gaia_catalog, os.path.join(output_directory, f"{tag}_gaia.ecsv"), format='ecsv', overwrite=True)
+    #gaia_catalog = ascii.read(os.path.join(output_directory, f"{tag}_gaia.ecsv"), format="ecsv")
+    my_logger.info(f"\n\tGaia catalog loaded.")
+    my_logger.info(f"\n\tUpdate object coordinates with proper motion at time={im.date_obs}.")
     target_coord_after_motion = update_target_coord_with_proper_motion(im.target, im.date_obs)
     gaia_coord_after_motion = update_gaia_catalog_with_proper_motion(gaia_catalog, im.date_obs)
     plot_sources_and_gaia_catalog(im, wcs, sources, target_coord_after_motion, gaia_coord_after_motion)
 
+    # compute shifts
+    index, dist_ra, dist_dec = shift_wcs_center_fit_gaia_catalog(im, wcs, sources, gaia_coord_after_motion)
+    plot_astrometry_shifts(im, wcs, sources, target_coord_after_motion,
+                           gaia_coord_after_motion[index], dist_ra, dist_dec)
+
+    # select the brightest and closest stars with maximum shift
+    sep_constraints = set_constraints()
+    origin_matches = origin[sep_constraints]
+    matches = gaia[idx[sep_constraints]]
+    dra, ddec = origin_matches.spherical_offsets_to(matches)
