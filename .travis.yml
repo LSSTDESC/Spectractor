@@ -61,7 +61,7 @@ before_script:
   - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN --with-libnetcdf=$TRAVIS_BUILD_DIR/NETCDF/"
   - "make uvspec"
   - "cd ../"
-  - "export LIBRADTRANDIR=libRadtran-2.0.2/"
+  - "export LIBRADTRAN_DIR=libRadtran-2.0.2/"
   - conda create -n py37 python=3.7 pip
   - source activate py37
   - python --version
