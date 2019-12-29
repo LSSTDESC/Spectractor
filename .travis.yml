@@ -43,7 +43,6 @@ install:
   - conda info -a
 
 before_script:
-  - ls /usr/include/net*
   # use personal github token to clone slitless github private repo
   - echo -e "machine github.com\n  login $CI_USER_TOKEN" > ~/.netrc
   # necessary for libradtran make uvspec command
@@ -70,9 +69,6 @@ before_script:
   - "make uvspec"
   - "cd ../"
   - "export LIBRADTRAN_DIR=$TRAVIS_BUILD_DIR/LIBRADTRAN"
-  - conda create -n py37 python=3.7 pip
-  - source activate py37
-  - python --version
 #  - apt-get install netpbm
 #  - apt-get install wcslib
   - export NETPBM_LIB="-L/usr/lib -lnetpbm"
@@ -92,6 +88,9 @@ before_script:
   - make install-indexes
   - cd ../
   - "export ASTROMETRYNET_BINDIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET"
+  - conda create -n py37 python=3.7 pip
+  - source activate py37
+  - python --version
 
 
   # - "git clone https://$CI_USER_TOKEN@github.com/jeremyneveu/slitless.git slitless"
