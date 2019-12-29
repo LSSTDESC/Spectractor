@@ -3,6 +3,8 @@ from spectractor.astrometry import Astrometry
 from spectractor.logbook import LogBook
 from spectractor.config import load_config
 
+import subprocess
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
@@ -18,9 +20,17 @@ if __name__ == "__main__":
                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
     parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
                         help="INI config file. (default: config.ctio.ini).")
+    parser.add_argument("-o", "--overwrite", dest="overwrite", action="store_true", default=False,
+                        help="Overwrite original input fits file with a new fits file containing the new WCS solution.")
+    parser.add_argument("-r", "--radius", dest="radius", default=500,
+                        help="Radius in pixel around the guessed target position to detect sources "
+                             "and set the new WCS solution.")
+    parser.add_argument("-m", "--maxiter", dest="maxiter", default=10,
+                        help="Maximum iterations before WCS solution convergence below 1 mas.")
     args = parser.parse_args()
 
     parameters.VERBOSE = args.verbose
+    radius = int(args.radius)
     if args.debug:
         parameters.DEBUG = True
         parameters.VERBOSE = True
@@ -37,13 +47,17 @@ if __name__ == "__main__":
         if target is None or xpos is None or ypos is None:
             continue
         a = Astrometry(file_name, target, disperser_label)
-        margin = 500
-        a.run_simple_astrometry(extent=((xpos-margin, xpos+margin), (ypos-margin, ypos+margin)))
-        for i in range(10):
+        a.run_simple_astrometry(extent=((xpos - radius, xpos + radius), (ypos - radius, ypos + radius)))
+        # iterate process until shift is below 1 mas on RA and DEC directions
+        # or maximum iterations is reached
+        for i in range(int(args.maxiter)):
             dra, ddec = a.run_gaia_astrometry()
-            print(dra, ddec)
             if dra < 1e-3 and ddec < 1e-3:
                 break
         if parameters.DEBUG or True:
             a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches, margin=200)
             a.plot_astrometry_shifts(vmax=3)
+        # overwrite input file
+        if args.overwrite:
+            a.my_logger.warning(f"Overwrite option is True: {a.file_name} replaced by {a.new_file_name}")
+            subprocess.check_output(f"mv {a.new_file_name} {a.file_name}")
