@@ -86,7 +86,7 @@ before_script:
   - make install INSTALL_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET
   - wget -r -nc http://data.astrometry.net/5000/index-5002-24.fits
   - mv data.astrometry.net/5000/index-5002-24.fits $TRAVIS_BUILD_DIR/ASTROMETRYNET/data/
-  - make install-indexes
+  # - make install-indexes
   - cd ../
   - "export ASTROMETRYNET_BINDIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET"
   - conda create -n py37 python=3.7 pip
