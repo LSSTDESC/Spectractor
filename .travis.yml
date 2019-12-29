@@ -14,7 +14,6 @@ addons: # for libradtran and astrometry.net library
         - libopenmpi-dev
         - openmpi-bin
         - netpbm
-        - wcslib
 
 python:
   - "3.7"
