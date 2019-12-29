@@ -41,7 +41,7 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5):
     for col in sources.colnames:
         sources[col].info.format = '%.8g'  # for consistent table output
     sources.sort('mag')
-    if parameters.DEBUG or True:
+    if parameters.DEBUG:
         positions = np.array((sources['xcentroid'], sources['ycentroid']))
         fig = plt.figure(figsize=(8, 8))
         plot_image_simple(plt.gca(), data_wo_bkg, scale="log10", target_pixcoords=positions)
@@ -131,6 +131,7 @@ class Astrometry(Image):
         self.sources_coord = None
         self.gaia_catalog = None
         self.gaia_index = None
+        self.gaia_matches = None
         self.gaia_coord_after_motion = None
         self.dist_2d = None
         self.dist_ra = 0 * u.arcsec
@@ -372,7 +373,7 @@ class Astrometry(Image):
         if extent is not None:
             self.sources['xcentroid'] += extent[0][0]
             self.sources['ycentroid'] += extent[1][0]
-        self.my_logger.warning(f'\n\t{self.sources}')
+        self.my_logger.info(f'\n\t{self.sources}')
 
         # write results in fits file
         self.write_sources()
@@ -427,8 +428,16 @@ class Astrometry(Image):
         ...     if target is None or xpos is None or ypos is None:
         ...         continue
         ...     a = Astrometry(file_name, target, disperser_label)
-        ...     a.run_gaia_astrometry()
-        ...     assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
+        ...     a.run_simple_astrometry(extent=((300,1400),(300,1400)))
+        ...     dra, ddec = a.run_gaia_astrometry() # doctest:  +ELLIPSIS
+        >>> print(dra, ddec)
+
+        .. doctest:
+            :hide:
+
+            >>> assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
+            >>> assert os.path.isfile('./tests/data/reduc_20170530_134_new.fits')
+            >>> assert np.all(np.isclose([dra, ddec], (0.18037512276062817, 0.0037444177129347285), rtol=1e-3))
 
         """
         # load detected sources
@@ -512,8 +521,6 @@ class Astrometry(Image):
         dra_median = np.median(dra.to(u.arcsec).value)
         ddec_median = np.median(ddec.to(u.arcsec).value)
 
-        if parameters.DEBUG or True:
-            # self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion, margin=30)
-            # self.plot_astrometry_shifts(vmax=3)
+        if parameters.DEBUG:
             self.plot_shifts_histograms(dra, ddec)
         return dra_median, ddec_median
