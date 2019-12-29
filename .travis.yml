@@ -38,7 +38,8 @@ install:
   - conda info -a
 
 before_script:
-  - dpkg --listfiles netpbm
+  - ls /usr/lib
+  - ls /usr/include
   # use personal github token to clone slitless github private repo
   - echo -e "machine github.com\n  login $CI_USER_TOKEN" > ~/.netrc
   # necessary for libradtran make uvspec command
