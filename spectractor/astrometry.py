@@ -307,6 +307,16 @@ class Astrometry(Image):
         ax[1].legend()
         plt.show()
 
+    def merge_wcs_with_new_exposure(self, log_file=None):
+        command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR, 'new-wcs')} -v -d -i {self.file_name} " \
+                  f"-w {self.wcs_file_name} -o {self.new_file_name}\n"
+        # f"mv {new_file_name} {file_name}"
+        self.my_logger.info(f'\n\tSave WCS in original file:\n\t{command}')
+        log = subprocess.check_output(command, shell=True)
+        if log_file is not None:
+            log_file.write(command + "\n")
+            log_file.write(log.decode("utf-8") + "\n")
+
     def run_simple_astrometry(self, extent=None):
         """Build a World Coordinate System (WCS) using astrometry.net library given an exposure as a FITS file.
 
@@ -377,13 +387,7 @@ class Astrometry(Image):
         log_file.write(command + "\n")
         log_file.write(log.decode("utf-8") + "\n")
         # save new WCS in original fits file
-        command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR, 'new-wcs')} -v -d -i {self.file_name} " \
-                  f"-w {self.wcs_file_name} -o {self.new_file_name}\n"
-        # f"mv {new_file_name} {file_name}"
-        self.my_logger.info(f'\n\tSave WCS in original file:\n\t{command}')
-        log = subprocess.check_output(command, shell=True)
-        log_file.write(command + "\n")
-        log_file.write(log.decode("utf-8") + "\n")
+        self.merge_wcs_with_new_exposure(log_file=log_file)
         log_file.close()
         # load WCS
         self.wcs = load_wcs_from_file(self.new_file_name)
@@ -470,8 +474,6 @@ class Astrometry(Image):
         # compute statistics
         dra_median = np.median(dra.to(u.arcsec).value)
         ddec_median = np.median(ddec.to(u.arcsec).value)
-        dra_rms = np.std(dra.to(u.arcsec).value)
-        ddec_rms = np.std(ddec.to(u.arcsec).value)
         if parameters.DEBUG or True:
             self.plot_shifts_histograms(dra, ddec)
             self.plot_shifts_profiles(gaia_matches, dra, ddec)
@@ -486,3 +488,30 @@ class Astrometry(Image):
                              * u.arcsec
         if parameters.DEBUG or True:
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion, margin=10)
+
+        # Now, write out the WCS object as a FITS header
+        header = self.wcs.to_header()
+
+        # header is an astropy.io.fits.Header object.  We can use it to create a new
+        # PrimaryHDU and write it to a file.
+        hdu = fits.PrimaryHDU(header=header)
+        # Save to FITS file
+        hdu.writeto(self.wcs_file_name+"_gaia", overwrite=True)
+
+        # save new WCS in original fits file
+        # self.merge_wcs_with_new_exposure(log_file=None)
+
+        if parameters.DEBUG or True:
+            # load WCS
+            self.wcs = load_wcs_from_file(self.wcs_file_name+"_gaia")
+            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion, margin=10)
+            self.gaia_index, self.dist_ra, self.dist_dec = \
+                self.shift_wcs_center_fit_gaia_catalog(self.gaia_coord_after_motion)
+            self.plot_astrometry_shifts(vmax=3)
+            self.set_sources_coord()
+            sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold)
+            sources_selection = self.sources_coord[sep_constraints]
+            gaia_matches = self.gaia_coord_after_motion[self.gaia_index[sep_constraints]]
+            dra, ddec = sources_selection.spherical_offsets_to(gaia_matches)
+            self.plot_shifts_histograms(dra, ddec)
+
