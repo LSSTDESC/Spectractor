@@ -65,9 +65,12 @@ before_script:
   - conda create -n py37 python=3.7 pip
   - source activate py37
   - python --version
-  - brew install netpbm
+  - apt-get install netpbm
+  - apt-get install wcslib
   - export NETPBM_LIB="-L/usr/local/lib -lnetpbm"
   - export NETPBM_INC="-I/usr/local/include/netpbm -I/usr/local/include"
+  - export WCSLIB_INC="-I/usr/local/Cellar/wcslib/5.7/include/wcslib"
+  - export WCSLIB_LIB="-L/usr/local/Cellar/wcslib/5.7/lib -lwcs -lm"
   - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
   - tar xvzf astrometry.net-latest.tar.gz
   - cd astrometry.net-*
