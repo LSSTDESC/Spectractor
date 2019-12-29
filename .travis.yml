@@ -39,7 +39,6 @@ install:
 
 before_script:
   # use personal github token to clone slitless github private repo
-  - which pnmtopng
   - echo -e "machine github.com\n  login $CI_USER_TOKEN" > ~/.netrc
   # necessary for libradtran make uvspec command
   - conda create -n py27 python=2.7 pip
@@ -70,8 +69,9 @@ before_script:
   - python --version
 #  - apt-get install netpbm
 #  - apt-get install wcslib
-  - export NETPBM_LIB="-L/usr/local/lib -lnetpbm"
-  - export NETPBM_INC="-I/usr/local/include/netpbm -I/usr/local/include"
+  - ls /usr/include/netpbm
+  - export NETPBM_LIB="-L/usr/lib -lnetpbm"
+  - export NETPBM_INC="-I/usr/include/netpbm -I/usr/include"
 #  - export WCSLIB_INC="-I/usr/local/Cellar/wcslib/5.7/include/wcslib"
 #  - export WCSLIB_LIB="-L/usr/local/Cellar/wcslib/5.7/lib -lwcs -lm"
   - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
