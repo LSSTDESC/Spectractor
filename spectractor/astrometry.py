@@ -346,15 +346,21 @@ class Astrometry(Image):
         >>> parameters.VERBOSE = True
         >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
-        >>> file_names = ['./tests/data/reduc_20170605_028.fits']
+        >>> os.remove('./tests/data/reduc_20170530_134_new.fits')
         >>> for file_name in file_names:
         ...     tag = file_name.split('/')[-1]
         ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         ...     if target is None or xpos is None or ypos is None:
         ...         continue
         ...     a = Astrometry(file_name, target, disperser_label)
-        ...     a.run_simple_astrometry(extent=((300,1400),(300,1400)))
-        ...     assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
+        ...     a.run_simple_astrometry(extent=((300,1400),(300,1400)))  # doctest: +ELLIPSIS
+        WCS ...
+
+        .. doctest:
+            :hide:
+
+            >>> assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
+            >>> assert os.path.isfile('./tests/data/reduc_20170530_134_new.fits')
 
         """
         # crop data
@@ -421,7 +427,7 @@ class Astrometry(Image):
         >>> parameters.VERBOSE = True
         >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
-        >>> file_names = ['./tests/data/reduc_20170605_028.fits']
+        >>> os.remove('./tests/data/reduc_20170530_134_new.fits')
         >>> for file_name in file_names:
         ...     tag = file_name.split('/')[-1]
         ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
@@ -429,15 +435,15 @@ class Astrometry(Image):
         ...         continue
         ...     a = Astrometry(file_name, target, disperser_label)
         ...     a.run_simple_astrometry(extent=((300,1400),(300,1400)))
-        ...     dra, ddec = a.run_gaia_astrometry() # doctest:  +ELLIPSIS
-        >>> print(dra, ddec)
+        ...     dra, ddec = a.run_gaia_astrometry()  # doctest: +ELLIPSIS
+        WCS ...
 
         .. doctest:
             :hide:
 
             >>> assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
             >>> assert os.path.isfile('./tests/data/reduc_20170530_134_new.fits')
-            >>> assert np.all(np.isclose([dra, ddec], (0.18037512276062817, 0.0037444177129347285), rtol=1e-3))
+            >>> assert np.all(np.isclose([dra, ddec], (0.021613160253789745, 1.4591414872641583e-07), rtol=1e-3))
 
         """
         # load detected sources
@@ -448,7 +454,6 @@ class Astrometry(Image):
             sources['Y'].name = "ycentroid"
             sources['FLUX'].name = "flux"
             self.sources = sources
-            self.my_logger.debug(f"\n\t{self.sources}")
 
         # load WCS if absent
         if self.wcs is None:
