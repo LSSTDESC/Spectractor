@@ -33,7 +33,7 @@ def remove_background(data, sigma=3.0, box_size=(50, 50), filter_size=(3, 3)):
     return data_wo_bkg
 
 
-def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=3.5):
+def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5):
     mean, median, std = sigma_clipped_stats(data_wo_bkg, sigma=sigma)
     mask = np.zeros(data_wo_bkg.shape, dtype=bool)
     daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std)
@@ -41,7 +41,7 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=3.5)
     for col in sources.colnames:
         sources[col].info.format = '%.8g'  # for consistent table output
     sources.sort('mag')
-    if parameters.DEBUG:
+    if parameters.DEBUG or True:
         positions = np.array((sources['xcentroid'], sources['ycentroid']))
         fig = plt.figure(figsize=(8, 8))
         plot_image_simple(plt.gca(), data_wo_bkg, scale="log10", target_pixcoords=positions)
@@ -173,15 +173,15 @@ class Astrometry(Image):
             plt.xlabel('RA')
             plt.ylabel('Dec')
         if sources is not None:
-            plt.scatter(sources['xcentroid'], sources['ycentroid'], s=300, lw=3,
-                        edgecolor='yellow', facecolor='none', label="all detected sources")
+            plt.scatter(sources['xcentroid'], sources['ycentroid'], s=300, lw=2,
+                        edgecolor='black', facecolor='none', label="all detected sources")
         target_x, target_y = wcs.all_world2pix(self.target_coord_after_motion.ra, self.target_coord_after_motion.dec, 0)
-        plt.scatter(target_x, target_y, s=300,
-                    edgecolor='cyan', facecolor='none', label=f"the target {self.target.label} after motion", lw=3)
+        plt.scatter(target_x, target_y, s=300, marker="+",
+                    edgecolor='cyan', facecolor='cyan', label=f"the target {self.target.label} after motion", lw=2)
         if gaia_coord is not None:
             gaia_x, gaia_y = wcs.all_world2pix(gaia_coord.ra, gaia_coord.dec, 0, maxiter=50, quiet=True)
-            plt.scatter(gaia_x, gaia_y, s=300,
-                        edgecolor='blue', facecolor='none', label=f"gaia stars after motion", lw=3)
+            plt.scatter(gaia_x, gaia_y, s=300, marker="+",
+                        edgecolor='blue', facecolor='blue', label=f"gaia stars after motion", lw=2)
         plt.legend()
         plt.xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
         plt.ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
@@ -215,11 +215,11 @@ class Astrometry(Image):
         plt.xlabel('RA')
         plt.ylabel('Dec')
         if self.sources is not None:
-            plt.scatter(self.sources['xcentroid'], self.sources['ycentroid'], s=100, lw=3,
-                        edgecolor='yellow', facecolor='none', label="all sources")
+            plt.scatter(self.sources['xcentroid'], self.sources['ycentroid'], s=100, lw=2,
+                        edgecolor='black', facecolor='none', label="all sources")
         sc = plt.scatter(gaia_x, gaia_y, s=100, c=self.dist_ra.to(u.arcsec).value,
                          cmap="bwr", vmin=-vmax, vmax=vmax,
-                         label=f"gaia stars after motion", lw=3)
+                         label=f"gaia stars after motion", lw=1)
         margin = 1000
         plt.xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
         plt.ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
@@ -232,11 +232,11 @@ class Astrometry(Image):
         plt.ylabel('Dec')
         plt.grid(color='white', ls='solid')
         if self.sources is not None:
-            plt.scatter(self.sources['xcentroid'], self.sources['ycentroid'], s=100, lw=3,
-                        edgecolor='yellow', facecolor='none', label="all sources")
+            plt.scatter(self.sources['xcentroid'], self.sources['ycentroid'], s=100, lw=2,
+                        edgecolor='black', facecolor='none', label="all sources")
         sc = plt.scatter(gaia_x, gaia_y, s=100, c=self.dist_dec.to(u.arcsec).value,
                          cmap="bwr", vmin=-vmax, vmax=vmax,
-                         label=f"gaia stars after motion", lw=3)
+                         label=f"gaia stars after motion", lw=1)
         plt.xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
         plt.ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
         plt.colorbar(sc, label="Shift in DEC [arcsec]")
@@ -372,7 +372,7 @@ class Astrometry(Image):
         if extent is not None:
             self.sources['xcentroid'] += extent[0][0]
             self.sources['ycentroid'] += extent[1][0]
-        self.my_logger.info(f'\n\t{self.sources}')
+        self.my_logger.warning(f'\n\t{self.sources}')
 
         # write results in fits file
         self.write_sources()
@@ -381,7 +381,7 @@ class Astrometry(Image):
                   f"--scale-low {0.95 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--scale-high {1.05 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--ra {self.target.coord.ra.value} --dec {self.target.coord.dec.value} " \
-                  f"--radius {2 * parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
+                  f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
                   f"--dir {self.output_directory} --out {self.tag} " \
                   f"--overwrite --x-column X --y-column Y {self.output_sources_fitsfile}"
         self.my_logger.info(f'\n\tRun astrometry.net solve_field command:\n\t{command}')
@@ -470,7 +470,7 @@ class Astrometry(Image):
             self.plot_astrometry_shifts(vmax=3)
 
         # select the brightest and closest stars with maximum shift
-        flux_log10_threshold = np.log10(self.sources['flux'][int(0.9 * len(self.sources))])
+        flux_log10_threshold = np.log10(self.sources['flux'][int(0.5 * len(self.sources))])
         sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold)
         sources_selection = self.sources_coord[sep_constraints]
         gaia_matches = self.gaia_coord_after_motion[self.gaia_index[sep_constraints]]
@@ -507,8 +507,8 @@ class Astrometry(Image):
             self.shift_wcs_center_fit_gaia_catalog(self.gaia_coord_after_motion)
         sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold)
         sources_selection = self.sources_coord[sep_constraints]
-        gaia_matches = self.gaia_coord_after_motion[self.gaia_index[sep_constraints]]
-        dra, ddec = sources_selection.spherical_offsets_to(gaia_matches)
+        self.gaia_matches = self.gaia_coord_after_motion[self.gaia_index[sep_constraints]]
+        dra, ddec = sources_selection.spherical_offsets_to(self.gaia_matches)
         dra_median = np.median(dra.to(u.arcsec).value)
         ddec_median = np.median(ddec.to(u.arcsec).value)
 
