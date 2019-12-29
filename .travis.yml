@@ -4,6 +4,7 @@ cache:
   directories:
   - "$TRAVIS_BUILD_DIR/build/NETCDF/src"
   - "$TRAVIS_BUILD_DIR/build/LIBRADTRAN/src"
+  - "$TRAVIS_BUILD_DIR/build/ASTROMETRYNET/src"
 
 addons: # for libradtran and astrometry.net library
   apt:
@@ -62,14 +63,14 @@ before_script:
   - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN --with-libnetcdf=$TRAVIS_BUILD_DIR/NETCDF/"
   - "make uvspec"
   - "cd ../"
-  - "export LIBRADTRAN_DIR=libRadtran-2.0.2/"
+  - "export LIBRADTRAN_DIR=$TRAVIS_BUILD_DIR/LIBRADTRAN"
   - conda create -n py37 python=3.7 pip
   - source activate py37
   - python --version
 #  - apt-get install netpbm
 #  - apt-get install wcslib
-#  - export NETPBM_LIB="-L/usr/local/lib -lnetpbm"
-#  - export NETPBM_INC="-I/usr/local/include/netpbm -I/usr/local/include"
+  - export NETPBM_LIB="-L/usr/local/lib -lnetpbm"
+  - export NETPBM_INC="-I/usr/local/include/netpbm -I/usr/local/include"
 #  - export WCSLIB_INC="-I/usr/local/Cellar/wcslib/5.7/include/wcslib"
 #  - export WCSLIB_LIB="-L/usr/local/Cellar/wcslib/5.7/lib -lwcs -lm"
   - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
@@ -83,7 +84,7 @@ before_script:
   - mv index-5002-24.fits data/
   - make install-indexes
   - cd ../
-  - "export ASTROMETRYNET_BINDIR=astrometry.net-0.78/"
+  - "export ASTROMETRYNET_BINDIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET"
 
 
   # - "git clone https://$CI_USER_TOKEN@github.com/jeremyneveu/slitless.git slitless"
