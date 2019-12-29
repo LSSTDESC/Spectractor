@@ -65,6 +65,21 @@ before_script:
   - conda create -n py37 python=3.7 pip
   - source activate py37
   - python --version
+  - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
+  - tar xvzf astrometry.net-latest.tar.gz
+  - ls
+  - cd astrometry.net-*
+  - ./configure  --prefix=$TRAVIS_BUILD_DIR/ASTROMETRYNET
+  - make
+  - make py
+  - make install
+  - wget -r -nc http://data.astrometry.net/5000/index-5002-24.fits
+  - mv index-5002-24.fits data/
+  - make install-indexes
+  - cd ../
+  - "export ASTROMETRYNET_BINDIR=libRadtran-astrometry.net/"
+
+
   # - "git clone https://$CI_USER_TOKEN@github.com/jeremyneveu/slitless.git slitless"
   # - "cd slitless"
   # - git checkout spectractor
