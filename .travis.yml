@@ -69,17 +69,12 @@ before_script:
   - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN --with-libnetcdf=$TRAVIS_BUILD_DIR/NETCDF/"
   - "make uvspec"
   - "cd ../"
-  - "export LIBRADTRAN_DIR=$TRAVIS_BUILD_DIR/LIBRADTRAN"
-#  - apt-get install netpbm
-#  - apt-get install wcslib
+  - "export LIBRADTRAN_DIR=libRadtran-2.0.2/"
   - export NETPBM_LIB="-L/usr/lib -lnetpbm"
   - export NETPBM_INC="-I/usr/include"
-#  - export WCSLIB_INC="-I/usr/local/Cellar/wcslib/5.7/include/wcslib"
-#  - export WCSLIB_LIB="-L/usr/local/Cellar/wcslib/5.7/lib -lwcs -lm"
   - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
   - tar xvzf astrometry.net-latest.tar.gz
   - cd astrometry.net-*
-#  - ./configure  --prefix=$TRAVIS_BUILD_DIR/ASTROMETRYNET
   - make
   - make py
   - make extra
