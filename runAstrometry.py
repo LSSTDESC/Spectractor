@@ -1,6 +1,7 @@
 from spectractor import parameters
 from spectractor.astrometry import Astrometry
 from spectractor.logbook import LogBook
+from spectractor.config import load_config
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -26,6 +27,8 @@ if __name__ == "__main__":
 
     file_names = args.input
 
+    load_config(args.config)
+
     logbook = LogBook(logbook=args.logbook)
     for file_name in file_names:
         tag = file_name.split('/')[-1]
@@ -34,10 +37,13 @@ if __name__ == "__main__":
         if target is None or xpos is None or ypos is None:
             continue
         a = Astrometry(file_name, target, disperser_label)
-        a.run_simple_astrometry()
+        margin = 500
+        a.run_simple_astrometry(extent=((xpos-margin, xpos+margin), (ypos-margin, ypos+margin)))
         for i in range(10):
             dra, ddec = a.run_gaia_astrometry()
             print(dra, ddec)
+            if dra < 1e-3 and ddec < 1e-3:
+                break
         if parameters.DEBUG or True:
-            a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_coord_after_motion, margin=30)
+            a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches, margin=200)
             a.plot_astrometry_shifts(vmax=3)
