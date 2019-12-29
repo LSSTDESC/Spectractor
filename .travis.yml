@@ -15,6 +15,11 @@ addons: # for libradtran and astrometry.net library
         - libopenmpi-dev
         - openmpi-bin
         - netpbm
+        - wcslib-dev
+        - libcfitsio-dev
+        - swig
+        - gsl-bin
+        - libgsl-dev
 
 python:
   - "3.7"
@@ -77,10 +82,11 @@ before_script:
   - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
   - tar xvzf astrometry.net-latest.tar.gz
   - cd astrometry.net-*
-  - ./configure  --prefix=$TRAVIS_BUILD_DIR/ASTROMETRYNET
+#  - ./configure  --prefix=$TRAVIS_BUILD_DIR/ASTROMETRYNET
   - make
   - make py
-  - make install
+  - make extra
+  - make install INSTALL_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET
   - wget -r -nc http://data.astrometry.net/5000/index-5002-24.fits
   - mv index-5002-24.fits data/
   - make install-indexes
