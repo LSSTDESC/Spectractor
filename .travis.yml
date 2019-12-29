@@ -70,7 +70,6 @@ before_script:
   - python --version
 #  - apt-get install netpbm
 #  - apt-get install wcslib
-  - ls /usr/include/pam.h
   - export NETPBM_LIB="-L/usr/lib -lnetpbm"
   - export NETPBM_INC="-I/usr/include"
 #  - export WCSLIB_INC="-I/usr/local/Cellar/wcslib/5.7/include/wcslib"
