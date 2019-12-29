@@ -49,6 +49,7 @@ before_script:
   - conda create -n py27 python=2.7 pip
   - source activate py27
   - python --version
+  - pip install pyutil
   - "export PYSYN_CDBS=tests/data/"
   - "echo backend: agg > matplotlibrc"
   - "wget -L ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.6.1.tar.gz"
