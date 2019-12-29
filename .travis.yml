@@ -69,9 +69,9 @@ before_script:
   - python --version
 #  - apt-get install netpbm
 #  - apt-get install wcslib
-  - ls /usr/include/netpbm
+  - ls /usr/include/pam.h
   - export NETPBM_LIB="-L/usr/lib -lnetpbm"
-  - export NETPBM_INC="-I/usr/include/netpbm -I/usr/include"
+  - export NETPBM_INC="-I/usr/include"
 #  - export WCSLIB_INC="-I/usr/local/Cellar/wcslib/5.7/include/wcslib"
 #  - export WCSLIB_LIB="-L/usr/local/Cellar/wcslib/5.7/lib -lwcs -lm"
   - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
