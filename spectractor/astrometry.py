@@ -54,6 +54,8 @@ def load_gaia_catalog(target, radius=10 * u.arcmin):
     from astroquery.gaia import Gaia
     job = Gaia.cone_search_async(target.coord,
                                  radius=0.5 * parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC * u.arcsec)
+    my_logger = set_logger("load_gaia_catalog")
+    my_logger.info(f"\n\t{job}")
     gaia_catalog = job.get_results()
     gaia_catalog.fill_value = 0
     gaia_catalog['parallax'].fill_value = np.min(gaia_catalog['parallax'])
