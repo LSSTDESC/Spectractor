@@ -398,10 +398,6 @@ class Astrometry(Image):
         log_file.write(command + "\n")
         log_file.write(log.decode("utf-8") + "\n")
         # save new WCS in original fits file
-        log = subprocess.check_output("ls ./tests/data/reduc_20170605_028_wcs", shell=True)
-        self.my_logger.info(f"\n\tls ./tests/data/reduc_20170605_028_wcs\n{log.decode('utf-8')}\n")
-        log = subprocess.check_output("more ./tests/data/reduc_20170605_028_wcs/reduc_20170605_028.wcs", shell=True)
-        self.my_logger.info(f"\n\tmore ./tests/data/reduc_20170605_028_wcs/reduc_20170605_028.wcs\n{log.decode('utf-8')}\n")
         self.merge_wcs_with_new_exposure(log_file=log_file)
         log_file.close()
         # load WCS
