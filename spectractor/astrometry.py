@@ -2,35 +2,21 @@ import os
 import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
-from astropy.stats import SigmaClip, sigma_clipped_stats
+from astropy.stats import sigma_clipped_stats
 from astropy.io import fits, ascii
 import astropy.units as u
 from astropy.table import Table
-from astropy import wcs as WCS
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, Distance
 
-from photutils import Background2D, SExtractorBackground, DAOStarFinder
+from photutils import DAOStarFinder
 
 from spectractor import parameters
-from spectractor.tools import plot_image_simple, ensure_dir
+from spectractor.tools import (plot_image_simple, set_wcs_file_name, set_wcs_tag, set_wcs_output_directory,
+                               load_wcs_from_file)
 from spectractor.config import set_logger
 from spectractor.extractor.images import Image
-
-
-def remove_background(data, sigma=3.0, box_size=(50, 50), filter_size=(3, 3)):
-    sigma_clip = SigmaClip(sigma=sigma)
-    bkg_estimator = SExtractorBackground()
-    bkg = Background2D(data, box_size, filter_size=filter_size,
-                       sigma_clip=sigma_clip, bkg_estimator=bkg_estimator)
-    data_wo_bkg = data - bkg.background
-    data_wo_bkg -= np.min(data_wo_bkg)
-    if parameters.DEBUG:
-        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-        ax[0].imshow(bkg.background, origin='lower')
-        ax[1].imshow(np.log10(1 + data_wo_bkg), origin='lower')
-        plt.show()
-    return data_wo_bkg
+from spectractor.extractor.background import remove_image_background_sextractor
 
 
 def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5):
@@ -62,32 +48,7 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin):
     return gaia_catalog
 
 
-def load_wcs_from_file(filename):
-    # Load the FITS hdulist using astropy.io.fits
-    hdulist = fits.open(filename)
-    # Parse the WCS keywords in the primary HDU
-    wcs = WCS.WCS(hdulist[0].header)
-    return wcs
-
-
-def update_target_coord_with_proper_motion(target, date_obs):
-    target_pmra = target.simbad[0]['PMRA'] * u.mas / u.yr
-    if np.isnan(target_pmra):
-        target_pmra = 0 * u.mas / u.yr
-    target_pmdec = target.simbad[0]['PMDEC'] * u.mas / u.yr
-    if np.isnan(target_pmdec):
-        target_pmdec = 0 * u.mas / u.yr
-    target_parallax = target.simbad[0]['PLX_VALUE'] * u.mas
-    if target_parallax == 0 * u.mas:
-        target_parallax = 1e-4 * u.mas
-    target_coord = SkyCoord(ra=target.coord.ra, dec=target.coord.dec, distance=Distance(parallax=target_parallax),
-                            pm_ra_cosdec=target_pmra, pm_dec=target_pmdec, frame='icrs', equinox="J2000",
-                            obstime="J2000")
-    target_coord_after_proper_motion = target_coord.apply_space_motion(new_obstime=Time(date_obs))
-    return target_coord_after_proper_motion
-
-
-def update_gaia_catalog_with_proper_motion(gaia_catalog, date_obs):
+def get_gaia_coords_after_proper_motion(gaia_catalog, date_obs):
     parallax = np.array(gaia_catalog['parallax'].filled(np.nanmin(np.abs(gaia_catalog['parallax']))))
     parallax[parallax < 0] = np.min(parallax[parallax > 0])
     gaia_stars = SkyCoord(ra=gaia_catalog['ra'], dec=gaia_catalog['dec'], frame='icrs', equinox="J2000",
@@ -96,8 +57,8 @@ def update_gaia_catalog_with_proper_motion(gaia_catalog, date_obs):
                               np.array(gaia_catalog['dec']) * np.pi / 180),
                           pm_dec=gaia_catalog['pmdec'].filled(0),
                           distance=Distance(parallax=parallax * u.mas, allow_negative=True))
-    gaia_stars_after_proper_motion = gaia_stars.apply_space_motion(new_obstime=Time(date_obs))
-    return gaia_stars_after_proper_motion
+    gaia_coords_after_proper_motion = gaia_stars.apply_space_motion(new_obstime=Time(date_obs))
+    return gaia_coords_after_proper_motion
 
 
 def plot_shifts_histograms(dra, ddec):
@@ -138,17 +99,15 @@ class Astrometry(Image):
         """
         Image.__init__(self, file_name, target=target, disperser_label=disperser_label)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.output_directory = ""
-        self.tag = file_name
-        self.set_wcs_output_directory()
-        self.set_file_tag()
+        self.output_directory = set_wcs_output_directory(file_name)
+        self.tag = set_wcs_tag(file_name)
         self.new_file_name = self.file_name.replace('.fits', '_new.fits')
-        self.output_sources_fitsfile = os.path.join(self.output_directory, f"{self.tag}_sources.fits")
+        self.sources_file_name = os.path.join(self.output_directory, f"{self.tag}_sources.fits")
         self.wcs_file_name = wcs_file_name
         if self.wcs_file_name != "":
             self.wcs = load_wcs_from_file(self.wcs_file_name)
         else:
-            self.wcs_file_name = os.path.join(self.output_directory, self.tag + '.wcs')
+            self.wcs_file_name = set_wcs_file_name(file_name)
             if os.path.isfile(self.wcs_file_name):
                 self.wcs = load_wcs_from_file(self.wcs_file_name)
         self.gaia_file_name = os.path.join(self.output_directory, f"{self.tag}_gaia.ecsv")
@@ -163,19 +122,7 @@ class Astrometry(Image):
         self.dist_2d = None
         self.dist_ra = 0 * u.arcsec
         self.dist_dec = 0 * u.arcsec
-        self.target_coord_after_motion = update_target_coord_with_proper_motion(self.target, date_obs=self.date_obs)
-
-    def set_wcs_output_directory(self):
-        output_directory = os.path.join(os.path.dirname(self.file_name),
-                                        os.path.splitext(os.path.basename(self.file_name))[0]) + "_wcs"
-        ensure_dir(output_directory)
-        self.output_directory = output_directory
-        return output_directory
-
-    def set_file_tag(self):
-        tag = os.path.splitext(os.path.basename(self.file_name))[0]
-        self.tag = tag
-        return tag
+        self.target_coord_after_motion = self.target.set_coord_after_proper_motion(date_obs=self.date_obs)
 
     def write_sources(self):
         colx = fits.Column(name='X', format='D', array=self.sources['xcentroid'])
@@ -185,8 +132,8 @@ class Astrometry(Image):
         hdu = fits.BinTableHDU.from_columns(coldefs)
         hdu.header['IMAGEW'] = self.data.shape[1]
         hdu.header['IMAGEH'] = self.data.shape[0]
-        hdu.writeto(self.output_sources_fitsfile, overwrite=True)
-        self.my_logger.info(f'\n\tSources positions saved in {self.output_sources_fitsfile}')
+        hdu.writeto(self.sources_file_name, overwrite=True)
+        self.my_logger.info(f'\n\tSources positions saved in {self.sources_file_name}')
 
     def plot_sources_and_gaia_catalog(self, wcs=None, sources=None, gaia_coord=None, margin=10000):
         fig = plt.figure(figsize=(8, 8))
@@ -377,7 +324,7 @@ class Astrometry(Image):
             self.plot_image(scale="log10")
         # remove background
         self.my_logger.info('\n\tRemove background using astropy SExtractorBackground()...')
-        data_wo_bkg = remove_background(data)
+        data_wo_bkg = remove_image_background_sextractor(data)
         # extract source positions and fluxes
         self.my_logger.info('\n\tDetect sources using photutils source_detection()...')
         self.sources = source_detection(data_wo_bkg)
@@ -395,7 +342,7 @@ class Astrometry(Image):
                   f"--ra {self.target.coord.ra.value} --dec {self.target.coord.dec.value} " \
                   f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
                   f"--dir {self.output_directory} --out {self.tag} " \
-                  f"--overwrite --x-column X --y-column Y {self.output_sources_fitsfile}"
+                  f"--overwrite --x-column X --y-column Y {self.sources_file_name}"
         self.my_logger.info(f'\n\tRun astrometry.net solve_field command:\n\t{command}')
         log = subprocess.check_output(command, shell=True)
         log_file = open(f"{os.path.join(self.output_directory, self.tag)}.log", "w+")
@@ -455,8 +402,8 @@ class Astrometry(Image):
         """
         # load detected sources
         if self.sources is None:
-            self.my_logger.info(f"\n\tLoad source positions and flux from {self.output_sources_fitsfile}")
-            sources = Table.read(self.output_sources_fitsfile)
+            self.my_logger.info(f"\n\tLoad source positions and flux from {self.sources_file_name}")
+            sources = Table.read(self.sources_file_name)
             sources['X'].name = "xcentroid"
             sources['Y'].name = "ycentroid"
             sources['FLUX'].name = "flux"
@@ -482,8 +429,8 @@ class Astrometry(Image):
 
         # update coordinates with proper motion data
         self.my_logger.info(f"\n\tUpdate object coordinates with proper motion at time={self.date_obs}.")
-        self.target_coord_after_motion = update_target_coord_with_proper_motion(self.target, self.date_obs)
-        self.gaia_coord_after_motion = update_gaia_catalog_with_proper_motion(self.gaia_catalog, self.date_obs)
+        self.target_coord_after_motion = self.target.set_coord_after_proper_motion(self.date_obs)
+        self.gaia_coord_after_motion = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.date_obs)
         if parameters.DEBUG:
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion)
 
