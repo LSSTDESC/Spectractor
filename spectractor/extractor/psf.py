@@ -12,7 +12,7 @@ from astropy.modeling.models import Moffat1D
 from astropy.table import Table
 
 from spectractor.tools import dichotomie, fit_poly1d, fit_moffat1d_outlier_removal, plot_image_simple
-from spectractor.extractor.background import extract_background_photutils
+from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.fit.fitter import FitWorkspace, run_minimisation
@@ -945,7 +945,7 @@ class ChromaticPSF:
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         # Fit the transverse profile:
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
@@ -1169,7 +1169,7 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         # Estimate the first guess values
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
@@ -1287,7 +1287,7 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         # Estimate the first guess values
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
@@ -1393,7 +1393,7 @@ class ChromaticPSF1DFitWorkspace(FitWorkspace):
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         # Estimate the first guess values
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
@@ -1589,7 +1589,7 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         # Estimate the first guess values
         # >>> s = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=saturation)
@@ -1734,7 +1734,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     >>> data_errors = np.sqrt(data+1)
 
     # Extract the background
-    >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+    >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
     # Fit the transverse profile:
     >>> s = ChromaticPSF1D(Nx=80, Ny=100, deg=4, saturation=saturation)
