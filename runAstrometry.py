@@ -66,4 +66,4 @@ if __name__ == "__main__":
         # overwrite input file
         if args.overwrite:
             a.my_logger.warning(f"Overwrite option is True: {a.file_name} replaced by {a.new_file_name}")
-            subprocess.check_output(f"mv {a.new_file_name} {a.file_name}")
+            subprocess.check_output(f"mv {a.new_file_name} {a.file_name}", shell=True)
