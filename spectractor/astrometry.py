@@ -346,7 +346,8 @@ class Astrometry(Image):
         >>> parameters.VERBOSE = True
         >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
-        >>> os.remove('./tests/data/reduc_20170530_134_new.fits')
+        >>> if os.path.isfile('./tests/data/reduc_20170530_134_new.fits'):
+        ...     os.remove('./tests/data/reduc_20170530_134_new.fits')
         >>> for file_name in file_names:
         ...     tag = file_name.split('/')[-1]
         ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
@@ -397,9 +398,9 @@ class Astrometry(Image):
         log_file.write(command + "\n")
         log_file.write(log.decode("utf-8") + "\n")
         # save new WCS in original fits file
-        log = subprocess.check_output("ls ./tests/data/reduc_20170605_028_wcs")
+        log = subprocess.check_output("ls ./tests/data/reduc_20170605_028_wcs", shell=True)
         self.my_logger.info(f"\n\tls ./tests/data/reduc_20170605_028_wcs\n{log.decode('utf-8')}\n")
-        log = subprocess.check_output("more ./tests/data/reduc_20170605_028_wcs/reduc_20170605_028.wcs")
+        log = subprocess.check_output("more ./tests/data/reduc_20170605_028_wcs/reduc_20170605_028.wcs", shell=True)
         self.my_logger.info(f"\n\tmore ./tests/data/reduc_20170605_028_wcs/reduc_20170605_028.wcs\n{log.decode('utf-8')}\n")
         self.merge_wcs_with_new_exposure(log_file=log_file)
         log_file.close()
@@ -432,7 +433,8 @@ class Astrometry(Image):
         >>> parameters.DEBUG = True
         >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
-        >>> os.remove('./tests/data/reduc_20170530_134_new.fits')
+        >>> if os.path.isfile('./tests/data/reduc_20170530_134_new.fits'):
+        ...     os.remove('./tests/data/reduc_20170530_134_new.fits')
         >>> for file_name in file_names:
         ...     tag = file_name.split('/')[-1]
         ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
