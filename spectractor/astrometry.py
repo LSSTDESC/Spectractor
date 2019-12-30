@@ -50,10 +50,9 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5):
     return sources
 
 
-def load_gaia_catalog(target, radius=10 * u.arcmin):
+def load_gaia_catalog(target, radius=5 * u.arcmin):
     from astroquery.gaia import Gaia
-    job = Gaia.cone_search_async(target.coord,
-                                 radius=0.5 * parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC * u.arcsec)
+    job = Gaia.cone_search_async(target.coord, radius=radius)
     my_logger = set_logger("load_gaia_catalog")
     my_logger.info(f"\n\t{job}")
     gaia_catalog = job.get_results()
@@ -474,7 +473,9 @@ class Astrometry(Image):
                 self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
             else:
                 self.my_logger.info(f"\n\tLoading Gaia catalog from TAP query...")
-                self.gaia_catalog = load_gaia_catalog(self.target)
+                self.gaia_catalog = load_gaia_catalog(self.target,
+                                                      radius=0.5 * parameters.CCD_IMSIZE *
+                                                             parameters.CCD_PIXEL2ARCSEC * u.arcsec)
                 ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
             self.my_logger.info(f"\n\tGaia catalog loaded.")
 
