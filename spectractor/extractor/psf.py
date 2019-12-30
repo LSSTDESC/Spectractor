@@ -19,8 +19,10 @@ from spectractor.fit.fitter import FitWorkspace, run_minimisation
 
 
 class PSF1D(Fittable1DModel):
-    inputs = ('x',)
-    outputs = ('y',)
+    # inputs = ('x',)
+    # outputs = ('y',)
+    n_inputs = 1
+    n_outputs = 1
 
     amplitude_moffat = Parameter('amplitude_moffat', default=0.5)
     x_mean = Parameter('x_mean', default=0)
@@ -199,8 +201,10 @@ class PSF1D(Fittable1DModel):
 
 
 class PSF2D(Fittable2DModel):
-    inputs = ('x', 'y',)
-    outputs = ('z',)
+    # inputs = ('x', 'y',)
+    # outputs = ('z',)
+    n_inputs = 2
+    n_outputs = 1
 
     amplitude_moffat = Parameter('amplitude_moffat', default=1)
     x_mean = Parameter('x_mean', default=0)
