@@ -3,7 +3,7 @@ import numpy as np
 
 from spectractor import parameters
 from spectractor.config import set_logger, load_config
-from spectractor.extractor.images import Image, find_target, turn_image
+from spectractor.extractor.images import Image, find_target, find_target_after_rotation, turn_image
 from spectractor.extractor.spectrum import (Spectrum, extract_spectrum_from_image, calibrate_spectrum,
                                             calibrate_spectrum_with_lines)
 from spectractor.tools import ensure_dir
@@ -51,7 +51,8 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     ...     if target is None or xpos is None or ypos is None:
     ...         continue
-    ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target, disperser_label, './config/ctio.ini')
+    ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target,
+    ...                            disperser_label, './config/ctio.ini')
     ...     assert spectrum is not None
     ...     assert os.path.isfile('./tests/data/reduc_20170530_134_spectrum.fits')
     """
@@ -70,12 +71,12 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     output_filename = output_filename.replace('.fits', '_spectrum.fits')
     output_filename = output_filename.replace('.fz', '_spectrum.fits')
     output_filename = os.path.join(output_directory, output_filename)
-    output_filename_spectrogram = output_filename.replace('spectrum','spectrogram')
-    output_filename_psf = output_filename.replace('spectrum.fits','table.csv')
+    output_filename_spectrogram = output_filename.replace('spectrum', 'spectrogram')
+    output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
     target_pixcoords = find_target(image, guess)
-    # Rotate the image: several methods
+    # Rotate the image
     turn_image(image)
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
@@ -84,9 +85,9 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     spectrum = Spectrum(image=image)
     # Subtract background and bad pixels
     extract_spectrum_from_image(image, spectrum, w=parameters.PIXWIDTH_SIGNAL,
-                                ws = (parameters.PIXDIST_BACKGROUND,
-                                      parameters.PIXDIST_BACKGROUND+parameters.PIXWIDTH_BACKGROUND),
-                                right_edge=parameters.CCD_IMSIZE-200)
+                                ws=(parameters.PIXDIST_BACKGROUND,
+                                    parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND),
+                                right_edge=parameters.CCD_IMSIZE - 200)
     spectrum.atmospheric_lines = atmospheric_lines
     # Calibrate the spectrum
     calibrate_spectrum(spectrum)
@@ -106,4 +107,3 @@ def Spectractor(file_name, output_directory, guess, target, disperser_label="", 
     spectrum.chromatic_psf.table['lambdas'] = spectrum.lambdas
     spectrum.chromatic_psf.table.write(output_filename_psf, overwrite=True)
     return spectrum
-

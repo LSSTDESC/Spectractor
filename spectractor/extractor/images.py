@@ -14,8 +14,9 @@ from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.psf import fit_PSF2D_minuit
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_info_from_CTIO_header,
-                               fit_poly1d, fit_poly1d_outlier_removal, weighted_avg_and_std,
-                               fit_poly2d_outlier_removal, hessian_and_theta)
+                               fit_poly1d_outlier_removal, weighted_avg_and_std,
+                               fit_poly2d_outlier_removal, hessian_and_theta,
+                               set_wcs_file_name, load_wcs_from_file)
 
 
 class Image(object):
@@ -266,7 +267,7 @@ class Image(object):
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         plt.legend()
-        if parameters.DISPLAY:   # pragma: no cover
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
 
@@ -389,31 +390,48 @@ def find_target(image, guess, rotated=False):
     y0: float
         The y position of the target.
     """
-    Dx = parameters.XWINDOW
-    Dy = parameters.YWINDOW
-    theX, theY = guess
-    if rotated:
-        angle = image.rotation_angle * np.pi / 180.
-        rotmat = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
-        vec = np.array(image.target_pixcoords) - 0.5 * np.array(image.data.shape[::-1])
-        guess2 = rotmat @ vec + 0.5 * np.array(image.data_rotated.shape[::-1])
-        x0 = int(guess2[0])
-        y0 = int(guess2[1])
-        guess = [x0, y0]
-        Dx = parameters.XWINDOW_ROT
-        Dy = parameters.YWINDOW_ROT
-    niter = 2
-    for i in range(niter):
-        sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
-                                                                 widths=[Dx, Dy])
-        # find the target
-        avX, avY = find_target_2Dprofile(image, sub_image, guess, sub_errors=sub_errors)
-        # compute target position
-        theX = x0 - Dx + avX
-        theY = y0 - Dy + avY
-        guess = [int(theX), int(theY)]
-        Dx = Dx // (i + 2)
-        Dy = Dy // (i + 2)
+    my_logger = set_logger(__name__)
+    wcs_file_name = set_wcs_file_name(image.file_name)
+    if os.path.isfile(wcs_file_name):
+        my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
+        if rotated:
+            theX, theY = find_target_after_rotation(image)
+        else:
+            wcs = load_wcs_from_file(wcs_file_name)
+            target_coord_after_motion = image.target.set_coord_after_proper_motion(image.date_obs)
+            target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra, target_coord_after_motion.dec, 0))
+            theX, theY = target_pixcoords
+        if parameters.DEBUG or True:
+            fig = plt.figure(figsize=(5, 5))
+            sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
+                                                                     rotated=rotated, widths=(20, 20))
+            plot_image_simple(plt.gca(), data=sub_image, scale="lin", title="", units=image.units,
+                              target_pixcoords=[theX-x0+Dx, theY-y0+Dy])
+            plt.show()
+    else:
+        my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
+        Dx = parameters.XWINDOW
+        Dy = parameters.YWINDOW
+        theX, theY = guess
+        if rotated:
+            guess2 = find_target_after_rotation(image)
+            x0 = int(guess2[0])
+            y0 = int(guess2[1])
+            guess = [x0, y0]
+            Dx = parameters.XWINDOW_ROT
+            Dy = parameters.YWINDOW_ROT
+        niter = 2
+        for i in range(niter):
+            sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
+                                                                     widths=[Dx, Dy])
+            # find the target
+            avX, avY = find_target_2Dprofile(image, sub_image, guess, sub_errors=sub_errors)
+            # compute target position
+            theX = x0 - Dx + avX
+            theY = y0 - Dy + avY
+            guess = [int(theX), int(theY)]
+            Dx = Dx // (i + 2)
+            Dy = Dy // (i + 2)
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
@@ -424,6 +442,14 @@ def find_target(image, guess, rotated=False):
         image.header['TARGETY'] = theY
         image.header.comments['TARGETY'] = 'target position on Y axis'
     return [theX, theY]
+
+
+def find_target_after_rotation(image):
+    angle = image.rotation_angle * np.pi / 180.
+    rotmat = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
+    vec = np.array(image.target_pixcoords) - 0.5 * np.array(image.data.shape[::-1])
+    target_pixcoords_after_rotation = rotmat @ vec + 0.5 * np.array(image.data_rotated.shape[::-1])
+    return target_pixcoords_after_rotation
 
 
 def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
@@ -753,7 +779,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         n, bins, patches = ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
         ax2.plot([theta_median, theta_median], [0, np.max(n)])
         ax2.set_xlabel("Rotation angles [degrees]")
-        if parameters.DISPLAY:   # pragma: no cover
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotation_hessian.pdf'))
@@ -825,7 +851,7 @@ def turn_image(image):
         f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:   # pragma: no cover
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotated_image.pdf'))
 
 
