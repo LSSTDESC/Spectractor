@@ -1,5 +1,5 @@
 from spectractor import parameters
-from spectractor.astrometry import Astrometry
+from spectractor.astrometry import Astrometry, plot_shifts_histograms
 from spectractor.logbook import LogBook
 from spectractor.config import load_config
 
@@ -52,14 +52,15 @@ if __name__ == "__main__":
         a.run_simple_astrometry(extent=((xpos - radius, xpos + radius), (ypos - radius, ypos + radius)))
         # iterate process until shift is below 1 mas on RA and DEC directions
         # or maximum iterations is reached
+        dra, ddec = 0, 0
         for i in range(int(args.maxiter)):
             dra, ddec = a.run_gaia_astrometry()
             dra_median = np.median(dra.to(u.arcsec).value)
             ddec_median = np.median(ddec.to(u.arcsec).value)
             if np.abs(dra_median) < 1e-3 and np.abs(ddec_median) < 1e-3:
                 break
-        if parameters.DEBUG or True:
-            a.plot_shifts_histograms(dra, ddec)
+        if parameters.DEBUG:
+            plot_shifts_histograms(dra, ddec)
             a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches, margin=200)
             a.plot_astrometry_shifts(vmax=3)
         # overwrite input file

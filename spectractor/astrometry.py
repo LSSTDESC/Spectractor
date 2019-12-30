@@ -100,6 +100,29 @@ def update_gaia_catalog_with_proper_motion(gaia_catalog, date_obs):
     return gaia_stars_after_proper_motion
 
 
+def plot_shifts_histograms(dra, ddec):
+    dra_median = np.median(dra.to(u.arcsec).value)
+    ddec_median = np.median(ddec.to(u.arcsec).value)
+    dra_rms = np.std(dra.to(u.arcsec).value)
+    ddec_rms = np.std(ddec.to(u.arcsec).value)
+    fig, ax = plt.subplots(1, 2, figsize=(8, 4))
+    ax[0].hist(dra.to(u.arcsec).value, bins=50)
+    ax[1].hist(ddec.to(u.arcsec).value, bins=50)
+    ax[0].axvline(dra_median, color='k', label="median", lw=2)
+    ax[1].axvline(ddec_median, color='k', label="median", lw=2)
+    ax[0].set_xlabel('Shift in RA [arcsec]')
+    ax[1].set_xlabel('Shift in DEC [arcsec]')
+    ax[0].text(0.05, 0.96, f"Median: {dra_median:.3g}arcsec\nRMS: {dra_rms:.3g} arcsec",
+               verticalalignment='top', horizontalalignment='left', transform=ax[0].transAxes)
+    ax[1].text(0.05, 0.96, f"Median: {ddec_median:.3g}arcsec\nRMS: {ddec_rms:.3g} arcsec",
+               verticalalignment='top', horizontalalignment='left', transform=ax[1].transAxes)
+    ax[0].grid()
+    ax[1].grid()
+    # ax[0].legend()
+    # ax[1].legend()
+    plt.show()
+
+
 class Astrometry(Image):
 
     def __init__(self, file_name, target="", disperser_label="", wcs_file_name=""):
@@ -121,11 +144,12 @@ class Astrometry(Image):
         self.set_file_tag()
         self.new_file_name = self.file_name.replace('.fits', '_new.fits')
         self.output_sources_fitsfile = os.path.join(self.output_directory, f"{self.tag}_sources.fits")
-        self.wcs_file_name = ""
+        self.wcs_file_name = wcs_file_name
         if self.wcs_file_name != "":
             self.wcs = load_wcs_from_file(self.wcs_file_name)
         else:
             self.wcs_file_name = os.path.join(self.output_directory, self.tag + '.wcs')
+            self.wcs = load_wcs_from_file(self.wcs_file_name)
         self.gaia_file_name = os.path.join(self.output_directory, f"{self.tag}_gaia.ecsv")
         self.my_logger.info(f"\n\tIntermediate outputs will be stored in {self.output_directory}")
         self.wcs = None
@@ -261,28 +285,6 @@ class Astrometry(Image):
                 else:
                     sep *= range_constraint
         return sep
-
-    def plot_shifts_histograms(self, dra, ddec):
-        dra_median = np.median(dra.to(u.arcsec).value)
-        ddec_median = np.median(ddec.to(u.arcsec).value)
-        dra_rms = np.std(dra.to(u.arcsec).value)
-        ddec_rms = np.std(ddec.to(u.arcsec).value)
-        fig, ax = plt.subplots(1, 2, figsize=(8, 4))
-        ax[0].hist(dra.to(u.arcsec).value, bins=50)
-        ax[1].hist(ddec.to(u.arcsec).value, bins=50)
-        ax[0].axvline(dra_median, color='k', label="median", lw=2)
-        ax[1].axvline(ddec_median, color='k', label="median", lw=2)
-        ax[0].set_xlabel('Shift in RA [arcsec]')
-        ax[1].set_xlabel('Shift in DEC [arcsec]')
-        ax[0].text(0.05, 0.96, f"Median: {dra_median:.3g}arcsec\nRMS: {dra_rms:.3g} arcsec",
-                   verticalalignment='top', horizontalalignment='left', transform=ax[0].transAxes)
-        ax[1].text(0.05, 0.96, f"Median: {ddec_median:.3g}arcsec\nRMS: {ddec_rms:.3g} arcsec",
-                   verticalalignment='top', horizontalalignment='left', transform=ax[1].transAxes)
-        ax[0].grid()
-        ax[1].grid()
-        # ax[0].legend()
-        # ax[1].legend()
-        plt.show()
 
     def plot_shifts_profiles(self, matches, dra, ddec):
         dra_median = np.median(dra.to(u.arcsec).value)
@@ -475,8 +477,8 @@ class Astrometry(Image):
             else:
                 self.my_logger.info(f"\n\tLoading Gaia catalog from TAP query...")
                 self.gaia_catalog = load_gaia_catalog(self.target,
-                                                      radius=0.5 * parameters.CCD_IMSIZE *
-                                                             parameters.CCD_PIXEL2ARCSEC * u.arcsec)
+                                                      radius=0.5 * parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC
+                                                             * u.arcsec)
                 ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
             self.my_logger.info(f"\n\tGaia catalog loaded.")
 
@@ -509,7 +511,7 @@ class Astrometry(Image):
         dra_rms = np.std(dra.to(u.arcsec).value)
         ddec_rms = np.std(ddec.to(u.arcsec).value)
         if parameters.DEBUG:
-            self.plot_shifts_histograms(dra, ddec)
+            plot_shifts_histograms(dra, ddec)
             self.plot_shifts_profiles(gaia_matches, dra, ddec)
 
         # update WCS
@@ -544,5 +546,5 @@ class Astrometry(Image):
         dra, ddec = sources_selection.spherical_offsets_to(self.gaia_matches)
 
         if parameters.DEBUG:
-            self.plot_shifts_histograms(dra, ddec)
+            plot_shifts_histograms(dra, ddec)
         return dra, ddec
