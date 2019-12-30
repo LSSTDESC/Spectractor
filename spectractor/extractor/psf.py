@@ -1299,6 +1299,7 @@ class ChromaticPSF1D(ChromaticPSF):
 
         guess = np.copy(self.poly_params)
         run_minimisation(w, method="newton", ftol=1e-4, xtol=1e-4)
+        plt.close('all')
 
         self.poly_params = w.poly_params
         self.profile_params = self.from_poly_params_to_profile_params(self.poly_params, force_positive=True)
