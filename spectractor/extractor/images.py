@@ -181,27 +181,27 @@ class Image(object):
         self.stat_errors = np.sqrt(err2)
         # convert in ADU
         self.stat_errors /= self.gain
-        if parameters.DEBUG:
-            fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-            y = self.stat_errors.flatten() ** 2
-            x = data.flatten()
-            fit, cov, model = fit_poly1d(x, y, order=1)
-            gain = 1 / fit[0]
-            ax[0].text(0.05, 0.95, f"fitted gain={gain:.3g} [e-/ADU]\nintercept={fit[1]:.3g} [ADU$^2$]"
-                                   f"\nfitted read-out={np.sqrt(fit[1]) * gain:.3g} [ADU]",
-                       horizontalalignment='left', verticalalignment='top', transform=ax[0].transAxes)
-            ax[0].scatter(x, y)
-            ax[0].plot(x, model, "k-")
-            ax[0].grid()
-            ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
-            ax[0].set_xlabel(r"Data pixel values [ADU]")
-            plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Uncertainty map", units=self.units,
-                              target_pixcoords=None, aspect="auto", cmap=None)
-            fig.tight_layout()
-            if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-                fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.png'))
-            if parameters.DISPLAY:  # pragma: no cover
-                plt.show()
+        # if parameters.DEBUG:
+        #     fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+        #     y = self.stat_errors.flatten() ** 2
+        #     x = data.flatten()
+        #     fit, cov, model = fit_poly1d(x, y, order=1)
+        #     gain = 1 / fit[0]
+        #     ax[0].text(0.05, 0.95, f"fitted gain={gain:.3g} [e-/ADU]\nintercept={fit[1]:.3g} [ADU$^2$]"
+        #                            f"\nfitted read-out={np.sqrt(fit[1]) * gain:.3g} [ADU]",
+        #                horizontalalignment='left', verticalalignment='top', transform=ax[0].transAxes)
+        #     ax[0].scatter(x, y)
+        #     ax[0].plot(x, model, "k-")
+        #     ax[0].grid()
+        #     ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
+        #     ax[0].set_xlabel(r"Data pixel values [ADU]")
+        #     plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Uncertainty map", units=self.units,
+        #                       target_pixcoords=None, aspect="auto", cmap=None)
+        #     fig.tight_layout()
+        #     if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+        #         fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.png'))
+        #     if parameters.DISPLAY:  # pragma: no cover
+        #         plt.show()
 
     def compute_parallactic_angle(self):
         """Compute the parallactic angle.
@@ -220,7 +220,7 @@ class Image(object):
         return self.parallactic_angle
 
     def plot_image(self, ax=None, scale="lin", title="", units="Image units", plot_stats=False,
-                   target_pixcoords=None, figsize=[9.3, 8], aspect=None, vmin=None, vmax=None,
+                   target_pixcoords=None, figsize=[7.3, 6], aspect=None, vmin=None, vmax=None,
                    cmap=None, cax=None):
         """Plot image.
 
