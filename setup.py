@@ -33,7 +33,7 @@ setup(
                   'spectractor.simulation': ['CTIOThroughput/*.txt']},
     url='https://github.com/LSSTDESC/Spectractor',
     license='BSD',
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     author='J. Neveu, S. Dagoret-Campagne',
     author_email='jneveu@lal.in2p3.fr',
     description='',

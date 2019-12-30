@@ -99,7 +99,7 @@ before_script:
   # - "cd ../"
 
 script:
-  - pip install numpy nose coloredlogs coverage coveralls six
+  - pip install numpy nose coloredlogs six
   - pip install -r requirements.txt
   # - python setup.py build
   # - python setup.py install
