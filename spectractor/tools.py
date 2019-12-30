@@ -4,6 +4,7 @@ import numpy as np
 from astropy.modeling import models, fitting
 from astropy.stats import sigma_clip
 from astropy.io import fits
+from astropy import wcs as WCS
 
 import matplotlib.pyplot as plt
 import matplotlib.colors
@@ -1561,6 +1562,33 @@ def rebin(arr, new_shape):
     shape = (new_shape[0], arr.shape[0] // new_shape[0],
              new_shape[1], arr.shape[1] // new_shape[1])
     return arr.reshape(shape).sum(-1).sum(1)
+
+
+def set_wcs_output_directory(file_name):
+    output_directory = os.path.join(os.path.dirname(file_name),
+                                    os.path.splitext(os.path.basename(file_name))[0]) + "_wcs"
+    ensure_dir(output_directory)
+    return output_directory
+
+
+def set_wcs_tag(file_name):
+    tag = os.path.splitext(os.path.basename(file_name))[0]
+    return tag
+
+
+def set_wcs_file_name(file_name):
+    output_directory = set_wcs_output_directory(file_name)
+    tag = set_wcs_tag(file_name)
+    wcs_file_name = os.path.join(output_directory, tag + '.wcs')
+    return wcs_file_name
+
+
+def load_wcs_from_file(filename):
+    # Load the FITS hdulist using astropy.io.fits
+    hdulist = fits.open(filename)
+    # Parse the WCS keywords in the primary HDU
+    wcs = WCS.WCS(hdulist[0].header, fix=False)
+    return wcs
 
 
 if __name__ == "__main__":
