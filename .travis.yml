@@ -79,6 +79,7 @@ before_script:
   - make py
   - make extra
   - make install INSTALL_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET
+  - which solve-field
   - wget -r -nc http://data.astrometry.net/5000/index-5002-24.fits
   - mv data.astrometry.net/5000/index-5002-24.fits $TRAVIS_BUILD_DIR/ASTROMETRYNET/data/
   # - make install-indexes
