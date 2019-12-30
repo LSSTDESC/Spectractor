@@ -36,7 +36,7 @@ def __getattr__(name):
 mypath = os.path.dirname(__file__)
 HOLO_DIR = os.path.join(mypath, "extractor/dispersers/")
 THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
-ASTROMETRYNET_BINDIR = os.getenv('ASTROMETRYNET_BINDIR') + '/'
+ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
 LIBRADTRAN_DIR = os.getenv('LIBRADTRAN_DIR') + '/'
 
 # CCD characteristics
