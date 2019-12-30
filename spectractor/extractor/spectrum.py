@@ -15,7 +15,7 @@ from spectractor.tools import (ensure_dir, load_fits, extract_info_from_CTIO_hea
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
                                from_lambda_to_colormap)
 from spectractor.extractor.psf import ChromaticPSF1D
-from spectractor.extractor.background import extract_background_photutils
+from spectractor.extractor.background import extract_spectrogram_background_sextractor
 
 
 class Spectrum:
@@ -1055,8 +1055,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Extract the background on the rotated image
-    bgd_model_func = extract_background_photutils(data, err, ws=ws)
-    # bgd_model_func = extract_background_poly2D(data, ws=ws)
+    bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
+    # bgd_model_func = extract_spectrogram_background_poly2D(data, ws=ws)
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
@@ -1118,7 +1118,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     Ny, Nx = data.shape
 
     # Extract the non rotated background
-    bgd_model_func = extract_background_photutils(data, err, ws=ws)
+    bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
 
     # Crop the background lateral regions
