@@ -22,8 +22,8 @@ if __name__ == "__main__":
                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
     parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
                         help="INI config file. (default: config.ctio.ini).")
-    parser.add_argument("-o", "--overwrite", dest="overwrite", action="store_true", default=False,
-                        help="Overwrite original input fits file with a new fits file containing the new WCS solution.")
+    # parser.add_argument("-o", "--overwrite", dest="overwrite", action="store_true", default=False,
+    #                     help="Overwrite original input fits file with a new fits file containing the new WCS solution.")
     parser.add_argument("-r", "--radius", dest="radius", default=500,
                         help="Radius in pixel around the guessed target position to detect sources "
                              "and set the new WCS solution.")
@@ -64,6 +64,6 @@ if __name__ == "__main__":
             a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches, margin=200)
             a.plot_astrometry_shifts(vmax=3)
         # overwrite input file
-        if args.overwrite:
-            a.my_logger.warning(f"Overwrite option is True: {a.file_name} replaced by {a.new_file_name}")
-            subprocess.check_output(f"mv {a.new_file_name} {a.file_name}", shell=True)
+        # if args.overwrite:
+        #     a.my_logger.warning(f"Overwrite option is True: {a.file_name} replaced by {a.new_file_name}")
+        #     subprocess.check_output(f"mv {a.new_file_name} {a.file_name}", shell=True)

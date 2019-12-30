@@ -149,7 +149,8 @@ class Astrometry(Image):
             self.wcs = load_wcs_from_file(self.wcs_file_name)
         else:
             self.wcs_file_name = os.path.join(self.output_directory, self.tag + '.wcs')
-            self.wcs = load_wcs_from_file(self.wcs_file_name)
+            if os.path.isfile(self.wcs_file_name):
+                self.wcs = load_wcs_from_file(self.wcs_file_name)
         self.gaia_file_name = os.path.join(self.output_directory, f"{self.tag}_gaia.ecsv")
         self.my_logger.info(f"\n\tIntermediate outputs will be stored in {self.output_directory}")
         self.wcs = None
@@ -317,7 +318,6 @@ class Astrometry(Image):
     def merge_wcs_with_new_exposure(self, log_file=None):
         command = f"{os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/new-wcs')} -v -d -i {self.file_name} " \
                   f"-w {self.wcs_file_name} -o {self.new_file_name}\n"
-        # f"mv {new_file_name} {file_name}"
         self.my_logger.info(f'\n\tSave WCS in original file:\n\t{command}')
         log = subprocess.check_output(command, shell=True)
         if log_file is not None:
@@ -332,7 +332,7 @@ class Astrometry(Image):
         Then photutils source_detection() is used to get the positions in pixels en flux of the objects in the field.
         The results are saved in the {file_name}_sources.fits file and used by the solve_field command from the
         astrometry.net library. The solve_field path must be set using the spectractor.parameters.ASTROMETRYNET_BINDIR
-        variable. A new WCS is created and merged with the given exposure.
+        variable. A new WCS is created and saved in as a FITS file.
         The intermediate results are saved in a new directory named as the FITS file name with a _wcs suffix.
 
         Parameters
@@ -350,8 +350,8 @@ class Astrometry(Image):
         >>> parameters.VERBOSE = True
         >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
-        >>> if os.path.isfile('./tests/data/reduc_20170530_134_new.fits'):
-        ...     os.remove('./tests/data/reduc_20170530_134_new.fits')
+        >>> if os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs'):
+        ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
         >>> for file_name in file_names:
         ...     tag = file_name.split('/')[-1]
         ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
@@ -365,7 +365,7 @@ class Astrometry(Image):
             :hide:
 
             >>> assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
-            >>> assert os.path.isfile('./tests/data/reduc_20170530_134_new.fits')
+            >>> assert os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
 
         """
         # crop data
@@ -402,10 +402,10 @@ class Astrometry(Image):
         log_file.write(command + "\n")
         log_file.write(log.decode("utf-8") + "\n")
         # save new WCS in original fits file
-        self.merge_wcs_with_new_exposure(log_file=log_file)
+        # self.merge_wcs_with_new_exposure(log_file=log_file)
         log_file.close()
         # load WCS
-        self.wcs = load_wcs_from_file(self.new_file_name)
+        self.wcs = load_wcs_from_file(self.wcs_file_name)
         return self.wcs
 
     # noinspection PyUnresolvedReferences
@@ -417,8 +417,7 @@ class Astrometry(Image):
         The name of the target must be given to get its RA,DEC coordinates via a Simbad query.
         A matching is performed between the detected sources and the Gaia catalog obtained for the region of the target.
         Then the closest and brightest sources are selected and the WCS is shifted by the median of the distance between
-        these stars and the detected sources.
-        A new WCS is created and merged with the given exposure.
+        these stars and the detected sources. The original WCS FITS file is updated.
 
         Parameters
         ----------
@@ -430,11 +429,10 @@ class Astrometry(Image):
         >>> from spectractor.logbook import LogBook
         >>> from spectractor import parameters
         >>> parameters.VERBOSE = True
-        >>> parameters.DEBUG = True
         >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
-        >>> if os.path.isfile('./tests/data/reduc_20170530_134_new.fits'):
-        ...     os.remove('./tests/data/reduc_20170530_134_new.fits')
+        >>> if os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs'):
+        ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
         >>> for file_name in file_names:
         ...     tag = file_name.split('/')[-1]
         ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
@@ -451,8 +449,8 @@ class Astrometry(Image):
             >>> dra_median = np.median(dra.to(u.arcsec).value)
             >>> ddec_median = np.median(ddec.to(u.arcsec).value)
             >>> assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
-            >>> assert os.path.isfile('./tests/data/reduc_20170530_134_new.fits')
-            >>> assert np.all(np.abs([dra_median, ddec_median]) < 1e-6)
+            >>> assert os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
+            >>> assert np.all(np.abs([dra_median, ddec_median]) < 1e-3)
 
         """
         # load detected sources
@@ -466,7 +464,7 @@ class Astrometry(Image):
 
         # load WCS if absent
         if self.wcs is None:
-            self.wcs = load_wcs_from_file(self.new_file_name)
+            self.wcs = load_wcs_from_file(self.wcs_file_name)
         self.sources_coord = self.set_sources_coord()
 
         # load the Gaia catalog
@@ -526,17 +524,17 @@ class Astrometry(Image):
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion, margin=30)
 
         # Now, write out the WCS object as a FITS header
-        hdu = fits.open(self.new_file_name)
+        hdu = fits.open(self.wcs_file_name)
         hdu[0].header['CRVAL1'] = self.wcs.wcs.crval[0]
         hdu[0].header['CRVAL2'] = self.wcs.wcs.crval[1]
         hdu[0].header['CRV1_MED'] = dra_median
         hdu[0].header['CRV2_MED'] = ddec_median
         hdu[0].header['CRV1_RMS'] = dra_rms
         hdu[0].header['CRV2_RMS'] = ddec_rms
-        hdu.writeto(self.new_file_name, overwrite=True)
+        hdu.writeto(self.wcs_file_name, overwrite=True)
 
         # check histogram medians
-        self.wcs = load_wcs_from_file(self.new_file_name)
+        self.wcs = load_wcs_from_file(self.wcs_file_name)
         self.set_sources_coord()
         self.gaia_index, self.dist_2d, self.dist_ra, self.dist_dec = \
             self.shift_wcs_center_fit_gaia_catalog(self.gaia_coord_after_motion)
