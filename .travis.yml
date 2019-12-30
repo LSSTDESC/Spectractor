@@ -83,7 +83,7 @@ before_script:
   - mv data.astrometry.net/5000/index-5002-24.fits $TRAVIS_BUILD_DIR/ASTROMETRYNET/data/
   # - make install-indexes
   - cd ../
-  - "export ASTROMETRYNET_BINDIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET"
+  - "export ASTROMETRYNET_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET"
   - conda create -n py37 python=3.7 pip
   - source activate py37
   - python --version
