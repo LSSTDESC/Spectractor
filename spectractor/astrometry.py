@@ -26,7 +26,7 @@ def remove_background(data, sigma=3.0, box_size=(50, 50), filter_size=(3, 3)):
     data_wo_bkg = data - bkg.background
     data_wo_bkg -= np.min(data_wo_bkg)
     if parameters.DEBUG:
-        fig, ax = plt.subplots(1, 2, figsize=(10, 10))
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
         ax[0].imshow(bkg.background, origin='lower')
         ax[1].imshow(np.log10(1 + data_wo_bkg), origin='lower')
         plt.show()
@@ -196,10 +196,10 @@ class Astrometry(Image):
         return self.sources_coord
 
     def shift_wcs_center_fit_gaia_catalog(self, gaia_coord):
-        gaia_index, self.dist_2d, dist_3d = self.sources_coord.match_to_catalog_sky(gaia_coord)
+        gaia_index, dist_2d, dist_3d = self.sources_coord.match_to_catalog_sky(gaia_coord)
         matches = gaia_coord[gaia_index]
         dist_ra, dist_dec = self.sources_coord.spherical_offsets_to(matches)
-        return gaia_index, dist_ra, dist_dec
+        return gaia_index, dist_2d, dist_ra, dist_dec
 
     def plot_astrometry_shifts(self, vmax=3):
         target_x, target_y = self.wcs.all_world2pix(self.target_coord_after_motion.ra,
@@ -248,9 +248,9 @@ class Astrometry(Image):
     def set_constraints(self, min_stars=50, flux_log10_threshold=0.1, min_range=3 * u.arcsec, max_range=5 * u.arcmin,
                         max_sep=1 * u.arcsec):
         sep = self.dist_2d < max_sep
-        sep *= np.log10(self.sources['flux']) > flux_log10_threshold
         sep *= self.sources_coord.separation(self.target_coord_after_motion) < max_range
         sep *= self.sources_coord.separation(self.target_coord_after_motion) > min_range
+        sep *= np.log10(self.sources['flux']) > flux_log10_threshold
         if np.sum(sep) > min_stars:
             for r in np.arange(0, max_range.value, 0.1)[::-1]:
                 range_constraint = self.sources_coord.separation(self.target.coord) < r * u.arcmin
@@ -425,6 +425,7 @@ class Astrometry(Image):
         >>> from spectractor.logbook import LogBook
         >>> from spectractor import parameters
         >>> parameters.VERBOSE = True
+        >>> parameters.DEBUG = True
         >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> os.remove('./tests/data/reduc_20170530_134_new.fits')
@@ -441,13 +442,15 @@ class Astrometry(Image):
         .. doctest:
             :hide:
 
+            >>> dra_median = np.median(dra.to(u.arcsec).value)
+            >>> ddec_median = np.median(ddec.to(u.arcsec).value)
             >>> assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
             >>> assert os.path.isfile('./tests/data/reduc_20170530_134_new.fits')
-            >>> assert np.all(np.isclose([dra, ddec], (0.021613160253789745, 1.4591414872641583e-07), rtol=1e-3))
+            >>> assert np.all(np.abs([dra_median, ddec_median]) < 1e-6)
 
         """
         # load detected sources
-        if self.sources is None or True:
+        if self.sources is None:
             self.my_logger.info(f"\n\tLoad source positions and flux from {self.output_sources_fitsfile}")
             sources = Table.read(self.output_sources_fitsfile)
             sources['X'].name = "xcentroid"
@@ -461,14 +464,15 @@ class Astrometry(Image):
         self.sources_coord = self.set_sources_coord()
 
         # load the Gaia catalog
-        if os.path.isfile(self.gaia_file_name):
-            self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
-            self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
-        else:
-            self.my_logger.info(f"\n\tLoading Gaia catalog from TAP query...")
-            self.gaia_catalog = load_gaia_catalog(self.target)
-            ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
-        self.my_logger.info(f"\n\tGaia catalog loaded.")
+        if self.gaia_catalog is None:
+            if os.path.isfile(self.gaia_file_name):
+                self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
+                self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
+            else:
+                self.my_logger.info(f"\n\tLoading Gaia catalog from TAP query...")
+                self.gaia_catalog = load_gaia_catalog(self.target)
+                ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
+            self.my_logger.info(f"\n\tGaia catalog loaded.")
 
         # update coordinates with proper motion data
         self.my_logger.info(f"\n\tUpdate object coordinates with proper motion at time={self.date_obs}.")
@@ -478,13 +482,16 @@ class Astrometry(Image):
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion)
 
         # compute shifts
-        self.gaia_index, self.dist_ra, self.dist_dec = \
+        self.gaia_index, self.dist_2d, self.dist_ra, self.dist_dec = \
             self.shift_wcs_center_fit_gaia_catalog(self.gaia_coord_after_motion)
         if parameters.DEBUG:
             self.plot_astrometry_shifts(vmax=3)
 
         # select the brightest and closest stars with maximum shift
-        flux_log10_threshold = np.log10(self.sources['flux'][int(0.5 * len(self.sources))])
+        if len(self.sources) > 50:
+            flux_log10_threshold = np.log10(self.sources['flux'][int(0.5 * len(self.sources))])
+        else:
+            flux_log10_threshold = np.log10(self.sources['flux'][int(0.8 * len(self.sources))])
         sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold)
         sources_selection = self.sources_coord[sep_constraints]
         gaia_matches = self.gaia_coord_after_motion[self.gaia_index[sep_constraints]]
@@ -493,6 +500,8 @@ class Astrometry(Image):
         # compute statistics
         dra_median = np.median(dra.to(u.arcsec).value)
         ddec_median = np.median(ddec.to(u.arcsec).value)
+        dra_rms = np.std(dra.to(u.arcsec).value)
+        ddec_rms = np.std(ddec.to(u.arcsec).value)
         if parameters.DEBUG:
             self.plot_shifts_histograms(dra, ddec)
             self.plot_shifts_profiles(gaia_matches, dra, ddec)
@@ -503,7 +512,7 @@ class Astrometry(Image):
         # (see https://docs.astropy.org/en/stable/api/astropy.coordinates.SkyCoord.html#astropy.coordinates.SkyCoord.spherical_offsets_to)
         # after the shift the histograms must be centered on zero
         self.wcs.wcs.crval = self.wcs.wcs.crval * u.deg + \
-                             np.array([dra_median / np.cos(self.target_coord_after_motion.dec * np.pi / 180),
+                             np.array([dra_median / np.cos(self.target_coord_after_motion.dec.radian),
                                        ddec_median]) * u.arcsec
         if parameters.DEBUG:
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion, margin=30)
@@ -512,20 +521,22 @@ class Astrometry(Image):
         hdu = fits.open(self.new_file_name)
         hdu[0].header['CRVAL1'] = self.wcs.wcs.crval[0]
         hdu[0].header['CRVAL2'] = self.wcs.wcs.crval[1]
+        hdu[0].header['CRV1_MED'] = dra_median
+        hdu[0].header['CRV2_MED'] = ddec_median
+        hdu[0].header['CRV1_RMS'] = dra_rms
+        hdu[0].header['CRV2_RMS'] = ddec_rms
         hdu.writeto(self.new_file_name, overwrite=True)
 
         # check histogram medians
         self.wcs = load_wcs_from_file(self.new_file_name)
         self.set_sources_coord()
-        self.gaia_index, self.dist_ra, self.dist_dec = \
+        self.gaia_index, self.dist_2d, self.dist_ra, self.dist_dec = \
             self.shift_wcs_center_fit_gaia_catalog(self.gaia_coord_after_motion)
         sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold)
         sources_selection = self.sources_coord[sep_constraints]
         self.gaia_matches = self.gaia_coord_after_motion[self.gaia_index[sep_constraints]]
         dra, ddec = sources_selection.spherical_offsets_to(self.gaia_matches)
-        dra_median = np.median(dra.to(u.arcsec).value)
-        ddec_median = np.median(ddec.to(u.arcsec).value)
 
         if parameters.DEBUG:
             self.plot_shifts_histograms(dra, ddec)
-        return dra_median, ddec_median
+        return dra, ddec

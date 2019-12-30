@@ -4,6 +4,8 @@ from spectractor.logbook import LogBook
 from spectractor.config import load_config
 
 import subprocess
+import numpy as np
+import astropy.units as u
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -52,9 +54,12 @@ if __name__ == "__main__":
         # or maximum iterations is reached
         for i in range(int(args.maxiter)):
             dra, ddec = a.run_gaia_astrometry()
-            if dra < 1e-3 and ddec < 1e-3:
+            dra_median = np.median(dra.to(u.arcsec).value)
+            ddec_median = np.median(ddec.to(u.arcsec).value)
+            if np.abs(dra_median) < 1e-3 and np.abs(ddec_median) < 1e-3:
                 break
         if parameters.DEBUG or True:
+            a.plot_shifts_histograms(dra, ddec)
             a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches, margin=200)
             a.plot_astrometry_shifts(vmax=3)
         # overwrite input file
