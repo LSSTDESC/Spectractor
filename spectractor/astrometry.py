@@ -50,9 +50,9 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5):
     return sources
 
 
-def load_gaia_catalog(target, radius=5 * u.arcmin):
+def load_gaia_catalog(coord, radius=5 * u.arcmin):
     from astroquery.gaia import Gaia
-    job = Gaia.cone_search_async(target.coord, radius=radius)
+    job = Gaia.cone_search_async(coord, radius=radius)
     my_logger = set_logger("load_gaia_catalog")
     my_logger.debug(f"\n\t{job}")
     gaia_catalog = job.get_results()
@@ -473,10 +473,10 @@ class Astrometry(Image):
                 self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
                 self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
             else:
-                self.my_logger.info(f"\n\tLoading Gaia catalog from TAP query...")
-                self.gaia_catalog = load_gaia_catalog(self.target,
-                                                      radius=0.5 * parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC
-                                                             * u.arcsec)
+                radius = 0.5 * parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC * u.arcsec
+                self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
+                                    f"arcsec from {self.target.label} {self.target.coord}...")
+                self.gaia_catalog = load_gaia_catalog(self.target.coord, radius=radius)
                 ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
             self.my_logger.info(f"\n\tGaia catalog loaded.")
 
@@ -493,7 +493,7 @@ class Astrometry(Image):
         if parameters.DEBUG:
             self.plot_astrometry_shifts(vmax=3)
 
-        # select the brightest and closest stars with maximum shift
+        # select the brightest and closest stars with minimal shift
         if len(self.sources) > 50:
             flux_log10_threshold = np.log10(self.sources['flux'][int(0.5 * len(self.sources))])
         else:
@@ -515,11 +515,11 @@ class Astrometry(Image):
         # update WCS
         # tested with high latitude 20170530_120.fits exposure: dra shift must be divided by cos(dec)
         # to set new WCS system because spherical_offsets_to gives shifts angle at equator
-        # (see https://docs.astropy.org/en/stable/api/astropy.coordinates.SkyCoord.html#astropy.coordinates.SkyCoord.spherical_offsets_to)
+        # (see https://docs.astropy.org/en/stable/api/astropy.coordinates.SkyCoord.html
+        # #astropy.coordinates.SkyCoord.spherical_offsets_to)
         # after the shift the histograms must be centered on zero
-        self.wcs.wcs.crval = self.wcs.wcs.crval * u.deg + \
-                             np.array([dra_median / np.cos(self.target_coord_after_motion.dec.radian),
-                                       ddec_median]) * u.arcsec
+        total_shift = np.array([dra_median / np.cos(self.target_coord_after_motion.dec.radian), ddec_median]) * u.arcsec
+        self.wcs.wcs.crval = self.wcs.wcs.crval * u.deg + total_shift
         if parameters.DEBUG:
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion, margin=30)
 
