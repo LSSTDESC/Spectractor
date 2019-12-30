@@ -311,7 +311,7 @@ class Astrometry(Image):
         plt.show()
 
     def merge_wcs_with_new_exposure(self, log_file=None):
-        command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR, 'new-wcs')} -v -d -i {self.file_name} " \
+        command = f"{os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/new-wcs')} -v -d -i {self.file_name} " \
                   f"-w {self.wcs_file_name} -o {self.new_file_name}\n"
         # f"mv {new_file_name} {file_name}"
         self.my_logger.info(f'\n\tSave WCS in original file:\n\t{command}')
@@ -384,7 +384,7 @@ class Astrometry(Image):
         # write results in fits file
         self.write_sources()
         # run astrometry.net
-        command = f"{os.path.join(parameters.ASTROMETRYNET_BINDIR, 'solve-field')} --scale-unit arcsecperpix " \
+        command = f"{os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')} --scale-unit arcsecperpix " \
                   f"--scale-low {0.95 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--scale-high {1.05 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--ra {self.target.coord.ra.value} --dec {self.target.coord.dec.value} " \
