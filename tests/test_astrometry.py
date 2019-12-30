@@ -7,6 +7,7 @@ from spectractor.config import load_config
 import os
 import subprocess
 import numpy as np
+import astropy.units as u
 
 
 def test_astrometry():
@@ -35,12 +36,13 @@ def test_astrometry():
         dra, ddec = 0, 0
         for i in range(maxiter):
             dra, ddec = a.run_gaia_astrometry()
-            if dra < 1e-3 and ddec < 1e-3:
+            dra_median = np.median(dra.to(u.arcsec).value)
+            ddec_median = np.median(ddec.to(u.arcsec).value)
+            if np.abs(dra_median) < 1e-3 and np.abs(ddec_median) < 1e-3:
                 break
         if parameters.DEBUG:
             a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches, margin=200)
             a.plot_astrometry_shifts(vmax=3)
-        print(dra, ddec)
         # checks
         assert os.path.isdir('./tests/data/reduc_20170605_028_wcs')
         assert os.path.isfile('./tests/data/reduc_20170605_028_new.fits')
@@ -51,7 +53,7 @@ def test_astrometry():
         assert np.isclose(a.target_coord_after_motion.dec.value, -54.30209)
         assert np.isclose(a.wcs.wcs.crval[0], 224.9718998)
         assert np.isclose(a.wcs.wcs.crval[1], -54.28912925)
-        assert np.all(np.isclose([dra, ddec], (0.000903019299029, -9.00223510558e-10), rtol=1e-3))
+        assert np.all(np.abs([dra_median, ddec_median]) < 1e-3)
 
 
 if __name__ == "__main__":
