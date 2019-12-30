@@ -82,7 +82,8 @@ before_script:
   - make extra
   - make install INSTALL_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET
   - wget -r -nc http://data.astrometry.net/5000/index-5002-24.fits
-  - mv data.astrometry.net/5000/index-5002-24.fits $TRAVIS_BUILD_DIR/ASTROMETRYNET/data/
+  - wget -r -nc http://data.astrometry.net/5000/index-5000-40.fits
+  - mv data.astrometry.net/5000/index-*.fits $TRAVIS_BUILD_DIR/ASTROMETRYNET/data/
   # - make install-indexes
   - cd ../
   - "export ASTROMETRYNET_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET"
