@@ -1,5 +1,7 @@
-from astropy.coordinates import SkyCoord
-import astropy.units as units
+from astropy.coordinates import SkyCoord, Distance
+import astropy.units as u
+from astropy.time import Time
+
 from astroquery.ned import Ned
 from astroquery.simbad import Simbad
 import matplotlib.pyplot as plt
@@ -43,7 +45,7 @@ def load_target(label, verbose=False):
     XX
     >>> parameters.OBS_OBJECT_TYPE = "HG-AR"
     >>> t = load_target("XX", verbose=False)
-    >>> print([l.wavelength for l in t.lines.lines][:5])
+    >>> print([line.wavelength for line in t.lines.lines][:5])
     [253.652, 296.728, 302.15, 313.155, 334.148]
     >>> parameters.OBS_OBJECT_TYPE = "OTHER"
     >>> t = load_target("XX", verbose=False)
@@ -83,6 +85,7 @@ class Target:
         self.sed = None
         self.lines = None
         self.coord = None
+        self.coord_after_proper_motion = None
         self.redshift = 0
 
 
@@ -103,7 +106,7 @@ class ArcLamp(Target):
 
         Mercury-Argon lamp:
         >>> t = ArcLamp("HG-AR", verbose=False)
-        >>> print([l.wavelength for l in t.lines.lines][:5])
+        >>> print([line.wavelength for line in t.lines.lines][:5])
         [253.652, 296.728, 302.15, 313.155, 334.148]
         >>> print(t.emission_spectrum)
         True
@@ -205,9 +208,10 @@ class Star(Target):
         if simbad is not None:
             if self.verbose:
                 self.my_logger.info(f'\n\tSimbad: {simbad}')
-            self.coord = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(units.hourangle, units.deg))
+            self.coord = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(u.hourangle, u.deg))
         else:
             self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
+        self.set_coord_after_proper_motion(date_obs="J2000")
         self.load_spectra()
 
     def load_spectra(self):
@@ -307,6 +311,22 @@ class Star(Target):
                                    hydrogen_only=self.hydrogen_only)
         self.build_sed()
 
+    def set_coord_after_proper_motion(self, date_obs):
+        target_pmra = self.simbad[0]['PMRA'] * u.mas / u.yr
+        if np.isnan(target_pmra):
+            target_pmra = 0 * u.mas / u.yr
+        target_pmdec = self.simbad[0]['PMDEC'] * u.mas / u.yr
+        if np.isnan(target_pmdec):
+            target_pmdec = 0 * u.mas / u.yr
+        target_parallax = self.simbad[0]['PLX_VALUE'] * u.mas
+        if target_parallax == 0 * u.mas:
+            target_parallax = 1e-4 * u.mas
+        target_coord = SkyCoord(ra=self.coord.ra, dec=self.coord.dec, distance=Distance(parallax=target_parallax),
+                                pm_ra_cosdec=target_pmra, pm_dec=target_pmdec, frame='icrs', equinox="J2000",
+                                obstime="J2000")
+        self.coord_after_proper_motion = target_coord.apply_space_motion(new_obstime=Time(date_obs))
+        return self.coord_after_proper_motion
+
     def build_sed(self, index=0):
         """Interpolate the database reference spectra and return self.sed as a function of the wavelength.
 
@@ -341,7 +361,7 @@ class Star(Target):
         for isp, sp in enumerate(self.spectra):
             plt.plot(self.wavelengths[isp], sp, label='Spectrum %d' % isp)
         plt.xlim((300, 1100))
-        plt.xlabel('$\lambda$ [nm]')
+        plt.xlabel(r'$\lambda$ [nm]')
         plt.ylabel('Flux')
         plt.title(self.label)
         plt.legend()
@@ -351,7 +371,7 @@ class Star(Target):
 
 if __name__ == "__main__":
     import doctest
-    #if np.__version__ >= "1.14.0":
-    #   np.set_printoptions(legacy="1.13")
+    # if np.__version__ >= "1.14.0":
+    #    np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
