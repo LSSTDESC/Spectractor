@@ -45,7 +45,7 @@ def test_astrometry():
             a.plot_astrometry_shifts(vmax=3)
         # checks
         assert os.path.isdir('./tests/data/reduc_20170605_028_wcs')
-        assert os.path.isfile('./tests/data/reduc_20170605_028_new.fits')
+        assert os.path.isfile('./tests/data/reduc_20170605_028_wcs/reduc_20170605_028.wcs')
         assert a.data is not None
         assert np.sum(a.data) > 1e-10
         assert len(a.sources) > 400
