@@ -33,7 +33,7 @@ def test_astrometry():
         a.run_simple_astrometry(extent=((xpos - radius, xpos + radius), (ypos - radius, ypos + radius)))
         # iterate process until shift is below 1 mas on RA and DEC directions
         # or maximum iterations is reached
-        dra, ddec = 0, 0
+        dra_median, ddec_median = 0, 0
         for i in range(maxiter):
             dra, ddec = a.run_gaia_astrometry()
             dra_median = np.median(dra.to(u.arcsec).value)
