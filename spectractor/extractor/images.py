@@ -367,7 +367,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     parameters.CCD_IMSIZE = image.data.shape[1]
 
 
-def find_target(image, guess, rotated=False):
+def find_target(image, guess, rotated=False, use_wcs=True):
     """Find the target in the Image instance.
 
     The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
@@ -382,6 +382,8 @@ def find_target(image, guess, rotated=False):
         Two parameter array giving the estimated position of the target in the image.
     rotated: bool
         If True, the target is searched in the rotated image.
+    use_wcs: bool
+        If True, the WCS file (if found) is used to set the target position in pixels.
 
     Returns
     -------
@@ -391,25 +393,27 @@ def find_target(image, guess, rotated=False):
         The y position of the target.
     """
     my_logger = set_logger(__name__)
-    wcs_file_name = set_wcs_file_name(image.file_name)
-    if os.path.isfile(wcs_file_name):
-        my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
-        if rotated:
-            theX, theY = find_target_after_rotation(image)
+    if use_wcs:
+        wcs_file_name = set_wcs_file_name(image.file_name)
+        if os.path.isfile(wcs_file_name):
+            my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
+            if rotated:
+                theX, theY = find_target_after_rotation(image)
+            else:
+                wcs = load_wcs_from_file(wcs_file_name)
+                target_coord_after_motion = image.target.set_coord_after_proper_motion(image.date_obs)
+                target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra, target_coord_after_motion.dec, 0))
+                theX, theY = target_pixcoords
+            if parameters.DEBUG or True:
+                fig = plt.figure(figsize=(5, 5))
+                sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
+                                                                         rotated=rotated, widths=(20, 20))
+                plot_image_simple(plt.gca(), data=sub_image, scale="lin", title="", units=image.units,
+                                  target_pixcoords=[theX-x0+Dx, theY-y0+Dy])
+                plt.show()
         else:
-            wcs = load_wcs_from_file(wcs_file_name)
-            target_coord_after_motion = image.target.set_coord_after_proper_motion(image.date_obs)
-            target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra, target_coord_after_motion.dec, 0))
-            theX, theY = target_pixcoords
-        if parameters.DEBUG or True:
-            fig = plt.figure(figsize=(5, 5))
-            sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
-                                                                     rotated=rotated, widths=(20, 20))
-            plot_image_simple(plt.gca(), data=sub_image, scale="lin", title="", units=image.units,
-                              target_pixcoords=[theX-x0+Dx, theY-y0+Dy])
-            plt.show()
+            my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
     else:
-        my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
         Dx = parameters.XWINDOW
         Dy = parameters.YWINDOW
         theX, theY = guess
