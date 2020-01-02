@@ -13,15 +13,16 @@ from photutils import DAOStarFinder
 
 from spectractor import parameters
 from spectractor.tools import (plot_image_simple, set_wcs_file_name, set_wcs_tag, set_wcs_output_directory,
-                               load_wcs_from_file)
+                               set_sources_file_name, set_gaia_catalog_file_name, load_wcs_from_file)
 from spectractor.config import set_logger
 from spectractor.extractor.images import Image
 from spectractor.extractor.background import remove_image_background_sextractor
 
 
-def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5):
+def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, mask=None):
     mean, median, std = sigma_clipped_stats(data_wo_bkg, sigma=sigma)
-    mask = np.zeros(data_wo_bkg.shape, dtype=bool)
+    if mask is None:
+        mask = np.zeros(data_wo_bkg.shape, dtype=bool)
     daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std)
     sources = daofind(data_wo_bkg - median, mask=mask)
     for col in sources.colnames:
@@ -102,7 +103,7 @@ class Astrometry(Image):
         self.output_directory = set_wcs_output_directory(file_name)
         self.tag = set_wcs_tag(file_name)
         self.new_file_name = self.file_name.replace('.fits', '_new.fits')
-        self.sources_file_name = os.path.join(self.output_directory, f"{self.tag}_sources.fits")
+        self.sources_file_name = set_sources_file_name(file_name)
         self.wcs_file_name = wcs_file_name
         if self.wcs_file_name != "":
             self.wcs = load_wcs_from_file(self.wcs_file_name)
@@ -110,7 +111,7 @@ class Astrometry(Image):
             self.wcs_file_name = set_wcs_file_name(file_name)
             if os.path.isfile(self.wcs_file_name):
                 self.wcs = load_wcs_from_file(self.wcs_file_name)
-        self.gaia_file_name = os.path.join(self.output_directory, f"{self.tag}_gaia.ecsv")
+        self.gaia_file_name = set_gaia_catalog_file_name(file_name)
         self.my_logger.info(f"\n\tIntermediate outputs will be stored in {self.output_directory}")
         self.wcs = None
         self.sources = None

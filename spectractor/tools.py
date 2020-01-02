@@ -1579,8 +1579,19 @@ def set_wcs_tag(file_name):
 def set_wcs_file_name(file_name):
     output_directory = set_wcs_output_directory(file_name)
     tag = set_wcs_tag(file_name)
-    wcs_file_name = os.path.join(output_directory, tag + '.wcs')
-    return wcs_file_name
+    return os.path.join(output_directory, tag + '.wcs')
+
+
+def set_sources_file_name(file_name):
+    output_directory = set_wcs_output_directory(file_name)
+    tag = set_wcs_tag(file_name)
+    return os.path.join(output_directory, f"{tag}_sources.fits")
+
+
+def set_gaia_catalog_file_name(file_name):
+    output_directory = set_wcs_output_directory(file_name)
+    tag = set_wcs_tag(file_name)
+    return os.path.join(output_directory, f"{tag}_gaia.ecsv")
 
 
 def load_wcs_from_file(filename):

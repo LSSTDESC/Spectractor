@@ -404,7 +404,7 @@ def find_target(image, guess, rotated=False, use_wcs=True):
                 target_coord_after_motion = image.target.set_coord_after_proper_motion(image.date_obs)
                 target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra, target_coord_after_motion.dec, 0))
                 theX, theY = target_pixcoords
-            if parameters.DEBUG or True:
+            if parameters.DEBUG:
                 fig = plt.figure(figsize=(5, 5))
                 sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
                                                                          rotated=rotated, widths=(20, 20))
