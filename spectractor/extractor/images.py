@@ -393,6 +393,7 @@ def find_target(image, guess, rotated=False, use_wcs=True):
         The y position of the target.
     """
     my_logger = set_logger(__name__)
+    target_pixcoords = [-1, -1]
     if use_wcs:
         wcs_file_name = set_wcs_file_name(image.file_name)
         if os.path.isfile(wcs_file_name):
@@ -413,7 +414,7 @@ def find_target(image, guess, rotated=False, use_wcs=True):
                 plt.show()
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
-    else:
+    if target_pixcoords == [-1, -1]:
         Dx = parameters.XWINDOW
         Dy = parameters.YWINDOW
         theX, theY = guess
