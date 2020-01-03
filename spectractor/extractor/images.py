@@ -399,7 +399,8 @@ def find_target(image, guess, rotated=False, use_wcs=True):
         if os.path.isfile(wcs_file_name):
             my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
             if rotated:
-                theX, theY = find_target_after_rotation(image)
+                target_pixcoords = find_target_after_rotation(image)
+                theX, theY = target_pixcoords
             else:
                 wcs = load_wcs_from_file(wcs_file_name)
                 target_coord_after_motion = image.target.set_coord_after_proper_motion(image.date_obs)
@@ -414,7 +415,7 @@ def find_target(image, guess, rotated=False, use_wcs=True):
                 plt.show()
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
-    if target_pixcoords == [-1, -1]:
+    if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
         Dx = parameters.XWINDOW
         Dy = parameters.YWINDOW
         theX, theY = guess
