@@ -921,13 +921,13 @@ def calibrate_spectrum_with_lines(spectrum):
             if parameters.LIVE_FIT:
                 spectrum.lambdas = lambdas_test
                 spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
-                                                        f'\nD={D:.2f}mm, shift={shift:.2f}pix')
+                                                            f'\nD={D:.2f}mm, shift={shift:.2f}pix')
         return chisq
 
     # grid exploration of the parameters
     # necessary because of the the line detection algo
     D_step = D_err / 2
-    pixel_shift_step = 0.5
+    pixel_shift_step = 0.1
     pixel_shift_prior = parameters.PIXSHIFT_PRIOR
     Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
     pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)

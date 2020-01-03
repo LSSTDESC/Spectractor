@@ -23,7 +23,7 @@ def test_extractor():
     file_names = ['tests/data/reduc_20170530_134.fits']
 
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
-    parameters.DEBUG = False # True
+    parameters.DEBUG = True
 
     for file_name in file_names:
         tag = file_name.split('/')[-1]
