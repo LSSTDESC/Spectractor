@@ -42,8 +42,9 @@ def test_extractor():
                                    f"\n\t\tnp.mean(spectrum.chromatic_psf.table['gamma']="
                                    f"{np.mean(spectrum.chromatic_psf.table['gamma'])}")
         assert np.isclose(spectrum.lambdas[0], 296, atol=1)
-        assert np.isclose(spectrum.lambdas[-1], 1083, atol=1)
-        assert np.all(np.isclose(spectrum.x0, [743.6651370068676, 683.0577836601408], atol=0.5))
+        assert np.isclose(spectrum.lambdas[-1], 1083.5, atol=1)
+        assert np.isclose(spectrum.x0[0], 743.6651370068676, atol=0.5)
+        assert np.isclose(spectrum.x0[1], 683.0577836601408, atol=1)
         assert np.isclose(spectrum.spectrogram_x0, -240, atol=1)
         assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3
         assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrum.fits')) is True
