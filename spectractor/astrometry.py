@@ -151,11 +151,12 @@ class Astrometry(Image):
         if sources is not None:
             plt.scatter(sources['xcentroid'], sources['ycentroid'], s=300, lw=2,
                         edgecolor='black', facecolor='none', label="all detected sources")
-        target_x, target_y = wcs.all_world2pix(self.target_coord_after_motion.ra, self.target_coord_after_motion.dec, 0)
+        target_x, target_y = wcs.all_world2pix(self.target_coord_after_motion.ra, self.target_coord_after_motion.dec,
+                                               0)
         plt.scatter(target_x, target_y, s=300, marker="+",
                     edgecolor='cyan', facecolor='cyan', label=f"the target {self.target.label} after motion", lw=2)
         if gaia_coord is not None:
-            gaia_x, gaia_y = wcs.all_world2pix(gaia_coord.ra, gaia_coord.dec, 0, maxiter=50, quiet=True)
+            gaia_x, gaia_y = wcs.all_world2pix(gaia_coord.ra, gaia_coord.dec, 0, quiet=True)
             plt.scatter(gaia_x, gaia_y, s=300, marker="+",
                         edgecolor='blue', facecolor='blue', label=f"gaia stars after motion", lw=2)
         plt.legend()
@@ -165,7 +166,8 @@ class Astrometry(Image):
         plt.show()
 
     def set_sources_coord(self):
-        sources_coord = self.wcs.all_pix2world(self.sources['xcentroid'], self.sources['ycentroid'], 0)
+        sources_coord = self.wcs.all_pix2world(self.sources['xcentroid'], self.sources['ycentroid'],
+                                               0)
         self.sources_coord = SkyCoord(ra=sources_coord[0] * u.deg, dec=sources_coord[1] * u.deg,
                                       frame="icrs", obstime=self.date_obs, equinox="J2000")
         return self.sources_coord
@@ -288,6 +290,13 @@ class Astrometry(Image):
         extent: 2-tuple
             ((xmin,xmax),(ymin,ymax)) 2 dimensional typle to crop the exposure before any operation (default: None).
 
+        Notes
+        -----
+        The source file given to solve-field is understood as a FITS file with pixel origin value at 1,
+        whereas pixel coordinates comes from photutils using a numpy convention with pixel origin value at 0.
+        To correct for this we shift the CRPIX center of 1 pixel at the end of the function. It can be that solve-field
+        using the source list or the raw FITS image then give the same WCS values.
+
         Examples
         --------
 
@@ -338,8 +347,8 @@ class Astrometry(Image):
         self.write_sources()
         # run astrometry.net
         command = f"{os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')} --scale-unit arcsecperpix " \
-                  f"--scale-low {0.95 * parameters.CCD_PIXEL2ARCSEC} " \
-                  f"--scale-high {1.05 * parameters.CCD_PIXEL2ARCSEC} " \
+                  f"--scale-low {0.999 * parameters.CCD_PIXEL2ARCSEC} " \
+                  f"--scale-high {1.001 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--ra {self.target.coord.ra.value} --dec {self.target.coord.dec.value} " \
                   f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
                   f"--dir {self.output_directory} --out {self.tag} " \
@@ -352,6 +361,15 @@ class Astrometry(Image):
         # save new WCS in original fits file
         # self.merge_wcs_with_new_exposure(log_file=log_file)
         log_file.close()
+
+        # The source file given to solve-field is understood as a FITS file with pixel origin value at 1,
+        # whereas pixel coordinates comes from photutils using a numpy convention with pixel origin value at 0
+        # To correct for this we shift the CRPIX center of 1 pixel
+        hdu = fits.open(self.wcs_file_name)
+        hdu[0].header['CRPIX1'] = float(hdu[0].header['CRPIX1']) + 1
+        hdu[0].header['CRPIX2'] = float(hdu[0].header['CRPIX2']) + 1
+        hdu.writeto(self.wcs_file_name, overwrite=True)
+
         # load WCS
         self.wcs = load_wcs_from_file(self.wcs_file_name)
         return self.wcs
@@ -454,8 +472,6 @@ class Astrometry(Image):
         # compute statistics
         dra_median = np.median(dra.to(u.arcsec).value)
         ddec_median = np.median(ddec.to(u.arcsec).value)
-        dra_rms = np.std(dra.to(u.arcsec).value)
-        ddec_rms = np.std(ddec.to(u.arcsec).value)
         if parameters.DEBUG:
             plot_shifts_histograms(dra, ddec)
             self.plot_shifts_profiles(gaia_matches, dra, ddec)
@@ -472,6 +488,10 @@ class Astrometry(Image):
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion, margin=30)
 
         # Now, write out the WCS object as a FITS header
+        dra_median = np.median(dra.to(u.arcsec).value)
+        ddec_median = np.median(ddec.to(u.arcsec).value)
+        dra_rms = np.std(dra.to(u.arcsec).value)
+        ddec_rms = np.std(ddec.to(u.arcsec).value)
         hdu = fits.open(self.wcs_file_name)
         hdu[0].header['CRVAL1'] = self.wcs.wcs.crval[0]
         hdu[0].header['CRVAL2'] = self.wcs.wcs.crval[1]
@@ -490,6 +510,18 @@ class Astrometry(Image):
         sources_selection = self.sources_coord[sep_constraints]
         self.gaia_matches = self.gaia_coord_after_motion[self.gaia_index[sep_constraints]]
         dra, ddec = sources_selection.spherical_offsets_to(self.gaia_matches)
+
+        # update values
+        dra_median = np.median(dra.to(u.arcsec).value)
+        ddec_median = np.median(ddec.to(u.arcsec).value)
+        dra_rms = np.std(dra.to(u.arcsec).value)
+        ddec_rms = np.std(ddec.to(u.arcsec).value)
+        hdu = fits.open(self.wcs_file_name)
+        hdu[0].header['CRV1_MED'] = dra_median
+        hdu[0].header['CRV2_MED'] = ddec_median
+        hdu[0].header['CRV1_RMS'] = dra_rms
+        hdu[0].header['CRV2_RMS'] = ddec_rms
+        hdu.writeto(self.wcs_file_name, overwrite=True)
 
         if parameters.DEBUG:
             plot_shifts_histograms(dra, ddec)
