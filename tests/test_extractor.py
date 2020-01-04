@@ -34,9 +34,16 @@ def test_extractor():
                                config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10
+        spectrum.my_logger.warning(f"\n\tQuantities to test:"
+                                   f"\n\t\tspectrum.lambdas[0]={spectrum.lambdas[0]}"
+                                   f"\n\t\tspectrum.lambdas[-1]={spectrum.lambdas[-1]}"
+                                   f"\n\t\tspectrum.x0={spectrum.x0}"
+                                   f"\n\t\tspectrum.spectrogram_x0={spectrum.spectrogram_x0}"
+                                   f"\n\t\tnp.mean(spectrum.chromatic_psf.table['gamma']="
+                                   f"{np.mean(spectrum.chromatic_psf.table['gamma'])}")
         assert np.isclose(spectrum.lambdas[0], 296, atol=1)
         assert np.isclose(spectrum.lambdas[-1], 1083, atol=1)
-        assert np.all(np.isclose(spectrum.x0 , [743.6651370068676, 683.0577836601408], atol=0.5))
+        assert np.all(np.isclose(spectrum.x0, [743.6651370068676, 683.0577836601408], atol=0.5))
         assert np.isclose(spectrum.spectrogram_x0, -240, atol=1)
         assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3
         assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrum.fits')) is True
