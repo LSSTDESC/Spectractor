@@ -22,8 +22,8 @@ if __name__ == "__main__":
                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
     parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
                         help="INI config file. (default: config.ctio.ini).")
-    # parser.add_argument("-o", "--overwrite", dest="overwrite", action="store_true", default=False,
-    #                     help="Overwrite original input fits file with a new fits file containing the new WCS solution.")
+    parser.add_argument("-o", "--output_directory", dest="output_directory", default="",
+                        help="Write results in given output directory (default: '' if same directory as input file).")
     parser.add_argument("-r", "--radius", dest="radius", default=500,
                         help="Radius in pixel around the guessed target position to detect sources "
                              "and set the new WCS solution.")
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None:
             continue
-        a = Astrometry(file_name, target, disperser_label)
+        a = Astrometry(file_name, target, disperser_label, output_directory=args.output_directory)
         a.run_simple_astrometry(extent=((xpos - radius, xpos + radius), (ypos - radius, ypos + radius)))
         # iterate process until shift is below 1 mas on RA and DEC directions
         # or maximum iterations is reached
