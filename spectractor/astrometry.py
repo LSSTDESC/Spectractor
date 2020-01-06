@@ -368,6 +368,7 @@ class Astrometry(Image):
         hdu = fits.open(self.wcs_file_name)
         hdu[0].header['CRPIX1'] = float(hdu[0].header['CRPIX1']) + 1
         hdu[0].header['CRPIX2'] = float(hdu[0].header['CRPIX2']) + 1
+        self.my_logger.info(f"\n\tWrite astrometry.net WCS solution in {self.wcs_file_name}...")
         hdu.writeto(self.wcs_file_name, overwrite=True)
 
         # load WCS
@@ -454,6 +455,7 @@ class Astrometry(Image):
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion)
 
         # compute shifts
+        self.my_logger.info(f"\n\tCompute distances between Gaia catalog and detected sources.")
         self.gaia_index, self.dist_2d, self.dist_ra, self.dist_dec = \
             self.shift_wcs_center_fit_gaia_catalog(self.gaia_coord_after_motion)
         if parameters.DEBUG:
@@ -472,6 +474,7 @@ class Astrometry(Image):
         # compute statistics
         dra_median = np.median(dra.to(u.arcsec).value)
         ddec_median = np.median(ddec.to(u.arcsec).value)
+        self.my_logger.info(f"\n\tMedian DeltaRA={dra_median:.3f} arcsec, median DeltaDEC={ddec_median:.3f} arcsec")
         if parameters.DEBUG:
             plot_shifts_histograms(dra, ddec)
             self.plot_shifts_profiles(gaia_matches, dra, ddec)
@@ -483,6 +486,7 @@ class Astrometry(Image):
         # #astropy.coordinates.SkyCoord.spherical_offsets_to)
         # after the shift the histograms must be centered on zero
         total_shift = np.array([dra_median / np.cos(self.target_coord_after_motion.dec.radian), ddec_median]) * u.arcsec
+        self.my_logger.info(f"\n\tShift original CRVAL value {self.wcs.wcs.crval} of {total_shift}.")
         self.wcs.wcs.crval = self.wcs.wcs.crval * u.deg + total_shift
         if parameters.DEBUG:
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion, margin=30)
@@ -512,6 +516,7 @@ class Astrometry(Image):
         dra, ddec = sources_selection.spherical_offsets_to(self.gaia_matches)
 
         # update values
+        self.my_logger.info(f"\n\tUpdate WCS solution from {self.wcs_file_name} with Gaia solution.")
         dra_median = np.median(dra.to(u.arcsec).value)
         ddec_median = np.median(ddec.to(u.arcsec).value)
         dra_rms = np.std(dra.to(u.arcsec).value)
