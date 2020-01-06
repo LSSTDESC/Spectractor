@@ -87,7 +87,7 @@ def plot_shifts_histograms(dra, ddec):
 
 class Astrometry(Image):
 
-    def __init__(self, file_name, target="", disperser_label="", wcs_file_name=""):
+    def __init__(self, file_name, target="", disperser_label="", wcs_file_name="", output_directory=""):
         """
         Parameters
         ----------
@@ -100,7 +100,7 @@ class Astrometry(Image):
         """
         Image.__init__(self, file_name, target=target, disperser_label=disperser_label)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.output_directory = set_wcs_output_directory(file_name)
+        self.output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
         self.tag = set_wcs_tag(file_name)
         self.new_file_name = self.file_name.replace('.fits', '_new.fits')
         self.sources_file_name = set_sources_file_name(file_name)

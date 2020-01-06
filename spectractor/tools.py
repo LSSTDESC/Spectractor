@@ -1564,9 +1564,11 @@ def rebin(arr, new_shape):
     return arr.reshape(shape).sum(-1).sum(1)
 
 
-def set_wcs_output_directory(file_name):
-    output_directory = os.path.join(os.path.dirname(file_name),
-                                    os.path.splitext(os.path.basename(file_name))[0]) + "_wcs"
+def set_wcs_output_directory(file_name, output_directory=""):
+    outdir = os.path.dirname(file_name)
+    if output_directory != "":
+        outdir = output_directory
+    output_directory = os.path.join(outdir, os.path.splitext(os.path.basename(file_name))[0]) + "_wcs"
     ensure_dir(output_directory)
     return output_directory
 
