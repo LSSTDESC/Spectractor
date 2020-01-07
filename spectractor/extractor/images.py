@@ -367,7 +367,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     parameters.CCD_IMSIZE = image.data.shape[1]
 
 
-def find_target(image, guess=[parameters.CCD_IMSIZE//2, parameters.CCD_IMSIZE//2], rotated=False, use_wcs=True):
+def find_target(image, guess=None, rotated=False, use_wcs=True):
     """Find the target in the Image instance.
 
     The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
@@ -418,6 +418,8 @@ def find_target(image, guess=[parameters.CCD_IMSIZE//2, parameters.CCD_IMSIZE//2
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
     if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
+        if guess is None:
+            my_logger.error(f"\n\tguess parameter must be set if WCS solution is not found.")
         Dx = parameters.XWINDOW
         Dy = parameters.YWINDOW
         theX, theY = guess

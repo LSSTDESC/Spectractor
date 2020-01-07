@@ -30,7 +30,7 @@ def test_extractor():
         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None:
             continue
-        spectrum = Spectractor(file_name, './outputs/', [xpos, ypos], target, disperser_label,
+        spectrum = Spectractor(file_name, './outputs/', target, [xpos, ypos], disperser_label,
                                config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10
