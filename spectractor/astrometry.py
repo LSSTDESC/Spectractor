@@ -368,6 +368,8 @@ class Astrometry(Image):
         hdu = fits.open(self.wcs_file_name)
         hdu[0].header['CRPIX1'] = float(hdu[0].header['CRPIX1']) + 1
         hdu[0].header['CRPIX2'] = float(hdu[0].header['CRPIX2']) + 1
+        # To avoid WCS warnings, change NAXIS value
+        hdu[0].header['NAXIS'] = 2
         self.my_logger.info(f"\n\tWrite astrometry.net WCS solution in {self.wcs_file_name}...")
         hdu.writeto(self.wcs_file_name, overwrite=True)
 
