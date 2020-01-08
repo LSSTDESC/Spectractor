@@ -1600,7 +1600,9 @@ def load_wcs_from_file(filename):
     # Load the FITS hdulist using astropy.io.fits
     hdulist = fits.open(filename)
     # Parse the WCS keywords in the primary HDU
-    wcs = WCS.WCS(hdulist[0].header, fix=False)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore")
+        wcs = WCS.WCS(hdulist[0].header, fix=False)
     return wcs
 
 
