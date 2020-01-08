@@ -14,6 +14,7 @@ import astropy.units as u
 
 def test_astrometry():
     file_names = ['tests/data/reduc_20170605_028.fits', 'tests/data/reduc_20170530_134.fits']
+    # file_names = ['tests/data/reduc_20170530_134.fits']
     # file_names = ['tests/data/sim_20170530_134.fits']
 
     load_config('./config/ctio.ini')
@@ -52,7 +53,7 @@ def test_astrometry():
         assert np.sum(a.data) > 1e-10
         assert np.all(np.abs([dra_median, ddec_median]) < 1e-3)
         if file_name == 'tests/data/reduc_20170605_028.fits':
-            assert len(a.sources) > 400
+            assert len(a.sources) > 200
             assert np.isclose(a.target_coord_after_motion.ra.value, 224.97283917)
             assert np.isclose(a.target_coord_after_motion.dec.value, -54.30209)
             assert np.isclose(a.wcs.wcs.crval[0], 224.9718998)
