@@ -9,7 +9,7 @@ from astropy.table import Table
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, Distance
 
-from photutils import DAOStarFinder
+from photutils import DAOStarFinder, IRAFStarFinder
 
 from spectractor import parameters
 from spectractor.tools import (plot_image_simple, set_wcs_file_name, set_wcs_tag, set_wcs_output_directory,
@@ -23,8 +23,10 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, m
     mean, median, std = sigma_clipped_stats(data_wo_bkg, sigma=sigma)
     if mask is None:
         mask = np.zeros(data_wo_bkg.shape, dtype=bool)
-    daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std)
-    sources = daofind(data_wo_bkg - median, mask=mask)
+    # daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std, exclude_border=True)
+    # sources = daofind(data_wo_bkg - median, mask=mask)
+    iraffind = IRAFStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std, exclude_border=True)
+    sources = iraffind(data_wo_bkg - median, mask=mask)
     for col in sources.colnames:
         sources[col].info.format = '%.8g'  # for consistent table output
     sources.sort('mag')
@@ -222,7 +224,7 @@ class Astrometry(Image):
         # fig.tight_layout()
         plt.show()
 
-    def set_constraints(self, min_stars=50, flux_log10_threshold=0.1, min_range=3 * u.arcsec, max_range=5 * u.arcmin,
+    def set_constraints(self, min_stars=100, flux_log10_threshold=0.1, min_range=3 * u.arcsec, max_range=5 * u.arcmin,
                         max_sep=1 * u.arcsec):
         sep = self.dist_2d < max_sep
         sep *= self.sources_coord.separation(self.target_coord_after_motion) < max_range
