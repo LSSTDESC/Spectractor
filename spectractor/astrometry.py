@@ -11,6 +11,8 @@ from astropy.coordinates import SkyCoord, Distance
 
 from photutils import DAOStarFinder, IRAFStarFinder
 
+from scipy.spatial import ConvexHull
+
 from spectractor import parameters
 from spectractor.tools import (plot_image_simple, set_wcs_file_name, set_wcs_tag, set_wcs_output_directory,
                                set_sources_file_name, set_gaia_catalog_file_name, load_wcs_from_file)
@@ -107,6 +109,7 @@ class Astrometry(Image):
         self.new_file_name = self.file_name.replace('.fits', '_new.fits')
         self.sources_file_name = set_sources_file_name(file_name, output_directory=output_directory)
         self.wcs_file_name = wcs_file_name
+        self.log_file_name = os.path.join(self.output_directory, self.tag)+".log"
         if self.wcs_file_name != "":
             self.wcs = load_wcs_from_file(self.wcs_file_name)
         else:
@@ -123,9 +126,27 @@ class Astrometry(Image):
         self.gaia_matches = None
         self.gaia_coord_after_motion = None
         self.dist_2d = None
+        self.quad_stars_coords = None
         self.dist_ra = 0 * u.arcsec
         self.dist_dec = 0 * u.arcsec
         self.target_coord_after_motion = self.target.set_coord_after_proper_motion(date_obs=self.date_obs)
+        if os.path.isfile(self.log_file_name):
+            self.quad_stars_coords = self.get_quad_stars()
+
+    def get_quad_stars(self):
+        coords = []
+        f = open(self.log_file_name, 'r')
+        for line in f:
+            if 'field_xy' in line:
+                coord = line.split(' ')[5].split(',')
+                coords.append([float(coord[0]), float(coord[1])])
+        f.close()
+        if len(coords) != 4:
+            self.my_logger.warning(f"\n\tOnly {len(coords)} calibration stars has been extracted from "
+                                   f"{self.log_file_name}, with positions {coords}. A quad of 4 stars is expected. "
+                                   f"Please check {self.log_file_name}.")
+        self.quad_stars_coords = coords
+        return coords
 
     def write_sources(self):
         colx = fits.Column(name='X', format='D', array=self.sources['xcentroid'])
@@ -138,15 +159,16 @@ class Astrometry(Image):
         hdu.writeto(self.sources_file_name, overwrite=True)
         self.my_logger.info(f'\n\tSources positions saved in {self.sources_file_name}')
 
-    def plot_sources_and_gaia_catalog(self, wcs=None, sources=None, gaia_coord=None, margin=10000):
-        fig = plt.figure(figsize=(8, 8))
+    def plot_sources_and_gaia_catalog(self, wcs=None, sources=None, gaia_coord=None, quad=None,
+                                      vmax=None, margin=parameters.CCD_IMSIZE):
+        fig = plt.figure(figsize=(6, 6))
 
         if wcs is None:
             wcs = self.wcs
             if wcs is not None:
                 fig.add_subplot(111, projection=wcs)
 
-        plot_image_simple(plt.gca(), self.data, scale="log10")
+        plot_image_simple(plt.gca(), self.data, scale="log10", vmax=vmax)
         if wcs is not None:
             plt.xlabel('RA')
             plt.ylabel('Dec')
@@ -161,6 +183,12 @@ class Astrometry(Image):
             gaia_x, gaia_y = wcs.all_world2pix(gaia_coord.ra, gaia_coord.dec, 0, quiet=True)
             plt.scatter(gaia_x, gaia_y, s=300, marker="+",
                         edgecolor='blue', facecolor='blue', label=f"gaia stars after motion", lw=2)
+        if quad is not None:
+            points = np.concatenate([quad, [quad[-1]]])
+            hull = ConvexHull(points)
+            for simplex in hull.simplices:
+                plt.plot(points[simplex, 0], points[simplex, 1], 'r-')
+            plt.plot(points.T[0], points.T[1], 'rx', lw=2)
         plt.legend()
         plt.xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
         plt.ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
@@ -180,7 +208,7 @@ class Astrometry(Image):
         dist_ra, dist_dec = self.sources_coord.spherical_offsets_to(matches)
         return gaia_index, dist_2d, dist_ra, dist_dec
 
-    def plot_astrometry_shifts(self, vmax=3):
+    def plot_astrometry_shifts(self, vmax=3, margin=parameters.CCD_IMSIZE):
         target_x, target_y = self.wcs.all_world2pix(self.target_coord_after_motion.ra,
                                                     self.target_coord_after_motion.dec, 0)
         gaia_x, gaia_y = self.wcs.all_world2pix(self.gaia_coord_after_motion[self.gaia_index].ra,
@@ -200,7 +228,6 @@ class Astrometry(Image):
         sc = plt.scatter(gaia_x, gaia_y, s=100, c=self.dist_ra.to(u.arcsec).value,
                          cmap="bwr", vmin=-vmax, vmax=vmax,
                          label=f"gaia stars after motion", lw=1)
-        margin = 1000
         plt.xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
         plt.ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
         plt.colorbar(sc, label="Shift in RA [arcsec]")
@@ -357,7 +384,7 @@ class Astrometry(Image):
                   f"--overwrite --x-column X --y-column Y {self.sources_file_name}"
         self.my_logger.info(f'\n\tRun astrometry.net solve_field command:\n\t{command}')
         log = subprocess.check_output(command, shell=True)
-        log_file = open(f"{os.path.join(self.output_directory, self.tag)}.log", "w+")
+        log_file = open(self.log_file_name, "w+")
         log_file.write(command + "\n")
         log_file.write(log.decode("utf-8") + "\n")
         # save new WCS in original fits file
@@ -372,6 +399,9 @@ class Astrometry(Image):
         hdu[0].header['CRPIX2'] = float(hdu[0].header['CRPIX2']) + 1
         self.my_logger.info(f"\n\tWrite astrometry.net WCS solution in {self.wcs_file_name}...")
         hdu.writeto(self.wcs_file_name, overwrite=True)
+
+        # load quad stars
+        self.quad_stars_coords = self.get_quad_stars()
 
         # load WCS
         self.wcs = load_wcs_from_file(self.wcs_file_name)
@@ -453,8 +483,9 @@ class Astrometry(Image):
         self.my_logger.info(f"\n\tUpdate object coordinates with proper motion at time={self.date_obs}.")
         self.target_coord_after_motion = self.target.set_coord_after_proper_motion(self.date_obs)
         self.gaia_coord_after_motion = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.date_obs)
-        if parameters.DEBUG:
-            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion)
+        if parameters.DEBUG or True:
+            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion,
+                                               quad=self.quad_stars_coords, margin=1000)
 
         # compute shifts
         self.my_logger.info(f"\n\tCompute distances between Gaia catalog and detected sources.")
@@ -491,7 +522,8 @@ class Astrometry(Image):
         self.my_logger.info(f"\n\tShift original CRVAL value {self.wcs.wcs.crval} of {total_shift}.")
         self.wcs.wcs.crval = self.wcs.wcs.crval * u.deg + total_shift
         if parameters.DEBUG:
-            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion, margin=30)
+            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion,
+                                               quad=self.quad_stars_coords, margin=30)
 
         # Now, write out the WCS object as a FITS header
         dra_median = np.median(dra.to(u.arcsec).value)

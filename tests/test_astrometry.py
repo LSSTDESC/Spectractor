@@ -14,7 +14,7 @@ import astropy.units as u
 
 def test_astrometry():
     file_names = ['tests/data/reduc_20170605_028.fits', 'tests/data/reduc_20170530_134.fits']
-    # file_names = ['tests/data/reduc_20170530_134.fits']
+    file_names = ['tests/data/reduc_20170530_134.fits']
     # file_names = ['tests/data/sim_20170530_134.fits']
 
     load_config('./config/ctio.ini')
@@ -44,7 +44,8 @@ def test_astrometry():
             if np.abs(dra_median) < 1e-3 and np.abs(ddec_median) < 1e-3:
                 break
         if parameters.DEBUG:
-            a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches, margin=200)
+            a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches,
+                                            quad=a.quad_stars_coords, margin=200)
             a.plot_astrometry_shifts(vmax=3)
         # checks
         assert os.path.isdir(wcs_output_directory)
