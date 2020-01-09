@@ -141,7 +141,7 @@ class Astrometry(Image):
                 coord = line.split(' ')[5].split(',')
                 coords.append([float(coord[0]), float(coord[1])])
         f.close()
-        if len(coords) != 4:
+        if len(coords) < 4:
             self.my_logger.warning(f"\n\tOnly {len(coords)} calibration stars has been extracted from "
                                    f"{self.log_file_name}, with positions {coords}. A quad of 4 stars is expected. "
                                    f"Please check {self.log_file_name}.")
