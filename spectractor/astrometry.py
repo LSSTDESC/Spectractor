@@ -143,7 +143,8 @@ class Astrometry(Image):
         f.close()
         if len(coords) < 4:
             self.my_logger.warning(f"\n\tOnly {len(coords)} calibration stars has been extracted from "
-                                   f"{self.log_file_name}, with positions {coords}. A quad of 4 stars is expected. "
+                                   f"{self.log_file_name}, with positions {coords}. "
+                                   f"A quad of at least 4 stars is expected. "
                                    f"Please check {self.log_file_name}.")
         self.quad_stars_coords = coords
         return coords
