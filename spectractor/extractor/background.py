@@ -178,7 +178,7 @@ def extract_background_photutils(data, err, ws=(20, 30), mask_signal_region=True
         ax[0].set_title(f'Data background: mean={np.nanmean(bgd_bands):.3f}, std={np.nanstd(bgd_bands):.3f}')
         ax[0].set_xlabel('X [pixels]')
         ax[0].set_ylabel('Y [pixels]')
-        bkg.plot_meshes(outlines=True, color='#1f77b4', ax=ax[0])
+        bkg.plot_meshes(outlines=True, color='#1f77b4', axes=ax[0])
         b = bkg.background
         im = ax[1].imshow(b, origin='lower', aspect="auto")
         ax[1].set_xlabel('X [pixels]')

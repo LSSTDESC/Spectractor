@@ -887,7 +887,7 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y)
-        my_logger.info(f'\n\t{or_fitted_model}')
+        my_logger.debug(f'\n\t{or_fitted_model}')
         # my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
