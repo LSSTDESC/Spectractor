@@ -110,7 +110,9 @@ class Spectrum:
         >>> assert np.max(s.err) < 1e-2
 
         """
-
+        if self.units == "ADU/s":
+            self.my_logger.warning(f"You ask to convert spectrum already in {self.units} in ADU/s... check your code !")
+            return
         self.data = self.data / parameters.FLAM_TO_ADURATE
         self.data /= self.lambdas * self.lambdas_binwidths
         if self.err is not None:
@@ -130,6 +132,10 @@ class Spectrum:
         >>> assert np.max(s.err) > 1e-2
 
         """
+        if self.units == 'erg/s/cm$^2$/nm':
+            self.my_logger.warning(f"You ask to convert spectrum already in {self.units}"
+                                   f" in erg/s/cm^2/nm... check your code !")
+            return
         self.data = self.data * parameters.FLAM_TO_ADURATE
         self.data *= self.lambdas_binwidths * self.lambdas
         if self.err is not None:
@@ -883,6 +889,8 @@ def calibrate_spectrum_with_lines(spectrum):
     """
     my_logger = set_logger(__name__)
 
+    # Convert back to ADU rate units because of lambda*dlambda normalisation in flam units
+    spectrum.convert_from_flam_to_ADUrate()
     # Convert wavelength array into original pixels
     x0 = spectrum.x0
     if x0 is None:
@@ -910,8 +918,9 @@ def calibrate_spectrum_with_lines(spectrum):
                              fwhm_func=fwhm_func, ax=None)
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
-            spectrum.lambdas = lambdas_test
-            spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
+            if parameters.LIVE_FIT:
+                spectrum.lambdas = lambdas_test
+                spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
                                                         f'\nD={D:.2f}mm, shift={shift:.2f}pix')
         return chisq
 
@@ -969,6 +978,8 @@ def calibrate_spectrum_with_lines(spectrum):
     lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.pixels = delta_pixels - pixel_shift
+    # Convert back to flam units
+    spectrum.convert_from_ADUrate_to_flam()
     spectrum.my_logger.info(
         '\n\tOrder0 total shift: {:.2f}pix'
         '\n\tD = {:.2f} mm (default: DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
@@ -1051,7 +1062,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     s = ChromaticPSF1D(Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
     s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, bgd_model_func=bgd_model_func,
-                                   saturation=image.saturation, live_fit=parameters.DEBUG)
+                                   saturation=image.saturation, live_fit=False)
 
     # Fill spectrum object
     spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
@@ -1136,7 +1147,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                                                                   x0=image.target_pixcoords)
     s.table['lambdas'] = first_guess_lambdas
     spectrum.lambdas = np.array(first_guess_lambdas)
-    my_logger.warning(f"\n\tTransverse fit table after derotation:\n{s.table[['lambdas', 'Dx_rot', 'Dx']]}")
+    my_logger.debug(f"\n\tTransverse fit table after derotation:\n{s.table[['lambdas', 'Dx_rot', 'Dx']]}")
 
     # Position of the order 0 in the spectrogram coordinates
     my_logger.info(f'\n\tExtract spectrogram: crop image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))'

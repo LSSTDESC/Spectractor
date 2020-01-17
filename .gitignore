@@ -11,6 +11,7 @@
 *.DS_Store
 *.xlsx
 .idea
+randomseed
 Spectractor.egg-info/
 build/
 dist/
