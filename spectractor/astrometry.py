@@ -364,7 +364,7 @@ class Astrometry(Image):
             self.plot_image(scale="log10")
         # remove background
         self.my_logger.info('\n\tRemove background using astropy SExtractorBackground()...')
-        data_wo_bkg = remove_image_background_sextractor(data)
+        data_wo_bkg = np.copy(data) #remove_image_background_sextractor(data, sigma=3.0, box_size=(50, 50), filter_size=(3, 3), positive=True)
         # extract source positions and fluxes
         self.my_logger.info('\n\tDetect sources using photutils source_detection()...')
         self.sources = source_detection(data_wo_bkg)
