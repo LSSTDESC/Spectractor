@@ -15,7 +15,7 @@ from scipy.spatial import ConvexHull
 
 from spectractor import parameters
 from spectractor.tools import (plot_image_simple, set_wcs_file_name, set_wcs_tag, set_wcs_output_directory,
-                               set_sources_file_name, set_gaia_catalog_file_name, load_wcs_from_file)
+                               set_sources_file_name, set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir)
 from spectractor.config import set_logger
 from spectractor.extractor.images import Image
 from spectractor.extractor.background import remove_image_background_sextractor
@@ -105,6 +105,7 @@ class Astrometry(Image):
         Image.__init__(self, file_name, target=target, disperser_label=disperser_label)
         self.my_logger = set_logger(self.__class__.__name__)
         self.output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
+        ensure_dir(self.output_directory)
         self.tag = set_wcs_tag(file_name)
         self.new_file_name = self.file_name.replace('.fits', '_new.fits')
         self.sources_file_name = set_sources_file_name(file_name, output_directory=output_directory)
