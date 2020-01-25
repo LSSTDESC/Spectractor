@@ -34,9 +34,9 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, m
     sources.sort('mag')
     if parameters.DEBUG:
         positions = np.array((sources['xcentroid'], sources['ycentroid']))
-        fig = plt.figure(figsize=(8, 8))
+        fig = plt.figure(figsize=(6, 6))
         plot_image_simple(plt.gca(), data_wo_bkg, scale="log10", target_pixcoords=positions)
-        fig.tight_layout()
+        # fig.tight_layout()
         plt.show()
     return sources
 
@@ -161,41 +161,50 @@ class Astrometry(Image):
         hdu.writeto(self.sources_file_name, overwrite=True)
         self.my_logger.info(f'\n\tSources positions saved in {self.sources_file_name}')
 
-    def plot_sources_and_gaia_catalog(self, wcs=None, sources=None, gaia_coord=None, quad=None,
-                                      vmax=None, margin=parameters.CCD_IMSIZE):
-        fig = plt.figure(figsize=(6, 6))
+    def plot_sources_and_gaia_catalog(self, ax=None, wcs=None, sources=None, gaia_coord=None, quad=None,
+                                      vmax=None, margin=parameters.CCD_IMSIZE, center=None, scale="log10"):
 
-        if wcs is None:
-            wcs = self.wcs
-            if wcs is not None:
-                fig.add_subplot(111, projection=wcs)
+        no_plot = False
+        if ax is None:
+            fig = plt.figure(figsize=(6, 6))
+            if wcs is None:
+                wcs = self.wcs
+                if wcs is not None:
+                    fig.add_subplot(111, projection=wcs)
+            ax = plt.gca()
+        else:
+            no_plot = True
 
-        plot_image_simple(plt.gca(), self.data, scale="log10", vmax=vmax)
-        if wcs is not None:
-            plt.xlabel('RA')
-            plt.ylabel('Dec')
+        plot_image_simple(ax, self.data, scale=scale, vmax=vmax)
+        if wcs is not None and not no_plot:
+            ax.set_xlabel('RA')
+            ax.set_ylabel('Dec')
         if sources is not None:
-            plt.scatter(sources['xcentroid'], sources['ycentroid'], s=300, lw=2,
+            ax.scatter(sources['xcentroid'], sources['ycentroid'], s=300, lw=2,
                         edgecolor='black', facecolor='none', label="all detected sources")
-        target_x, target_y = wcs.all_world2pix(self.target_coord_after_motion.ra, self.target_coord_after_motion.dec,
+        if center is None:
+            target_x, target_y = wcs.all_world2pix(self.target_coord_after_motion.ra, self.target_coord_after_motion.dec,
                                                0)
-        plt.scatter(target_x, target_y, s=300, marker="+",
+        else:
+            target_x, target_y = center
+        ax.scatter(target_x, target_y, s=300, marker="+",
                     edgecolor='cyan', facecolor='cyan', label=f"the target {self.target.label} after motion", lw=2)
         if gaia_coord is not None:
             gaia_x, gaia_y = wcs.all_world2pix(gaia_coord.ra, gaia_coord.dec, 0, quiet=True)
-            plt.scatter(gaia_x, gaia_y, s=300, marker="+",
+            ax.scatter(gaia_x, gaia_y, s=300, marker="+",
                         edgecolor='blue', facecolor='blue', label=f"gaia stars after motion", lw=2)
         if quad is not None:
             points = np.concatenate([quad, [quad[-1]]])
             hull = ConvexHull(points)
             for simplex in hull.simplices:
-                plt.plot(points[simplex, 0], points[simplex, 1], 'r-')
-            plt.plot(points.T[0], points.T[1], 'rx', lw=2)
-        plt.legend()
-        plt.xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
-        plt.ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
-        # fig.tight_layout()
-        plt.show()
+                ax.plot(points[simplex, 0], points[simplex, 1], 'r-')
+            ax.plot(points.T[0], points.T[1], 'rx', lw=2)
+        ax.legend()
+        ax.set_xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
+        ax.set_ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
+        if not no_plot:
+            fig.tight_layout()
+            plt.show()
 
     def set_sources_coord(self):
         sources_coord = self.wcs.all_pix2world(self.sources['xcentroid'], self.sources['ycentroid'],
@@ -305,7 +314,7 @@ class Astrometry(Image):
             log_file.write(command + "\n")
             log_file.write(log.decode("utf-8") + "\n")
 
-    def run_simple_astrometry(self, extent=None):
+    def run_simple_astrometry(self, extent=None, sources=None):
         """Build a World Coordinate System (WCS) using astrometry.net library given an exposure as a FITS file.
 
         The name of the target must be given to get its RA,DEC coordinates via a Simbad query.
@@ -363,18 +372,20 @@ class Astrometry(Image):
             data = np.copy(self.data)
         if parameters.DEBUG:
             self.plot_image(scale="log10")
-        # remove background
-        self.my_logger.info('\n\tRemove background using astropy SExtractorBackground()...')
-        data_wo_bkg = remove_image_background_sextractor(data, sigma=3.0, box_size=(50, 50),
-                                                         filter_size=(3, 3), positive=True)
-        # extract source positions and fluxes
-        self.my_logger.info('\n\tDetect sources using photutils source_detection()...')
-        self.sources = source_detection(data_wo_bkg)
-        if extent is not None:
-            self.sources['xcentroid'] += extent[0][0]
-            self.sources['ycentroid'] += extent[1][0]
-        self.my_logger.info(f'\n\t{self.sources}')
-
+        if sources is None:
+            # remove background
+            self.my_logger.info('\n\tRemove background using astropy SExtractorBackground()...')
+            data_wo_bkg = remove_image_background_sextractor(data, sigma=3.0, box_size=(50, 50),
+                                                             filter_size=(10, 10), positive=True)
+            # extract source positions and fluxes
+            self.my_logger.info('\n\tDetect sources using photutils source_detection()...')
+            self.sources = source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, mask=None)
+            if extent is not None:
+                self.sources['xcentroid'] += extent[0][0]
+                self.sources['ycentroid'] += extent[1][0]
+            self.my_logger.info(f'\n\t{self.sources}')
+        else:
+            self.sources = sources
         # write results in fits file
         self.write_sources()
         # run astrometry.net
