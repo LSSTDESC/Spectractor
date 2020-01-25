@@ -24,9 +24,9 @@ if __name__ == "__main__":
                         help="INI config file. (default: config.ctio.ini).")
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="",
                         help="Write results in given output directory (default: '' if same directory as input file).")
-    parser.add_argument("-r", "--radius", dest="radius", default=500,
+    parser.add_argument("-r", "--radius", dest="radius", default=parameters.CCD_IMSIZE,
                         help="Radius in pixel around the guessed target position to detect sources "
-                             "and set the new WCS solution.")
+                             "and set the new WCS solution (default: parameters.CCD_IMSIZE).")
     parser.add_argument("-m", "--maxiter", dest="maxiter", default=10,
                         help="Maximum iterations before WCS solution convergence below 1 mas.")
     args = parser.parse_args()
@@ -49,7 +49,9 @@ if __name__ == "__main__":
         if target is None or xpos is None or ypos is None:
             continue
         a = Astrometry(file_name, target, disperser_label, output_directory=args.output_directory)
-        a.run_simple_astrometry(extent=((xpos - radius, xpos + radius), (ypos - radius, ypos + radius)))
+        extent = ((max(0, xpos - radius), min(xpos + radius, parameters.CCD_IMSIZE)),
+                  (max(0, ypos - radius), min(ypos + radius, parameters.CCD_IMSIZE)))
+        a.run_simple_astrometry(extent=extent)
         # iterate process until shift is below 1 mas on RA and DEC directions
         # or maximum iterations is reached
         dra, ddec = 0, 0
