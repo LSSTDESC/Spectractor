@@ -280,7 +280,7 @@ class Astrometry(Image):
         sep *= np.log10(self.sources['flux']) > flux_log10_threshold
         if np.sum(sep) > min_stars:
             for r in np.arange(0, max_range.value, 0.1)[::-1]:
-                range_constraint = self.sources_radec_positions.separation(self.target.coord) < r * u.arcmin
+                range_constraint = self.sources_radec_positions.separation(self.target.radec_position_after_pm) < r * u.arcmin
                 if np.sum(sep * range_constraint) < min_stars:
                     break
                 else:
@@ -541,7 +541,9 @@ class Astrometry(Image):
                 self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
                 self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
             else:
-                radius = parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC * u.arcsec
+                radius = np.sqrt(2)*max(np.max(self.sources["xcentroid"])-np.min(self.sources["xcentroid"]),
+                                        np.max(self.sources["ycentroid"])-np.min(self.sources["ycentroid"]))
+                radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
                 self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
                                     f"arcsec from {self.target.label} {self.target.radec_position}...")
                 self.gaia_catalog = load_gaia_catalog(self.target.radec_position, radius=radius)
