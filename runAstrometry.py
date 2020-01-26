@@ -1,10 +1,8 @@
 from spectractor import parameters
-from spectractor.astrometry import Astrometry, plot_shifts_histograms
+from spectractor.astrometry import Astrometry
 from spectractor.logbook import LogBook
 from spectractor.config import load_config
 
-import numpy as np
-import astropy.units as u
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
