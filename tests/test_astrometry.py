@@ -39,7 +39,7 @@ def test_astrometry():
         assert os.path.isfile(set_wcs_file_name(file_name))
         assert a.data is not None
         assert np.sum(a.data) > 1e-10
-        print(gaia_min_residuals)
+        assert gaia_min_residuals < 0.8
         # assert np.all(np.abs([dra_median, ddec_median]) < 1e-3)
         if file_name == 'tests/data/reduc_20170605_028.fits':
             assert len(a.sources) > 200
