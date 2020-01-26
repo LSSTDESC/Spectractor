@@ -404,7 +404,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
                 theX, theY = target_pixcoords
             else:
                 wcs = load_wcs_from_file(wcs_file_name)
-                target_coord_after_motion = image.target.set_coord_after_proper_motion(image.date_obs)
+                target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
                 target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra,
                                                               target_coord_after_motion.dec, 0))
                 theX, theY = target_pixcoords
