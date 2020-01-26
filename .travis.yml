@@ -55,9 +55,9 @@ before_script:
   - "export PYSYN_CDBS=tests/data/"
   - "echo backend: agg > matplotlibrc"
   - "wget -L ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.7.3.tar.gz"
-  - "gzip -d netcdf-4.7.3.tar.gz"
-  - "tar -xf netcdf-4.7.3.tar"
-  - "cd netcdf-4.7.3"
+  - git clone https://github.com/Unidata/netcdf-c.git
+  - cd netcdf-c
+  - git checkout tags/v4.7.3
   - "./configure  --prefix=$TRAVIS_BUILD_DIR/NETCDF --disable-netcdf-4"
   - "make"
   - "make install"
