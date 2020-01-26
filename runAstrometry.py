@@ -50,21 +50,7 @@ if __name__ == "__main__":
         a = Astrometry(file_name, target, disperser_label, output_directory=args.output_directory)
         extent = ((max(0, xpos - radius), min(xpos + radius, parameters.CCD_IMSIZE)),
                   (max(0, ypos - radius), min(ypos + radius, parameters.CCD_IMSIZE)))
-        a.run_simple_astrometry(extent=extent)
-        # iterate process until shift is below 1 mas on RA and DEC directions
-        # or maximum iterations is reached
-        dra, ddec = 0, 0
-        for i in range(int(args.maxiter)):
-            dra, ddec = a.run_gaia_astrometry()
-            dra_median = np.median(dra.to(u.arcsec).value)
-            ddec_median = np.median(ddec.to(u.arcsec).value)
-            if np.abs(dra_median) < 1e-3 and np.abs(ddec_median) < 1e-3:
-                break
-        if parameters.DEBUG:
-            plot_shifts_histograms(dra, ddec)
-            a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches, label=target,
-                                            quad=a.quad_stars_pixel_positions, margin=200)
-            a.plot_astrometry_shifts(vmax=3)
+        gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=maxiter)
         # overwrite input file
         # if args.overwrite:
         #     a.my_logger.warning(f"Overwrite option is True: {a.file_name} replaced by {a.new_file_name}")
