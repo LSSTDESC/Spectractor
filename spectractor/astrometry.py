@@ -279,7 +279,7 @@ class Astrometry(Image):
         sep *= np.log10(self.sources['flux']) > flux_log10_threshold
         if np.sum(sep) > min_stars:
             for r in np.arange(0, max_range.value, 0.1)[::-1]:
-                range_constraint = self.sources_radec_positions.separation(self.target.radec_position_after_pm)\
+                range_constraint = self.sources_radec_positions.separation(self.target.radec_position_after_pm) \
                                    < r * u.arcmin
                 if np.sum(sep * range_constraint) < min_stars:
                     break
@@ -544,8 +544,8 @@ class Astrometry(Image):
                 self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
                 self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
             else:
-                radius = np.sqrt(2)*max(np.max(self.sources["xcentroid"])-np.min(self.sources["xcentroid"]),
-                                        np.max(self.sources["ycentroid"])-np.min(self.sources["ycentroid"]))
+                radius = 2 * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
+                                 np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
                 radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
                 self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
                                     f"arcsec from {self.target.label} {self.target.radec_position}...")
@@ -663,7 +663,7 @@ class Astrometry(Image):
                 # check the positions of quad stars with their WCS position from Gaia catalog
                 gaia_residuals = self.compute_gaia_pixel_residuals()
                 gaia_residuals_sum_x, gaia_residuals_sum_y = np.sum(np.abs(gaia_residuals), axis=0)
-                gaia_residuals_mean = np.sum(np.sqrt(np.sum(gaia_residuals**2, axis=1)))
+                gaia_residuals_mean = np.sum(np.sqrt(np.sum(gaia_residuals ** 2, axis=1)))
                 if parameters.DEBUG:
                     self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,
                                                        quad=self.quad_stars_pixel_positions, label=self.target.label)
