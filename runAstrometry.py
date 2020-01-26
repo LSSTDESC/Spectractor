@@ -63,8 +63,8 @@ if __name__ == "__main__":
                 break
         if parameters.DEBUG:
             plot_shifts_histograms(dra, ddec)
-            a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches,
-                                            quad=a.quad_stars_coords, margin=200)
+            a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches,label=target,
+                                            quad=a.quad_stars_pixel_positions, margin=200)
             a.plot_astrometry_shifts(vmax=3)
         # overwrite input file
         # if args.overwrite:
