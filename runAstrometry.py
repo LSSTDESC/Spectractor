@@ -50,7 +50,7 @@ if __name__ == "__main__":
         a = Astrometry(file_name, target, disperser_label, output_directory=args.output_directory)
         extent = ((max(0, xpos - radius), min(xpos + radius, parameters.CCD_IMSIZE)),
                   (max(0, ypos - radius), min(ypos + radius, parameters.CCD_IMSIZE)))
-        gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=maxiter)
+        gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=int(args.maxiter))
         # overwrite input file
         # if args.overwrite:
         #     a.my_logger.warning(f"Overwrite option is True: {a.file_name} replaced by {a.new_file_name}")
