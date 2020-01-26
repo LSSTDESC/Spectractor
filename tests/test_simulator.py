@@ -2,7 +2,7 @@ from numpy.testing import run_module_suite
 import numpy as np
 
 from spectractor import parameters
-from spectractor.simulation.simulator import (SpectrumSimulator, SpectrumSimulatorSimGrid,
+from spectractor.simulation.simulator import (SpectrumSimulatorSimGrid,
                                               Atmosphere, AtmosphereGrid, SpectrogramSimulator)
 from spectractor.simulation.image_simulation import ImageSim
 from spectractor.config import load_config
@@ -19,7 +19,8 @@ def test_atmosphere():
     assert a.aerosols == 0.05
     a.plot_transmission()
 
-    a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits', pwv_grid = [5, 5, 1], ozone_grid = [400, 400, 1], aerosol_grid = [0.0, 0.1, 2])
+    a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits', pwv_grid=[5, 5, 1],
+                       ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
     atmospheric_grid = a.compute()
     assert np.sum(atmospheric_grid) > 0
     assert np.all(np.isclose(a.atmgrid[0, a.index_atm_data:], parameters.LAMBDAS))
