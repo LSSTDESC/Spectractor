@@ -387,7 +387,7 @@ class Astrometry(Image):
             ((xmin,xmax),(ymin,ymax)) 2 dimensional typle to crop the exposure before any operation (default: None).
         sources: Table
             List of sources. If None, then source detection is run on the image (default: None).
-            
+
         Notes
         -----
         The source file given to solve-field is understood as a FITS file with pixel origin value at 1,
