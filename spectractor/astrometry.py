@@ -10,7 +10,7 @@ from astropy.table import Table
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, Distance
 
-from photutils import DAOStarFinder, IRAFStarFinder
+from photutils import IRAFStarFinder
 
 from scipy.spatial import ConvexHull
 
@@ -35,7 +35,6 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, m
     sources.sort('mag')
     if parameters.DEBUG:
         positions = np.array((sources['xcentroid'], sources['ycentroid']))
-        fig = plt.figure(figsize=(6, 6))
         plot_image_simple(plt.gca(), data_wo_bkg, scale="log10", target_pixcoords=positions)
         if parameters.DISPLAY:
             # fig.tight_layout()
@@ -280,7 +279,8 @@ class Astrometry(Image):
         sep *= np.log10(self.sources['flux']) > flux_log10_threshold
         if np.sum(sep) > min_stars:
             for r in np.arange(0, max_range.value, 0.1)[::-1]:
-                range_constraint = self.sources_radec_positions.separation(self.target.radec_position_after_pm) < r * u.arcmin
+                range_constraint = self.sources_radec_positions.separation(self.target.radec_position_after_pm)\
+                                   < r * u.arcmin
                 if np.sum(sep * range_constraint) < min_stars:
                     break
                 else:
@@ -337,6 +337,7 @@ class Astrometry(Image):
 
     def find_quad_star_index_in_sources(self, quad_star):
         eps = 1e-1
+        k = -1
         for k in range(len(self.sources)):
             if abs(self.sources['xcentroid'][k] - quad_star[0]) < eps \
                     and abs(self.sources['ycentroid'][k] - quad_star[1]):
@@ -384,7 +385,9 @@ class Astrometry(Image):
         ----------
         extent: 2-tuple
             ((xmin,xmax),(ymin,ymax)) 2 dimensional typle to crop the exposure before any operation (default: None).
-
+        sources: Table
+            List of sources. If None, then source detection is run on the image (default: None).
+            
         Notes
         -----
         The source file given to solve-field is understood as a FITS file with pixel origin value at 1,
@@ -644,8 +647,8 @@ class Astrometry(Image):
         for c in t.columns:
             t[c].format = "%.2f"
         sources_list = []
-        for iter in range(maxiter):
-            self.my_logger.info(f'\n\tIteration #{iter}')
+        for k in range(maxiter):
+            self.my_logger.info(f'\n\tIteration #{k}')
             try:
                 # find a simple astrometric solution using astrometry.net
                 self.run_simple_astrometry(extent=extent, sources=self.sources)
@@ -670,8 +673,8 @@ class Astrometry(Image):
                 t.add_row([target_x, target_y, gaia_residuals_sum_x, gaia_residuals_sum_y, gaia_residuals_mean])
                 self.remove_worst_quad_star_from_sources()
             except FileNotFoundError:
-                iter -= 1
-                self.my_logger.warning(f"\n\tAstrometry.net failed at iteration {iter}. "
+                k -= 1
+                self.my_logger.warning(f"\n\tAstrometry.net failed at iteration {k}. "
                                        f"Stop the loop here and look for best solution.")
                 break
         t.pprint_all()
