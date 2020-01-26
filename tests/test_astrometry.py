@@ -9,7 +9,6 @@ from spectractor.extractor.images import Image, find_target
 import os
 import subprocess
 import numpy as np
-import astropy.units as u
 
 
 def test_astrometry():
