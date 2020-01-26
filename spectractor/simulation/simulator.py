@@ -65,6 +65,7 @@ class SpectrumSimulation(Spectrum):
         self.data = None
         self.err = None
         self.model = lambda x: np.zeros_like(x)
+        self.model_err = lambda x: np.zeros_like(x)
 
     def simulate_without_atmosphere(self, lambdas):
         """Compute the spectrum of an object and its uncertainties
@@ -91,8 +92,8 @@ class SpectrumSimulation(Spectrum):
         self.data *= self.target.sed(lambdas)
         self.err = np.zeros_like(self.data)
         idx = np.where(self.telescope.transmission(lambdas) > 0)[0]
-        self.err[idx] = self.telescope.transmission_err(lambdas)[idx] / self.telescope.transmission(lambdas)[idx] * \
-                        self.data[idx]
+        self.err[idx] = self.telescope.transmission_err(lambdas)[idx] / self.telescope.transmission(lambdas)[idx]
+        self.err[idx] *= self.data[idx]
         # self.data *= self.lambdas*self.lambdas_binwidths
         return self.data, self.err
 
@@ -135,7 +136,7 @@ class SpectrumSimulation(Spectrum):
         lambdas = self.disperser.grating_pixel_to_lambda(pixels, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
-        # np.savetxt('atmospheric_transmission_20170530_130.txt', np.array([lambdas, atmospheric_transmission(lambdas)]).T)
+        # np.savetxt('atmospheric_trans_20170530_130.txt',np.array([lambdas,atmospheric_transmission(lambdas)]).T)
         self.data *= A1 * atmospheric_transmission
         self.err *= A1 * atmospheric_transmission
         # Now add the systematics
@@ -262,12 +263,12 @@ class SpectrogramModel(Spectrum):
         self.chromatic_psf.table['Dy_mean'] = 0
         self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['x_mean'])
         # derotate
-        # self.my_logger.warning(f"\n\tbefore\n {self.chromatic_psf.table[['Dx_rot', 'Dx', 'Dy', 'Dy_mean']][:5]} {angle}")
+        # self.my_logger.warning(f"\n\tbefore\n {self.chromatic_psf.table[['Dx_rot','Dx','Dy','Dy_mean']][:5]} {angle}")
         self.chromatic_psf.rotate_table(-self.rotation_angle)
         self.chromatic_psf.profile_params = self.chromatic_psf.from_table_to_profile_params()
         if parameters.DEBUG:
             self.chromatic_psf.plot_summary()
-        # self.my_logger.warning(f"\n\tafter\n {self.chromatic_psf.table[['Dx_rot', 'Dx', 'Dy', 'Dy_mean']][:5]}  {angle}")
+        # self.my_logger.warning(f"\n\tafter\n {self.chromatic_psf.table[['Dx_rot','Dx','Dy','Dy_mean']][:5]} {angle}")
         return self.chromatic_psf.profile_params
 
     def simulate_dispersion(self, D, shift_x, shift_y, r0):
@@ -282,7 +283,7 @@ class SpectrogramModel(Spectrum):
         lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
         distances_order2 = self.disperser.grating_lambda_to_pixel(lambdas_order2, x0=new_x0, order=2)
         # Dx_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
-        # Dy_mean_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
+        # Dy_mean_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy_mean'],bounds_error=False, fill_value=(0,0))
         # dy_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_mean'],
         #                    bounds_error=False, fill_value=(0, 0))
         # dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) + 1j * (
@@ -349,6 +350,7 @@ class SpectrogramModel(Spectrum):
         D
         shift_x
         shift_y
+        angle
 
         Returns
         -------
@@ -630,8 +632,8 @@ class SpectrumSimGrid():
         self.spectragrid[:, self.atmgrid.index_atm_count:self.atmgrid.index_atm_data] = \
             self.atmgrid.atmgrid[:, self.atmgrid.index_atm_count:self.atmgrid.index_atm_data]
         # Is broadcasting working OK ?
-        self.spectragrid[1:, self.atmgrid.index_atm_data:] = self.atmgrid.atmgrid[1:,
-                                                             self.atmgrid.index_atm_data:] * all_transm
+        self.spectragrid[1:, self.atmgrid.index_atm_data:] = self.atmgrid.atmgrid[1:, self.atmgrid.index_atm_data:]
+        self.spectragrid[1:, self.atmgrid.index_atm_data:] *= all_transm
         return self.spectragrid
 
     def plot_spectra(self):
@@ -640,7 +642,7 @@ class SpectrumSimGrid():
         for count in counts:
             plt.plot(self.lambdas, self.spectragrid[int(count), self.atmgrid.index_atm_data:])
         plt.grid()
-        plt.xlabel("$\lambda$ [nm]")
+        plt.xlabel(r"$\lambda$ [nm]")
         plt.ylabel("Flux [ADU/s]")
         plt.title("Spectra for Atmospheric variations")
         if parameters.DISPLAY:
@@ -649,7 +651,7 @@ class SpectrumSimGrid():
     def plot_spectra_img(self):
         plt.figure()
         img = plt.imshow(self.spectragrid[1:, self.atmgrid.index_atm_data:], origin='lower', cmap='jet')
-        plt.xlabel("$\lambda$ [nm]")
+        plt.xlabel(r"$\lambda$ [nm]")
         plt.ylabel("Simulation number")
         plt.title("Spectra for atmospheric variations")
         cbar = plt.colorbar(img)
@@ -669,7 +671,7 @@ class SpectrumSimGrid():
             hdu = fits.PrimaryHDU(self.spectragrid, header=self.header)
             hdu.writeto(self.filename, overwrite=True)
             if parameters.VERBOSE or parameters.DEBUG:
-                self.my_logger.info('\n\tSPECTRA.save atm-file=%s' % (self.filename))
+                self.my_logger.info(f'\n\tSPECTRA.save atm-file={self.filename}')
 
 
 def SimulatorInit(filename):
@@ -816,7 +818,6 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
     spectragrid = spectra.compute()
     spectra.save_spectra(output_filename)
     if parameters.DEBUG:
-        infostring = '\n\t ========= Spectra simulation :  ==============='
         spectra.plot_spectra()
         spectra.plot_spectra_img()
     # ---------------------------------------------------------------------------
