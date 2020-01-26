@@ -3,7 +3,6 @@ from spectractor.astrometry import Astrometry, plot_shifts_histograms
 from spectractor.logbook import LogBook
 from spectractor.config import load_config
 
-import subprocess
 import numpy as np
 import astropy.units as u
 
@@ -63,7 +62,7 @@ if __name__ == "__main__":
                 break
         if parameters.DEBUG:
             plot_shifts_histograms(dra, ddec)
-            a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches,label=target,
+            a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches, label=target,
                                             quad=a.quad_stars_pixel_positions, margin=200)
             a.plot_astrometry_shifts(vmax=3)
         # overwrite input file

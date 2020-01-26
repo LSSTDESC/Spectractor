@@ -384,7 +384,7 @@ class Astrometry(Image):
         Parameters
         ----------
         extent: 2-tuple
-            ((xmin,xmax),(ymin,ymax)) 2 dimensional typle to crop the exposure before any operation (default: None).
+            ((xmin,xmax),(ymin,ymax)) 2 dimensional tuple to crop the exposure before any operation (default: None).
         sources: Table
             List of sources. If None, then source detection is run on the image (default: None).
 
