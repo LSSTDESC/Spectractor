@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
@@ -36,8 +37,9 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, m
         positions = np.array((sources['xcentroid'], sources['ycentroid']))
         fig = plt.figure(figsize=(6, 6))
         plot_image_simple(plt.gca(), data_wo_bkg, scale="log10", target_pixcoords=positions)
-        # fig.tight_layout()
-        plt.show()
+        if parameters.DISPLAY:
+            # fig.tight_layout()
+            plt.show()
     return sources
 
 
@@ -86,7 +88,8 @@ def plot_shifts_histograms(dra, ddec):
     ax[1].grid()
     # ax[0].legend()
     # ax[1].legend()
-    plt.show()
+    if parameters.DISPLAY:
+        plt.show()
 
 
 class Astrometry(Image):
@@ -110,7 +113,7 @@ class Astrometry(Image):
         self.new_file_name = self.file_name.replace('.fits', '_new.fits')
         self.sources_file_name = set_sources_file_name(file_name, output_directory=output_directory)
         self.wcs_file_name = wcs_file_name
-        self.log_file_name = os.path.join(self.output_directory, self.tag)+".log"
+        self.log_file_name = os.path.join(self.output_directory, self.tag) + ".log"
         if self.wcs_file_name != "":
             self.wcs = load_wcs_from_file(self.wcs_file_name)
         else:
@@ -121,20 +124,35 @@ class Astrometry(Image):
         self.my_logger.info(f"\n\tIntermediate outputs will be stored in {self.output_directory}")
         self.wcs = None
         self.sources = None
-        self.sources_coord = None
+        self.sources_radec_positions = None
         self.gaia_catalog = None
         self.gaia_index = None
         self.gaia_matches = None
-        self.gaia_coord_after_motion = None
+        self.gaia_residuals = None
+        self.gaia_radec_positions_after_pm = None
         self.dist_2d = None
-        self.quad_stars_coords = None
+        self.quad_stars_pixel_positions = None
         self.dist_ra = 0 * u.arcsec
         self.dist_dec = 0 * u.arcsec
-        self.target_coord_after_motion = self.target.set_coord_after_proper_motion(date_obs=self.date_obs)
+        self.target_radec_position_after_pm = self.target.get_radec_position_after_pm(date_obs=self.date_obs)
         if os.path.isfile(self.log_file_name):
-            self.quad_stars_coords = self.get_quad_stars()
+            self.quad_stars_pixel_positions = self.get_quad_stars_pixel_positions()
 
-    def get_quad_stars(self):
+    def get_target_pixel_position(self):
+        target_x, target_y = self.wcs.all_world2pix(self.target_radec_position_after_pm.ra,
+                                                    self.target_radec_position_after_pm.dec, 0)
+        return target_x, target_y
+
+    def get_gaia_pixel_positions(self, gaia_index=None):
+        if gaia_index is None:
+            gaia_x, gaia_y = self.wcs.all_world2pix(self.gaia_radec_positions_after_pm.ra,
+                                                    self.gaia_radec_positions_after_pm.dec, 0, quiet=True)
+        else:
+            gaia_x, gaia_y = self.wcs.all_world2pix(self.gaia_radec_positions_after_pm[gaia_index].ra,
+                                                    self.gaia_radec_positions_after_pm[gaia_index].dec, 0, quiet=True)
+        return gaia_x, gaia_y
+
+    def get_quad_stars_pixel_positions(self):
         coords = []
         f = open(self.log_file_name, 'r')
         for line in f:
@@ -142,12 +160,13 @@ class Astrometry(Image):
                 coord = line.split(' ')[5].split(',')
                 coords.append([float(coord[0]), float(coord[1])])
         f.close()
+        coords = np.array(coords)
         if len(coords) < 4:
             self.my_logger.warning(f"\n\tOnly {len(coords)} calibration stars has been extracted from "
                                    f"{self.log_file_name}, with positions {coords}. "
                                    f"A quad of at least 4 stars is expected. "
                                    f"Please check {self.log_file_name}.")
-        self.quad_stars_coords = coords
+        self.quad_stars_pixel_positions = coords
         return coords
 
     def write_sources(self):
@@ -161,38 +180,32 @@ class Astrometry(Image):
         hdu.writeto(self.sources_file_name, overwrite=True)
         self.my_logger.info(f'\n\tSources positions saved in {self.sources_file_name}')
 
-    def plot_sources_and_gaia_catalog(self, ax=None, wcs=None, sources=None, gaia_coord=None, quad=None,
+    def plot_sources_and_gaia_catalog(self, ax=None, sources=None, gaia_coord=None, quad=None, label="",
                                       vmax=None, margin=parameters.CCD_IMSIZE, center=None, scale="log10"):
-
         no_plot = False
         if ax is None:
-            fig = plt.figure(figsize=(6, 6))
-            if wcs is None:
-                wcs = self.wcs
-                if wcs is not None:
-                    fig.add_subplot(111, projection=wcs)
+            fig = plt.figure(figsize=(8, 6))
+            if self.wcs is not None:
+                fig.add_subplot(111, projection=self.wcs)
             ax = plt.gca()
         else:
             no_plot = True
 
         plot_image_simple(ax, self.data, scale=scale, vmax=vmax)
-        if wcs is not None and not no_plot:
+        if self.wcs is not None and not no_plot:
             ax.set_xlabel('RA')
             ax.set_ylabel('Dec')
         if sources is not None:
             ax.scatter(sources['xcentroid'], sources['ycentroid'], s=300, lw=2,
-                        edgecolor='black', facecolor='none', label="all detected sources")
+                       edgecolor='black', facecolor='none', label="Detected sources")
         if center is None:
-            target_x, target_y = wcs.all_world2pix(self.target_coord_after_motion.ra, self.target_coord_after_motion.dec,
-                                               0)
+            target_x, target_y = self.get_target_pixel_position()
         else:
             target_x, target_y = center
-        ax.scatter(target_x, target_y, s=300, marker="+",
-                    edgecolor='cyan', facecolor='cyan', label=f"the target {self.target.label} after motion", lw=2)
+        ax.scatter(target_x, target_y, s=300, marker="+", edgecolor='cyan', facecolor='cyan', label=f"{label}", lw=2)
         if gaia_coord is not None:
-            gaia_x, gaia_y = wcs.all_world2pix(gaia_coord.ra, gaia_coord.dec, 0, quiet=True)
-            ax.scatter(gaia_x, gaia_y, s=300, marker="+",
-                        edgecolor='blue', facecolor='blue', label=f"gaia stars after motion", lw=2)
+            gaia_x, gaia_y = self.get_gaia_pixel_positions()
+            ax.scatter(gaia_x, gaia_y, s=300, marker="+", edgecolor='blue', facecolor='blue', label=f"Gaia stars", lw=2)
         if quad is not None:
             points = np.concatenate([quad, [quad[-1]]])
             hull = ConvexHull(points)
@@ -202,29 +215,25 @@ class Astrometry(Image):
         ax.legend()
         ax.set_xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
         ax.set_ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
-        if not no_plot:
-            fig.tight_layout()
+        if not no_plot and parameters.DISPLAY:
+            # fig.tight_layout()
             plt.show()
 
-    def set_sources_coord(self):
-        sources_coord = self.wcs.all_pix2world(self.sources['xcentroid'], self.sources['ycentroid'],
-                                               0)
-        self.sources_coord = SkyCoord(ra=sources_coord[0] * u.deg, dec=sources_coord[1] * u.deg,
-                                      frame="icrs", obstime=self.date_obs, equinox="J2000")
-        return self.sources_coord
+    def get_sources_radec_positions(self):
+        sources_coord = self.wcs.all_pix2world(self.sources['xcentroid'], self.sources['ycentroid'], 0)
+        self.sources_radec_positions = SkyCoord(ra=sources_coord[0] * u.deg, dec=sources_coord[1] * u.deg,
+                                                frame="icrs", obstime=self.date_obs, equinox="J2000")
+        return self.sources_radec_positions
 
     def shift_wcs_center_fit_gaia_catalog(self, gaia_coord):
-        gaia_index, dist_2d, dist_3d = self.sources_coord.match_to_catalog_sky(gaia_coord)
+        gaia_index, dist_2d, dist_3d = self.sources_radec_positions.match_to_catalog_sky(gaia_coord)
         matches = gaia_coord[gaia_index]
-        dist_ra, dist_dec = self.sources_coord.spherical_offsets_to(matches)
+        dist_ra, dist_dec = self.sources_radec_positions.spherical_offsets_to(matches)
         return gaia_index, dist_2d, dist_ra, dist_dec
 
-    def plot_astrometry_shifts(self, vmax=3, margin=parameters.CCD_IMSIZE):
-        target_x, target_y = self.wcs.all_world2pix(self.target_coord_after_motion.ra,
-                                                    self.target_coord_after_motion.dec, 0)
-        gaia_x, gaia_y = self.wcs.all_world2pix(self.gaia_coord_after_motion[self.gaia_index].ra,
-                                                self.gaia_coord_after_motion[self.gaia_index].dec,
-                                                0, maxiter=50, quiet=True)
+    def plot_astrometry_shifts(self, vmax=3, margin=parameters.CCD_IMSIZE, gaia_index=None):
+        target_x, target_y = self.get_target_pixel_position()
+        gaia_x, gaia_y = self.get_gaia_pixel_positions(gaia_index=gaia_index)
 
         fig = plt.figure(figsize=(6, 8))
 
@@ -259,18 +268,19 @@ class Astrometry(Image):
         plt.ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
         plt.colorbar(sc, label="Shift in DEC [arcsec]")
         plt.legend()
-        # fig.tight_layout()
-        plt.show()
+        if parameters.DISPLAY:
+            # fig.tight_layout()
+            plt.show()
 
     def set_constraints(self, min_stars=100, flux_log10_threshold=0.1, min_range=3 * u.arcsec, max_range=5 * u.arcmin,
                         max_sep=1 * u.arcsec):
         sep = self.dist_2d < max_sep
-        sep *= self.sources_coord.separation(self.target_coord_after_motion) < max_range
-        sep *= self.sources_coord.separation(self.target_coord_after_motion) > min_range
+        sep *= self.sources_radec_positions.separation(self.target_radec_position_after_pm) < max_range
+        sep *= self.sources_radec_positions.separation(self.target_radec_position_after_pm) > min_range
         sep *= np.log10(self.sources['flux']) > flux_log10_threshold
         if np.sum(sep) > min_stars:
             for r in np.arange(0, max_range.value, 0.1)[::-1]:
-                range_constraint = self.sources_coord.separation(self.target.coord) < r * u.arcmin
+                range_constraint = self.sources_radec_positions.separation(self.target.coord) < r * u.arcmin
                 if np.sum(sep * range_constraint) < min_stars:
                     break
                 else:
@@ -289,9 +299,9 @@ class Astrometry(Image):
         ax[0].axhline(ddec_median, color=c_dec.get_facecolor()[0], label="median", lw=2)
         ax[1].axhline(dra_median, color=c_ra.get_facecolor()[0], label="median", lw=2)
         ax[1].axhline(ddec_median, color=c_dec.get_facecolor()[0], label="median", lw=2)
-        ax[0].axvline(self.target_coord_after_motion.ra.value, color='k', linestyle="--",
+        ax[0].axvline(self.target_radec_position_after_pm.ra.value, color='k', linestyle="--",
                       label=f"{self.target.label} RA")
-        ax[1].axvline(self.target_coord_after_motion.dec.value, color='k', linestyle="--",
+        ax[1].axvline(self.target_radec_position_after_pm.dec.value, color='k', linestyle="--",
                       label=f"{self.target.label} DEC")
         ax[0].set_xlabel('Gaia RA [deg]')
         ax[1].set_xlabel('Gaia DEC [deg]')
@@ -303,7 +313,8 @@ class Astrometry(Image):
         ax[1].set_ylim(-2, 2)
         ax[0].legend()
         ax[1].legend()
-        plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
     def merge_wcs_with_new_exposure(self, log_file=None):
         command = f"{os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/new-wcs')} -v -d -i {self.file_name} " \
@@ -313,6 +324,50 @@ class Astrometry(Image):
         if log_file is not None:
             log_file.write(command + "\n")
             log_file.write(log.decode("utf-8") + "\n")
+
+    def compute_gaia_pixel_residuals(self):
+        coords = self.get_quad_stars_pixel_positions().T
+        ra, dec = self.wcs.all_pix2world(coords[0], coords[1], 0)
+        coords_radec = SkyCoord(ra * u.deg, dec * u.deg, frame='icrs', equinox="J2000")
+        gaia_index, dist_2d, dist_3d = coords_radec.match_to_catalog_sky(self.gaia_radec_positions_after_pm)
+        matches = self.gaia_radec_positions_after_pm[gaia_index]
+        gaia_coords = np.array(self.wcs.all_world2pix(matches.ra, matches.dec, 0))
+        self.gaia_residuals = (gaia_coords - coords).T
+        return self.gaia_residuals
+
+    def find_quad_star_index_in_sources(self, quad_star):
+        eps = 1e-1
+        for k in range(len(self.sources)):
+            if abs(self.sources['xcentroid'][k] - quad_star[0]) < eps \
+                    and abs(self.sources['ycentroid'][k] - quad_star[1]):
+                break
+        return k
+
+    def remove_worst_quad_star_from_sources(self):
+        gaia_pixel_residuals = self.compute_gaia_pixel_residuals()
+        distances = np.sqrt(np.sum(gaia_pixel_residuals ** 2, axis=1))
+        max_residual_index = np.argmax(distances)
+        worst_source_index = self.find_quad_star_index_in_sources(self.quad_stars_pixel_positions[max_residual_index])
+        self.my_logger.debug(f"\n\tRemove source #{worst_source_index}\n{self.sources[max_residual_index]}")
+        self.sources.remove_row(worst_source_index)
+
+    def plot_quad_stars(self, margin=10, scale="log10"):
+        nquads = len(self.quad_stars_pixel_positions)
+        fig, ax = plt.subplots(1, nquads, figsize=(4 * nquads, 3))
+        for k in range(nquads):
+            row = self.sources[self.find_quad_star_index_in_sources((self.quad_stars_pixel_positions[k][0],
+                                                                     self.quad_stars_pixel_positions[k][1]))]
+            self.plot_sources_and_gaia_catalog(ax=ax[k], center=(self.quad_stars_pixel_positions[k][0],
+                                                                 self.quad_stars_pixel_positions[k][1]),
+                                               margin=margin, scale=scale, sources=self.sources,
+                                               gaia_coord=self.gaia_matches, label=f"Quad star #{k}",
+                                               quad=self.quad_stars_pixel_positions)
+            ax[k].set_title(
+                f"x={self.quad_stars_pixel_positions[k][0]:.2f}, y={self.quad_stars_pixel_positions[k][1]:.2f}, "
+                f"flux={row['flux']:.2f}")
+        if parameters.DISPLAY:
+            fig.tight_layout()
+            plt.show()
 
     def run_simple_astrometry(self, extent=None, sources=None):
         """Build a World Coordinate System (WCS) using astrometry.net library given an exposure as a FITS file.
@@ -392,7 +447,7 @@ class Astrometry(Image):
         command = f"{os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')} --scale-unit arcsecperpix " \
                   f"--scale-low {0.999 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--scale-high {1.001 * parameters.CCD_PIXEL2ARCSEC} " \
-                  f"--ra {self.target.coord.ra.value} --dec {self.target.coord.dec.value} " \
+                  f"--ra {self.target.radec_position.ra.value} --dec {self.target.radec_position.dec.value} " \
                   f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
                   f"--dir {self.output_directory} --out {self.tag} " \
                   f"--overwrite --x-column X --y-column Y {self.sources_file_name}"
@@ -415,7 +470,7 @@ class Astrometry(Image):
         hdu.writeto(self.wcs_file_name, overwrite=True)
 
         # load quad stars
-        self.quad_stars_coords = self.get_quad_stars()
+        self.quad_stars_pixel_positions = self.get_quad_stars_pixel_positions()
 
         # load WCS
         self.wcs = load_wcs_from_file(self.wcs_file_name)
@@ -478,7 +533,7 @@ class Astrometry(Image):
         # load WCS if absent
         if self.wcs is None:
             self.wcs = load_wcs_from_file(self.wcs_file_name)
-        self.sources_coord = self.set_sources_coord()
+        self.sources_radec_positions = self.get_sources_radec_positions()
 
         # load the Gaia catalog
         if self.gaia_catalog is None:
@@ -486,27 +541,28 @@ class Astrometry(Image):
                 self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
                 self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
             else:
-                radius = 0.5 * parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC * u.arcsec
+                radius = parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC * u.arcsec
                 self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
-                                    f"arcsec from {self.target.label} {self.target.coord}...")
-                self.gaia_catalog = load_gaia_catalog(self.target.coord, radius=radius)
+                                    f"arcsec from {self.target.label} {self.target.radec_position}...")
+                self.gaia_catalog = load_gaia_catalog(self.target.radec_position, radius=radius)
                 ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
             self.my_logger.info(f"\n\tGaia catalog loaded.")
 
         # update coordinates with proper motion data
         self.my_logger.info(f"\n\tUpdate object coordinates with proper motion at time={self.date_obs}.")
-        self.target_coord_after_motion = self.target.set_coord_after_proper_motion(self.date_obs)
-        self.gaia_coord_after_motion = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.date_obs)
-        if parameters.DEBUG or True:
-            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion,
-                                               quad=self.quad_stars_coords, margin=1000)
+        self.target_radec_position_after_pm = self.target.get_radec_position_after_pm(self.date_obs)
+        self.gaia_radec_positions_after_pm = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.date_obs)
+        if parameters.DEBUG:
+            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,
+                                               quad=self.quad_stars_pixel_positions, margin=1000,
+                                               label=self.target.label)
 
         # compute shifts
         self.my_logger.info(f"\n\tCompute distances between Gaia catalog and detected sources.")
         self.gaia_index, self.dist_2d, self.dist_ra, self.dist_dec = \
-            self.shift_wcs_center_fit_gaia_catalog(self.gaia_coord_after_motion)
+            self.shift_wcs_center_fit_gaia_catalog(self.gaia_radec_positions_after_pm)
         if parameters.DEBUG:
-            self.plot_astrometry_shifts(vmax=3)
+            self.plot_astrometry_shifts(vmax=3, gaia_index=self.gaia_index)
 
         # select the brightest and closest stars with minimal shift
         if len(self.sources) > 50:
@@ -514,8 +570,8 @@ class Astrometry(Image):
         else:
             flux_log10_threshold = np.log10(self.sources['flux'][int(0.8 * len(self.sources))])
         sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold)
-        sources_selection = self.sources_coord[sep_constraints]
-        gaia_matches = self.gaia_coord_after_motion[self.gaia_index[sep_constraints]]
+        sources_selection = self.sources_radec_positions[sep_constraints]
+        gaia_matches = self.gaia_radec_positions_after_pm[self.gaia_index[sep_constraints]]
         dra, ddec = sources_selection.spherical_offsets_to(gaia_matches)
 
         # compute statistics
@@ -532,12 +588,13 @@ class Astrometry(Image):
         # (see https://docs.astropy.org/en/stable/api/astropy.coordinates.SkyCoord.html
         # #astropy.coordinates.SkyCoord.spherical_offsets_to)
         # after the shift the histograms must be centered on zero
-        total_shift = np.array([dra_median / np.cos(self.target_coord_after_motion.dec.radian), ddec_median]) * u.arcsec
+        total_shift = np.array(
+            [dra_median / np.cos(self.target_radec_position_after_pm.dec.radian), ddec_median]) * u.arcsec
         self.my_logger.info(f"\n\tShift original CRVAL value {self.wcs.wcs.crval} of {total_shift}.")
         self.wcs.wcs.crval = self.wcs.wcs.crval * u.deg + total_shift
         if parameters.DEBUG:
-            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_coord_after_motion,
-                                               quad=self.quad_stars_coords, margin=30)
+            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,
+                                               quad=self.quad_stars_pixel_positions, margin=30, label=self.target.label)
 
         # Now, write out the WCS object as a FITS header
         dra_median = np.median(dra.to(u.arcsec).value)
@@ -555,12 +612,12 @@ class Astrometry(Image):
 
         # check histogram medians
         self.wcs = load_wcs_from_file(self.wcs_file_name)
-        self.set_sources_coord()
+        self.get_sources_radec_positions()
         self.gaia_index, self.dist_2d, self.dist_ra, self.dist_dec = \
-            self.shift_wcs_center_fit_gaia_catalog(self.gaia_coord_after_motion)
+            self.shift_wcs_center_fit_gaia_catalog(self.gaia_radec_positions_after_pm)
         sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold)
-        sources_selection = self.sources_coord[sep_constraints]
-        self.gaia_matches = self.gaia_coord_after_motion[self.gaia_index[sep_constraints]]
+        sources_selection = self.sources_radec_positions[sep_constraints]
+        self.gaia_matches = self.gaia_radec_positions_after_pm[self.gaia_index[sep_constraints]]
         dra, ddec = sources_selection.spherical_offsets_to(self.gaia_matches)
 
         # update values
@@ -579,3 +636,48 @@ class Astrometry(Image):
         if parameters.DEBUG:
             plot_shifts_histograms(dra, ddec)
         return dra, ddec
+
+    def run_full_astrometry(self, extent=None, maxiter=20):
+        t = Table(names=["target_x", "target_y", "gaia_residuals_sum_x", "gaia_residuals_sum_y", "gaia_residuals_mean"])
+        for c in t.columns:
+            t[c].format = "%.2f"
+        sources_list = []
+        for iter in range(maxiter):
+            self.my_logger.info(f'\n\tIteration #{iter}')
+            try:
+                # find a simple astrometric solution using astrometry.net
+                self.run_simple_astrometry(extent=extent, sources=self.sources)
+                # refine with Gaia catalog
+                for i in range(maxiter):
+                    dra, ddec = self.run_gaia_astrometry()
+                    dra_median = np.median(dra.to(u.mas).value)
+                    ddec_median = np.median(ddec.to(u.mas).value)
+                    if np.abs(dra_median) < 1 and np.abs(ddec_median) < 1:
+                        break
+                sources_list.append(deepcopy(self.sources))
+                # check the positions of quad stars with their WCS position from Gaia catalog
+                gaia_residuals = self.compute_gaia_pixel_residuals()
+                gaia_residuals_sum_x, gaia_residuals_sum_y = np.sum(np.abs(gaia_residuals), axis=0)
+                gaia_residuals_mean = np.sum(np.sqrt(np.sum(gaia_residuals**2, axis=1)))
+                if parameters.DEBUG:
+                    self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,
+                                                       quad=self.quad_stars_pixel_positions, label=self.target.label)
+                    self.plot_astrometry_shifts(vmax=3, gaia_index=self.gaia_index)
+                    self.plot_quad_stars()
+                target_x, target_y = self.get_target_pixel_position()
+                t.add_row([target_x, target_y, gaia_residuals_sum_x, gaia_residuals_sum_y, gaia_residuals_mean])
+                self.remove_worst_quad_star_from_sources()
+            except FileNotFoundError:
+                iter -= 1
+                self.my_logger.warning(f"\n\tAstrometry.net failed at iteration {iter}. "
+                                       f"Stop the loop here and look for best solution.")
+                break
+        t.pprint_all()
+        best_iter = int(np.argmin(t["gaia_residuals_mean"]))
+        self.my_logger.info(f'\n\tBest run: iteration #{best_iter}')
+        self.run_simple_astrometry(extent=extent, sources=sources_list[best_iter])
+        self.run_gaia_astrometry()
+        self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,
+                                           quad=self.quad_stars_pixel_positions, label=self.target.label)
+        self.plot_quad_stars()
+        return np.min(t["gaia_residuals_mean"])

@@ -17,9 +17,10 @@ def test_astrometry():
 
     load_config('./config/ctio.ini')
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+    parameters.VERBOSE = True
     parameters.DEBUG = True
 
-    radius = 600
+    radius = parameters.CCD_IMSIZE
     maxiter = 10
 
     for file_name in file_names:
@@ -31,30 +32,20 @@ def test_astrometry():
         if target is None or xpos is None or ypos is None:
             continue
         a = Astrometry(file_name, target, disperser_label)
-        a.run_simple_astrometry(extent=((xpos - radius, xpos + radius), (ypos - radius, ypos + radius)))
-        # iterate process until shift is below 1 mas on RA and DEC directions
-        # or maximum iterations is reached
-        dra_median, ddec_median = 0, 0
-        for i in range(maxiter):
-            dra, ddec = a.run_gaia_astrometry()
-            dra_median = np.median(dra.to(u.arcsec).value)
-            ddec_median = np.median(ddec.to(u.arcsec).value)
-            if np.abs(dra_median) < 1e-3 and np.abs(ddec_median) < 1e-3:
-                break
-        if parameters.DEBUG:
-            a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_matches,
-                                            quad=a.quad_stars_coords, margin=200)
-            a.plot_astrometry_shifts(vmax=3)
+        extent = ((max(0, xpos - radius), min(xpos + radius, parameters.CCD_IMSIZE)),
+                  (max(0, ypos - radius), min(ypos + radius, parameters.CCD_IMSIZE)))
+        gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=maxiter)
         # checks
         assert os.path.isdir(wcs_output_directory)
         assert os.path.isfile(set_wcs_file_name(file_name))
         assert a.data is not None
         assert np.sum(a.data) > 1e-10
-        assert np.all(np.abs([dra_median, ddec_median]) < 1e-3)
+        print(gaia_min_residuals)
+        # assert np.all(np.abs([dra_median, ddec_median]) < 1e-3)
         if file_name == 'tests/data/reduc_20170605_028.fits':
             assert len(a.sources) > 200
-            assert np.isclose(a.target_coord_after_motion.ra.value, 224.97283917)
-            assert np.isclose(a.target_coord_after_motion.dec.value, -54.30209)
+            assert np.isclose(a.target_radec_position_after_pm.ra.value, 224.97283917)
+            assert np.isclose(a.target_radec_position_after_pm.dec.value, -54.30209)
             assert np.isclose(a.wcs.wcs.crval[0], 224.9718998)
             assert np.isclose(a.wcs.wcs.crval[1], -54.28912925)
         if file_name == 'tests/data/sim_20170530_134.fits':
