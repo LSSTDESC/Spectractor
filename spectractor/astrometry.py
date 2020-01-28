@@ -319,11 +319,16 @@ class Astrometry(Image):
         >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> gaia_x, gaia_y = a.get_gaia_pixel_positions()
-        >>> print(gaia_x, gaia_y) # doctest: +ELLIPSIS
-        [  745... ] [ 679...]
+
+        or with selected Gaia index:
+
         >>> gaia_x, gaia_y = a.get_gaia_pixel_positions(gaia_index=[1, 2])
-        >>> print(gaia_x, gaia_y) # doctest: +ELLIPSIS
-        [743... 628...] [683... 612...]
+
+        .. doctest:
+            :hide:
+
+            >>> assert np.isclose(gaia_x[0], 744, atol=0.5)
+            >>> assert np.isclose(gaia_y[0], 683, atol=0.5)
 
         """
         if gaia_index is None:
@@ -352,8 +357,12 @@ class Astrometry(Image):
         >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> quad_star_x, quad_star_y = a.get_quad_stars_pixel_positions()
-        >>> print(quad_star_x, quad_star_y)
-        [1279.3  465.9 1104.9  781.2] [410.6 423.1 487.2 414.2]
+
+        .. doctest:
+            :hide:
+
+            >>> assert len(quad_star_x) == len(quad_star_y)
+            >>> assert len(quad_star_x) == 4
 
         """
         coords = []
@@ -417,8 +426,8 @@ class Astrometry(Image):
         <Table length=...
 
         """
-        radius = 2 * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
-                         np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
+        radius = 0.5*np.sqrt(2) * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
+                                      np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
         radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
         self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
                             f"arcsec from {self.target.label} {self.target.radec_position}...")
@@ -473,7 +482,7 @@ class Astrometry(Image):
         >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_gaia_catalog_around_target() # doctest: +ELLIPSIS
-        Created TAP+ (v1.2.1)...
+        INFO: Query finished...
         >>> a.load_sources_from_file() # doctest: +ELLIPSIS
         <Table length=...
         >>> a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_radec_positions_after_pm,
@@ -584,10 +593,8 @@ class Astrometry(Image):
         <SkyCoord (ICRS): (ra, dec) in deg...
         >>> gaia_index, dist_2d, dist_ra, dist_dec = a.match_sources_to_gaia_catalog(
         ...                                                         gaia_coord=a.gaia_radec_positions_after_pm)
-        >>> print(gaia_index[0: 3])
-        [134 114  17]
-        >>> print(dist_2d[0: 3])
-        [0d00m00.166s 0d00m00.0454s 0d00m00.1614s]
+        >>> print(dist_2d[0: 3])  # doctest: +ELLIPSIS
+        [0d00... 0d00m00... 0d00m00...]
 
         """
         if gaia_coord is None:
@@ -612,7 +619,7 @@ class Astrometry(Image):
         >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_gaia_catalog_around_target() # doctest: +ELLIPSIS
-        Created TAP+ (v1.2.1)...
+        INFO: Query finished...
         >>> a.load_sources_from_file() # doctest: +ELLIPSIS
         <Table length=...
         >>> a.get_sources_radec_positions()  # doctest: +ELLIPSIS
@@ -737,9 +744,9 @@ class Astrometry(Image):
     def remove_worst_quad_star_from_sources(self):
         gaia_pixel_residuals = self.compute_gaia_pixel_residuals()
         distances = np.sqrt(np.sum(gaia_pixel_residuals ** 2, axis=1))
-        max_residual_index = np.argmax(distances)
+        max_residual_index = int(np.argmax(distances))
         worst_source_index = \
-            self.find_quad_star_index_in_sources(np.array(self.quad_stars_pixel_positions).T[max_residual_index])
+            self.find_quad_star_index_in_sources(self.quad_stars_pixel_positions[max_residual_index])
         self.my_logger.debug(f"\n\tRemove source #{worst_source_index}\n{self.sources[max_residual_index]}")
         self.sources.remove_row(worst_source_index)
 
@@ -891,6 +898,7 @@ class Astrometry(Image):
         >>> from spectractor.logbook import LogBook
         >>> from spectractor import parameters
         >>> parameters.VERBOSE = True
+        >>> parameters.DEBUG = True
         >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> if os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs'):
