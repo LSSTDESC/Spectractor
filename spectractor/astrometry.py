@@ -1238,6 +1238,8 @@ class Astrometry(Image):
         >>> from spectractor import parameters
         >>> parameters.VERBOSE = True
         >>> parameters.DEBUG = True
+        >>> radius = 100
+        >>> maxiter = 10
         >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> if os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs'):
@@ -1255,7 +1257,7 @@ class Astrometry(Image):
         .. doctest:
             :hide:
 
-            >>> assert os.path.isdir(a.wcs_output_directory)
+            >>> assert os.path.isdir(a.output_directory)
             >>> assert os.path.isfile(set_wcs_file_name(file_name))
             >>> assert a.data is not None
             >>> assert np.sum(a.data) > 1e-10
@@ -1292,7 +1294,7 @@ class Astrometry(Image):
                     self.plot_astrometry_shifts(vmax=3)
                     self.plot_quad_stars()
                 target_x, target_y = self.get_target_pixel_position()
-                t.add_row([k, target_x, target_y, gaia_residuals_sum_x, gaia_residuals_sum_y, gaia_residuals_mean])
+                t.add_row([k, target_x, target_y, gaia_residuals_sum_x, gaia_residuals_sum_y, gaia_residuals_quad_sum])
                 self.remove_worst_quad_star_from_sources()
             except FileNotFoundError or TimeoutError:
                 k -= 1
