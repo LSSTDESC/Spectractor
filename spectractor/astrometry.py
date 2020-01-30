@@ -124,7 +124,7 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin):
     >>> from astropy.coordinates import SkyCoord
     >>> c = SkyCoord(ra=0*u.deg, dec=0*u.deg)
     >>> gaia_catalog = load_gaia_catalog(c, radius=1*u.arcmin)  # doctest: +ELLIPSIS
-    Created TAP+ (v1.2.1)...
+    INFO: Query finished...
     >>> print(gaia_catalog)  # doctest: +SKIP
             dist        ...
 
@@ -350,23 +350,20 @@ class Astrometry(Image):
 
         Returns
         -------
-        quad_star_x: array_like
-            The quad star positions along the x axis.
-        quad_star_y: array_like
-            The quad star positions along the y axis.
+        quad_star_positions: array_like
+            The array of quad star (x, y) positions.
 
         Examples
         --------
 
         >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
-        >>> quad_star_x, quad_star_y = a.get_quad_stars_pixel_positions()
+        >>> quad_stars = a.get_quad_stars_pixel_positions()
 
         .. doctest:
             :hide:
 
-            >>> assert len(quad_star_x) == len(quad_star_y)
-            >>> assert len(quad_star_x) == 4
+            >>> assert quad_stars.shape == (4, 2)
 
         """
         coords = []
@@ -376,14 +373,13 @@ class Astrometry(Image):
                 coord = line.split(' ')[5].split(',')
                 coords.append([float(coord[0]), float(coord[1])])
         f.close()
-        coords = np.array(coords)
         if len(coords) < 4:
             self.my_logger.warning(f"\n\tOnly {len(coords)} calibration stars has been extracted from "
                                    f"{self.log_file_name}, with positions {coords}. "
                                    f"A quad of at least 4 stars is expected. "
                                    f"Please check {self.log_file_name}.")
         self.quad_stars_pixel_positions = np.array(coords)
-        return coords.T
+        return self.quad_stars_pixel_positions
 
     def load_sources_from_file(self):
         """Load the sources from the class associated self.sources_file_name file.
@@ -487,7 +483,7 @@ class Astrometry(Image):
         >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_radec_positions_after_pm,
-        ...                                 quad=np.array(a.quad_stars_pixel_positions).T,
+        ...                                 quad=a.quad_stars_pixel_positions,
         ...                                 label=a.target.label)
 
         .. plot:
@@ -829,7 +825,7 @@ class Astrometry(Image):
             >>> assert np.all(np.abs(residuals) < 0.2)
 
         """
-        coords = self.get_quad_stars_pixel_positions()
+        coords = self.quad_stars_pixel_positions.T
         ra, dec = self.wcs.all_pix2world(coords[0], coords[1], 0)
         coords_radec = SkyCoord(ra * u.deg, dec * u.deg, frame='icrs', equinox="J2000")
         gaia_index, dist_2d, dist_3d = coords_radec.match_to_catalog_sky(self.gaia_radec_positions_after_pm)
@@ -915,18 +911,18 @@ class Astrometry(Image):
         >>> a.plot_quad_stars()
 
         """
-        nquads = len(self.quad_stars_pixel_positions[0])
+        nquads = self.quad_stars_pixel_positions.shape[0]
         fig, ax = plt.subplots(1, nquads, figsize=(4 * nquads, 3))
         for k in range(nquads):
-            row = self.sources[self.find_quad_star_index_in_sources((self.quad_stars_pixel_positions[0][k],
-                                                                     self.quad_stars_pixel_positions[1][k]))]
-            self.plot_sources_and_gaia_catalog(ax=ax[k], center=(self.quad_stars_pixel_positions[0][k],
-                                                                 self.quad_stars_pixel_positions[1][k]),
+            row = self.sources[self.find_quad_star_index_in_sources((self.quad_stars_pixel_positions[k][0],
+                                                                     self.quad_stars_pixel_positions[k][1]))]
+            self.plot_sources_and_gaia_catalog(ax=ax[k], center=(self.quad_stars_pixel_positions[k][0],
+                                                                 self.quad_stars_pixel_positions[k][1]),
                                                margin=margin, scale=scale, sources=self.sources,
                                                gaia_coord=self.gaia_matches, label=f"Quad star #{k}",
-                                               quad=np.array(self.quad_stars_pixel_positions).T)
+                                               quad=self.quad_stars_pixel_positions)
             ax[k].set_title(
-                f"x={self.quad_stars_pixel_positions[0][k]:.2f}, y={self.quad_stars_pixel_positions[1][k]:.2f}, "
+                f"x={self.quad_stars_pixel_positions[k][0]:.2f}, y={self.quad_stars_pixel_positions[k][1]:.2f}, "
                 f"flux={row['flux']:.2f}")
         if parameters.DISPLAY:
             fig.tight_layout()
@@ -995,8 +991,6 @@ class Astrometry(Image):
             data = self.data[extent[1][0]:extent[1][1], extent[0][0]:extent[0][1]]
         else:
             data = np.copy(self.data)
-        if parameters.DEBUG:
-            self.plot_image(scale="log10")
         if sources is None:
             # remove background
             self.my_logger.info('\n\tRemove background using astropy SExtractorBackground()...')
@@ -1118,7 +1112,7 @@ class Astrometry(Image):
         self.gaia_radec_positions_after_pm = get_gaia_coords_after_proper_motion(self.gaia_catalog, self.date_obs)
         if parameters.DEBUG:
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,
-                                               quad=np.array(self.quad_stars_pixel_positions).T, margin=1000,
+                                               quad=self.quad_stars_pixel_positions, margin=1000,
                                                label=self.target.label)
 
         # compute shifts
@@ -1156,10 +1150,10 @@ class Astrometry(Image):
             [dra_median / np.cos(self.target_radec_position_after_pm.dec.radian), ddec_median]) * u.arcsec
         self.my_logger.info(f"\n\tShift original CRVAL value {self.wcs.wcs.crval} of {total_shift}.")
         self.wcs.wcs.crval = self.wcs.wcs.crval * u.deg + total_shift
-        if parameters.DEBUG:
-            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,
-                                               quad=np.array(self.quad_stars_pixel_positions).T,
-                                               margin=30, label=self.target.label)
+        # if parameters.DEBUG:
+        #     self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,
+        #                                        quad=np.array(self.quad_stars_pixel_positions).T,
+        #                                        margin=10, label=self.target.label)
 
         # Now, write out the WCS object as a FITS header
         dra_median = np.median(dra.to(u.arcsec).value)
@@ -1198,8 +1192,11 @@ class Astrometry(Image):
         hdu[0].header['CRV2_RMS'] = ddec_rms
         hdu.writeto(self.wcs_file_name, overwrite=True)
 
-        if parameters.DEBUG:
-            plot_shifts_histograms(dra, ddec)
+        # if parameters.DEBUG:
+        #     plot_shifts_histograms(dra, ddec)
+        #     self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,
+        #                                        quad=np.array(self.quad_stars_pixel_positions).T,
+        #                                        margin=10, label=self.target.label)
         return dra, ddec
 
     def run_full_astrometry(self, extent=None, maxiter=20):
@@ -1267,7 +1264,8 @@ class Astrometry(Image):
 
         t = Table(names=["iter", "target_x", "target_y", "gaia_residuals_abs_sum_x",
                          "gaia_residuals_abs_sum_y", "gaia_residuals_quad_sum"])
-        for c in t.columns:
+        t["iter"].format = "%d"
+        for c in t.columns[1:]:
             t[c].format = "%.2f"
         sources_list = []
         for k in range(maxiter):
@@ -1289,7 +1287,7 @@ class Astrometry(Image):
                 gaia_residuals_quad_sum = np.sum(np.sqrt(np.sum(gaia_residuals ** 2, axis=1)))
                 if parameters.DEBUG:
                     self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,
-                                                       quad=np.array(self.quad_stars_pixel_positions).T,
+                                                       quad=self.quad_stars_pixel_positions,
                                                        label=self.target.label)
                     self.plot_astrometry_shifts(vmax=3)
                     self.plot_quad_stars()
@@ -1297,9 +1295,9 @@ class Astrometry(Image):
                 t.add_row([k, target_x, target_y, gaia_residuals_sum_x, gaia_residuals_sum_y, gaia_residuals_quad_sum])
                 self.remove_worst_quad_star_from_sources()
             except FileNotFoundError or TimeoutError:
-                k -= 1
                 self.my_logger.warning(f"\n\tAstrometry.net failed at iteration {k}. "
                                        f"Stop the loop here and look for best solution.")
+                k -= 1
                 break
         t.pprint_all()
         best_iter = int(np.argmin(t["gaia_residuals_quad_sum"]))
@@ -1307,9 +1305,10 @@ class Astrometry(Image):
         self.run_simple_astrometry(extent=extent, sources=sources_list[best_iter])
         self.run_gaia_astrometry()
         self.my_logger.info(f'\n\tFinal target position: {self.get_target_pixel_position()}')
-        self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,
-                                           quad=np.array(self.quad_stars_pixel_positions).T, label=self.target.label)
-        self.plot_quad_stars()
+        if parameters.DEBUG:
+            self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,
+                                               quad=self.quad_stars_pixel_positions, label="FINALLLL")
+            self.plot_quad_stars()
         return np.min(t["gaia_residuals_quad_sum"])
 
 
