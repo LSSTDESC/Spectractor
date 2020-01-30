@@ -1,7 +1,6 @@
 import os
 from copy import deepcopy
 import subprocess
-import scipy
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clipped_stats
@@ -125,7 +124,7 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin):
     >>> from astropy.coordinates import SkyCoord
     >>> c = SkyCoord(ra=0*u.deg, dec=0*u.deg)
     >>> gaia_catalog = load_gaia_catalog(c, radius=1*u.arcmin)  # doctest: +ELLIPSIS
-    INFO: Query finished...
+    Created TAP+ (v1.2.1)...
     >>> print(gaia_catalog)  # doctest: +SKIP
             dist        ...
 
@@ -529,11 +528,14 @@ class Astrometry(Image):
             target_x, target_y = center
         ax.scatter(target_x, target_y, s=300, marker="x", edgecolor='cyan', facecolor='cyan', label=f"{label}", lw=2)
         if quad is not None:
-            points = np.concatenate([quad, [quad[-1]]])
-            hull = ConvexHull(points)
-            for simplex in hull.simplices:
-                ax.plot(points[simplex, 0], points[simplex, 1], 'r-')
-            ax.plot(points.T[0], points.T[1], 'rx', lw=2, label="Quad stars")
+            if len(quad) > 3:
+                points = np.concatenate([quad, [quad[-1]]])
+                hull = ConvexHull(points)
+                for simplex in hull.simplices:
+                    ax.plot(points[simplex, 0], points[simplex, 1], 'r-')
+                ax.plot(points.T[0], points.T[1], 'rx', lw=2, label="Quad stars")
+            else:
+                self.my_logger.warning(f"\n\tNumber of quad stars is {len(quad)}: the quad can't be plotted. Skip it.")
         ax.legend()
         ax.set_xlim(max(0, target_x - margin), min(target_x + margin, self.data.shape[1]))
         ax.set_ylim(max(0, target_y - margin), min(target_y + margin, self.data.shape[0]))
@@ -1225,7 +1227,7 @@ class Astrometry(Image):
 
         Returns
         -------
-        min_gaia_residuals_mean: float
+        min_gaia_residuals_quad_sum: float
             The minimum total quadratic distance between Gaia stars and the quad stars (in pixels).
 
         Examples
@@ -1261,7 +1263,8 @@ class Astrometry(Image):
 
         """
 
-        t = Table(names=["target_x", "target_y", "gaia_residuals_sum_x", "gaia_residuals_sum_y", "gaia_residuals_mean"])
+        t = Table(names=["iter", "target_x", "target_y", "gaia_residuals_abs_sum_x",
+                         "gaia_residuals_abs_sum_y", "gaia_residuals_quad_sum"])
         for c in t.columns:
             t[c].format = "%.2f"
         sources_list = []
@@ -1281,7 +1284,7 @@ class Astrometry(Image):
                 # check the positions of quad stars with their WCS position from Gaia catalog
                 gaia_residuals = self.compute_gaia_pixel_residuals()
                 gaia_residuals_sum_x, gaia_residuals_sum_y = np.sum(np.abs(gaia_residuals), axis=0)
-                gaia_residuals_mean = np.sum(np.sqrt(np.sum(gaia_residuals ** 2, axis=1)))
+                gaia_residuals_quad_sum = np.sum(np.sqrt(np.sum(gaia_residuals ** 2, axis=1)))
                 if parameters.DEBUG:
                     self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,
                                                        quad=np.array(self.quad_stars_pixel_positions).T,
@@ -1289,7 +1292,7 @@ class Astrometry(Image):
                     self.plot_astrometry_shifts(vmax=3)
                     self.plot_quad_stars()
                 target_x, target_y = self.get_target_pixel_position()
-                t.add_row([target_x, target_y, gaia_residuals_sum_x, gaia_residuals_sum_y, gaia_residuals_mean])
+                t.add_row([k, target_x, target_y, gaia_residuals_sum_x, gaia_residuals_sum_y, gaia_residuals_mean])
                 self.remove_worst_quad_star_from_sources()
             except FileNotFoundError or TimeoutError:
                 k -= 1
@@ -1297,7 +1300,7 @@ class Astrometry(Image):
                                        f"Stop the loop here and look for best solution.")
                 break
         t.pprint_all()
-        best_iter = int(np.argmin(t["gaia_residuals_mean"]))
+        best_iter = int(np.argmin(t["gaia_residuals_quad_sum"]))
         self.my_logger.info(f'\n\tBest run: iteration #{best_iter}')
         self.run_simple_astrometry(extent=extent, sources=sources_list[best_iter])
         self.run_gaia_astrometry()
@@ -1305,7 +1308,7 @@ class Astrometry(Image):
         self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,
                                            quad=np.array(self.quad_stars_pixel_positions).T, label=self.target.label)
         self.plot_quad_stars()
-        return np.min(t["gaia_residuals_mean"])
+        return np.min(t["gaia_residuals_quad_sum"])
 
 
 if __name__ == "__main__":
