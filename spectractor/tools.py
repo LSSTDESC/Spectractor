@@ -1,4 +1,8 @@
-import os, sys
+from functools import wraps
+import errno
+import os
+import signal
+
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting
