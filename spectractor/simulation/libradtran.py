@@ -42,7 +42,7 @@ class Libradtran:
         # LibRadTran installation directory
         self.simulation_directory = 'simulations'
         ensure_dir(self.simulation_directory)
-        self.libradtran_path = os.getenv('LIBRADTRANDIR') + '/'
+        self.libradtran_path = parameters.LIBRADTRAN_DIR
 
         # Filename : RT_LS_pp_us_sa_rt_z15_wv030_oz30.txt
         #          : Prog_Obs_Rte_Atm_proc_Mod_zXX_wv_XX_oz_XX

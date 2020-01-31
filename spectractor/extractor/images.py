@@ -14,8 +14,9 @@ from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.psf import fit_PSF2D_minuit
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_info_from_CTIO_header,
-                               fit_poly1d, fit_poly1d_outlier_removal, weighted_avg_and_std,
-                               fit_poly2d_outlier_removal, hessian_and_theta)
+                               fit_poly1d_outlier_removal, weighted_avg_and_std,
+                               fit_poly2d_outlier_removal, hessian_and_theta,
+                               set_wcs_file_name, load_wcs_from_file)
 
 
 class Image(object):
@@ -181,27 +182,27 @@ class Image(object):
         self.stat_errors = np.sqrt(err2)
         # convert in ADU
         self.stat_errors /= self.gain
-        if parameters.DEBUG:
-            fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-            y = self.stat_errors.flatten() ** 2
-            x = data.flatten()
-            fit, cov, model = fit_poly1d(x, y, order=1)
-            gain = 1 / fit[0]
-            ax[0].text(0.05, 0.95, f"fitted gain={gain:.3g} [e-/ADU]\nintercept={fit[1]:.3g} [ADU$^2$]"
-                                   f"\nfitted read-out={np.sqrt(fit[1]) * gain:.3g} [ADU]",
-                       horizontalalignment='left', verticalalignment='top', transform=ax[0].transAxes)
-            ax[0].scatter(x, y)
-            ax[0].plot(x, model, "k-")
-            ax[0].grid()
-            ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
-            ax[0].set_xlabel(r"Data pixel values [ADU]")
-            plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Uncertainty map", units=self.units,
-                              target_pixcoords=None, aspect="auto", cmap=None)
-            fig.tight_layout()
-            if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-                fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.png'))
-            if parameters.DISPLAY:  # pragma: no cover
-                plt.show()
+        # if parameters.DEBUG:
+        #     fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+        #     y = self.stat_errors.flatten() ** 2
+        #     x = data.flatten()
+        #     fit, cov, model = fit_poly1d(x, y, order=1)
+        #     gain = 1 / fit[0]
+        #     ax[0].text(0.05, 0.95, f"fitted gain={gain:.3g} [e-/ADU]\nintercept={fit[1]:.3g} [ADU$^2$]"
+        #                            f"\nfitted read-out={np.sqrt(fit[1]) * gain:.3g} [ADU]",
+        #                horizontalalignment='left', verticalalignment='top', transform=ax[0].transAxes)
+        #     ax[0].scatter(x, y)
+        #     ax[0].plot(x, model, "k-")
+        #     ax[0].grid()
+        #     ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
+        #     ax[0].set_xlabel(r"Data pixel values [ADU]")
+        #     plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Uncertainty map", units=self.units,
+        #                       target_pixcoords=None, aspect="auto", cmap=None)
+        #     fig.tight_layout()
+        #     if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+        #         fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.png'))
+        #     if parameters.DISPLAY:  # pragma: no cover
+        #         plt.show()
 
     def compute_parallactic_angle(self):
         """Compute the parallactic angle.
@@ -220,7 +221,7 @@ class Image(object):
         return self.parallactic_angle
 
     def plot_image(self, ax=None, scale="lin", title="", units="Image units", plot_stats=False,
-                   target_pixcoords=None, figsize=[9.3, 8], aspect=None, vmin=None, vmax=None,
+                   target_pixcoords=None, figsize=[7.3, 6], aspect=None, vmin=None, vmax=None,
                    cmap=None, cax=None):
         """Plot image.
 
@@ -266,7 +267,7 @@ class Image(object):
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         plt.legend()
-        if parameters.DISPLAY:   # pragma: no cover
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
 
@@ -366,7 +367,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     parameters.CCD_IMSIZE = image.data.shape[1]
 
 
-def find_target(image, guess, rotated=False):
+def find_target(image, guess=None, rotated=False, use_wcs=True):
     """Find the target in the Image instance.
 
     The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
@@ -378,9 +379,12 @@ def find_target(image, guess, rotated=False):
     image: Image
         The Image instance.
     guess: array_like
-        Two parameter array giving the estimated position of the target in the image.
+        Two parameter array giving the estimated position of the target in the image, optional if WCS is used.
     rotated: bool
         If True, the target is searched in the rotated image.
+    use_wcs: bool
+        If True, the WCS file (if found) is used to set the target position in pixels,
+        guess parameter is then unnecessary.
 
     Returns
     -------
@@ -389,31 +393,55 @@ def find_target(image, guess, rotated=False):
     y0: float
         The y position of the target.
     """
-    Dx = parameters.XWINDOW
-    Dy = parameters.YWINDOW
-    theX, theY = guess
-    if rotated:
-        angle = image.rotation_angle * np.pi / 180.
-        rotmat = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
-        vec = np.array(image.target_pixcoords) - 0.5 * np.array(image.data.shape[::-1])
-        guess2 = rotmat @ vec + 0.5 * np.array(image.data_rotated.shape[::-1])
-        x0 = int(guess2[0])
-        y0 = int(guess2[1])
-        guess = [x0, y0]
-        Dx = parameters.XWINDOW_ROT
-        Dy = parameters.YWINDOW_ROT
-    niter = 2
-    for i in range(niter):
-        sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
-                                                                 widths=[Dx, Dy])
-        # find the target
-        avX, avY = find_target_2Dprofile(image, sub_image, guess, sub_errors=sub_errors)
-        # compute target position
-        theX = x0 - Dx + avX
-        theY = y0 - Dy + avY
-        guess = [int(theX), int(theY)]
-        Dx = Dx // (i + 2)
-        Dy = Dy // (i + 2)
+    my_logger = set_logger(__name__)
+    target_pixcoords = [-1, -1]
+    if use_wcs:
+        wcs_file_name = set_wcs_file_name(image.file_name)
+        if os.path.isfile(wcs_file_name):
+            my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
+            if rotated:
+                target_pixcoords = find_target_after_rotation(image)
+                theX, theY = target_pixcoords
+            else:
+                wcs = load_wcs_from_file(wcs_file_name)
+                target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
+                target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra,
+                                                              target_coord_after_motion.dec, 0))
+                theX, theY = target_pixcoords
+            if parameters.DEBUG:
+                fig = plt.figure(figsize=(5, 5))
+                sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
+                                                                         rotated=rotated, widths=(20, 20))
+                plot_image_simple(plt.gca(), data=sub_image, scale="lin", title="", units=image.units,
+                                  target_pixcoords=[theX-x0+Dx, theY-y0+Dy])
+                plt.show()
+        else:
+            my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
+    if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
+        if guess is None:
+            my_logger.error(f"\n\tguess parameter must be set if WCS solution is not found.")
+        Dx = parameters.XWINDOW
+        Dy = parameters.YWINDOW
+        theX, theY = guess
+        if rotated:
+            guess2 = find_target_after_rotation(image)
+            x0 = int(guess2[0])
+            y0 = int(guess2[1])
+            guess = [x0, y0]
+            Dx = parameters.XWINDOW_ROT
+            Dy = parameters.YWINDOW_ROT
+        niter = 2
+        for i in range(niter):
+            sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
+                                                                     widths=[Dx, Dy])
+            # find the target
+            avX, avY = find_target_2Dprofile(image, sub_image, guess, sub_errors=sub_errors)
+            # compute target position
+            theX = x0 - Dx + avX
+            theY = y0 - Dy + avY
+            guess = [int(theX), int(theY)]
+            Dx = Dx // (i + 2)
+            Dy = Dy // (i + 2)
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
@@ -424,6 +452,14 @@ def find_target(image, guess, rotated=False):
         image.header['TARGETY'] = theY
         image.header.comments['TARGETY'] = 'target position on Y axis'
     return [theX, theY]
+
+
+def find_target_after_rotation(image):
+    angle = image.rotation_angle * np.pi / 180.
+    rotmat = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
+    vec = np.array(image.target_pixcoords) - 0.5 * np.array(image.data.shape[::-1])
+    target_pixcoords_after_rotation = rotmat @ vec + 0.5 * np.array(image.data_rotated.shape[::-1])
+    return target_pixcoords_after_rotation
 
 
 def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
@@ -753,7 +789,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         n, bins, patches = ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
         ax2.plot([theta_median, theta_median], [0, np.max(n)])
         ax2.set_xlabel("Rotation angles [degrees]")
-        if parameters.DISPLAY:   # pragma: no cover
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotation_hessian.pdf'))
@@ -825,7 +861,7 @@ def turn_image(image):
         f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-        if parameters.LSST_SAVEFIGPATH:   # pragma: no cover
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotated_image.pdf'))
 
 

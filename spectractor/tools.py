@@ -1,9 +1,14 @@
-import os, sys
+from functools import wraps
+import errno
+import os
+import signal
+
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting
 from astropy.stats import sigma_clip
 from astropy.io import fits
+from astropy import wcs as WCS
 
 import matplotlib.pyplot as plt
 import matplotlib.colors
@@ -48,7 +53,7 @@ def gauss(x, A, x0, sigma):
     >>> y[25]
     10.0
     """
-    return A * np.exp(-(x - x0)*(x - x0) / (2 * sigma * sigma))
+    return A * np.exp(-(x - x0) * (x - x0) / (2 * sigma * sigma))
 
 
 def gauss_jacobian(x, A, x0, sigma):
@@ -79,7 +84,7 @@ def gauss_jacobian(x, A, x0, sigma):
     """
     dA = gauss(x, A, x0, sigma) / A
     dx0 = A * (x - x0) / (sigma * sigma) * dA
-    dsigma = A * (x-x0)*(x-x0) / (sigma ** 3) * dA
+    dsigma = A * (x - x0) * (x - x0) / (sigma ** 3) * dA
     return np.array([dA, dx0, dsigma]).T
 
 
@@ -126,7 +131,7 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
     >>> popt, pcov = fit_gauss(x, y, guess=guess, bounds=((1,600,1),(100,700,100)), sigma=y_err)
     >>> assert np.all(np.isclose(p,popt))
     """
-    popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds,  tr_solver='exact', jac=gauss_jacobian,
+    popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds, tr_solver='exact', jac=gauss_jacobian,
                            sigma=sigma, method='dogbox', verbose=0, xtol=1e-20, ftol=1e-20)
     return popt, pcov
 
@@ -204,7 +209,7 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
 
 
 def rescale_x_for_legendre(x):
-    middle = 0.5*(np.max(x) + np.min(x))
+    middle = 0.5 * (np.max(x) + np.min(x))
     x_norm = x - middle
     if np.max(x_norm) != 0:
         return x_norm / np.max(x_norm)
@@ -304,7 +309,8 @@ def multigauss_and_bgd_jacobian(x, *params):
 
 
 # noinspection PyTypeChecker
-def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None, fix_centroids=False):
+def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None,
+                           fix_centroids=False):
     """Fit a multiple Gaussian profile plus a polynomial background to data, using iminuit.
     The mean guess value of the Gaussian must not be far from the truth values.
     Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
@@ -599,7 +605,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y)
-        outliers = [] # not working
+        outliers = []  # not working
         '''
         import matplotlib.pyplot as plt
         plt.figure(figsize=(8,5))
@@ -923,7 +929,7 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
     >>> Y = PSF.evaluate(X, *p)
 
     ..plot:
-        plt.imshow(Z, origin='loxer')
+        plt.imshow(Z, origin='lower')
         plt.show()
     >>> guess = (45, 48, 4, 2)
     >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
@@ -932,7 +938,7 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
     >>> assert(np.all(np.isclose(p, res, 1e-6)))
 
     ..plot:
-        plt.imshow(Z-fit(X, Y), origin='loxer')
+        plt.imshow(Z-fit(X, Y), origin='lower')
         plt.show()
     """
     my_logger = set_logger(__name__)
@@ -1031,7 +1037,7 @@ def ensure_dir(directory_name):
     if not os.path.exists(directory_name):
         os.makedirs(directory_name)
 
-        
+
 def weighted_avg_and_std(values, weights):
     """
     Return the weighted average and standard deviation.
@@ -1191,7 +1197,7 @@ def formatting_numbers(value, error_high, error_low, std=None, label=None):
             if std is not None:
                 str_std = f"{std:.2g}"
     out += [str_value, str_error_high]
-    #if not np.isclose(error_high, error_low):
+    # if not np.isclose(error_high, error_low):
     out += [str_error_low]
     if std is not None:
         out += [str_std]
@@ -1335,7 +1341,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     cmap: colormap
         Color map label (default: None)
     target_pixcoords: array_like, optional
-        2D array  giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
+        2D array giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
     vmin: float
         Minimum value of the image (default: None)
     vmax: float
@@ -1417,7 +1423,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
     ax.set_xlim(xlim)
     ax.set_ylim(0., np.nanmax(data) * 1.2)
     if lambdas is not None:
-        ax.set_xlabel('$\lambda$ [nm]')
+        ax.set_xlabel(r'$\lambda$ [nm]')
     else:
         ax.set_xlabel('X [pixels]')
     if units != '':
@@ -1499,7 +1505,7 @@ def dichotomie(f, a, b, epsilon):
 
 
 def wavelength_to_rgb(wavelength, gamma=0.8):
-    ''' taken from http://www.noah.org/wiki/Wavelength_to_RGB_in_Python
+    """ taken from http://www.noah.org/wiki/Wavelength_to_RGB_in_Python
     This converts a given wavelength of light to an
     approximate RGB color value. The wavelength must be given
     in nanometers in the range from 380 nm through 750 nm
@@ -1508,7 +1514,7 @@ def wavelength_to_rgb(wavelength, gamma=0.8):
     Based on code by Dan Bruton
     http://www.physics.sfasu.edu/astro/color/spectra.html
     Additionally alpha value set to 0.5 outside range
-    '''
+    """
     wavelength = float(wavelength)
     if 380 <= wavelength <= 750:
         A = 1.
@@ -1548,7 +1554,7 @@ def wavelength_to_rgb(wavelength, gamma=0.8):
         R = 0.0
         G = 0.0
         B = 0.0
-    return (R, G, B, A)
+    return R, G, B, A
 
 
 def from_lambda_to_colormap(lambdas):
@@ -1563,10 +1569,51 @@ def rebin(arr, new_shape):
     return arr.reshape(shape).sum(-1).sum(1)
 
 
+def set_wcs_output_directory(file_name, output_directory=""):
+    outdir = os.path.dirname(file_name)
+    if output_directory != "":
+        outdir = output_directory
+    output_directory = os.path.join(outdir, os.path.splitext(os.path.basename(file_name))[0]) + "_wcs"
+    return output_directory
+
+
+def set_wcs_tag(file_name):
+    tag = os.path.splitext(os.path.basename(file_name))[0]
+    return tag
+
+
+def set_wcs_file_name(file_name, output_directory=""):
+    output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
+    tag = set_wcs_tag(file_name)
+    return os.path.join(output_directory, tag + '.wcs')
+
+
+def set_sources_file_name(file_name, output_directory=""):
+    output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
+    tag = set_wcs_tag(file_name)
+    return os.path.join(output_directory, f"{tag}_sources.fits")
+
+
+def set_gaia_catalog_file_name(file_name, output_directory=""):
+    output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
+    tag = set_wcs_tag(file_name)
+    return os.path.join(output_directory, f"{tag}_gaia.ecsv")
+
+
+def load_wcs_from_file(filename):
+    # Load the FITS hdulist using astropy.io.fits
+    hdulist = fits.open(filename)
+    # Parse the WCS keywords in the primary HDU
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore")
+        wcs = WCS.WCS(hdulist[0].header, fix=False)
+    return wcs
+
+
 if __name__ == "__main__":
     import doctest
+
     # if np.__version__ >= "1.14.0":
     #    np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
-
