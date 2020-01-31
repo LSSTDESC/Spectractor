@@ -322,6 +322,7 @@ class Star(Target):
         self.my_logger.debug(f"\n\tTarget label: {self.label}"
                              f"\n\tCalspec? {is_calspec}"
                              f"\n\tNumber of spectra: {len(self.spectra)}"
+                             f"\n\tRedshift: {self.redshift}"
                              f"\n\tEmission spectrum ? {self.emission_spectrum}"
                              f"\n\tLines: {[l.label for l in self.lines.lines]}")
 
