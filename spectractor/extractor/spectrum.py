@@ -927,7 +927,7 @@ def calibrate_spectrum_with_lines(spectrum):
     # grid exploration of the parameters
     # necessary because of the the line detection algo
     D_step = D_err / 2
-    pixel_shift_step = 0.1
+    pixel_shift_step = parameters.PIXSHIFT_PRIOR / 5
     pixel_shift_prior = parameters.PIXSHIFT_PRIOR
     Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
     pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
