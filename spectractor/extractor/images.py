@@ -101,7 +101,7 @@ class Image(object):
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
-                                  data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
+                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
         self.compute_statistical_error()
         self.convert_to_ADU_rate_units()
 
