@@ -12,15 +12,17 @@ from astropy.modeling.models import Moffat1D
 from astropy.table import Table
 
 from spectractor.tools import dichotomie, fit_poly1d, fit_moffat1d_outlier_removal, plot_image_simple
-from spectractor.extractor.background import extract_background_photutils
+from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.fit.fitter import FitWorkspace, run_minimisation
 
 
 class PSF1D(Fittable1DModel):
-    inputs = ('x',)
-    outputs = ('y',)
+    # inputs = ('x',)
+    # outputs = ('y',)
+    n_inputs = 1
+    n_outputs = 1
 
     amplitude_moffat = Parameter('amplitude_moffat', default=0.5)
     x_mean = Parameter('x_mean', default=0)
@@ -199,8 +201,10 @@ class PSF1D(Fittable1DModel):
 
 
 class PSF2D(Fittable2DModel):
-    inputs = ('x', 'y',)
-    outputs = ('z',)
+    # inputs = ('x', 'y',)
+    # outputs = ('z',)
+    n_inputs = 2
+    n_outputs = 1
 
     amplitude_moffat = Parameter('amplitude_moffat', default=1)
     x_mean = Parameter('x_mean', default=0)
@@ -941,7 +945,7 @@ class ChromaticPSF:
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         # Fit the transverse profile:
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
@@ -1165,7 +1169,7 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         # Estimate the first guess values
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
@@ -1283,7 +1287,7 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         # Estimate the first guess values
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
@@ -1299,6 +1303,7 @@ class ChromaticPSF1D(ChromaticPSF):
 
         guess = np.copy(self.poly_params)
         run_minimisation(w, method="newton", ftol=1e-4, xtol=1e-4)
+        plt.close('all')
 
         self.poly_params = w.poly_params
         self.profile_params = self.from_poly_params_to_profile_params(self.poly_params, force_positive=True)
@@ -1388,7 +1393,7 @@ class ChromaticPSF1DFitWorkspace(FitWorkspace):
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         # Estimate the first guess values
         >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
@@ -1584,7 +1589,7 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         # Estimate the first guess values
         # >>> s = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=saturation)
@@ -1729,7 +1734,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     >>> data_errors = np.sqrt(data+1)
 
     # Extract the background
-    >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+    >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
     # Fit the transverse profile:
     >>> s = ChromaticPSF1D(Nx=80, Ny=100, deg=4, saturation=saturation)

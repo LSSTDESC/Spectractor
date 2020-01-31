@@ -36,8 +36,6 @@ from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 import spectractor.parameters as parameters
 
-import pyfftw
-
 
 class SpectrumSimulation(Spectrum):
 
@@ -67,6 +65,7 @@ class SpectrumSimulation(Spectrum):
         self.data = None
         self.err = None
         self.model = lambda x: np.zeros_like(x)
+        self.model_err = lambda x: np.zeros_like(x)
 
     def simulate_without_atmosphere(self, lambdas):
         """Compute the spectrum of an object and its uncertainties
@@ -93,8 +92,8 @@ class SpectrumSimulation(Spectrum):
         self.data *= self.target.sed(lambdas)
         self.err = np.zeros_like(self.data)
         idx = np.where(self.telescope.transmission(lambdas) > 0)[0]
-        self.err[idx] = self.telescope.transmission_err(lambdas)[idx] / self.telescope.transmission(lambdas)[idx] * \
-                        self.data[idx]
+        self.err[idx] = self.telescope.transmission_err(lambdas)[idx] / self.telescope.transmission(lambdas)[idx]
+        self.err[idx] *= self.data[idx]
         # self.data *= self.lambdas*self.lambdas_binwidths
         return self.data, self.err
 
@@ -137,7 +136,7 @@ class SpectrumSimulation(Spectrum):
         lambdas = self.disperser.grating_pixel_to_lambda(pixels, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
-        # np.savetxt('atmospheric_transmission_20170530_130.txt', np.array([lambdas, atmospheric_transmission(lambdas)]).T)
+        # np.savetxt('atmospheric_trans_20170530_130.txt',np.array([lambdas,atmospheric_transmission(lambdas)]).T)
         self.data *= A1 * atmospheric_transmission
         self.err *= A1 * atmospheric_transmission
         # Now add the systematics
@@ -184,8 +183,8 @@ class SpectrogramModel(Spectrum):
         self.disperser = disperser
         self.telescope = telescope
         self.atmosphere = atmosphere
-        #self.pixels_x = np.arange(self.chromatic_psf.Nx).astype(int)
-        #self.pixels_y = np.arange(self.chromatic_psf.Ny).astype(int)
+        # self.pixels_x = np.arange(self.chromatic_psf.Nx).astype(int)
+        # self.pixels_y = np.arange(self.chromatic_psf.Ny).astype(int)
         self.true_spectrum = None
         self.lambdas = None
         self.data = None
@@ -233,21 +232,22 @@ class SpectrogramModel(Spectrum):
             spectrum_err = np.zeros_like(spectrum)
             idx = np.where(telescope_transmission > 0)[0]
             spectrum *= parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas)
-            spectrum_err[idx] = self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[idx]
+            spectrum_err[idx] = self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[
+                idx]
         else:
             def integrand(lbda):
                 return lbda * self.target.sed(lbda) * self.telescope.transmission(lbda - shift_t) \
                        * self.disperser.transmission(lbda - shift_t) * atmosphere(lbda)
 
-            for i in range(len(lambdas)-1):
-                spectrum[i] = parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i+1])[0]
+            for i in range(len(lambdas) - 1):
+                spectrum[i] = parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i + 1])[0]
 
         self.data = spectrum
         self.err = np.zeros_like(spectrum)
 
         # fig = plt.figure()
         # plt.plot(lambdas, spectrum/np.max(spectrum), label="spec")
-        # plt.plot(lambdas, telescope_transmission/np.max(telescope_transmission), label="transmission")
+        # # plt.plot(lambdas, telescope_transmission/np.max(telescope_transmission), label="transmission")
         # plt.plot(lambdas, self.disperser.transmission(lambdas-shift_t), label="disperser trans")
         # plt.legend()
         # plt.show()
@@ -263,12 +263,12 @@ class SpectrogramModel(Spectrum):
         self.chromatic_psf.table['Dy_mean'] = 0
         self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['x_mean'])
         # derotate
-        # self.my_logger.warning(f"\n\tbefore\n {self.chromatic_psf.table[['Dx_rot', 'Dx', 'Dy', 'Dy_mean']][:5]} {angle}")
+        # self.my_logger.warning(f"\n\tbefore\n {self.chromatic_psf.table[['Dx_rot','Dx','Dy','Dy_mean']][:5]} {angle}")
         self.chromatic_psf.rotate_table(-self.rotation_angle)
         self.chromatic_psf.profile_params = self.chromatic_psf.from_table_to_profile_params()
         if parameters.DEBUG:
             self.chromatic_psf.plot_summary()
-        # self.my_logger.warning(f"\n\tafter\n {self.chromatic_psf.table[['Dx_rot', 'Dx', 'Dy', 'Dy_mean']][:5]}  {angle}")
+        # self.my_logger.warning(f"\n\tafter\n {self.chromatic_psf.table[['Dx_rot','Dx','Dy','Dy_mean']][:5]} {angle}")
         return self.chromatic_psf.profile_params
 
     def simulate_dispersion(self, D, shift_x, shift_y, r0):
@@ -283,7 +283,7 @@ class SpectrogramModel(Spectrum):
         lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
         distances_order2 = self.disperser.grating_lambda_to_pixel(lambdas_order2, x0=new_x0, order=2)
         # Dx_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
-        # Dy_mean_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
+        # Dy_mean_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy_mean'],bounds_error=False, fill_value=(0,0))
         # dy_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_mean'],
         #                    bounds_error=False, fill_value=(0, 0))
         # dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) + 1j * (
@@ -292,7 +292,9 @@ class SpectrogramModel(Spectrum):
         #             Dy_mean_func(lambdas_order2) + dy_func(lambdas_order2) - shift_y)
         # Dx_func = interp1d(lambdas, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
         # Dy_mean_func = interp1d(lambdas, self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
-        dy_func = interp1d(lambdas, self.chromatic_psf.table['Dy'][:distance.size] - self.chromatic_psf.table['Dy_mean'][:distance.size],
+        dy_func = interp1d(lambdas,
+                           self.chromatic_psf.table['Dy'][:distance.size] - self.chromatic_psf.table['Dy_mean'][
+                                                                            :distance.size],
                            bounds_error=False, fill_value=(0, 0))
         dispersion_law = r0 + (self.chromatic_psf.table['Dx'][:distance.size] - shift_x) + 1j * (
                 self.chromatic_psf.table['Dy'][:distance.size] - shift_y)
@@ -303,8 +305,6 @@ class SpectrogramModel(Spectrum):
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         if parameters.DEBUG:
-            print(r0, self.chromatic_psf.table['Dx'][:6], self.chromatic_psf.table['Dy'][:6],
-                  dy_func(lambdas_order2)[:6])
             from spectractor.tools import from_lambda_to_colormap
             plt.plot(self.chromatic_psf.table['Dx'], self.chromatic_psf.table['Dy_mean'], 'k-', label="mean")
             plt.scatter(-r0.real + dispersion_law.real, -r0.imag + dispersion_law.imag, label="dispersion_law",
@@ -324,7 +324,8 @@ class SpectrogramModel(Spectrum):
         nlbda = dispersion_law.size
         # TODO: increase rapidity (multithreading, optimisation...)
         for i in range(0, nlbda, 1):
-            psf_lambda = PSF2D.evaluate(xx, yy, 1, dispersion_law[i].real, dispersion_law[i].imag, *profile_params[i, 2:])
+            psf_lambda = PSF2D.evaluate(xx, yy, 1, dispersion_law[i].real, dispersion_law[i].imag,
+                                        *profile_params[i, 2:])
             norm = PSF2D.normalisation(1, *profile_params[i, 2:-1])
             if norm > 0:
                 psf_lambda /= norm
@@ -333,7 +334,7 @@ class SpectrogramModel(Spectrum):
             simul += psf_lambda
         return simul
 
-    #@profile
+    # @profile
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
                  shift_x=0., shift_y=0., angle=0., psf_poly_params=None):
         """
@@ -349,6 +350,7 @@ class SpectrogramModel(Spectrum):
         D
         shift_x
         shift_y
+        angle
 
         Returns
         -------
@@ -356,6 +358,8 @@ class SpectrogramModel(Spectrum):
         Example
         -------
         >>> from spectractor.extractor.psf import  ChromaticPSF1D
+        >>> from spectractor import parameters
+        >>> parameters.DEBUG = True
         >>> spectrum, telescope, disperser, target = SimulatorInit('outputs/reduc_20170530_134_spectrum.fits')
         >>> airmass = spectrum.header['AIRMASS']
         >>> pressure = spectrum.header['OUTPRESS']
@@ -366,38 +370,39 @@ class SpectrogramModel(Spectrum):
         >>> lambdas, data, err = spec.simulate(A2=0, angle=spectrum.rotation_angle, psf_poly_params=psf_poly_params)
         """
         import time
-        start= time.time()
+        start = time.time()
         self.rotation_angle = angle
         profile_params = self.simulate_psf(psf_poly_params)
-        self.my_logger.debug(f'\n\tAfter psf: {time.time()-start}')
-        start=time.time()
+        self.my_logger.debug(f'\n\tAfter psf: {time.time() - start}')
+        start = time.time()
         r0 = self.spectrogram_x0 + 1j * self.spectrogram_y0
         lambdas, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
-        self.my_logger.debug(f'\n\tAfter dispersion: {time.time()-start}')
-        start=time.time()
+        self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
+        start = time.time()
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
         self.true_spectrum = spectrum
-        self.my_logger.debug(f'\n\tAfter spectrum: {time.time()-start}')
-        start=time.time()
+        self.my_logger.debug(f'\n\tAfter spectrum: {time.time() - start}')
+        start = time.time()
         ima1 = self.build_spectrogram(profile_params, spectrum, dispersion_law)
-        self.my_logger.debug(f'\n\tAfter build ima1: {time.time()-start}')
-        start=time.time()
+        self.my_logger.debug(f'\n\tAfter build ima1: {time.time() - start}')
+        start = time.time()
 
         # Add order 2
         ima2 = np.zeros_like(ima1)
         if A2 > 0.:
             nlbda_order2 = dispersion_law_order2.size
-            ima2 = self.build_spectrogram(profile_params[-nlbda_order2:], spectrum[:nlbda_order2], dispersion_law_order2)
+            ima2 = self.build_spectrogram(profile_params[-nlbda_order2:], spectrum[:nlbda_order2],
+                                          dispersion_law_order2)
 
-        self.my_logger.debug(f'\n\tAfter build ima2: {time.time()-start}')
-        start=time.time()
+        self.my_logger.debug(f'\n\tAfter build ima2: {time.time() - start}')
+        start = time.time()
         # self.data is in ADU/s units here
         self.data = A1 * (ima1 + A2 * ima2)
         if self.with_background:
             self.data += self.spectrogram_bgd
         self.err = np.zeros_like(self.data)
-        self.my_logger.debug(f'\n\tAfter all: {time.time()-start}')
-        start=time.time()
+        self.my_logger.debug(f'\n\tAfter all: {time.time() - start}')
+        start = time.time()
         if parameters.DEBUG:
             fig, ax = plt.subplots(3, 1, sharex="all", figsize=(12, 9))
             ax[0].imshow(self.data, origin='lower')
@@ -421,7 +426,7 @@ class SpectrogramModel(Spectrum):
         return self.lambdas, self.data, self.err
 
     def simulate_FFT(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
-                 shift_x=0., shift_y=0., angle=0., psf_poly_params=None):
+                     shift_x=0., shift_y=0., angle=0., psf_poly_params=None):
         """
         DEPRECATED
 
@@ -458,7 +463,7 @@ class SpectrogramModel(Spectrum):
         start = time.time()
         self.rotation_angle = angle
         self.simulate_psf(psf_poly_params)
-        self.my_logger.debug(f'\n\tTime after simulate PSF: {time.time()-start}')
+        self.my_logger.debug(f'\n\tTime after simulate PSF: {time.time() - start}')
         start = time.time()
         # print(self.spectrogram_x0, self.spectrogram_Nx, self.spectrogram_y0, self.spectrogram_Ny, self.spectrogram_xmin,self.spectrogram_ymin)
         # If nofftshift,use this r0:
@@ -466,11 +471,11 @@ class SpectrogramModel(Spectrum):
         # Else, this one:
         # r0 = (self.spectrogram_x0 ) + 1j * (self.spectrogram_y0 )
         lambdas, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
-        self.my_logger.debug(f'\n\tTime after simulate disp: {time.time()-start}')
+        self.my_logger.debug(f'\n\tTime after simulate disp: {time.time() - start}')
         start = time.time()
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
         self.true_spectrum = spectrum
-        self.my_logger.debug(f'\n\tTime after simulate spec: {time.time()-start}')
+        self.my_logger.debug(f'\n\tTime after simulate spec: {time.time() - start}')
         start = time.time()
         nlbda = lambdas.size
 
@@ -499,7 +504,7 @@ class SpectrogramModel(Spectrum):
         # Extended image (nima × nlbda) has to be perfecty centered
         ny, nx = (nima, rescale_factor * self.spectrogram_Nx)  # Rectangular minimal embedding
         hcube = FA.embed_array(cube, (nlbda, ny, nx))
-        self.my_logger.debug(f'\n\tTime after filling the cube: {time.time()-start}')
+        self.my_logger.debug(f'\n\tTime after filling the cube: {time.time() - start}')
         start = time.time()
 
         # Generate slitless-spectroscopy image from Fourier analysis
@@ -515,16 +520,16 @@ class SpectrogramModel(Spectrum):
             uh = self.uh
             vh = self.vh
             fhcube = self.fhcube
-        self.my_logger.debug(f'\n\tTime after fourier cube: {time.time()-start}')
+        self.my_logger.debug(f'\n\tTime after fourier cube: {time.time() - start}')
         # r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2 - shift_x) \
         #      + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2 - shift_y)
         fdima0 = F.disperse_fcube(uh, vh, fhcube, spectrum, dispersion_law, method="numexpr")  # FT
-        self.my_logger.debug(f'\n\tTime after simulate after fourier: {time.time()-start}')
+        self.my_logger.debug(f'\n\tTime after simulate after fourier: {time.time() - start}')
         start = time.time()
 
         # Dispersed image (noiseless)
         dima0 = F.ifft_image(fdima0)
-        self.my_logger.debug(f'\n\tTime after simulate inverse fourier: {time.time()-start}')
+        self.my_logger.debug(f'\n\tTime after simulate inverse fourier: {time.time() - start}')
         start = time.time()
 
         # Now add the systematics
@@ -536,10 +541,10 @@ class SpectrogramModel(Spectrum):
             nlbda_order2 = dispersion_law_order2.size
             fdima0_2 = F.disperse_fcube(uh, vh, fhcube[-nlbda_order2:], spectrum[:nlbda_order2], dispersion_law_order2,
                                         method="numexpr")  # FT
-            self.my_logger.debug(f'\n\tTime after simulate after fourier order 2: {time.time()-start}')
+            self.my_logger.debug(f'\n\tTime after simulate after fourier order 2: {time.time() - start}')
             start = time.time()
             dima0_2 = F.ifft_image(fdima0_2)
-            self.my_logger.debug(f'\n\tTime after simulate inverse fourier order 2: {time.time()-start}')
+            self.my_logger.debug(f'\n\tTime after simulate inverse fourier order 2: {time.time() - start}')
             start = time.time()
 
             # sim_conv = interp1d(lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
@@ -587,7 +592,6 @@ class SpectrogramModel(Spectrum):
         return self.lambdas, self.data, self.err
 
 
-
 class SpectrumSimGrid():
     """ SpectrumSim class used to store information and methods
     relative to spectrum simulation.
@@ -628,8 +632,8 @@ class SpectrumSimGrid():
         self.spectragrid[:, self.atmgrid.index_atm_count:self.atmgrid.index_atm_data] = \
             self.atmgrid.atmgrid[:, self.atmgrid.index_atm_count:self.atmgrid.index_atm_data]
         # Is broadcasting working OK ?
-        self.spectragrid[1:, self.atmgrid.index_atm_data:] = self.atmgrid.atmgrid[1:,
-                                                             self.atmgrid.index_atm_data:] * all_transm
+        self.spectragrid[1:, self.atmgrid.index_atm_data:] = self.atmgrid.atmgrid[1:, self.atmgrid.index_atm_data:]
+        self.spectragrid[1:, self.atmgrid.index_atm_data:] *= all_transm
         return self.spectragrid
 
     def plot_spectra(self):
@@ -638,7 +642,7 @@ class SpectrumSimGrid():
         for count in counts:
             plt.plot(self.lambdas, self.spectragrid[int(count), self.atmgrid.index_atm_data:])
         plt.grid()
-        plt.xlabel("$\lambda$ [nm]")
+        plt.xlabel(r"$\lambda$ [nm]")
         plt.ylabel("Flux [ADU/s]")
         plt.title("Spectra for Atmospheric variations")
         if parameters.DISPLAY:
@@ -647,7 +651,7 @@ class SpectrumSimGrid():
     def plot_spectra_img(self):
         plt.figure()
         img = plt.imshow(self.spectragrid[1:, self.atmgrid.index_atm_data:], origin='lower', cmap='jet')
-        plt.xlabel("$\lambda$ [nm]")
+        plt.xlabel(r"$\lambda$ [nm]")
         plt.ylabel("Simulation number")
         plt.title("Spectra for atmospheric variations")
         cbar = plt.colorbar(img)
@@ -667,7 +671,7 @@ class SpectrumSimGrid():
             hdu = fits.PrimaryHDU(self.spectragrid, header=self.header)
             hdu.writeto(self.filename, overwrite=True)
             if parameters.VERBOSE or parameters.DEBUG:
-                self.my_logger.info('\n\tSPECTRA.save atm-file=%s' % (self.filename))
+                self.my_logger.info(f'\n\tSPECTRA.save atm-file={self.filename}')
 
 
 def SimulatorInit(filename):
@@ -814,7 +818,6 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
     spectragrid = spectra.compute()
     spectra.save_spectra(output_filename)
     if parameters.DEBUG:
-        infostring = '\n\t ========= Spectra simulation :  ==============='
         spectra.plot_spectra()
         spectra.plot_spectra_img()
     # ---------------------------------------------------------------------------
