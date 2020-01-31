@@ -241,6 +241,7 @@ class Star(Target):
         self.spectra = []
         # first try with pysynphot
         file_names = []
+        is_calspec = False
         if os.getenv("PYSYN_CDBS") is not None:
             dirname = os.path.expandvars('$PYSYN_CDBS/calspec/')
             for fname in os.listdir(dirname):
@@ -248,10 +249,11 @@ class Star(Target):
                     if self.label.lower() in fname.lower():
                         file_names.append(dirname + fname)
         if len(file_names) > 0:
+            is_calspec = True
             self.emission_spectrum = False
             self.hydrogen_only = True
             self.lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES,
-                               redshift=0., emission_spectrum=self.emission_spectrum,
+                               redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
             for k, f in enumerate(file_names):
                 if '_mod_' in f:
@@ -265,6 +267,12 @@ class Star(Target):
                 else:
                     self.wavelengths.append(data.wave)
                     self.spectra.append(data.flux)
+        elif 'HD' in self.label:  # it is a star
+            self.emission_spectrum = False
+            self.hydrogen_only = True
+            self.lines = Lines(ATMOSPHERIC_LINES + HYDROGEN_LINES,
+                               redshift=self.redshift, emission_spectrum=self.emission_spectrum,
+                               hydrogen_only=self.hydrogen_only)
         else:
             if 'PNG' not in self.label:
                 # Try with NED query
@@ -311,6 +319,11 @@ class Star(Target):
                                    redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                    hydrogen_only=self.hydrogen_only)
         self.build_sed()
+        self.my_logger.debug(f"\n\tTarget label: {self.label}"
+                             f"\n\tCalspec? {is_calspec}"
+                             f"\n\tNumber of spectra: {len(self.spectra)}"
+                             f"\n\tEmission spectrum ? {self.emission_spectrum}"
+                             f"\n\tLines: {[l.label for l in self.lines.lines]}")
 
     def get_radec_position_after_pm(self, date_obs):
         target_pmra = self.simbad[0]['PMRA'] * u.mas / u.yr
