@@ -2,7 +2,7 @@ numpy>1.15
 scipy
 matplotlib
 pandas
-pyfftw
+# pyfftw
 numexpr
 astropy>=3.2
 photutils
@@ -15,8 +15,9 @@ tqdm
 mpi4py
 schwimmbad
 iminuit
-coverage
+coverage<5.0,>=3.6
 configparser
 coveralls
 pysynphot
 deprecated
+pyyaml

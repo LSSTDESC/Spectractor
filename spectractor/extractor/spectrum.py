@@ -15,7 +15,7 @@ from spectractor.tools import (ensure_dir, load_fits, extract_info_from_CTIO_hea
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
                                from_lambda_to_colormap)
 from spectractor.extractor.psf import ChromaticPSF1D, ChromaticPSF2D
-from spectractor.extractor.background import extract_background_photutils
+from spectractor.extractor.background import extract_spectrogram_background_sextractor
 
 
 class Spectrum:
@@ -961,7 +961,7 @@ def calibrate_spectrum_with_lines(spectrum):
     # grid exploration of the parameters
     # necessary because of the the line detection algo
     D_step = D_err / 2
-    pixel_shift_step = 0.5
+    pixel_shift_step = 0.1
     pixel_shift_prior = parameters.PIXSHIFT_PRIOR
     Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
     pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
@@ -1089,8 +1089,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Extract the background on the rotated image
-    bgd_model_func = extract_background_photutils(data, err, ws=ws)
-    # bgd_model_func = extract_background_poly2D(data, ws=ws)
+    bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
+    # bgd_model_func = extract_spectrogram_background_poly2D(data, ws=ws)
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
@@ -1181,7 +1181,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     Ny, Nx = data.shape
 
     # Extract the non rotated background
-    bgd_model_func = extract_background_photutils(data, err, ws=ws)
+    bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
 
     # Crop the background lateral regions

@@ -30,18 +30,27 @@ def test_extractor():
         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None:
             continue
-        spectrum = Spectractor(file_name, './outputs/', [xpos, ypos], target, disperser_label,
-                              config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
+        spectrum = Spectractor(file_name, './outputs/', target, [xpos, ypos], disperser_label,
+                               config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10
-        assert np.isclose(spectrum.lambdas[0], 296.56935941, atol=0.2)
-        assert np.isclose(spectrum.lambdas[-1], 1083.9470213, atol=0.5)
-        assert np.all(np.isclose(spectrum.x0 , [743.6651370068676, 683.0577836601408], atol=0.2))
-        assert np.isclose(spectrum.spectrogram_x0, -239.3348629931324, atol=0.2)
-        assert 2.5 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3.5
+        spectrum.my_logger.warning(f"\n\tQuantities to test:"
+                                   f"\n\t\tspectrum.lambdas[0]={spectrum.lambdas[0]}"
+                                   f"\n\t\tspectrum.lambdas[-1]={spectrum.lambdas[-1]}"
+                                   f"\n\t\tspectrum.x0={spectrum.x0}"
+                                   f"\n\t\tspectrum.spectrogram_x0={spectrum.spectrogram_x0}"
+                                   f"\n\t\tnp.mean(spectrum.chromatic_psf.table['gamma']="
+                                   f"{np.mean(spectrum.chromatic_psf.table['gamma'])}")
+        assert np.isclose(spectrum.lambdas[0], 296, atol=1)
+        assert np.isclose(spectrum.lambdas[-1], 1083.5, atol=1)
+        assert np.isclose(spectrum.x0[0], 743.6651370068676, atol=0.5)
+        assert np.isclose(spectrum.x0[1], 683.0577836601408, atol=1)
+        assert np.isclose(spectrum.spectrogram_x0, -240, atol=1)
+        assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3
         assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrum.fits')) is True
         assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrogram.fits')) is True
 
 
 if __name__ == "__main__":
+
     run_module_suite()
