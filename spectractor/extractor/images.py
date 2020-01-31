@@ -37,11 +37,17 @@ class Image(object):
         Examples
         --------
         >>> im = Image('tests/data/reduc_20170605_028.fits')
-        >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
-        >>> assert im.data is not None and np.mean(im.data) > 0
-        >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
-        >>> assert im.header is not None
-        >>> assert im.gain is not None and np.mean(im.gain) > 0
+        >>> print(im.file_name)
+        'tests/data/reduc_20170605_028.fits'
+        
+        .. doctest:
+            :hide:
+            >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
+            >>> assert im.data is not None and np.mean(im.data) > 0
+            >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
+            >>> assert im.header is not None
+            >>> assert im.gain is not None and np.mean(im.gain) > 0
+
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.file_name = file_name
@@ -98,6 +104,8 @@ class Image(object):
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
             load_LPNHE_image(self)
+        if parameters.OBS_NAME == "AUXTEL":
+            load_AUXTEL_image(self)
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
@@ -364,6 +372,33 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
+    parameters.CCD_IMSIZE = image.data.shape[1]
+
+
+def load_AUXTEL_image(image):  # pragma: no cover
+    """Specific routine to load AUXTEL fits files and load their data and properties for Spectractor.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    image.my_logger.info(f'\n\tLoading AUXTEL image {image.file_name}...')
+    image.my_logger.warning(image.header)
+    hdu_list = fits.open(image.file_name)
+    image.header = hdu_list[0].header
+    image.data = hdu_list[1].data.astype(np.float64)
+    hdu_list.close()  # need to free allocation for file descripto
+    # image.data = np.concatenate((data[10:-10, 10:-10], data2[10:-10, 10:-10]))
+    image.date_obs = image.header['DATE-OBS']
+    image.expo = float(image.header['EXPTIME'])
+    image.header['ROTANGLE'] = image.rotation_angle
+    image.header['LSHIFT'] = 0.
+    image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.data = image.data.T
+    image.my_logger.info('\n\tImage loaded')
+    # compute CCD gain map
+    image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
 
 
