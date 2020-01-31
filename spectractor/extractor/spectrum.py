@@ -110,8 +110,9 @@ class Spectrum:
         >>> assert np.max(s.err) < 1e-2
 
         """
-        if self.units == "ADU/s":
-            self.my_logger.warning(f"You ask to convert spectrum already in {self.units} in ADU/s... check your code !")
+        if self.units == 'erg/s/cm$^2$/nm' or self.units == "flam":
+            self.my_logger.warning(f"You ask to convert spectrum already in {self.units}"
+                                   f" in erg/s/cm^2/nm... check your code ! Skip the instruction.")
             return
         self.data = self.data / parameters.FLAM_TO_ADURATE
         self.data /= self.lambdas * self.lambdas_binwidths
@@ -132,9 +133,9 @@ class Spectrum:
         >>> assert np.max(s.err) > 1e-2
 
         """
-        if self.units == 'erg/s/cm$^2$/nm':
-            self.my_logger.warning(f"You ask to convert spectrum already in {self.units}"
-                                   f" in erg/s/cm^2/nm... check your code !")
+        if self.units == "ADU/s":
+            self.my_logger.warning(f"You ask to convert spectrum already in {self.units} in ADU/s... check your code ! "
+                                   f"Skip the instruction")
             return
         self.data = self.data * parameters.FLAM_TO_ADURATE
         self.data *= self.lambdas_binwidths * self.lambdas
@@ -478,7 +479,7 @@ def calibrate_spectrum(spectrum, xlim=None):
     spectrum.convert_from_ADUrate_to_flam()
 
 
-def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None,
+def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None, calibration_lines_only=False,
                  xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
     """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
     around emission or absorption tabulated lines, and to select surrounding pixels
@@ -553,12 +554,12 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     bgd_npar = parameters.CALIB_BGD_NPARAMS
     peak_width = parameters.CALIB_PEAK_WIDTH
     bgd_width = parameters.CALIB_BGD_WIDTH
-    if lines.hydrogen_only:
-        peak_width = 7
-        bgd_width = 15
-    fwhm_to_peak_width_factor = 3
+    # if lines.hydrogen_only:
+    #     peak_width = 7
+    #     bgd_width = 15
+    fwhm_to_peak_width_factor = 1.5
     len_index_to_bgd_npar_factor = 0.12
-    baseline_prior = 0.1  # *sigma gaussian prior on base line fit
+    baseline_prior = 3  # *sigma gaussian prior on base line fit
     # filter the noise
     # plt.errorbar(lambdas,spec,yerr=spec_err)
     spec = np.copy(spec)
@@ -579,6 +580,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         line.fitted = False
         line.fit_popt = None
         line.high_snr = False
+        if not line.use_for_calibration and calibration_lines_only:
+            continue
         # wavelength of the line: find the nearest pixel index
         line_wavelength = line.wavelength
         if fwhm_func is not None:
@@ -890,7 +893,8 @@ def calibrate_spectrum_with_lines(spectrum):
     my_logger = set_logger(__name__)
 
     # Convert back to ADU rate units because of lambda*dlambda normalisation in flam units
-    spectrum.convert_from_flam_to_ADUrate()
+    # if spectrum.units == "erg/s/cm$^2$/nm":
+    #     spectrum.convert_from_flam_to_ADUrate()
     # Convert wavelength array into original pixels
     x0 = spectrum.x0
     if x0 is None:
@@ -904,7 +908,7 @@ def calibrate_spectrum_with_lines(spectrum):
     delta_pixels = spectrum.disperser.grating_lambda_to_pixel(spectrum.lambdas, x0=x0, order=spectrum.order)
 
     # Detect emission/absorption lines and calibrate pixel/lambda
-    D = parameters.DISTANCE2CCD  # - parameters.DISTANCE2CCD_ERR
+    D = parameters.DISTANCE2CCD
     D_err = parameters.DISTANCE2CCD_ERR
     fwhm_func = interp1d(spectrum.chromatic_psf.table['lambdas'],
                          spectrum.chromatic_psf.table['fwhm'],
@@ -915,7 +919,7 @@ def calibrate_spectrum_with_lines(spectrum):
         lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - shift,
                                                                   x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
-                             fwhm_func=fwhm_func, ax=None)
+                             fwhm_func=fwhm_func, ax=None, calibration_lines_only=True)
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             if parameters.LIVE_FIT:
@@ -978,8 +982,10 @@ def calibrate_spectrum_with_lines(spectrum):
     lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.pixels = delta_pixels - pixel_shift
+    detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
+                 fwhm_func=fwhm_func, ax=None, calibration_lines_only=False)
     # Convert back to flam units
-    spectrum.convert_from_ADUrate_to_flam()
+    # spectrum.convert_from_ADUrate_to_flam()
     spectrum.my_logger.info(
         '\n\tOrder0 total shift: {:.2f}pix'
         '\n\tD = {:.2f} mm (default: DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
@@ -1061,7 +1067,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     s = ChromaticPSF1D(Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
-    s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, bgd_model_func=bgd_model_func,
+    s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=10, sigma=5, bgd_model_func=bgd_model_func,
                                    saturation=image.saturation, live_fit=False)
 
     # Fill spectrum object
