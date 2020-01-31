@@ -14,7 +14,8 @@ from astropy.table import Table
 
 from spectractor.tools import (dichotomie, fit_poly1d, fit_moffat1d_outlier_removal, plot_image_simple,
                                compute_fwhm, compute_integral)
-from spectractor.extractor.background import extract_background_photutils, extract_background_fit1D
+from spectractor.extractor.background import (extract_spectrogram_background_sextractor,
+                                              extract_spectrogram_background_fit1D)
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping
@@ -278,7 +279,7 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
 
         .. doctest::
 
-            >>> bgd_model_func = extract_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5)
+            >>> bgd_model_func = extract_spectrogram_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5)
 
         Fit the data:
 
@@ -295,6 +296,7 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
             import numpy as np
             import matplotlib.pyplot as plt
             from spectractor.extractor.psf import *
+            from spectractor.extractor.background import extract_spectrogram_background_fit1D
             p = np.array([100,  50, 3, 2, -0.1, 2, 200])
             psf = PSF1D(p)
             x = np.arange(100)
@@ -303,7 +305,7 @@ class PSF1DFitWorkspace(PSFFitWorkspace):
             data += bgd
             data = np.random.poisson(data)
             data_errors = np.sqrt(data+1)
-            bgd_model_func = extract_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5)
+            bgd_model_func = extract_spectrogram_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5)
             w = PSF1DFitWorkspace(psf, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
             x, mod, mod_err = w.simulate(*p[:-1])
             w.plot_fit()
@@ -1155,9 +1157,8 @@ class ChromaticPSF:
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        Extract the background:
-
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        # Extract the background
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Fit the transverse profile:
 
@@ -1323,7 +1324,7 @@ class ChromaticPSF:
 
         Extract the background:
 
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
 
@@ -1347,7 +1348,7 @@ class ChromaticPSF:
             >>> assert np.std(residuals) < 1.2
         """
         guess = np.copy(self.poly_params)
-        run_minimisation(w, method="newton", ftol=1/(w.Nx*w.Ny), xtol=1e-6, niter=50)
+        run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50)
         self.poly_params = w.poly_params
 
         # add background crop to y_mean
@@ -1356,7 +1357,7 @@ class ChromaticPSF:
             if label == "amplitude_moffat":
                 continue
             if label != "y_mean":
-                ymean_index += self.degrees[label]+1
+                ymean_index += self.degrees[label] + 1
             else:
                 break
         self.poly_params[ymean_index] += w.bgd_width
@@ -1509,7 +1510,7 @@ class ChromaticPSF1D(ChromaticPSF):
 
         Extract the background:
 
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
 
@@ -1571,9 +1572,8 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        Extract the background:
-
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        # Extract the background
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
 
@@ -1725,7 +1725,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
             # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
-            self.Q = parameters.PSF_FIT_REG_PARAM*np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
+            self.Q = parameters.PSF_FIT_REG_PARAM * np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
         if self.amplitude_priors_method == "fixed":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
@@ -1784,7 +1784,8 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                  nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                          file_name, amplitude_priors_method, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                                          file_name, amplitude_priors_method, nwalkers, nsteps, burnin, nbins, verbose,
+                                          plot,
                                           live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.pixels = np.arange(self.Ny)
@@ -1825,9 +1826,9 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        Extract the background:
+        # Extract the background
 
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
 
@@ -1860,7 +1861,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
             M = np.array([self.chromatic_psf.PSF.evaluate(self.pixels, p=profile_params[x, :]) for x in range(self.Nx)])
             M_dot_W_dot_M = np.array([M[x].T @ self.W[x] @ M[x] for x in range(self.Nx)])
             if self.amplitude_priors_method != "psf1d":
-                cov_matrix = np.diag([1/M_dot_W_dot_M[x] if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
+                cov_matrix = np.diag([1 / M_dot_W_dot_M[x] if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
                                       for x in range(self.Nx)])
                 amplitude_params = np.array([
                     M[x].T @ self.W_dot_data[x] / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
@@ -1885,7 +1886,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                     pass
             else:
                 M_dot_W_dot_M_plus_Q = [M_dot_W_dot_M[x] + self.Q[x, x] for x in range(self.Nx)]
-                cov_matrix = np.diag([1/M_dot_W_dot_M_plus_Q[x] if M_dot_W_dot_M_plus_Q[x] > 0 else 0.1 * self.bgd_std
+                cov_matrix = np.diag([1 / M_dot_W_dot_M_plus_Q[x] if M_dot_W_dot_M_plus_Q[x] > 0 else 0.1 * self.bgd_std
                                       for x in range(self.Nx)])
                 amplitude_params = [cov_matrix[x, x] * (M[x].T @ self.W_dot_data[x] + self.Q_dot_A0[x])
                                     for x in range(self.Nx)]
@@ -1900,7 +1901,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.cov_matrix = np.copy(cov_matrix)
         poly_params[:self.Nx] = amplitude_params
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
-        self.model = self.chromatic_psf.evaluate(poly_params, pixels=self.pixels) #[self.bgd_width:-self.bgd_width, :]
+        self.model = self.chromatic_psf.evaluate(poly_params, pixels=self.pixels)  # [self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         self.poly_params = np.copy(poly_params)
         return self.pixels, self.model, self.model_err
@@ -2049,7 +2050,7 @@ class ChromaticPSF2D(ChromaticPSF):
 
         Extract the background:
 
-        >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
 
@@ -2114,9 +2115,10 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> data_errors = np.sqrt(data+1)
 
         # Extract the background
-        # >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
-        #
-        # # Estimate the first guess values
+
+        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+
+        # Estimate the first guess values
         # >>> s = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=saturation)
         # >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         # ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
@@ -2223,7 +2225,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                  file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                          file_name, amplitude_priors_method, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                                          file_name, amplitude_priors_method, nwalkers, nsteps, burnin, nbins, verbose,
+                                          plot,
                                           live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.pixels = np.mgrid[:self.Nx, :self.Ny]
@@ -2326,7 +2329,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         .. doctest::
 
-            >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+            >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
 
@@ -2361,7 +2364,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         profile_params[:self.Nx, 0] = 1
         profile_params[:self.Nx, 1] = np.arange(self.Nx)
         profile_params[:self.Nx, 2] -= self.bgd_width
-        poly_params[self.Nx+self.chromatic_psf.degrees['x_mean']+1] -= self.bgd_width
+        poly_params[self.Nx + self.chromatic_psf.degrees['x_mean'] + 1] -= self.bgd_width
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
             W_dot_M = np.zeros((self.Ny * self.Nx, self.Nx))
@@ -2413,7 +2416,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[i, i]) for i in range(self.Nx)])
         self.cov_matrix = np.copy(cov_matrix)
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
-        self.model = self.chromatic_psf.evaluate(poly_params, pixels=self.pixels) #[self.bgd_width:-self.bgd_width, :]
+        self.model = self.chromatic_psf.evaluate(poly_params, pixels=self.pixels)  # [self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         self.poly_params = np.copy(poly_params)
         return self.pixels, self.model, self.model_err
@@ -2467,9 +2470,9 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
-    Extract the background:
+    # Extract the background
 
-    >>> bgd_model_func = extract_background_photutils(data, data_errors, ws=[30,50])
+    >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
     Fit the transverse profile:
 

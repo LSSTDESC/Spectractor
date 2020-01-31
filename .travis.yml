@@ -4,8 +4,9 @@ cache:
   directories:
   - "$TRAVIS_BUILD_DIR/build/NETCDF/src"
   - "$TRAVIS_BUILD_DIR/build/LIBRADTRAN/src"
+  - "$TRAVIS_BUILD_DIR/build/ASTROMETRYNET/src"
 
-addons: # for libradtran library
+addons: # for libradtran and astrometry.net library
   apt:
       packages:
         - gfortran
@@ -13,6 +14,14 @@ addons: # for libradtran library
         - libhdf5-dev
         - libopenmpi-dev
         - openmpi-bin
+        - libnetpbm10
+        - libnetpbm10-dev
+        - netpbm
+        - wcslib-dev
+        - libcfitsio-dev
+        - swig
+        - gsl-bin
+        - libgsl-dev
 
 python:
   - "3.7"
@@ -42,29 +51,46 @@ before_script:
   - conda create -n py27 python=2.7 pip
   - source activate py27
   - python --version
+  - pip install pyutil numpy
   - "export PYSYN_CDBS=tests/data/"
   - "echo backend: agg > matplotlibrc"
-  - "wget -L ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.6.1.tar.gz"
-  - "gzip -d netcdf-4.6.1.tar.gz"
-  - "tar -xf netcdf-4.6.1.tar"
-  - "cd netcdf-4.6.1"
+  - git clone https://github.com/Unidata/netcdf-c.git
+  - cd netcdf-c
+  - git checkout tags/v4.7.3
   - "./configure  --prefix=$TRAVIS_BUILD_DIR/NETCDF --disable-netcdf-4"
   - "make"
   - "make install"
   - "cd ../"
   - "echo $LD_LIBRARY_PATH"
   - "export LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/NETCDF/lib/"
-  - "wget -L http://www.libradtran.org/download/libRadtran-2.0.3.tar.gz"
-  - "gzip -d libRadtran-2.0.3.tar.gz"
-  - "tar -xf libRadtran-2.0.3.tar"
-  - "cd libRadtran-2.0.3"
+  - "wget -L http://www.libradtran.org/download/history/libRadtran-2.0.2.tar.gz"
+  - "gzip -d libRadtran-2.0.2.tar.gz"
+  - "tar -xf libRadtran-2.0.2.tar"
+  - "cd libRadtran-2.0.2"
   - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN --with-libnetcdf=$TRAVIS_BUILD_DIR/NETCDF/"
   - "make uvspec"
   - "cd ../"
-  - "export LIBRADTRANDIR=libRadtran-2.0.3/"
+  - "export LIBRADTRAN_DIR=libRadtran-2.0.2/"
+  - export NETPBM_LIB="-L/usr/lib -lnetpbm"
+  - export NETPBM_INC="-I/usr/include"
+  - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
+  - tar xvzf astrometry.net-latest.tar.gz
+  - cd astrometry.net-*
+  - make
+  - make py
+  - make extra
+  - make install INSTALL_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET
+  - wget -r -nc http://data.astrometry.net/5000/index-5002-24.fits
+  - wget -r -nc http://data.astrometry.net/5000/index-5000-40.fits
+  - mv data.astrometry.net/5000/index-*.fits $TRAVIS_BUILD_DIR/ASTROMETRYNET/data/
+  # - make install-indexes
+  - cd ../
+  - "export ASTROMETRYNET_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET"
   - conda create -n py37 python=3.7 pip
   - source activate py37
   - python --version
+
+
   # - "git clone https://$CI_USER_TOKEN@github.com/jeremyneveu/slitless.git slitless"
   # - "cd slitless"
   # - git checkout spectractor
@@ -72,7 +98,7 @@ before_script:
   # - "cd ../"
 
 script:
-  - pip install numpy nose coloredlogs coverage coveralls six
+  - pip install numpy nose coloredlogs six
   - pip install -r requirements.txt
   # - python setup.py build
   # - python setup.py install

@@ -1,5 +1,7 @@
-from astropy.coordinates import SkyCoord
-import astropy.units as units
+from astropy.coordinates import SkyCoord, Distance
+import astropy.units as u
+from astropy.time import Time
+
 from astroquery.ned import Ned
 from astroquery.simbad import Simbad
 import matplotlib.pyplot as plt
@@ -37,7 +39,7 @@ def load_target(label, verbose=False):
     >>> t = load_target("HD111980", verbose=False)
     >>> print(t.label)
     HD111980
-    >>> print(t.coord.dec)
+    >>> print(t.radec_position.dec)
     -18d31m20.009s
     >>> parameters.OBS_OBJECT_TYPE = "MONOCHROMATOR"
     >>> t = load_target("XX", verbose=False)
@@ -45,7 +47,7 @@ def load_target(label, verbose=False):
     XX
     >>> parameters.OBS_OBJECT_TYPE = "HG-AR"
     >>> t = load_target("XX", verbose=False)
-    >>> print([l.wavelength for l in t.lines.lines][:5])
+    >>> print([line.wavelength for line in t.lines.lines][:5])
     [253.652, 296.728, 302.15, 313.155, 334.148]
     >>> parameters.OBS_OBJECT_TYPE = "OTHER"
     >>> t = load_target("XX", verbose=False)
@@ -84,7 +86,8 @@ class Target:
         self.hydrogen_only = False
         self.sed = None
         self.lines = None
-        self.coord = None
+        self.radec_position = None
+        self.radec_position_after_pm = None
         self.redshift = 0
 
 
@@ -106,7 +109,7 @@ class ArcLamp(Target):
         Mercury-Argon lamp:
 
         >>> t = ArcLamp("HG-AR", verbose=False)
-        >>> print([l.wavelength for l in t.lines.lines][:5])
+        >>> print([line.wavelength for line in t.lines.lines][:5])
         [253.652, 296.728, 302.15, 313.155, 334.148]
         >>> print(t.emission_spectrum)
         True
@@ -172,7 +175,7 @@ class Star(Target):
         >>> s = Star('3C273')
         >>> print(s.label)
         3C273
-        >>> print(s.coord.dec)
+        >>> print(s.radec_position.dec)
         2d03m08.598s
         >>> print(s.emission_spectrum)
         True
@@ -182,7 +185,7 @@ class Star(Target):
         >>> s = Star('HD111980')
         >>> print(s.label)
         HD111980
-        >>> print(s.coord.dec)
+        >>> print(s.radec_position.dec)
         -18d31m20.009s
         >>> print(s.emission_spectrum)
         False
@@ -190,6 +193,7 @@ class Star(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
+        self.simbad = None
         self.load()
 
     def load(self):
@@ -198,17 +202,22 @@ class Star(Target):
         Examples
         --------
         >>> s = Star('3C273')
-        >>> print(s.coord.dec)
+        >>> print(s.radec_position.dec)
         2d03m08.598s
 
         """
+        Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
+                                  'parallax', 'pm', 'z_value')
         simbad = Simbad.query_object(self.label)
+        self.simbad = simbad
         if simbad is not None:
-            if self.verbose:
-                self.my_logger.info(f'\n\tSimbad: {simbad}')
-            self.coord = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(units.hourangle, units.deg))
+            if self.verbose or True:
+                self.my_logger.info(f'\n\tSimbad:\n{simbad}')
+            self.radec_position = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(u.hourangle, u.deg))
         else:
-            self.my_logger.warning(f'\n\tTarget {self.label} not found in Simbad')
+           self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
+        self.get_radec_position_after_pm(date_obs="J2000")
+        self.redshift = float(simbad['Z_VALUE'])
         self.load_spectra()
 
     def load_spectra(self):
@@ -253,7 +262,7 @@ class Star(Target):
                 if '_mod_' in f:
                     continue
                 if self.verbose:
-                    print('Loading %s' % f)
+                    self.my_logger.info('\n\tLoading %s' % f)
                 data = S.FileSpectrum(f, keepneg=True)
                 if isinstance(data.waveunits, S.units.Angstrom):
                     self.wavelengths.append(data.wave / 10.)
@@ -304,9 +313,26 @@ class Star(Target):
             else:
                 self.emission_spectrum = True
                 self.lines = Lines(ATMOSPHERIC_LINES+ISM_LINES+HYDROGEN_LINES,
-                                   redshift=0., emission_spectrum=self.emission_spectrum,
+                                   redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                    hydrogen_only=self.hydrogen_only)
         self.build_sed()
+
+    def get_radec_position_after_pm(self, date_obs):
+        target_pmra = self.simbad[0]['PMRA'] * u.mas / u.yr
+        if np.isnan(target_pmra):
+            target_pmra = 0 * u.mas / u.yr
+        target_pmdec = self.simbad[0]['PMDEC'] * u.mas / u.yr
+        if np.isnan(target_pmdec):
+            target_pmdec = 0 * u.mas / u.yr
+        target_parallax = self.simbad[0]['PLX_VALUE'] * u.mas
+        if target_parallax == 0 * u.mas:
+            target_parallax = 1e-4 * u.mas
+        target_coord = SkyCoord(ra=self.radec_position.ra, dec=self.radec_position.dec,
+                                distance=Distance(parallax=target_parallax),
+                                pm_ra_cosdec=target_pmra, pm_dec=target_pmdec, frame='icrs', equinox="J2000",
+                                obstime="J2000")
+        self.radec_position_after_pm = target_coord.apply_space_motion(new_obstime=Time(date_obs))
+        return self.radec_position_after_pm
 
     def build_sed(self, index=0):
         """Interpolate the database reference spectra and return self.sed as a function of the wavelength.
