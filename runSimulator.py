@@ -47,4 +47,4 @@ if __name__ == "__main__":
                          pwv=5, ozone=300, aerosols=0.03,
                          psf_poly_params=None, with_stars=False)
         sim_file_name = args.output_directory+'/'+tag.replace('reduc_','sim_')
-        Spectractor(sim_file_name, args.output_directory, [xpos, ypos], target, disperser_label, args.config)
+        Spectractor(sim_file_name, args.output_directory, target, [xpos, ypos], disperser_label, args.config)

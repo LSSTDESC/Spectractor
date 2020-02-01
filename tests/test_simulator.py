@@ -2,7 +2,7 @@ from numpy.testing import run_module_suite
 import numpy as np
 
 from spectractor import parameters
-from spectractor.simulation.simulator import (SpectrumSimulator, SpectrumSimulatorSimGrid,
+from spectractor.simulation.simulator import (SpectrumSimulatorSimGrid,
                                               Atmosphere, AtmosphereGrid, SpectrogramSimulator)
 from spectractor.simulation.image_simulation import ImageSim
 from spectractor.config import load_config
@@ -19,7 +19,8 @@ def test_atmosphere():
     assert a.aerosols == 0.05
     a.plot_transmission()
 
-    a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits', pwv_grid = [5, 5, 1], ozone_grid = [400, 400, 1], aerosol_grid = [0.0, 0.1, 2])
+    a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits', pwv_grid=[5, 5, 1],
+                       ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
     atmospheric_grid = a.compute()
     assert np.sum(atmospheric_grid) > 0
     assert np.all(np.isclose(a.atmgrid[0, a.index_atm_data:], parameters.LAMBDAS))
@@ -56,7 +57,7 @@ def test_simulator():
                                                       A1=1.1, A2=0.1, D=56, shift_x=-3, shift_y=1, angle=-1)
         psf_poly_params = spectrogram_simulation.chromatic_psf.from_table_to_poly_params()
         image_simulation = ImageSim(file_name.replace('_spectrum.fits', '.fits'), file_name, './tests/data/', A2=0.01,
-                                    psf_poly_params=psf_poly_params, with_stars=False)
+                                    psf_poly_params=psf_poly_params, with_stars=True)
         SpectrumSimulatorSimGrid(file_name, './tests/data/', pwv_grid=[0, 10, 2], ozone_grid=[200, 400, 2],
                                  aerosol_grid=[0, 0.1, 2])
         atmgrid = AtmosphereGrid(file_name, file_name.replace('spectrum', 'atmsim'))
