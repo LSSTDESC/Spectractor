@@ -1,22 +1,24 @@
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import pixel_rotation, detect_peaks, fftconvolve_gaussian, ensure_dir
+from spectractor.tools import (pixel_rotation, detect_peaks, set_wcs_file_name, set_sources_file_name,
+                               set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir,
+                               plot_image_simple)
 from spectractor.extractor.images import Image, find_target
+from spectractor.astrometry import get_gaia_coords_after_proper_motion, source_detection
+from spectractor.extractor.background import  remove_image_background_sextractor
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.simulator import SpectrogramSimulatorCore, SimulatorInit
 
-from astropy.modeling import models
-from astropy.io import fits
+from astropy.io import fits, ascii
+import astropy.units as units
+from astropy.coordinates import SkyCoord
+from astropy.table import Table
 from scipy.signal import fftconvolve, gaussian
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import numpy as np
 import copy
 import os
-
-
-# from astroquery.gaia import Gaia, TapPlus, GaiaClass
-# Gaia = GaiaClass(TapPlus(url='http://gaia.ari.uni-heidelberg.de/tap'))
 
 
 class StarModel:
@@ -57,15 +59,15 @@ class StarModel:
         >>> from spectractor.extractor.images import fit_PSF2D_minuit
         >>> p = (100, 50, 50, 3, 2, -0.1, 1, 200)
         >>> psf = PSF2D(*p)
-        >>> yy, xx = np.mgrid[:100,:100]
+        >>> yy, xx = np.mgrid[:100,:50]
         >>> data = psf.evaluate(xx, yy, *p)
         >>> model = fit_PSF2D_minuit(xx, yy, data, guess=p)
-        >>> s = StarModel((20, 20), model, 200, target=None)
+        >>> s = StarModel((20, 10), model, 200, target=None)
         >>> s.plot_model()
         >>> s.x0
         20
         >>> s.y0
-        20
+        10
         >>> s.model.amplitude
         200
         """
@@ -77,7 +79,8 @@ class StarModel:
         self.model = copy.deepcopy(model)
         self.model.x_mean = self.x0
         self.model.y_mean = self.y0
-        self.model.amplitude = amplitude
+        self.model.amplitude_moffat = amplitude
+        self.my_logger.warning(f"{self.model}")
         # to be realistic, usually fitted fwhm is too big, divide by 2
         self.fwhm = self.model.gamma / 2
         self.sigma = self.model.stddev / 2
@@ -88,7 +91,7 @@ class StarModel:
         """
         x = np.linspace(self.x0 - 10 * self.fwhm, self.x0 + 10 * self.fwhm, 50)
         y = np.linspace(self.y0 - 10 * self.fwhm, self.y0 + 10 * self.fwhm, 50)
-        yy, xx = np.meshgrid(x, y)
+        xx, yy = np.meshgrid(x, y)
         star = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
         im = plt.pcolor(x, y, star, cmap='jet')
@@ -108,63 +111,91 @@ class StarModel:
 
 class StarFieldModel:
 
-    def __init__(self, base_image, threshold=0):
+    def __init__(self, base_image, flux_factor=1):
+        """
+        Examples
+        --------
+
+        >>> from spectractor.extractor.images import Image, find_target
+        >>> im = Image('tests/data/reduc_20170530_134.fits', target="HD111980")
+        >>> x0, y0 = find_target(im, guess=(740, 680), use_wcs=False)
+        >>> s = StarFieldModel(im)
+        >>> s.plot_model()
+
+        """
+        self.image = base_image
         self.target = base_image.target
         self.field = None
         self.stars = []
         self.pixcoords = []
-        x0, y0 = base_image.target_pixcoords
-        '''
-        result = Gaia.query_object_async(self.target.coord, 
-            width=CCD_IMSIZE*CCD_PIXEL2ARCSEC*units.arcsec/np.cos(self.target.coord.dec.radian), 
-            height=CCD_IMSIZE*CCD_PIXEL2ARCSEC*units.arcsec)
-        if parameters.DEBUG:
-            print result.pprint()
-        for o in result:
-            if o['dist'] < 0.005 : continue
-            radec = SkyCoord(ra=float(o['ra']),dec=float(o['dec']), frame='icrs', unit='deg')
-            y = int(y0 - (radec.dec.arcsec - self.target.coord.dec.arcsec)/CCD_PIXEL2ARCSEC)
-            x = int(x0 - (radec.ra.arcsec - self.target.coord.ra.arcsec)*np.cos(radec.dec.radian)/CCD_PIXEL2ARCSEC)
-            w = 10 # search windows in pixels
-            if x<w or x>CCD_IMSIZE-w: continue
-            if y<w or y>CCD_IMSIZE-w: continue
-            sub =  base_image.data[y-w:y+w,x-w:x+w]
-            A = np.max(sub) - np.min(sub)
-            if A < threshold: continue
-            self.stars.append( StarModel([x,y],base_image.target_star2D,A) )
-            self.pixcoords.append([x,y])
-        self.pixcoords = np.array(self.pixcoords).T
-        np.savetxt('starfield.txt',self.pixcoords)
-'''
-        # mask background, faint stars, and saturated pixels
-        image_thresholded = np.copy(base_image.data)
-        self.saturation = 0.99 * parameters.CCD_MAXADU / base_image.expo
-        self.saturated_pixels = np.where(image_thresholded > self.saturation)
-        image_thresholded[self.saturated_pixels] = 0.
-        image_thresholded -= threshold
-        image_thresholded[np.where(image_thresholded < 0)] = 0.
-        # mask order0 and spectrum
-        margin = 30
-        for y in range(int(y0) - 100, int(y0) + 100):
-            for x in range(parameters.CCD_IMSIZE):
-                u, v = pixel_rotation(x, y, base_image.disperser.theta([x0, y0]) * np.pi / 180., x0, y0)
-                if margin > v > -margin:
-                    image_thresholded[y, x] = 0.
-        # look for local maxima and create stars
-        peak_positions = detect_peaks(image_thresholded)
-        for y in range(parameters.CCD_IMSIZE):
-            for x in range(parameters.CCD_IMSIZE):
-                if peak_positions[y, x]:
-                    if np.sqrt((y - y0) ** 2 + (x - x0) ** 2) < 10 * base_image.target_star2D.gamma:
-                        continue  # no double star
-                    self.stars.append(StarModel([x, y], base_image.target_star2D, image_thresholded[y, x]))
-                    self.pixcoords.append([x, y])
-        self.pixcoords = np.array(self.pixcoords).T
         self.fwhm = base_image.target_star2D.gamma
+        self.flux_factor = flux_factor
+        self.set_star_list()
+
+    def set_star_list(self):
+        x0, y0 = self.image.target_pixcoords
+        sources_file_name = set_sources_file_name(self.image.file_name)
+        if os.path.isfile(sources_file_name):
+            # load sources positions and flux
+            sources = Table.read(sources_file_name)
+            sources['X'].name = "xcentroid"
+            sources['Y'].name = "ycentroid"
+            sources['FLUX'].name = "flux"
+            # test presence of WCS and gaia catalog files
+            wcs_file_name = set_wcs_file_name(self.image.file_name)
+            gaia_catalog_file_name = set_gaia_catalog_file_name(self.image.file_name)
+            if os.path.isfile(wcs_file_name) and os.path.isfile(gaia_catalog_file_name):
+                # load gaia catalog
+                gaia_catalog = ascii.read(gaia_catalog_file_name, format="ecsv")
+                gaia_coord_after_motion = get_gaia_coords_after_proper_motion(gaia_catalog, self.image.date_obs)
+                # load WCS
+                wcs = load_wcs_from_file(wcs_file_name)
+                # catalog matching to set star positions using Gaia
+                sources_coord = wcs.all_pix2world(sources['xcentroid'], sources['ycentroid'], 0)
+                sources_coord = SkyCoord(ra=sources_coord[0] * units.deg, dec=sources_coord[1] * units.deg,
+                                         frame="icrs", obstime=self.image.date_obs, equinox="J2000")
+                gaia_index, dist_2d, dist_3d = sources_coord.match_to_catalog_sky(gaia_coord_after_motion)
+                for k, gaia_i in enumerate(gaia_index):
+                    x, y = wcs.all_world2pix(gaia_coord_after_motion[gaia_i].ra, gaia_coord_after_motion[gaia_i].dec, 0)
+                    A = sources['flux'][k] * self.flux_factor
+                    self.image.my_logger.warning(f"\n\t{x} {y} {A}")
+                    self.stars.append(StarModel([x, y], self.image.target_star2D, A))
+                    self.pixcoords.append([x, y])
+            else:
+                for k, source in enumerate(sources):
+                    x, y = sources['xcentroid'][k], sources['ycentroid'][k]
+                    A = sources['flux'][k] * self.flux_factor
+                    self.stars.append(StarModel([x, y], self.image.target_star2D, A))
+                    self.pixcoords.append([x, y])
+        else:
+            # mask background, faint stars, and saturated pixels
+            data = np.copy(self.image.data)
+            # self.saturation = 0.99 * parameters.CCD_MAXADU / base_image.expo
+            # self.saturated_pixels = np.where(image_thresholded > self.saturation)
+            # image_thresholded[self.saturated_pixels] = 0.
+            # image_thresholded -= threshold
+            # image_thresholded[np.where(image_thresholded < 0)] = 0.
+            # mask order0 and spectrum
+            margin = 30
+            mask = np.zeros(data.shape, dtype=bool)
+            for y in range(int(y0) - 100, int(y0) + 100):
+                for x in range(parameters.CCD_IMSIZE):
+                    u, v = pixel_rotation(x, y, self.image.disperser.theta([x0, y0]) * np.pi / 180., x0, y0)
+                    if margin > v > -margin:
+                        mask[y, x] = True
+            # remove background and detect sources
+            data_wo_bkg = remove_image_background_sextractor(data)
+            sources = source_detection(data_wo_bkg, mask=mask)
+            for k, source in enumerate(sources):
+                x, y = sources['xcentroid'][k], sources['ycentroid'][k]
+                A = sources['flux'][k] * self.flux_factor
+                self.stars.append(StarModel([x, y], self.image.target_star2D, A))
+                self.pixcoords.append([x, y])
+        self.pixcoords = np.array(self.pixcoords).T
 
     def model(self, x, y):
         if self.field is None:
-            window = int(10 * self.fwhm)
+            window = int(20 * self.fwhm)
             self.field = self.stars[0].model(x, y)
             for k in range(1, len(self.stars)):
                 left = max(0, int(self.pixcoords[0][k]) - window)
@@ -173,24 +204,24 @@ class StarFieldModel:
                 up = min(parameters.CCD_IMSIZE, int(self.pixcoords[1][k]) + window)
                 yy, xx = np.mgrid[low:up, left:right]
                 self.field[low:up, left:right] += self.stars[k].model(xx, yy)
-            self.field[self.saturated_pixels] += self.saturation
         return self.field
 
     def plot_model(self):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         starfield = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
-        im = plt.imshow(starfield, origin='lower', cmap='jet')
-        ax.grid(color='white', ls='solid')
-        ax.grid(True)
-        ax.set_xlabel('X [pixels]')
-        ax.set_ylabel('Y [pixels]')
-        ax.set_title(f'Star field model: fwhm={self.fwhm.value:.2f}')
-        cb = plt.colorbar(im, ax=ax)
-        cb.formatter.set_powerlimits((0, 0))
-        cb.locator = MaxNLocator(7, prune=None)
-        cb.update_ticks()
-        cb.set_label('Arbitrary units')  # ,fontsize=16)
+        plot_image_simple(ax, starfield, scale="log10", target_pixcoords=self.pixcoords)
+        # im = plt.imshow(starfield, origin='lower', cmap='jet')
+        # ax.grid(color='white', ls='solid')
+        # ax.grid(True)
+        # ax.set_xlabel('X [pixels]')
+        # ax.set_ylabel('Y [pixels]')
+        # ax.set_title(f'Star field model: fwhm={self.fwhm.value:.2f}')
+        # cb = plt.colorbar(im, ax=ax)
+        # cb.formatter.set_powerlimits((0, 0))
+        # cb.locator = MaxNLocator(7, prune=None)
+        # cb.update_ticks()
+        # cb.set_label('Arbitrary units')  # ,fontsize=16)
         if parameters.DISPLAY:
             plt.show()
 
@@ -364,9 +395,13 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     guess = [spectrum.header['TARGETX'], spectrum.header['TARGETY']]
     if parameters.DEBUG:
         image.plot_image(scale='log10', target_pixcoords=guess)
-    # Find the exact target position in the raw cut image: several methods
+    # Fit the star 2D profile
     my_logger.info('\n\tSearch for the target in the image...')
-    target_pixcoords = find_target(image, guess)
+    target_pixcoords = find_target(image, guess, use_wcs=False)
+    # Find the exact target position using WCS if available
+    wcs_file_name = set_wcs_file_name(image.file_name)
+    if os.path.isfile(wcs_file_name):
+        target_pixcoords = find_target(image, guess, use_wcs=True)
     # Background model
     my_logger.info('\n\tBackground model...')
     yy, xx = np.mgrid[:parameters.XWINDOW, :parameters.YWINDOW]
@@ -378,7 +413,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Target model
     my_logger.info('\n\tStar model...')
     # Spectrogram is simulated with spectrum.x0 target position: must be this position to simualte the target.
-    star = StarModel(spectrum.x0, image.target_star2D, image.target_star2D.amplitude_moffat.value, target=image.target)
+    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.amplitude_moffat.value,
+                     target=image.target)
     reso = star.sigma
     if parameters.DEBUG:
         star.plot_model()
@@ -386,7 +422,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     starfield = None
     if with_stars:
         my_logger.info('\n\tStar field model...')
-        starfield = StarFieldModel(image, threshold=0.01 * star.amplitude)
+        starfield = StarFieldModel(image)
         if parameters.VERBOSE:
             image.plot_image(scale='log10', target_pixcoords=starfield.pixcoords)
             starfield.plot_model()
@@ -424,6 +460,9 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Convert data from ADU/s in ADU
     image.convert_to_ADU_units()
+
+    # Saturation effects
+    image.data[image.data > image.saturation] = image.saturation
 
     # Add Poisson and read-out noise
     image.add_poisson_and_read_out_noise()

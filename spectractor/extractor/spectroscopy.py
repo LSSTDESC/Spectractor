@@ -164,8 +164,9 @@ class Lines:
 
         """
         self.my_logger = set_logger(self.__class__.__name__)
-        if redshift < 0:
-            self.my_logger.error(f'\n\tRedshift must be positive or null. Got redshift={redshift}.')
+        if redshift < -1e-2:
+            self.my_logger.error(f'\n\tRedshift must small in absolute value (|z|<0.01) or be positive or null. '
+                                 f'Got redshift={redshift}.')
         self.lines = lines
         self.redshift = redshift
         self.atmospheric_lines = atmospheric_lines
