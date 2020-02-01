@@ -268,7 +268,7 @@ def find_order01_positions(holo_center, N_interp, theta_interp, verbose=True):
 class Grating:
     """Generic class for dispersers."""
 
-    def __init__(self, N, label="", D=parameters.DISTANCE2CCD, data_dir=parameters.HOLO_DIR, verbose=False):
+    def __init__(self, N, label="", D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR, verbose=False):
         """Initialize a standard grating object.
 
         Parameters
@@ -281,7 +281,7 @@ class Grating:
             The distance between the CCD and the disperser in mm.
         data_dir: str
             The directory where information about this disperser is stored. Must be in the form data_dir/label/...
-            (default: parameters.HOLO_DIR)
+            (default: parameters.DISPERSER_DIR)
         verbose: bool
             Set to True to increase the verbosity of the initialisation (default: False)
 
@@ -290,7 +290,7 @@ class Grating:
         >>> g = Grating(400)
         >>> print(g.N_input)
         400
-        >>> g = Grating(400, label="Ron400", data_dir=parameters.HOLO_DIR)
+        >>> g = Grating(400, label="Ron400", data_dir=parameters.DISPERSER_DIR)
         >>> print(g.N_input)
         400.869182487
         >>> assert g.D is parameters.DISTANCE2CCD
@@ -536,7 +536,7 @@ class Grating:
 
 class Hologram(Grating):
 
-    def __init__(self, label, D=parameters.DISTANCE2CCD, data_dir=parameters.HOLO_DIR,
+    def __init__(self, label, D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR,
                  lambda_plot=256000, verbose=False):
         """Initialize an Hologram object, given its label. Specification are loaded from text files
         in data_dir/label/... Inherit from the Grating class.
@@ -549,7 +549,7 @@ class Hologram(Grating):
             The distance between the CCD and the disperser in mm.
         data_dir: str
             The directory where information about this disperser is stored. Must be in the form data_dir/label/...
-            (default: parameters.HOLO_DIR)
+            (default: parameters.DISPERSER_DIR)
         lambda_plot: float, optional
             Wavelength to plot the hologram pattern (default: 256000).
         verbose: bool
@@ -557,7 +557,7 @@ class Hologram(Grating):
 
         Examples
         --------
-        >>> h = Hologram(label="HoloPhP", data_dir=parameters.HOLO_DIR)
+        >>> h = Hologram(label="HoloPhP", data_dir=parameters.DISPERSER_DIR)
         >>> h.label
         'HoloPhP'
         >>> h.N((500,500))
