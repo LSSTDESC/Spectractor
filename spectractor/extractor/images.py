@@ -37,11 +37,17 @@ class Image(object):
         Examples
         --------
         >>> im = Image('tests/data/reduc_20170605_028.fits')
-        >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
-        >>> assert im.data is not None and np.mean(im.data) > 0
-        >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
-        >>> assert im.header is not None
-        >>> assert im.gain is not None and np.mean(im.gain) > 0
+        >>> print(im.file_name)
+        'tests/data/reduc_20170605_028.fits'
+
+        .. doctest:
+            :hide:
+            >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
+            >>> assert im.data is not None and np.mean(im.data) > 0
+            >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
+            >>> assert im.header is not None
+            >>> assert im.gain is not None and np.mean(im.gain) > 0
+
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.file_name = file_name
@@ -79,7 +85,7 @@ class Image(object):
             self.target = load_target(target, verbose=parameters.VERBOSE)
             self.header['TARGET'] = self.target.label
             self.header.comments['TARGET'] = 'object targeted in the image'
-            self.header['REDSHIFT'] = self.target.redshift
+            self.header['REDSHIFT'] = str(self.target.redshift)
             self.header.comments['REDSHIFT'] = 'redshift of the target'
         self.err = None
 
@@ -98,10 +104,12 @@ class Image(object):
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
             load_LPNHE_image(self)
+        if parameters.OBS_NAME == "AUXTEL":
+            load_AUXTEL_image(self)
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
-                                  data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
+                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
         self.compute_statistical_error()
         self.convert_to_ADU_rate_units()
 
@@ -367,6 +375,33 @@ def load_LPNHE_image(image):  # pragma: no cover
     parameters.CCD_IMSIZE = image.data.shape[1]
 
 
+def load_AUXTEL_image(image):  # pragma: no cover
+    """Specific routine to load AUXTEL fits files and load their data and properties for Spectractor.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    image.my_logger.info(f'\n\tLoading AUXTEL image {image.file_name}...')
+    image.my_logger.warning(image.header)
+    hdu_list = fits.open(image.file_name)
+    image.header = hdu_list[0].header
+    image.data = hdu_list[1].data.astype(np.float64)
+    hdu_list.close()  # need to free allocation for file descripto
+    # image.data = np.concatenate((data[10:-10, 10:-10], data2[10:-10, 10:-10]))
+    image.date_obs = image.header['DATE-OBS']
+    image.expo = float(image.header['EXPTIME'])
+    image.header['ROTANGLE'] = image.rotation_angle
+    image.header['LSHIFT'] = 0.
+    image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.data = image.data.T[:, ::-1]
+    image.my_logger.info('\n\tImage loaded')
+    # compute CCD gain map
+    image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
+    parameters.CCD_IMSIZE = image.data.shape[1]
+
+
 def find_target(image, guess=None, rotated=False, use_wcs=True):
     """Find the target in the Image instance.
 
@@ -395,6 +430,8 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
     """
     my_logger = set_logger(__name__)
     target_pixcoords = [-1, -1]
+    theX = -1
+    theY = -1
     if use_wcs:
         wcs_file_name = set_wcs_file_name(image.file_name)
         if os.path.isfile(wcs_file_name):
@@ -622,7 +659,7 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     XX = np.arange(NX)
     YY = np.arange(NY)
     Y, X = np.mgrid[:NY, :NX]
-    bkgd_2D = fit_poly2d_outlier_removal(X, Y, sub_image, order=2, sigma=3)
+    bkgd_2D = fit_poly2d_outlier_removal(X, Y, sub_image, order=1, sigma=3)
     image.target_bkgd2D = bkgd_2D
     sub_image_subtracted = sub_image - bkgd_2D(X, Y)
     # find a first guess of the target position
