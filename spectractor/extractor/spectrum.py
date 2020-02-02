@@ -1172,6 +1172,19 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.spectrogram_deg = spectrum.chromatic_psf.deg
     spectrum.spectrogram_saturation = spectrum.chromatic_psf.saturation
 
+    # Plot FHWM(lambda)
+    if parameters.DEBUG:
+        fig = plt.figure(figsize=(10, 6))
+        plt.plot(spectrum.lambdas, np.array(s.table['fwhm']))
+        plt.xlabel(r"$\lambda$ [nm]")
+        plt.ylabel("Transverse FWHM [pixels]")
+        plt.ylim((0.8*np.min(s.table['fwhm']), 1.2*np.max(s.table['fwhm'][-10:])))
+        plt.grid()
+        if parameters.DISPLAY:
+            plt.show()
+        if parameters.LSST_SAVEFIGPATH:
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'fwhm.pdf'))
+
     # Summary plot
     if parameters.DEBUG or parameters.LSST_SAVEFIGPATH:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
