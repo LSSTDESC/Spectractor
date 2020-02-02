@@ -395,6 +395,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.header['ROTANGLE'] = image.rotation_angle
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.disperser_label = image.header['GRATING']
     image.data = image.data.T[:, ::-1]
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
