@@ -65,7 +65,7 @@ def test_extractor_auxtel():
     for file_name in file_names:
         tag = file_name.split('/')[-1]
         # disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-        spectrum = Spectractor(file_name, './outputs/', target_label, guess=[xpos, ypos],
+        spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
                                config='./config/auxtel.ini', line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10

@@ -9,7 +9,7 @@ from spectractor.extractor.spectrum import (Spectrum, extract_spectrum_from_imag
 from spectractor.tools import ensure_dir
 
 
-def Spectractor(file_name, output_directory, target, guess=None, disperser_label="", config='./config/ctio.ini',
+def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='./config/ctio.ini',
                 atmospheric_lines=True, line_detection=True):
     """ Spectractor
     Main function to extract a spectrum from an image
@@ -20,7 +20,7 @@ def Spectractor(file_name, output_directory, target, guess=None, disperser_label
         Input file nam of the image to analyse.
     output_directory: str
         Output directory.
-    target: str
+    target_label: str
         The name of the targeted object.
     guess: [int,int], optional
         [x0,y0] list of the guessed pixel positions of the target in the image (must be integers). Mandatory if
@@ -63,7 +63,7 @@ def Spectractor(file_name, output_directory, target, guess=None, disperser_label
     # Load config file
     load_config(config)
     # Load reduced image
-    image = Image(file_name, target=target, disperser_label=disperser_label)
+    image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
     if parameters.DEBUG:
         image.plot_image(scale='log10', target_pixcoords=guess)
     # Set output path
