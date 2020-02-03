@@ -21,7 +21,7 @@ from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_
 
 class Image(object):
 
-    def __init__(self, file_name, target="", disperser_label=""):
+    def __init__(self, file_name, target_label="", disperser_label=""):
         """
         The image class contains all the features necessary to load an image and extract a spectrum.
 
@@ -29,7 +29,7 @@ class Image(object):
         ----------
         file_name: str
             The file name where the image is.
-        target: str, optional
+        target_label: str, optional
             The target name, to be found in data bases.
         disperser_label: str, optional
             The disperser label to load its properties
@@ -81,8 +81,8 @@ class Image(object):
         self.target_pixcoords_rotated = None
         self.target_bkgd2D = None
         self.target_star2D = None
-        if target != "":
-            self.target = load_target(target, verbose=parameters.VERBOSE)
+        if target_label != "":
+            self.target = load_target(target_label, verbose=parameters.VERBOSE)
             self.header['TARGET'] = self.target.label
             self.header.comments['TARGET'] = 'object targeted in the image'
             self.header['REDSHIFT'] = str(self.target.redshift)
@@ -395,6 +395,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.header['ROTANGLE'] = image.rotation_angle
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.disperser_label = image.header['GRATING']
     image.data = image.data.T[:, ::-1]
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map

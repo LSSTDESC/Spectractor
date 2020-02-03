@@ -58,7 +58,6 @@ def test_extractor_auxtel():
     # logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    disperser_label = "Ron90"
     xpos = 1600
     ypos = 2293
     target_label = "HD107696"
@@ -66,7 +65,7 @@ def test_extractor_auxtel():
     for file_name in file_names:
         tag = file_name.split('/')[-1]
         # disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-        spectrum = Spectractor(file_name, './outputs/', target_label, [xpos, ypos], disperser_label,
+        spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
                                config='./config/auxtel.ini', line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10
