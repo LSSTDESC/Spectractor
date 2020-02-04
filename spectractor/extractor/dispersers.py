@@ -366,11 +366,17 @@ class Grating:
             a = np.loadtxt(filename)
             self.N_input = a[0]
             self.N_err = a[1]
+        else:
+            raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
+
         filename = self.data_dir + self.label + "/full_name.txt"
         if os.path.isfile(filename):
             with open(filename, 'r') as f:
-                for line in f:
+                for line in f:  # MFL: you really just want the last line of the file?
                     self.full_name = line.rstrip('\n')
+        else:
+            raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
+
         filename = self.data_dir + self.label + "/transmission.txt"
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
@@ -380,6 +386,9 @@ class Grating:
         else:
             self.transmission = lambda x: np.ones_like(x).astype(float)
             self.transmission_err = lambda x: np.zeros_like(x).astype(float)
+            msg = f"Failed to load {filename} for {self.label}, using default (perfect) transmission"
+            self.my_logger.info(msg)
+
         filename = self.data_dir + self.label + "/ratio_order_2over1.txt"
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
@@ -399,6 +408,9 @@ class Grating:
             self.theta_tilt = float(lines[1].split(' ')[2])
         else:
             self.theta_tilt = 0
+            msg = f"Failed to load {filename} for {self.label}, using default tilt of {self.theta_tilt}"
+            self.my_logger.info(msg)
+
         if verbose:
             self.my_logger.info(f'\n\tGrating average tilt of {self.theta_tilt:.1f} degrees')
 
@@ -545,7 +557,7 @@ class Grating:
         """ Return wavelength resolution in nm per pixel.
         See mathematica notebook: derivative of the grating formula.
         x0: the order 0 position on the full raw image.
-        deltaX: the distance in pixels between order 0 and signal point 
+        deltaX: the distance in pixels between order 0 and signal point
         in the rotated image."""
         delta = get_delta_pix_ortho(deltaX, x0, D=self.D) * parameters.CCD_PIXEL2MM
         # theta = self.refraction_angle(x,x0,order=order)
