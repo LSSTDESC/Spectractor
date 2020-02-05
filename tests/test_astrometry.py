@@ -31,8 +31,8 @@ def test_astrometry():
         if target is None or xpos is None or ypos is None:
             continue
         a = Astrometry(file_name, target, disperser_label)
-        extent = ((max(0, xpos - radius), min(xpos + radius, parameters.CCD_IMSIZE)),
-                  (max(0, ypos - radius), min(ypos + radius, parameters.CCD_IMSIZE)))
+        extent = ((int(max(0, xpos - radius)), int(min(xpos + radius, parameters.CCD_IMSIZE))),
+                  (int(max(0, ypos - radius)), int(min(ypos + radius, parameters.CCD_IMSIZE))))
         gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=maxiter)
         # checks
         assert os.path.isdir(wcs_output_directory)
