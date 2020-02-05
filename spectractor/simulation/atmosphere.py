@@ -54,7 +54,7 @@ class Atmosphere:
 
         """
         self.title = f'Atmospheric transmission with z={self.airmass:4.2f}, P={self.pressure:4.2f} hPa, ' \
-                     f'T={self.temperature:4.2f}$\degree$C'
+                     rf'T={self.temperature:4.2f}$\degree$C'
 
     def set_label(self):
         """Make a label string for the simulation.
@@ -79,7 +79,7 @@ class Atmosphere:
         Returns
         -------
         transmission: callable
-            The transmission function of wavelengths in nm.
+            The transmission function with wavelengths in nm.
 
         Examples
         --------
@@ -96,6 +96,10 @@ class Atmosphere:
         >>> a.plot_transmission()
 
         ..plot:
+
+            from spectractor.simulation.atmosphere import Atmosphere
+            import matplotlib.pyplot as plt
+            a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
             fig = plt.figure()
             plot_transmission_simple(plt.gca(), lambdas, transmission(lambdas), title=a.title, label=a.label)
             plt.show()
@@ -127,14 +131,12 @@ class Atmosphere:
         >>> a.plot_transmission()
 
         """
-        fig = plt.figure()
         plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.transmission(parameters.LAMBDAS),
                                  title=self.title, label=self.label)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
 
-# ----------------------------------------------------------------------------------
 class AtmosphereGrid(Atmosphere):
 
     def __init__(self, image_filename="", filename="", airmass=1., pressure=800., temperature=10.,
@@ -277,7 +279,7 @@ class AtmosphereGrid(Atmosphere):
         # first determine the length
         if parameters.VERBOSE or parameters.DEBUG:
             self.my_logger.info(f'\n\tAtmosphere simulations for z={self.airmass:4.2f}, P={self.pressure:4.2f}hPa, '
-                                f'T={self.temperature:4.2f}$\degree$C, for data-file={self.image_filename} ')
+                                rf'T={self.temperature:4.2f}$\degree$C, for data-file={self.image_filename} ')
         count = 0
         for aer in self.AER_Points:
             for pwv in self.PWV_Points:
@@ -325,7 +327,7 @@ class AtmosphereGrid(Atmosphere):
         plt.figure()
         img = plt.imshow(self.atmgrid[1:, self.index_atm_data:], origin='lower', cmap='jet', aspect="auto")
         plt.grid(True)
-        plt.xlabel("$\lambda$ [nm]")
+        plt.xlabel(r"$\lambda$ [nm]")
         plt.ylabel("Simulation number")
         plt.title(" Atmospheric variations")
         cbar = plt.colorbar(img)
@@ -520,3 +522,9 @@ class AtmosphereGrid(Atmosphere):
         atm = self.model(points)
         self.transmission = interp1d(self.lambdas, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
         return self.transmission
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
