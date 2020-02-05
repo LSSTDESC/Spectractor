@@ -1174,12 +1174,17 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Plot FHWM(lambda)
     if parameters.DEBUG:
-        fig = plt.figure(figsize=(10, 6))
-        plt.plot(spectrum.lambdas, np.array(s.table['fwhm']))
-        plt.xlabel(r"$\lambda$ [nm]")
-        plt.ylabel("Transverse FWHM [pixels]")
-        plt.ylim((0.8*np.min(s.table['fwhm']), 1.2*np.max(s.table['fwhm'][-10:])))
-        plt.grid()
+        fig, ax = plt.subplots(2, 1, figsize=(10, 8), sharex="all")
+        ax[0].plot(spectrum.lambdas, np.array(s.table['fwhm']))
+        ax[0].set_xlabel(r"$\lambda$ [nm]")
+        ax[0].set_ylabel("Transverse FWHM [pixels]")
+        ax[0].set_ylim((0.8*np.min(s.table['fwhm']), 1.2*np.max(s.table['fwhm'][-10:])))
+        ax[0].grid()
+        ax[1].plot(spectrum.lambdas, np.array(s.table['x_mean']))
+        ax[1].set_xlabel(r"$\lambda$ [nm]")
+        ax[1].set_ylabel("Distance from mean dispersion axis [pixels]")
+        # ax[1].set_ylim((0.8*np.min(s.table['Dy']), 1.2*np.max(s.table['fwhm'][-10:])))
+        ax[1].grid()
         if parameters.DISPLAY:
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
