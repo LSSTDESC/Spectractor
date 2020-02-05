@@ -5,6 +5,7 @@ from spectractor.config import load_config
 
 
 if __name__ == "__main__":
+    import sys
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
@@ -24,8 +25,12 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--radius", dest="radius", default=parameters.CCD_IMSIZE,
                         help="Radius in pixel around the guessed target position to detect sources "
                              "and set the new WCS solution (default: parameters.CCD_IMSIZE).")
-    parser.add_argument("-m", "--maxiter", dest="maxiter", default=10,
-                        help="Maximum iterations before WCS solution convergence below 1 mas.")
+    parser.add_argument("-m", "--maxiter", dest="maxiter", default=20,
+                        help="Maximum iterations to find best WCS (with the lowest residuals with the Gaia catalog).")
+    parser.add_argument("-x", "--xy", dest="target_xy", default="0,0",
+                        help="X,Y guessed position of the order 0, separated by a comma (default: 0,0).")
+    parser.add_argument("-t", "--target", dest="target_label", default="",
+                        help="Target label (default: '').")
     args = parser.parse_args()
 
     parameters.VERBOSE = args.verbose
@@ -40,14 +45,24 @@ if __name__ == "__main__":
 
     logbook = LogBook(logbook=args.logbook)
     for file_name in file_names:
-        tag = file_name.split('/')[-1]
-        tag = tag.replace('sim_', 'reduc_')
-        disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-        if target is None or xpos is None or ypos is None:
-            continue
-        a = Astrometry(file_name, target, disperser_label, output_directory=args.output_directory)
-        extent = ((max(0, xpos - radius), min(xpos + radius, parameters.CCD_IMSIZE)),
-                  (max(0, ypos - radius), min(ypos + radius, parameters.CCD_IMSIZE)))
+        disperser_label = ""
+        if args.target_xy != "0,0" and args.target_label == "":
+            tag = file_name.split('/')[-1]
+            tag = tag.replace('sim_', 'reduc_')
+            disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+            if target_label is None or xpos is None or ypos is None:
+                continue
+        else:
+            xpos, ypos = args.target_xy.split(",")
+            target_label = args.target_label
+            xpos = float(xpos)
+            ypos = float(ypos)
+            if target_label == "" or (xpos == 0 and ypos == 0):
+                sys.exit("Options --xy and --target must be used together, one of these seems not set.")
+        a = Astrometry(file_name, target_label=target_label, disperser_label=disperser_label,
+                       output_directory=args.output_directory)
+        extent = ((int(max(0, xpos - radius)), int(min(xpos + radius, parameters.CCD_IMSIZE))),
+                  (int(max(0, ypos - radius)), int(min(ypos + radius, parameters.CCD_IMSIZE))))
         gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=int(args.maxiter))
         # overwrite input file
         # if args.overwrite:
