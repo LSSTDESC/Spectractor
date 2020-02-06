@@ -688,8 +688,6 @@ class FullAtmosphereGrid():
         from astropy.table import Table
         self.my_logger.info(f'\n\tAtmosphere.load_image atm-file')
         table = Table.read("./full_atmospheric_grid.h5", format="hdf5", path="atmospheres")
-        #h5file = open_file("./full_atmospheric_grid.h5", mode="r")
-        #table = h5file.root.atmospheres.transmissions
         self.airmass_grid = np.unique(table['airmass'])
         self.pressure_grid = np.unique(table['pressure'])
         self.temperature_grid = np.unique(table['temperature'])
@@ -697,13 +695,10 @@ class FullAtmosphereGrid():
         self.ozone_grid = np.unique(table['ozone'])
         self.aerosols_grid = np.unique(table['aerosols'])
         self.lambdas = np.unique(table['lambdas'])
-        #for r in table.iterrows():
-            #    print(r['pressure'])
 
         shape = (self.airmass_grid.size, self.pressure_grid.size, self.temperature_grid.size,
-                                 self.pwv_grid.size, self.ozone_grid.size, self.aerosols_grid.size, self.lambdas.size)
+                 self.pwv_grid.size, self.ozone_grid.size, self.aerosols_grid.size, self.lambdas.size)
         self.atmgrid = np.array(table['transmissions']).reshape(shape)
-        self.my_logger.warning(f"\n{self.atmgrid}")
 
         # interpolate the grid
         self.model = RegularGridInterpolator((self.airmass_grid, self.pressure_grid, self.temperature_grid,
@@ -721,13 +716,12 @@ class FullAtmosphereGrid():
         """
         plt.figure()
         shape = np.copy(self.atmgrid.shape)
-        shape = (np.prod(shape[:-1]), shape[-1])
+        shape = (np.prod(shape[:-1]).astype(int), shape[-1])
         data = self.atmgrid.reshape(shape)
-        counts = np.arange(shape[0])
-        for count in counts:
+        for count in range(int(shape[0])):
             label = f'{count}'
-            plot_transmission_simple(plt.gca(), self.lambdas, data[int(count), :],
-                                     title="Atmospheric grid", label=label)
+            plot_transmission_simple(plt.gca(), self.lambdas, data[int(count), :], title="Atmospheric grid",
+                                     label=label)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
@@ -753,13 +747,17 @@ class FullAtmosphereGrid():
         if parameters.DISPLAY:
             plt.show()
 
-    def simulate(self, ozone, pwv, aerosols):
+    def simulate(self, airmass, pressure, temperature, ozone, pwv, aerosols):
         """Interpolate from the atmospheric grid to get the atmospheric transmission.
-
-        First ozone, second pwv, last aerosols, to respect order of loops when generating the grid
 
         Parameters
         ----------
+        airmass: float
+            Airmass of the source object.
+        pressure: float
+            Pressure of the atmosphere in hPa.
+        temperature: float
+            Temperature of the atmosphere in Celsius degrees.
         ozone: float
             Ozone quantity in Dobson
         pwv: float
@@ -769,11 +767,11 @@ class FullAtmosphereGrid():
 
         Examples
         --------
-        >>> a = AtmosphereGrid(filename='tests/data/reduc_20170530_134_atmsim.fits')
-        >>> lambdas = np.arange(200, 1200)
-        >>> fig = plt.figure()
+        >>> a = FullAtmosphereGrid()
+        >>> a.load()
+        >>> a.plot_transmission_image()
         >>> for pwv in np.arange(5):
-        ...     transmission = a.simulate(ozone=400, pwv=pwv, aerosols=0.05)
+        ...     transmission = a.simulate(airmass=1.2, pressure=815, temperature=11, ozone=400, pwv=pwv, aerosols=0.05)
         ...     plot_transmission_simple(plt.gca(), lambdas, transmission(lambdas),
         ...     title=a.title, label=a.label)
         >>> if parameters.DISPLAY: plt.show()
