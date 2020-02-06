@@ -2,6 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
+from astropy.table import Table
 
 from scipy.interpolate import interp1d, RegularGridInterpolator
 
@@ -524,22 +525,7 @@ class AtmosphereGrid(Atmosphere):
         return self.transmission
 
 
-from tables import IsDescription, Float32Col, open_file
-
-
-class AtmospherePoint(IsDescription):
-
-    airmass = Float32Col()
-    pressure = Float32Col()
-    temperature = Float32Col()
-    pwv = Float32Col()
-    ozone = Float32Col()
-    aerosols = Float32Col()
-    wavelength = Float32Col()
-    transmission = Float32Col()
-
-
-class FullAtmosphereGrid():
+class FullAtmosphereGrid:
 
     def __init__(self, airmass_grid=[1.], pressure_grid=[800.], temperature_grid=[10.],
                  pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
@@ -579,60 +565,6 @@ class FullAtmosphereGrid():
         self.ozone_grid = ozone_grid
         self.aerosols_grid = aerosol_grid
 
-    def compute_h5(self):
-        """Compute atmospheric transmissions and fill self.atmgrid.
-
-        The wavelengths used for the computation are the ones set by parameters.LAMBDAS.
-
-        Returns
-        -------
-        atmospheric_grid: array_like
-            The atmospheric grid self.atmgrid.
-
-        Examples
-        --------
-        >>> a = FullAtmosphereGrid(airmass_grid=[1], pressure_grid=[800, 850], temperature_grid=[10],
-        ... pwv_grid=[5, 6], ozone_grid=[300, 400], aerosol_grid=[0.0, 0.1])
-        >>> atmospheric_grid = a.compute()
-        >>> atmospheric_grid
-        >>> a.plot_transmission()
-        """
-        # first determine the length
-        self.my_logger.warning(f'\n\tAtmosphere simulations for\n\t\tz={self.airmass_grid}'
-                            f'\n\t\tP={self.pressure_grid}hPa\n\t\tT={self.temperature_grid}degC'
-                            f'\n\t\tPWV={self.pwv_grid}mm\n\t\tOzone={self.ozone_grid}dobson'
-                            f'\n\t\tAerosols={self.aerosols_grid}')
-        count = 0
-        h5file = open_file("full_atmospheric_grid.h5", mode="w",
-                           title="Grid of atmosphere simulations from LibRadTran 2.0.2")
-        group = h5file.create_group("/", 'atmospheres', 'Atmospheric simulations')
-        table = h5file.create_table(group, 'transmissions', AtmospherePoint, "Atmospheric transmission [no units]")
-        for z in self.airmass_grid:
-            for pressure in self.pressure_grid:
-                for temperature in self.temperature_grid:
-                    for pwv in self.pwv_grid:
-                        for oz in self.ozone_grid:
-                            for aer in self.aerosols_grid:
-                                self.my_logger.warning(f"\n\tz={z} P={pressure}hPa T={temperature} PWV={pwv}mm "
-                                                       f"Ozone={oz}DB Aerosols={aer}")
-                                a = Atmosphere(airmass=z, pressure=pressure, temperature=temperature)
-                                transmission = a.simulate(ozone=oz, pwv=pwv, aerosols=aer)
-                                transm = transmission(self.lambdas)
-                                for i, lbda in enumerate(self.lambdas):
-                                    atm = table.row
-                                    atm['airmass'] = z
-                                    atm['pressure'] = pressure
-                                    atm['temperature'] = temperature
-                                    atm['pwv'] = pwv
-                                    atm['ozone'] = oz
-                                    atm['aerosols'] = aer
-                                    atm['wavelength'] = lbda
-                                    atm['transmission'] = transm[i]
-                                    atm.append()
-                        table.flush()
-        h5file.close()
-        return table
-
     def compute(self):
         """Compute atmospheric transmissions and fill self.atmgrid.
 
@@ -645,35 +577,38 @@ class FullAtmosphereGrid():
 
         Examples
         --------
-        >>> a = FullAtmosphereGrid(airmass_grid=[1], pressure_grid=[800, 850], temperature_grid=[10],
-        ... pwv_grid=[5, 6], ozone_grid=[300, 400], aerosol_grid=[0.0, 0.1])
+        >>> a = FullAtmosphereGrid(airmass_grid=[1], pressure_grid=[800], temperature_grid=[10],
+        ... pwv_grid=[5], ozone_grid=[300], aerosol_grid=[0.0, 0.1])
         >>> atmospheric_grid = a.compute()
         >>> atmospheric_grid
+        >>> a.load()
         >>> a.plot_transmission()
         """
         # first determine the length
-        self.my_logger.warning(f'\n\tAtmosphere simulations for\n\t\tz={self.airmass_grid}'
-                               f'\n\t\tP={self.pressure_grid}hPa\n\t\tT={self.temperature_grid}degC'
-                               f'\n\t\tPWV={self.pwv_grid}mm\n\t\tOzone={self.ozone_grid}dobson'
-                               f'\n\t\tAerosols={self.aerosols_grid}')
-        count = 0
-        from astropy.table import Table
+        self.my_logger.info(f'\n\tAtmosphere simulations for\n\t\tz = {self.airmass_grid}'
+                            f'\n\t\tP = {self.pressure_grid} hPa\n\t\tT = {self.temperature_grid} degC'
+                            f'\n\t\tPWV = {self.pwv_grid} mm\n\t\tOzone = {self.ozone_grid} dobson'
+                            f'\n\t\tAerosols = {self.aerosols_grid}')
         ncols = 8
-        table = Table(names=("airmass", "pressure", "temperature", "pwv", "ozone", "aerosols", "lambdas","transmissions"), dtype=["f4"]*ncols)
+        table = Table(
+            names=("airmass", "pressure", "temperature", "pwv", "ozone", "aerosols", "lambdas", "transmissions"),
+            dtype=["f4"] * ncols)
+        if os.path.isfile("full_atmospheric_grid.h5"):
+            table = Table.read("./full_atmospheric_grid.h5", format="hdf5", path="atmospheres")
         for z in self.airmass_grid:
             for pressure in self.pressure_grid:
                 for temperature in self.temperature_grid:
                     for pwv in self.pwv_grid:
                         for oz in self.ozone_grid:
                             for aer in self.aerosols_grid:
-                                self.my_logger.warning(f"\n\tz={z} P={pressure}hPa T={temperature} PWV={pwv}mm "
-                                                       f"Ozone={oz}DB Aerosols={aer}")
+                                self.my_logger.info(f"\n\tz={z} P={pressure}hPa T={temperature} PWV={pwv}mm "
+                                                    f"Ozone={oz}DB Aerosols={aer}")
                                 a = Atmosphere(airmass=z, pressure=pressure, temperature=temperature)
                                 transmission = a.simulate(ozone=oz, pwv=pwv, aerosols=aer)
                                 transm = transmission(self.lambdas)
-                                for i,lbda in enumerate(self.lambdas):
+                                for i, lbda in enumerate(self.lambdas):
                                     table.add_row([z, pressure, temperature, pwv, oz, aer, lbda, transm[i]])
-        table.write("full_atmospheric_grid.h5", path='atmospheres', append=True, compression=True)
+        table.write("full_atmospheric_grid.h5", path='atmospheres', append=True, compression=True, overwrite=True)
         return table
 
     def load(self, file_name="./full_atmospheric_grid.h5"):
@@ -685,9 +620,8 @@ class FullAtmosphereGrid():
         >>> a.load()
 
         """
-        from astropy.table import Table
         self.my_logger.info(f'\n\tAtmosphere.load_image atm-file')
-        table = Table.read("./full_atmospheric_grid.h5", format="hdf5", path="atmospheres")
+        table = Table.read(file_name, format="hdf5", path="atmospheres")
         self.airmass_grid = np.unique(table['airmass'])
         self.pressure_grid = np.unique(table['pressure'])
         self.temperature_grid = np.unique(table['temperature'])
@@ -769,23 +703,24 @@ class FullAtmosphereGrid():
         --------
         >>> a = FullAtmosphereGrid()
         >>> a.load()
-        >>> a.plot_transmission_image()
-        >>> for pwv in np.arange(5):
-        ...     transmission = a.simulate(airmass=1.2, pressure=815, temperature=11, ozone=400, pwv=pwv, aerosols=0.05)
-        ...     plot_transmission_simple(plt.gca(), lambdas, transmission(lambdas),
-        ...     title=a.title, label=a.label)
+        >>> lambdas = parameters.LAMBDAS
+        >>> fig, ax = plt.subplots(2, 1)
+        >>> for pwv in np.arange(5,6,1):
+        ...     transmission = a.simulate(airmass=1.2, pressure=830, temperature=11, ozone=400, pwv=pwv, aerosols=0.05)
+        ...     plot_transmission_simple(ax[0], lambdas, transmission(lambdas))
+        ...     atm = Atmosphere(airmass=1.2, pressure=830, temperature=11)
+        ...     m = atm.simulate(ozone=400, pwv=pwv, aerosols=0.05)
+        ...     plot_transmission_simple(ax[0], lambdas, m(lambdas))
+        ...     ax[1].plot(lambdas, m(lambdas)/transmission(lambdas))
         >>> if parameters.DISPLAY: plt.show()
         """
-        self.pwv = pwv
-        self.ozone = ozone
-        self.aerosols = aerosols
-        self.set_title()
-        self.set_label()
         ones = np.ones_like(self.lambdas)
-        points = np.array([self.lambdas, ozone * ones, pwv * ones, aerosols * ones]).T
+        points = np.array(
+            [airmass * ones, pressure * ones, temperature * ones, pwv * ones, ozone * ones, aerosols * ones,
+             self.lambdas]).T
         atm = self.model(points)
-        self.transmission = interp1d(self.lambdas, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
-        return self.transmission
+        transmission = interp1d(self.lambdas, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
+        return transmission
 
 
 if __name__ == "__main__":
