@@ -527,8 +527,8 @@ class AtmosphereGrid(Atmosphere):
 
 class FullAtmosphereGrid:
 
-    def __init__(self, file_name="./full_atmospheric_grid.h5", airmass_grid=[1.], pressure_grid=[800.], temperature_grid=[10.],
-                 pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
+    def __init__(self, file_name="./full_atmospheric_grid.h5", airmass_grid=[1.], pressure_grid=[800.],
+                 temperature_grid=[10.], pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
         """Class to load and interpolate grids of atmospheric transmission computed with Libradtran.
 
         Parameters
