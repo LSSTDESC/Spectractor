@@ -83,6 +83,8 @@ class Spectrum:
             self.header = image.header
             self.date_obs = image.date_obs
             self.airmass = image.airmass
+            self.temperature = image.temperature
+            self.pressure = image.pressure
             self.expo = image.expo
             self.filters = image.filters
             self.filter = image.filter
@@ -285,6 +287,9 @@ class Spectrum:
         >>> assert os.path.isfile('./tests/test.fits')
         >>> os.remove('./tests/test.fits')
         """
+        self.header['AIRMASS'] = self.airmass
+        self.header['OUTPRESS'] = self.pressure
+        self.header['OUTTEMP'] = self.temperature
         self.header['UNIT1'] = "nanometer"
         self.header['UNIT2'] = self.units
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
@@ -374,6 +379,12 @@ class Spectrum:
                 self.rotation_angle = self.header['ROTANGLE']
             if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
+            if self.header['AIRMASS'] != "":
+                self.airmass = float(self.header['AIRMASS'])
+            if self.header['OUTPRESS'] != "":
+                self.pressure = float(self.header['OUTPRESS'])
+            if self.header['OUTTEMP'] != "":
+                self.temperature = float(self.header['OUTTEMP'])
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)

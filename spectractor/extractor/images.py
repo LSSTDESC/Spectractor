@@ -292,6 +292,10 @@ def load_CTIO_image(image):
     if image.header['YPIXSIZE'] != parameters.CCD_PIXEL2ARCSEC:
         image.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
             parameters.CCD_PIXEL2ARCSEC, image.header['YPIXSIZE']))
+    image.airmass = float(image.header['AIRMASS'])
+    image.pressure = float(image.header['OUTPRESS'])
+    image.temperature = float(image.header['OUTTEMP'])
+
     image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
                            obstime=image.header['DATE-OBS'])
     image.my_logger.info(f'\n\tImage {image.file_name} loaded.')
@@ -360,6 +364,9 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.header['ROTANGLE'] = image.rotation_angle
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.airmass = 1
+    image.pressure = 1000
+    image.temperature = 20
     image.data = image.data.T
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
