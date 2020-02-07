@@ -528,29 +528,36 @@ class AtmosphereGrid(Atmosphere):
 class FullAtmosphereGrid:
 
     def __init__(self, file_name="./full_atmospheric_grid.h5", airmass_grid=[1.], pressure_grid=[800.],
-                 temperature_grid=[10.], pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
+                 temperature_grid=[10.], pwv_grid=[0, 10, 10], ozone_grid=[300, 700, 4], aerosol_grid=[0, 0.1, 3]):
         """Class to load and interpolate grids of atmospheric transmission computed with Libradtran.
 
         Parameters
         ----------
+        file_name: str
+            File name for the .h5 output containing the grid (default: './full_atmospheric_grid.h5').
         airmass_grid: array_like
-            Airmass of the source object (default: 1).
+            Airmass of the source object (default: [1]).
         pressure_grid: array_like
-            Pressure of the atmosphere in hPa (default: 800).
+            Pressure of the atmosphere in hPa (default: [800]).
         temperature_grid: array_like
-            Temperature of the atmosphere in Celsius degrees (default: 10).
+            Temperature of the atmosphere in Celsius degrees (default: [10]).
         pwv_grid: array_like
             array_like of 3 numbers for the PWV quantity: min, max, number of simulations (default: [0, 10, 10]).
         ozone_grid: array_like
-            array_like of 3 numbers for the ozone quantity: min, max, number of simulations (default: [100, 700, 7]).
+            array_like of 3 numbers for the ozone quantity: min, max, number of simulations (default: [300, 700, 4]).
         aerosol_grid: array_like
-            array_like of 3 numbers for the aerosol quantity: min, max, number of simulations (default: [0, 0.1, 10]).
+            array_like of 3 numbers for the aerosol quantity: min, max, number of simulations (default: [0, 0.1, 3]).
 
         Examples
         --------
         >>> a = FullAtmosphereGrid()
         >>> a.airmass_grid
-        'reduc_20170530_134_spectrum.fits'
+        [1.0]
+
+        .. doctest:
+            :hide:
+
+            >>> assert np.all(a.lambdas == parameters.LAMBDAS)
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.filename = file_name
