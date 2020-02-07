@@ -29,9 +29,9 @@ def test_atmosphere():
     a.save_file(a.image_filename.replace('.fits', '_atmsim.fits'))
     assert os.path.isfile('tests/data/reduc_20170605_028_atmsim.fits')
     a.load_file(a.image_filename.replace('.fits', '_atmsim.fits'))
-    assert np.all(a.AER_Points == np.array([0., 0.1]))
-    assert np.all(a.PWV_Points == np.array([5.]))
-    assert np.all(a.OZ_Points == np.array([400.]))
+    assert np.all(a.aerosols_grid == np.array([0., 0.1]))
+    assert np.all(a.pwv_grid == np.array([5.]))
+    assert np.all(a.ozone_grid == np.array([400.]))
 
     a.plot_transmission()
     a.plot_transmission_image()
