@@ -527,7 +527,7 @@ class AtmosphereGrid(Atmosphere):
 
 class FullAtmosphereGrid:
 
-    def __init__(self, airmass_grid=[1.], pressure_grid=[800.], temperature_grid=[10.],
+    def __init__(self, file_name="./full_atmospheric_grid.h5", airmass_grid=[1.], pressure_grid=[800.], temperature_grid=[10.],
                  pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
         """Class to load and interpolate grids of atmospheric transmission computed with Libradtran.
 
@@ -553,6 +553,7 @@ class FullAtmosphereGrid:
         'reduc_20170530_134_spectrum.fits'
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        self.filename = file_name
 
         # the interpolated grid
         self.atmgrid = None
@@ -593,8 +594,8 @@ class FullAtmosphereGrid:
         table = Table(
             names=("airmass", "pressure", "temperature", "pwv", "ozone", "aerosols", "lambdas", "transmissions"),
             dtype=["f4"] * ncols)
-        if os.path.isfile("full_atmospheric_grid.h5"):
-            table = Table.read("./full_atmospheric_grid.h5", format="hdf5", path="atmospheres")
+        if os.path.isfile(self.filename):
+            table = Table.read(self.filename, format="hdf5", path="atmospheres")
         for z in self.airmass_grid:
             for pressure in self.pressure_grid:
                 for temperature in self.temperature_grid:
@@ -608,7 +609,7 @@ class FullAtmosphereGrid:
                                 transm = transmission(self.lambdas)
                                 for i, lbda in enumerate(self.lambdas):
                                     table.add_row([z, pressure, temperature, pwv, oz, aer, lbda, transm[i]])
-        table.write("full_atmospheric_grid.h5", path='atmospheres', append=True, compression=True, overwrite=True)
+        table.write(self.filename, path='atmospheres', compression=True, overwrite=True)
         return table
 
     def load(self, file_name="./full_atmospheric_grid.h5"):
@@ -620,7 +621,8 @@ class FullAtmosphereGrid:
         >>> a.load()
 
         """
-        self.my_logger.info(f'\n\tAtmosphere.load_image atm-file')
+        self.my_logger.info(f'\n\tLoading {file_name}...')
+        self.filename = file_name
         table = Table.read(file_name, format="hdf5", path="atmospheres")
         self.airmass_grid = np.unique(table['airmass'])
         self.pressure_grid = np.unique(table['pressure'])
