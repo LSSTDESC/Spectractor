@@ -61,7 +61,7 @@ class Atmosphere:
         """Make a label string for the simulation.
 
         """
-        self.label = f'PWV={self.pwv:4.2f}mm, OZ={self.ozone:4.2f}DB, VAOD={self.aerosols:4.2f} '
+        self.label = f'PWV={self.pwv:4.2f}mm, OZ={self.ozone:4.2f}db, VAOD={self.aerosols:4.2f} '
 
     def simulate(self, ozone, pwv, aerosols):
         """Simulate the atmosphere transparency with Libradtran given atmospheric composition.
@@ -193,9 +193,9 @@ class AtmosphereGrid(Atmosphere):
         self.NB_ATM_HEADER = self.index_atm_data + 1
         self.NB_ATM_DATA = len(parameters.LAMBDAS) - 1
         self.NB_ATM_POINTS = 0
-        self.AER_Points = np.array([])
-        self.OZ_Points = np.array([])
-        self.PWV_Points = np.array([])
+        self.aerosols_grid = np.array([])
+        self.ozone_grid = np.array([])
+        self.pwv_grid = np.array([])
         self.set_grid(pwv_grid=pwv_grid, ozone_grid=ozone_grid, aerosol_grid=aerosol_grid)
 
         # the interpolated grid
@@ -237,9 +237,9 @@ class AtmosphereGrid(Atmosphere):
         PWV_MAX = float(pwv_grid[1])
 
         # definition of the grid
-        self.AER_Points = np.linspace(AER_MIN, AER_MAX, NB_AER_POINTS)
-        self.OZ_Points = np.linspace(OZ_MIN, OZ_MAX, NB_OZ_POINTS)
-        self.PWV_Points = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
+        self.aerosols_grid = np.linspace(AER_MIN, AER_MAX, NB_AER_POINTS)
+        self.ozone_grid = np.linspace(OZ_MIN, OZ_MAX, NB_OZ_POINTS)
+        self.pwv_grid = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
 
         # total number of points
         self.NB_ATM_POINTS = NB_AER_POINTS * NB_OZ_POINTS * NB_PWV_POINTS
@@ -282,9 +282,9 @@ class AtmosphereGrid(Atmosphere):
             self.my_logger.info(f'\n\tAtmosphere simulations for z={self.airmass:4.2f}, P={self.pressure:4.2f}hPa, '
                                 rf'T={self.temperature:4.2f}$\degree$C, for data-file={self.image_filename} ')
         count = 0
-        for aer in self.AER_Points:
-            for pwv in self.PWV_Points:
-                for oz in self.OZ_Points:
+        for aer in self.aerosols_grid:
+            for pwv in self.pwv_grid:
+                for oz in self.ozone_grid:
                     count += 1
                     # fills headers info in the numpy array
                     self.atmgrid[count, self.index_atm_count] = count
@@ -370,21 +370,21 @@ class AtmosphereGrid(Atmosphere):
             hdr['TEMPERAT'] = self.temperature
             hdr['NBATMPTS'] = self.NB_ATM_POINTS
 
-            hdr['NBAERPTS'] = self.AER_Points.size
-            hdr['AERMIN'] = self.AER_Points.min()
-            hdr['AERMAX'] = self.AER_Points.max()
+            hdr['NBAERPTS'] = self.aerosols_grid.size
+            hdr['AERMIN'] = self.aerosols_grid.min()
+            hdr['AERMAX'] = self.aerosols_grid.max()
 
-            hdr['NBPWVPTS'] = self.PWV_Points.size
-            hdr['PWVMIN'] = self.PWV_Points.min()
-            hdr['PWVMAX'] = self.PWV_Points.max()
+            hdr['NBPWVPTS'] = self.pwv_grid.size
+            hdr['PWVMIN'] = self.pwv_grid.min()
+            hdr['PWVMAX'] = self.pwv_grid.max()
 
-            hdr['NBOZPTS'] = self.OZ_Points.size
-            hdr['OZMIN'] = self.OZ_Points.min()
-            hdr['OZMAX'] = self.OZ_Points.max()
+            hdr['NBOZPTS'] = self.ozone_grid.size
+            hdr['OZMIN'] = self.ozone_grid.min()
+            hdr['OZMAX'] = self.ozone_grid.max()
 
-            hdr['AER_PTS'] = np.array_str(self.AER_Points)
-            hdr['PWV_PTS'] = np.array_str(self.PWV_Points)
-            hdr['OZ_PTS'] = np.array_str(self.OZ_Points)
+            hdr['AER_PTS'] = np.array_str(self.aerosols_grid)
+            hdr['PWV_PTS'] = np.array_str(self.pwv_grid)
+            hdr['OZ_PTS'] = np.array_str(self.ozone_grid)
             hdr['NBWLBIN'] = parameters.LAMBDAS.size
             hdr['WLMIN'] = parameters.LAMBDA_MIN
             hdr['WLMAX'] = parameters.LAMBDA_MAX
@@ -417,11 +417,11 @@ class AtmosphereGrid(Atmosphere):
         >>> a.save_file(a.image_filename.replace('.fits', '_atmsim.fits'))
         >>> assert os.path.isfile('tests/data/reduc_20170605_028_atmsim.fits')
         >>> a.load_file(a.image_filename.replace('.fits', '_atmsim.fits'))
-        >>> a.AER_Points
+        >>> a.aerosols_grid
         array([0. , 0.1])
-        >>> a.PWV_Points
+        >>> a.pwv_grid
         array([5.])
-        >>> a.OZ_Points
+        >>> a.ozone_grid
         array([400.])
         """
 
@@ -460,9 +460,9 @@ class AtmosphereGrid(Atmosphere):
             OZ_MIN = hdr['OZMIN']
             OZ_MAX = hdr['OZMAX']
 
-            self.AER_Points = np.linspace(AER_MIN, AER_MAX, NB_AER_POINTS)
-            self.OZ_Points = np.linspace(OZ_MIN, OZ_MAX, NB_OZ_POINTS)
-            self.PWV_Points = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
+            self.aerosols_grid = np.linspace(AER_MIN, AER_MAX, NB_AER_POINTS)
+            self.ozone_grid = np.linspace(OZ_MIN, OZ_MAX, NB_OZ_POINTS)
+            self.pwv_grid = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
 
             NBWLBINS = hdr['NBWLBIN']
             # WLMIN = hdr['WLMIN']
@@ -483,7 +483,7 @@ class AtmosphereGrid(Atmosphere):
 
             # interpolate the grid
             self.lambdas = self.atmgrid[0, self.index_atm_data:]
-            self.model = RegularGridInterpolator((self.lambdas, self.OZ_Points, self.PWV_Points, self.AER_Points), (
+            self.model = RegularGridInterpolator((self.lambdas, self.ozone_grid, self.pwv_grid, self.aerosols_grid), (
                 self.atmgrid[1:, self.index_atm_data:].reshape(NB_AER_POINTS, NB_PWV_POINTS,
                                                                NB_OZ_POINTS,
                                                                len(self.lambdas))).T, bounds_error=False, fill_value=0)
@@ -551,13 +551,11 @@ class FullAtmosphereGrid:
         Examples
         --------
         >>> a = FullAtmosphereGrid()
-        >>> a.airmass_grid
-        [1.0]
 
         .. doctest:
             :hide:
 
-            >>> assert np.all(a.lambdas == parameters.LAMBDAS)
+            >>> assert np.all(np.isclose(a.lambdas, parameters.LAMBDAS))
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.filename = file_name
@@ -572,6 +570,8 @@ class FullAtmosphereGrid:
         self.pwv_grid = pwv_grid
         self.ozone_grid = ozone_grid
         self.aerosols_grid = aerosol_grid
+        if os.path.isfile(self.filename):
+            self.load(self.filename)
 
     def compute(self):
         """Compute atmospheric transmissions and fill self.atmgrid.
@@ -610,7 +610,7 @@ class FullAtmosphereGrid:
                         for oz in self.ozone_grid:
                             for aer in self.aerosols_grid:
                                 self.my_logger.info(f"\n\tz={z} P={pressure}hPa T={temperature} PWV={pwv}mm "
-                                                    f"Ozone={oz}DB Aerosols={aer}")
+                                                    f"Ozone={oz}db Aerosols={aer}")
                                 a = Atmosphere(airmass=z, pressure=pressure, temperature=temperature)
                                 transmission = a.simulate(ozone=oz, pwv=pwv, aerosols=aer)
                                 transm = transmission(self.lambdas)
@@ -631,13 +631,13 @@ class FullAtmosphereGrid:
         self.my_logger.info(f'\n\tLoading {file_name}...')
         self.filename = file_name
         table = Table.read(file_name, format="hdf5", path="atmospheres")
-        self.airmass_grid = np.unique(table['airmass'])
-        self.pressure_grid = np.unique(table['pressure'])
-        self.temperature_grid = np.unique(table['temperature'])
-        self.pwv_grid = np.unique(table['pwv'])
-        self.ozone_grid = np.unique(table['ozone'])
-        self.aerosols_grid = np.unique(table['aerosols'])
-        self.lambdas = np.unique(table['lambdas'])
+        self.airmass_grid = np.array(np.unique(table['airmass']))
+        self.pressure_grid = np.array(np.unique(table['pressure']))
+        self.temperature_grid = np.array(np.unique(table['temperature']))
+        self.pwv_grid = np.array(np.unique(table['pwv']))
+        self.ozone_grid = np.array(np.unique(table['ozone']))
+        self.aerosols_grid = np.array(np.unique(table['aerosols']))
+        self.lambdas = np.array(np.unique(table['lambdas']))
 
         shape = (self.airmass_grid.size, self.pressure_grid.size, self.temperature_grid.size,
                  self.pwv_grid.size, self.ozone_grid.size, self.aerosols_grid.size, self.lambdas.size)
@@ -677,6 +677,10 @@ class FullAtmosphereGrid:
         >>> a.load()
         >>> a.plot_transmission_image()
         """
+        self.my_logger.info(f'\n\tAtmosphere simulations for\n\t\tz = {self.airmass_grid}'
+                            f'\n\t\tP = {self.pressure_grid} hPa\n\t\tT = {self.temperature_grid} degC'
+                            f'\n\t\tPWV = {self.pwv_grid} mm\n\t\tOzone = {self.ozone_grid} dobson'
+                            f'\n\t\tAerosols = {self.aerosols_grid}')
         plt.figure()
         shape = np.copy(self.atmgrid.shape)
         shape = (np.prod(shape[:-1]), shape[-1])
@@ -720,7 +724,8 @@ class FullAtmosphereGrid:
         ...     atm = Atmosphere(airmass=1.2, pressure=830, temperature=11)
         ...     m = atm.simulate(ozone=400, pwv=pwv, aerosols=0.05)
         ...     plot_transmission_simple(ax[0], lambdas, m(lambdas))
-        ...     ax[1].plot(lambdas, m(lambdas)/transmission(lambdas))
+        ...     ax[1].plot(lambdas, m(lambdas)/transmission(lambdas))  # doctest: +ELLIPSIS
+        [<matplotlib.lines.Line2D object at ...>]
         >>> if parameters.DISPLAY: plt.show()
         """
         ones = np.ones_like(self.lambdas)
