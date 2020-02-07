@@ -45,9 +45,9 @@ class SpectrumFitWorkspace(FitWorkspace):
                            r"$\alpha_{\mathrm{pix}}$ [pix]"]
         self.bounds = [(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1), (1, 10), (50, 60), (-20, 20)]
         if atmgrid_filename != "":
-            self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
-            self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
-            self.bounds[4] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
+            self.bounds[2] = (min(self.atmosphere.ozone_grid), max(self.atmosphere.ozone_grid))
+            self.bounds[3] = (min(self.atmosphere.pwv_grid), max(self.atmosphere.pwv_grid))
+            self.bounds[4] = (min(self.atmosphere.aerosols_grid), max(self.atmosphere.aerosols_grid))
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
         self.get_truth()

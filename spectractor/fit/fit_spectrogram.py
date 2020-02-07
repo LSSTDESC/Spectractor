@@ -6,7 +6,7 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.simulation.simulator import SimulatorInit, SpectrogramModel
-from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid, FullAtmosphereGrid
 from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_gradient_descent, save_gradient_descent
 
 plot_counter = 0
@@ -19,15 +19,17 @@ class SpectrogramFitWorkspace(FitWorkspace):
         FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
                               live_fit, truth=truth)
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
-        self.airmass = self.spectrum.header['AIRMASS']
-        self.pressure = self.spectrum.header['OUTPRESS']
-        self.temperature = self.spectrum.header['OUTTEMP']
         self.my_logger = set_logger(self.__class__.__name__)
         if atmgrid_file_name == "":
-            self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
+            self.atmosphere = Atmosphere(self.spectrum.airmass, self.spectrum.pressure, self.spectrum.temperature)
         else:
             self.use_grid = True
-            self.atmosphere = AtmosphereGrid(file_name, atmgrid_file_name)
+            if ".fits" in atmgrid_file_name:
+                self.atmosphere = AtmosphereGrid(file_name, atmgrid_file_name)
+            elif ".h5" in atmgrid_file_name:
+                self.atmosphere = FullAtmosphereGrid(atmgrid_file_name)
+            else:
+                self.my_logger.error(f"\n\tUnknown extension for file {atmgrid_file_name}. Should be .fits or .h5.")
             if parameters.VERBOSE:
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
         self.crop_spectrogram()
@@ -64,9 +66,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
                                                 (50, 60), (-3, 3), (-3, 3), (-90, 90)]),
                                       self.psf_poly_params_bounds[:-1]])  # remove saturation
         if atmgrid_file_name != "":
-            self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
-            self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
-            self.bounds[4] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
+            self.bounds[2] = (min(self.atmosphere.ozone_grid), max(self.atmosphere.ozone_grid))
+            self.bounds[3] = (min(self.atmosphere.pwv_grid), max(self.atmosphere.pwv_grid))
+            self.bounds[4] = (min(self.atmosphere.aerosols_grid), max(self.atmosphere.aerosols_grid))
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
                                            with_background=True, fast_sim=False)
