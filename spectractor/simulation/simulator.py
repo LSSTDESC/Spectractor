@@ -17,6 +17,7 @@ Last update : July 2018
 """
 
 import os
+import sys
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,7 +34,7 @@ from spectractor.extractor.psf import PSF2D
 from spectractor.tools import fftconvolve_gaussian, ensure_dir, rebin
 from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
-from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid, FullAtmosphereGrid
 import spectractor.parameters as parameters
 
 
@@ -135,7 +136,14 @@ class SpectrumSimulation(Spectrum):
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(pixels, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
-        atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
+        if isinstance(self.atmosphere, Atmosphere) or isinstance(self.atmosphere, AtmosphereGrid):
+            atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
+        elif isinstance(self.atmosphere, FullAtmosphereGrid):
+            atmospheric_transmission = self.atmosphere.simulate(self.airmass, self.pressure, self.temperature,
+                                                                ozone, pwv, aerosols)(lambdas)
+        else:
+            self.my_logger.error(f"\n\tUnknown atmospheric class.")
+            sys.exit()
         # np.savetxt('atmospheric_trans_20170530_130.txt',np.array([lambdas,atmospheric_transmission(lambdas)]).T)
         self.data *= A1 * atmospheric_transmission
         self.err *= A1 * atmospheric_transmission
@@ -169,8 +177,8 @@ class SpectrogramModel(Spectrum):
         ----------
         spectrum: Spectrum
             Spectrum instance to load main properties before simulation.
-        atmosphere: Atmosphere
-            Atmosphere or AtmosphereGrid instance to make the atmospheric simulation.
+        atmosphere: Atmosphere, AtmosphericGrid, FullAtmosphericGrid
+            Atmosphere, AtmosphereGrid or FullAtmosphericGrid instance to make the atmospheric simulation.
         telescope: TelescopeTransmission
             Telescope transmission.
         disperser: Grating
@@ -222,7 +230,13 @@ class SpectrogramModel(Spectrum):
 
         """
         spectrum = np.zeros_like(lambdas)
-        atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
+        if isinstance(self.atmosphere, Atmosphere) or isinstance(self.atmosphere, AtmosphereGrid):
+            atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
+        elif isinstance(self.atmosphere, FullAtmosphereGrid):
+            atmosphere = self.atmosphere.simulate(self.airmass, self.pressure, self.temperature, ozone, pwv, aerosols)
+        else:
+            self.my_logger.error(f"\n\tUnknown atmospheric class.")
+            sys.exit()
         if self.fast_sim:
             spectrum = self.target.sed(lambdas)
             spectrum *= self.disperser.transmission(lambdas - shift_t)
@@ -836,13 +850,9 @@ def SpectrumSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A
 
     # SIMULATE SPECTRUM
     # -------------------
-    airmass = spectrum.header['AIRMASS']
-    pressure = spectrum.header['OUTPRESS']
-    temperature = spectrum.header['OUTTEMP']
-
-    spectrum_simulation = SpectrumSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
-                                                temperature, pwv, ozone, aerosols, A1=A1, A2=A2, reso=reso, D=D,
-                                                shift=shift)
+    spectrum_simulation = SpectrumSimulatorCore(spectrum, telescope, disperser, spectrum.airmass,
+                                                spectrum.pressure, spectrum.temperature, pwv, ozone, aerosols,
+                                                A1=A1, A2=A2, reso=reso, D=D, shift=shift)
 
     # Save the spectrum
     spectrum_simulation.header['OZONE'] = ozone
@@ -879,12 +889,8 @@ def SpectrogramSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05
 
     # SIMULATE SPECTRUM
     # -------------------
-    airmass = spectrum.header['AIRMASS']
-    pressure = spectrum.header['OUTPRESS']
-    temperature = spectrum.header['OUTTEMP']
-
-    spectrogram_simulation = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
-                                                      temperature, pwv, ozone, aerosols,
+    spectrogram_simulation = SpectrogramSimulatorCore(spectrum, telescope, disperser, spectrum.airmass,
+                                                      spectrum.pressure, spectrum.temperature, pwv, ozone, aerosols,
                                                       D=D, shift_x=shift_x,
                                                       shift_y=shift_y, shift_t=shift_t, angle=angle,
                                                       psf_poly_params=psf_poly_params)

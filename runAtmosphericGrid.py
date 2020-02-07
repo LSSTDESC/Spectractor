@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("-z", "--airmass", dest="airmass",
                         help="Three numbers min,max,nsteps to set the airmass grid.", default="1,3,3")
     parser.add_argument("-p", "--pressure", dest="pressure",
-                        help="Three numbers min,max,nsteps to set the pressure grid (in hPa).", default="800,1000,3")
+                        help="Three numbers min,max,nsteps to set the pressure grid (in hPa).", default="700,1000,4")
     parser.add_argument("-t", "--temperature", dest="temperature",
                         help="Three numbers min,max,nsteps to set the temperature grid (in Celsius degree).",
                         default="0,20,3")
@@ -24,7 +24,7 @@ if __name__ == "__main__":
                         help="Three numbers min,max,nsteps to set the precipitable water vapor (PWV) grid (in mm).",
                         default="0,10,3")
     parser.add_argument("-o", "--ozone", dest="ozone",
-                        help="Three numbers min,max,nsteps to set the ozone concentration grid (in dobson).",
+                        help="Three numbers min,max,nsteps to set the ozone concentration grid (in db).",
                         default="300,500,3")
     parser.add_argument("-a", "--aerosols", dest="aerosols",
                         help="Three numbers min,max,nsteps to set the aerosol concentration grid.",
