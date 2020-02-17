@@ -545,6 +545,8 @@ class Moffat(PSF):
             plt.xlabel("X [pixels]")
             plt.ylabel("Y [pixels]")
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
         """
         if p is not None:
@@ -1055,6 +1057,8 @@ class PSFFitWorkspace(FitWorkspace):
             figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 def load_PSF(psf_type=parameters.PSF_TYPE, target=None, clip=False):

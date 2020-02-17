@@ -516,7 +516,8 @@ class Image(object):
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'))
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 def load_CTIO_image(image):
     """Specific routine to load CTIO fits files and load their data and properties for Spectractor.
@@ -792,6 +793,8 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
                 plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
                                   target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
                 plt.show()
+            if parameters.PdfPages:
+                parameters.PdfPages.savefig()
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "fit" or rotated:
@@ -1006,6 +1009,8 @@ def find_target_1Dprofile(image, sub_image, guess):
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot1.pdf'))
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
     return avX, avY
 
 
@@ -1229,6 +1234,8 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotation_hessian.pdf'))
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
     return theta_median
 
 

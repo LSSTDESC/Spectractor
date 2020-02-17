@@ -90,6 +90,8 @@ class StarModel:
                           units='Arbitrary units')
         if parameters.DISPLAY:
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 class StarFieldModel:
@@ -207,6 +209,8 @@ class StarFieldModel:
         # cb.set_label('Arbitrary units')  # ,fontsize=16)
         if parameters.DISPLAY:
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 class BackgroundModel:
@@ -301,6 +305,8 @@ class BackgroundModel:
         cb.set_label('Arbitrary units')  # ,fontsize=16)
         if parameters.DISPLAY:
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 class ImageModel(Image):

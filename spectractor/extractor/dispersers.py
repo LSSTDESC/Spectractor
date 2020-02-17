@@ -589,6 +589,8 @@ class Grating:
         plt.legend(loc='best')
         if parameters.DISPLAY:
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 class Hologram(Grating):

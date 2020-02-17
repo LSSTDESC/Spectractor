@@ -287,6 +287,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         else:
             if parameters.DISPLAY and parameters.VERBOSE:
                 plt.show()
+            if parameters.PdfPages:
+                parameters.PdfPages.savefig()
             if parameters.SAVE:
                 figname = self.filename.replace('.fits', '_bestfit.pdf')
                 self.my_logger.info(f'Save figure {figname}.')
