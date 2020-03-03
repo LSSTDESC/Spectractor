@@ -338,14 +338,16 @@ class Lines:
             t[t.colnames[-1]].unit = 'reduced'
             print(t)
 
+
 # Line catalog
 
 # Hydrogen lines
 HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02], use_for_calibration=True)
 HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02])
-HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA]
+HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.016, 0.02], use_for_calibration=True)
+HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
 
 # Atmospheric lines
 FE1 = Line(382.044, atmospheric=True, label=r'$Fe$',
@@ -376,7 +378,7 @@ H2O_1 = Line(935, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
 H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2, CAII1, CAII2, FE1, FE2, FE3]
+ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2] #, CAII1, CAII2, FE1, FE2, FE3
 
 # ISM lines
 OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
