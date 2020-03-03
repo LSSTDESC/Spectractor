@@ -52,7 +52,7 @@ def test_extractor():
         assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrogram.fits')) is True
 
 
-def test_extractor_auxtel():
+def extractor_auxtel():
     file_names = ['tests/data/auxtel_first_light-1.fits']
 
     # logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
