@@ -31,8 +31,8 @@ def test_astrometry():
         if target is None or xpos is None or ypos is None:
             continue
         a = Astrometry(file_name, target, disperser_label)
-        extent = ((max(0, xpos - radius), min(xpos + radius, parameters.CCD_IMSIZE)),
-                  (max(0, ypos - radius), min(ypos + radius, parameters.CCD_IMSIZE)))
+        extent = ((int(max(0, xpos - radius)), int(min(xpos + radius, parameters.CCD_IMSIZE))),
+                  (int(max(0, ypos - radius)), int(min(ypos + radius, parameters.CCD_IMSIZE))))
         gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=maxiter)
         # checks
         assert os.path.isdir(wcs_output_directory)
@@ -48,7 +48,7 @@ def test_astrometry():
             assert np.isclose(a.wcs.wcs.crval[0], 224.9718998)
             assert np.isclose(a.wcs.wcs.crval[1], -54.28912925)
         if file_name == 'tests/data/sim_20170530_134.fits':
-            im = Image(file_name, target=target)
+            im = Image(file_name, target_label=target)
             x0_wcs, y0_wcs = find_target(im, guess=[xpos, ypos], rotated=False, use_wcs=True)
             x0, y0 = find_target(im, guess=[xpos, ypos], rotated=False, use_wcs=False)
             im.my_logger.warning(f"\n\tTrue {target} position: "

@@ -117,7 +117,7 @@ class StarFieldModel:
         --------
 
         >>> from spectractor.extractor.images import Image, find_target
-        >>> im = Image('tests/data/reduc_20170530_134.fits', target="HD111980")
+        >>> im = Image('tests/data/reduc_20170530_134.fits', target_label="HD111980")
         >>> x0, y0 = find_target(im, guess=(740, 680), use_wcs=False)
         >>> s = StarFieldModel(im)
         >>> s.plot_model()
@@ -320,9 +320,9 @@ class BackgroundModel:
 
 class ImageModel(Image):
 
-    def __init__(self, filename, target=None):
+    def __init__(self, filename, target_label=None):
         self.my_logger = set_logger(self.__class__.__name__)
-        Image.__init__(self, filename, target=target.label)
+        Image.__init__(self, filename, target_label=target_label.label)
         self.true_lambdas = None
         self.true_spectrum = None
 
@@ -391,7 +391,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
     # Load reduced image
     spectrum, telescope, disperser, target = SimulatorInit(spectrum_filename)
-    image = ImageModel(image_filename, target=target)
+    image = ImageModel(image_filename, target_label=target)
     guess = [spectrum.header['TARGETX'], spectrum.header['TARGETY']]
     if parameters.DEBUG:
         image.plot_image(scale='log10', target_pixcoords=guess)
