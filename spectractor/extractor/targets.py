@@ -1,15 +1,55 @@
-import matplotlib.pyplot as plt
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, Distance
+import astropy.units as u
+from astropy.time import Time
+
 from astroquery.ned import Ned
 from astroquery.simbad import Simbad
+import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
+import os
+import numpy as np
 
-from spectractor.extractor.spectroscopy import *
+from spectractor import parameters
+from spectractor.config import set_logger
+from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
+                                                ISM_LINES)
 
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
 
 
 def load_target(label, verbose=False):
+    """Load the target properties according to the type set by parameters.OBS_OBJECT_TYPE.
+
+    Currently, the type can be either "STAR", "HG-AR" or "MONOCHROMATOR". The label parameter gives the
+    name of the source and allows to load its specific properties.
+
+    Parameters
+    ----------
+    label: str
+        The label of the target.
+    verbose: bool, optional
+        If True, more verbosity (default: False).
+
+    Examples
+    --------
+    >>> parameters.OBS_OBJECT_TYPE = "STAR"
+    >>> t = load_target("HD111980", verbose=False)
+    >>> print(t.label)
+    HD111980
+    >>> print(t.radec_position.dec)
+    -18d31m20.009s
+    >>> parameters.OBS_OBJECT_TYPE = "MONOCHROMATOR"
+    >>> t = load_target("XX", verbose=False)
+    >>> print(t.label)
+    XX
+    >>> parameters.OBS_OBJECT_TYPE = "HG-AR"
+    >>> t = load_target("XX", verbose=False)
+    >>> print([line.wavelength for line in t.lines.lines][:5])
+    [253.652, 296.728, 302.15, 313.155, 334.148]
+    >>> parameters.OBS_OBJECT_TYPE = "OTHER"
+    >>> t = load_target("XX", verbose=False)
+    """
     if parameters.OBS_OBJECT_TYPE == 'STAR':
         return Star(label, verbose)
     elif parameters.OBS_OBJECT_TYPE == 'HG-AR':
@@ -33,27 +73,6 @@ class Target:
         verbose: bool, optional
             Set True to increase verbosity (default: False)
 
-        Examples
-        --------
-
-        Emission line object:
-        >>> t = Target('3C273')
-        >>> print(t.label)
-        3C273
-        >>> print(t.coord.dec)
-        2d03m08.598s
-        >>> print(t.emission_spectrum)
-        True
-
-        Standard star:
-        >>> t = Target('HD111980')
-        >>> print(t.label)
-        HD111980
-        >>> print(t.coord.dec)
-        -18d31m20.009s
-        >>> print(t.emission_spectrum)
-        False
-
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.label = label
@@ -65,22 +84,20 @@ class Target:
         self.hydrogen_only = False
         self.sed = None
         self.lines = None
-        self.coord = None
+        self.radec_position = None
+        self.radec_position_after_pm = None
         self.redshift = 0
-
-    def load(self):
-        pass
 
 
 class ArcLamp(Target):
 
     def __init__(self, label, verbose=False):
-        """Initialize Star class.
+        """Initialize ArcLamp class.
 
         Parameters
         ----------
         label: str
-            String label to name the target
+            String label to name the lamp.
         verbose: bool, optional
             Set True to increase verbosity (default: False)
 
@@ -88,12 +105,10 @@ class ArcLamp(Target):
         --------
 
         Mercury-Argon lamp:
-        >>> s = Star('3C273')
-        >>> print(s.label)
-        3C273
-        >>> print(s.coord.dec)
-        2d03m08.598s
-        >>> print(s.emission_spectrum)
+        >>> t = ArcLamp("HG-AR", verbose=False)
+        >>> print([line.wavelength for line in t.lines.lines][:5])
+        [253.652, 296.728, 302.15, 313.155, 334.148]
+        >>> print(t.emission_spectrum)
         True
 
         """
@@ -102,32 +117,29 @@ class ArcLamp(Target):
         self.emission_spectrum = True
         self.lines = Lines(HGAR_LINES, emission_spectrum=True)
 
-    def load(self):
+    def load(self):  # pragma: no cover
         pass
 
 
 class Monochromator(Target):
 
     def __init__(self, label, verbose=False):
-        """Initialize Star class.
+        """Initialize Monochromator class.
 
         Parameters
         ----------
         label: str
-            String label to name the target
+            String label to name the monochromator.
         verbose: bool, optional
             Set True to increase verbosity (default: False)
 
         Examples
         --------
 
-        Mercury-Argon lamp:
-        >>> s = Star('3C273')
-        >>> print(s.label)
-        3C273
-        >>> print(s.coord.dec)
-        2d03m08.598s
-        >>> print(s.emission_spectrum)
+        >>> t = Monochromator("XX", verbose=False)
+        >>> print(t.label)
+        XX
+        >>> print(t.emission_spectrum)
         True
 
         """
@@ -136,7 +148,7 @@ class Monochromator(Target):
         self.emission_spectrum = True
         self.lines = Lines([], emission_spectrum=True)
 
-    def load(self):
+    def load(self):  # pragma: no cover
         pass
 
 
@@ -159,7 +171,7 @@ class Star(Target):
         >>> s = Star('3C273')
         >>> print(s.label)
         3C273
-        >>> print(s.coord.dec)
+        >>> print(s.radec_position.dec)
         2d03m08.598s
         >>> print(s.emission_spectrum)
         True
@@ -168,7 +180,7 @@ class Star(Target):
         >>> s = Star('HD111980')
         >>> print(s.label)
         HD111980
-        >>> print(s.coord.dec)
+        >>> print(s.radec_position.dec)
         -18d31m20.009s
         >>> print(s.emission_spectrum)
         False
@@ -176,6 +188,7 @@ class Star(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
+        self.simbad = None
         self.load()
 
     def load(self):
@@ -184,36 +197,51 @@ class Star(Target):
         Examples
         --------
         >>> s = Star('3C273')
-        >>> print(s.coord.dec)
+        >>> print(s.radec_position.dec)
         2d03m08.598s
 
         """
-        Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype')
+        Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
+                                  'parallax', 'pm', 'z_value')
         simbad = Simbad.query_object(self.label)
+        self.simbad = simbad
         if simbad is not None:
-            if self.verbose:
-                self.my_logger.info(f'\n\tSimbad: {simbad}')
-            self.coord = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(units.hourangle, units.deg))
+            if self.verbose or True:
+                self.my_logger.info(f'\n\tSimbad:\n{simbad}')
+            self.radec_position = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(u.hourangle, u.deg))
         else:
             self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
+        self.get_radec_position_after_pm(date_obs="J2000")
+        self.redshift = float(simbad['Z_VALUE'])
         self.load_spectra()
 
     def load_spectra(self):
         """Load reference spectra from Pysynphot database or NED database.
 
+        If the object redshift is >0.2, the LAMBDA_MIN and LAMBDA_MAX parameters
+        are redshifted accordingly.
+
         Examples
         --------
         >>> s = Star('3C273')
         >>> print(s.spectra[0][:4])
-        [  0.00000000e+00   2.50485769e-14   2.42380612e-14   2.40887886e-14]
+        [0.0000000e+00 2.5048577e-14 2.4238061e-14 2.4088789e-14]
         >>> s = Star('HD111980')
         >>> print(s.spectra[0][:4])
-        [  2.16890002e-13   2.66480010e-13   2.03540011e-13   2.38780004e-13]
+        [2.16890002e-13 2.66480010e-13 2.03540011e-13 2.38780004e-13]
+        >>> s = Star('PKS1510-089')
+        >>> print(s.redshift)
+        0.36
+        >>> print(f'{parameters.LAMBDA_MIN:.1f}, {parameters.LAMBDA_MAX:.1f}')
+        408.0, 1496.0
+        >>> print(s.spectra[0][:4])
+        [117.34012 139.27621  87.38032 143.0816 ]
         """
         self.wavelengths = []  # in nm
         self.spectra = []
         # first try with pysynphot
         file_names = []
+        is_calspec = False
         if os.getenv("PYSYN_CDBS") is not None:
             dirname = os.path.expandvars('$PYSYN_CDBS/calspec/')
             for fname in os.listdir(dirname):
@@ -221,16 +249,17 @@ class Star(Target):
                     if self.label.lower() in fname.lower():
                         file_names.append(dirname + fname)
         if len(file_names) > 0:
+            is_calspec = True
             self.emission_spectrum = False
             self.hydrogen_only = True
             self.lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES,
-                               redshift=0., emission_spectrum=self.emission_spectrum,
+                               redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
             for k, f in enumerate(file_names):
                 if '_mod_' in f:
                     continue
                 if self.verbose:
-                    print('Loading %s' % f)
+                    self.my_logger.info('\n\tLoading %s' % f)
                 data = S.FileSpectrum(f, keepneg=True)
                 if isinstance(data.waveunits, S.units.Angstrom):
                     self.wavelengths.append(data.wave / 10.)
@@ -238,6 +267,12 @@ class Star(Target):
                 else:
                     self.wavelengths.append(data.wave)
                     self.spectra.append(data.flux)
+        elif 'HD' in self.label:  # it is a star
+            self.emission_spectrum = False
+            self.hydrogen_only = True
+            self.lines = Lines(ATMOSPHERIC_LINES + HYDROGEN_LINES,
+                               redshift=self.redshift, emission_spectrum=self.emission_spectrum,
+                               hydrogen_only=self.hydrogen_only)
         else:
             if 'PNG' not in self.label:
                 # Try with NED query
@@ -281,9 +316,32 @@ class Star(Target):
             else:
                 self.emission_spectrum = True
                 self.lines = Lines(ATMOSPHERIC_LINES+ISM_LINES+HYDROGEN_LINES,
-                                   redshift=0., emission_spectrum=self.emission_spectrum,
+                                   redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                    hydrogen_only=self.hydrogen_only)
         self.build_sed()
+        self.my_logger.debug(f"\n\tTarget label: {self.label}"
+                             f"\n\tCalspec? {is_calspec}"
+                             f"\n\tNumber of spectra: {len(self.spectra)}"
+                             f"\n\tRedshift: {self.redshift}"
+                             f"\n\tEmission spectrum ? {self.emission_spectrum}"
+                             f"\n\tLines: {[l.label for l in self.lines.lines]}")
+
+    def get_radec_position_after_pm(self, date_obs):
+        target_pmra = self.simbad[0]['PMRA'] * u.mas / u.yr
+        if np.isnan(target_pmra):
+            target_pmra = 0 * u.mas / u.yr
+        target_pmdec = self.simbad[0]['PMDEC'] * u.mas / u.yr
+        if np.isnan(target_pmdec):
+            target_pmdec = 0 * u.mas / u.yr
+        target_parallax = self.simbad[0]['PLX_VALUE'] * u.mas
+        if target_parallax == 0 * u.mas:
+            target_parallax = 1e-4 * u.mas
+        target_coord = SkyCoord(ra=self.radec_position.ra, dec=self.radec_position.dec,
+                                distance=Distance(parallax=target_parallax),
+                                pm_ra_cosdec=target_pmra, pm_dec=target_pmdec, frame='icrs', equinox="J2000",
+                                obstime="J2000")
+        self.radec_position_after_pm = target_coord.apply_space_motion(new_obstime=Time(date_obs))
+        return self.radec_position_after_pm
 
     def build_sed(self, index=0):
         """Interpolate the database reference spectra and return self.sed as a function of the wavelength.
@@ -298,7 +356,7 @@ class Star(Target):
         >>> s = Star('HD111980')
         >>> s.build_sed(index=0)
         >>> s.sed(550)
-        array(1.676051129017069e-11)
+        array(1.67605113e-11)
         """
         if len(self.spectra) == 0:
             self.sed = lambda x: np.zeros_like(x)
@@ -319,17 +377,17 @@ class Star(Target):
         for isp, sp in enumerate(self.spectra):
             plt.plot(self.wavelengths[isp], sp, label='Spectrum %d' % isp)
         plt.xlim((300, 1100))
-        plt.xlabel('$\lambda$ [nm]')
+        plt.xlabel(r'$\lambda$ [nm]')
         plt.ylabel('Flux')
         plt.title(self.label)
         plt.legend()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
 
 if __name__ == "__main__":
     import doctest
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
+    # if np.__version__ >= "1.14.0":
+    #    np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
