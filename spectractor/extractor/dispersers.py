@@ -1,8 +1,12 @@
-import matplotlib.pyplot as plt
 from scipy import interpolate
 from scipy import ndimage
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
-from spectractor.tools import *
+from spectractor import parameters
+from spectractor.tools import fit_poly2d
+from spectractor.logbook import set_logger
 
 
 def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=256000):
@@ -35,11 +39,12 @@ def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=2
     # wavelength in nm, hologram produced at 639nm
     # spherical wave centered in 0,0,0
     U = lambda x, y, z: np.exp(2j * np.pi * np.sqrt(x * x + y * y + z * z) * 1e6 /
-                                          lambda_plot) / np.sqrt(x * x + y * y + z * z)
+                               lambda_plot) / np.sqrt(x * x + y * y + z * z)
     # superposition of two spherical sources centered in order 0 and order 1 positions
     xA = [order0_position[0] * parameters.CCD_PIXEL2MM, order0_position[1] * parameters.CCD_PIXEL2MM]
     xB = [order1_position[0] * parameters.CCD_PIXEL2MM, order1_position[1] * parameters.CCD_PIXEL2MM]
-    A = lambda x, y: U(x - xA[0], y - xA[1], -parameters.DISTANCE2CCD) + U(x-xB[0], y-xB[1], -parameters.DISTANCE2CCD)
+    A = lambda x, y: U(x - xA[0], y - xA[1], -parameters.DISTANCE2CCD) + U(x - xB[0], y - xB[1],
+                                                                           -parameters.DISTANCE2CCD)
     intensity = lambda x, y: np.abs(A(x, y)) ** 2
     xholo = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
     yholo = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
@@ -237,9 +242,10 @@ def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
     order0_position = [-0.5 * AB * np.cos(theta_tilt * np.pi / 180) + x_center,
                        -0.5 * AB * np.sin(theta_tilt * np.pi / 180) + y_center]
     if verbose:
-        print('Order  0 position at x0 = %.1f and y0 = %.1f' % (order0_position[0], order0_position[1]))
-        print('Order +1 position at x0 = %.1f and y0 = %.1f' % (order1_position[0], order1_position[1]))
-        print('Distance between the orders: %.2f pixels (%.2f mm)' % (AB, AB * parameters.CCD_PIXEL2MM))
+        my_logger = set_logger(__name__)
+        my_logger.info(f'\n\tOrder  0 position at x0 = {order0_position[0]:.1f} and y0 = {order0_position[1]:.1f}'
+                       f'\n\tOrder +1 position at x0 = {order1_position[0]:.1f} and y0 = {order1_position[1]:.1f}'
+                       f'\n\tDistance between the orders: {AB:.2f} pixels ({AB * parameters.CCD_PIXEL2MM:.2f} mm)')
     return order0_position, order1_position, AB
 
 
@@ -262,7 +268,7 @@ def find_order01_positions(holo_center, N_interp, theta_interp, verbose=True):
 class Grating:
     """Generic class for dispersers."""
 
-    def __init__(self, N, label="", D=parameters.DISTANCE2CCD, data_dir=parameters.HOLO_DIR, verbose=False):
+    def __init__(self, N, label="", D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR, verbose=False):
         """Initialize a standard grating object.
 
         Parameters
@@ -275,7 +281,7 @@ class Grating:
             The distance between the CCD and the disperser in mm.
         data_dir: str
             The directory where information about this disperser is stored. Must be in the form data_dir/label/...
-            (default: parameters.HOLO_DIR)
+            (default: parameters.DISPERSER_DIR)
         verbose: bool
             Set to True to increase the verbosity of the initialisation (default: False)
 
@@ -284,11 +290,12 @@ class Grating:
         >>> g = Grating(400)
         >>> print(g.N_input)
         400
-        >>> g = Grating(400, label="Ron400", data_dir=parameters.HOLO_DIR)
+        >>> g = Grating(400, label="Ron400", data_dir=parameters.DISPERSER_DIR)
         >>> print(g.N_input)
         400.869182487
         >>> assert g.D is parameters.DISTANCE2CCD
         """
+        self.my_logger = set_logger(self.__class__.__name__)
         self.N_input = N
         self.N_err = 1
         self.D = D
@@ -375,8 +382,9 @@ class Grating:
         else:
             self.theta_tilt = 0
         if verbose:
-            print('Grating plate center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
-                self.plate_center[0], self.plate_center[1], self.theta_tilt))
+            self.my_logger.info(f'\n\tGrating plate center at x0 = {self.plate_center[0]:.1f} '
+                                f'and y0 = {self.plate_center[1]:.1f} '
+                                f'with average tilt of {self.theta_tilt:.1f} degrees')
 
     def refraction_angle(self, deltaX, x0):
         """ Return the refraction angle with respect to the disperser normal, using geometrical consideration,
@@ -428,7 +436,7 @@ class Grating:
         >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, parameters.DISTANCE2CCD))
         """
         theta0 = get_theta0(x0)
-        return np.arcsin(order * lambdas*1e-6 * self.N(x0) + np.sin(theta0))
+        return np.arcsin(order * lambdas * 1e-6 * self.N(x0) + np.sin(theta0))
 
     def grating_pixel_to_lambda(self, deltaX, x0, order=1):
         """ Convert pixels into wavelengths (in nm) with.
@@ -436,7 +444,7 @@ class Grating:
         Parameters
         ----------
         deltaX: array, float
-            Pixel distance to order 0.
+            Pixel distances to order 0.
         x0: float or [float, float]
             Order 0 position detected in the non-rotated image.
         order: int
@@ -528,7 +536,7 @@ class Grating:
 
 class Hologram(Grating):
 
-    def __init__(self, label, D=parameters.DISTANCE2CCD, data_dir=parameters.HOLO_DIR,
+    def __init__(self, label, D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR,
                  lambda_plot=256000, verbose=False):
         """Initialize an Hologram object, given its label. Specification are loaded from text files
         in data_dir/label/... Inherit from the Grating class.
@@ -541,7 +549,7 @@ class Hologram(Grating):
             The distance between the CCD and the disperser in mm.
         data_dir: str
             The directory where information about this disperser is stored. Must be in the form data_dir/label/...
-            (default: parameters.HOLO_DIR)
+            (default: parameters.DISPERSER_DIR)
         lambda_plot: float, optional
             Wavelength to plot the hologram pattern (default: 256000).
         verbose: bool
@@ -549,7 +557,7 @@ class Hologram(Grating):
 
         Examples
         --------
-        >>> h = Hologram(label="HoloPhP", data_dir=parameters.HOLO_DIR)
+        >>> h = Hologram(label="HoloPhP", data_dir=parameters.DISPERSER_DIR)
         >>> h.label
         'HoloPhP'
         >>> h.N((500,500))
@@ -641,8 +649,7 @@ class Hologram(Grating):
 
         """
         if verbose:
-            print('Load disperser {}:'.format(self.label))
-            print('\tfrom {}'.format(self.data_dir + self.label))
+            self.my_logger.info(f'\n\tLoad disperser {self.label}:\n\tfrom {os.path.join(self.data_dir, self.label)}')
         filename = self.data_dir + self.label + "/hologram_grooves_per_mm.txt"
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
@@ -683,16 +690,19 @@ class Hologram(Grating):
         self.x_lines, self.line1, self.line2 = neutral_lines(self.holo_center[0], self.holo_center[1], self.theta_tilt)
         if verbose:
             if self.is_hologram:
-                print('Hologram characteristics:')
-                print('\tN = {:.2f} +/- {:.2f} grooves/mm at plate center'.format(self.N(self.plate_center), self.N_err))
-                print('\tPlate center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
-                    self.plate_center[0], self.plate_center[1], self.theta_tilt))
-                print('\tHologram center at x0 = {:.1f} and y0 = {:.1f} with average tilt of {:.1f} degrees'.format(
-                    self.holo_center[0], self.holo_center[1], self.theta_tilt))
+                self.my_logger.info(f'\n\tHologram characteristics:'
+                                    f'\n\tN = {self.N(self.plate_center):.2f} +/- {self.N_err:.2f} '
+                                    f'grooves/mm at plate center'
+                                    f'\n\tPlate center at x0 = {self.plate_center[0]:.1f} and '
+                                    f'y0 = {self.plate_center[1]:.1f} with average tilt of {self.theta_tilt:.1f} '
+                                    f'degrees'
+                                    f'\n\tHologram center at x0 = {self.holo_center[0]:.1f} '
+                                    f'and y0 = {self.holo_center[1]:.1f} with average tilt of {self.theta_tilt:.1f} '
+                                    f'degrees')
             else:
-                print('Grating characteristics:')
-                print('\tN = {:.2f} +/- {:.2f} grooves/mm'.format(self.N([0, 0]), self.N_err))
-                print('\tAverage tilt of {:.1f} degrees'.format(self.theta_tilt))
+                self.my_logger.info(f'\n\tGrating characteristics:'
+                                    f'\n\tN = {self.N([0, 0]):.2f} +/- {self.N_err:.2f} grooves/mm'
+                                    f'\n\tAverage tilt of {self.theta_tilt:.1f} degrees')
         if self.is_hologram:
             self.order0_position, self.order1_position, self.AB = find_order01_positions(self.holo_center,
                                                                                          self.N_interp, self.theta,
@@ -701,6 +711,7 @@ class Hologram(Grating):
 
 if __name__ == "__main__":
     import doctest
+
     if np.__version__ >= "1.14.0":
         np.set_printoptions(legacy="1.13")
 

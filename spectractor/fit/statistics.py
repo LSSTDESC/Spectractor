@@ -1,8 +1,12 @@
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy import interpolate
+import numpy as np
+import sys
 
-from spectractor.tools import *
+
+from spectractor import parameters
+from spectractor.tools import formatting_numbers
 
 
 class Axis(object):
@@ -15,6 +19,7 @@ class Axis(object):
         self.step = 0
         self.set_axis(axis)
         self.size = len(axis)
+        self.txt = ''
 
     def getAxisVal(self, index):
         return self.axis[index]
@@ -68,7 +73,7 @@ class Grid:
         return [self.getAxisIndex(i, values[i]) for i in self.rangedim]
 
     def getMaximum(self):
-        self.max = max(self.grid.flatten())
+        self.max = np.max(self.grid.flatten())
         self.max_index = np.argmax(self.grid)
         return self.max
 
@@ -216,11 +221,13 @@ class PDF(Grid):
         for xindex, x in enumerate(self.axe.axis):
             xxprod[xindex] = self.grid[xindex] * (x - self.mean) ** 2
         self.variance = np.trapz(xxprod, self.axe.axis)
-        txt = "\t%s: %s +%s -%s (std: %s)" % formatting_numbers(self.mean, self.error_high, self.error_low,
+        txt = "%s: %s +%s -%s (std: %s)" % formatting_numbers(self.mean, self.error_high, self.error_low,
                                                                 std=np.sqrt(self.variance), label=self.label)
         self.title = '$%s^{+%s}_{-%s}$' % formatting_numbers(self.mean, self.error_high, self.error_low)
+        self.txt = txt
+        self.txt_long = f"{self.label}: {self.mean} +{self.error_high} -{self.error_low} (std: {np.sqrt(self.variance)})"
         if verbose:
-            print(txt)
+            print('\t'+txt)
 
 
 class Contours(Grid):
@@ -410,7 +417,7 @@ class Likelihood(Grid):
                             if j < i:
                                 self.contours[i][j].grid = self.grid
 
-    def triangle_plots(self,output_filename=''):
+    def triangle_plots(self, output_filename=''):
         n = self.dim
         fig = plt.figure(1, figsize=(16, 9))
         if parameters.PAPER:
@@ -478,7 +485,7 @@ class Likelihood(Grid):
             print("\t" + self.labels[i] + ": " + str(self.getAxisVal(i, self.max_index)))
 
     def stats(self, output='', pdfonly=False, verbose=True):
-        # self.max_likelihood_stats()
+        #self.max_likelihood_stats()
         if verbose:
             print('Marginalised best fit values (Mean and MCI):')
         self.mean_vec = np.zeros(self.dim)
@@ -505,12 +512,9 @@ class Likelihood(Grid):
             if output is not '':
                 txt = ''
                 for i in self.rangedim:
-                    txt += 'Parameter ' + self.labels[i] + ' ' + self.axis_names[i] + ' ' + str(
-                        self.pdfs[i].max_pdf) + '\n'
-                    if self.labels[i] == 'Depth' and self.cov_matrix[i][i] > 20 * 20:
-                        print('Warning! Depth covariance above 15 pixels. '
-                              'Reduce this to have a correct sampling inside depth prior.')
+                    txt += f'{self.pdfs[i].txt_long}\n'
                 cov = '\n'.join([''.join(['\t{0:8.6f}'.format(item) for item in row]) for row in self.cov_matrix])
+                print(f'Save best fit parameters in {output}')
                 f = open(output, 'w')
                 f.write(txt + cov)
                 f.close()

@@ -1,12 +1,22 @@
-numpy
+numpy>1.15
 scipy
 matplotlib
-astropy
+pandas
+# pyfftw
+numexpr
+astropy>=3.2
+photutils
 astroquery
 coloredlogs
 scikit-image
 pysynphot
-emcee
-coverage
+h5py==2.8.0
+emcee==3.0rc2
+tqdm
+mpi4py
+schwimmbad
+iminuit
+coverage<5.0,>=3.6
 configparser
 coveralls
+pyyaml

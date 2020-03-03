@@ -1,7 +1,10 @@
 from astropy.table import Table
 from scipy.interpolate import interp1d
+import numpy as np
 
-from spectractor.tools import *
+from spectractor import parameters
+from spectractor.config import set_logger
+from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_for_legendre
 
 
 class Line:
@@ -61,6 +64,7 @@ class Line:
         self.fit_fwhm = None
         self.fit_popt = None
         self.fit_chisq = None
+        self.fit_bgd_npar = parameters.CALIB_BGD_NPARAMS
 
     def gaussian_model(self, lambdas, A=1, sigma=2, use_fit=False):
         """Return a Gaussian model of the spectral line.
@@ -134,32 +138,35 @@ class Lines:
         Examples
         --------
         The default first five lines:
-        >>> lines = Lines(redshift=0, atmospheric_lines=False, hydrogen_only=False, emission_spectrum=False)
+        >>> lines = Lines(ISM_LINES+HYDROGEN_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=False, emission_spectrum=False)
         >>> print([lines.lines[i].wavelength for i in range(5)])
         [353.1, 388.8, 410.2, 434.0, 447.1]
 
         The four hydrogen lines only:
-        >>> lines = Lines(redshift=0, atmospheric_lines=False, hydrogen_only=True, emission_spectrum=True)
+        >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(4)])
         [410.2, 434.0, 486.3, 656.3]
         >>> print(lines.emission_spectrum)
         True
 
         Redshift the hydrogen lines, the atmospheric lines stay unchanged:
-        >>> lines = Lines(redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
-        >>> print([lines.lines[i].wavelength for i in range(5)])
-        [382.044, 393.366, 396.847, 430.79, 438.355]
+        >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
+        >>> print([lines.lines[i].wavelength for i in range(7)])
+        [382.044, 393.366, 396.847, 430.79, 438.355, 686.719, 762.1]
 
         Redshift all the spectral lines, except the atmospheric lines:
-        >>> lines = Lines(redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
+        >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
         [382.044, 393.366, 396.847, 430.79, 438.355]
+
+        Negative redshift:
+        >>> lines = Lines(HYDROGEN_LINES, redshift=-0.5)
+
         """
         self.my_logger = set_logger(self.__class__.__name__)
-        if redshift < 0:
-            self.my_logger.warning(f'Redshift must be positive or null. Got {redshift}')
-            sys.exit()
-
+        if redshift < -1e-2:
+            self.my_logger.error(f'\n\tRedshift must small in absolute value (|z|<0.01) or be positive or null. '
+                                 f'Got redshift={redshift}.')
         self.lines = lines
         self.redshift = redshift
         self.atmospheric_lines = atmospheric_lines
@@ -177,11 +184,13 @@ class Lines:
 
         Examples
         --------
-        >>> lines = Lines()
+        >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=0)
         >>> sorted_lines = lines.sort_lines()
-
+        >>> print([l.wavelength for l in sorted_lines][:5])
+        [382.044, 393.366, 396.847, 410.2, 430.79]
         """
         sorted_lines = []
+        import copy
         for line in self.lines:
             if self.hydrogen_only:
                 if not self.atmospheric_lines:
@@ -195,7 +204,7 @@ class Lines:
             else:
                 if not self.atmospheric_lines and line.atmospheric:
                     continue
-            sorted_lines.append(line)
+            sorted_lines.append(copy.copy(line))
         if self.redshift > 0:
             for line in sorted_lines:
                 if not line.atmospheric:
@@ -203,19 +212,22 @@ class Lines:
         sorted_lines = sorted(sorted_lines, key=lambda x: x.wavelength)
         return sorted_lines
 
-    def plot_atomic_lines(self, ax, color_atomic='g', color_atmospheric='b', fontsize=12):
-        """Over plot the atomic lines as vertical lines.
+    def plot_atomic_lines(self, ax, color_atomic='g', color_atmospheric='b', fontsize=12, force=False):
+        """Over plot the atomic lines as vertical lines, only if they are fitted or with high
+        signal to  noise ratio, unless force keyword is set to True.
 
         Parameters
         ----------
         ax: Axes
-            An Axes instance on which plot the spectral lines
+            An Axes instance on which plot the spectral lines.
         color_atomic: str
-            Color of the atomic lines (default: 'g')
+            Color of the atomic lines (default: 'g').
         color_atmospheric: str
-            Color of the atmospheric lines (default: 'b')
+            Color of the atmospheric lines (default: 'b').
         fontsize: int
-            Font size of the spectral line labels (default: 12)
+            Font size of the spectral line labels (default: 12).
+        force: bool
+            Force the plot of vertical lines if set to True (default: False).
 
         Examples
         --------
@@ -223,13 +235,18 @@ class Lines:
         >>> f, ax = plt.subplots(1,1)
         >>> ax.set_xlim(300,1000)
         (300, 1000)
-        >>> lines = Lines()
+        >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
+        >>> lines.lines[5].fitted = True
+        >>> lines.lines[5].high_snr = True
+        >>> lines.lines[-1].fitted = True
+        >>> lines.lines[-1].high_snr = True
         >>> ax = lines.plot_atomic_lines(ax)
         >>> assert ax is not None
+        >>> if parameters.DISPLAY: plt.show()
         """
         xlim = ax.get_xlim()
         for l in self.lines:
-            if not l.fitted or not l.high_snr:
+            if (not l.fitted or not l.high_snr) and not force:
                 continue
             color = color_atomic
             if l.atmospheric:
@@ -242,20 +259,69 @@ class Lines:
         return ax
 
     def plot_detected_lines(self, ax=None, print_table=False):
+        """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
+        around emission or absorption tabulated lines, and to select surrounding pixels
+        to fit a (positive or negative) gaussian and a polynomial background. If several regions
+        overlap, a multi-gaussian fit is performed above a common polynomial background.
+        The mean global shift (in nm) between the detected and tabulated lines is returned, considering
+        only the lines with a signal-to-noise ratio above a threshold.
+        The order of the polynomial background is set in parameters.py with CALIB_BGD_ORDER.
+
+        Parameters
+        ----------
+        ax: Axes
+            The Axes instance if needed (default: None).
+        print_table: bool, optional
+            If True, print a summary table (default: False).
+
+        Examples
+        --------
+
+        Creation of a mock spectrum with emission and absorption lines
+        >>> from spectractor.extractor.spectrum import Spectrum, detect_lines
+        >>> lambdas = np.arange(300,1000,1)
+        >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
+        >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
+        >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
+        >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
+        >>> spectrum_err = np.sqrt(spectrum)
+        >>> spec = Spectrum()
+        >>> spec.lambdas = lambdas
+        >>> spec.data = spectrum
+        >>> spec.err = spectrum_err
+        >>> fwhm_func = interp1d(lambdas, 0.01 * lambdas)
+
+        Detect the lines
+        >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
+        ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
+        >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
+        >>> assert(global_chisq < 1)
+
+        Plot the result
+        >>> import matplotlib.pyplot as plt
+        >>> from spectractor.tools import plot_spectrum_simple
+        >>> spec.lines = lines
+        >>> fig = plt.figure()
+        >>> plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
+        >>> lines.plot_detected_lines(plt.gca())
+        >>> if parameters.DISPLAY: plt.show()
+        """
         lambdas = np.zeros(1)
         rows = []
         j = 0
-        bgd_npar = parameters.CALIB_BGD_NPARAMS
         for line in self.lines:
             if line.fitted is True:
                 # look for lines in subset fit
+                bgd_npar = line.fit_bgd_npar
+                parameters.CALIB_BGD_NPARAMS = bgd_npar
                 if lambdas.shape != line.fit_lambdas.shape or not np.allclose(lambdas, line.fit_lambdas, 1e-3):
                     j = 0
                     lambdas = np.copy(line.fit_lambdas)
                     if ax is not None:
                         ax.plot(lambdas, multigauss_and_bgd(lambdas, *line.fit_popt), lw=2, color='b')
-                        ax.plot(lambdas, np.polyval(line.fit_popt[0:bgd_npar], lambdas), lw=2, color='b',
-                                linestyle='--')
+                        x_norm = rescale_x_for_legendre(lambdas)
+                        bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
+                        ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
                 popt = line.fit_popt
                 peak_pos = popt[bgd_npar + 3 * j + 1]
                 FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
@@ -272,14 +338,16 @@ class Lines:
             t[t.colnames[-1]].unit = 'reduced'
             print(t)
 
+
 # Line catalog
 
 # Hydrogen lines
 HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02], use_for_calibration=True)
 HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02])
-HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA]
+HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.016, 0.02], use_for_calibration=True)
+HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
 
 # Atmospheric lines
 FE1 = Line(382.044, atmospheric=True, label=r'$Fe$',
@@ -290,10 +358,10 @@ FE3 = Line(438.355, atmospheric=True, label=r'$Fe$',
            label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 CAII1 = Line(393.366, atmospheric=True, label=r'$Ca_{II}$',
              label_pos=[0.007, 0.02],
-             use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+             use_for_calibration=False)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 CAII2 = Line(396.847, atmospheric=True, label=r'$Ca_{II}$',
              label_pos=[0.007, 0.02],
-             use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
+             use_for_calibration=False)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
           label_pos=[0.007, 0.02],
           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
@@ -310,7 +378,7 @@ H2O_1 = Line(935, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
 H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2, CAII1, CAII2, FE1, FE2, FE3]
+ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2] #, CAII1, CAII2, FE1, FE2, FE3
 
 # ISM lines
 OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
@@ -380,3 +448,11 @@ AR16 = Line(912.297, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR17 = Line(922.450, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 HGAR_LINES = [HG1, HG2, HG3, HG4, HG5, HG6, HG7, HG8, HG9, HG10, HG11, HG12,
                AR1, AR2, AR3, AR4, AR5, AR6, AR7, AR8, AR9, AR10, AR11, AR12, AR13, AR14, AR15, AR16, AR17 ]
+
+
+if __name__ == "__main__":
+    import doctest
+    if np.__version__ >= "1.14.0":
+        np.set_printoptions(legacy="1.13")
+
+    doctest.testmod()
