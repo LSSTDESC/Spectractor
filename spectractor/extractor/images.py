@@ -1,4 +1,6 @@
 from astropy.coordinates import Angle
+import astropy.io.fits as pyfits
+
 from matplotlib import cm
 from matplotlib.ticker import MaxNLocator
 
@@ -85,17 +87,38 @@ class Image(object):
         self.build_gain_map()
         self.compute_parallactic_angle()
 
+    def imgslice(self, slicespec):
+        """
+        Utility function: convert a FITS slice specification (1-based)
+        into the corresponding numpy array slice spec (0-based, xy swapped).
+
+        ex : '[11:522,1:2002]'  -> (0, 2002, 522, 576)
+        """
+
+        parts = slicespec.replace('[', '').replace(']', '').split(',')
+        xbegin, xend = [int(i) for i in parts[0].split(':')]
+        ybegin, yend = [int(i) for i in parts[1].split(':')]
+        xbegin -= 1
+        ybegin -= 1
+        return np.s_[ybegin:yend, xbegin:xend]
+
     def load_LPNHE_image(self, file_name):
         """
         Args:
             file_name (:obj:`str`): path to the image
         """
         self.my_logger.info('\n\tLoading LPNHE image %s...' % file_name)
-        self.header, data1 = load_fits(file_name, 15)
-        self.header, data2 = load_fits(file_name, 7)
-        data1 = data1.astype(np.float64)
-        data2 = data2.astype(np.float64)
-        self.data = np.concatenate((data1[10:-10, 10:-10], data2[10:-10, 10:-10]))
+        hdus = pyfits.open(file_name)
+        self.header = hdus[0].header
+        hdu1 = hdus["CHAN_14"]
+        hdu2 = hdus["CHAN_06"]
+        data1 = hdu1.data[self.imgslice(hdu1.header['DATASEC'])].astype(np.float64)
+        bias1 = np.mean(hdu1.data[self.imgslice(hdu1.header['BIASSEC'])].astype(np.float64))
+        data1 -= bias1
+        data2 = hdu2.data[self.imgslice(hdu2.header['DATASEC'])].astype(np.float64)
+        bias2 = np.mean(hdu2.data[self.imgslice(hdu2.header['BIASSEC'])].astype(np.float64))
+        data2 -= bias2
+        self.data = np.concatenate([data1, data2])
         self.date_obs = self.header['DATE-OBS']
         self.expo = float(self.header['EXPTIME'])
         self.header['LSHIFT'] = 0.
@@ -404,12 +427,12 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     theta_guess = image.disperser.theta(image.target_pixcoords)
     mask2 = np.where(np.abs(theta - theta_guess) > deg_threshold)
     theta_mask[mask2] = np.nan
-    theta_mask = theta_mask[2:-2,2:-2]
+    theta_mask = theta_mask[2:-2, 2:-2]
     theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
     if parameters.OBS_OBJECT_TYPE != 'STAR':
         pixels = np.where(~np.isnan(theta_mask))
         p = np.polyfit(pixels[1], pixels[0], deg=1)
-        theta_median = np.arctan(p[0]) * 180/np.pi
+        theta_median = np.arctan(p[0]) * 180 / np.pi
     else:
         theta_median = np.median(theta_hist)
     theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
@@ -457,14 +480,18 @@ def turn_image(image):
         margin = 100
         y0 = int(image.target_pixcoords[1])
         f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
-        image.plot_image_simple(ax1, data=image.data[max(0,y0 - 2*parameters.YWINDOW):min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin],
+        image.plot_image_simple(ax1, data=image.data[
+                                          max(0, y0 - 2 * parameters.YWINDOW):min(y0 + 2 * parameters.YWINDOW,
+                                                                                  image.data.shape[0]), margin:-margin],
                                 scale="log", title='Raw image (log10 scale)', units=image.units,
-                                target_pixcoords=(image.target_pixcoords[0] - margin, 2*parameters.YWINDOW), aspect='auto')
+                                target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW),
+                                aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
-        image.plot_image_simple(ax2, data=image.data_rotated[max(0,y0 - 2*parameters.YWINDOW):
-                                                             min(y0 + 2*parameters.YWINDOW, image.data.shape[0]), margin:-margin], scale="log", title='Turned image (log10 scale)',
+        image.plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
+                                                             min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
+                                          margin:-margin], scale="log", title='Turned image (log10 scale)',
                                 units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
-        ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2*parameters.YWINDOW, 2*parameters.YWINDOW], 'k-')
+        ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
         f.tight_layout()
         if parameters.DISPLAY:
             plt.show()
