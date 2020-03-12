@@ -95,6 +95,7 @@ class Spectrum:
             self.target_pixcoords_rotated = image.target_pixcoords_rotated
             self.units = image.units
             self.gain = image.gain
+            self.rotation_angle = image.rotation_angle
             self.my_logger.info('\n\tSpectrum info copied from image')
         self.load_filter()
 
