@@ -104,7 +104,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
     distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
-    spectrum.lambdas = np.interp(distance, spectrum.pixels, spectrum.lambdas)
-    spectrum.chromatic_psf.table['lambdas'] = spectrum.lambdas
+    lambdas = np.interp(distance, spectrum.pixels, spectrum.lambdas)
+    spectrum.chromatic_psf.table['lambdas'] = lambdas
     spectrum.chromatic_psf.table.write(output_filename_psf, overwrite=True)
     return spectrum
