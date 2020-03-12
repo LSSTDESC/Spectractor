@@ -1309,7 +1309,7 @@ class ChromaticPSF1D(ChromaticPSF):
         self.profile_params = self.from_poly_params_to_profile_params(self.poly_params, force_positive=True)
         self.fill_table_with_profile_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
-        if parameters.DEBUG or True:
+        if parameters.DEBUG:
             # Plot data, best fit model and residuals:
             self.plot_summary()
             self.plot_chromatic_PSF1D_residuals(w.bgd, data, data_errors, guess=guess, title='Best fit')
