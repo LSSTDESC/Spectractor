@@ -1333,7 +1333,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     data: array_like
         The image data 2D array.
     scale: str
-        Scaling of the image (choose between: lin, log or log10) (default: lin)
+        Scaling of the image (choose between: lin, log or log10, symlog) (default: lin)
     title: str
         Title of the image (default: "")
     units: str
@@ -1367,16 +1367,23 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         min_noz = np.min(data[np.where(data > 0)])
         data[zeros] = min_noz
         # apply log
-        data = np.log10(data)
-    im = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect)
+        # data = np.log10(data)
+    if scale == "log10" or scale == "log":
+        norm = matplotlib.colors.LogNorm(vmin=vmin, vmax=vmax)
+    elif scale == "symlog":
+        norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=10)
+    else:
+        norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
     ax.grid(color='silver', ls='solid')
     ax.grid(True)
     ax.set_xlabel('X [pixels]')
     ax.set_ylabel('Y [pixels]')
     cb = plt.colorbar(im, ax=ax, cax=cax)
-    cb.formatter.set_powerlimits((0, 0))
-    cb.locator = MaxNLocator(7, prune=None)
-    cb.update_ticks()
+    if scale == "lin":
+        cb.formatter.set_powerlimits((0, 0))
+        cb.locator = MaxNLocator(7, prune=None)
+        cb.update_ticks()
     cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
     if title != "":
         ax.set_title(title)
