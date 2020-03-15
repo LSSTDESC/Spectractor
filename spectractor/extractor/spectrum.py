@@ -1195,7 +1195,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     if parameters.DEBUG or parameters.LSST_SAVEFIGPATH:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         xx = np.arange(s.table['Dx_rot'].size)
-        plot_image_simple(ax[2], data=data, scale="log", title='', units=image.units, aspect='auto')
+        plot_image_simple(ax[2], data=data, scale="symlog", title='', units=image.units, aspect='auto')
         ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_mean'], label='Dispersion axis')
         ax[2].scatter(xx, target_pixcoords_spectrogram[1] + s.table['Dy'],
                       c=s.table['lambdas'], edgecolors='None', cmap=from_lambda_to_colormap(s.table['lambdas']),

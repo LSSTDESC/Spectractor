@@ -180,8 +180,8 @@ class Image(object):
         # removes the zeros and negative pixels first
         # set to minimum positive value
         data = np.copy(self.data)
-        min_noz = np.min(data[data > 0])
-        data[data <= 0] = min_noz
+        # min_noz = np.min(data[data > 0])
+        # data[data <= 0] = min_noz
         # OLD: compute poisson noise in ADU/s without read-out noise
         # self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
         # convert in e- counts
@@ -364,7 +364,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     hdu1 = hdus["CHAN_14"]
     hdu2 = hdus["CHAN_06"]
     data1 = hdu1.data[imgslice(hdu1.header['DATASEC'])].astype(np.float64)
-    bias1 = np.mean(hdu1.data[imgslice(hdu1.header['BIASSEC'])].astype(np.float64))
+    bias1 = np.median(hdu1.data[imgslice(hdu1.header['BIASSEC'])].astype(np.float64))
     data1 -= bias1
     detsecy, detsecx = imgslice(hdu1.header['DETSEC'])
     if detsecy.start > detsecy.stop:
@@ -372,7 +372,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     if detsecx.start > detsecx.stop:
         data1 = data1[::-1, :]
     data2 = hdu2.data[imgslice(hdu2.header['DATASEC'])].astype(np.float64)
-    bias2 = np.mean(hdu2.data[imgslice(hdu2.header['BIASSEC'])].astype(np.float64))
+    bias2 = np.median(hdu2.data[imgslice(hdu2.header['BIASSEC'])].astype(np.float64))
     data2 -= bias2
     detsecy, detsecx = imgslice(hdu2.header['DETSEC'])
     if detsecy.start > detsecy.stop:
@@ -394,6 +394,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
+    image.read_out_noise = float(image.header['CCDNOISE']) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
 
 
@@ -909,13 +910,13 @@ def turn_image(image):
         plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):min(y0 + 2 * parameters.YWINDOW,
                                                                                        image.data.shape[0]),
                                     margin:-margin],
-                          scale="log", title='Raw image (log10 scale)', units=image.units,
+                          scale="symlog", title='Raw image (log10 scale)', units=image.units,
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
                                     margin:-margin],
-                          scale="log", title='Turned image (log10 scale)',
+                          scale="symlog", title='Turned image (log10 scale)',
                           units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
         f.tight_layout()

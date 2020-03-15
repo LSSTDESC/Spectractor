@@ -65,7 +65,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     # Load reduced image
     image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
     if parameters.DEBUG:
-        image.plot_image(scale='log10', target_pixcoords=guess)
+        image.plot_image(scale='symlog', target_pixcoords=guess)
     # Set output path
     ensure_dir(output_directory)
     output_filename = file_name.split('/')[-1]
