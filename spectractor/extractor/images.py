@@ -384,10 +384,13 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
     image.header['LSHIFT'] = 0.
-    parameters.DISTANCE2CCD -= 10 * float(hdus["XYZ"].header["ZPOS"])
+    parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
+    if "mm" not in hdus["XYZ"].header.comments["ZPOS"]:
+        image.my_logger.error(f'\n\tmm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
+                              f'Distances along Z axis must be in mm.')
     image.header['D2CCD'] = parameters.DISTANCE2CCD
     image.my_logger.info(f'\n\tDistance to CCD adjusted to {parameters.DISTANCE2CCD} mm '
-                         f'considering XYZ platform is set at ZPOS={10 * float(hdus["XYZ"].header["ZPOS"])} mm.')
+                         f'considering XYZ platform is set at ZPOS={float(hdus["XYZ"].header["ZPOS"])} mm.')
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
