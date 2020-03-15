@@ -371,7 +371,6 @@ def load_LPNHE_image(image):  # pragma: no cover
         data1 = data1[:, ::-1]
     if detsecx.start > detsecx.stop:
         data1 = data1[::-1, :]
-    image.my_logger.warning(f"\n\t{bias1}, {hdu1.header['DETSEC']} {hdu2.header['DETSEC']}")
     data2 = hdu2.data[imgslice(hdu2.header['DATASEC'])].astype(np.float64)
     bias2 = np.mean(hdu2.data[imgslice(hdu2.header['BIASSEC'])].astype(np.float64))
     data2 -= bias2
@@ -380,13 +379,15 @@ def load_LPNHE_image(image):  # pragma: no cover
         data2 = data2[:, ::-1]
     if detsecx.start > detsecx.stop:
         data2 = data2[::-1, :]
-    image.my_logger.warning(f"\n\t{bias2}, {hdu2.header['DATASEC']} {imgslice(hdu2.header['DATASEC'])}")
     data = np.concatenate([data2, data1])
     image.data = data[::-1, :].T
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
     image.header['LSHIFT'] = 0.
+    parameters.DISTANCE2CCD -= 10 * float(hdus["XYZ"].header["ZPOS"])
     image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.my_logger.info(f'\n\tDistance to CCD adjusted to {parameters.DISTANCE2CCD} mm '
+                         f'considering XYZ platform is set at ZPOS={10 * float(hdus["XYZ"].header["ZPOS"])} mm.')
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
