@@ -366,17 +366,27 @@ def load_LPNHE_image(image):  # pragma: no cover
     data1 = hdu1.data[imgslice(hdu1.header['DATASEC'])].astype(np.float64)
     bias1 = np.mean(hdu1.data[imgslice(hdu1.header['BIASSEC'])].astype(np.float64))
     data1 -= bias1
-    image.my_logger.info('\n\tpouet')
-    image.my_logger.warning(f"\n\t{bias1}, {imgslice(hdu1.header['DATASEC'])}")
+    detsecy, detsecx = imgslice(hdu1.header['DETSEC'])
+    if detsecy.start > detsecy.stop:
+        data1 = data1[:, ::-1]
+    if detsecx.start > detsecx.stop:
+        data1 = data1[::-1, :]
+    image.my_logger.warning(f"\n\t{bias1}, {hdu1.header['DETSEC']} {hdu2.header['DETSEC']}")
     data2 = hdu2.data[imgslice(hdu2.header['DATASEC'])].astype(np.float64)
     bias2 = np.mean(hdu2.data[imgslice(hdu2.header['BIASSEC'])].astype(np.float64))
     data2 -= bias2
-    image.data = np.concatenate([data1, data2])
+    detsecy, detsecx = imgslice(hdu2.header['DETSEC'])
+    if detsecy.start > detsecy.stop:
+        data2 = data2[:, ::-1]
+    if detsecx.start > detsecx.stop:
+        data2 = data2[::-1, :]
+    image.my_logger.warning(f"\n\t{bias2}, {hdu2.header['DATASEC']} {imgslice(hdu2.header['DATASEC'])}")
+    data = np.concatenate([data2, data1])
+    image.data = data[::-1, :].T
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
-    image.data = image.data.T
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
