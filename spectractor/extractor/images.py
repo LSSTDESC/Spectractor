@@ -16,7 +16,7 @@ from spectractor.extractor.psf import fit_PSF2D_minuit
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_info_from_CTIO_header,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
-                               set_wcs_file_name, load_wcs_from_file)
+                               set_wcs_file_name, load_wcs_from_file, imgslice)
 
 
 class Image(object):
@@ -100,6 +100,7 @@ class Image(object):
             The fits file name.
 
         """
+        self.my_logger.info('\n\tLoading LPNHE image %s...' % file_name)
         if parameters.OBS_NAME == 'CTIO':
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
@@ -112,73 +113,6 @@ class Image(object):
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
         self.compute_statistical_error()
         self.convert_to_ADU_rate_units()
-
-    def load_CTIO_image(self, file_name):
-        """
-        Args:
-            file_name (:obj:`str`): path to the image
-        """
-        self.my_logger.info('\n\tLoading CTIO image %s...' % file_name)
-        self.header, self.data = load_fits(file_name)
-        extract_info_from_CTIO_header(self, self.header)
-        self.header['LSHIFT'] = 0.
-        self.header['D2CCD'] = parameters.DISTANCE2CCD
-        parameters.CCD_IMSIZE = int(self.header['XLENGTH'])
-        parameters.CCD_PIXEL2ARCSEC = float(self.header['XPIXSIZE'])
-        if self.header['YLENGTH'] != parameters.CCD_IMSIZE:
-            self.my_logger.warning(
-                f'\n\tImage rectangular: X={parameters.CCD_IMSIZE:d} pix, Y={self.header["YLENGTH"]:d} pix')
-        if self.header['YPIXSIZE'] != parameters.CCD_PIXEL2ARCSEC:
-            self.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
-                parameters.CCD_PIXEL2ARCSEC, self.header['YPIXSIZE']))
-        self.coord = SkyCoord(self.header['RA'] + ' ' + self.header['DEC'], unit=(units.hourangle, units.deg),
-                              obstime=self.header['DATE-OBS'])
-        self.my_logger.info('\n\tImage loaded')
-        # compute CCD gain map
-        self.build_gain_map()
-        self.compute_parallactic_angle()
-
-    def imgslice(self, slicespec):
-        """
-        Utility function: convert a FITS slice specification (1-based)
-        into the corresponding numpy array slice spec (0-based, xy swapped).
-
-        ex : '[11:522,1:2002]'  -> (0, 2002, 522, 576)
-        """
-
-        parts = slicespec.replace('[', '').replace(']', '').split(',')
-        xbegin, xend = [int(i) for i in parts[0].split(':')]
-        ybegin, yend = [int(i) for i in parts[1].split(':')]
-        xbegin -= 1
-        ybegin -= 1
-        return np.s_[ybegin:yend, xbegin:xend]
-
-    def load_LPNHE_image(self, file_name):
-        """
-        Args:
-            file_name (:obj:`str`): path to the image
-        """
-        self.my_logger.info('\n\tLoading LPNHE image %s...' % file_name)
-        hdus = fits.open(file_name)
-        self.header = hdus[0].header
-        hdu1 = hdus["CHAN_14"]
-        hdu2 = hdus["CHAN_06"]
-        data1 = hdu1.data[self.imgslice(hdu1.header['DATASEC'])].astype(np.float64)
-        bias1 = np.mean(hdu1.data[self.imgslice(hdu1.header['BIASSEC'])].astype(np.float64))
-        data1 -= bias1
-        data2 = hdu2.data[self.imgslice(hdu2.header['DATASEC'])].astype(np.float64)
-        bias2 = np.mean(hdu2.data[self.imgslice(hdu2.header['BIASSEC'])].astype(np.float64))
-        data2 -= bias2
-        self.data = np.concatenate([data1, data2])
-        self.date_obs = self.header['DATE-OBS']
-        self.expo = float(self.header['EXPTIME'])
-        self.header['LSHIFT'] = 0.
-        self.header['D2CCD'] = parameters.DISTANCE2CCD
-        self.data = self.data.T
-        self.my_logger.info('\n\tImage loaded')
-        # compute CCD gain map
-        self.gain = float(self.header['CCDGAIN']) * np.ones_like(self.data)
-        parameters.CCD_IMSIZE = self.data.shape[1]
 
     def save_image(self, output_file_name, overwrite=False):
         """Save the image in a fits file.
@@ -424,15 +358,22 @@ def load_LPNHE_image(image):  # pragma: no cover
     image: Image
         The Image instance to fill with file data and header.
     """
-    image.my_logger.info(f'\n\tLoading LPNHE image {image.file_name}...')
-    image.header, data1 = load_fits(image.file_name, 15)
-    image.header, data2 = load_fits(image.file_name, 7)
-    data1 = data1.astype(np.float64)
-    data2 = data2.astype(np.float64)
-    image.data = np.concatenate((data1[10:-10, 10:-10], data2[10:-10, 10:-10]))
+    image.my_logger.info(f'\n\tLoading CTIO image {image.file_name}...')
+    hdus = fits.open(image.file_name)
+    image.header = hdus[0].header
+    hdu1 = hdus["CHAN_14"]
+    hdu2 = hdus["CHAN_06"]
+    data1 = hdu1.data[imgslice(hdu1.header['DATASEC'])].astype(np.float64)
+    bias1 = np.mean(hdu1.data[imgslice(hdu1.header['BIASSEC'])].astype(np.float64))
+    data1 -= bias1
+    image.my_logger.info('\n\tpouet')
+    image.my_logger.warning(f"\n\t{bias1}, {imgslice(hdu1.header['DATASEC'])}")
+    data2 = hdu2.data[imgslice(hdu2.header['DATASEC'])].astype(np.float64)
+    bias2 = np.mean(hdu2.data[imgslice(hdu2.header['BIASSEC'])].astype(np.float64))
+    data2 -= bias2
+    image.data = np.concatenate([data1, data2])
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
-    image.header['ROTANGLE'] = image.rotation_angle
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
     image.data = image.data.T
