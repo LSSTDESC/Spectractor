@@ -1610,6 +1610,22 @@ def load_wcs_from_file(filename):
     return wcs
 
 
+def imgslice(slicespec):
+    """
+    Utility function: convert a FITS slice specification (1-based)
+    into the corresponding numpy array slice spec (0-based, xy swapped).
+
+    ex : '[11:522,1:2002]'  -> (0, 2002, 522, 576)
+    """
+
+    parts = slicespec.replace('[', '').replace(']', '').split(',')
+    xbegin, xend = [int(i) for i in parts[0].split(':')]
+    ybegin, yend = [int(i) for i in parts[1].split(':')]
+    xbegin -= 1
+    ybegin -= 1
+    return np.s_[ybegin:yend, xbegin:xend]
+
+
 if __name__ == "__main__":
     import doctest
 
