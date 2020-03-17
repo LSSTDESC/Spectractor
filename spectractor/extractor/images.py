@@ -100,7 +100,6 @@ class Image(object):
             The fits file name.
 
         """
-        self.my_logger.info('\n\tLoading LPNHE image %s...' % file_name)
         if parameters.OBS_NAME == 'CTIO':
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
@@ -358,7 +357,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     image: Image
         The Image instance to fill with file data and header.
     """
-    image.my_logger.info(f'\n\tLoading CTIO image {image.file_name}...')
+    image.my_logger.info(f'\n\tLoading LPNHE image {image.file_name}...')
     hdus = fits.open(image.file_name)
     image.header = hdus[0].header
     hdu1 = hdus["CHAN_14"]
