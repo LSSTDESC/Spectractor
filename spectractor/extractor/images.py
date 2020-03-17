@@ -179,14 +179,15 @@ class Image(object):
         # removes the zeros and negative pixels first
         # set to minimum positive value
         data = np.copy(self.data)
-        # min_noz = np.min(data[data > 0])
-        # data[data <= 0] = min_noz
         # OLD: compute poisson noise in ADU/s without read-out noise
         # self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
         # convert in e- counts
         err2 = data * self.gain
         if self.read_out_noise is not None:
             err2 += self.read_out_noise * self.read_out_noise
+        # remove negative values (due to dead columns for instance
+        min_noz = np.min(err2[err2 > 0])
+        err2[err2 <= 0] = min_noz
         self.stat_errors = np.sqrt(err2)
         # convert in ADU
         self.stat_errors /= self.gain
