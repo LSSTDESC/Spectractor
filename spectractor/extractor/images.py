@@ -16,7 +16,7 @@ from spectractor.extractor.psf import fit_PSF2D_minuit
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_info_from_CTIO_header,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
-                               set_wcs_file_name, load_wcs_from_file)
+                               set_wcs_file_name, load_wcs_from_file, imgslice)
 
 
 class Image(object):
@@ -179,14 +179,15 @@ class Image(object):
         # removes the zeros and negative pixels first
         # set to minimum positive value
         data = np.copy(self.data)
-        min_noz = np.min(data[data > 0])
-        data[data <= 0] = min_noz
         # OLD: compute poisson noise in ADU/s without read-out noise
         # self.stat_errors = np.sqrt(data) / np.sqrt(self.gain * self.expo)
         # convert in e- counts
         err2 = data * self.gain
         if self.read_out_noise is not None:
             err2 += self.read_out_noise * self.read_out_noise
+        # remove negative values (due to dead columns for instance
+        min_noz = np.min(err2[err2 > 0])
+        err2[err2 <= 0] = min_noz
         self.stat_errors = np.sqrt(err2)
         # convert in ADU
         self.stat_errors /= self.gain
@@ -358,20 +359,42 @@ def load_LPNHE_image(image):  # pragma: no cover
         The Image instance to fill with file data and header.
     """
     image.my_logger.info(f'\n\tLoading LPNHE image {image.file_name}...')
-    image.header, data1 = load_fits(image.file_name, 15)
-    image.header, data2 = load_fits(image.file_name, 7)
-    data1 = data1.astype(np.float64)
-    data2 = data2.astype(np.float64)
-    image.data = np.concatenate((data1[10:-10, 10:-10], data2[10:-10, 10:-10]))
+    hdus = fits.open(image.file_name)
+    image.header = hdus[0].header
+    hdu1 = hdus["CHAN_14"]
+    hdu2 = hdus["CHAN_06"]
+    data1 = hdu1.data[imgslice(hdu1.header['DATASEC'])].astype(np.float64)
+    bias1 = np.median(hdu1.data[imgslice(hdu1.header['BIASSEC'])].astype(np.float64))
+    data1 -= bias1
+    detsecy, detsecx = imgslice(hdu1.header['DETSEC'])
+    if detsecy.start > detsecy.stop:
+        data1 = data1[:, ::-1]
+    if detsecx.start > detsecx.stop:
+        data1 = data1[::-1, :]
+    data2 = hdu2.data[imgslice(hdu2.header['DATASEC'])].astype(np.float64)
+    bias2 = np.median(hdu2.data[imgslice(hdu2.header['BIASSEC'])].astype(np.float64))
+    data2 -= bias2
+    detsecy, detsecx = imgslice(hdu2.header['DETSEC'])
+    if detsecy.start > detsecy.stop:
+        data2 = data2[:, ::-1]
+    if detsecx.start > detsecx.stop:
+        data2 = data2[::-1, :]
+    data = np.concatenate([data2, data1])
+    image.data = data[::-1, :].T
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
-    image.header['ROTANGLE'] = image.rotation_angle
     image.header['LSHIFT'] = 0.
+    parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
+    if "mm" not in hdus["XYZ"].header.comments["ZPOS"]:
+        image.my_logger.error(f'\n\tmm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
+                              f'Distances along Z axis must be in mm.')
     image.header['D2CCD'] = parameters.DISTANCE2CCD
-    image.data = image.data.T
+    image.my_logger.info(f'\n\tDistance to CCD adjusted to {parameters.DISTANCE2CCD} mm '
+                         f'considering XYZ platform is set at ZPOS={float(hdus["XYZ"].header["ZPOS"])} mm.')
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
+    image.read_out_noise = float(image.header['CCDNOISE']) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
 
 
@@ -887,13 +910,13 @@ def turn_image(image):
         plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):min(y0 + 2 * parameters.YWINDOW,
                                                                                        image.data.shape[0]),
                                     margin:-margin],
-                          scale="log", title='Raw image (log10 scale)', units=image.units,
+                          scale="symlog", title='Raw image (log10 scale)', units=image.units,
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
                                     margin:-margin],
-                          scale="log", title='Turned image (log10 scale)',
+                          scale="symlog", title='Turned image (log10 scale)',
                           units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
         f.tight_layout()
