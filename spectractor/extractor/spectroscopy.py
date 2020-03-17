@@ -1,6 +1,7 @@
 from astropy.table import Table
 from scipy.interpolate import interp1d
 import numpy as np
+import copy
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -118,7 +119,7 @@ class Line:
 class Lines:
     """Class gathering all the lines and associated methods."""
 
-    def __init__(self, lines, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=False):
+    def __init__(self, lines, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=False, orders=[1]):
         """ Main emission/absorption lines in nm. Sorted lines are sorted in self.lines.
         See http://www.pa.uky.edu/~peter/atomic/ or https://physics.nist.gov/PhysRefData/ASD/lines_form.html
 
@@ -167,7 +168,19 @@ class Lines:
         if redshift < -1e-2:
             self.my_logger.error(f'\n\tRedshift must small in absolute value (|z|<0.01) or be positive or null. '
                                  f'Got redshift={redshift}.')
-        self.lines = lines
+        self.lines = []
+        for order in orders:
+            for line in lines:
+                tmp_line = copy.deepcopy(line)
+                tmp_line.wavelength *= order
+                if order > 1:
+                    if line.label[-1] == "$":
+                        tmp_line.label = tmp_line.label[:-1]
+                    tmp_line.label += "^(2)"
+                    if line.label[-1] == "$":
+                        tmp_line.label += "$"
+                self.lines.append(tmp_line)
+        self.my_logger.warning(f"{[l.wavelength for l in self.lines]}")
         self.redshift = redshift
         self.atmospheric_lines = atmospheric_lines
         self.hydrogen_only = hydrogen_only
