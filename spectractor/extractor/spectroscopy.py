@@ -119,7 +119,8 @@ class Line:
 class Lines:
     """Class gathering all the lines and associated methods."""
 
-    def __init__(self, lines, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=False, orders=[1]):
+    def __init__(self, lines, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=False,
+                 orders=[1]):
         """ Main emission/absorption lines in nm. Sorted lines are sorted in self.lines.
         See http://www.pa.uky.edu/~peter/atomic/ or https://physics.nist.gov/PhysRefData/ASD/lines_form.html
 
@@ -135,6 +136,9 @@ class Lines:
             Set True to gather only the hydrogen spectral lines, atmospheric lines still included (default: False)
         emission_spectrum: bool, optional
             Set True if the spectral line has to be detected in emission (default: False)
+        orders: list, optional
+            List of integers corresponding to the diffraction order to account for the line search and the
+            wavelength calibration (default: [1])
 
         Examples
         --------
@@ -160,6 +164,11 @@ class Lines:
         >>> print([lines.lines[i].wavelength for i in range(5)])
         [382.044, 393.366, 396.847, 430.79, 438.355]
 
+        Hydrogen lines at order 1 and 2:
+        >>> lines = Lines(HYDROGEN_LINES, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True, orders=[1, 2])
+        >>> print([lines.lines[i].wavelength for i in range(len(lines.lines))])
+        [397.0, 410.2, 434.0, 486.3, 656.3, 794.0, 820.4, 868.0, 972.6, 1312.6]
+
         Negative redshift:
         >>> lines = Lines(HYDROGEN_LINES, redshift=-0.5)
 
@@ -169,6 +178,7 @@ class Lines:
             self.my_logger.error(f'\n\tRedshift must small in absolute value (|z|<0.01) or be positive or null. '
                                  f'Got redshift={redshift}.')
         self.lines = []
+        self.orders = orders
         for order in orders:
             for line in lines:
                 tmp_line = copy.deepcopy(line)
@@ -180,7 +190,6 @@ class Lines:
                     if line.label[-1] == "$":
                         tmp_line.label += "$"
                 self.lines.append(tmp_line)
-        self.my_logger.warning(f"{[l.wavelength for l in self.lines]}")
         self.redshift = redshift
         self.atmospheric_lines = atmospheric_lines
         self.hydrogen_only = hydrogen_only
