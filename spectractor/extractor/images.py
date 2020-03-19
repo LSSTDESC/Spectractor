@@ -9,7 +9,7 @@ import numpy as np
 import os
 
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.psf import fit_PSF2D_minuit
@@ -21,7 +21,7 @@ from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_
 
 class Image(object):
 
-    def __init__(self, file_name, target_label="", disperser_label=""):
+    def __init__(self, file_name, target_label="", disperser_label="", config=""):
         """
         The image class contains all the features necessary to load an image and extract a spectrum.
 
@@ -33,6 +33,8 @@ class Image(object):
             The target name, to be found in data bases.
         disperser_label: str, optional
             The disperser label to load its properties
+        config: str, optional
+            A config file name to load some parameter values for a given instrument (default: "").
 
         Examples
         --------
@@ -50,6 +52,8 @@ class Image(object):
 
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        if config != "":
+            load_config(config)
         self.file_name = file_name
         self.units = 'ADU'
         self.expo = -1
