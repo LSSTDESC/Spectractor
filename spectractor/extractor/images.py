@@ -293,6 +293,7 @@ def load_CTIO_image(image):
     extract_info_from_CTIO_header(image, image.header)
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.header.comments["D2CCD"] = "[mm] Distance between the disperser and the CCD"
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
     parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
     if image.header['YLENGTH'] != parameters.CCD_IMSIZE:
@@ -385,6 +386,8 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.expo = float(image.header['EXPTIME'])
     image.header['LSHIFT'] = 0.
     parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
+    image.header["D2CCD"] = parameters.DISTANCE2CCD
+    image.header.comments["D2CCD"] = "[mm] Distance between the disperser and the CCD"
     if "mm" not in hdus["XYZ"].header.comments["ZPOS"]:
         image.my_logger.error(f'\n\tmm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
                               f'Distances along Z axis must be in mm.')
@@ -396,6 +399,13 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
     image.read_out_noise = float(image.header['CCDNOISE']) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
+    # save xys platform position into main header
+    image.header["XPOS"] = hdus["XYZ"].header["XPOS"]
+    image.header.comments["XPOS"] = hdus["XYZ"].header.comments["XPOS"]
+    image.header["YPOS"] = hdus["XYZ"].header["YPOS"]
+    image.header.comments["YPOS"] = hdus["XYZ"].header.comments["YPOS"]
+    image.header["ZPOS"] = hdus["XYZ"].header["ZPOS"]
+    image.header.comments["ZPOS"] = hdus["XYZ"].header.comments["ZPOS"]
 
 
 def load_AUXTEL_image(image):  # pragma: no cover
@@ -418,6 +428,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.header['ROTANGLE'] = image.rotation_angle
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
+    image.header.comments["D2CCD"] = "[mm] Distance between the disperser and the CCD"
     image.disperser_label = image.header['GRATING']
     image.data = image.data.T[:, ::-1]
     image.my_logger.info('\n\tImage loaded')
