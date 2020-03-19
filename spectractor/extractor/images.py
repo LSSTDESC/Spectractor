@@ -291,7 +291,6 @@ def load_CTIO_image(image):
     image.my_logger.info(f'\n\tLoading CTIO image {image.file_name}...')
     image.header, image.data = load_fits(image.file_name)
     extract_info_from_CTIO_header(image, image.header)
-    image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
     image.header.comments["D2CCD"] = "[mm] Distance between the disperser and the CCD"
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
@@ -384,7 +383,6 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.data = data[::-1, :].T
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
-    image.header['LSHIFT'] = 0.
     parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
     image.header["D2CCD"] = parameters.DISTANCE2CCD
     image.header.comments["D2CCD"] = "[mm] Distance between the disperser and the CCD"
@@ -426,7 +424,6 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
     image.header['ROTANGLE'] = image.rotation_angle
-    image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
     image.header.comments["D2CCD"] = "[mm] Distance between the disperser and the CCD"
     image.disperser_label = image.header['GRATING']
