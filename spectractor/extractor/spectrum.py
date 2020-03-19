@@ -7,7 +7,7 @@ import numpy as np
 import os
 
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, extract_info_from_CTIO_header, plot_image_simple,
@@ -20,7 +20,7 @@ from spectractor.extractor.background import extract_spectrogram_background_sext
 
 class Spectrum:
 
-    def __init__(self, file_name="", image=None, order=1, target=None):
+    def __init__(self, file_name="", image=None, order=1, target=None, config=""):
         """ Spectrum class used to store information and methods
         relative to spectra nd their extraction.
 
@@ -35,6 +35,8 @@ class Spectrum:
             Order of the spectrum (default: 1)
         target: Target, optional
             Target object if provided (default: None)
+        config: str, optional
+            A config file name to load some parameter values for a given instrument (default: "").
 
         Examples
         --------
@@ -55,6 +57,8 @@ class Spectrum:
         PNG321.0+3.9
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        if config != "":
+            load_config(config)
         self.target = target
         self.data = None
         self.err = None

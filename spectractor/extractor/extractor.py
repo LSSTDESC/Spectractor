@@ -62,6 +62,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     my_logger.info('\n\tStart SPECTRACTOR')
     # Load config file
     load_config(config)
+
     # Load reduced image
     image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
     if parameters.DEBUG:
