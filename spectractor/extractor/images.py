@@ -13,7 +13,7 @@ from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.psf import fit_PSF2D_minuit
-from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_info_from_CTIO_header,
+from spectractor.tools import (plot_image_simple, save_fits, load_fits,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
                                set_wcs_file_name, load_wcs_from_file, imgslice)
@@ -294,7 +294,14 @@ def load_CTIO_image(image):
     """
     image.my_logger.info(f'\n\tLoading CTIO image {image.file_name}...')
     image.header, image.data = load_fits(image.file_name)
-    extract_info_from_CTIO_header(image, image.header)
+
+    image.date_obs = image.header['DATE-OBS']
+    image.airmass = float(image.header['AIRMASS'])
+    image.expo = float(image.header['EXPTIME'])
+    image.filters = image.header['FILTERS']
+    image.filter = image.header['FILTER1']
+    image.disperser_label = image.header['FILTER2']
+
     image.header['D2CCD'] = parameters.DISTANCE2CCD
     image.header.comments["D2CCD"] = "[mm] Distance between the disperser and the CCD"
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
