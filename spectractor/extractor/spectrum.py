@@ -10,7 +10,7 @@ from spectractor import parameters
 from spectractor.config import set_logger, load_config
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
-from spectractor.tools import (ensure_dir, load_fits, extract_info_from_CTIO_header, plot_image_simple,
+from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
                                from_lambda_to_colormap)
@@ -370,7 +370,6 @@ class Spectrum:
             self.data = raw_data[1]
             if len(raw_data) > 2:
                 self.err = raw_data[2]
-            extract_info_from_CTIO_header(self, self.header)
             if self.header['TARGET'] != "":
                 self.target = load_target(self.header['TARGET'], verbose=parameters.VERBOSE)
                 self.lines = self.target.lines
