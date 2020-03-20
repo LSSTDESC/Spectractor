@@ -112,6 +112,7 @@ class Image(object):
             load_AUXTEL_image(self)
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
+        self.header["GRATING"] = self.disperser_label
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
         self.compute_statistical_error()

@@ -380,7 +380,7 @@ class Spectrum:
             if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
-            self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+            self.disperser = Hologram(self.header['GRATING'], data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             self.load_spectrogram(input_file_name.replace('spectrum', 'spectrogram'))
             self.load_chromatic_psf(input_file_name.replace('spectrum.fits', 'table.csv'))
