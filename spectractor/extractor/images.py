@@ -772,7 +772,7 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     return new_avX, new_avY
 
 
-def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters.YWINDOW,
+def compute_rotation_angle_hessian(image, angle_range=(-10,10), width_cut=parameters.YWINDOW,
                                    right_edge=parameters.CCD_IMSIZE - 200,
                                    margin_cut=12):
     """Compute the rotation angle in degree of a spectrogram with the Hessian of the image.
@@ -783,8 +783,8 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     ----------
     image: Image
         The Image instance.
-    deg_threshold: float
-        Don't consider pixel with Hessian angle above deg_threshold or below -deg_threshold (default: 10).
+    angle_range: (float, float)
+        Don't consider pixel with Hessian angle outside this range (default: (-10,10)).
     width_cut: int
         Half with of the image to consider in height (default: parameters.YWINDOW).
     right_edge: int
@@ -837,7 +837,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         theta_mask[mask] = np.nan
         # print len(theta_mask[~np.isnan(theta_mask)]), lambda_threshold
     theta_guess = image.disperser.theta(image.target_pixcoords)
-    mask2 = np.where(np.abs(theta - theta_guess) > deg_threshold)
+    mask2 = np.logical_or(angle_range[0] > theta - theta_guess, theta - theta_guess > angle_range[1])
     theta_mask[mask2] = np.nan
     theta_mask = theta_mask[2:-2, 2:-2]
     theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
@@ -861,7 +861,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         xindex = np.arange(data.shape[1])
         x_new = np.linspace(xindex.min(), xindex.max(), 50)
         y_new = width_cut + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
-        ax1.imshow(theta_mask, origin='lower', cmap=cm.brg, aspect='auto', vmin=-deg_threshold, vmax=deg_threshold)
+        ax1.imshow(theta_mask, origin='lower', cmap=cm.brg, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
         ax1.plot(x_new, y_new, 'b-')
         ax1.set_ylim(0, 2 * width_cut)
         ax1.set_xlabel('X [pixels]')
@@ -911,6 +911,7 @@ def turn_image(image):
     >>> assert np.isclose(im.rotation_angle, np.arctan(slope)*180/np.pi, rtol=1e-2)
     """
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
+                                                          angle_range=(parameters.ROT_ANGLE_MIN, parameters.ROT_ANGLE_MAX),
                                                           right_edge=parameters.CCD_IMSIZE - 200)
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
