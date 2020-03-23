@@ -370,6 +370,8 @@ class Spectrum:
             self.data = raw_data[1]
             if len(raw_data) > 2:
                 self.err = raw_data[2]
+            if self.header['GRATING'] != "":
+                self.disperser_label = self.header['GRATING']
             if self.header['TARGET'] != "":
                 self.target = load_target(self.header['TARGET'], verbose=parameters.VERBOSE)
                 self.lines = self.target.lines
@@ -379,11 +381,23 @@ class Spectrum:
                 self.rotation_angle = self.header['ROTANGLE']
             if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
+            if self.header['D2CCD'] != "":
+                parameters.DISTANCE2CCD = float(self.header["D2CCD"])
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
-            self.disperser = Hologram(self.header['GRATING'], data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+            self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
-            self.load_spectrogram(input_file_name.replace('spectrum', 'spectrogram'))
-            self.load_chromatic_psf(input_file_name.replace('spectrum.fits', 'table.csv'))
+            spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
+            self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
+            if os.path.isfile(spectrogram_file_name):
+                self.load_spectrogram(spectrogram_file_name)
+            else:
+                self.my_logger.error(f"\n\tSpectrogram file {spectrogram_file_name} does not exist.")
+            psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
+            self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
+            if os.path.isfile(psf_file_name):
+                self.load_chromatic_psf(psf_file_name)
+            else:                
+                self.my_logger.error(f"\n\tPSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
                 self.spectrogram_fit = hdu_list[1].data
@@ -481,6 +495,8 @@ def calibrate_spectrum(spectrum, xlim=None):
     if spectrum.err is not None:
         spectrum.err = spectrum.err[spectrum.lambdas_indices]
     spectrum.convert_from_ADUrate_to_flam()
+    spectrum.header['PIXSHIFT'] = 0
+    spectrum.header['D2CCD'] = parameters.DISTANCE2CCD
 
 
 def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None, calibration_lines_only=False,
@@ -562,7 +578,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     #     peak_width = 7
     #     bgd_width = 15
     fwhm_to_peak_width_factor = 1.5
-    len_index_to_bgd_npar_factor = 0.12
+    len_index_to_bgd_npar_factor = 0* 0.12 / 0.024 * parameters.CCD_PIXEL2MM
     baseline_prior = 3  # *sigma gaussian prior on base line fit
     # filter the noise
     # plt.errorbar(lambdas,spec,yerr=spec_err)
