@@ -21,6 +21,7 @@ def test_logbook():
 
 def test_extractor():
     file_names = ['tests/data/reduc_20170530_134.fits']
+    output_directory = "./outputs"
 
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
     parameters.VERBOSE = True
@@ -31,7 +32,7 @@ def test_extractor():
         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None:
             continue
-        spectrum = Spectractor(file_name, './outputs/', target, [xpos, ypos], disperser_label,
+        spectrum = Spectractor(file_name, output_directory, target, [xpos, ypos], disperser_label,
                                config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10
@@ -48,8 +49,8 @@ def test_extractor():
         assert np.isclose(spectrum.x0[1], 683.0577836601408, atol=1)
         assert np.isclose(spectrum.spectrogram_x0, -240, atol=1)
         assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3
-        assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrum.fits')) is True
-        assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrogram.fits')) is True
+        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrum.fits'))) is True
+        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrogram.fits'))) is True
 
 
 def extractor_auxtel():
