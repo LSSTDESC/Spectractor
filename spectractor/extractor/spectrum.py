@@ -368,7 +368,6 @@ class Spectrum:
             self.lambdas = raw_data[0]
             self.lambdas_binwidths = np.gradient(self.lambdas)
             self.data = raw_data[1]
-            self.my_logger.warning(f"{self.header}")
             if len(raw_data) > 2:
                 self.err = raw_data[2]
             if self.header['GRATING'] != "":
