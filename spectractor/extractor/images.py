@@ -40,10 +40,11 @@ class Image(object):
         --------
         >>> im = Image('tests/data/reduc_20170605_028.fits')
         >>> print(im.file_name)
-        'tests/data/reduc_20170605_028.fits'
+        tests/data/reduc_20170605_028.fits
 
         .. doctest:
             :hide:
+
             >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
             >>> assert im.data is not None and np.mean(im.data) > 0
             >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
@@ -87,15 +88,15 @@ class Image(object):
         self.target_bkgd2D = None
         self.target_star2D = None
         self.header['TARGET'] = self.target_label
-        self.header.comments['TARGET'] = 'name of the targeted object in the image'
+        self.header.comments['TARGET'] = 'name of the target in the image'
         self.header['REDSHIFT'] = 0
         self.header.comments['REDSHIFT'] = 'redshift of the target'
         self.header["GRATING"] = self.disperser_label
         self.header.comments["GRATING"] = "name of the disperser"
         self.header['ROTANGLE'] = self.rotation_angle
-        self.header.comments["ROTANGLE"] = "[deg] main rotation angle of the dispersion axis with respect to horizontal"
+        self.header.comments["ROTANGLE"] = "[deg] angle of the dispersion axis"
         self.header['D2CCD'] = parameters.DISTANCE2CCD
-        self.header.comments["D2CCD"] = "[mm] distance between the disperser and the CCD"
+        self.header.comments["D2CCD"] = "[mm] distance between disperser and CCD"
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
             self.header['REDSHIFT'] = str(self.target.redshift)
@@ -493,7 +494,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
                 sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
                                                                          rotated=rotated, widths=(20, 20))
                 plot_image_simple(plt.gca(), data=sub_image, scale="lin", title="", units=image.units,
-                                  target_pixcoords=[theX-x0+Dx, theY-y0+Dy])
+                                  target_pixcoords=[theX - x0 + Dx, theY - y0 + Dy])
                 plt.show()
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
@@ -771,7 +772,7 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     return new_avX, new_avY
 
 
-def compute_rotation_angle_hessian(image, angle_range=(-10,10), width_cut=parameters.YWINDOW,
+def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=parameters.YWINDOW,
                                    right_edge=parameters.CCD_IMSIZE - 200,
                                    margin_cut=12):
     """Compute the rotation angle in degree of a spectrogram with the Hessian of the image.
@@ -848,13 +849,13 @@ def compute_rotation_angle_hessian(image, angle_range=(-10,10), width_cut=parame
         theta_median = float(np.median(theta_hist))
     theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
     image.header['THETAFIT'] = theta_median
-    image.header.comments['THETAFIT'] = '[USED] rotation angle from the Hessian analysis'
+    image.header.comments['THETAFIT'] = '[deg] [USED] rotation angle from the Hessian analysis'
     image.header['THETAINT'] = theta_guess
-    image.header.comments['THETAINT'] = 'rotation angle interp from disperser scan'
-    if abs(theta_median - theta_guess) > theta_critical:
-        image.my_logger.warning(
-            f'\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels '
-            f'over {parameters.CCD_IMSIZE:d} pixels: {theta_median:.2f} vs {theta_guess:.2f}')
+    image.header.comments['THETAINT'] = '[deg] rotation angle interp from disperser scan'
+    # if abs(theta_median - theta_guess) > theta_critical:
+    #     image.my_logger.warning(
+    #         f'\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels '
+    #         f'over {parameters.CCD_IMSIZE:d} pixels: {theta_median:.2f} vs {theta_guess:.2f}')
     if parameters.DEBUG:
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6))
         xindex = np.arange(data.shape[1])
@@ -910,7 +911,8 @@ def turn_image(image):
     >>> assert np.isclose(im.rotation_angle, np.arctan(slope)*180/np.pi, rtol=1e-2)
     """
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
-                                                          angle_range=(parameters.ROT_ANGLE_MIN, parameters.ROT_ANGLE_MAX),
+                                                          angle_range=(parameters.ROT_ANGLE_MIN,
+                                                                       parameters.ROT_ANGLE_MAX),
                                                           right_edge=parameters.CCD_IMSIZE - 200)
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
