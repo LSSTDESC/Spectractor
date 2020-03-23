@@ -1611,9 +1611,11 @@ def from_lambda_to_colormap(lambdas):
     --------
     >>> lambdas = np.arange(300, 1000, 10)
     >>> spec = from_lambda_to_colormap(lambdas)
-    >>> plt.scatter(lambdas, np.zeros(lambdas.size), cmap=spec, c=lambdas)
+    >>> plt.scatter(lambdas, np.zeros(lambdas.size), cmap=spec, c=lambdas)  #doctest: +ELLIPSIS
+    <matplotlib.collections.PathCollection object at ...>
     >>> plt.grid()
-    >>> plt.xlabel("Wavelength [nm]")
+    >>> plt.xlabel("Wavelength [nm]")  #doctest: +ELLIPSIS
+    Text(..., 'Wavelength [nm]')
     >>> plt.show()
 
     ..plot::
