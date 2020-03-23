@@ -61,6 +61,7 @@ class Image(object):
         self.date_obs = None
         self.disperser = None
         self.disperser_label = disperser_label
+        self.target_label = target_label
         self.filter = None
         self.filters = None
         self.header = None
@@ -85,13 +86,19 @@ class Image(object):
         self.target_pixcoords_rotated = None
         self.target_bkgd2D = None
         self.target_star2D = None
-        if target_label != "":
-            self.target = load_target(target_label, verbose=parameters.VERBOSE)
-            self.header['TARGET'] = self.target.label
-            self.header.comments['TARGET'] = 'object targeted in the image'
+        self.header['TARGET'] = self.target_label
+        self.header.comments['TARGET'] = 'name of the targeted object in the image'
+        self.header['REDSHIFT'] = 0
+        self.header.comments['REDSHIFT'] = 'redshift of the target'
+        self.header["GRATING"] = self.disperser_label
+        self.header.comments["GRATING"] = "name of the disperser"
+        self.header['ROTANGLE'] = self.rotation_angle
+        self.header.comments["ROTANGLE"] = "[deg] main rotation angle of the dispersion axis with respect to horizontal"
+        self.header['D2CCD'] = parameters.DISTANCE2CCD
+        self.header.comments["D2CCD"] = "[mm] distance between the disperser and the CCD"
+        if self.target_label != "":
+            self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
             self.header['REDSHIFT'] = str(self.target.redshift)
-            self.header.comments['REDSHIFT'] = 'redshift of the target'
-        self.err = None
 
     def load_image(self, file_name):
         """
@@ -303,8 +310,6 @@ def load_CTIO_image(image):
     image.filter = image.header['FILTER1']
     image.disperser_label = image.header['FILTER2']
 
-    image.header['D2CCD'] = parameters.DISTANCE2CCD
-    image.header.comments["D2CCD"] = "[mm] Distance between the disperser and the CCD"
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
     parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
     if image.header['YLENGTH'] != parameters.CCD_IMSIZE:
@@ -396,15 +401,11 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
     parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
-    image.header["D2CCD"] = parameters.DISTANCE2CCD
-    image.header.comments["D2CCD"] = "[mm] Distance between the disperser and the CCD"
     if "mm" not in hdus["XYZ"].header.comments["ZPOS"]:
         image.my_logger.error(f'\n\tmm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
                               f'Distances along Z axis must be in mm.')
-    image.header['D2CCD'] = parameters.DISTANCE2CCD
     image.my_logger.info(f'\n\tDistance to CCD adjusted to {parameters.DISTANCE2CCD} mm '
                          f'considering XYZ platform is set at ZPOS={float(hdus["XYZ"].header["ZPOS"])} mm.')
-    image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
     image.read_out_noise = float(image.header['CCDNOISE']) * np.ones_like(image.data)
@@ -416,6 +417,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.header.comments["YPOS"] = hdus["XYZ"].header.comments["YPOS"]
     image.header["ZPOS"] = hdus["XYZ"].header["ZPOS"]
     image.header.comments["ZPOS"] = hdus["XYZ"].header.comments["ZPOS"]
+    image.my_logger.info('\n\tImage loaded')
 
 
 def load_AUXTEL_image(image):  # pragma: no cover
@@ -435,15 +437,12 @@ def load_AUXTEL_image(image):  # pragma: no cover
     # image.data = np.concatenate((data[10:-10, 10:-10], data2[10:-10, 10:-10]))
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
-    image.header['ROTANGLE'] = image.rotation_angle
-    image.header['D2CCD'] = parameters.DISTANCE2CCD
-    image.header.comments["D2CCD"] = "[mm] Distance between the disperser and the CCD"
-    image.disperser_label = image.header['GRATING']
     image.data = image.data.T[:, ::-1]
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
+    image.disperser_label = image.header['GRATING']
 
 
 def find_target(image, guess=None, rotated=False, use_wcs=True):
