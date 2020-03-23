@@ -682,10 +682,10 @@ def SimulatorInit(filename):
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SIMULATOR initialisation')
     # Load data spectrum
-    #try:
-    spectrum = Spectrum(filename)
-    #except:
-    #spectrum = Image(filename)
+    try:
+        spectrum = Spectrum(filename)
+    except:
+        spectrum = Image(filename)
 
     # TELESCOPE TRANSMISSION
     # ------------------------
