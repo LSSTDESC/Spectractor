@@ -486,11 +486,12 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
             else:
                 wcs = load_wcs_from_file(wcs_file_name)
                 target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
+                # noinspection PyUnresolvedReferences
                 target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra,
                                                               target_coord_after_motion.dec, 0))
                 theX, theY = target_pixcoords
             if parameters.DEBUG:
-                fig = plt.figure(figsize=(5, 5))
+                plt.figure(figsize=(5, 5))
                 sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
                                                                          rotated=rotated, widths=(20, 20))
                 plot_image_simple(plt.gca(), data=sub_image, scale="lin", title="", units=image.units,
@@ -847,7 +848,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         theta_median = np.arctan(p[0]) * 180 / np.pi
     else:
         theta_median = float(np.median(theta_hist))
-    theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
+    # theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
     image.header['THETAFIT'] = theta_median
     image.header.comments['THETAFIT'] = '[deg] [USED] rotation angle from the Hessian analysis'
     image.header['THETAINT'] = theta_guess
@@ -929,15 +930,15 @@ def turn_image(image):
         margin = 100
         y0 = int(image.target_pixcoords[1])
         f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
-        plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):min(y0 + 2 * parameters.YWINDOW,
-                                                                                       image.data.shape[0]),
-                                    margin:-margin],
+        plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):
+                                               min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
+                                               margin:-margin],
                           scale="symlog", title='Raw image (log10 scale)', units=image.units,
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
-                                    margin:-margin],
+                                                       margin:-margin],
                           scale="symlog", title='Turned image (log10 scale)',
                           units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
