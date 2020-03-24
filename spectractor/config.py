@@ -13,6 +13,22 @@ logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 
 def from_config_to_parameters(config):
+    """Convert config file keywords into spectractor.parameters parameters.
+
+    Parameters
+    ----------
+    config: ConfigParser
+        The ConfigParser instance to convert
+
+    Examples
+    --------
+    >>> config = configparser.ConfigParser()
+    >>> config.read("./config/default.ini")
+    ['./config/default.ini']
+    >>> from_config_to_parameters(config)
+    >>> assert parameters.OBS_NAME == "DEFAULT"
+
+    """
     # List all contents
     for section in config.sections():
         for options in config.options(section):
