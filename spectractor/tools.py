@@ -1474,15 +1474,6 @@ def load_fits(file_name, hdu_index=0):
     return header, data
 
 
-def extract_info_from_CTIO_header(obj, header):
-    obj.date_obs = header['DATE-OBS']
-    obj.airmass = header['AIRMASS']
-    obj.expo = header['EXPTIME']
-    obj.filters = header['FILTERS']
-    obj.filter = header['FILTER1']
-    obj.disperser_label = header['FILTER2']
-
-
 def save_fits(file_name, header, data, overwrite=False):
     """Generic function to save a FITS file.
 
@@ -1620,9 +1611,11 @@ def from_lambda_to_colormap(lambdas):
     --------
     >>> lambdas = np.arange(300, 1000, 10)
     >>> spec = from_lambda_to_colormap(lambdas)
-    >>> plt.scatter(lambdas, np.zeros(lambdas.size), cmap=spec, c=lambdas)
+    >>> plt.scatter(lambdas, np.zeros(lambdas.size), cmap=spec, c=lambdas)  #doctest: +ELLIPSIS
+    <matplotlib.collections.PathCollection object at ...>
     >>> plt.grid()
-    >>> plt.xlabel("Wavelength [nm]")
+    >>> plt.xlabel("Wavelength [nm]")  #doctest: +ELLIPSIS
+    Text(..., 'Wavelength [nm]')
     >>> plt.show()
 
     ..plot::
