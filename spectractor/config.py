@@ -13,8 +13,25 @@ logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 
 def load_config(config_filename):
+    """Load configuration parameters from a .ini config file.
+
+    Parameters
+    ----------
+    config_filename: str
+        The path to the config file.
+
+    Examples
+    --------
+    >>> load_config("./config/ctio.ini")
+    >>> assert parameters.OBS_NAME == "CTIO"
+
+    """
+    if not os.path.isfile("./config/default.ini"):
+        sys.exit('Config file ./config/default.ini does not exist.')
+    load_config("./config/default.ini")
+
     if not os.path.isfile(config_filename):
-        sys.exit('Config file %s does not exist.' % config_filename)
+        sys.exit(f'Config file {config_filename} does not exist.')
     # Load the configuration file
     config = configparser.ConfigParser()
     config.read(config_filename)
@@ -53,7 +70,7 @@ def load_config(config_filename):
 
     if parameters.VERBOSE:
         for section in config.sections():
-            print("Section: %s" % section)
+            print(f"Section: {section}")
             for options in config.options(section):
                 value = config.get(section, options)
                 par = getattr(parameters, options.upper())
