@@ -112,7 +112,7 @@ def load_config(config_filename):
             for options in config.options(section):
                 value = config.get(section, options)
                 par = getattr(parameters, options.upper())
-                print(f"x {options}: {value}\t => parameters.{options.upper()}: {par}\t {type(par)}")
+                print(f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}")
 
 
 def set_logger(logger):
@@ -130,6 +130,7 @@ def set_logger(logger):
 
     Examples
     --------
+
     >>> class Test:
     ...     def __init__(self):
     ...         self.my_logger = set_logger(self.__class__.__name__)
@@ -142,6 +143,7 @@ def set_logger(logger):
     >>> parameters.DEBUG = True
     >>> test = Test()
     >>> test.log()
+    
     """
     my_logger = logging.getLogger(logger)
     coloredlogs.DEFAULT_LEVEL_STYLES['warn'] = {'color': 'yellow'}
