@@ -23,7 +23,7 @@ def make_test_image():
     spectrum_filename = "tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = spectrum_filename.replace("_spectrum.fits", ".fits")
     ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=1, A2=0.05,
-             psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=True)
+             psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=True, with_rotation=True)
 
 
 def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
@@ -72,7 +72,7 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
 
 def test_fitchromaticpsf2d():
     parameters.VERBOSE = True
-    # parameters.DEBUG = True
+    parameters.DEBUG = True
     sim_image = "./tests/data/sim_20170530_134.fits"
     if not os.path.isfile(sim_image):
         make_test_image()
@@ -89,7 +89,8 @@ def test_fitchromaticpsf2d():
     tag = tag.replace('sim_', 'reduc_')
     logbook = LogBook(logbook="./ctiofulllogbook_jun2017_v5.csv")
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-    spectrum = Spectractor(sim_image, "./tests/data", [xpos, ypos], target, disperser_label, "./config/ctio.ini")
+    spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
+                           disperser_label=disperser_label, config="./config/ctio.ini")
     plot_residuals(spectrum, lambdas_truth, amplitude_truth)
 
     assert np.isclose(float(image.header['X0_T']), spectrum.target_pixcoords[0], atol=0.01)
@@ -103,4 +104,5 @@ def test_fitchromaticpsf2d():
 
 
 if __name__ == "__main__":
+
     run_module_suite()
