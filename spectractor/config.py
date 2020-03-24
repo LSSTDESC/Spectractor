@@ -22,6 +22,7 @@ def from_config_to_parameters(config):
 
     Examples
     --------
+
     >>> config = configparser.ConfigParser()
     >>> config.read("./config/default.ini")
     ['./config/default.ini']
