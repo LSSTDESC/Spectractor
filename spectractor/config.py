@@ -12,30 +12,7 @@ from spectractor import parameters
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 
-def load_config(config_filename):
-    """Load configuration parameters from a .ini config file.
-
-    Parameters
-    ----------
-    config_filename: str
-        The path to the config file.
-
-    Examples
-    --------
-    >>> load_config("./config/ctio.ini")
-    >>> assert parameters.OBS_NAME == "CTIO"
-
-    """
-    if not os.path.isfile("./config/default.ini"):
-        sys.exit('Config file ./config/default.ini does not exist.')
-    load_config("./config/default.ini")
-
-    if not os.path.isfile(config_filename):
-        sys.exit(f'Config file {config_filename} does not exist.')
-    # Load the configuration file
-    config = configparser.ConfigParser()
-    config.read(config_filename)
-
+def from_config_to_parameters(config):
     # List all contents
     for section in config.sections():
         for options in config.options(section):
@@ -52,6 +29,35 @@ def load_config(config_filename):
             else:
                 value = str(value)
             setattr(parameters, options.upper(), value)
+
+
+def load_config(config_filename):
+    """Load configuration parameters from a .ini config file.
+
+    Parameters
+    ----------
+    config_filename: str
+        The path to the config file.
+
+    Examples
+    --------
+    >>> load_config("./config/ctio.ini")
+    >>> assert parameters.OBS_NAME == "CTIO"
+
+    """
+    if not os.path.isfile("./config/default.ini"):
+        sys.exit('Config file ./config/default.ini does not exist.')
+    # Load the configuration file
+    config = configparser.ConfigParser()
+    config.read("./config/default.ini")
+    from_config_to_parameters(config)
+
+    if not os.path.isfile(config_filename):
+        sys.exit(f'Config file {config_filename} does not exist.')
+    # Load the configuration file
+    config = configparser.ConfigParser()
+    config.read(config_filename)
+    from_config_to_parameters(config)
 
     # Derive other parameters
     parameters.MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
