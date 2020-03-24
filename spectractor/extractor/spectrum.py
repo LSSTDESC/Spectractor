@@ -7,10 +7,10 @@ import numpy as np
 import os
 
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
-from spectractor.tools import (ensure_dir, load_fits, extract_info_from_CTIO_header, plot_image_simple,
+from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
                                from_lambda_to_colormap)
@@ -20,7 +20,7 @@ from spectractor.extractor.background import extract_spectrogram_background_sext
 
 class Spectrum:
 
-    def __init__(self, file_name="", image=None, order=1, target=None):
+    def __init__(self, file_name="", image=None, order=1, target=None, config=""):
         """ Spectrum class used to store information and methods
         relative to spectra nd their extraction.
 
@@ -35,6 +35,8 @@ class Spectrum:
             Order of the spectrum (default: 1)
         target: Target, optional
             Target object if provided (default: None)
+        config: str, optional
+            A config file name to load some parameter values for a given instrument (default: "").
 
         Examples
         --------
@@ -55,6 +57,8 @@ class Spectrum:
         PNG321.0+3.9
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        if config != "":
+            load_config(config)
         self.target = target
         self.data = None
         self.err = None
@@ -366,7 +370,8 @@ class Spectrum:
             self.data = raw_data[1]
             if len(raw_data) > 2:
                 self.err = raw_data[2]
-            extract_info_from_CTIO_header(self, self.header)
+            if self.header['GRATING'] != "":
+                self.disperser_label = self.header['GRATING']
             if self.header['TARGET'] != "":
                 self.target = load_target(self.header['TARGET'], verbose=parameters.VERBOSE)
                 self.lines = self.target.lines
@@ -376,11 +381,23 @@ class Spectrum:
                 self.rotation_angle = self.header['ROTANGLE']
             if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
+            if self.header['D2CCD'] != "":
+                parameters.DISTANCE2CCD = float(self.header["D2CCD"])
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
-            self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+            self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
-            self.load_spectrogram(input_file_name.replace('spectrum', 'spectrogram'))
-            self.load_chromatic_psf(input_file_name.replace('spectrum.fits', 'table.csv'))
+            spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
+            self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
+            if os.path.isfile(spectrogram_file_name):
+                self.load_spectrogram(spectrogram_file_name)
+            else:
+                self.my_logger.error(f"\n\tSpectrogram file {spectrogram_file_name} does not exist.")
+            psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
+            self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
+            if os.path.isfile(psf_file_name):
+                self.load_chromatic_psf(psf_file_name)
+            else:                
+                self.my_logger.error(f"\n\tPSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
                 self.spectrogram_fit = hdu_list[1].data
@@ -478,6 +495,8 @@ def calibrate_spectrum(spectrum, xlim=None):
     if spectrum.err is not None:
         spectrum.err = spectrum.err[spectrum.lambdas_indices]
     spectrum.convert_from_ADUrate_to_flam()
+    spectrum.header['PIXSHIFT'] = 0
+    spectrum.header['D2CCD'] = parameters.DISTANCE2CCD
 
 
 def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None, calibration_lines_only=False,
@@ -559,7 +578,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     #     peak_width = 7
     #     bgd_width = 15
     fwhm_to_peak_width_factor = 1.5
-    len_index_to_bgd_npar_factor = 0.12
+    len_index_to_bgd_npar_factor = 0* 0.12 / 0.024 * parameters.CCD_PIXEL2MM
     baseline_prior = 3  # *sigma gaussian prior on base line fit
     # filter the noise
     # plt.errorbar(lambdas,spec,yerr=spec_err)

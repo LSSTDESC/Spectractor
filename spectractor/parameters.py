@@ -90,6 +90,8 @@ PIXSHIFT_PRIOR = 1  # prior on the reliability of the centroid estimate in pixel
 # Rotation parameters
 ROT_PREFILTER = True  # must be set to true, otherwise create residuals and correlated noise
 ROT_ORDER = 5  # must be above 3
+ROT_ANGLE_MIN = -10
+ROT_ANGL_MAX = 10  # in the Hessian analysis to compute rotation angle, cut all angles outside this range [degrees]
 
 # Range for spectrum
 LAMBDA_MIN = 300  # minimum wavelength for spectrum extraction (in nm)

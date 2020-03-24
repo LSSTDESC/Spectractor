@@ -9,11 +9,11 @@ import numpy as np
 import os
 
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.psf import fit_PSF2D_minuit
-from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_info_from_CTIO_header,
+from spectractor.tools import (plot_image_simple, save_fits, load_fits,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
                                set_wcs_file_name, load_wcs_from_file, imgslice)
@@ -21,7 +21,7 @@ from spectractor.tools import (plot_image_simple, save_fits, load_fits, extract_
 
 class Image(object):
 
-    def __init__(self, file_name, target_label="", disperser_label=""):
+    def __init__(self, file_name, target_label="", disperser_label="", config=""):
         """
         The image class contains all the features necessary to load an image and extract a spectrum.
 
@@ -33,15 +33,18 @@ class Image(object):
             The target name, to be found in data bases.
         disperser_label: str, optional
             The disperser label to load its properties
+        config: str, optional
+            A config file name to load some parameter values for a given instrument (default: "").
 
         Examples
         --------
         >>> im = Image('tests/data/reduc_20170605_028.fits')
         >>> print(im.file_name)
-        'tests/data/reduc_20170605_028.fits'
+        tests/data/reduc_20170605_028.fits
 
         .. doctest:
             :hide:
+
             >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
             >>> assert im.data is not None and np.mean(im.data) > 0
             >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
@@ -50,6 +53,8 @@ class Image(object):
 
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        if config != "":
+            load_config(config)
         self.file_name = file_name
         self.units = 'ADU'
         self.expo = -1
@@ -57,6 +62,7 @@ class Image(object):
         self.date_obs = None
         self.disperser = None
         self.disperser_label = disperser_label
+        self.target_label = target_label
         self.filter = None
         self.filters = None
         self.header = None
@@ -81,13 +87,19 @@ class Image(object):
         self.target_pixcoords_rotated = None
         self.target_bkgd2D = None
         self.target_star2D = None
-        if target_label != "":
-            self.target = load_target(target_label, verbose=parameters.VERBOSE)
-            self.header['TARGET'] = self.target.label
-            self.header.comments['TARGET'] = 'object targeted in the image'
+        self.header['TARGET'] = self.target_label
+        self.header.comments['TARGET'] = 'name of the target in the image'
+        self.header['REDSHIFT'] = 0
+        self.header.comments['REDSHIFT'] = 'redshift of the target'
+        self.header["GRATING"] = self.disperser_label
+        self.header.comments["GRATING"] = "name of the disperser"
+        self.header['ROTANGLE'] = self.rotation_angle
+        self.header.comments["ROTANGLE"] = "[deg] angle of the dispersion axis"
+        self.header['D2CCD'] = parameters.DISTANCE2CCD
+        self.header.comments["D2CCD"] = "[mm] distance between disperser and CCD"
+        if self.target_label != "":
+            self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
             self.header['REDSHIFT'] = str(self.target.redshift)
-            self.header.comments['REDSHIFT'] = 'redshift of the target'
-        self.err = None
 
     def load_image(self, file_name):
         """
@@ -108,6 +120,7 @@ class Image(object):
             load_AUXTEL_image(self)
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
+        self.header["GRATING"] = self.disperser_label
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
         self.compute_statistical_error()
@@ -290,9 +303,14 @@ def load_CTIO_image(image):
     """
     image.my_logger.info(f'\n\tLoading CTIO image {image.file_name}...')
     image.header, image.data = load_fits(image.file_name)
-    extract_info_from_CTIO_header(image, image.header)
-    image.header['LSHIFT'] = 0.
-    image.header['D2CCD'] = parameters.DISTANCE2CCD
+
+    image.date_obs = image.header['DATE-OBS']
+    image.airmass = float(image.header['AIRMASS'])
+    image.expo = float(image.header['EXPTIME'])
+    image.filters = image.header['FILTERS']
+    image.filter = image.header['FILTER1']
+    image.disperser_label = image.header['FILTER2']
+
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
     parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
     if image.header['YLENGTH'] != parameters.CCD_IMSIZE:
@@ -383,19 +401,24 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.data = data[::-1, :].T
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
-    image.header['LSHIFT'] = 0.
     parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
     if "mm" not in hdus["XYZ"].header.comments["ZPOS"]:
         image.my_logger.error(f'\n\tmm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
                               f'Distances along Z axis must be in mm.')
-    image.header['D2CCD'] = parameters.DISTANCE2CCD
     image.my_logger.info(f'\n\tDistance to CCD adjusted to {parameters.DISTANCE2CCD} mm '
                          f'considering XYZ platform is set at ZPOS={float(hdus["XYZ"].header["ZPOS"])} mm.')
-    image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
     image.read_out_noise = float(image.header['CCDNOISE']) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
+    # save xys platform position into main header
+    image.header["XPOS"] = hdus["XYZ"].header["XPOS"]
+    image.header.comments["XPOS"] = hdus["XYZ"].header.comments["XPOS"]
+    image.header["YPOS"] = hdus["XYZ"].header["YPOS"]
+    image.header.comments["YPOS"] = hdus["XYZ"].header.comments["YPOS"]
+    image.header["ZPOS"] = hdus["XYZ"].header["ZPOS"]
+    image.header.comments["ZPOS"] = hdus["XYZ"].header.comments["ZPOS"]
+    image.my_logger.info('\n\tImage loaded')
 
 
 def load_AUXTEL_image(image):  # pragma: no cover
@@ -415,15 +438,12 @@ def load_AUXTEL_image(image):  # pragma: no cover
     # image.data = np.concatenate((data[10:-10, 10:-10], data2[10:-10, 10:-10]))
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
-    image.header['ROTANGLE'] = image.rotation_angle
-    image.header['LSHIFT'] = 0.
-    image.header['D2CCD'] = parameters.DISTANCE2CCD
-    image.disperser_label = image.header['GRATING']
     image.data = image.data.T[:, ::-1]
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
+    image.disperser_label = image.header['GRATING']
 
 
 def find_target(image, guess=None, rotated=False, use_wcs=True):
@@ -466,15 +486,16 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
             else:
                 wcs = load_wcs_from_file(wcs_file_name)
                 target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
+                # noinspection PyUnresolvedReferences
                 target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra,
                                                               target_coord_after_motion.dec, 0))
                 theX, theY = target_pixcoords
             if parameters.DEBUG:
-                fig = plt.figure(figsize=(5, 5))
+                plt.figure(figsize=(5, 5))
                 sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
                                                                          rotated=rotated, widths=(20, 20))
                 plot_image_simple(plt.gca(), data=sub_image, scale="lin", title="", units=image.units,
-                                  target_pixcoords=[theX-x0+Dx, theY-y0+Dy])
+                                  target_pixcoords=[theX - x0 + Dx, theY - y0 + Dy])
                 plt.show()
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
@@ -752,7 +773,7 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     return new_avX, new_avY
 
 
-def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters.YWINDOW,
+def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=parameters.YWINDOW,
                                    right_edge=parameters.CCD_IMSIZE - 200,
                                    margin_cut=12):
     """Compute the rotation angle in degree of a spectrogram with the Hessian of the image.
@@ -763,8 +784,8 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
     ----------
     image: Image
         The Image instance.
-    deg_threshold: float
-        Don't consider pixel with Hessian angle above deg_threshold or below -deg_threshold (default: 10).
+    angle_range: (float, float)
+        Don't consider pixel with Hessian angle outside this range (default: (-10,10)).
     width_cut: int
         Half with of the image to consider in height (default: parameters.YWINDOW).
     right_edge: int
@@ -817,7 +838,7 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         theta_mask[mask] = np.nan
         # print len(theta_mask[~np.isnan(theta_mask)]), lambda_threshold
     theta_guess = image.disperser.theta(image.target_pixcoords)
-    mask2 = np.where(np.abs(theta - theta_guess) > deg_threshold)
+    mask2 = np.logical_or(angle_range[0] > theta - theta_guess, theta - theta_guess > angle_range[1])
     theta_mask[mask2] = np.nan
     theta_mask = theta_mask[2:-2, 2:-2]
     theta_hist = theta_mask[~np.isnan(theta_mask)].flatten()
@@ -827,21 +848,21 @@ def compute_rotation_angle_hessian(image, deg_threshold=10, width_cut=parameters
         theta_median = np.arctan(p[0]) * 180 / np.pi
     else:
         theta_median = float(np.median(theta_hist))
-    theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
+    # theta_critical = 180. * np.arctan(20. / parameters.CCD_IMSIZE) / np.pi
     image.header['THETAFIT'] = theta_median
-    image.header.comments['THETAFIT'] = '[USED] rotation angle from the Hessian analysis'
+    image.header.comments['THETAFIT'] = '[deg] [USED] rotation angle from the Hessian analysis'
     image.header['THETAINT'] = theta_guess
-    image.header.comments['THETAINT'] = 'rotation angle interp from disperser scan'
-    if abs(theta_median - theta_guess) > theta_critical:
-        image.my_logger.warning(
-            f'\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels '
-            f'over {parameters.CCD_IMSIZE:d} pixels: {theta_median:.2f} vs {theta_guess:.2f}')
+    image.header.comments['THETAINT'] = '[deg] rotation angle interp from disperser scan'
+    # if abs(theta_median - theta_guess) > theta_critical:
+    #     image.my_logger.warning(
+    #         f'\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels '
+    #         f'over {parameters.CCD_IMSIZE:d} pixels: {theta_median:.2f} vs {theta_guess:.2f}')
     if parameters.DEBUG:
         f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6))
         xindex = np.arange(data.shape[1])
         x_new = np.linspace(xindex.min(), xindex.max(), 50)
         y_new = width_cut + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
-        ax1.imshow(theta_mask, origin='lower', cmap=cm.brg, aspect='auto', vmin=-deg_threshold, vmax=deg_threshold)
+        ax1.imshow(theta_mask, origin='lower', cmap=cm.brg, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
         ax1.plot(x_new, y_new, 'b-')
         ax1.set_ylim(0, 2 * width_cut)
         ax1.set_xlabel('X [pixels]')
@@ -891,6 +912,8 @@ def turn_image(image):
     >>> assert np.isclose(im.rotation_angle, np.arctan(slope)*180/np.pi, rtol=1e-2)
     """
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
+                                                          angle_range=(parameters.ROT_ANGLE_MIN,
+                                                                       parameters.ROT_ANGLE_MAX),
                                                           right_edge=parameters.CCD_IMSIZE - 200)
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
@@ -907,15 +930,15 @@ def turn_image(image):
         margin = 100
         y0 = int(image.target_pixcoords[1])
         f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
-        plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):min(y0 + 2 * parameters.YWINDOW,
-                                                                                       image.data.shape[0]),
-                                    margin:-margin],
+        plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):
+                                               min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
+                                               margin:-margin],
                           scale="symlog", title='Raw image (log10 scale)', units=image.units,
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
-                                    margin:-margin],
+                                                       margin:-margin],
                           scale="symlog", title='Turned image (log10 scale)',
                           units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
