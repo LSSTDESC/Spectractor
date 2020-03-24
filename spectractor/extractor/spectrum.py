@@ -7,10 +7,10 @@ import numpy as np
 import os
 
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
-from spectractor.tools import (ensure_dir, load_fits, extract_info_from_CTIO_header, plot_image_simple,
+from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
                                from_lambda_to_colormap)
@@ -20,7 +20,7 @@ from spectractor.extractor.background import extract_spectrogram_background_sext
 
 class Spectrum:
 
-    def __init__(self, file_name="", image=None, order=1, target=None):
+    def __init__(self, file_name="", image=None, order=1, target=None, config=""):
         """ Spectrum class used to store information and methods
         relative to spectra nd their extraction.
 
@@ -35,6 +35,8 @@ class Spectrum:
             Order of the spectrum (default: 1)
         target: Target, optional
             Target object if provided (default: None)
+        config: str, optional
+            A config file name to load some parameter values for a given instrument (default: "").
 
         Examples
         --------
@@ -55,6 +57,8 @@ class Spectrum:
         PNG321.0+3.9
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        if config != "":
+            load_config(config)
         self.target = target
         self.data = None
         self.err = None
@@ -95,6 +99,7 @@ class Spectrum:
             self.target_pixcoords_rotated = image.target_pixcoords_rotated
             self.units = image.units
             self.gain = image.gain
+            self.rotation_angle = image.rotation_angle
             self.my_logger.info('\n\tSpectrum info copied from image')
         self.load_filter()
 
@@ -114,8 +119,9 @@ class Spectrum:
             >>> assert np.max(s.err) < 1e-2
 
         """
-        if self.units == "ADU/s":
-            self.my_logger.warning(f"You ask to convert spectrum already in {self.units} in ADU/s... check your code !")
+        if self.units == 'erg/s/cm$^2$/nm' or self.units == "flam":
+            self.my_logger.warning(f"You ask to convert spectrum already in {self.units}"
+                                   f" in erg/s/cm^2/nm... check your code ! Skip the instruction.")
             return
         self.data = self.data / parameters.FLAM_TO_ADURATE
         self.data /= self.lambdas * self.lambdas_binwidths
@@ -140,9 +146,9 @@ class Spectrum:
             >>> assert np.max(s.err) > 1e-2
 
         """
-        if self.units == 'erg/s/cm$^2$/nm':
-            self.my_logger.warning(f"You ask to convert spectrum already in {self.units}"
-                                   f" in erg/s/cm^2/nm... check your code !")
+        if self.units == "ADU/s":
+            self.my_logger.warning(f"You ask to convert spectrum already in {self.units} in ADU/s... check your code ! "
+                                   f"Skip the instruction")
             return
         self.data = self.data * parameters.FLAM_TO_ADURATE
         self.data *= self.lambdas_binwidths * self.lambdas
@@ -391,7 +397,8 @@ class Spectrum:
             self.data = raw_data[1]
             if len(raw_data) > 2:
                 self.err = raw_data[2]
-            extract_info_from_CTIO_header(self, self.header)
+            if self.header['GRATING'] != "":
+                self.disperser_label = self.header['GRATING']
             if self.header['TARGET'] != "":
                 self.target = load_target(self.header['TARGET'], verbose=parameters.VERBOSE)
                 self.lines = self.target.lines
@@ -401,11 +408,23 @@ class Spectrum:
                 self.rotation_angle = self.header['ROTANGLE']
             if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
+            if self.header['D2CCD'] != "":
+                parameters.DISTANCE2CCD = float(self.header["D2CCD"])
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
-            self.disperser = Hologram(self.header['FILTER2'], data_dir=parameters.HOLO_DIR, verbose=parameters.VERBOSE)
+            self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
-            self.load_spectrogram(input_file_name.replace('spectrum', 'spectrogram'))
-            self.load_chromatic_psf(input_file_name.replace('spectrum.fits', 'table.csv'))
+            spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
+            self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
+            if os.path.isfile(spectrogram_file_name):
+                self.load_spectrogram(spectrogram_file_name)
+            else:
+                self.my_logger.error(f"\n\tSpectrogram file {spectrogram_file_name} does not exist.")
+            psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
+            self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
+            if os.path.isfile(psf_file_name):
+                self.load_chromatic_psf(psf_file_name)
+            else:                
+                self.my_logger.error(f"\n\tPSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
                 self.spectrogram_fit = hdu_list[1].data
@@ -503,9 +522,11 @@ def calibrate_spectrum(spectrum, xlim=None):
     if spectrum.err is not None:
         spectrum.err = spectrum.err[spectrum.lambdas_indices]
     spectrum.convert_from_ADUrate_to_flam()
+    spectrum.header['PIXSHIFT'] = 0
+    spectrum.header['D2CCD'] = parameters.DISTANCE2CCD
 
 
-def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None,
+def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None, calibration_lines_only=False,
                  xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
     """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
     around emission or absorption tabulated lines, and to select surrounding pixels
@@ -587,12 +608,12 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     bgd_npar = parameters.CALIB_BGD_NPARAMS
     peak_width = parameters.CALIB_PEAK_WIDTH
     bgd_width = parameters.CALIB_BGD_WIDTH
-    if lines.hydrogen_only:
-        peak_width = 7
-        bgd_width = 15
-    fwhm_to_peak_width_factor = 3
-    len_index_to_bgd_npar_factor = 0.12
-    baseline_prior = 0.1  # *sigma gaussian prior on base line fit
+    # if lines.hydrogen_only:
+    #     peak_width = 7
+    #     bgd_width = 15
+    fwhm_to_peak_width_factor = 1.5
+    len_index_to_bgd_npar_factor = 0* 0.12 / 0.024 * parameters.CCD_PIXEL2MM
+    baseline_prior = 3  # *sigma gaussian prior on base line fit
     # filter the noise
     # plt.errorbar(lambdas,spec,yerr=spec_err)
     spec = np.copy(spec)
@@ -613,6 +634,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         line.fitted = False
         line.fit_popt = None
         line.high_snr = False
+        if not line.use_for_calibration and calibration_lines_only:
+            continue
         # wavelength of the line: find the nearest pixel index
         line_wavelength = line.wavelength
         if fwhm_func is not None:
@@ -924,7 +947,8 @@ def calibrate_spectrum_with_lines(spectrum):
     my_logger = set_logger(__name__)
 
     # Convert back to ADU rate units because of lambda*dlambda normalisation in flam units
-    spectrum.convert_from_flam_to_ADUrate()
+    # if spectrum.units == "erg/s/cm$^2$/nm":
+    #     spectrum.convert_from_flam_to_ADUrate()
     # Convert wavelength array into original pixels
     x0 = spectrum.x0
     if x0 is None:
@@ -938,7 +962,7 @@ def calibrate_spectrum_with_lines(spectrum):
     delta_pixels = spectrum.disperser.grating_lambda_to_pixel(spectrum.lambdas, x0=x0, order=spectrum.order)
 
     # Detect emission/absorption lines and calibrate pixel/lambda
-    D = parameters.DISTANCE2CCD  # - parameters.DISTANCE2CCD_ERR
+    D = parameters.DISTANCE2CCD
     D_err = parameters.DISTANCE2CCD_ERR
     fwhm_func = interp1d(spectrum.chromatic_psf.table['lambdas'],
                          spectrum.chromatic_psf.table['fwhm'],
@@ -949,7 +973,7 @@ def calibrate_spectrum_with_lines(spectrum):
         lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - shift,
                                                                   x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
-                             fwhm_func=fwhm_func, ax=None)
+                             fwhm_func=fwhm_func, ax=None, calibration_lines_only=True)
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             if parameters.LIVE_FIT:
@@ -961,7 +985,7 @@ def calibrate_spectrum_with_lines(spectrum):
     # grid exploration of the parameters
     # necessary because of the the line detection algo
     D_step = D_err / 2
-    pixel_shift_step = 0.1
+    pixel_shift_step = parameters.PIXSHIFT_PRIOR / 5
     pixel_shift_prior = parameters.PIXSHIFT_PRIOR
     Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
     pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
@@ -1012,8 +1036,10 @@ def calibrate_spectrum_with_lines(spectrum):
     lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.pixels = delta_pixels - pixel_shift
+    detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
+                 fwhm_func=fwhm_func, ax=None, calibration_lines_only=False)
     # Convert back to flam units
-    spectrum.convert_from_ADUrate_to_flam()
+    # spectrum.convert_from_ADUrate_to_flam()
     spectrum.my_logger.info(
         '\n\tOrder0 total shift: {:.2f}pix'
         '\n\tD = {:.2f} mm (default: DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
@@ -1229,11 +1255,29 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     spectrum.spectrogram_deg = spectrum.chromatic_psf.deg
     spectrum.spectrogram_saturation = spectrum.chromatic_psf.saturation
 
+    # Plot FHWM(lambda)
+    if parameters.DEBUG:
+        fig, ax = plt.subplots(2, 1, figsize=(10, 8), sharex="all")
+        ax[0].plot(spectrum.lambdas, np.array(s.table['fwhm']))
+        ax[0].set_xlabel(r"$\lambda$ [nm]")
+        ax[0].set_ylabel("Transverse FWHM [pixels]")
+        ax[0].set_ylim((0.8*np.min(s.table['fwhm']), 1.2*np.max(s.table['fwhm'][-10:])))
+        ax[0].grid()
+        ax[1].plot(spectrum.lambdas, np.array(s.table['x_mean']))
+        ax[1].set_xlabel(r"$\lambda$ [nm]")
+        ax[1].set_ylabel("Distance from mean dispersion axis [pixels]")
+        # ax[1].set_ylim((0.8*np.min(s.table['Dy']), 1.2*np.max(s.table['fwhm'][-10:])))
+        ax[1].grid()
+        if parameters.DISPLAY:
+            plt.show()
+        if parameters.LSST_SAVEFIGPATH:
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'fwhm.pdf'))
+
     # Summary plot
     if parameters.DEBUG or parameters.LSST_SAVEFIGPATH:
         fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
         xx = np.arange(s.table['Dx_rot'].size)
-        plot_image_simple(ax[2], data=data, scale="log", title='', units=image.units, aspect='auto')
+        plot_image_simple(ax[2], data=data, scale="symlog", title='', units=image.units, aspect='auto')
         ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_mean'], label='Dispersion axis')
         ax[2].scatter(xx, target_pixcoords_spectrogram[1] + s.table['Dy'],
                       c=s.table['lambdas'], edgecolors='None', cmap=from_lambda_to_colormap(s.table['lambdas']),
