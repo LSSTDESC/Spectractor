@@ -714,7 +714,7 @@ def SimulatorInit(filename):
     else:
         target = Target(spectrum.target)
     if parameters.DEBUG:
-        infostring = '\n\t ========= SED : %s  ===============' % target.label
+        infostring = f'\n\t ========= SED : {target.label}  ==============='
         my_logger.info(infostring)
         target.plot_spectra()
 
