@@ -2035,6 +2035,7 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> parameters.PIXWIDTH_BACKGROUND = 10
         >>> parameters.PIXWIDTH_SIGNAL = 30
         >>> parameters.VERBOSE = True
+        >>> parameters.DEBUG = True
 
         Build a mock spectrogram with random Poisson noise:
 
@@ -2062,8 +2063,10 @@ class ChromaticPSF2D(ChromaticPSF):
         Fit the data:
 
         >>> w = s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors,
-        ... amplitude_priors_method="fixed")
+        ... amplitude_priors_method="psf1d")
         >>> s.plot_summary(truth=s0)
+
+        >>> plt.plot(s0.profile_params[: 0], s.amplitude_params)
 
         ..  doctest::
             :hide:
