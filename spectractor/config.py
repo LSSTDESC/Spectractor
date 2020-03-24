@@ -57,8 +57,23 @@ def load_config(config_filename):
 
     Examples
     --------
+
     >>> load_config("./config/ctio.ini")
     >>> assert parameters.OBS_NAME == "CTIO"
+
+    .. doctest:
+        :hide:
+
+        >>> load_config("./config/unknown_file.ini")
+        Traceback (most recent call last):
+        ...
+        SystemExit: Config file ./config/unknown_file.ini does not exist.
+        >>> os.rename("./config/default.ini", "./config/default.ini.bak")
+        >>> load_config("./config/ctio.ini")
+        Traceback (most recent call last):
+        ...
+        SystemExit: Config file ./config/default.ini does not exist.
+        >>> os.rename("./config/default.ini.bak", "./config/default.ini")
 
     """
     if not os.path.isfile("./config/default.ini"):
