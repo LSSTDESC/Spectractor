@@ -255,7 +255,7 @@ class Image(object):
         self.header.comments['PARANGLE'] = 'parallactic angle in degree'
         return self.parallactic_angle
 
-    def plot_image(self, ax=None, scale="lin", title="", units="Image units", plot_stats=False,
+    def plot_image(self, ax=None, scale="lin", title="", units="", plot_stats=False,
                    target_pixcoords=None, figsize=[7.3, 6], aspect=None, vmin=None, vmax=None,
                    cmap=None, cax=None):
         """Plot image.
@@ -265,11 +265,11 @@ class Image(object):
         ax: Axes, optional
             Axes instance (default: None).
         scale: str
-            Scaling of the image (choose between: lin, log or log10) (default: lin)
+            Scaling of the image (choose between: lin, log or log10, symlog) (default: lin)
         title: str
             Title of the image (default: "")
         units: str
-            Units of the image to be written in the color bar label (default: "Image units")
+            Units of the image to be written in the color bar label (default: "")
         cmap: colormap
             Color map label (default: None)
         target_pixcoords: array_like, optional
@@ -299,6 +299,8 @@ class Image(object):
         data = np.copy(self.data)
         if plot_stats:
             data = np.copy(self.stat_errors)
+        if units == "":
+            units = self.units
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         plt.legend()
