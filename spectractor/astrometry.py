@@ -218,14 +218,14 @@ def plot_shifts_histograms(dra, ddec):
 
 class Astrometry(Image):
 
-    def __init__(self, file_name, target="", disperser_label="", wcs_file_name="", output_directory=""):
+    def __init__(self, file_name, target_label="", disperser_label="", wcs_file_name="", output_directory=""):
         """Class to handle astrometric computations.
 
         Parameters
         ----------
         file_name: str
             Input file name of the image to analyse.
-        target: str, optional
+        target_label: str, optional
             The name of the targeted object (default: "").
         disperser_label: str, optional
             The name of the disperser (default: "").
@@ -234,7 +234,7 @@ class Astrometry(Image):
         output_directory: str, optional
             The output directory path. If empty, a directory *_wcs is created next to the analyzed image (default: "").
         """
-        Image.__init__(self, file_name, target=target, disperser_label=disperser_label)
+        Image.__init__(self, file_name, target_label=target_label, disperser_label=disperser_label)
         self.my_logger = set_logger(self.__class__.__name__)
         self.output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
         ensure_dir(self.output_directory)
@@ -290,7 +290,7 @@ class Astrometry(Image):
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> target_x, target_y = a.get_target_pixel_position()
         >>> print(target_x, target_y) # doctest: +ELLIPSIS
@@ -320,7 +320,7 @@ class Astrometry(Image):
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> gaia_x, gaia_y = a.get_gaia_pixel_positions()
 
@@ -356,7 +356,7 @@ class Astrometry(Image):
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> quad_stars = a.get_quad_stars_pixel_positions()
 
@@ -394,7 +394,7 @@ class Astrometry(Image):
 
         Examples
         --------
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_sources_from_file()  # doctest: +ELLIPSIS
         <Table length=...
@@ -420,7 +420,7 @@ class Astrometry(Image):
 
         Examples
         --------
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_gaia_catalog_around_target() # doctest: +ELLIPSIS
         INFO: Query finished...
@@ -480,7 +480,7 @@ class Astrometry(Image):
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_radec_positions_after_pm,
         ...                                 quad=a.quad_stars_pixel_positions,
@@ -549,7 +549,7 @@ class Astrometry(Image):
 
         Examples
         --------
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.get_sources_radec_positions()  # doctest: +ELLIPSIS
         <SkyCoord (ICRS): (ra, dec) in deg...
@@ -581,7 +581,7 @@ class Astrometry(Image):
 
         Examples
         --------
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.get_sources_radec_positions()  # doctest: +ELLIPSIS
         <SkyCoord (ICRS): (ra, dec) in deg...
@@ -610,7 +610,7 @@ class Astrometry(Image):
 
         Examples
         --------
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.get_sources_radec_positions()  # doctest: +ELLIPSIS
         <SkyCoord (ICRS): (ra, dec) in deg...
@@ -725,7 +725,7 @@ class Astrometry(Image):
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.get_sources_radec_positions()  # doctest: +ELLIPSIS
         <SkyCoord (ICRS): (ra, dec) in deg...
@@ -814,7 +814,7 @@ class Astrometry(Image):
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> residuals = a.compute_gaia_pixel_residuals()
 
@@ -850,7 +850,7 @@ class Astrometry(Image):
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_sources_from_file() # doctest: +ELLIPSIS
         <Table length=...
@@ -874,7 +874,7 @@ class Astrometry(Image):
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_sources_from_file() # doctest: +ELLIPSIS
         <Table length=...
@@ -904,7 +904,7 @@ class Astrometry(Image):
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target="HD111980",
+        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_sources_from_file() # doctest: +ELLIPSIS
         <Table length=...

@@ -1680,7 +1680,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     data: array_like
         The image data 2D array.
     scale: str
-        Scaling of the image (choose between: lin, log or log10) (default: lin)
+        Scaling of the image (choose between: lin, log or log10, symlog) (default: lin)
     title: str
         Title of the image (default: "")
     units: str
@@ -1720,16 +1720,23 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         min_noz = np.min(data[np.where(data > 0)])
         data[zeros] = min_noz
         # apply log
-        data = np.log10(data)
-    im = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect)
+        # data = np.log10(data)
+    if scale == "log10" or scale == "log":
+        norm = matplotlib.colors.LogNorm(vmin=vmin, vmax=vmax)
+    elif scale == "symlog":
+        norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=10)
+    else:
+        norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
     ax.grid(color='silver', ls='solid')
     ax.grid(True)
     ax.set_xlabel('X [pixels]')
     ax.set_ylabel('Y [pixels]')
     cb = plt.colorbar(im, ax=ax, cax=cax)
-    cb.formatter.set_powerlimits((0, 0))
-    cb.locator = MaxNLocator(7, prune=None)
-    cb.update_ticks()
+    if scale == "lin":
+        cb.formatter.set_powerlimits((0, 0))
+        cb.locator = MaxNLocator(7, prune=None)
+        cb.update_ticks()
     cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
     if title != "":
         ax.set_title(title)
@@ -1794,23 +1801,53 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
 
 
 def load_fits(file_name, hdu_index=0):
+    """Generic function to load a FITS file.
+
+    Parameters
+    ----------
+    file_name: str
+        The FITS file name.
+    hdu_index: int, optional
+        The HDU index in the file (default: 0).
+
+    Returns
+    -------
+    header: fits.Header
+        Header of the FITS file.
+    data: np.array
+        The data array.
+
+    Examples
+    --------
+    >>> header, data = load_fits("./tests/data/reduc_20170530_134.fits")
+    >>> header["DATE-OBS"]
+    '2017-05-31T02:53:52.356'
+    >>> data.shape
+    (2048, 2048)
+
+    """
     hdu_list = fits.open(file_name)
     header = hdu_list[0].header
     data = hdu_list[hdu_index].data
-    hdu_list.close()  # need to free allocation for file descripto
+    hdu_list.close()  # need to free allocation for file description
     return header, data
 
 
-def extract_info_from_CTIO_header(obj, header):
-    obj.date_obs = header['DATE-OBS']
-    obj.airmass = header['AIRMASS']
-    obj.expo = header['EXPTIME']
-    obj.filters = header['FILTERS']
-    obj.filter = header['FILTER1']
-    obj.disperser_label = header['FILTER2']
-
-
 def save_fits(file_name, header, data, overwrite=False):
+    """Generic function to save a FITS file.
+
+    Parameters
+    ----------
+    file_name: str
+        The FITS file name.
+    header: fits.Header
+        Header of the FITS file.
+    data: np.array
+        The data array.
+    overwrite: bool, optional
+        If True and the file already exists, it is overwritten (default: False).
+
+    """
     hdu = fits.PrimaryHDU()
     hdu.header = header
     hdu.data = data
@@ -1918,18 +1955,103 @@ def wavelength_to_rgb(wavelength, gamma=0.8):
 
 
 def from_lambda_to_colormap(lambdas):
+    """Convert an array of wavelength in nm into a color map.
+
+    Parameters
+    ----------
+    lambdas: array_like
+        Wavelength array in nm.
+
+    Returns
+    -------
+    spectral_map: matplotlib.colors.LinearSegmentedColormap
+        Color map.
+
+    Examples
+    --------
+    >>> lambdas = np.arange(300, 1000, 10)
+    >>> spec = from_lambda_to_colormap(lambdas)
+    >>> plt.scatter(lambdas, np.zeros(lambdas.size), cmap=spec, c=lambdas)  #doctest: +ELLIPSIS
+    <matplotlib.collections.PathCollection object at ...>
+    >>> plt.grid()
+    >>> plt.xlabel("Wavelength [nm]")  #doctest: +ELLIPSIS
+    Text(..., 'Wavelength [nm]')
+    >>> plt.show()
+
+    ..plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.tools import from_lambda_to_colormap
+        lambdas = np.arange(300, 1000, 10)
+        spec = from_lambda_to_colormap(lambdas)
+        plt.scatter(lambdas, np.zeros(lambdas.size), cmap=spec, c=lambdas)
+        plt.xlabel("Wavelength [nm]")
+        plt.grid()
+        plt.show()
+
+    """
     colorlist = [wavelength_to_rgb(lbda) for lbda in lambdas]
     spectralmap = matplotlib.colors.LinearSegmentedColormap.from_list("spectrum", colorlist)
     return spectralmap
 
 
 def rebin(arr, new_shape):
+    """Rebin and reshape a numpy array.
+
+    Parameters
+    ----------
+    arr: np.array
+        Numpy array to be reshaped.
+    new_shape: array_like
+        New shape of the array.
+
+    Returns
+    -------
+    arr_rebinned: np.array
+        Rebinned array.
+
+    Examples
+    --------
+    >>> a = np.ones((10, 10))
+    >>> b = rebin(a, (5, 5))
+    >>> b
+    array([[4., 4., 4., 4., 4.],
+           [4., 4., 4., 4., 4.],
+           [4., 4., 4., 4., 4.],
+           [4., 4., 4., 4., 4.],
+           [4., 4., 4., 4., 4.]])
+    """
     shape = (new_shape[0], arr.shape[0] // new_shape[0],
              new_shape[1], arr.shape[1] // new_shape[1])
     return arr.reshape(shape).sum(-1).sum(1)
 
 
 def set_wcs_output_directory(file_name, output_directory=""):
+    """Returns the WCS output directory corresponding to the analyzed image. The name of the directory is
+    the anme of the image with the suffix _wcs.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the image.
+    output_directory: str, optional
+        If not set, the main output directory is the one the image,
+        otherwise the specified directory is taken (default: "").
+
+    Returns
+    -------
+    output: str
+        The name of the output directory
+
+    Examples
+    --------
+    >>> set_wcs_output_directory("image.fits", output_directory="")
+    'image_wcs'
+    >>> set_wcs_output_directory("image.png", output_directory="outputs")
+    'outputs/image_wcs'
+
+    """
     outdir = os.path.dirname(file_name)
     if output_directory != "":
         outdir = output_directory
@@ -1938,36 +2060,168 @@ def set_wcs_output_directory(file_name, output_directory=""):
 
 
 def set_wcs_tag(file_name):
+    """Returns the WCS tag name associated to the analyzed image: the file name without the extension.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the image.
+
+    Returns
+    -------
+    tag: str
+        The tag.
+
+    Examples
+    --------
+    >>> set_wcs_tag("image.fits")
+    'image'
+
+    """
     tag = os.path.splitext(os.path.basename(file_name))[0]
     return tag
 
 
 def set_wcs_file_name(file_name, output_directory=""):
+    """Returns the WCS file name associated to the analyzed image, placed in the output directory.
+    The extension is .wcs.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the image.
+    output_directory: str, optional
+        If not set, the main output directory is the one the image,
+        otherwise the specified directory is taken (default: "").
+
+    Returns
+    -------
+    wcs_file_name: str
+        The WCS file name.
+
+    Examples
+    --------
+    >>> set_wcs_file_name("image.fits", output_directory="")
+    'image_wcs/image.wcs'
+    >>> set_wcs_file_name("image.png", output_directory="outputs")
+    'outputs/image_wcs/image.wcs'
+
+    """
     output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
     tag = set_wcs_tag(file_name)
     return os.path.join(output_directory, tag + '.wcs')
 
 
 def set_sources_file_name(file_name, output_directory=""):
+    """Returns the file name containing the deteted sources associated to the analyzed image,
+    placed in the output directory. The suffix is _source.fits.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the image.
+    output_directory: str, optional
+        If not set, the main output directory is the one the image,
+        otherwise the specified directory is taken (default: "").
+
+    Returns
+    -------
+    sources_file_name: str
+        The detected sources file name.
+
+    Examples
+    --------
+    >>> set_sources_file_name("image.fits", output_directory="")
+    'image_wcs/image_sources.fits'
+    >>> set_sources_file_name("image.png", output_directory="outputs")
+    'outputs/image_wcs/image_sources.fits'
+
+    """
     output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
     tag = set_wcs_tag(file_name)
     return os.path.join(output_directory, f"{tag}_sources.fits")
 
 
 def set_gaia_catalog_file_name(file_name, output_directory=""):
+    """Returns the file name containing the Gaia catalog associated to the analyzed image,
+    placed in the output directory. The suffix is _gaia.ecsv.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the image.
+    output_directory: str, optional
+        If not set, the main output directory is the one the image,
+        otherwise the specified directory is taken (default: "").
+
+    Returns
+    -------
+    sources_file_name: str
+        The Gaia catalog file name.
+
+    Examples
+    --------
+    >>> set_gaia_catalog_file_name("image.fits", output_directory="")
+    'image_wcs/image_gaia.ecsv'
+    >>> set_gaia_catalog_file_name("image.png", output_directory="outputs")
+    'outputs/image_wcs/image_gaia.ecsv'
+
+    """
     output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
     tag = set_wcs_tag(file_name)
     return os.path.join(output_directory, f"{tag}_gaia.ecsv")
 
 
-def load_wcs_from_file(filename):
+def load_wcs_from_file(file_name):
+    """Open the WCS FITS file and returns a WCS astropy object.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the WCS FITS file.
+
+    Returns
+    -------
+    wcs: WCS
+        WCS Astropy object.
+
+    """
     # Load the FITS hdulist using astropy.io.fits
-    hdulist = fits.open(filename)
+    hdulist = fits.open(file_name)
     # Parse the WCS keywords in the primary HDU
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore")
         wcs = WCS.WCS(hdulist[0].header, fix=False)
     return wcs
+
+
+def imgslice(slicespec):
+    """
+    Utility function: convert a FITS slice specification (1-based)
+    into the corresponding numpy array slice spec (0-based as python does, xy swapped).
+
+    Parameters
+    ----------
+    slicespec: str
+        FITS slice specification with the format [xmin:xmax,ymin:ymax]
+
+    Returns
+    -------
+    slice: slice
+        Slice object to be injected in a np.array for instance.
+
+    Examples
+    --------
+    >>> imgslice('[11:522,1:2002]')
+    (slice(0, 2002, None), slice(10, 522, None))
+    """
+
+    parts = slicespec.replace('[', '').replace(']', '').split(',')
+    xbegin, xend = [int(i) for i in parts[0].split(':')]
+    ybegin, yend = [int(i) for i in parts[1].split(':')]
+    xbegin -= 1
+    ybegin -= 1
+    return np.s_[ybegin:yend, xbegin:xend]
 
 
 if __name__ == "__main__":

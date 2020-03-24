@@ -2,6 +2,7 @@ from astropy.table import Table
 from scipy.interpolate import interp1d
 import numpy as np
 import matplotlib.pyplot as plt
+import copy
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -97,8 +98,13 @@ class Line:
         >>> print(model)
         1.0
         >>> model = l.gaussian_model(656.3+sigma*np.sqrt(2*np.log(2)), A=1, sigma=sigma, use_fit=False)
+<<<<<<< HEAD
         >>> print(f"{model:.3f}")
         0.500
+=======
+        >>> print(f"{model:.4f}")
+        0.5000
+>>>>>>> 0a2084ab0fee7215de461fbbc0ae00e305cef637
 
         Use a fit (for the example we create a mock fit result):
 
@@ -121,7 +127,8 @@ class Line:
 class Lines:
     """Class gathering all the lines and associated methods."""
 
-    def __init__(self, lines, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=False):
+    def __init__(self, lines, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=False,
+                 orders=[1]):
         """ Main emission/absorption lines in nm. Sorted lines are sorted in self.lines.
         See http://www.pa.uky.edu/~peter/atomic/ or https://physics.nist.gov/PhysRefData/ASD/lines_form.html
 
@@ -137,6 +144,9 @@ class Lines:
             Set True to gather only the hydrogen spectral lines, atmospheric lines still included (default: False)
         emission_spectrum: bool, optional
             Set True if the spectral line has to be detected in emission (default: False)
+        orders: list, optional
+            List of integers corresponding to the diffraction order to account for the line search and the
+            wavelength calibration (default: [1])
 
         Examples
         --------
@@ -144,13 +154,13 @@ class Lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=False, emission_spectrum=False)
         >>> print([lines.lines[i].wavelength for i in range(5)])
-        [353.1, 388.8, 410.2, 434.0, 447.1]
+        [353.1, 388.8, 397.0, 410.2, 434.0]
 
         The four hydrogen lines only:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(4)])
-        [410.2, 434.0, 486.3, 656.3]
+        [397.0, 410.2, 434.0, 486.3]
         >>> print(lines.emission_spectrum)
         True
 
@@ -158,13 +168,18 @@ class Lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(7)])
-        [382.044, 393.366, 396.847, 430.79, 438.355, 686.719, 762.1]
+        [686.719, 762.1, 794.0, 820.4, 822.696, 868.0, 898.765]
 
         Redshift all the spectral lines, except the atmospheric lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
-        [382.044, 393.366, 396.847, 430.79, 438.355]
+        [686.719, 706.2, 762.1, 777.6, 794.0]
+
+        Hydrogen lines at order 1 and 2:
+        >>> lines = Lines(HYDROGEN_LINES, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True, orders=[1, 2])
+        >>> print([lines.lines[i].wavelength for i in range(len(lines.lines))])
+        [397.0, 410.2, 434.0, 486.3, 656.3, 794.0, 820.4, 868.0, 972.6, 1312.6]
 
         Negative redshift:
 
@@ -175,7 +190,19 @@ class Lines:
         if redshift < -1e-2:
             self.my_logger.error(f'\n\tRedshift must small in absolute value (|z|<0.01) or be positive or null. '
                                  f'Got redshift={redshift}.')
-        self.lines = lines
+        self.lines = []
+        self.orders = orders
+        for order in orders:
+            for line in lines:
+                tmp_line = copy.deepcopy(line)
+                tmp_line.wavelength *= order
+                if order > 1:
+                    if line.label[-1] == "$":
+                        tmp_line.label = tmp_line.label[:-1]
+                    tmp_line.label += "^(2)"
+                    if line.label[-1] == "$":
+                        tmp_line.label += "$"
+                self.lines.append(tmp_line)
         self.redshift = redshift
         self.atmospheric_lines = atmospheric_lines
         self.hydrogen_only = hydrogen_only
@@ -195,7 +222,7 @@ class Lines:
         >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=0)
         >>> sorted_lines = lines.sort_lines()
         >>> print([l.wavelength for l in sorted_lines][:5])
-        [382.044, 393.366, 396.847, 410.2, 430.79]
+        [397.0, 410.2, 434.0, 486.3, 656.3]
         """
         sorted_lines = []
         import copy
@@ -274,16 +301,16 @@ class Lines:
 
         """
         xlim = ax.get_xlim()
-        for l in self.lines:
-            if (not l.fitted or not l.high_snr) and not force:
+        for line in self.lines:
+            if (not line.fitted or not line.high_snr) and not force:
                 continue
             color = color_atomic
-            if l.atmospheric:
+            if line.atmospheric:
                 color = color_atmospheric
-            ax.axvline(l.wavelength, lw=2, color=color)
-            xpos = (l.wavelength - xlim[0]) / (xlim[1] - xlim[0]) + l.label_pos[0]
+            ax.axvline(line.wavelength, lw=2, color=color)
+            xpos = (line.wavelength - xlim[0]) / (xlim[1] - xlim[0]) + line.label_pos[0]
             if 0 < xpos < 1:
-                ax.annotate(l.label, xy=(xpos, l.label_pos[1]), rotation=90, ha='left', va='bottom',
+                ax.annotate(line.label, xy=(xpos, line.label_pos[1]), rotation=90, ha='left', va='bottom',
                             xycoords='axes fraction', color=color, fontsize=fontsize)
         return ax
 
@@ -405,8 +432,9 @@ class Lines:
 HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02], use_for_calibration=True)
 HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02])
-HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA]
+HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.016, 0.02], use_for_calibration=True)
+HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
 
 # Atmospheric lines
 FE1 = Line(382.044, atmospheric=True, label=r'$Fe$',
@@ -437,7 +465,7 @@ H2O_1 = Line(935, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
 H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2, CAII1, CAII2, FE1, FE2, FE3]
+ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2]  # , CAII1, CAII2, FE1, FE2, FE3
 
 # ISM lines
 OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
@@ -473,7 +501,7 @@ HEII3 = Line(617.1, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.0
 HEII4 = Line(856.7, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
 HI = Line(833.9, atmospheric=False, label=r'$H_{I}$', label_pos=[0.007, 0.02])
 ISM_LINES = [OIII, CII1, CII2, CIV, CII3, CIII1, CIII2, CIII3, HEI1, HEI2, HEI3, HEI4, HEI5, HEI6, HEI7, HEI8,
-             HEI9, HEI10, HEI11, HEI12, HEI13, OI, OII, HEII1, HEII2, HEII3, HEII4,  HI, FEII1, FEII2, FEII3, FEII4]
+             HEI9, HEI10, HEI11, HEI12, HEI13, OI, OII, HEII1, HEII2, HEII3, HEII4, HI, FEII1, FEII2, FEII3, FEII4]
 
 # HG-AR lines https://oceanoptics.com/wp-content/uploads/hg1.pdf
 HG1 = Line(253.652, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
@@ -506,8 +534,7 @@ AR15 = Line(866.794, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR16 = Line(912.297, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR17 = Line(922.450, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 HGAR_LINES = [HG1, HG2, HG3, HG4, HG5, HG6, HG7, HG8, HG9, HG10, HG11, HG12,
-               AR1, AR2, AR3, AR4, AR5, AR6, AR7, AR8, AR9, AR10, AR11, AR12, AR13, AR14, AR15, AR16, AR17]
-
+              AR1, AR2, AR3, AR4, AR5, AR6, AR7, AR8, AR9, AR10, AR11, AR12, AR13, AR14, AR15, AR16, AR17]
 
 if __name__ == "__main__":
     import doctest
