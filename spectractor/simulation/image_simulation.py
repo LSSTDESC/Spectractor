@@ -466,11 +466,11 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     true_lambdas = np.copy(spectrogram.lambdas)
     true_spectrum = spectrogram.set_true_spectrum(true_lambdas, ozone, pwv, aerosols, shift_t=0)
 
-    # Convert data from ADU/s in ADU
-    image.convert_to_ADU_units()
-
     # Saturation effects
     image.data[image.data > image.saturation] = image.saturation
+
+    # Convert data from ADU/s in ADU
+    image.convert_to_ADU_units()
 
     # Add Poisson and read-out noise
     image.add_poisson_and_read_out_noise()
