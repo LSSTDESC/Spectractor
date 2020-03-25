@@ -12,13 +12,24 @@ from spectractor import parameters
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 
-def load_config(config_filename):
-    if not os.path.isfile(config_filename):
-        sys.exit('Config file %s does not exist.' % config_filename)
-    # Load the configuration file
-    config = configparser.ConfigParser()
-    config.read(config_filename)
+def from_config_to_parameters(config):
+    """Convert config file keywords into spectractor.parameters parameters.
 
+    Parameters
+    ----------
+    config: ConfigParser
+        The ConfigParser instance to convert
+
+    Examples
+    --------
+
+    >>> config = configparser.ConfigParser()
+    >>> config.read("./config/default.ini")
+    ['./config/default.ini']
+    >>> from_config_to_parameters(config)
+    >>> assert parameters.OBS_NAME == "DEFAULT"
+
+    """
     # List all contents
     for section in config.sections():
         for options in config.options(section):
@@ -35,6 +46,50 @@ def load_config(config_filename):
             else:
                 value = str(value)
             setattr(parameters, options.upper(), value)
+
+
+def load_config(config_filename):
+    """Load configuration parameters from a .ini config file.
+
+    Parameters
+    ----------
+    config_filename: str
+        The path to the config file.
+
+    Examples
+    --------
+
+    >>> load_config("./config/ctio.ini")
+    >>> assert parameters.OBS_NAME == "CTIO"
+
+    .. doctest:
+        :hide:
+
+        >>> load_config("./config/unknown_file.ini")
+        Traceback (most recent call last):
+        ...
+        SystemExit: Config file ./config/unknown_file.ini does not exist.
+        >>> os.rename("./config/default.ini", "./config/default.ini.bak")
+        >>> load_config("./config/ctio.ini")
+        Traceback (most recent call last):
+        ...
+        SystemExit: Config file ./config/default.ini does not exist.
+        >>> os.rename("./config/default.ini.bak", "./config/default.ini")
+
+    """
+    if not os.path.isfile("./config/default.ini"):
+        sys.exit('Config file ./config/default.ini does not exist.')
+    # Load the configuration file
+    config = configparser.ConfigParser()
+    config.read("./config/default.ini")
+    from_config_to_parameters(config)
+
+    if not os.path.isfile(config_filename):
+        sys.exit(f'Config file {config_filename} does not exist.')
+    # Load the configuration file
+    config = configparser.ConfigParser()
+    config.read(config_filename)
+    from_config_to_parameters(config)
 
     # Derive other parameters
     parameters.MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
@@ -53,11 +108,11 @@ def load_config(config_filename):
 
     if parameters.VERBOSE:
         for section in config.sections():
-            print("Section: %s" % section)
+            print(f"Section: {section}")
             for options in config.options(section):
                 value = config.get(section, options)
                 par = getattr(parameters, options.upper())
-                print(f"x {options}: {value}\t => parameters.{options.upper()}: {par}\t {type(par)}")
+                print(f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}")
 
 
 def set_logger(logger):
@@ -75,6 +130,7 @@ def set_logger(logger):
 
     Examples
     --------
+
     >>> class Test:
     ...     def __init__(self):
     ...         self.my_logger = set_logger(self.__class__.__name__)
@@ -87,6 +143,7 @@ def set_logger(logger):
     >>> parameters.DEBUG = True
     >>> test = Test()
     >>> test.log()
+    
     """
     my_logger = logging.getLogger(logger)
     coloredlogs.DEFAULT_LEVEL_STYLES['warn'] = {'color': 'yellow'}
