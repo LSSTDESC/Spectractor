@@ -1847,6 +1847,18 @@ def save_fits(file_name, header, data, overwrite=False):
     overwrite: bool, optional
         If True and the file already exists, it is overwritten (default: False).
 
+    Examples
+    --------
+
+    >>> header, data = load_fits("./tests/data/reduc_20170530_134.fits")
+    >>> save_fits("./outputs/save_fits_test.fits", header, data, overwrite=True)
+    >>> assert os.path.isfile("./outputs/save_fits_test.fits")
+
+    .. doctest:
+        :hide:
+
+        >>> os.remove("./outputs/save_fits_test.fits")
+
     """
     hdu = fits.PrimaryHDU()
     hdu.header = header
