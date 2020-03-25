@@ -281,9 +281,9 @@ class FitWorkspace:
             for k in nchains:
                 ARs = []
                 indices = []
-                for l in range(self.burnin + window, self.nsteps, window):
-                    ARs.append(self.compute_local_acceptance_rate(l - window, l, k))
-                    indices.append(l)
+                for pos in range(self.burnin + window, self.nsteps, window):
+                    ARs.append(self.compute_local_acceptance_rate(pos - window, pos, k))
+                    indices.append(pos)
                 if self.valid_chains[k]:
                     ax[self.ndim, 1].plot(indices, ARs, label=f'Walker {k:d}')
                 else:
@@ -310,23 +310,23 @@ class FitWorkspace:
             for i in range(self.ndim):
                 Rs = []
                 lens = []
-                for l in range(self.burnin + step, self.nsteps, step):
+                for pos in range(self.burnin + step, self.nsteps, step):
                     chain_averages = []
                     chain_variances = []
-                    global_average = np.mean(self.chains[self.burnin:l, self.valid_chains, i])
+                    global_average = np.mean(self.chains[self.burnin:pos, self.valid_chains, i])
                     for k in nchains:
                         if not self.valid_chains[k]:
                             continue
-                        chain_averages.append(np.mean(self.chains[self.burnin:l, k, i]))
-                        chain_variances.append(np.var(self.chains[self.burnin:l, k, i], ddof=1))
+                        chain_averages.append(np.mean(self.chains[self.burnin:pos, k, i]))
+                        chain_variances.append(np.var(self.chains[self.burnin:pos, k, i], ddof=1))
                     W = np.mean(chain_variances)
                     B = 0
                     for n in range(len(chain_averages)):
                         B += (chain_averages[n] - global_average) ** 2
-                    B *= ((l + 1) / (len(chain_averages) - 1))
-                    R = (W * l / (l + 1) + B / (l + 1) * (len(chain_averages) + 1) / len(chain_averages)) / W
+                    B *= ((pos + 1) / (len(chain_averages) - 1))
+                    R = (W * pos / (pos + 1) + B / (pos + 1) * (len(chain_averages) + 1) / len(chain_averages)) / W
                     Rs.append(R - 1)
-                    lens.append(l)
+                    lens.append(pos)
                 print(f'\t{self.input_labels[i]}: R-1 = {Rs[-1]:.3f} (l = {lens[-1] - 1:d})')
                 self.gelmans.append(Rs[-1])
                 ax[i, 1].plot(lens, Rs, lw=1, label=self.axis_names[i])
@@ -405,9 +405,9 @@ class FitWorkspace:
             good_indices = self.not_outliers
             model = model.flatten()[good_indices]
             data = self.data.flatten()[good_indices]
-            model_err =  model_err.flatten()[good_indices]
+            model_err = model_err.flatten()[good_indices]
             err = self.err.flatten()[good_indices]
-            res = ((model - data)) / np.sqrt(model_err ** 2 + err ** 2)
+            res = (model - data) / np.sqrt(model_err ** 2 + err ** 2)
         else:
             res = ((model - self.data) / np.sqrt(model_err ** 2 + self.err ** 2)).flatten()
         return res
@@ -489,8 +489,9 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             if np.all(J[ip] == np.zeros(J.shape[1])):
                 ipar = np.delete(ipar, list(ipar).index(ip))
                 tmp_params[ip] = 0
-                my_logger.warning(f"\n\tStep {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed at 0 "
-                      f"in the following instead of its current value ({tmp_params[ip]}).")
+                my_logger.warning(
+                    f"\n\tStep {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed at 0 "
+                    f"in the following instead of its current value ({tmp_params[ip]}).")
         # remove fixed parameters
         J = J[ipar].T
         # algebra
@@ -529,12 +530,13 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                        f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
                        f"\n\tParameter shifts: {alpha_min * dparams}"
                        f"\n\tNew parameters: {tmp_params[ipar]}"
-                       f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} computed in {time.time() - start:.2f}s")
+                       f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} "
+                       f"computed in {time.time() - start:.2f}s")
         if fit_workspace.live_fit:
             fit_workspace.plot_fit()
             fit_workspace.cov = inv_JT_W_J
             # fit_workspace.plot_correlation_matrix(ipar)
-        if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol :
+        if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
             my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
                            f"relative to the sum of the parameters is below xtol={xtol}.")
             break
@@ -551,7 +553,7 @@ def print_parameter_summary(params, cov, labels):
     txt = ""
     for ip in np.arange(0, cov.shape[0]).astype(int):
         txt += "%s: %s +%s -%s\n\t" % formatting_numbers(params[ip], np.sqrt(cov[ip, ip]), np.sqrt(cov[ip, ip]),
-                                                    label=labels[ip])
+                                                         label=labels[ip])
     my_logger.info(f"\n\t{txt}")
 
 
@@ -612,7 +614,8 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
     return params_table, costs
 
 
-def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50, verbose=False):
+def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50,
+                     verbose=False):
     my_logger = set_logger(__name__)
 
     bounds = fit_workspace.bounds
@@ -686,7 +689,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
             save_gradient_descent(fit_workspace, costs, params_table)
 
 
-def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50, sigma=5.0, clip_niter=3, verbose=False):
+def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4,
+                                    niter=50, sigma=5.0, clip_niter=3, verbose=False):
     my_logger = set_logger(__name__)
     for step in range(clip_niter):
         if verbose:
@@ -696,7 +700,8 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
             my_logger.debug(f'\n\tBest fitting parameters:\n{fit_workspace.p}')
         # remove outliers
         indices_no_nan = ~np.isnan(fit_workspace.data)
-        residuals = np.abs(fit_workspace.model[indices_no_nan] - fit_workspace.data[indices_no_nan]) / fit_workspace.err[indices_no_nan]
+        residuals = np.abs(fit_workspace.model[indices_no_nan]
+                           - fit_workspace.data[indices_no_nan]) / fit_workspace.err[indices_no_nan]
         outliers = residuals > sigma
         outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
         outliers.sort()
@@ -706,14 +711,14 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
             if np.all(fit_workspace.outliers == outliers):
                 if verbose:
                     my_logger.debug(f'\n\tOutliers flat index list unchanged since last iteration: '
-                               f'break the sigma clipping iterations.')
+                                    f'break the sigma clipping iterations.')
                 break
             else:
                 fit_workspace.outliers = outliers
         else:
             if verbose:
-                 my_logger.debug(f'\n\tNo outliers detected at first iteration: '
-                           f'break the sigma clipping iterations.')
+                my_logger.debug(f'\n\tNo outliers detected at first iteration: '
+                                f'break the sigma clipping iterations.')
             break
 
 
