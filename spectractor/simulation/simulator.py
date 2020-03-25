@@ -85,7 +85,6 @@ class SpectrumSimulation(Spectrum):
             The spectrum uncertainties in Target units.
         """
         self.lambdas = lambdas
-        self.err = np.zeros_like(lambdas)
         self.lambdas_binwidths = np.gradient(lambdas)
         self.data = self.disperser.transmission(lambdas)
         self.data *= self.telescope.transmission(lambdas)
@@ -97,12 +96,15 @@ class SpectrumSimulation(Spectrum):
         # self.data *= self.lambdas*self.lambdas_binwidths
         return self.data, self.err
 
-    def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0., D=parameters.DISTANCE2CCD, shift=0.):
+    def simulate(self, lambdas, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0.,
+                 D=parameters.DISTANCE2CCD, shift_x=0.):
         """Simulate the cross spectrum of an object and its uncertainties
         after its transmission throught the instrument and the atmosphere.
 
         Parameters
         ----------
+        lambdas: array_like
+            The wavelength array to simulate (in nm).
         A1: float
             Global amplitude of the spectrum (default: 1).
         A2: float
@@ -117,7 +119,7 @@ class SpectrumSimulation(Spectrum):
             Gaussian kernel size for the convolution (default: 0).
         D: float
             Distance between the CCD and the disperser in mm (default: parameters.DISTANCE2CCD)
-        shift: float
+        shift_x: float
             Shift in pixels of the order 0 position estimate (default: 0).
 
         Returns
@@ -130,8 +132,11 @@ class SpectrumSimulation(Spectrum):
             The spectrum uncertainties interpolated function in Target units.
 
         """
-        pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0] - shift
-        new_x0 = [self.x0[0] - shift, self.x0[1]]
+        #distance = np.array(self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x, shift_y=0))
+        #pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0] - shift
+        self.disperser.D = float(self.header["D2CCD"])
+        pixels = self.disperser.grating_lambda_to_pixel(lambdas, x0=self.x0, order=1)
+        new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(pixels, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
@@ -140,7 +145,7 @@ class SpectrumSimulation(Spectrum):
         self.data *= A1 * atmospheric_transmission
         self.err *= A1 * atmospheric_transmission
         # Now add the systematics
-        if reso > 1:
+        if reso > 0.1:
             self.data = fftconvolve_gaussian(self.data, reso)
             self.err = np.sqrt(np.abs(fftconvolve_gaussian(self.err ** 2, reso)))
         if A2 > 0.:
@@ -152,12 +157,14 @@ class SpectrumSimulation(Spectrum):
             self.err = self.model_err(lambdas)
         # now we include effects related to the wrong extraction of the spectrum:
         # wrong estimation of the order 0 position and wrong DISTANCE2CCD
-        pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0]
-        self.disperser.D = parameters.DISTANCE2CCD
-        self.lambdas = self.disperser.grating_pixel_to_lambda(pixels, self.x0, order=1)
-        self.model = interp1d(self.lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
-        self.model_err = interp1d(self.lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
-        return self.lambdas, self.model, self.model_err
+        # pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0]
+        # self.disperser.D = parameters.DISTANCE2CCD
+        # self.lambdas = self.disperser.grating_pixel_to_lambda(pixels, self.x0, order=1)
+        # self.model = interp1d(self.lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
+        # self.model_err = interp1d(self.lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
+        min_positive = np.min(self.err[self.err > 0])
+        self.err[np.isclose(self.err, 0., atol=0.01*min_positive)] = min_positive
+        return self.lambdas, self.data, self.err
 
 
 class SpectrogramModel(Spectrum):
@@ -846,14 +853,14 @@ def SpectrumSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A
                                                 shift=shift)
 
     # Save the spectrum
-    spectrum_simulation.header['OZONE'] = ozone
-    spectrum_simulation.header['PWV'] = pwv
-    spectrum_simulation.header['VAOD'] = aerosols
-    spectrum_simulation.header['A1'] = A1
-    spectrum_simulation.header['A2'] = A2
-    spectrum_simulation.header['RESO'] = reso
-    spectrum_simulation.header['D2CCD'] = D
-    spectrum_simulation.header['X0SHIFT'] = shift
+    spectrum_simulation.header['OZONE_T'] = ozone
+    spectrum_simulation.header['PWV_T'] = pwv
+    spectrum_simulation.header['VAOD_T'] = aerosols
+    spectrum_simulation.header['A1_T'] = A1
+    spectrum_simulation.header['A2_T'] = A2
+    spectrum_simulation.header['RESO_T'] = reso
+    spectrum_simulation.header['D2CCD_T'] = D
+    spectrum_simulation.header['X0_T'] = shift
     output_filename = filename.replace('spectrum', 'sim')
     if outputdir != "":
         base_filename = filename.split('/')[-1]
@@ -891,15 +898,15 @@ def SpectrogramSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05
                                                       psf_poly_params=psf_poly_params)
 
     # Save the spectrum
-    spectrogram_simulation.header['OZONE'] = ozone
-    spectrogram_simulation.header['PWV'] = pwv
-    spectrogram_simulation.header['VAOD'] = aerosols
-    spectrogram_simulation.header['A1'] = A1
-    spectrogram_simulation.header['A2'] = A2
-    spectrogram_simulation.header['D2CCD'] = D
-    spectrogram_simulation.header['X0SHIFT'] = shift_x
-    spectrogram_simulation.header['Y0SHIFT'] = shift_y
-    spectrogram_simulation.header['TSHIFT'] = shift_t
+    spectrogram_simulation.header['OZONE_T'] = ozone
+    spectrogram_simulation.header['PWV_T'] = pwv
+    spectrogram_simulation.header['VAOD_T'] = aerosols
+    spectrogram_simulation.header['A1_T'] = A1
+    spectrogram_simulation.header['A2_T'] = A2
+    spectrogram_simulation.header['D2CCD_T'] = D
+    spectrogram_simulation.header['X0_T'] = shift_x
+    spectrogram_simulation.header['Y0_T'] = shift_y
+    spectrogram_simulation.header['TSHIFT_T'] = shift_t
     spectrogram_simulation.header['ROTANGLE'] = angle
     output_filename = filename.replace('spectrum', 'sim')
     if outputdir != "":

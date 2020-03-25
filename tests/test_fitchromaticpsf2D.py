@@ -1,9 +1,12 @@
 from numpy.testing import run_module_suite
+from scipy.interpolate import interp1d
 
 from spectractor import parameters
 from spectractor.extractor.images import Image
+from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.extractor import Spectractor
 from spectractor.logbook import LogBook
+from spectractor.config import load_config
 from spectractor.simulation.image_simulation import ImageSim
 from spectractor.tools import plot_spectrum_simple
 import os
@@ -19,7 +22,8 @@ PSF_POLY_PARAMS_TRUTH = [0, 0, 0,
                          500]
 
 
-def make_test_image():
+def make_test_image(config="./config/ctio.ini"):
+    load_config(config)
     spectrum_filename = "tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = spectrum_filename.replace("_spectrum.fits", ".fits")
     ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=1, A2=0.05,
@@ -56,7 +60,8 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
     # ax[0].plot(spectrum.lambdas, transverse_sum, label="Transverse sum")
     ax[0].set_ylabel(f"Spectrum [{spectrum.units}]")
     ax[0].legend()
-    residuals = (spectrum.data - amplitude_truth)/spectrum.err
+    amplitude_truth_interp = interp1d(lambdas_truth, amplitude_truth, kind='cubic', fill_value=0, bounds_error=False)(spectrum.lambdas)
+    residuals = (spectrum.data - amplitude_truth_interp)/spectrum.err
     ax[1].errorbar(spectrum.lambdas, residuals, yerr=np.ones_like(spectrum.data), label="Fit", fmt="r.")
     ax[1].set_ylabel(f"Residuals")
     ax[1].set_xlabel(r"$\lambda$ [nm]")
@@ -70,27 +75,36 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
     plt.show()
 
 
-def test_fitchromaticpsf2d():
+def load_test(sim_image, config="./config/ctio.ini"):
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    sim_image = "./tests/data/sim_20170530_134.fits"
     if not os.path.isfile(sim_image):
-        make_test_image()
-    image = Image(sim_image)
+        make_test_image(config=config)
+    image = Image(sim_image, config=config)
     lambdas_truth = np.fromstring(image.header['LAMBDAS'][1:-1], sep=' ')
     amplitude_truth = np.fromstring(image.header['PSF_POLY'][1:-1], sep=' ', dtype=float)[:lambdas_truth.size]
     parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
     parameters.LAMBDA_TRUTH = np.copy(lambdas_truth)
     parameters.PSF_POLY_ORDER = int(image.header['PSF_DEG'])
-    print(parameters.AMPLITUDE_TRUTH)
-
     parameters.PSF_POLY_ORDER = 2
+    return image, lambdas_truth, amplitude_truth
+
+
+def test_fitchromaticpsf2d_run(sim_image="./tests/data/sim_20170530_134.fits", config="./config/ctio.ini"):
+    load_test(sim_image, config=config)
     tag = sim_image.split('/')[-1]
     tag = tag.replace('sim_', 'reduc_')
     logbook = LogBook(logbook="./ctiofulllogbook_jun2017_v5.csv")
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
                            disperser_label=disperser_label, config="./config/ctio.ini")
+    return spectrum
+
+
+def test_fitchromaticpsf2d_test(sim_image="./tests/data/sim_20170530_134.fits", config="./config/ctio.ini"):
+    image, lambdas_truth, amplitude_truth = load_test(sim_image, config=config)
+    spectrum = Spectrum(sim_image.replace(".fits", "_spectrum.fits"), config=config)
+
     plot_residuals(spectrum, lambdas_truth, amplitude_truth)
 
     assert np.isclose(float(image.header['X0_T']), spectrum.target_pixcoords[0], atol=0.01)

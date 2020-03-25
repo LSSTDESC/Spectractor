@@ -489,8 +489,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     output_filename = os.path.join(outputdir, output_filename)
 
     # Save images and parameters
-    image.header['A1'] = A1
-    image.header['A2'] = A2
+    image.header['A1_T'] = A1
+    image.header['A2_T'] = A2
     image.header['X0_T'] = spectrum.x0[0]
     image.header['Y0_T'] = spectrum.x0[1]
     image.header['D2CCD_T'] = spectrum.disperser.D

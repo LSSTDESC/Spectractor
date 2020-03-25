@@ -7,6 +7,7 @@ from spectractor.config import set_logger
 from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import FitWorkspace
+from spectractor.tools import plot_spectrum_simple
 
 
 class SpectrumFitWorkspace(FitWorkspace):
@@ -32,9 +33,9 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.A1 = 1.0
         self.A2 = 0.05
         self.ozone = 300.
-        self.pwv = 3
+        self.pwv = 5
         self.aerosols = 0.03
-        self.reso = 1.5
+        self.reso = 1
         self.D = self.spectrum.header['D2CCD']
         self.shift = self.spectrum.header['PIXSHIFT']
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D, self.shift])
@@ -55,12 +56,12 @@ class SpectrumFitWorkspace(FitWorkspace):
         if 'A1' in list(self.spectrum.header.keys()):
             A1_truth = self.spectrum.header['A1']
             A2_truth = self.spectrum.header['A2']
-            ozone_truth = self.spectrum.header['OZONE']
-            pwv_truth = self.spectrum.header['PWV']
-            aerosols_truth = self.spectrum.header['VAOD']
+            ozone_truth = self.spectrum.header['OZONE_T']
+            pwv_truth = self.spectrum.header['PWV_T']
+            aerosols_truth = self.spectrum.header['VAOD_T']
             reso_truth = self.spectrum.header['RESO']
-            D_truth = self.spectrum.header['D2CCD']
-            shift_truth = self.spectrum.header['X0SHIFT']
+            D_truth = self.spectrum.header['D2CCD_T']
+            shift_truth = self.spectrum.header['X0_T']
             self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth,
                           reso_truth, D_truth, shift_truth)
         else:
@@ -71,10 +72,11 @@ class SpectrumFitWorkspace(FitWorkspace):
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))
-        self.spectrum.plot_spectrum_simple(ax, lambdas=lambdas)
-        p0 = ax.plot(lambdas, self.model(lambdas), label='model')
+        plot_spectrum_simple(ax, lambdas=lambdas, data=self.data, data_err=self.err,
+                             units=self.spectrum.units)
+        p0 = ax.plot(lambdas, self.model, label='model')
         ax.fill_between(lambdas, self.model - self.model_err,
-                        self.model(lambdas) + self.model_err, alpha=0.3, color=p0[0].get_color())
+                        self.model + self.model_err, alpha=0.3, color=p0[0].get_color())
         # ax.plot(self.lambdas, self.model_noconv, label='before conv')
         if title != '':
             ax.set_title(title, fontsize=10)
@@ -82,14 +84,16 @@ class SpectrumFitWorkspace(FitWorkspace):
         divider = make_axes_locatable(ax)
         ax2 = divider.append_axes("bottom", size=size, pad=0)
         ax.figure.add_axes(ax2)
-        residuals = (self.spectrum.data - self.model(lambdas)) / self.model(lambdas)
-        residuals_err = self.spectrum.err / self.model(lambdas)
-        ax2.errorbar(lambdas, residuals, yerr=residuals_err, fmt='ro', markersize=2)
+        min_positive = np.min(self.model[self.model > 0])
+        idx = np.logical_not(np.isclose(self.model[sub], 0, atol=0.01*min_positive))
+        residuals = (self.spectrum.data[sub][idx] - self.model[sub][idx]) / self.model[sub][idx]
+        residuals_err = self.spectrum.err[sub][idx] / self.model[sub][idx]
+        ax2.errorbar(lambdas[sub][idx], residuals, yerr=residuals_err, fmt='ro', markersize=2)
         ax2.axhline(0, color=p0[0].get_color())
         ax2.grid(True)
-        residuals_model = self.model_err / self.model(lambdas)
-        ax2.fill_between(lambdas, -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
-        std = np.std(residuals[sub])
+        residuals_model = self.model_err[sub][idx] / self.model[sub][idx]
+        ax2.fill_between(lambdas[sub][idx], -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
+        std = np.std(residuals)
         ax2.set_ylim([-2. * std, 2. * std])
         ax2.set_xlabel(ax.get_xlabel())
         ax2.set_ylabel('(data-fit)/fit')
@@ -101,7 +105,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax2.get_yaxis().set_label_coords(-0.15, 0.5)
 
     def simulate(self, A1, A2, ozone, pwv, aerosols, reso, D, shift):
-        lambdas, model, model_err = self.simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift)
+        lambdas, model, model_err = self.simulation.simulate(self.lambdas, A1, A2, ozone, pwv, aerosols, reso, D, shift)
         # if self.live_fit:
         #    self.plot_fit()
         self.model = model
@@ -109,6 +113,27 @@ class SpectrumFitWorkspace(FitWorkspace):
         return model, model_err
 
     def plot_fit(self):
+        """
+        Examples
+        --------
+
+        .. plot::
+            :include-source:
+
+            >>> from spectractor.fit.fit_spectrum import SpectrumFitWorkspace
+            >>> parameters.VERBOSE = True
+            >>> file_name = 'tests/data/sim_20170530_134_spectrum.fits'
+            >>> atmgrid_file_name = file_name.replace('spectrum', 'atmsim')
+            >>> fit_workspace = SpectrumFitWorkspace(file_name, atmgrid_file_name=atmgrid_file_name, verbose=True)
+            >>> A1, A2, ozone, pwv, aerosols, reso, D, shift_x = fit_workspace.p
+            >>> lambdas, model, model_err = fit_workspace.simulation.simulate(fit_workspace.lambdas, A1, A2,
+            ... ozone, pwv, aerosols, reso, D, shift_x)
+            >>> fit_workspace.lambdas = lambdas
+            >>> fit_workspace.model = model
+            >>> fit_workspace.model_err = model_err
+            >>> fit_workspace.plot_fit()
+
+        """
         fig = plt.figure(figsize=(12, 6))
         ax1 = plt.subplot(222)
         ax2 = plt.subplot(224)
