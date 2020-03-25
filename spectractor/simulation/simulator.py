@@ -139,7 +139,6 @@ class SpectrumSimulation(Spectrum):
         #pixels = self.disperser.grating_lambda_to_pixel(lambdas, x0=self.x0, order=1)
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
-        self.my_logger.warning(f"{self.pixels}")
         lambdas = self.disperser.grating_pixel_to_lambda(self.pixels - shift_x, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
