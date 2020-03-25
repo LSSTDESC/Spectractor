@@ -51,7 +51,7 @@ class Spectrum:
 
         Load a spectrum from a fits image file
         >>> from spectractor.extractor.images import Image
-        >>> image = Image('tests/data/reduc_20170605_028.fits', target='PNG321.0+3.9')
+        >>> image = Image('tests/data/reduc_20170605_028.fits', target_label='PNG321.0+3.9')
         >>> s = Spectrum(image=image)
         >>> print(s.target.label)
         PNG321.0+3.9
