@@ -37,8 +37,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.aerosols = 0.03
         self.reso = 1
         self.D = self.spectrum.header['D2CCD']
-        self.shift = self.spectrum.header['PIXSHIFT']
-        self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D, self.shift])
+        self.shift_x = self.spectrum.header['PIXSHIFT']
+        self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D, self.shift_x])
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
@@ -104,13 +104,13 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax.get_yaxis().set_label_coords(-0.15, 0.6)
         ax2.get_yaxis().set_label_coords(-0.15, 0.5)
 
-    def simulate(self, A1, A2, ozone, pwv, aerosols, reso, D, shift):
-        lambdas, model, model_err = self.simulation.simulate(self.lambdas, A1, A2, ozone, pwv, aerosols, reso, D, shift)
+    def simulate(self, A1, A2, ozone, pwv, aerosols, reso, D, shift_x):
+        lambdas, model, model_err = self.simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift_x)
         # if self.live_fit:
         #    self.plot_fit()
         self.model = model
         self.model_err = model_err
-        return model, model_err
+        return lambdas, model, model_err
 
     def plot_fit(self):
         """
@@ -160,3 +160,45 @@ class SpectrumFitWorkspace(FitWorkspace):
                 self.my_logger.info(f'Save figure {figname}.')
                 fig.savefig(figname, dpi=100, bbox_inches='tight')
 
+
+if __name__ == "__main__":
+    from argparse import ArgumentParser
+    from spectractor.config import load_config
+    from spectractor.fit.fitter import run_minimisation
+
+    parser = ArgumentParser()
+    parser.add_argument(dest="input", metavar='path', default=["tests/data/reduc_20170530_134_spectrum.fits"],
+                        help="Input fits file name. It can be a list separated by spaces, or it can use * as wildcard.",
+                        nargs='*')
+    parser.add_argument("-d", "--debug", dest="debug", action="store_true",
+                        help="Enter debug mode (more verbose and plots).", default=False)
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
+                        help="Enter verbose (print more stuff).", default=False)
+    parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
+                        help="Write results in given output directory (default: ./outputs/).")
+    parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
+                        help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
+    parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
+                        help="INI config file. (default: config.ctio.ini).")
+    args = parser.parse_args()
+
+    parameters.VERBOSE = args.verbose
+    if args.debug:
+        parameters.DEBUG = True
+        parameters.VERBOSE = True
+
+    file_names = args.input
+
+    load_config(args.config)
+
+    # filename = 'outputs/reduc_20170530_130_spectrum.fits'
+    # filename = 'outputs/sim_20170530_134_spectrum.fits'
+    # 062
+    filename = './tests/data/sim_20170530_134_spectrum.fits'
+    atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+
+    w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
+                             burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
+    run_minimisation(w, method="newton")
+    # run_emcee(w, ln=lnprob_spectrogram)
+    # w.analyze_chains()
