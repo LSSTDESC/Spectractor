@@ -61,6 +61,9 @@ class SpectrumSimulation(Spectrum):
         self.disperser = disperser
         self.telescope = telescope
         self.atmosphere = atmosphere
+        # save original pixel distances to zero order
+        self.pixels = self.disperser.grating_lambda_to_pixel(self.lambdas, x0=self.x0, order=1)
+        # now reset data
         self.lambdas = None
         self.data = None
         self.err = None
@@ -96,15 +99,13 @@ class SpectrumSimulation(Spectrum):
         # self.data *= self.lambdas*self.lambdas_binwidths
         return self.data, self.err
 
-    def simulate(self, lambdas, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0.,
+    def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0.,
                  D=parameters.DISTANCE2CCD, shift_x=0.):
         """Simulate the cross spectrum of an object and its uncertainties
         after its transmission throught the instrument and the atmosphere.
 
         Parameters
         ----------
-        lambdas: array_like
-            The wavelength array to simulate (in nm).
         A1: float
             Global amplitude of the spectrum (default: 1).
         A2: float
@@ -134,11 +135,12 @@ class SpectrumSimulation(Spectrum):
         """
         #distance = np.array(self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x, shift_y=0))
         #pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0] - shift
-        self.disperser.D = float(self.header["D2CCD"])
-        pixels = self.disperser.grating_lambda_to_pixel(lambdas, x0=self.x0, order=1)
+        #self.disperser.D = float(self.header["D2CCD"])
+        #pixels = self.disperser.grating_lambda_to_pixel(lambdas, x0=self.x0, order=1)
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
-        lambdas = self.disperser.grating_pixel_to_lambda(pixels, x0=new_x0, order=1)
+        self.my_logger.warning(f"{self.pixels}")
+        lambdas = self.disperser.grating_pixel_to_lambda(self.pixels - shift_x, x0=new_x0, order=1)
         self.simulate_without_atmosphere(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
         # np.savetxt('atmospheric_trans_20170530_130.txt',np.array([lambdas,atmospheric_transmission(lambdas)]).T)
