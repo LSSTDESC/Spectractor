@@ -126,7 +126,7 @@ class SpectrumFitWorkspace(FitWorkspace):
             >>> atmgrid_file_name = file_name.replace('spectrum', 'atmsim')
             >>> fit_workspace = SpectrumFitWorkspace(file_name, atmgrid_file_name=atmgrid_file_name, verbose=True)
             >>> A1, A2, ozone, pwv, aerosols, reso, D, shift_x = fit_workspace.p
-            >>> lambdas, model, model_err = fit_workspace.simulation.simulate(fit_workspace.lambdas, A1, A2,
+            >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2,
             ... ozone, pwv, aerosols, reso, D, shift_x)
             >>> fit_workspace.lambdas = lambdas
             >>> fit_workspace.model = model
