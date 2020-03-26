@@ -37,8 +37,8 @@ class FitWorkspace:
         self.input_labels = []
         self.axis_names = []
         self.input_labels = []
-        self.axis_names = []
         self.bounds = ((), ())
+        self.fixed = []
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.nsteps = nsteps
         self.nbins = nbins
@@ -533,6 +533,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                        f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} "
                        f"computed in {time.time() - start:.2f}s")
         if fit_workspace.live_fit:
+            fit_workspace.simulate(*tmp_params)
             fit_workspace.plot_fit()
             fit_workspace.cov = inv_JT_W_J
             # fit_workspace.plot_correlation_matrix(ipar)
