@@ -488,10 +488,10 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                 continue
             if np.all(J[ip] == np.zeros(J.shape[1])):
                 ipar = np.delete(ipar, list(ipar).index(ip))
-                tmp_params[ip] = 0
+                # tmp_params[ip] = 0
                 my_logger.warning(
-                    f"\n\tStep {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed at 0 "
-                    f"in the following instead of its current value ({tmp_params[ip]}).")
+                    f"\n\tStep {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed "
+                    f"at its last known current value ({tmp_params[ip]}).")
         # remove fixed parameters
         J = J[ipar].T
         # algebra
@@ -505,24 +505,25 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         def line_search(alpha):
             tmp_params_2 = np.copy(tmp_params)
             tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
+            for ip, p in enumerate(tmp_params_2):
+                if p < fit_workspace.bounds[ip][0]:
+                    tmp_params_2[ip] = fit_workspace.bounds[ip][0]
+                if p > fit_workspace.bounds[ip][1]:
+                    tmp_params_2[ip] = fit_workspace.bounds[ip][1]
             lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
             return np.sum(((mod.flatten()[fit_workspace.not_outliers]
                             - fit_workspace.data.flatten()[fit_workspace.not_outliers])
                            / fit_workspace.err.flatten()[fit_workspace.not_outliers]) ** 2)
 
         # tol parameter acts on alpha (not func)
-        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2)
+        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2, brack=(-0.01, 0.01))
         tmp_params[ipar] += alpha_min * dparams
         # check bounds
         for ip, p in enumerate(tmp_params):
             if p < fit_workspace.bounds[ip][0]:
-                # print(ip, fit_workspace.axis_names[ip], tmp_params[ip], fit_workspace.bounds[ip][0])
                 tmp_params[ip] = fit_workspace.bounds[ip][0]
             if p > fit_workspace.bounds[ip][1]:
-                # print(ip, fit_workspace.axis_names[ip], tmp_params[ip], fit_workspace.bounds[ip][1])
                 tmp_params[ip] = fit_workspace.bounds[ip][1]
-        # in_bounds, penalty, outbound_parameter_name = \
-        #     fit_workspace.spectrum.chromatic_psf.check_bounds(tmp_params[fit_workspace.psf_params_start_index:])
         # prepare outputs
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
@@ -537,6 +538,10 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             fit_workspace.plot_fit()
             fit_workspace.cov = inv_JT_W_J
             # fit_workspace.plot_correlation_matrix(ipar)
+        if len(ipar) == 0:
+            my_logger.warning(f"\n\tGradient descent terminated in {i} iterations because all parameters "
+                              f"have null Jacobian.")
+            break
         if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
             my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
                            f"relative to the sum of the parameters is below xtol={xtol}.")
