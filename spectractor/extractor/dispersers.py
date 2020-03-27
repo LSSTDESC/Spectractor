@@ -290,7 +290,7 @@ class Grating:
         >>> g = Grating(400)
         >>> print(g.N_input)
         400
-        >>> g = Grating(400, label="Ron400", data_dir=parameters.HOLO_DIR)
+        >>> g = Grating(400, label="Ron400", data_dir=parameters.DISPERSER_DIR)
         >>> print(f"{g.N_input:6f}")
         400.869182
         >>> assert g.D is parameters.DISTANCE2CCD
