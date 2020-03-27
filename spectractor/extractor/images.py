@@ -197,7 +197,8 @@ class Image(object):
         add in quadrature the read-out noise, takes the square root and returns a map in ADU units.
         """
         if self.units != 'ADU':
-            self.my_logger.error('\n\tNoise must be estimated on an image in ADU units')
+            self.my_logger.error('\n\tNoise must be estimated on an image in ADU units. '
+                                 'Currently self.units={self.units}.')
         # removes the zeros and negative pixels first
         # set to minimum positive value
         data = np.copy(self.data)
@@ -215,6 +216,31 @@ class Image(object):
         self.stat_errors /= self.gain
 
     def plot_statistical_error(self):
+        """Plot the statistical uncertainty map and check it is a Poisson noise.
+
+        The image units must be ADU.
+
+        Examples
+        --------
+
+        .. doctest::
+
+            >>> im = Image('tests/data/reduc_20170530_134.fits')
+            >>> im.convert_to_ADU_units()
+            >>> im.plot_statistical_error()
+
+        .. plot::
+            :include-source:
+
+            from spectractor.extractor.images import Image
+            im = Image('tests/data/reduc_20170530_134.fits')
+            im.convert_to_ADU_units()
+            im.plot_statistical_error()
+
+        """
+        if self.units != "ADU":
+            self.my_logger.error(f"\n\tNoise map must be in ADU units to be plotted and analyzed. "
+                                 f"Currently self.units={self.units}.")
         data = np.copy(self.data)
         min_noz = np.min(data[data > 0])
         data[data <= 0] = min_noz
