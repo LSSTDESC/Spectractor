@@ -151,7 +151,7 @@ class MoffatGauss(PSF):
 
     def __init__(self, p=None):
         PSF.__init__(self)
-        self.p_default = np.array([1, 0, 0, 3, 2, 0, 1, 1])
+        self.p_default = np.array([1, 0, 0, 3, 2, 0, 1, 1]).astype(float)
         if p is not None:
             self.p = p
         else:
@@ -1291,7 +1291,7 @@ class ChromaticPSF:
         # fwhm = compute_fwhm(index, signal, minimum=0)
         # Initialize PSF
         psf = MoffatGauss()
-        guess = np.copy(psf.p_default)
+        guess = np.copy(psf.p_default).astype(float)
         # guess = [2 * np.nanmax(signal), middle, 0.5 * fwhm, 2, 0, 0.1 * fwhm, saturation]
         guess[0] = 2 * np.nanmax(signal)
         guess[1] = xmax_index
@@ -1345,16 +1345,16 @@ class ChromaticPSF:
             # mean = np.nansum(pdf * index)
             # bounds[0] = (0.1 * np.nanstd(bgd), 2 * np.nanmax(y[middle - ws[0]:middle + ws[0]]))
             bounds[0] = (0.1 * np.nanstd(bgd), 1.5 * np.nansum(y[middle - ws[0]:middle + ws[0]]))
+            guess[0] = np.nansum(signal)
+            guess[1] = x
             # if guess[4] > -1:
             #    guess[0] = np.max(signal) / (1 + guess[4])
             # std = np.sqrt(np.nansum(pdf * (index - mean) ** 2))
-            # maxi = np.abs(np.nanmax(signal))
-            # if guess[0] * (1 + 0*guess[4]) < 3 * np.nanstd(bgd):
-            #     guess[0] = 0.9 * maxi
+            maxi = np.abs(np.nanmax(signal))
+            if guess[0] < 3 * np.nanstd(bgd):
+                guess[0] = float(0.9 * maxi)
             # if guess[0] * (1 + 0*guess[4]) > 1.2 * maxi:
             #     guess[0] = 0.9 * maxi
-            guess[0] = np.nansum(signal)
-            guess[1] = x
             psf_guess = MoffatGauss(p=guess)
             w = PSFFitWorkspace(psf_guess, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False)
