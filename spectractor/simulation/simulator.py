@@ -29,7 +29,7 @@ from spectractor.extractor.images import Image
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import Target
-from spectractor.extractor.psf import PSF2D
+from spectractor.extractor.psf import MoffatGauss
 from spectractor.tools import fftconvolve_gaussian, ensure_dir, rebin
 from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
@@ -267,7 +267,7 @@ class SpectrogramModel(Spectrum):
     def simulate_psf(self, psf_poly_params):
         psf_poly_params_with_saturation = np.concatenate([psf_poly_params, [self.spectrogram_saturation]])
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params_with_saturation,
-                                                                               force_positive=True)
+                                                                               apply_bounds=True)
         self.chromatic_psf.fill_table_with_profile_params(profile_params)
         # self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
         # self.chromatic_psf.table['Dx'] = np.arange(self.spectrogram_Nx) - self.spec
@@ -334,7 +334,7 @@ class SpectrogramModel(Spectrum):
         simul = np.zeros((self.spectrogram_Ny, self.spectrogram_Nx))
         nlbda = dispersion_law.size
         # cannot use directly ChromaticPSF2D class because it does not include the rotation of the spectrogram
-        psf = PSF2D()
+        psf = MoffatGauss()
         # TODO: increase rapidity (multithreading, optimisation...)
         for i in range(0, nlbda, 1):
             # here spectrum[i] is in ADU/s
@@ -499,10 +499,10 @@ class SpectrogramModel(Spectrum):
         # PSF cube
         if self.psf_cube is None or not self.fix_psf_cube:
             cube = pyfftw.zeros_aligned((nlbda, nima, nima), dtype='float32')
-            shape_params = np.array([self.chromatic_psf.table[name] for name in PSF2D.param_names[3:]]).T
+            shape_params = np.array([self.chromatic_psf.table[name] for name in MoffatGauss2D.param_names[3:]]).T
             for l in range(nlbda):
-                ima = PSF2D.evaluate(x, y, 1, 0, 0, *shape_params[l])
-                norm = PSF2D.normalisation(1, *shape_params[l])
+                ima = MoffatGauss.evaluate(x, y, 1, 0, 0, *shape_params[l])
+                norm = MoffatGauss.normalisation(1, *shape_params[l])
                 if norm != 0.:
                     ima /= norm  # Flux normalization: the flux should go in the spectrum
                 cube[l] = np.copy(ima)

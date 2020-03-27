@@ -55,10 +55,10 @@ class StarModel:
 
         Examples
         --------
-        >>> from spectractor.extractor.psf import PSF2D
+        >>> from spectractor.extractor.psf import MoffatGauss
         >>> from spectractor.extractor.images import fit_PSF2D_minuit
         >>> p = (100, 50, 50, 3, 2, -0.1, 1, 200)
-        >>> psf = PSF2D(*p)
+        >>> psf = MoffatGauss(*p)
         >>> yy, xx = np.mgrid[:100,:50]
         >>> data = psf.evaluate(xx, yy, *p)
         >>> model = fit_PSF2D_minuit(xx, yy, data, guess=p)
