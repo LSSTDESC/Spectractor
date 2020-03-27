@@ -84,6 +84,7 @@ class PSF:
         >>> psf0 = MoffatGauss(p0)
         >>> xx, yy = np.mgrid[:50, :60]
         >>> data = psf0.evaluate(np.array([xx, yy]), p0)
+        >>> data += psf0.evaluate(np.array([xx, yy]), p=[20000, 20, 50, 5, 2, -0.1, 2, 400000])
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
@@ -303,6 +304,7 @@ class PSFFitWorkspace(FitWorkspace):
         self.err = data_errors
         self.bgd_model_func = bgd_model_func
         self.p = np.copy(self.psf.p[1:])
+        self.guess = np.copy(self.psf.p)
         self.saturation = self.psf.p[-1]
         self.fixed = [False] * len(self.p)
         self.fixed[-1] = True  # fix saturation parameter
@@ -421,14 +423,22 @@ class PSFFitWorkspace(FitWorkspace):
             ax[0].errorbar(self.pixels, data, yerr=self.err, fmt='ro', label="Data")
             if len(self.outliers) > 0:
                 ax[0].errorbar(self.outliers, data[self.outliers], yerr=self.err[self.outliers], fmt='go',
-                               label=f"Outliers")
+                               label=rf"Outliers ({self.sigma_clip}$\sigma$)")
             if self.bgd_model_func is not None:
                 ax[0].plot(self.pixels, self.bgd_model_func(self.pixels), 'b--', label="fitted bgd")
+            if self.guess is not None:
+                if self.bgd_model_func is not None:
+                    ax[0].plot(self.pixels, self.psf.evaluate(self.pixels, p=self.guess)
+                               + self.bgd_model_func(self.pixels), 'k--', label="Guess")
+                else:
+                    ax[0].plot(self.pixels, self.psf.evaluate(self.pixels, p=self.guess),
+                               'k--', label="Guess")
             model = np.copy(self.model)
             # if self.bgd_model_func is not None:
             #    model = self.model + self.bgd_model_func(self.pixels)
             ax[0].plot(self.pixels, model, 'b-', label="Model")
-            ylim = ax[0].get_ylim()
+            ylim = list(ax[0].get_ylim())
+            ylim[1] = 1.2 * np.max(self.model)
             ax[0].set_ylim(ylim)
             ax[0].set_ylabel('Transverse profile')
             ax[0].legend(loc=2, numpoints=1)
@@ -497,11 +507,12 @@ class PSFFitWorkspace(FitWorkspace):
         else:
             if parameters.DISPLAY:
                 plt.show()
+            else:
+                plt.close(fig)
         if parameters.SAVE:  # pragma: no cover
             figname = self.filename.replace(self.filename.split('.')[-1], "_bestfit.pdf")
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
-        plt.close(fig)
 
 
 class ChromaticPSF:
@@ -1270,9 +1281,7 @@ class ChromaticPSF:
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
             if live_fit and parameters.DISPLAY:  # pragma: no cover
-                fit = MoffatGauss(p=best_fit)
-                plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, fit, bgd_model_func, best_fit,
-                                              psf_guess, w.outliers, sigma, live_fit)
+                w.plot_fit()
         # interpolate the skipped pixels with splines
         x = np.arange(Nx)
         xp = np.array(sorted(set(list(pixel_range))))
@@ -2182,141 +2191,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.model_err = np.zeros_like(self.model)
         self.poly_params = np.copy(poly_params)
         return self.pixels, self.model, self.model_err
-
-
-def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, bgd_model_func=None, params=None,
-                                  psf_guess=None, outliers=[], sigma=3, live_fit=False):  # pragma: no cover
-    """Plot the transverse profile of  the spectrogram.
-
-    This plot function is called in transverse_PSF1D_profile if live_fit option is True.
-
-    Parameters
-    ----------
-    x: int
-        Pixel index along the dispersion axis.
-    indices: array_like
-        Pixel indices across the dispersion axis.
-    bgd_indices: array_like
-        Pixel indices across the dispersion axis for the background estimate.
-    data: array_like
-        The 2D spectrogram data array.
-    err: array_like
-        The 2D spectrogram uncertainty data array.
-    fit: MoffatGauss, optional
-        Best fitting model function for the profile (default: None).
-    bgd_model_func: callable, optional
-        A 2D function to model the extracted background (default: None -> null background)
-    params: array_like, optional
-        Best fitting model parameter array (default: None).
-    psf_guess: MoffatGauss, optional
-        Guessed fitting model function for the profile before the fit (default: None).
-    outliers: array_like, optional
-        Pixel indices of the outliers across the dispersion axis (default: None).
-    sigma: int, optional
-        Value of the sigma-clipping rejection (default: 3).
-        Necessary only if an outlier array is given with the outliers keyword.
-    live_fit: bool
-        If True, plot is shown  in live during the fitting procedure (default: False).
-
-    Examples
-    --------
-
-    Build a mock spectrogram with random Poisson noise:
-
-    >>> s0 = ChromaticPSF1D(Nx=80, Ny=100, saturation=1000)
-    >>> params = s0.generate_test_poly_params()
-    >>> saturation = params[-1]
-    >>> data = s0.evaluate(params)
-    >>> bgd = 10*np.ones_like(data)
-    >>> data += bgd
-    >>> data = np.random.poisson(data)
-    >>> data_errors = np.sqrt(data+1)
-
-    Extract the background:
-
-    >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
-
-    Fit the transverse profile:
-
-    >>> s = ChromaticPSF1D(Nx=80, Ny=100, deg=4, saturation=saturation)
-    >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
-    ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
-
-    """
-    # TODO: merge with plot_fit of PSFFitworkspace ?
-    Ny = len(indices)
-    y = data[:, x]
-    bgd = data[bgd_indices, x]
-    bgd_err = err[bgd_indices, x]
-    fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex='all', gridspec_kw={'height_ratios': [5, 1]})
-    ax[0].errorbar(np.arange(Ny), y, yerr=err[:, x], fmt='ro', label="original data")
-    ax[0].errorbar(bgd_indices, bgd, yerr=bgd_err, fmt='bo', label="bgd data")
-    if len(outliers) > 0:
-        ax[0].errorbar(outliers, data[outliers, x], yerr=err[outliers, x], fmt='go',
-                       label=rf"outliers ({sigma}$\sigma$)")
-    if bgd_model_func is not None:
-        ax[0].plot(bgd_indices, bgd_model_func(x, bgd_indices)[:, 0], 'b--', label="fitted bgd")
-    if psf_guess is not None:
-        if bgd_model_func is not None:
-            ax[0].plot(indices, psf_guess.evaluate(indices) + bgd_model_func(x, indices)[:, 0], 'k--',
-                       label="guessed profile")
-        else:
-            ax[0].plot(indices, psf_guess.evaluate(indices), 'k--', label="guessed profile")
-    if fit is not None and bgd_model_func is not None:
-        model = fit.evaluate(indices) + bgd_model_func(x, indices)[:, 0]
-        ax[0].plot(indices, model, 'b-', label="fitted profile")
-    ylim = ax[0].get_ylim()
-    # if params is not None:
-    #     PSF_moffat = Moffat1D(*params[:4])
-    #     ax[0].plot(indices, PSF_moffat(indices) + bgd_model_func(x, indices)[:, 0], 'b+', label="fitted moffat")
-    ax[0].set_ylim(ylim)
-    ax[0].set_ylabel('Transverse profile')
-    ax[0].legend(loc=2, numpoints=1)
-    ax[0].grid(True)
-    if fit is not None:
-        txt = ""
-        for ip, p in enumerate(fit.param_names):
-            txt += f'{p}: {fit.p[ip]:.4g}\n'
-        ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
-        ax[0].set_title(f'x={x}')
-    model = np.zeros_like(indices).astype(float)
-    model_outliers = np.zeros_like(outliers).astype(float)
-    if fit is not None:
-        model += fit.evaluate(indices)
-        if len(outliers) > 0:
-            model_outliers += fit.evaluate(indices)[outliers]
-    if bgd_model_func is not None:
-        model += bgd_model_func(x, indices)[:, 0]
-        if len(outliers) > 0:
-            model_outliers += bgd_model_func(x, indices)[outliers, 0]
-    if fit is not None or bgd_model_func is not None:
-        residuals = (y - model) / err[:, x]  # / model
-        residuals_err = err[:, x] / err[:, x]  # / model
-        ax[1].errorbar(indices, residuals, yerr=residuals_err, fmt='ro')
-        if len(outliers) > 0:
-            residuals_outliers = (data[outliers, x] - model_outliers) / err[outliers, x]  # / model_outliers
-            residuals_outliers_err = err[outliers, x] / err[outliers, x]  # / model_outliers
-            ax[1].errorbar(outliers, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
-        ax[1].axhline(0, color='b')
-        ax[1].grid(True)
-        std = np.std(residuals)
-        ax[1].set_ylim([-3. * std, 3. * std])
-        ax[1].set_xlabel(ax[0].get_xlabel())
-        ax[1].set_ylabel('(data-fit)/err')
-        ax[0].set_xticks(ax[1].get_xticks()[1:-1])
-        ax[0].get_yaxis().set_label_coords(-0.1, 0.5)
-        ax[1].get_yaxis().set_label_coords(-0.1, 0.5)
-    fig.tight_layout()
-    fig.subplots_adjust(wspace=0, hspace=0)
-    if parameters.DISPLAY:
-        if live_fit:
-            plt.draw()
-            plt.pause(1e-8)
-            plt.close()
-        else:
-            plt.show()
-    else:
-        plt.close("all")
 
 
 def PSF2D_chisq(params, model, xx, yy, zz, zz_err=None):
