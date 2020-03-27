@@ -2914,8 +2914,8 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
 class PSF1DAstropy(Fittable1DModel):
     n_inputs = 1
     n_outputs = 1
-    inputs = ('x',)
-    outputs = ('y',)
+    # inputs = ('x',)
+    # outputs = ('y',)
 
     amplitude_moffat = Parameter('amplitude_moffat', default=0.5)
     x_mean = Parameter('x_mean', default=0)
@@ -3542,8 +3542,8 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
 class PSF2DAstropy(Fittable2DModel):
     n_inputs = 2
     n_outputs = 1
-    inputs = ('x', 'y',)
-    outputs = ('z',)
+    # inputs = ('x', 'y',)
+    # outputs = ('z',)
 
     amplitude_moffat = Parameter('amplitude_moffat', default=1)
     x_mean = Parameter('x_mean', default=0)
