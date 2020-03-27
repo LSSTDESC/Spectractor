@@ -43,7 +43,7 @@ class SpectrumFitWorkspace(FitWorkspace):
                              r"alpha_pix [pix]"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]"]
-        self.bounds = [(0, 2), (0, 0.5), (0, 800), (0, 10), (0, 1), (1, 10), (50, 60), (-20, 20)]
+        self.bounds = [(0, 2), (0, 0.5), (300, 700), (0, 10), (0, 0.01), (0.1, 2), (50, 60), (-2, 2)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -161,10 +161,18 @@ class SpectrumFitWorkspace(FitWorkspace):
                 fig.savefig(figname, dpi=100, bbox_inches='tight')
 
 
+def lnprob_spectrum(p):
+    global fit_workspace
+    lp = fit_workspace.lnprior(p)
+    if not np.isfinite(lp):
+        return -1e20
+    return lp + fit_workspace.lnlike(p)
+
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
     from spectractor.config import load_config
-    from spectractor.fit.fitter import run_minimisation
+    from spectractor.fit.fitter import run_minimisation, run_emcee
 
     parser = ArgumentParser()
     parser.add_argument(dest="input", metavar='path', default=["tests/data/reduc_20170530_134_spectrum.fits"],
@@ -194,11 +202,12 @@ if __name__ == "__main__":
     # filename = 'outputs/reduc_20170530_130_spectrum.fits'
     # filename = 'outputs/sim_20170530_134_spectrum.fits'
     # 062
-    filename = './tests/data/sim_20170530_134_spectrum.fits'
+    filename = './outputs/reduc_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-    w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                             burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-    run_minimisation(w, method="newton")
-    # run_emcee(w, ln=lnprob_spectrogram)
-    # w.analyze_chains()
+    fit_workspace = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=5000,
+                             burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
+    run_minimisation(fit_workspace, method="newton")
+    fit_workspace.plot_fit()
+    run_emcee(fit_workspace, ln=lnprob_spectrum)
+    fit_workspace.analyze_chains()
