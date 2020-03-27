@@ -1271,7 +1271,7 @@ class ChromaticPSF:
             psf_guess = MoffatGauss(p=guess)
             w = PSFFitWorkspace(psf_guess, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False)
-            run_minimisation_sigma_clipping(w, method="minuit", sigma=sigma, clip_niter=2, verbose=False, fix=w.fixed)
+            run_minimisation_sigma_clipping(w, method="minuit", sigma_clip=sigma, niter_clip=2, verbose=False, fix=w.fixed)
             best_fit = w.psf.p
             # It is better not to propagate the guess to further pixel columns
             # otherwise fit_chromatic_psf1D is more likely to get trapped in a local minimum
