@@ -36,8 +36,7 @@ class PSF:
         self.p = np.array([])
         self.param_names = ["amplitude", "x_mean", "y_mean", "saturation"]
         self.axis_names = ["$A$", r"$x_0$", r"$y_0$", "saturation"]
-        self.bounds_soft = [[]]
-        self.bounds_hard = [[]]
+        self.bounds = [[]]
         self.p_default = np.array([1, 0, 0, 1])
         self.max_half_width = np.inf
 
@@ -159,20 +158,15 @@ class MoffatGauss(PSF):
         self.param_names = ["amplitude", "x_mean", "y_mean", "gamma", "alpha", "eta_gauss", "stddev",
                             "saturation"]
         self.axis_names = ["$A$", r"$x_0$", r"$y_0$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
-        self.bounds_hard = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 10),
-                                     (-1, 0), (0.1, np.inf), (0, np.inf)])
-        self.bounds_soft = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 10),
-                                     (-1, 0), (0.1, np.inf), (0, np.inf)])
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 10),
+                                (-1, 0), (0.1, np.inf), (0, np.inf)])
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.bounds_hard = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
-                                     (0.1, self.max_half_width), (1.1, 10), (-1, 0), (0.1, self.max_half_width/2),
-                                     (0, np.inf)])
-        self.bounds_soft = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
-                                     (0.1, self.max_half_width), (1.1, 10), (-1, 0), (0.1, self.max_half_width/2),
-                                     (0, np.inf)])
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
+                                (0.1, self.max_half_width), (1.1, 10), (-1, 0), (0.1, self.max_half_width/2),
+                                (0, np.inf)])
 
     def evaluate(self, pixels, p=None):
         """Evaluate the MoffatGauss function.
@@ -1303,7 +1297,7 @@ class ChromaticPSF:
         #           (0.1, min(Ny // 2, fwhm)),
         #           (0, 2 * saturation)]
         psf.apply_max_width_to_bounds(max_half_width=Ny // 2)
-        bounds = np.copy(psf.bounds_hard)
+        bounds = np.copy(psf.bounds)
         bounds[0] = (0.1 * maxi, 10 * maxi)
         bounds[2] = (middle - w, middle + w)
         bounds[-1] = (0, 2 * saturation)
