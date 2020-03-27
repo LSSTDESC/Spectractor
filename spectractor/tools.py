@@ -1313,9 +1313,9 @@ def compute_integral(x, y, bounds=None):
 
     .. doctest::
 
-        >>> from spectractor.extractor.psf import MoffatGauss1D
-        >>> p = [2,30,4,2,-0.5,1,10]
-        >>> psf = MoffatGauss1D(p)
+        >>> from spectractor.extractor.psf import MoffatGauss
+        >>> p = [2,30,30,4,2,-0.5,1,10]
+        >>> psf = MoffatGauss(p)
         >>> integral = compute_integral(x, psf.evaluate(x))
         >>> assert np.isclose(integral, p[0], atol=1e-3)
 
