@@ -1221,9 +1221,9 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
 
     Defocused PSF example
 
-    >>> from spectractor.extractor.psf import PSF1D
+    >>> from spectractor.extractor.psf import MoffatGauss1D
     >>> p = [2,40,4,2,-0.4,1,10]
-    >>> psf = PSF1D(p)
+    >>> psf = MoffatGauss1D(p)
     >>> fwhm, half, center, a, b = compute_fwhm(x, psf.evaluate(x), full_output=True)
 
     .. doctest::
@@ -1313,9 +1313,9 @@ def compute_integral(x, y, bounds=None):
 
     .. doctest::
 
-        >>> from spectractor.extractor.psf import PSF1D
+        >>> from spectractor.extractor.psf import MoffatGauss1D
         >>> p = [2,30,4,2,-0.5,1,10]
-        >>> psf = PSF1D(p)
+        >>> psf = MoffatGauss1D(p)
         >>> integral = compute_integral(x, psf.evaluate(x))
         >>> assert np.isclose(integral, p[0], atol=1e-3)
 

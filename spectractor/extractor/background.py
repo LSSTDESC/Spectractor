@@ -70,10 +70,10 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
-    # Fit the transverse profile:
+    Fit the transverse profile:
 
     >>> bgd_model = extract_spectrogram_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5, pixel_step=1)
->
+
     """
     Ny, Nx = data.shape
     middle = Ny // 2
