@@ -516,7 +516,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                            / fit_workspace.err.flatten()[fit_workspace.not_outliers]) ** 2)
 
         # tol parameter acts on alpha (not func)
-        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2, brack=(-0.01, 0.01))
+        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2, brack=(-0.1, 0.1))
         tmp_params[ipar] += alpha_min * dparams
         # check bounds
         for ip, p in enumerate(tmp_params):
@@ -613,7 +613,7 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
     ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
     print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
                             [fit_workspace.input_labels[ip] for ip in ipar])
-    if parameters.DEBUG:
+    if parameters.DEBUG and verbose:
         # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
         plot_gradient_descent(fit_workspace, costs, params_table)
         fit_workspace.plot_correlation_matrix(ipar=ipar)
