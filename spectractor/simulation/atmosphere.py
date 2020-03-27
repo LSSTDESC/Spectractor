@@ -138,6 +138,8 @@ class Atmosphere:
                                  title=self.title, label=self.label)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
+        else:
+            plt.close('all')
 
 
 # ----------------------------------------------------------------------------------
@@ -338,6 +340,8 @@ class AtmosphereGrid(Atmosphere):
                                      title="Atmospheric grid", label=label)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
+        else:
+            plt.close('all')
 
     def plot_transmission_image(self):
         """Plot the atmospheric transmission contained in the grid using imshow.
@@ -365,6 +369,8 @@ class AtmosphereGrid(Atmosphere):
         cbar.set_label('Atmospheric transmission')
         if parameters.DISPLAY:
             plt.show()
+        else:
+            plt.close('all')
 
     def save_file(self, filename=""):
         """Save the atmospheric grid in a fits file.

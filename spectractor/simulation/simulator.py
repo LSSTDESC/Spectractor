@@ -656,6 +656,8 @@ class SpectrumSimGrid:
         plt.title("Spectra for Atmospheric variations")
         if parameters.DISPLAY:
             plt.show()
+        else:
+            plt.close('all')
 
     def plot_spectra_img(self):
         plt.figure()
@@ -668,6 +670,8 @@ class SpectrumSimGrid:
         plt.grid(True)
         if parameters.DISPLAY:
             plt.show()
+        else:
+            plt.close('all')
 
     def save_spectra(self, filename):
 
