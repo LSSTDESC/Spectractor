@@ -1109,53 +1109,6 @@ class ChromaticPSF:
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
-    def plot_chromatic_PSF1D_residuals(self, bgd, data, data_errors, guess=None, live_fit=False, title=""):
-        """Plot the residuals after fit_chromatic_PSF1D function.
-
-        Parameters
-        ----------
-        bgd: array_like
-            The 2D background array.
-        data: array_like
-            The 2D data array.
-        data_errors: array_like
-            The 2D data uncertainty array.
-        guess: array_like, optional
-            The guessed profile before the fit (default: None).
-        live_fit: bool
-            If True, the plot is shown during the fitting procedure (default: False).
-        title: str, optional
-            Title of the plot (default: "").
-        """
-        fig, ax = plt.subplots(5, 1, sharex='all', figsize=(6, 8))
-        plt.title(title)
-        im0 = ax[0].imshow(data, origin='lower', aspect='auto')
-        ax[0].set_title('Data')
-        plt.colorbar(im0, ax=ax[0])
-        im_guess = self.evaluate(guess) + bgd
-        im1 = ax[1].imshow(im_guess, origin='lower', aspect='auto')
-        fit = self.evaluate(self.poly_params) + bgd
-        ax[1].set_title('Guess')
-        plt.colorbar(im1, ax=ax[1])
-        im2 = ax[2].imshow((data - im_guess) / data_errors, origin='lower', aspect='auto')
-        ax[2].set_title('(Data-Guess)/Data_errors')
-        plt.colorbar(im2, ax=ax[2])
-        im3 = ax[3].imshow(fit, origin='lower', aspect='auto')
-        ax[3].set_title(title)
-        plt.colorbar(im3, ax=ax[3])
-        im4 = ax[4].imshow((data - fit) / data_errors, origin='lower', aspect='auto')
-        ax[4].set_title('(Data-Fit)/Data_errors')
-        plt.colorbar(im4, ax=ax[4])
-        fig.tight_layout()
-        if parameters.DISPLAY:  # pragma: no cover
-            if live_fit:
-                plt.draw()
-                plt.pause(1e-8)
-                plt.close()
-            else:
-                plt.show()
-        plt.close()
-
     def fit_transverse_PSF1D_profile(self, data, err, w, ws, pixel_step=1, bgd_model_func=None, saturation=None,
                                      live_fit=False, sigma=5):
         """
@@ -1411,10 +1364,10 @@ class ChromaticPSF:
         self.profile_params[:self.Nx, 1] = np.arange(self.Nx)
         self.fill_table_with_profile_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
-        if parameters.DEBUG:
+        if parameters.DEBUG or True:
             # Plot data, best fit model and residuals:
             self.plot_summary()
-            self.plot_chromatic_PSF1D_residuals(w.bgd, data, data_errors, guess=guess, title='Best fit')
+            w.plot_fit()
 
 
 class ChromaticPSF1D(ChromaticPSF):
@@ -1571,7 +1524,7 @@ class ChromaticPSF1D(ChromaticPSF):
         >>> w = s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=data_errors,
         ... amplitude_priors_method="noprior")
         >>> s.plot_summary(truth=s0)
-        >>> s.plot_chromatic_PSF1D_residuals(w.bgd, data, data_errors, guess=guess, title='Best fit')
+        >>> w.plot_fit()
 
         ..  doctest::
             :hide:
@@ -1585,129 +1538,6 @@ class ChromaticPSF1D(ChromaticPSF):
                                        amplitude_priors_method=amplitude_priors_method)
         self.fit_chromatic_psf(w, data, data_errors=data_errors, bgd_model_func=bgd_model_func)
         return w
-
-    @deprecated(reason="Use fit_chromatic_PSF1D instead.")
-    def fit_chromatic_PSF1D_minuit(self, data, bgd_model_func=None, data_errors=None):
-        """
-        Fit a chromatic PSF model on 2D data.
-
-        Parameters
-        ----------
-        data: array_like
-            2D array containing the image data.
-        bgd_model_func: callable, optional
-            A 2D function to model the extracted background (default: None -> null background)
-        data_errors: np.array
-            the 2D array uncertainties.
-
-        Examples
-        --------
-
-        Set the parameters:
-
-        >>> parameters.PIXDIST_BACKGROUND = 40
-        >>> parameters.PIXWIDTH_BACKGROUND = 10
-        >>> parameters.PIXWIDTH_SIGNAL = 30
-
-        Build a mock spectrogram with random Poisson noise:
-
-        >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
-        >>> params = s0.generate_test_poly_params()
-        >>> s0.poly_params = params
-        >>> saturation = params[-1]
-        >>> data = s0.evaluate(params)
-        >>> bgd = 10*np.ones_like(data)
-        >>> data += bgd
-        >>> data = np.random.poisson(data)
-        >>> data_errors = np.sqrt(data+1)
-
-        Extract the background:
-
-        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
-
-        Estimate the first guess values:
-
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=saturation)
-        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
-        >>> s.plot_summary(truth=s0)
-
-        Fit the data:
-
-        >>> s.fit_chromatic_PSF1D_minuit(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
-        >>> s.plot_summary(truth=s0)
-        """
-        Ny, Nx = data.shape
-        if Ny != self.Ny:
-            self.my_logger.error(f"\n\tData y shape {Ny} different from ChromaticPSF1D input self.Ny {self.Ny}.")
-        if Nx != self.Nx:
-            self.my_logger.error(f"\n\tData x shape {Nx} different from ChromaticPSF1D input self.Nx {self.Nx}.")
-        guess = np.copy(self.poly_params)
-        pixels = np.arange(Ny)
-
-        bgd = np.zeros_like(data)
-        if bgd_model_func is not None:
-            # xx, yy = np.meshgrid(np.arange(Nx), pixels)
-            bgd = bgd_model_func(np.arange(Nx), pixels)
-
-        data_subtracted = data - bgd
-        bgd_std = float(np.std(np.random.poisson(bgd)))
-
-        # crop spectrogram to fit faster
-        bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
-        data_subtracted = data_subtracted[bgd_width:-bgd_width, :]
-        pixels = np.arange(data_subtracted.shape[0])
-        data_errors_cropped = np.copy(data_errors[bgd_width:-bgd_width, :])
-
-        # error matrix
-        W = 1. / (data_errors_cropped * data_errors_cropped)
-        W = [np.diag(W[:, x]) for x in range(Nx)]
-        W_dot_data = [W[x] @ data_subtracted[:, x] for x in range(Nx)]
-        poly_params = np.copy(guess)
-
-        def spectrogram_chisq(shape_params):
-            # linear regression for the amplitude parameters
-            poly_params[Nx:] = np.copy(shape_params)
-            profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
-            profile_params[:Nx, 0] = 1
-            profile_params[:Nx, 1] -= bgd_width
-            J = np.array([self.psf.evaluate(pixels, p=profile_params[x, :]) for x in range(Nx)])
-            J_dot_W_dot_J = np.array([J[x].T @ W[x] @ J[x] for x in range(Nx)])
-            amplitude_params = [
-                J[x].T @ W_dot_data[x] / (J_dot_W_dot_J[x]) if J_dot_W_dot_J[x] > 0 else 0.1 * bgd_std
-                for x in
-                range(Nx)]
-            poly_params[:Nx] = amplitude_params
-            in_bounds, penalty, name = self.check_bounds(poly_params, noise_level=bgd_std)
-            mod = self.evaluate(poly_params)[bgd_width:-bgd_width, :]
-            self.poly_params = np.copy(poly_params)
-            if data_errors is None:
-                return np.nansum((mod - data_subtracted) ** 2) + penalty
-            else:
-                return np.nansum(((mod - data_subtracted) / data_errors_cropped) ** 2) + penalty
-
-        self.my_logger.debug(f'\n\tStart chisq: {spectrogram_chisq(guess[Nx:])} with {guess[Nx:]}')
-        error = 0.01 * np.abs(guess) * np.ones_like(guess)
-        fix = [False] * (self.n_poly_params - Nx)
-        fix[-1] = True
-        bounds = self.set_bounds_for_minuit(data)
-        # fix[:Nx] = [True] * Nx
-        # noinspection PyArgumentList
-        m = Minuit.from_array_func(fcn=spectrogram_chisq, start=guess[Nx:], error=error[Nx:], errordef=1,
-                                   fix=fix, print_level=parameters.DEBUG, limit=bounds[Nx:])
-        m.migrad()
-        # m.hesse()
-        # print(m.np_matrix())
-        # print(m.np_matrix(correlation=True))
-        self.poly_params[Nx:] = m.np_values()
-        self.profile_params = self.from_poly_params_to_profile_params(self.poly_params,
-                                                                      apply_bounds=True)
-        self.fill_table_with_profile_params(self.profile_params)
-        self.from_profile_params_to_shape_params(self.profile_params)
-        if parameters.DEBUG:
-            # Plot data, best fit model and residuals:
-            self.plot_summary()
-            self.plot_chromatic_PSF1D_residuals(bgd, data, data_errors, guess=guess, title='Best fit')
 
 
 class ChromaticPSFFitWorkspace(FitWorkspace):
@@ -2127,7 +1957,7 @@ class ChromaticPSF2D(ChromaticPSF):
         >>> w = s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=data_errors,
         ... amplitude_priors_method="psf1d")
         >>> s.plot_summary(truth=s0)
-        >>> s.plot_chromatic_PSF1D_residuals(w.bgd, data, data_errors, guess=guess, title='Best fit')
+        >>> w.plot_fit()
         >>> plt.errorbar(s0.poly_params[:s0.Nx], w.amplitude_params-s0.poly_params[:s0.Nx],
         ... yerr=w.amplitude_params_err, fmt="r+") # doctest: +ELLIPSIS
         <ErrorbarContainer ... artists>
@@ -2146,143 +1976,6 @@ class ChromaticPSF2D(ChromaticPSF):
                                        amplitude_priors_method=amplitude_priors_method)
         self.fit_chromatic_psf(w, data, data_errors=data_errors, bgd_model_func=bgd_model_func)
         return w
-
-    @deprecated(reason="Has never worked... Use fit_chromatic_PSF2D instead.")
-    def fit_chromatic_PSF2D_minuit(self, data, bgd_model_func=None, data_errors=None):
-        """
-        Fit a chromatic MoffatGauss2D model on 2D data.
-
-        Parameters
-        ----------
-        data: array_like
-            2D array containing the image data.
-        bgd_model_func: callable, optional
-            A 2D function to model the extracted background (default: None -> null background)
-        data_errors: np.array
-            the 2D array uncertainties.
-
-        Examples
-        --------
-
-        Set the parameters:
-
-        >>> parameters.PIXDIST_BACKGROUND = 40
-        >>> parameters.PIXWIDTH_BACKGROUND = 10
-        >>> parameters.PIXWIDTH_SIGNAL = 30
-
-        Build a mock spectrogram with random Poisson noise:
-
-        >>> s0 = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=20000)
-        >>> params = s0.generate_test_poly_params()
-        >>> s0.poly_params = params
-        >>> saturation = params[-1]
-        >>> data = s0.evaluate(params)
-        >>> bgd = 10*np.ones_like(data)
-        >>> data += bgd
-        >>> data = np.random.poisson(data)
-        >>> data_errors = np.sqrt(data+1)
-
-        # Extract the background
-
-        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
-
-        # Estimate the first guess values
-        # >>> s = ChromaticPSF2D(Nx=100, Ny=100, deg=4, saturation=saturation)
-        # >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-        # ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
-        #
-        # # Fit the data:
-        # >>> parameters.DEBUG = True
-        # >>> s.fit_chromatic_PSF2D_minuit(data, bgd_model_func=bgd_model_func, data_errors=data_errors)
-        # >>> s.plot_summary(truth=s0)
-        """
-        my_logger = set_logger(__name__)
-        Ny, Nx = data.shape
-        if Ny != self.Ny:
-            my_logger.error(f"\n\tData y shape {Ny} different from ChromaticPSF1D input self.Ny {self.Ny}.")
-        if Nx != self.Nx:
-            my_logger.error(f"\n\tData x shape {Nx} different from ChromaticPSF1D input self.Nx {self.Nx}.")
-        guess = np.copy(self.poly_params)
-        pixels = np.arange(Ny)
-
-        bgd = np.zeros_like(data)
-        if bgd_model_func is not None:
-            # xx, yy = np.meshgrid(np.arange(Nx), pixels)
-            bgd = bgd_model_func(np.arange(Nx), pixels)
-
-        data_subtracted = data - bgd
-        bgd_std = float(np.std(np.random.poisson(bgd)))
-
-        # crop spectrogram to fit faster
-        bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
-        data_subtracted = data_subtracted[bgd_width:-bgd_width, :]
-        Ny = data_subtracted.shape[0]
-        pixels = np.mgrid[:Nx, :Ny]
-        data_errors_cropped = np.copy(data_errors[bgd_width:-bgd_width, :])
-
-        # error matrix
-        W = 1. / (data_errors_cropped * data_errors_cropped)
-        # W = [np.diag(W[:, x]) for x in range(Nx)]
-        W = W.flatten()
-        W_dot_data = np.diag(W) @ data_subtracted.flatten()
-        poly_params = np.copy(guess)
-
-        W_dot_J = np.zeros((Ny * Nx, Nx))
-        J = np.zeros((Ny * Nx, Nx))
-
-        def spectrogram_chisq(shape_params):
-            # linear regression for the amplitude parameters
-            poly_params[Nx:] = np.copy(shape_params)
-            profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
-            profile_params[:Nx, 0] = 1
-            profile_params[:Nx, 1] = np.arange(Nx)
-            # profile_params[:Nx, 2] -= bgd_width
-            for x in range(Nx):
-                # self.my_logger.warning(f'\n\t{x} {profile_params[x, :]}')
-                J[:, x] = self.psf.evaluate(pixels, p=profile_params[x, :]).flatten()
-                W_dot_J[:, x] = J[:, x] * W
-                # plt.imshow(self.psf.evaluate(self.pixels, p=profile_params[x, :]), origin="lower")
-                # plt.imshow(data, origin="lower")
-                # plt.title(f"{x}")
-                # plt.show()
-            J_dot_W_dot_J = J.T @ W_dot_J
-            # self.my_logger.warning(f'\n\tJWJ {J_dot_W_dot_J}')
-            L = np.linalg.inv(np.linalg.cholesky(J_dot_W_dot_J))
-            inv_J_dot_W_dot_J = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
-            amplitude_params = inv_J_dot_W_dot_J @ (J.T @ W_dot_data)
-            # amplitude_params[np.diagonal(J_dot_W_dot_J) <= 0] = 0.1 * bgd_std
-            # amplitude_params[amplitude_params < 0.1 * bgd_std] = 0.1 * bgd_std
-            poly_params[:Nx] = amplitude_params
-            in_bounds, penalty, name = self.check_bounds(poly_params, noise_level=bgd_std)
-            mod = self.evaluate(poly_params)[bgd_width:-bgd_width, :]
-            if not in_bounds:
-                self.my_logger.warning(f'{in_bounds} {penalty} {name}')
-            self.poly_params = np.copy(poly_params)
-            if data_errors is None:
-                return np.nansum((mod - data_subtracted) ** 2) + penalty
-            else:
-                return np.nansum(((mod - data_subtracted) / data_errors_cropped) ** 2) + penalty
-
-        my_logger.debug(f'\n\tStart chisq: {spectrogram_chisq(guess[Nx:])} with {guess[Nx:]}')
-        error = 0.01 * np.abs(guess) * np.ones_like(guess)
-        fix = [False] * (self.n_poly_params - Nx)
-        fix[Nx + self.degrees['amplitude']:Nx + self.degrees['amplitude'] + self.degrees['x_mean']] = \
-            [True] * self.degrees['x_mean']
-        fix[-1] = True
-        bounds = self.set_bounds_for_minuit(data)
-        # noinspection PyArgumentList
-        m = Minuit.from_array_func(fcn=spectrogram_chisq, start=guess[Nx:], error=error[Nx:], errordef=1,
-                                   fix=fix, print_level=2, limit=bounds[Nx:])
-        m.migrad()
-        self.poly_params[Nx:] = m.np_values()
-        self.profile_params = self.from_poly_params_to_profile_params(self.poly_params,
-                                                                      apply_bounds=True)
-        self.fill_table_with_profile_params(self.profile_params)
-        self.from_profile_params_to_shape_params(self.profile_params)
-        if parameters.DEBUG:
-            # Plot data, best fit model and residuals:
-            self.plot_summary()
-            self.plot_chromatic_PSF1D_residuals(bgd, data, data_errors, guess=guess, title='Best fit')
 
 
 class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
