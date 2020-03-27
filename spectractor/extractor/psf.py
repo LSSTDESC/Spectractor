@@ -38,9 +38,8 @@ class PSF:
         self.axis_names = ["$A$", r"$x_0$", r"$y_0$", "saturation"]
         self.bounds_soft = [[]]
         self.bounds_hard = [[]]
-        self.max_width = np.inf
         self.p_default = np.array([1, 0, 0, 1])
-        self.max_width = np.inf
+        self.max_half_width = np.inf
 
     def evaluate(self, pixels, p=None):
         if p is not None:
@@ -55,7 +54,7 @@ class PSF:
                                  f"Here pixels.ndim={pixels.shape}.")
             return None
 
-    def apply_max_width_to_bounds(self, max_width=None):
+    def apply_max_width_to_bounds(self, max_half_width=None):
         pass
 
     def fit_psf(self, data, data_errors=None, bgd_model_func=None):
@@ -69,7 +68,7 @@ class PSF:
         data_errors: np.array, optional
             The 1D or 2D array of uncertainties.
         bgd_model_func: callable, optional
-            A AD or 2D function to model the extracted background (default: None -> null background)
+            A 1D or 2D function to model the extracted background (default: None -> null background).
 
         Returns
         -------
@@ -142,7 +141,7 @@ class PSF:
 
         """
         w = PSFFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func,
-                            verbose=parameters.VERBOSE, live_fit=False)
+                            verbose=False, live_fit=False)
         run_minimisation(w, method="newton", ftol=1 / w.pixels.size, xtol=1e-6, niter=50, fix=w.fixed)
         self.p = w.psf.p
         return w
@@ -306,13 +305,15 @@ class MoffatGauss(PSF):
         self.bounds_soft = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 10),
                                      (-1, 0), (0.1, np.inf), (0, np.inf)])
 
-    def apply_max_width_to_bounds(self, max_width=None):
-        if max_width is not None:
-            self.max_width = max_width
-        self.bounds_hard = np.array([(0, np.inf), (0, self.max_width), (0, self.max_width),
-                                     (0.1, self.max_width), (1.1, 10), (-1, 0), (0.1, self.max_width), (0, np.inf)])
-        self.bounds_soft = np.array([(0, np.inf), (0, self.max_width), (0, self.max_width),
-                                     (0.1, self.max_width), (1.1, 10), (-1, 0), (0.1, self.max_width), (0, np.inf)])
+    def apply_max_width_to_bounds(self, max_half_width=None):
+        if max_half_width is not None:
+            self.max_half_width = max_half_width
+        self.bounds_hard = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2*self.max_half_width),
+                                     (0.1, self.max_half_width), (1.1, 10), (-1, 0), (0.1, self.max_half_width),
+                                     (0, np.inf)])
+        self.bounds_soft = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2*self.max_half_width),
+                                     (0.1, self.max_half_width), (1.1, 10), (-1, 0), (0.1, self.max_half_width),
+                                     (0, np.inf)])
 
     def evaluate(self, pixels, p=None):
         """Evaluate the MoffatGauss function.
@@ -454,12 +455,13 @@ class PSFFitWorkspace(FitWorkspace):
         # prepare the fit
         if data.ndim == 2:
             self.Ny, self.Nx = self.data.shape
-            self.psf.apply_max_width_to_bounds(self.Ny)
+            self.psf.apply_max_width_to_bounds(self.Ny//2)
             self.pixels = np.mgrid[:self.Nx, :self.Ny]
         elif data.ndim == 1:
-            self.Nx = self.data.size
-            self.psf.apply_max_width_to_bounds(self.Nx)
-            self.pixels = np.arange(self.Nx)
+            self.Ny = self.data.size
+            self.Nx = 1
+            self.psf.apply_max_width_to_bounds(self.Ny//2)
+            self.pixels = np.arange(self.Ny)
             self.fixed[0] = True
         else:
             self.my_logger.error(f"\n\tData array must have dimension 1 or 2. Here pixels.ndim={data.ndim}.")
@@ -1028,7 +1030,7 @@ class ChromaticPSF:
         for x in pixel_x:
             p = profile_params[x, :]
             out = self.psf.evaluate(self.pixels, p=p)
-            fwhm = compute_fwhm(self.pixels, out, center=p[1], minimum=0)
+            fwhm = compute_fwhm(self.pixels, out, center=p[2], minimum=0)
             self.table['flux_integral'][x] = p[0]  # if MoffatGauss1D normalized
             self.table['fwhm'][x] = fwhm
             self.table['Dy_mean'][x] = 0
@@ -1225,16 +1227,15 @@ class ChromaticPSF:
                 ax[0].plot(all_pixels, PSF_truth[:, i], color=p[0].get_color(), linestyle='--')
         img = np.zeros((self.Ny, self.Nx)).astype(float)
         pixels = np.mgrid[:self.Nx, :self.Ny]
-        psf = MoffatGauss()
         for x in all_pixels[::self.Nx // 10]:
             params = [PSF_models[p][x] for p in range(len(self.psf.param_names))]
-            p = [1, x, self.Ny // 2]
-            for par in params[-5:]:
-                p.append(par)
-            out = psf.evaluate(pixels, p=p)
+            params[:3] = [1, x, self.Ny // 2]
+            out = self.psf.evaluate(pixels, p=params)
             out /= np.max(out)
             img += out
-        ax[1].imshow(img, origin='lower')
+        ax[1].imshow(img, origin='lower') #, extent=[0, self.Nx,
+                                          #        self.Ny//2-parameters.PIXWIDTH_SIGNAL,
+                                          #        self.Ny//2+parameters.PIXWIDTH_SIGNAL])
         ax[1].set_xlabel('X [pixels]')
         ax[1].set_ylabel('Y [pixels]')
         ax[0].set_ylabel('PSF parameters')
@@ -1391,7 +1392,7 @@ class ChromaticPSF:
         #           (-1, 0),
         #           (0.1, min(Ny // 2, fwhm)),
         #           (0, 2 * saturation)]
-        psf.apply_max_width_to_bounds(max_width=Ny // 2)
+        psf.apply_max_width_to_bounds(max_half_width=Ny // 2)
         bounds = np.copy(psf.bounds_hard)
         bounds[0] = (0.1 * maxi, 10 * maxi)
         bounds[2] = (middle - w, middle + w)
@@ -1445,8 +1446,9 @@ class ChromaticPSF:
             guess[0] = np.nansum(signal)
             guess[1] = x
             psf_guess = MoffatGauss(p=guess)
-            w = PSFFitWorkspace(psf_guess, signal, data_errors=err[:, x], bgd_model_func=None, live_fit=False)
-            run_minimisation_sigma_clipping(w, method="newton", sigma=sigma, clip_niter=2, verbose=False, fix=w.fixed)
+            w = PSFFitWorkspace(psf_guess, signal, data_errors=err[:, x], bgd_model_func=None,
+                                live_fit=False, verbose=False)
+            run_minimisation_sigma_clipping(w, method="minuit", sigma=sigma, clip_niter=2, verbose=False, fix=w.fixed)
             best_fit = w.psf.p
             # It is better not to propagate the guess to further pixel columns
             # otherwise fit_chromatic_psf1D is more likely to get trapped in a local minimum
@@ -1543,6 +1545,8 @@ class ChromaticPSF:
         self.poly_params[w.Nx + w.y_mean_0_index] += w.bgd_width
 
         # fill results
+        self.psf.apply_max_width_to_bounds(max_half_width=w.Ny // 2 + w.bgd_width)
+        self.set_bounds()
         self.profile_params = self.from_poly_params_to_profile_params(self.poly_params, apply_bounds=True)
         self.profile_params[:self.Nx, 0] = w.amplitude_params
         self.profile_params[:self.Nx, 1] = np.arange(self.Nx)
@@ -1642,7 +1646,7 @@ class ChromaticPSF1D(ChromaticPSF):
             Ny, Nx = self.Ny, self.Nx
         else:
             Ny, Nx = pixels.size, self.Nx
-        self.psf.apply_max_width_to_bounds(max_width=Ny)
+        self.psf.apply_max_width_to_bounds(max_half_width=Ny // 2)
         profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         output = np.zeros((Ny, Nx))
         y = np.arange(Ny)
@@ -1902,7 +1906,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.Ny, self.Nx = self.data.shape
 
         # update the bounds
-        self.chromatic_psf.psf.apply_max_width_to_bounds(max_width=self.Ny // 2)
+        self.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.Ny // 2)
         self.bounds = self.chromatic_psf.set_bounds()
 
         # error matrix
@@ -2197,7 +2201,7 @@ class ChromaticPSF2D(ChromaticPSF):
             pixels = np.mgrid[:Nx, :Ny]
         else:
             dim, Nx, Ny = pixels.shape
-        self.psf.apply_max_width_to_bounds(max_width=Ny)
+        self.psf.apply_max_width_to_bounds(max_half_width=Ny // 2)
         profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         # replace x_mean
         profile_params[:, 1] = np.arange(Nx)
