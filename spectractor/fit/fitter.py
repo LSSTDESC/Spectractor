@@ -31,6 +31,7 @@ class FitWorkspace:
         self.err = None
         self.x = None
         self.outliers = []
+        self.sigma_clip = 5
         self.model = None
         self.model_err = None
         self.model_noconv = None
@@ -698,11 +699,12 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
 
 
 def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4,
-                                    niter=50, sigma=5.0, clip_niter=3, verbose=False):
+                                    niter=50, sigma_clip=5.0, niter_clip=3, verbose=False):
     my_logger = set_logger(__name__)
-    for step in range(clip_niter):
+    fit_workspace.sigma_clip = sigma_clip
+    for step in range(niter_clip):
         if verbose:
-            my_logger.debug(f"\n\tSigma-clipping step {step}/{clip_niter} (sigma={sigma})")
+            my_logger.debug(f"\n\tSigma-clipping step {step}/{niter_clip} (sigma={sigma_clip})")
         run_minimisation(fit_workspace, method=method, epsilon=epsilon, fix=fix, xtol=xtol, ftol=ftol, niter=niter)
         if verbose:
             my_logger.debug(f'\n\tBest fitting parameters:\n{fit_workspace.p}')
@@ -710,7 +712,7 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         indices_no_nan = ~np.isnan(fit_workspace.data)
         residuals = np.abs(fit_workspace.model[indices_no_nan]
                            - fit_workspace.data[indices_no_nan]) / fit_workspace.err[indices_no_nan]
-        outliers = residuals > sigma
+        outliers = residuals > sigma_clip
         outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
         outliers.sort()
         if len(outliers) > 0:

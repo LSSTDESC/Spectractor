@@ -101,27 +101,27 @@ def test_minimisation_sigma_clipping():
     sigma = 5
     clip_niter = 4
     w = LineFitWorkspace(x, y, yerr, file_name="", truth=truth, nwalkers=20, nsteps=5000, burnin=1000, nbins=20)
-    run_minimisation_sigma_clipping(w, method="minimize", sigma=sigma, clip_niter=clip_niter)
+    run_minimisation_sigma_clipping(w, method="minimize", sigma_clip=sigma, niter_clip=clip_niter)
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     assert np.all(outliers == w.outliers)
     w.p = np.array([1, 1])
     w.outliers = []
-    run_minimisation_sigma_clipping(w, method="basinhopping", sigma=sigma, clip_niter=clip_niter)
+    run_minimisation_sigma_clipping(w, method="basinhopping", sigma_clip=sigma, niter_clip=clip_niter)
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     assert np.all(outliers == w.outliers)
     w.p = np.array([1, 1])
     w.outliers = []
-    run_minimisation_sigma_clipping(w, method="least_squares", sigma=sigma, clip_niter=clip_niter)
+    run_minimisation_sigma_clipping(w, method="least_squares", sigma_clip=sigma, niter_clip=clip_niter)
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     assert np.all(outliers == w.outliers)
     w.p = np.array([1, 1])
     w.outliers = []
-    run_minimisation_sigma_clipping(w, method="minuit", sigma=sigma, clip_niter=clip_niter)
+    run_minimisation_sigma_clipping(w, method="minuit", sigma_clip=sigma, niter_clip=clip_niter)
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     assert np.all(outliers == w.outliers)
     w.p = np.array([1, 1])
     w.outliers = []
-    run_minimisation_sigma_clipping(w, method="newton", sigma=sigma, clip_niter=clip_niter)
+    run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma, niter_clip=clip_niter)
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     assert np.all(outliers == w.outliers)
 
