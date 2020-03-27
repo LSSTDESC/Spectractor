@@ -42,8 +42,18 @@ class PSF:
         self.p_default = np.array([1, 0, 0, 1])
         self.max_width = np.inf
 
-    def evaluate(self, x, p=None):
-        return np.zeros_like(x)
+    def evaluate(self, pixels, p=None):
+        if p is not None:
+            self.p = p
+        # amplitude, x_mean, y_mean, saturation = self.p
+        if pixels.ndim == 3 and pixels.shape[0] == 2:
+            return np.zeros_like(pixels)
+        elif pixels.ndim == 1:
+            return np.zeros_like(pixels)
+        else:
+            self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
+                                 f"Here pixels.ndim={pixels.shape}.")
+            return None
 
     def apply_max_width_to_bounds(self, max_width=None):
         pass
@@ -960,7 +970,8 @@ class ChromaticPSF:
                 if len(poly_params) > length:
                     profile_params[:, k] = \
                         np.polynomial.legendre.legval(pixels,
-                                                      poly_params[length+shift:length+shift+self.degrees[name]+1])
+                                                      poly_params[
+                                                      length + shift:length + shift + self.degrees[name] + 1])
                 else:
                     p = poly_params[shift:shift + self.degrees[name] + 1]
                     if len(p) > 0:  # to avoid saturation parameters in case not set
@@ -2392,7 +2403,7 @@ class ChromaticPSF2D(ChromaticPSF):
         my_logger.debug(f'\n\tStart chisq: {spectrogram_chisq(guess[Nx:])} with {guess[Nx:]}')
         error = 0.01 * np.abs(guess) * np.ones_like(guess)
         fix = [False] * (self.n_poly_params - Nx)
-        fix[Nx+self.degrees['amplitude']:Nx+self.degrees['amplitude']+self.degrees['x_mean']] = \
+        fix[Nx + self.degrees['amplitude']:Nx + self.degrees['amplitude'] + self.degrees['x_mean']] = \
             [True] * self.degrees['x_mean']
         fix[-1] = True
         bounds = self.set_bounds_for_minuit(data)
