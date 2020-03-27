@@ -1221,9 +1221,9 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
 
     Defocused PSF example
 
-    >>> from spectractor.extractor.psf import MoffatGauss1D
-    >>> p = [2,40,4,2,-0.4,1,10]
-    >>> psf = MoffatGauss1D(p)
+    >>> from spectractor.extractor.psf import MoffatGauss
+    >>> p = [2,40,40,4,2,-0.4,1,10]
+    >>> psf = MoffatGauss(p)
     >>> fwhm, half, center, a, b = compute_fwhm(x, psf.evaluate(x), full_output=True)
 
     .. doctest::
@@ -1237,10 +1237,10 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
         import matplotlib.pyplot as plt
         import numpy as np
         from spectractor.tools import gauss, compute_fwhm
-        from spectractor.extractor.psf import PSF1D
+        from spectractor.extractor.psf import MoffatGauss
         x = np.arange(0, 100, 1)
-        p = [2,40,4,2,-0.4,1,10]
-        psf = PSF1D(p)
+        p = [2,40,40,4,2,-0.4,1,10]
+        psf = MoffatGauss(p)
         fwhm, half, center, a, b = compute_fwhm(x, psf.evaluate(x), full_output=True)
         plt.figure()
         plt.plot(x, psf.evaluate(x, p), label="function")
