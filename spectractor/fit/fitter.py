@@ -762,3 +762,10 @@ def run_emcee(fit_workspace, ln=lnprob):
             continue
     fit_workspace.chains = sampler.chain
     fit_workspace.lnprobs = sampler.lnprobability
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
+
