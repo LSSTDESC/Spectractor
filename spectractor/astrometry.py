@@ -538,6 +538,8 @@ class Astrometry(Image):
         if not no_plot and parameters.DISPLAY:
             # fig.tight_layout()
             plt.show()
+        else:
+            plt.close("all")
 
     def get_sources_radec_positions(self):
         """Gives the RA,DEC position of the detected sources.
@@ -671,6 +673,8 @@ class Astrometry(Image):
         if parameters.DISPLAY:
             # fig.tight_layout()
             plt.show()
+        else:
+            plt.close("all")
 
     def set_constraints(self, min_stars=100, flux_log10_threshold=0.1, min_range=3 * u.arcsec, max_range=5 * u.arcmin,
                         max_sep=1 * u.arcsec):
