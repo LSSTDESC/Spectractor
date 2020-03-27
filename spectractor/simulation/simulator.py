@@ -133,10 +133,10 @@ class SpectrumSimulation(Spectrum):
             The spectrum uncertainties interpolated function in Target units.
 
         """
-        #distance = np.array(self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x, shift_y=0))
-        #pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0] - shift
-        #self.disperser.D = float(self.header["D2CCD"])
-        #pixels = self.disperser.grating_lambda_to_pixel(lambdas, x0=self.x0, order=1)
+        # distance = np.array(self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x, shift_y=0))
+        # pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0] - shift
+        # self.disperser.D = float(self.header["D2CCD"])
+        # pixels = self.disperser.grating_lambda_to_pixel(lambdas, x0=self.x0, order=1)
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(self.pixels - shift_x, x0=new_x0, order=1)
@@ -164,7 +164,7 @@ class SpectrumSimulation(Spectrum):
         # self.model = interp1d(self.lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
         # self.model_err = interp1d(self.lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
         min_positive = np.min(self.err[self.err > 0])
-        self.err[np.isclose(self.err, 0., atol=0.01*min_positive)] = min_positive
+        self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
         return self.lambdas, self.data, self.err
 
 
@@ -191,8 +191,8 @@ class SpectrogramModel(Spectrum):
         self.disperser = disperser
         self.telescope = telescope
         self.atmosphere = atmosphere
-        #self.pixels_x = np.arange(self.chromatic_psf.Nx).astype(int)
-        #self.pixels_y = np.arange(self.chromatic_psf.Ny).astype(int)
+        # self.pixels_x = np.arange(self.chromatic_psf.Nx).astype(int)
+        # self.pixels_y = np.arange(self.chromatic_psf.Ny).astype(int)
         self.true_lambdas = None
         self.true_spectrum = None
         self.lambdas = None
@@ -411,7 +411,6 @@ class SpectrogramModel(Spectrum):
             self.data += self.spectrogram_bgd
         self.err = np.zeros_like(self.data)
         self.my_logger.debug(f'\n\tAfter all: {time.time() - start}')
-        start = time.time()
         if parameters.DEBUG:
             fig, ax = plt.subplots(3, 1, sharex="all", figsize=(12, 9))
             ax[0].imshow(self.data, origin='lower')
@@ -474,7 +473,8 @@ class SpectrogramModel(Spectrum):
         self.simulate_psf(psf_poly_params)
         self.my_logger.debug(f'\n\tTime after simulate PSF: {time.time() - start}')
         start = time.time()
-        # print(self.spectrogram_x0, self.spectrogram_Nx, self.spectrogram_y0, self.spectrogram_Ny, self.spectrogram_xmin,self.spectrogram_ymin)
+        # print(self.spectrogram_x0, self.spectrogram_Nx, self.spectrogram_y0, self.spectrogram_Ny,
+        # self.spectrogram_xmin,self.spectrogram_ymin)
         # If nofftshift,use this r0:
         r0 = (self.spectrogram_x0 - self.spectrogram_Nx / 2) + 1j * (self.spectrogram_y0 - self.spectrogram_Ny / 2)
         # Else, this one:
@@ -499,13 +499,13 @@ class SpectrogramModel(Spectrum):
         # PSF cube
         if self.psf_cube is None or not self.fix_psf_cube:
             cube = pyfftw.zeros_aligned((nlbda, nima, nima), dtype='float32')
-            shape_params = np.array([self.chromatic_psf.table[name] for name in MoffatGauss2D.param_names[3:]]).T
-            for l in range(nlbda):
-                ima = MoffatGauss.evaluate(x, y, 1, 0, 0, *shape_params[l])
-                norm = MoffatGauss.normalisation(1, *shape_params[l])
-                if norm != 0.:
-                    ima /= norm  # Flux normalization: the flux should go in the spectrum
-                cube[l] = np.copy(ima)
+            shape_params = np.array([self.chromatic_psf.table[name] for name in MoffatGauss.param_names[3:]]).T
+            for lbda in range(nlbda):
+                ima = MoffatGauss.evaluate(x, y, 1, 0, 0, *shape_params[lbda])
+                # norm = MoffatGauss.normalisation(1, *shape_params[l])
+                # if norm != 0.:
+                #     ima /= norm  # Flux normalization: the flux should go in the spectrum
+                cube[lbda] = np.copy(ima)
             self.psf_cube = cube
         else:
             cube = self.psf_cube
@@ -524,7 +524,8 @@ class SpectrogramModel(Spectrum):
             self.uh = uh
             self.vh = vh
             self.fhcube = fhcube
-            # print(uh.shape, vh.shape, np.min(self.uh), np.max(self.uh), fhcube.shape, dispersion_law.reshape(-1, 1, 1).shape)
+            # print(uh.shape, vh.shape, np.min(self.uh), np.max(self.uh), fhcube.shape,
+            # dispersion_law.reshape(-1, 1, 1).shape)
         else:
             uh = self.uh
             vh = self.vh
@@ -554,7 +555,6 @@ class SpectrogramModel(Spectrum):
             start = time.time()
             dima0_2 = F.ifft_image(fdima0_2)
             self.my_logger.debug(f'\n\tTime after simulate inverse fourier order 2: {time.time() - start}')
-            start = time.time()
 
             # sim_conv = interp1d(lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
             # err_conv = interp1d(lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
@@ -601,7 +601,7 @@ class SpectrogramModel(Spectrum):
         return self.lambdas, self.data, self.err
 
 
-class SpectrumSimGrid():
+class SpectrumSimGrid:
     """ SpectrumSim class used to store information and methods
     relative to spectrum simulation.
     NEED TO ADAPT THIS CLASS TO THE FULL SIMULATION WITH SYSTEMATICS.
@@ -666,7 +666,8 @@ class SpectrumSimGrid():
         cbar = plt.colorbar(img)
         cbar.set_label("Flux [ADU/s]")
         plt.grid(True)
-        if parameters.DISPLAY: plt.show()
+        if parameters.DISPLAY:
+            plt.show()
 
     def save_spectra(self, filename):
 
@@ -717,7 +718,6 @@ def SimulatorInit(filename):
 
     # STAR SPECTRUM
     # ------------------------
-    target = spectrum.target
     if not isinstance(spectrum.target, str):
         target = spectrum.target
     else:
@@ -747,7 +747,6 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
     spectrum_simulation = SpectrumSimulation(spectrum, atmosphere, telescope, disperser)
     spectrum_simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift)
     if parameters.DEBUG:
-        infostring = '\n\t ========= Spectra simulation :  ==============='
         spectrum_simulation.plot_spectrum()
     return spectrum_simulation
 
@@ -824,7 +823,7 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
     # -------------
     # in any case we re-calculate the spectra in case of change of spectrum function
     spectra = SpectrumSimGrid(spectrum, atm, telescope, disperser, target, atm.header)
-    spectragrid = spectra.compute()
+    spectra.compute()
     spectra.save_spectra(output_filename)
     if parameters.DEBUG:
         spectra.plot_spectra()
