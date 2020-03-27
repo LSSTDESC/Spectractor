@@ -352,7 +352,7 @@ class FitWorkspace:
         print('************************************')
 
     def save_parameters_summary(self, header=""):
-        output_filename = self.filename.replace(self.filename.split('.')[-1], "_bestfit.txt")
+        output_filename = self.filename.replace("."+self.filename.split('.')[-1], "_bestfit.txt")
         f = open(output_filename, 'w')
         txt = self.filename + "\n"
         if header != "":
@@ -582,7 +582,7 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
     fig.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
     if parameters.SAVE and fit_workspace.filename != "":
-        figname = fit_workspace.filename.replace(fit_workspace.filename.split('.')[-1], "_fitting.pdf")
+        figname = fit_workspace.filename.replace("."+fit_workspace.filename.split('.')[-1], "_fitting.pdf")
         fit_workspace.my_logger.info(f"\n\tSave figure {figname}.")
         fig.savefig(figname, dpi=100, bbox_inches='tight')
     if parameters.DISPLAY:
