@@ -366,7 +366,6 @@ class SpectrogramModel(Spectrum):
 
         Example
         -------
-        >>> from spectractor.extractor.psf import  ChromaticPSF1D
         >>> from spectractor import parameters
         >>> parameters.DEBUG = True
         >>> spectrum, telescope, disperser, target = SimulatorInit('outputs/reduc_20170530_134_spectrum.fits')
