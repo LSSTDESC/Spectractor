@@ -98,13 +98,8 @@ class Line:
         >>> print(model)
         1.0
         >>> model = l.gaussian_model(656.3+sigma*np.sqrt(2*np.log(2)), A=1, sigma=sigma, use_fit=False)
-<<<<<<< HEAD
-        >>> print(f"{model:.3f}")
-        0.500
-=======
         >>> print(f"{model:.4f}")
         0.5000
->>>>>>> 0a2084ab0fee7215de461fbbc0ae00e305cef637
 
         Use a fit (for the example we create a mock fit result):
 
