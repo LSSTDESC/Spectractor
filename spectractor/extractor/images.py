@@ -465,7 +465,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
     """Find the target in the Image instance.
 
     The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
-    using two iterative fits of a PSF2D model.
+    using two iterative fits of a PSF model.
     User must give a guess array in the raw image.
 
     Parameters
@@ -604,7 +604,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
 
 def find_target_1Dprofile(image, sub_image, guess):
     """
-    Find precisely the position of the targeted object fitting a PSF1D model
+    Find precisely the position of the targeted object fitting a PSF model
     on each projection of the image along x and y, using outlier removal.
 
     Parameters
@@ -681,7 +681,7 @@ def find_target_1Dprofile(image, sub_image, guess):
 
 def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     """
-    Find precisely the position of the targeted object fitting a PSF2D model.
+    Find precisely the position of the targeted object fitting a PSF model.
     A polynomial 2D background is subtracted first. Saturated pixels are masked with np.nan values.
 
     THE ERROR ARRAY IS NOT USED FOR THE MOMENT.
