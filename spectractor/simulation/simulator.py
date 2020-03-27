@@ -338,7 +338,7 @@ class SpectrogramModel(Spectrum):
         # TODO: increase rapidity (multithreading, optimisation...)
         for i in range(0, nlbda, 1):
             # here spectrum[i] is in ADU/s
-            p = np.array([spectrum[i], dispersion_law[i].real, dispersion_law[i].imag] + list(profile_params[i, 2:]))
+            p = np.array([spectrum[i], dispersion_law[i].real, dispersion_law[i].imag] + list(profile_params[i, 3:]))
             psf_lambda = psf.evaluate(pixels, p=p)
             simul += psf_lambda
         return simul
