@@ -2550,7 +2550,7 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
     ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
 
     """
-    # TODO: merge with plot_fit of ChromaticPSF1DFitworkspace
+    # TODO: merge with plot_fit of PSFFitworkspace ?
     Ny = len(indices)
     y = data[:, x]
     bgd = data[bgd_indices, x]
@@ -2622,7 +2622,8 @@ def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, 
             plt.close()
         else:
             plt.show()
-    plt.close()
+    else:
+        plt.close("all")
 
 
 def PSF2D_chisq(params, model, xx, yy, zz, zz_err=None):
