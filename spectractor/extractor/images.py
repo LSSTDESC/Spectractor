@@ -195,10 +195,29 @@ class Image(object):
         """Compute the image noise map from Image.data. The latter must be in ADU.
         The function first converts the image in electron counts units, evaluate the Poisson noise,
         add in quadrature the read-out noise, takes the square root and returns a map in ADU units.
+
+        Examples
+        --------
+        .. doctest::
+
+            >>> im = Image('tests/data/reduc_20170530_134.fits')
+            >>> im.compute_statistical_error()
+            >>> im.convert_to_ADU_units()
+            >>> im.compute_statistical_error()
+            >>> im.plot_statistical_error()
+
+        .. plot::
+            :include-source:
+
+            from spectractor.extractor.images import Image
+            im = Image('tests/data/reduc_20170530_134.fits')
+            im.convert_to_ADU_units()
+            im.plot_statistical_error()
+
         """
         if self.units != 'ADU':
-            self.my_logger.error('\n\tNoise must be estimated on an image in ADU units. '
-                                 'Currently self.units={self.units}.')
+            self.my_logger.error(f'\n\tNoise must be estimated on an image in ADU units. '
+                                 f'Currently self.units={self.units}.')
         # removes the zeros and negative pixels first
         # set to minimum positive value
         data = np.copy(self.data)
@@ -214,6 +233,64 @@ class Image(object):
         self.stat_errors = np.sqrt(err2)
         # convert in ADU
         self.stat_errors /= self.gain
+        # check uncertainty model
+        self.check_statistical_error()
+
+    def check_statistical_error(self):
+        """Check that statistical uncertainty map follows the input uncertainty model
+        in terms of gain and read-out noise.
+
+        A linear model is fitted to the squared pixel uncertainty values with respect to the pixel data values.
+        The slop gives the gain value and the intercept gives the read-out noise value.
+
+        Returns
+        -------
+        fit: tuple
+            The best fit parameter of the linear model.
+        x: array_like
+            The x data used for the fit (data).
+        y: array_like
+            The y data used for the fit (squared uncertainties).
+        model: array_like
+            The linear model values.
+
+        Examples
+        --------
+
+        .. doctest::
+
+            >>> im = Image('tests/data/reduc_20170530_134.fits')
+            >>> im.convert_to_ADU_units()
+            >>> fit, x, y, model = im.check_statistical_error()
+
+        .. doctest::
+            :hide:
+
+            >>> assert fit is not None
+            >>> assert len(fit) == 2
+            >>> assert x.shape == y.shape
+            >>> assert y.shape == model.shape
+
+        """
+        if self.units != "ADU":
+            self.my_logger.error(f"\n\tNoise map must be in ADU units to be plotted and analyzed. "
+                                 f"Currently self.units={self.units}.")
+        data = np.copy(self.data)
+        min_noz = np.min(data[data > 0])
+        data[data <= 0] = min_noz
+        y = self.stat_errors.flatten() ** 2
+        x = data.flatten()
+        fit, cov, model = fit_poly1d(x, y, order=1)
+        gain = 1 / fit[0]
+        read_out = np.sqrt(fit[1]) * gain
+        if not np.isclose(gain, np.mean(self.gain), rtol=1e-2):
+            self.my_logger.warning(f"\n\tFitted gain seems to be different than input gain. "
+                                   f"Fit={gain} but average of self.gain is {np.mean(self.gain)}.")
+        if not np.isclose(read_out, np.mean(self.read_out_noise), rtol=1e-2):
+            self.my_logger.warning(f"\n\tFitted read out noise seems to be different than input readout noise. "
+                                   f"Fit={read_out} but average of self.read_out_noise is "
+                                   f"{np.mean(self.read_out_noise)}.")
+        return fit, x, y, model
 
     def plot_statistical_error(self):
         """Plot the statistical uncertainty map and check it is a Poisson noise.
@@ -238,27 +315,20 @@ class Image(object):
             im.plot_statistical_error()
 
         """
-        if self.units != "ADU":
-            self.my_logger.error(f"\n\tNoise map must be in ADU units to be plotted and analyzed. "
-                                 f"Currently self.units={self.units}.")
-        data = np.copy(self.data)
-        min_noz = np.min(data[data > 0])
-        data[data <= 0] = min_noz
         fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-        y = self.stat_errors.flatten() ** 2
-        x = data.flatten()
-        fit, cov, model = fit_poly1d(x, y, order=1)
+        fit, x, y, model = self.check_statistical_error()
         gain = 1 / fit[0]
+        read_out = np.sqrt(fit[1]) * gain
         ax[0].text(0.05, 0.95, f"fitted gain={gain:.3g} [e-/ADU]\nintercept={fit[1]:.3g} [ADU$^2$]"
-                               f"\nfitted read-out={np.sqrt(fit[1]) * gain:.3g} [ADU]",
+                               f"\nfitted read-out={read_out:.3g} [ADU]",
                    horizontalalignment='left', verticalalignment='top', transform=ax[0].transAxes)
         ax[0].scatter(x, y)
         ax[0].plot(x, model, "k-")
         ax[0].grid()
         ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
         ax[0].set_xlabel(r"Data pixel values [ADU]")
-        plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Uncertainty map", units=self.units,
-                          target_pixcoords=None, aspect="auto", cmap=None)
+        plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Statistical uncertainty map",
+                          units=self.units, target_pixcoords=None, aspect="auto", cmap=None)
         fig.tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.png'))
@@ -1012,13 +1082,13 @@ def turn_image(image):
         f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
         plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):
                                                min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
-                                               margin:-margin],
+                                    margin:-margin],
                           scale="symlog", title='Raw image (log10 scale)', units=image.units,
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
         ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
-                                                       margin:-margin],
+                                    margin:-margin],
                           scale="symlog", title='Turned image (log10 scale)',
                           units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
         ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
