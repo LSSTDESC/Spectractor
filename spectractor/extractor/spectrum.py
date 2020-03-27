@@ -1120,8 +1120,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    s = ChromaticPSF2D(Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
-    s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, sigma=5, bgd_model_func=bgd_model_func,
+    s = ChromaticPSF1D(Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
+    s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=10, sigma=5, bgd_model_func=bgd_model_func,
                                    saturation=image.saturation, live_fit=False)
 
     # Fill spectrum object
@@ -1133,41 +1133,41 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         s.plot_summary()
 
     # Fit the data:
-    method = "psf1d"
-    my_logger.info(f'\n\tStart ChromaticPSF2D polynomial fit with amplitude_priors_method={method}...')
-    w = s.fit_chromatic_PSF2D(data, bgd_model_func=bgd_model_func, data_errors=err, amplitude_priors_method=method)
+    method = "noprior"
+    my_logger.info(f'\n\tStart ChromaticPSF1D polynomial fit with amplitude_priors_method={method}...')
+    w = s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=err, amplitude_priors_method=method)
     spectrum.spectrogram_fit = s.evaluate(s.poly_params)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
     spectrum.chromatic_psf = s
-    spectrum.data = np.copy(s.table['flux_integral'])
+    spectrum.data = np.copy(s.table['amplitude'])
 
-    fig, ax = plt.subplots(3, 1, figsize=(9, 9), sharex="all")
-    x = np.arange(spectrum.data.size)
-    ax[0].errorbar(x, s.table['flux_sum'], yerr=s.table['flux_err'], fmt="k.", label="flux_sum")
-    ax[0].errorbar(x, w.amplitude_params, yerr=w.amplitude_params_err, fmt="r.", label="amplitudes")
-    truth = parameters.AMPLITUDE_TRUTH*parameters.LAMBDA_TRUTH*np.gradient(parameters.LAMBDA_TRUTH)
-    truth *= parameters.FLAM_TO_ADURATE
-    ax[0].plot(np.arange(parameters.AMPLITUDE_TRUTH.size), truth, label="Truth")
-    ax[0].grid()
-    ax[0].legend()
-    ax[0].set_xlabel("X [pixels]")
-    ax[0].set_title(f"lambda={parameters.PSF_FIT_REG_PARAM}")
-    ax[0].set_ylabel('Spectrum amplitudes')
-    ax[1].errorbar(x, s.table['flux_sum']-truth, yerr=s.table['flux_err'], fmt="k.", label="flux_sum")
-    ax[1].axhline(0, color="k")
-    ax[1].grid()
-    ax[1].legend()
-    ax[1].set_xlabel("X [pixels]")
-    ax[1].set_ylabel('Sum-Truth')
-    ax[2].errorbar(x, w.amplitude_params-truth, yerr=w.amplitude_params_err, fmt="r.", label="amplitudes")
-    ax[2].axhline(0, color="k")
-    ax[2].grid()
-    ax[2].legend()
-    ax[2].set_xlabel("X [pixels]")
-    ax[2].set_ylabel('Amplitudes-Truth')
-    fig.tight_layout()
-    plt.show()
+    # fig, ax = plt.subplots(3, 1, figsize=(9, 9), sharex="all")
+    # x = np.arange(spectrum.data.size)
+    # ax[0].errorbar(x, s.table['flux_sum'], yerr=s.table['flux_err'], fmt="k.", label="flux_sum")
+    # ax[0].errorbar(x, w.amplitude_params, yerr=w.amplitude_params_err, fmt="r.", label="amplitudes")
+    # truth = parameters.AMPLITUDE_TRUTH*parameters.LAMBDA_TRUTH*np.gradient(parameters.LAMBDA_TRUTH)
+    # truth *= parameters.FLAM_TO_ADURATE
+    # ax[0].plot(np.arange(parameters.AMPLITUDE_TRUTH.size), truth, label="Truth")
+    # ax[0].grid()
+    # ax[0].legend()
+    # ax[0].set_xlabel("X [pixels]")
+    # ax[0].set_title(f"lambda={parameters.PSF_FIT_REG_PARAM}")
+    # ax[0].set_ylabel('Spectrum amplitudes')
+    # ax[1].errorbar(x, s.table['flux_sum']-truth, yerr=s.table['flux_err'], fmt="k.", label="flux_sum")
+    # ax[1].axhline(0, color="k")
+    # ax[1].grid()
+    # ax[1].legend()
+    # ax[1].set_xlabel("X [pixels]")
+    # ax[1].set_ylabel('Sum-Truth')
+    # ax[2].errorbar(x, w.amplitude_params-truth, yerr=w.amplitude_params_err, fmt="r.", label="amplitudes")
+    # ax[2].axhline(0, color="k")
+    # ax[2].grid()
+    # ax[2].legend()
+    # ax[2].set_xlabel("X [pixels]")
+    # ax[2].set_ylabel('Amplitudes-Truth')
+    # fig.tight_layout()
+    # plt.show()
 
     s.table['Dx_rot'] = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
     s.table['Dx'] = np.copy(s.table['Dx_rot'])
@@ -1175,11 +1175,11 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
     s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
     s.table['y_mean'] = s.table['y_mean'] - (image.target_pixcoords_rotated[1] - ymin)
-    my_logger.debug(f"\n\tTransverse fit table before derotation:\n{s.table[['Dx_rot', 'Dx', 'y_mean', 'Dy']]}")
+    my_logger.debug(f"\n\tTransverse fit table before derotation:\n{s.table[['Dx_rot', 'y_mean', 'Dx', 'Dy']]}")
 
     # rotate and save the table
     s.rotate_table(-image.rotation_angle)
-    my_logger.debug(f"\n\tTransverse fit table after derotation:\n{s.table[['Dx_rot', 'Dx', 'y_mean', 'Dy']]}")
+    my_logger.debug(f"\n\tTransverse fit table after derotation:\n{s.table[['Dx_rot', 'y_mean', 'Dx', 'Dy']]}")
 
     # Extract the spectrogram edges
     data = np.copy(image.data)[:, 0:right_edge]
@@ -1236,7 +1236,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                                                                   x0=image.target_pixcoords)
     s.table['lambdas'] = first_guess_lambdas
     spectrum.lambdas = np.array(first_guess_lambdas)
-    my_logger.debug(f"\n\tTransverse fit table after derotation:\n{s.table[['lambdas', 'Dx_rot', 'Dx']]}")
+    my_logger.debug(f"\n\tTransverse fit table after derotation:\n{s.table[['lambdas', 'Dx_rot', 'Dx', 'Dy']]}")
 
     # Position of the order 0 in the spectrogram coordinates
     my_logger.info(f'\n\tExtract spectrogram: crop image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))'
@@ -1261,9 +1261,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[0].plot(spectrum.lambdas, np.array(s.table['fwhm']))
         ax[0].set_xlabel(r"$\lambda$ [nm]")
         ax[0].set_ylabel("Transverse FWHM [pixels]")
-        ax[0].set_ylim((0.8*np.min(s.table['fwhm']), 1.2*np.max(s.table['fwhm'][-10:])))
+        ax[0].set_ylim((0.8*np.min(s.table['fwhm']), 1.2*np.max(s.table['fwhm'])))  # [-10:])))
         ax[0].grid()
-        ax[1].plot(spectrum.lambdas, np.array(s.table['x_mean']))
+        ax[1].plot(spectrum.lambdas, np.array(s.table['y_mean']))
         ax[1].set_xlabel(r"$\lambda$ [nm]")
         ax[1].set_ylabel("Distance from mean dispersion axis [pixels]")
         # ax[1].set_ylim((0.8*np.min(s.table['Dy']), 1.2*np.max(s.table['fwhm'][-10:])))
