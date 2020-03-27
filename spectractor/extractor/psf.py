@@ -2882,8 +2882,8 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
 
     Returns
     -------
-    fitted_model: MoffatGauss2D
-        the PSF2D fitted model.
+    fitted_model: PSF2DAstropy
+        the PSF fitted model.
 
     Examples
     --------
@@ -2974,7 +2974,7 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
 
     Returns
     -------
-    fitted_model: MoffatGauss2D
+    fitted_model: PSF2DAstropy
         the PSF2D fitted model.
 
     Examples
