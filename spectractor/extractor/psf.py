@@ -40,7 +40,7 @@ class PSF:
         self.p_default = np.array([1, 0, 0, 1])
         self.max_half_width = np.inf
 
-    def evaluate(self, pixels, p=None):
+    def evaluate(self, pixels, p=None):  # pragma: no cover
         if p is not None:
             self.p = p
         # amplitude, x_mean, y_mean, saturation = self.p
@@ -53,7 +53,7 @@ class PSF:
                                  f"Here pixels.ndim={pixels.shape}.")
             return None
 
-    def apply_max_width_to_bounds(self, max_half_width=None):
+    def apply_max_width_to_bounds(self, max_half_width=None):  # pragma: no cover
         pass
 
     def fit_psf(self, data, data_errors=None, bgd_model_func=None):
@@ -238,7 +238,7 @@ class MoffatGauss(PSF):
                 norm /= integral
             a *= norm
             return np.clip(a, 0, saturation).T
-        else:
+        else:   # pragma: no cover
             self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
                                  f"Here pixels.ndim={pixels.shape}.")
             return None
@@ -303,7 +303,7 @@ class PSFFitWorkspace(FitWorkspace):
         self.fixed[-1] = True  # fix saturation parameter
         self.input_labels = list(np.copy(self.psf.param_names[1:]))
         self.axis_names = list(np.copy(self.psf.axis_names[1:]))
-        self.bounds = self.psf.bounds_hard[1:]
+        self.bounds = self.psf.bounds[1:]
         self.nwalkers = max(2 * self.ndim, nwalkers)
 
         # prepare the fit
@@ -321,7 +321,7 @@ class PSFFitWorkspace(FitWorkspace):
             self.my_logger.error(f"\n\tData array must have dimension 1 or 2. Here pixels.ndim={data.ndim}.")
 
         # update bounds
-        self.bounds = self.psf.bounds_hard[1:]
+        self.bounds = self.psf.bounds[1:]
 
         # error matrix
         self.W = 1. / (self.err * self.err)
@@ -966,12 +966,12 @@ class ChromaticPSF:
                 shift = shift + self.degrees[name] + 1
         if apply_bounds:
             for k, name in enumerate(self.psf.param_names):
-                indices = profile_params[:, k] <= self.psf.bounds_hard[k][0]
+                indices = profile_params[:, k] <= self.psf.bounds[k][0]
                 if np.any(indices):
-                    profile_params[indices, k] = self.psf.bounds_hard[k][0]
-                indices = profile_params[:, k] > self.psf.bounds_hard[k][1]
+                    profile_params[indices, k] = self.psf.bounds[k][0]
+                indices = profile_params[:, k] > self.psf.bounds[k][1]
                 if np.any(indices):
-                    profile_params[indices, k] = self.psf.bounds_hard[k][1]
+                    profile_params[indices, k] = self.psf.bounds[k][1]
                 # if name == "x_mean":
                 #    profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
                 #    profile_params[profile_params[:, k] >= self.Ny, k] = self.Ny
@@ -1108,14 +1108,37 @@ class ChromaticPSF:
             - Nx first parameters are amplitudes for the Moffat transverse profiles
             - next parameters are polynomial coefficients for all the PSF parameters
             in the same order as in PSF definition, except amplitude
-
         noise_level: float, optional
             Noise level to set minimal boundary for amplitudes (negatively).
 
         Returns
         -------
         in_bounds: bool
-            Return True if all parameters respect the model parameter priors.
+            True if all parameters respect the model parameter priors.
+        penalty: float
+            Float value to add to chi square evaluating the degree of departure of a parameter from its boundaries.
+        outbound_parameter_name: str
+            Names of the parameters that are out of their boundaries.
+
+        Examples
+        --------
+
+        Build a mock spectrogram with random Poisson noise:
+
+        >>> psf = MoffatGauss()
+        >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=1, saturation=8000)
+        >>> poly_params_test = s.generate_test_poly_params()
+
+        Check bounds:
+
+        >>> in_bounds, penalty, outbound_parameter_name = s.check_bounds(poly_params_test)
+
+        .. dpctest::
+            :hide:
+
+            >>> assert in_bounds is False
+            >>> assert np.isclose(penalty, 0, atol=1e-16)
+            >>> assert outbound_parameter_name is not None
 
         """
         in_bounds = True
@@ -1132,14 +1155,14 @@ class ChromaticPSF:
             elif name is "saturation":
                 continue
             else:
-                if np.any(p > self.psf.bounds_soft[k][1]):
-                    penalty += np.sum(profile_params[p > self.psf.bounds_soft[k][1], k] - self.psf.bounds_soft[k][1])
+                if np.any(p > self.psf.bounds[k][1]):
+                    penalty += np.sum(profile_params[p > self.psf.bounds[k][1], k] - self.psf.bounds[k][1])
                     if not np.isclose(np.mean(p), 0):
                         penalty /= np.abs(np.mean(p))
                     in_bounds = False
                     outbound_parameter_name += name + ' '
-                if np.any(p < self.psf.bounds_soft[k][0]):
-                    penalty += np.sum(self.psf.bounds_soft[k][0] - profile_params[p < self.psf.bounds_soft[k][0], k])
+                if np.any(p < self.psf.bounds[k][0]):
+                    penalty += np.sum(self.psf.bounds[k][0] - profile_params[p < self.psf.bounds[k][0], k])
                     if not np.isclose(np.mean(p), 0):
                         penalty /= np.abs(np.mean(p))
                     in_bounds = False
@@ -1700,11 +1723,52 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+        >>> guess = np.copy(s.table["amplitude"])
 
-        Simulate the data:
+        Fit the amplitude of data without any prior:
 
         >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True,
         ... amplitude_priors_method="noprior")
+        >>> y, mod, mod_err = w.simulate(*s.poly_params[s.Nx:])
+        >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+
+        Fit the amplitude of data smoothing the result with a window of size 10 pixels:
+
+        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True,
+        ... amplitude_priors_method="smooth")
+        >>> y, mod, mod_err = w.simulate(*s.poly_params[s.Nx:])
+        >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+
+        Fit the amplitude of data using the transverse PSF1D fit as a prior and with a
+        Tikhonov regularisation parameter set by parameters.PSF_FIT_REG_PARAM:
+
+        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True,
+        ... amplitude_priors_method="psf1d")
+        >>> y, mod, mod_err = w.simulate(*s.poly_params[s.Nx:])
+        >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+
+        Set the amplitude parameters fixing the transverse PSF1D fit amplitudes:
+
+        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True,
+        ... amplitude_priors_method="fixed")
         >>> y, mod, mod_err = w.simulate(*s.poly_params[s.Nx:])
         >>> w.plot_fit()
 
@@ -1852,6 +1916,9 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         The error matrix on the :math:`\hat{\mathbf{A}}` coefficient is simply
         :math:`(\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}`.
 
+        See Also
+        --------
+        ChromaticPSF1DFitWorkspace.simulate
 
         Parameters
         ----------
