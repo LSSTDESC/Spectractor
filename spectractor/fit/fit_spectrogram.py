@@ -45,7 +45,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_poly_params = self.psf_poly_params[length:-1]  # remove saturation (fixed parameter)
         self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:-1])
         self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:-1])
-        self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds(data=None)
+        self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
         self.angle = self.spectrum.rotation_angle
@@ -251,8 +251,8 @@ def lnprob_spectrogram(p):
 
 
 def plot_psf_poly_params(psf_poly_params):
-    from spectractor.extractor.psf import PSF1D
-    psf = PSF1D()
+    from spectractor.extractor.psf import MoffatGauss
+    psf = MoffatGauss()
     truth_psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
                              -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
                              0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
