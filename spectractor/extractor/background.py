@@ -182,8 +182,12 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         mask = None
     # windows size in x is set to only 6 pixels to be able to estimate rapid variations of the background on real data
     # filter window size is set to window // 2 so 3
-    bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
-                       filter_size=((ws[1] - ws[0]) // 2, (ws[1] - ws[0]) // 2),
+    # bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
+    #                    filter_size=((ws[1] - ws[0]) // 2, (ws[1] - ws[0]) // 2),
+    #                    sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
+    #                    mask=mask)
+    bkg = Background2D(data, (parameters.PIXWIDTH_BOXSIZE, parameters.PIXWIDTH_BOXSIZE),
+                       filter_size=(parameters.PIXWIDTH_BOXSIZE//2, parameters.PIXWIDTH_BOXSIZE//2),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False,
@@ -192,11 +196,13 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     if parameters.DEBUG:
         fig, ax = plt.subplots(3, 1, figsize=(12, 6), sharex='all')
         bgd_bands = np.copy(data).astype(float)
+        mean = np.nanmean(bgd_bands)
+        std = np.nanstd(bgd_bands)
         bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
-        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=0)
+        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=mean-3*std, vmax=mean+3*std)
         c = plt.colorbar(im, ax=ax[0])
         c.set_label(f'Data units (lin scale)')
-        ax[0].set_title(f'Data background: mean={np.nanmean(bgd_bands):.3f}, std={np.nanstd(bgd_bands):.3f}')
+        ax[0].set_title(f'Data background: mean={mean:.3f}, std={std:.3f}')
         ax[0].set_xlabel('X [pixels]')
         ax[0].set_ylabel('Y [pixels]')
         bkg.plot_meshes(outlines=True, color='#1f77b4', axes=ax[0])

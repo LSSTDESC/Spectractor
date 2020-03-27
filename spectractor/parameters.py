@@ -103,6 +103,7 @@ LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, LAMBDA_STEP)
 PIXWIDTH_SIGNAL = 10  # half transverse width of the signal rectangular window in pixels
 PIXDIST_BACKGROUND = 20  # distance from dispersion axis to analyse the background in pixels
 PIXWIDTH_BACKGROUND = 10  # transverse width of the background rectangular window in pixels
+PIXWIDTH_BOXSIZE = 20 # box size for sextractor evaluation of the background
 BGD_ORDER = 1  # the order of the polynomial background to fit in the transverse direction
 
 # PSF
