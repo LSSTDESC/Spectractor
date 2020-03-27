@@ -527,12 +527,13 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # prepare outputs
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
-        my_logger.info(f"\n\tIteration={i}: initial cost={cost:.3f} initial chisq_red={cost / tmp_model.size:.3f}"
-                       f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
-                       f"\n\tParameter shifts: {alpha_min * dparams}"
-                       f"\n\tNew parameters: {tmp_params[ipar]}"
-                       f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} "
-                       f"computed in {time.time() - start:.2f}s")
+        if fit_workspace.verbose:
+            my_logger.info(f"\n\tIteration={i}: initial cost={cost:.3f} initial chisq_red={cost / tmp_model.size:.3f}"
+                           f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
+                           f"\n\tParameter shifts: {alpha_min * dparams}"
+                           f"\n\tNew parameters: {tmp_params[ipar]}"
+                           f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} "
+                           f"computed in {time.time() - start:.2f}s")
         if fit_workspace.live_fit:
             fit_workspace.simulate(*tmp_params)
             fit_workspace.plot_fit()
@@ -665,7 +666,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         error[2:5] = 0.3 * np.abs(guess[2:5]) * np.ones_like(guess[2:5])
         z = np.where(np.isclose(error, 0.0, 1e-6))
         error[z] = 1.
-        fix = [False] * guess.size
+        if fix is None:
+            fix = [False] * guess.size
         # noinspection PyArgumentList
         m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
                                    fix=fix, print_level=verbose, limit=bounds)
