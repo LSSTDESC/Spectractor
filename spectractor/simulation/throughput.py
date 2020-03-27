@@ -372,6 +372,8 @@ def plot_all_transmissions(title="Telescope transmissions"):
                              title=title, lw=4)
     if parameters.DISPLAY:
         plt.show()
+    else:
+        plt.close('all')
 
 
 class TelescopeTransmission:
@@ -472,6 +474,8 @@ class TelescopeTransmission:
                                  uncertainties=self.transmission_err(parameters.LAMBDAS))
         if parameters.DISPLAY:
             plt.show()
+        else:
+            plt.close('all')
 
 
 if __name__ == "__main__":
