@@ -14,7 +14,7 @@ from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
                                from_lambda_to_colormap)
-from spectractor.extractor.psf import ChromaticPSF1D, ChromaticPSF2D
+from spectractor.extractor.psf import ChromaticPSF, MoffatGauss, PSF
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 
 
@@ -73,7 +73,8 @@ class Spectrum:
         self.filters = None
         self.units = 'ADU/s'
         self.gain = parameters.CCD_GAIN
-        self.chromatic_psf = ChromaticPSF1D(1, 1, deg=1, saturation=1)
+        self.psf = PSF()
+        self.chromatic_psf = ChromaticPSF(self.psf, Nx=1, Ny=1, deg=1, saturation=1)
         self.rotation_angle = 0
         self.spectrogram = None
         self.spectrogram_bgd = None
@@ -411,7 +412,8 @@ class Spectrum:
             if self.header['D2CCD'] != "":
                 parameters.DISTANCE2CCD = float(self.header["D2CCD"])
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
-            self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+            self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
+                                      data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
             self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
@@ -423,7 +425,7 @@ class Spectrum:
             self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
             if os.path.isfile(psf_file_name):
                 self.load_chromatic_psf(psf_file_name)
-            else:                
+            else:
                 self.my_logger.error(f"\n\tPSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
@@ -480,9 +482,10 @@ class Spectrum:
         >>> s.load_spectrum('outputs/reduc_20170530_134_spectrum.fits')
         """
         if os.path.isfile(input_file_name):
-            self.chromatic_psf = ChromaticPSF1D(self.spectrogram_Nx, self.spectrogram_Ny,
-                                                deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,
-                                                file_name=input_file_name)
+            psf = MoffatGauss()
+            self.chromatic_psf = ChromaticPSF(psf, self.spectrogram_Nx, self.spectrogram_Ny,
+                                              deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,
+                                              file_name=input_file_name)
             # self.chromatic_psf.table = Table.read(input_file_name)
             self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
         else:
@@ -526,7 +529,8 @@ def calibrate_spectrum(spectrum, xlim=None):
     spectrum.header['D2CCD'] = parameters.DISTANCE2CCD
 
 
-def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None, calibration_lines_only=False,
+def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None,
+                 calibration_lines_only=False,
                  xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
     """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
     around emission or absorption tabulated lines, and to select surrounding pixels
@@ -612,7 +616,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     #     peak_width = 7
     #     bgd_width = 15
     fwhm_to_peak_width_factor = 1.5
-    len_index_to_bgd_npar_factor = 0* 0.12 / 0.024 * parameters.CCD_PIXEL2MM
+    len_index_to_bgd_npar_factor = 0 * 0.12 / 0.024 * parameters.CCD_PIXEL2MM
     baseline_prior = 3  # *sigma gaussian prior on base line fit
     # filter the noise
     # plt.errorbar(lambdas,spec,yerr=spec_err)
@@ -1120,8 +1124,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    s = ChromaticPSF1D(Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
-    s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=10, sigma=5, bgd_model_func=bgd_model_func,
+    psf = MoffatGauss()
+    s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
+    s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=10, sigma_clip=5, bgd_model_func=bgd_model_func,
                                    saturation=image.saturation, live_fit=False)
 
     # Fill spectrum object
@@ -1134,13 +1139,23 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Fit the data:
     method = "noprior"
-    my_logger.info(f'\n\tStart ChromaticPSF1D polynomial fit with amplitude_priors_method={method}...')
-    w = s.fit_chromatic_PSF1D(data, bgd_model_func=bgd_model_func, data_errors=err, amplitude_priors_method=method)
-    spectrum.spectrogram_fit = s.evaluate(s.poly_params)
+    mode = "1D"
+    my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
+                   f'mode={mode} and amplitude_priors_method={method}...')
+    w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
+                            amplitude_priors_method=method, mode=mode)
+    # w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
+    #                         amplitude_priors_method="psf1d", mode="2D", verbose=True)
+    if parameters.DEBUG:
+        s.plot_summary()
+        w.plot_fit()
+    spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
     spectrum.chromatic_psf = s
-    spectrum.data = np.copy(s.table['amplitude'])
+    # spectrum.data = np.copy(s.table['amplitude'])
+    spectrum.data = np.copy(w.amplitude_params)
+    # spectrum.err = np.copy(w.amplitude_params_err)
 
     # fig, ax = plt.subplots(3, 1, figsize=(9, 9), sharex="all")
     # x = np.arange(spectrum.data.size)
@@ -1261,7 +1276,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[0].plot(spectrum.lambdas, np.array(s.table['fwhm']))
         ax[0].set_xlabel(r"$\lambda$ [nm]")
         ax[0].set_ylabel("Transverse FWHM [pixels]")
-        ax[0].set_ylim((0.8*np.min(s.table['fwhm']), 1.2*np.max(s.table['fwhm'])))  # [-10:])))
+        ax[0].set_ylim((0.8 * np.min(s.table['fwhm']), 1.2 * np.max(s.table['fwhm'])))  # [-10:])))
         ax[0].grid()
         ax[1].plot(spectrum.lambdas, np.array(s.table['y_mean']))
         ax[1].set_xlabel(r"$\lambda$ [nm]")
