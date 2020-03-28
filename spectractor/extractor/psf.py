@@ -17,6 +17,8 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping
 
+from numba import njit
+
 
 class PSF:
     """Generic PSF model class.
@@ -145,7 +147,7 @@ class PSF:
         self.p = w.psf.p
         return w
 
-from numba import njit
+
 @njit
 def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev):
     rr = (y - y_mean) * (y - y_mean)
@@ -160,7 +162,7 @@ def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev
     a *= norm
     return a.T
 
-# import numexpr as ne
+
 @njit
 def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev):
     rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
@@ -191,7 +193,7 @@ class MoffatGauss(PSF):
         if max_half_width is not None:
             self.max_half_width = max_half_width
         self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
-                                (0.1, self.max_half_width), (1.1, 10), (-1, 0), (0.1, self.max_half_width/2),
+                                (0.1, self.max_half_width), (1.1, 10), (-1, 0), (0.1, self.max_half_width / 2),
                                 (0, np.inf)])
 
     def evaluate(self, pixels, p=None):
@@ -240,28 +242,12 @@ class MoffatGauss(PSF):
         amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            # rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
-            # rr_gg = rr / (gamma * gamma)
-            # a = ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
-            # norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * stddev * stddev
-            # a *= amplitude / norm
-            # return np.clip(a, 0, saturation).T
-            return np.clip(evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev),0, saturation)
+            return np.clip(evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean,
+                                                  gamma, alpha, eta_gauss, stddev), 0, saturation)
         elif pixels.ndim == 1:
-            y = pixels
-            # rr = (y - y_mean) * (y - y_mean)
-            # rr_gg = rr / (gamma * gamma)
-            # a = ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
-            # # integral = compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
-            # dx = y[1] - y[0]
-            # integral = np.sum(a) * dx
-            # norm = amplitude
-            # if integral != 0:
-            #     norm /= integral
-            # a *= norm
-            # return np.clip(a, 0, saturation).T
+            y = np.array(pixels)
             return np.clip(evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev), 0, saturation)
-        else:   # pragma: no cover
+        else:  # pragma: no cover
             self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
                                  f"Here pixels.ndim={pixels.shape}.")
             return None
@@ -2020,16 +2006,15 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             # Matrix filling
             # W_dot_M = np.zeros((self.Ny * self.Nx, self.Nx))
             # M = np.zeros((self.Ny * self.Nx, self.Nx))
-            # W_dot_M[:, x] = M[:, x] * self.W
-            # M[:, x] = self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
-            M = np.array([self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten() for x in range(self.Nx)]).T
+            M = np.array([self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
+                          for x in range(self.Nx)]).T
             W_dot_M = np.array([M[:, x] * self.W for x in range(self.Nx)]).T
             # for x in range(self.Nx):
-                # self.my_logger.warning(f'\n\t{x} {profile_params[x, :]}')
-                # plt.imshow(self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]), origin="lower")
-                # plt.imshow(self.data, origin="lower")
-                # plt.title(f"{x}")
-                # plt.show()
+            # self.my_logger.warning(f'\n\t{x} {profile_params[x, :]}')
+            # plt.imshow(self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]), origin="lower")
+            # plt.imshow(self.data, origin="lower")
+            # plt.title(f"{x}")
+            # plt.show()
             # Compute the minimizing amplitudes
             M_dot_W_dot_M = M.T @ W_dot_M
             if self.amplitude_priors_method != "psf1d":
