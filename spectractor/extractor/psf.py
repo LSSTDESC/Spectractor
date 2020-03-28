@@ -145,6 +145,32 @@ class PSF:
         self.p = w.psf.p
         return w
 
+from numba import njit
+@njit
+def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev):
+    rr = (y - y_mean) * (y - y_mean)
+    rr_gg = rr / (gamma * gamma)
+    a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
+    # integral = compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
+    dx = y[1] - y[0]
+    integral = np.sum(a) * dx
+    norm = amplitude
+    if integral != 0:
+        norm /= integral
+    a *= norm
+    return a.T
+
+# import numexpr as ne
+@njit
+def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev):
+    rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
+    rr_gg = rr / (gamma * gamma)
+    a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
+    # a = np.power(1 + rr_gg, -alpha) + eta_gauss * ne.evaluate('exp(-(rr / (2. * stddev * stddev)))')
+    norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * stddev * stddev
+    a *= amplitude / norm
+    return a.T
+
 
 class MoffatGauss(PSF):
 
@@ -213,31 +239,28 @@ class MoffatGauss(PSF):
             self.p = p
         amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
-            x, y = pixels.astype(np.float32)  # float32 to increase rapidity
-            rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
-            rr_gg = rr / (gamma * gamma)
-            a = ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
-            norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * stddev * stddev
-            a *= amplitude / norm
-            return np.clip(a, 0, saturation).T
+            x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
+            # rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
+            # rr_gg = rr / (gamma * gamma)
+            # a = ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
+            # norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * stddev * stddev
+            # a *= amplitude / norm
+            # return np.clip(a, 0, saturation).T
+            return np.clip(evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev),0, saturation)
         elif pixels.ndim == 1:
-            y = pixels.astype(np.float32)  # float32 to increase rapidity
-            rr = (y - y_mean) * (y - y_mean)
-            rr_gg = rr / (gamma * gamma)
-            try:
-                a = ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
-            except RuntimeWarning:  # pragma: no cover
-                my_logger = set_logger(__name__)
-                my_logger.warning(f"{[amplitude, y_mean, gamma, alpha, eta_gauss, stddev, saturation]}")
-                a = eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
-            # integral = compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
-            dx = y[1] - y[0]
-            integral = np.sum(a) * dx
-            norm = amplitude
-            if integral != 0:
-                norm /= integral
-            a *= norm
-            return np.clip(a, 0, saturation).T
+            y = pixels
+            # rr = (y - y_mean) * (y - y_mean)
+            # rr_gg = rr / (gamma * gamma)
+            # a = ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
+            # # integral = compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
+            # dx = y[1] - y[0]
+            # integral = np.sum(a) * dx
+            # norm = amplitude
+            # if integral != 0:
+            #     norm /= integral
+            # a *= norm
+            # return np.clip(a, 0, saturation).T
+            return np.clip(evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev), 0, saturation)
         else:   # pragma: no cover
             self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
                                  f"Here pixels.ndim={pixels.shape}.")
@@ -963,15 +986,17 @@ class ChromaticPSF:
                     p = poly_params[shift:shift + self.degrees[name] + 1]
                     if len(p) > 0:  # to avoid saturation parameters in case not set
                         profile_params[:, k] = np.polynomial.legendre.legval(pixels, p)
-                shift = shift + self.degrees[name] + 1
+                shift += self.degrees[name] + 1
         if apply_bounds:
             for k, name in enumerate(self.psf.param_names):
-                indices = profile_params[:, k] <= self.psf.bounds[k][0]
-                if np.any(indices):
-                    profile_params[indices, k] = self.psf.bounds[k][0]
-                indices = profile_params[:, k] > self.psf.bounds[k][1]
-                if np.any(indices):
-                    profile_params[indices, k] = self.psf.bounds[k][1]
+                profile_params[profile_params[:, k] <= self.psf.bounds[k][0], k] = self.psf.bounds[k][0]
+                profile_params[profile_params[:, k] > self.psf.bounds[k][1], k] = self.psf.bounds[k][1]
+                # indices = profile_params[:, k] <= self.psf.bounds[k][0]
+                # if np.any(indices):
+                #     profile_params[indices, k] = self.psf.bounds[k][0]
+                # indices = profile_params[:, k] > self.psf.bounds[k][1]
+                # if np.any(indices):
+                #     profile_params[indices, k] = self.psf.bounds[k][1]
                 # if name == "x_mean":
                 #    profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
                 #    profile_params[profile_params[:, k] >= self.Ny, k] = self.Ny
@@ -1993,16 +2018,18 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # profile_params[:self.Nx, 2] -= self.bgd_width
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
-            W_dot_M = np.zeros((self.Ny * self.Nx, self.Nx))
-            M = np.zeros((self.Ny * self.Nx, self.Nx))
-            for x in range(self.Nx):
+            # W_dot_M = np.zeros((self.Ny * self.Nx, self.Nx))
+            # M = np.zeros((self.Ny * self.Nx, self.Nx))
+            # W_dot_M[:, x] = M[:, x] * self.W
+            # M[:, x] = self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
+            M = np.array([self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten() for x in range(self.Nx)]).T
+            W_dot_M = np.array([M[:, x] * self.W for x in range(self.Nx)]).T
+            # for x in range(self.Nx):
                 # self.my_logger.warning(f'\n\t{x} {profile_params[x, :]}')
-                M[:, x] = self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
                 # plt.imshow(self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]), origin="lower")
                 # plt.imshow(self.data, origin="lower")
                 # plt.title(f"{x}")
                 # plt.show()
-                W_dot_M[:, x] = M[:, x] * self.W
             # Compute the minimizing amplitudes
             M_dot_W_dot_M = M.T @ W_dot_M
             if self.amplitude_priors_method != "psf1d":
@@ -2041,7 +2068,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.poly_params = np.copy(poly_params)
         poly_params[self.Nx + self.y_mean_0_index] += self.bgd_width
         self.amplitude_params = np.copy(amplitude_params)
-        self.amplitude_params_err = np.array([np.sqrt(cov_matrix[i, i]) for i in range(self.Nx)])
+        self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
         self.cov_matrix = np.copy(cov_matrix)
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]

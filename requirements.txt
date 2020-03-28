@@ -3,7 +3,7 @@ scipy
 matplotlib
 pandas
 # pyfftw
-numexpr
+# numexpr
 astropy>=3.2
 photutils
 astroquery
