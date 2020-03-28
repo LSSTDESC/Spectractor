@@ -213,7 +213,7 @@ class MoffatGauss(PSF):
             self.p = p
         amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
-            x, y = pixels
+            x, y = pixels.astype(np.float32)  # float32 to increase rapidity
             rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
             rr_gg = rr / (gamma * gamma)
             a = ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
@@ -221,7 +221,7 @@ class MoffatGauss(PSF):
             a *= amplitude / norm
             return np.clip(a, 0, saturation).T
         elif pixels.ndim == 1:
-            y = pixels
+            y = pixels.astype(np.float32)  # float32 to increase rapidity
             rr = (y - y_mean) * (y - y_mean)
             rr_gg = rr / (gamma * gamma)
             try:
