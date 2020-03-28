@@ -404,18 +404,16 @@ class FitWorkspace:
         x, model, model_err = self.simulate(*p)
         if len(self.outliers) > 0:
             good_indices = self.not_outliers
-            model = model.flatten()[good_indices]
-            data = self.data.flatten()[good_indices]
             model_err = model_err.flatten()[good_indices]
             err = self.err.flatten()[good_indices]
-            res = (model - data) / np.sqrt(model_err ** 2 + err ** 2)
+            res = (model.flatten()[good_indices] - self.data.flatten()[good_indices]) / np.sqrt(model_err * model_err + err * err)
         else:
-            res = ((model - self.data) / np.sqrt(model_err ** 2 + self.err ** 2)).flatten()
+            res = ((model - self.data) / np.sqrt(model_err * model_err + self.err * self.err)).flatten()
         return res
 
     def chisq(self, p):
         res = self.weighted_residuals(p)
-        chisq = np.sum(res ** 2)
+        chisq = np.sum(res * res)
         return chisq
 
     def lnlike(self, p):
