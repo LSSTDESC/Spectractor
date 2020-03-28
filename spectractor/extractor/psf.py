@@ -194,6 +194,82 @@ class PSF:
         return w
 
 
+class Moffat(PSF):
+
+    def __init__(self, p=None):
+        PSF.__init__(self)
+        self.p_default = np.array([1, 0, 0, 3, 2, 1]).astype(float)
+        if p is not None:
+            self.p = p
+        else:
+            self.p = np.copy(self.p_default)
+        self.param_names = ["amplitude", "x_mean", "y_mean", "gamma", "alpha", "saturation"]
+        self.axis_names = ["$A$", r"$x_0$", r"$y_0$", r"$\gamma$", r"$\alpha$", "saturation"]
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 10),
+                                (0, np.inf)])
+
+    def apply_max_width_to_bounds(self, max_half_width=None):
+        if max_half_width is not None:
+            self.max_half_width = max_half_width
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
+                                (0.1, self.max_half_width), (1.1, 10), (0, np.inf)])
+
+    def evaluate(self, pixels, p=None):
+        """Evaluate the Moffat function.
+
+        The function is normalized to have an integral equal to amplitude parameter.
+
+        Parameters
+        ----------
+        pixels: list
+            List containing the X abscisse 2D array and the Y abscisse 2D array.
+        p: array_like
+            The parameter array. If None, the array used to instanciate the class is taken.
+            If given, the class instance parameter array is updated.
+
+        Returns
+        -------
+        output: array_like
+            The PSF function evaluated.
+
+        Examples
+        --------
+        >>> p = [2,20,30,4,2,10]
+        >>> psf = Moffat(p)
+        >>> xx, yy = np.mgrid[:50, :60]
+        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.psf import Moffat
+            p = [2,20,30,4,2,10]
+            psf = Moffat(p)
+            xx, yy = np.mgrid[:50, :60]
+            out = psf.evaluate(pixels=np.array([xx, yy]))
+            fig = plt.figure(figsize=(5,5))
+            plt.imshow(out, origin="lower")
+            plt.xlabel("X [pixels]")
+            plt.ylabel("Y [pixels]")
+            plt.show()
+
+        """
+        if p is not None:
+            self.p = p
+        amplitude, x_mean, y_mean, gamma, alpha, saturation = self.p
+        if pixels.ndim == 3 and pixels.shape[0] == 2:
+            x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
+            return np.clip(evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha), 0, saturation)
+        elif pixels.ndim == 1:
+            y = np.array(pixels)
+            return np.clip(evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha), 0, saturation)
+        else:  # pragma: no cover
+            self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
+                                 f"Here pixels.ndim={pixels.shape}.")
+            return None
+
+
 class MoffatGauss(PSF):
 
     def __init__(self, p=None):
@@ -245,9 +321,9 @@ class MoffatGauss(PSF):
 
             import matplotlib.pyplot as plt
             import numpy as np
-            from spectractor.extractor.psf import PSF2D
+            from spectractor.extractor.psf import MoffatGauss
             p = [2,20,30,4,2,-0.5,1,10]
-            psf = PSF2D(p)
+            psf = MoffatGauss(p)
             xx, yy = np.mgrid[:50, :60]
             out = psf.evaluate(pixels=np.array([xx, yy]))
             fig = plt.figure(figsize=(5,5))
