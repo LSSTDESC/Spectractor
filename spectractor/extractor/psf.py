@@ -231,7 +231,7 @@ class MoffatGauss(PSF):
                 my_logger.warning(f"{[amplitude, y_mean, gamma, alpha, eta_gauss, stddev, saturation]}")
                 a = eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
             # integral = compute_integral(x, a) #, bounds=(-10*fwhm, 10*fwhm))
-            dx = np.gradient(y)[0]
+            dx = y[1] - y[0]
             integral = np.sum(a) * dx
             norm = amplitude
             if integral != 0:
