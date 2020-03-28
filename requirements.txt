@@ -4,6 +4,7 @@ matplotlib
 pandas
 # pyfftw
 # numexpr
+numba
 astropy>=3.2
 photutils
 astroquery
