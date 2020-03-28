@@ -7,7 +7,7 @@ from astropy.table import Table
 
 from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm)
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
-from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss
+from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss, Moffat
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping
@@ -123,8 +123,9 @@ class ChromaticPSF:
             >>> assert(np.all(np.isclose(params,[0, 50, 100, 150, 200, 0, 0, 2, 0, 5, 0, 2, 0, -0.4, -0.4, 1,0,20000])))
 
         """
-        if not isinstance(self.psf, MoffatGauss):
-            self.my_logger.error(f"\n\tIn this test function, PSF model must be MoffatGauss. Gave {type(self.psf)}.")
+        if not isinstance(self.psf, MoffatGauss) and not isinstance(self.psf, Moffat):
+            self.my_logger.error(f"\n\tIn this test function, PSF model must be MoffatGauss or Moffat. "
+                                 f"Gave {type(self.psf)}.")
         params = [50 * i for i in range(self.Nx)]
         # add absorption lines
         if self.Nx > 80:
@@ -135,8 +136,9 @@ class ChromaticPSF:
         params += [0.] * (self.degrees['y_mean'] - 1) + [0, self.Ny / 2]  # y mean
         params += [0.] * (self.degrees['gamma'] - 1) + [0, 5]  # gamma
         params += [0.] * (self.degrees['alpha'] - 1) + [0, 2]  # alpha
-        params += [0.] * (self.degrees['eta_gauss'] - 1) + [-0.4, -0.4]  # eta_gauss
-        params += [0.] * (self.degrees['stddev'] - 1) + [0, 1]  # stddev
+        if isinstance(self.psf, MoffatGauss):
+            params += [0.] * (self.degrees['eta_gauss'] - 1) + [-0.4, -0.4]  # eta_gauss
+            params += [0.] * (self.degrees['stddev'] - 1) + [0, 1]  # stddev
         params += [self.saturation]  # saturation
         poly_params = np.zeros_like(params)
         poly_params[:self.Nx] = params[:self.Nx]
