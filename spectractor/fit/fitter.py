@@ -496,8 +496,11 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # algebra
         JT_W = J.T * W
         JT_W_J = JT_W @ J
-        L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
-        inv_JT_W_J = L.T @ L
+        try:
+            L = np.linalg.inv(np.linalg.cholesky(JT_W_J))  # cholesky is too sensible to the numerical precision
+            inv_JT_W_J = L.T @ L
+        except np.linalg.LinAlgError:
+            inv_JT_W_J = np.linalg.inv(JT_W_J)
         JT_W_R0 = JT_W @ residuals
         dparams = - inv_JT_W_J @ JT_W_R0
 
