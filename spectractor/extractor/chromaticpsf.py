@@ -89,11 +89,13 @@ class ChromaticPSF:
             if ip == 0:
                 self.poly_params_labels += [f"{p}_{k}" for k in range(len(self.table))]
                 self.poly_params_names += \
-                    ["$" + self.psf.axis_names[ip] + "_{(" + str(k) + ")}$" for k in range(len(self.table))]
+                    ["$" + self.psf.axis_names[ip].replace("$", "") + "_{(" + str(k) + ")}$"
+                     for k in range(len(self.table))]
             else:
                 for k in range(self.degrees[p] + 1):
                     self.poly_params_labels.append(f"{p}_{k}")
-                    self.poly_params_names.append("$" + self.psf.axis_names[ip] + "_{(" + str(k) + ")}$")
+                    self.poly_params_names.append("$" + self.psf.axis_names[ip].replace("$", "")
+                                                  + "_{(" + str(k) + ")}$")
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg
@@ -803,7 +805,7 @@ class ChromaticPSF:
         middle = Ny // 2
         index = np.arange(Ny)
         # Prepare the fit: start with the maximum of the spectrum
-        xmax_index = int(np.unravel_index(np.argmax(data[middle - ws[0]:middle + ws[0], :]), data.shape)[1])
+        xmax_index = int(np.unravel_index(np.argmax(data[middle - w:middle + w, :]), data.shape)[1])
         bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
         y = data[:, xmax_index]
         # first fit with moffat only to initialize the guess
@@ -818,18 +820,18 @@ class ChromaticPSF:
         psf = MoffatGauss()
         guess = np.copy(psf.p_default).astype(float)
         # guess = [2 * np.nanmax(signal), middle, 0.5 * fwhm, 2, 0, 0.1 * fwhm, saturation]
-        guess[0] = 2 * np.nanmax(signal)
+        signal_sum = np.nanmax(signal)
+        guess[0] = signal_sum
         guess[1] = xmax_index
         guess[2] = middle
         guess[-1] = saturation
-        maxi = np.abs(np.nanmax(y))
         # bounds = [(0.1 * maxi, 10 * maxi), (middle - w, middle + w), (0.1, min(fwhm, Ny // 2)), (0.1, self.alpha_max),
         #           (-1, 0),
         #           (0.1, min(Ny // 2, fwhm)),
         #           (0, 2 * saturation)]
         psf.apply_max_width_to_bounds(max_half_width=Ny // 2)
         bounds = np.copy(psf.bounds)
-        bounds[0] = (0.1 * maxi, 10 * maxi)
+        bounds[0] = (0.1 * signal_sum, 2 * signal_sum)
         bounds[2] = (middle - w, middle + w)
         bounds[-1] = (0, 2 * saturation)
         # moffat_guess = [2 * np.nanmax(signal), middle, 0.5 * fwhm, 2]
@@ -864,26 +866,25 @@ class ChromaticPSF:
                 signal = y
             # in case guess amplitude is too low
             # pdf = np.abs(signal)
-            # signal_sum = np.nansum(np.abs(signal))
+            signal_sum = np.nansum(np.abs(signal[middle - ws[0]:middle + ws[0]]))
             # if signal_sum > 0:
             #     pdf /= signal_sum
             # mean = np.nansum(pdf * index)
             # bounds[0] = (0.1 * np.nanstd(bgd), 2 * np.nanmax(y[middle - ws[0]:middle + ws[0]]))
-            bounds[0] = (0.1 * np.nanstd(bgd), 1.5 * np.nansum(y[middle - ws[0]:middle + ws[0]]))
-            guess[0] = np.nansum(signal)
+            bounds[0] = (0.1 * signal_sum, 1.5 * signal_sum)
+            guess[0] = signal_sum
             guess[1] = x
             # if guess[4] > -1:
             #    guess[0] = np.max(signal) / (1 + guess[4])
             # std = np.sqrt(np.nansum(pdf * (index - mean) ** 2))
-            maxi = np.abs(np.nanmax(signal))
             if guess[0] < 3 * np.nanstd(bgd):
-                guess[0] = float(0.9 * maxi)
+                guess[0] = float(0.9 *np.abs(np.nanmax(signal)))
             # if guess[0] * (1 + 0*guess[4]) > 1.2 * maxi:
             #     guess[0] = 0.9 * maxi
             psf_guess = MoffatGauss(p=guess)
             w = PSFFitWorkspace(psf_guess, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False)
-            run_minimisation_sigma_clipping(w, method="minuit", sigma_clip=sigma_clip, niter_clip=2, verbose=False,
+            run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=2, verbose=False,
                                             fix=w.fixed)
             best_fit = w.psf.p
             # It is better not to propagate the guess to further pixel columns
