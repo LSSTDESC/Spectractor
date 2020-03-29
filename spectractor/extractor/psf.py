@@ -136,9 +136,28 @@ class PSF:
 
         Fit the data in 2D:
 
-        >>> p = np.array([100000, 19, 31, 3, 3, -0.1, 2, 400000])
+        >>> p = np.array([100000, 19, 31, 3, 3, -0.1, 3, 400000])
         >>> psf = MoffatGauss(p)
         >>> w = psf.fit_psf(data, data_errors=data_errors, bgd_model_func=None)
+        >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert w.model is not None
+            >>> residuals = (w.data-w.model)/w.err
+            >>> assert w.costs[-1] / w.pixels.size < 1.3
+            >>> assert np.abs(np.mean(residuals)) < 0.4
+            >>> assert np.std(residuals) < 1.2
+            >>> assert np.all(np.isclose(psf.p[1:3], p0[1:3], atol=1e-1))
+
+        Fit the data in 1D:
+
+        >>> data1d = data[:,int(p[1])]
+        >>> data1d_err = data_errors[:,int(p[1])]
+        >>> p = np.array([10000, 20, 32, 3, 3, -0.2, 1, 400000])
+        >>> psf1d = MoffatGauss(p)
+        >>> w = psf1d.fit_psf(data1d, data_errors=data1d_err, bgd_model_func=None)
         >>> w.plot_fit()
 
         ..  doctest::
@@ -149,24 +168,7 @@ class PSF:
             >>> assert w.costs[-1] / w.pixels.size < 1.2
             >>> assert np.abs(np.mean(residuals)) < 0.2
             >>> assert np.std(residuals) < 1.2
-
-        Fit the data in 1D:
-
-        >>> data1d = data[:,int(p[1])]
-        >>> data1d_err = data_errors[:,int(p[1])]
-        >>> p = np.array([100000, 15, 35, 5, 2, -0.1, 2, 400000])
-        >>> psf = MoffatGauss(p)
-        >>> w = psf.fit_psf(data1d, data_errors=data1d_err, bgd_model_func=None)
-        >>> w.plot_fit()
-
-        ..  doctest::
-            :hide:
-
-            >>> assert w.model is not None
-            >>> residuals = (w.data-w.model)/w.err
-            >>> assert w.costs[-1] / w.pixels.size < 1.2
-            >>> assert np.abs(np.mean(residuals)) < 0.15
-            >>> assert np.std(residuals) < 1.2
+            >>> assert np.all(np.isclose(w.p[2], p0[2], atol=1e-1))
 
         .. plot::
             :include-source:
@@ -190,7 +192,7 @@ class PSF:
         w = PSFFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func,
                             verbose=False, live_fit=False)
         run_minimisation(w, method="newton", ftol=1 / w.pixels.size, xtol=1e-6, niter=50, fix=w.fixed)
-        self.p = w.psf.p
+        self.p = np.copy(w.p)
         return w
 
 
@@ -391,8 +393,8 @@ class PSFFitWorkspace(FitWorkspace):
         >>> w = PSFFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
 
         """
-        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                              live_fit, truth=truth)
+        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose=verbose, plot=plot,
+                              live_fit=live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         if data.shape != data_errors.shape:
             self.my_logger.error(f"\n\tData and uncertainty arrays must have the same shapes. "
@@ -401,14 +403,14 @@ class PSFFitWorkspace(FitWorkspace):
         self.data = data
         self.err = data_errors
         self.bgd_model_func = bgd_model_func
-        self.p = np.copy(self.psf.p[1:])
+        self.p = np.copy(self.psf.p) #[1:])
         self.guess = np.copy(self.psf.p)
         self.saturation = self.psf.p[-1]
         self.fixed = [False] * len(self.p)
         self.fixed[-1] = True  # fix saturation parameter
-        self.input_labels = list(np.copy(self.psf.param_names[1:]))
-        self.axis_names = list(np.copy(self.psf.axis_names[1:]))
-        self.bounds = self.psf.bounds[1:]
+        self.input_labels = list(np.copy(self.psf.param_names))  #[1:]))
+        self.axis_names = list(np.copy(self.psf.axis_names)) #[1:]))
+        self.bounds = self.psf.bounds  # [1:]
         self.nwalkers = max(2 * self.ndim, nwalkers)
 
         # prepare the fit
@@ -421,26 +423,28 @@ class PSFFitWorkspace(FitWorkspace):
             self.Nx = 1
             self.psf.apply_max_width_to_bounds(self.Ny // 2)
             self.pixels = np.arange(self.Ny)
-            self.fixed[0] = True
+            self.fixed[1] = True
         else:
             self.my_logger.error(f"\n\tData array must have dimension 1 or 2. Here pixels.ndim={data.ndim}.")
 
         # update bounds
-        self.bounds = self.psf.bounds[1:]
+        self.bounds = self.psf.bounds  # [1:]
+        total_flux = np.sum(data)
+        self.bounds[0] = (0.1 * total_flux, 2 * total_flux)
 
         # error matrix
         self.W = 1. / (self.err * self.err)
         self.W = np.diag(self.W.flatten())
         self.W_dot_data = self.W @ self.data.flatten()
 
-    def simulate(self, *shape_params):
+    def simulate(self, *psf_params):
         """
         Compute a PSF model given PSF parameters and minimizing
         amplitude parameter given a data array.
 
         Parameters
         ----------
-        shape_params: array_like
+        psf_params: array_like
             PSF shape parameter array (all parameters except amplitude).
 
         Examples
@@ -458,7 +462,7 @@ class PSFFitWorkspace(FitWorkspace):
         Fit the data in 2D:
 
         >>> w = PSFFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
-        >>> x, mod, mod_err = w.simulate(*p[1:])
+        >>> x, mod, mod_err = w.simulate(*p)
         >>> w.plot_fit()
 
         ..  doctest::
@@ -471,8 +475,9 @@ class PSFFitWorkspace(FitWorkspace):
 
         >>> data1d = data[:,int(p[1])]
         >>> data1d_err = data_errors[:,int(p[1])]
+        >>> psf.p[0] = p[0] / 10.5
         >>> w = PSFFitWorkspace(psf, data1d, data1d_err, bgd_model_func=None, verbose=True)
-        >>> x, mod, mod_err = w.simulate(*p[1:])
+        >>> x, mod, mod_err = w.simulate(*psf.p)
         >>> w.plot_fit()
 
         ..  doctest::
@@ -500,14 +505,16 @@ class PSFFitWorkspace(FitWorkspace):
 
         """
         # Initialization of the regression
-        self.p = np.copy(shape_params)
-        # Matrix filling
-        M = self.psf.evaluate(self.pixels, p=np.array([1] + list(self.p))).flatten()
-        M_dot_W_dot_M = M.T @ self.W @ M
-        # Regression
-        amplitude = M.T @ self.W_dot_data / M_dot_W_dot_M
+        self.p = np.copy(psf_params)
+        # if not self.fixed_amplitude:
+        #     # Matrix filling
+        #     M = self.psf.evaluate(self.pixels, p=np.array([1] + list(self.p))).flatten()
+        #     M_dot_W_dot_M = M.T @ self.W @ M
+        #     # Regression
+        #     amplitude = M.T @ self.W_dot_data / M_dot_W_dot_M
+        #     self.p[0] = amplitude
         # Save results
-        self.model = self.psf.evaluate(self.pixels, p=np.array([amplitude] + list(self.p)))
+        self.model = self.psf.evaluate(self.pixels, p=self.p)
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
@@ -531,6 +538,7 @@ class PSFFitWorkspace(FitWorkspace):
                 else:
                     ax[0].plot(self.pixels, self.psf.evaluate(self.pixels, p=self.guess),
                                'k--', label="Guess")
+                self.psf.p = np.copy(self.p)
             model = np.copy(self.model)
             # if self.bgd_model_func is not None:
             #    model = self.model + self.bgd_model_func(self.pixels)
@@ -567,7 +575,7 @@ class PSFFitWorkspace(FitWorkspace):
         elif self.data.ndim == 2:
             gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
             fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(5, 7), gridspec_kw=gs_kw)
-            norm = np.max(self.data)
+            norm = np.nanmax(self.data)
             plot_image_simple(ax[0, 0], data=self.model / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
                               units='1/max(data)')
             ax[0, 0].set_title("Model", fontsize=10, loc='center', color='white', y=0.8)
