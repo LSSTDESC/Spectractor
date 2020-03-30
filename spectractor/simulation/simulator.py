@@ -703,10 +703,6 @@ def SimulatorInit(filename):
     # TELESCOPE TRANSMISSION
     # ------------------------
     telescope = TelescopeTransmission(spectrum.filter)
-    if parameters.DEBUG:
-        infostring = '\n\t ========= Telescope transmission :  ==============='
-        my_logger.info(infostring)
-        telescope.plot_transmission()
 
     # DISPERSER TRANSMISSION
     # ------------------------
@@ -714,10 +710,6 @@ def SimulatorInit(filename):
         disperser = spectrum.disperser
     else:
         disperser = Hologram(spectrum.disperser)
-    if parameters.DEBUG:
-        infostring = '\n\t ========= Disperser transmission :  ==============='
-        my_logger.info(infostring)
-        disperser.plot_transmission()
 
     # STAR SPECTRUM
     # ------------------------
@@ -725,10 +717,6 @@ def SimulatorInit(filename):
         target = spectrum.target
     else:
         target = Target(spectrum.target)
-    if parameters.DEBUG:
-        infostring = f'\n\t ========= SED : {target.label}  ==============='
-        my_logger.info(infostring)
-        target.plot_spectra()
 
     return spectrum, telescope, disperser, target
 
