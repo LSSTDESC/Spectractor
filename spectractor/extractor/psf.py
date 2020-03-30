@@ -90,7 +90,7 @@ class PSF:
 
     def evaluate(self, pixels, p=None):  # pragma: no cover
         if p is not None:
-            self.p = p
+            self.p = np.asarray(p).astype(float)
         # amplitude, x_mean, y_mean, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             return np.zeros_like(pixels)
@@ -202,7 +202,7 @@ class Moffat(PSF):
         PSF.__init__(self)
         self.p_default = np.array([1, 0, 0, 3, 2, 1]).astype(float)
         if p is not None:
-            self.p = p
+            self.p = np.asarray(p).astype(float)
         else:
             self.p = np.copy(self.p_default)
         self.param_names = ["amplitude", "x_mean", "y_mean", "gamma", "alpha", "saturation"]
@@ -258,7 +258,7 @@ class Moffat(PSF):
 
         """
         if p is not None:
-            self.p = p
+            self.p = np.asarray(p).astype(float)
         amplitude, x_mean, y_mean, gamma, alpha, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
@@ -278,7 +278,7 @@ class MoffatGauss(PSF):
         PSF.__init__(self)
         self.p_default = np.array([1, 0, 0, 3, 2, 0, 1, 1]).astype(float)
         if p is not None:
-            self.p = p
+            self.p = np.asarray(p).astype(float)
         else:
             self.p = np.copy(self.p_default)
         self.param_names = ["amplitude", "x_mean", "y_mean", "gamma", "alpha", "eta_gauss", "stddev",
@@ -336,7 +336,7 @@ class MoffatGauss(PSF):
 
         """
         if p is not None:
-            self.p = p
+            self.p = np.asarray(p).astype(float)
         amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
