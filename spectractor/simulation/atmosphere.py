@@ -54,7 +54,7 @@ class Atmosphere:
 
         """
         self.title = f'Atmospheric transmission with z={self.airmass:4.2f}, P={self.pressure:4.2f} hPa, ' \
-                     f'T={self.temperature:4.2f}$\degree$C'
+                     rf'T={self.temperature:4.2f}$\degree$C'
 
     def set_label(self):
         """Make a label string for the simulation.
@@ -281,7 +281,8 @@ class AtmosphereGrid(Atmosphere):
         .. plot::
 
             from spectractor.simulation.atmosphere import AtmosphereGrid
-            a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits', pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
+            a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits', pwv_grid=[5, 5, 1],
+                               ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
             atmospheric_grid = a.compute()
             a.plot_transmission()
 
@@ -289,13 +290,14 @@ class AtmosphereGrid(Atmosphere):
             :hide:
 
             >>> assert np.all(np.isclose(a.atmgrid[0, a.index_atm_data:], parameters.LAMBDAS))
-            >>> assert not np.any(np.isclose(a.atmgrid[1, a.index_atm_data:], np.zeros_like(parameters.LAMBDAS), rtol=1e-6))
+            >>> assert not np.any(np.isclose(a.atmgrid[1, a.index_atm_data:],
+            ... np.zeros_like(parameters.LAMBDAS), rtol=1e-6))
             >>> assert a.atmgrid.shape == (3, a.index_atm_data+len(parameters.LAMBDAS))
         """
         # first determine the length
         if parameters.VERBOSE or parameters.DEBUG:
             self.my_logger.info(f'\n\tAtmosphere simulations for z={self.airmass:4.2f}, P={self.pressure:4.2f}hPa, '
-                                f'T={self.temperature:4.2f}$\degree$C, for data-file={self.image_filename} ')
+                                rf'T={self.temperature:4.2f}$\degree$C, for data-file={self.image_filename} ')
         count = 0
         for aer in self.AER_Points:
             for pwv in self.PWV_Points:
@@ -324,7 +326,8 @@ class AtmosphereGrid(Atmosphere):
         .. plot::
 
             from spectractor.simulation.atmosphere import AtmosphereGrid
-            a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits', pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
+            a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits', pwv_grid=[5, 5, 1],
+                               ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
             atmospheric_grid = a.compute()
             a.plot_transmission()
 
@@ -353,7 +356,8 @@ class AtmosphereGrid(Atmosphere):
         .. plot::
 
             from spectractor.simulation.atmosphere import AtmosphereGrid
-            a = AtmosphereGrid(image_filename='tests/data/reduc_20170530_134_atmsim.fits', pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
+            a = AtmosphereGrid(image_filename='tests/data/reduc_20170530_134_atmsim.fits', pwv_grid=[5, 5, 1],
+                               ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
             atmospheric_grid = a.compute()
             a.plot_transmission_image()
 
