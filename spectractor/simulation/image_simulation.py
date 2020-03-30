@@ -33,11 +33,9 @@ class StarModel:
         Y position of the star centroid in pixels.
     amplitude: amplitude
         The amplitude of the star in image units.
-    target: Target
-        The associated Target instance (default: None).
     """
 
-    def __init__(self, centroid_coords, psf, amplitude, target=None):
+    def __init__(self, centroid_coords, psf, amplitude):
         """Create a StarModel instance.
 
         The model is based on an Astropy Fittable2DModel. The centroid and amplitude
@@ -51,8 +49,6 @@ class StarModel:
             PSF model
         amplitude: float
             The desired amplitude of the star in image units.
-        target: Target
-            The associated Target instance (default: None).
 
         Examples
         --------
@@ -128,6 +124,7 @@ class StarFieldModel:
         self.flux_factor = flux_factor
         self.set_star_list()
 
+    # noinspection PyUnresolvedReferences
     def set_star_list(self):
         x0, y0 = self.image.target_pixcoords
         sources_file_name = set_sources_file_name(self.image.file_name)
@@ -325,7 +322,8 @@ class ImageModel(Image):
         xx, yy = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
         self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
-        spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data  # - spectrogram.spectrogram_bgd)
+                  spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
+        # - spectrogram.spectrogram_bgd)
         if starfield is not None:
             self.data += starfield.model(xx, yy)
 
@@ -406,8 +404,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Target model
     my_logger.info('\n\tStar model...')
     # Spectrogram is simulated with spectrum.x0 target position: must be this position to simualte the target.
-    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.p[0]) #,
-    #                 target=image.target)
+    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.p[0])
     # reso = star.fwhm
     if parameters.DEBUG:
         star.plot_model()
@@ -510,51 +507,51 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.save_image(output_filename, overwrite=True)
     return image
 
-
-if __name__ == "__main__":
-    from spectractor.logbook import LogBook
-    from argparse import ArgumentParser
-
-    parser = ArgumentParser()
-    parser.add_argument("-d", "--debug", dest="debug", action="store_true",
-                        help="Enter debug mode (more verbose and plots).", default=False)
-    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
-                        help="Enter verbose (print more stuff).", default=False)
-    parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
-                        help="Write results in given output directory (default: ./outputs/).")
-    parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
-                        help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
-    args = parser.parse_args()
-
-    parameters.VERBOSE = args.verbose
-    if args.debug:
-        parameters.DEBUG = True
-        parameters.VERBOSE = True
-
-    file_names = ['tests/data/reduc_20170530_134.fits']
-    spectrum_file_name = 'outputs/reduc_20170530_134_spectrum.fits'
-    # guess = [720, 670]
-    # hologramme HoloAmAg
-    psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
-                       -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
-                       0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
-                       528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
-    # psf_poly_params = [0.11298966008548948, -0.396825836448203, 10.60387678061209, 2.0649268678546955,
-    #                    -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
-    #                    0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
-    #                    528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
-    # file_name="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
-    # guess = [840, 530]
-    # target = "HD205905"
-    # x = np.linspace(-1, 1, 100)
-    # plt.plot(x, np.polynomial.legendre.legval(x, psf_poly_params[0:3]))
-    # plt.show()
-    logbook = LogBook(logbook=args.logbook)
-    for file_name in file_names:
-        tag = file_name.split('/')[-1]
-        disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-        if target is None or xpos is None or ypos is None:
-            continue
-
-        image = ImageSim(file_name, spectrum_file_name, args.output_directory, A1=1, A2=0.05,
-                         psf_poly_params=psf_poly_params, with_stars=False)
+#
+# if __name__ == "__main__":
+#     from spectractor.logbook import LogBook
+#     from argparse import ArgumentParser
+#
+#     parser = ArgumentParser()
+#     parser.add_argument("-d", "--debug", dest="debug", action="store_true",
+#                         help="Enter debug mode (more verbose and plots).", default=False)
+#     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
+#                         help="Enter verbose (print more stuff).", default=False)
+#     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
+#                         help="Write results in given output directory (default: ./outputs/).")
+#     parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
+#                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
+#     args = parser.parse_args()
+#
+#     parameters.VERBOSE = args.verbose
+#     if args.debug:
+#         parameters.DEBUG = True
+#         parameters.VERBOSE = True
+#
+#     file_names = ['tests/data/reduc_20170530_134.fits']
+#     spectrum_file_name = 'outputs/reduc_20170530_134_spectrum.fits'
+#     # guess = [720, 670]
+#     # hologramme HoloAmAg
+#     psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
+#                        -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
+#                        0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
+#                        528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
+#     # psf_poly_params = [0.11298966008548948, -0.396825836448203, 10.60387678061209, 2.0649268678546955,
+#     #                    -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
+#     #                    0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
+#     #                    528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
+#     # file_name="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
+#     # guess = [840, 530]
+#     # target = "HD205905"
+#     # x = np.linspace(-1, 1, 100)
+#     # plt.plot(x, np.polynomial.legendre.legval(x, psf_poly_params[0:3]))
+#     # plt.show()
+#     logbook = LogBook(logbook=args.logbook)
+#     for file_name in file_names:
+#         tag = file_name.split('/')[-1]
+#         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
+#         if target is None or xpos is None or ypos is None:
+#             continue
+#
+#         image = ImageSim(file_name, spectrum_file_name, args.output_directory, A1=1, A2=0.05,
+#                          psf_poly_params=psf_poly_params, with_stars=False)
