@@ -133,7 +133,6 @@ class Atmosphere:
         >>> a.plot_transmission()
 
         """
-        fig = plt.figure(figsize=(5, 5))
         plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.transmission(parameters.LAMBDAS),
                                  title=self.title, label=self.label)
         if parameters.DISPLAY:  # pragma: no cover
