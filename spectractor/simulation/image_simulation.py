@@ -1,13 +1,14 @@
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import (pixel_rotation, detect_peaks, set_wcs_file_name, set_sources_file_name,
+from spectractor.tools import (pixel_rotation, set_wcs_file_name, set_sources_file_name,
                                set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir,
                                plot_image_simple)
 from spectractor.extractor.images import Image, find_target
 from spectractor.astrometry import get_gaia_coords_after_proper_motion, source_detection
-from spectractor.extractor.background import  remove_image_background_sextractor
+from spectractor.extractor.background import remove_image_background_sextractor
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.simulator import SpectrogramSimulatorCore, SimulatorInit
+from spectractor.extractor.psf import PSF
 
 from astropy.io import fits, ascii
 import astropy.units as units
@@ -36,7 +37,7 @@ class StarModel:
         The associated Target instance (default: None).
     """
 
-    def __init__(self, pixcoords, model, amplitude, target=None):
+    def __init__(self, centroid_coords, psf, amplitude, target=None):
         """Create a StarModel instance.
 
         The model is based on an Astropy Fittable2DModel. The centroid and amplitude
@@ -44,10 +45,10 @@ class StarModel:
 
         Parameters
         ----------
-        pixcoords: array_like
+        centroid_coords: array_like
             Tuple of (x,y) coordinates of the desired star centroid in pixels.
-        model: Fittable2DModel
-            Astropy fittable 2D model
+        psf: PSF
+            PSF model
         amplitude: float
             The desired amplitude of the star in image units.
         target: Target
@@ -55,44 +56,39 @@ class StarModel:
 
         Examples
         --------
-        >>> from spectractor.extractor.psf import MoffatGauss
-        >>> from spectractor.extractor.images import fit_PSF2D_minuit
-        >>> p = (100, 50, 50, 3, 2, -0.1, 1, 200)
-        >>> psf = MoffatGauss(*p)
-        >>> yy, xx = np.mgrid[:100,:50]
-        >>> data = psf.evaluate(xx, yy, *p)
-        >>> model = fit_PSF2D_minuit(xx, yy, data, guess=p)
-        >>> s = StarModel((20, 10), model, 200, target=None)
+        >>> from spectractor.extractor.psf import Moffat
+        >>> p = (100, 50, 50, 5, 2, 200)
+        >>> psf = Moffat(p)
+        >>> s = StarModel((20, 10), psf, 200, target=None)
         >>> s.plot_model()
         >>> s.x0
         20
         >>> s.y0
         10
-        >>> s.model.amplitude
+        >>> s.amplitude
         200
         """
         self.my_logger = set_logger(self.__class__.__name__)
-        self.x0 = pixcoords[0]
-        self.y0 = pixcoords[1]
+        self.x0 = centroid_coords[0]
+        self.y0 = centroid_coords[1]
         self.amplitude = amplitude
-        self.target = target
-        self.model = copy.deepcopy(model)
-        self.model.x_mean = self.x0
-        self.model.y_mean = self.y0
-        self.model.amplitude_moffat = amplitude
-        self.my_logger.warning(f"{self.model}")
-        # to be realistic, usually fitted fwhm is too big, divide by 2
-        self.fwhm = self.model.gamma / 2
-        self.sigma = self.model.stddev / 2
+        # self.target = target
+        self.psf = copy.deepcopy(psf)
+        self.psf.p[1] = self.x0
+        self.psf.p[2] = self.y0
+        self.psf.p[0] = amplitude
+        # to be realistic, usually fitted fwhm is too big, divide gamma by 2
+        self.fwhm = self.psf.p[3]
+        # self.sigma = self.model.stddev / 2
 
     def plot_model(self):
         """
         Plot the star model.
         """
-        x = np.linspace(self.x0 - 10 * self.fwhm, self.x0 + 10 * self.fwhm, 50)
-        y = np.linspace(self.y0 - 10 * self.fwhm, self.y0 + 10 * self.fwhm, 50)
+        x = np.arange(self.x0 - 5 * self.fwhm, self.x0 + 5 * self.fwhm)
+        y = np.arange(self.y0 - 5 * self.fwhm, self.y0 + 5 * self.fwhm)
         xx, yy = np.meshgrid(x, y)
-        star = self.model(xx, yy)
+        star = self.psf.evaluate(np.array([xx, yy]))
         fig, ax = plt.subplots(1, 1)
         im = plt.pcolor(x, y, star, cmap='jet')
         ax.grid(color='white', ls='solid')
@@ -128,7 +124,7 @@ class StarFieldModel:
         self.field = None
         self.stars = []
         self.pixcoords = []
-        self.fwhm = base_image.target_star2D.gamma
+        self.fwhm = base_image.target_star2D.p[3]
         self.flux_factor = flux_factor
         self.set_star_list()
 
@@ -158,7 +154,6 @@ class StarFieldModel:
                 for k, gaia_i in enumerate(gaia_index):
                     x, y = wcs.all_world2pix(gaia_coord_after_motion[gaia_i].ra, gaia_coord_after_motion[gaia_i].dec, 0)
                     A = sources['flux'][k] * self.flux_factor
-                    self.image.my_logger.warning(f"\n\t{x} {y} {A}")
                     self.stars.append(StarModel([x, y], self.image.target_star2D, A))
                     self.pixcoords.append([x, y])
             else:
@@ -196,18 +191,18 @@ class StarFieldModel:
     def model(self, x, y):
         if self.field is None:
             window = int(20 * self.fwhm)
-            self.field = self.stars[0].model(x, y)
+            self.field = self.stars[0].psf.evaluate(np.array([x, y]))
             for k in range(1, len(self.stars)):
                 left = max(0, int(self.pixcoords[0][k]) - window)
                 right = min(parameters.CCD_IMSIZE, int(self.pixcoords[0][k]) + window)
                 low = max(0, int(self.pixcoords[1][k]) - window)
                 up = min(parameters.CCD_IMSIZE, int(self.pixcoords[1][k]) + window)
                 yy, xx = np.mgrid[low:up, left:right]
-                self.field[low:up, left:right] += self.stars[k].model(xx, yy)
+                self.field[low:up, left:right] += self.stars[k].psf.evaluate(np.array([xx, yy]))
         return self.field
 
     def plot_model(self):
-        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
+        xx, yy = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         starfield = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
         plot_image_simple(ax, starfield, scale="log10", target_pixcoords=self.pixcoords)
@@ -327,8 +322,8 @@ class ImageModel(Image):
         self.true_spectrum = None
 
     def compute(self, star, background, spectrogram, starfield=None):
-        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
-        self.data = star.model(xx, yy) + background.model()
+        xx, yy = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
+        self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
         self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
         spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data  # - spectrogram.spectrogram_bgd)
         if starfield is not None:
@@ -392,7 +387,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image = ImageModel(image_filename, target_label=target)
     guess = [spectrum.header['TARGETX'], spectrum.header['TARGETY']]
     if parameters.DEBUG:
-        image.plot_image(scale='log10', target_pixcoords=guess)
+        image.plot_image(scale='symlog', target_pixcoords=guess)
     # Fit the star 2D profile
     my_logger.info('\n\tSearch for the target in the image...')
     target_pixcoords = find_target(image, guess, use_wcs=False)
@@ -404,16 +399,16 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info('\n\tBackground model...')
     yy, xx = np.mgrid[:parameters.XWINDOW, :parameters.YWINDOW]
     bgd_level = float(np.mean(image.target_bkgd2D(xx, yy)))
-    background = BackgroundModel(level=bgd_level, frame=None)  # frame=(1600, 1650))
+    background = BackgroundModel(level=bgd_level, frame=None)  # (1600, 1650, 100))
     if parameters.DEBUG:
         background.plot_model()
 
     # Target model
     my_logger.info('\n\tStar model...')
     # Spectrogram is simulated with spectrum.x0 target position: must be this position to simualte the target.
-    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.amplitude_moffat.value,
-                     target=image.target)
-    reso = star.sigma
+    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.p[0]) #,
+    #                 target=image.target)
+    # reso = star.fwhm
     if parameters.DEBUG:
         star.plot_model()
     # Star field model
@@ -422,7 +417,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tStar field model...')
         starfield = StarFieldModel(image)
         if parameters.VERBOSE:
-            image.plot_image(scale='log10', target_pixcoords=starfield.pixcoords)
+            image.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
             starfield.plot_model()
 
     # Spectrum model
@@ -480,7 +475,9 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Plot
     if parameters.VERBOSE and parameters.DISPLAY:  # pragma: no cover
-        image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
+        image.convert_to_ADU_rate_units()
+        image.plot_image(scale="symlog", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
+        image.convert_to_ADU_units()
 
     # Set output path
     ensure_dir(outputdir)
@@ -505,7 +502,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         psf_poly_params_truth = np.array(list(true_spectrum) + list(psf_poly_params_truth))
     image.header['PSF_POLY'] = np.array_str(psf_poly_params_truth, max_line_width=1000000, precision=4)
     image.header['LAMBDAS'] = np.array_str(true_lambdas, max_line_width=1000000, precision=2)
-    image.header['RESO'] = reso
+    # image.header['RESO'] = reso
     image.header['ROTATION'] = int(with_rotation)
     image.header['ROTANGLE'] = rotation_angle
     image.header['STARS'] = int(with_stars)
