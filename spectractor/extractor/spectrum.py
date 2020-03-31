@@ -14,7 +14,7 @@ from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
                                from_lambda_to_colormap)
-from spectractor.extractor.psf import MoffatGauss, PSF
+from spectractor.extractor.psf import MoffatGauss, PSF, Moffat
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 
@@ -1125,7 +1125,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    psf = MoffatGauss()
+    psf = Moffat()
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
     s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=10, sigma_clip=5, bgd_model_func=bgd_model_func,
                                    saturation=image.saturation, live_fit=False)
