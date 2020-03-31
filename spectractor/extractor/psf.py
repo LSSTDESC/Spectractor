@@ -433,9 +433,11 @@ class PSFFitWorkspace(FitWorkspace):
         self.bounds[0] = (0.1 * total_flux, 2 * total_flux)
 
         # error matrix
+        # here image uncertainties are assumed to be uncorrelated
+        # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
-        self.W = np.diag(self.W.flatten())
-        self.W_dot_data = self.W @ self.data.flatten()
+        self.W = self.W.flatten()  # np.diag(self.W.flatten())
+        self.W_dot_data = self.W * self.data.flatten()
 
     def simulate(self, *psf_params):
         """

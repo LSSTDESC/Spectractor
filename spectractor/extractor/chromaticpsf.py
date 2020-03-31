@@ -122,13 +122,14 @@ class ChromaticPSF:
         ..  doctest::
             :hide:
 
-            >>> assert(np.all(np.isclose(params,[0, 50, 100, 150, 200, 0, 0, 2, 0, 5, 0, 2, 0, -0.4, -0.4, 1,0,20000])))
+            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 2, 0, 5, 0, 2, 0, -0.4, -0.4, 1,0,20000])))
 
         """
         if not isinstance(self.psf, MoffatGauss) and not isinstance(self.psf, Moffat):
             self.my_logger.error(f"\n\tIn this test function, PSF model must be MoffatGauss or Moffat. "
                                  f"Gave {type(self.psf)}.")
         params = [50 * i for i in range(self.Nx)]
+        params[0] = 10
         # add absorption lines
         if self.Nx > 80:
             params = list(np.array(params)
@@ -892,6 +893,7 @@ class ChromaticPSF:
             # Randomness of the slice fit is better :
             # guess = best_fit
             self.profile_params[x, :] = best_fit
+            # TODO: propagate amplitude uncertainties from Newton fit
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
             if live_fit and parameters.DISPLAY:  # pragma: no cover
@@ -996,9 +998,11 @@ class ChromaticPSF:
         >>> amplitude_residuals.append([s0.poly_params[:s0.Nx], w.amplitude_params-s0.poly_params[:s0.Nx],
         ... w.amplitude_params_err])
         >>> for k, label in enumerate(["Transverse", "PSF1D", "PSF2D"]):
-        ...     plt.errorbar(amplitude_residuals[k][0], amplitude_residuals[k][1], yerr=amplitude_residuals[k][2],
-        ...         fmt="+", label=label)  # doctest: +ELLIPSIS
+        ...     plt.errorbar(np.arange(s0.Nx), amplitude_residuals[k][1]/s0.poly_params[:s0.Nx],
+        ...                  yerr=amplitude_residuals[k][2]/s0.poly_params[:s0.Nx],
+        ...                  fmt="+", label=label)  # doctest: +ELLIPSIS
         <ErrorbarContainer ... artists>
+        >>> plt.ylim((-1,1))
         >>> plt.grid()
         >>> plt.legend()  # doctest: +ELLIPSIS
         <matplotlib.legend.Legend object at ...>
@@ -1104,9 +1108,11 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.bounds = self.chromatic_psf.set_bounds()
 
         # error matrix
+        # here image uncertainties are assumed to be uncorrelated
+        # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
-        self.W_dot_data = np.diag(self.W) @ self.data.flatten()
+        self.W_dot_data = self.W * self.data.flatten()  # np.diag(self.W) @ self.data.flatten()
 
         # prepare results
         self.amplitude_params = np.zeros(self.Nx)
@@ -1122,7 +1128,9 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
             # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
-            self.Q = parameters.PSF_FIT_REG_PARAM * np.diag([1 / np.sum(self.err[:, i] ** 2) for i in range(self.Nx)])
+            # TODO: use the covariance matrix from the psf1d fit ?
+            # TODO: Fit on one example for the best PSF_FIT_REG_PARAMS parameter
+            self.Q = parameters.PSF_FIT_REG_PARAM * np.diag([1 / np.sum(self.err[:, x] ** 2) for x in range(self.Nx)])
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
         if self.amplitude_priors_method == "fixed":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
@@ -1187,9 +1195,11 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.pixels = np.arange(self.Ny)
 
         # error matrix
+        # here image uncertainties are assumed to be uncorrelated
+        # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
-        self.W = [np.diag(self.W[:, x]) for x in range(self.Nx)]
-        self.W_dot_data = [self.W[x] @ self.data[:, x] for x in range(self.Nx)]
+        self.W = [self.W[:, x] for x in range(self.Nx)]  # [np.diag(self.W[:, x]) for x in range(self.Nx)]
+        self.W_dot_data = [self.W[x] * self.data[:, x] for x in range(self.Nx)]
 
     def simulate(self, *shape_params):
         """
@@ -1299,7 +1309,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
             M = np.array([self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]) for x in range(self.Nx)])
-            M_dot_W_dot_M = np.array([M[x].T @ self.W[x] @ M[x] for x in range(self.Nx)])
+            M_dot_W_dot_M = np.array([M[x].T @ (self.W[x] * M[x]) for x in range(self.Nx)])
             if self.amplitude_priors_method != "psf1d":
                 cov_matrix = np.diag([1 / M_dot_W_dot_M[x] if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
                                       for x in range(self.Nx)])
@@ -1360,9 +1370,11 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.pixels = np.mgrid[:self.Nx, :self.Ny]
 
         # error matrix
+        # here image uncertainties are assumed to be uncorrelated
+        # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
-        self.W_dot_data = np.diag(self.W) @ self.data.flatten()
+        self.W_dot_data = self.W * self.data.flatten()  # np.diag(self.W) @ self.data.flatten()
 
     def simulate(self, *shape_params):
         r"""
