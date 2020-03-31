@@ -59,7 +59,8 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
 
     Build a mock spectrogram with random Poisson noise:
 
-    >>> from spectractor.extractor.psf import ChromaticPSF, MoffatGauss
+    >>> from spectractor.extractor.psf import MoffatGauss
+    >>> from spectractor.extractor.chromaticpsf import ChromaticPSF
     >>> from spectractor import parameters
     >>> parameters.DEBUG = True
     >>> psf = MoffatGauss()
@@ -151,7 +152,8 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
 
     Build a mock spectrogram with random Poisson noise:
 
-    >>> from spectractor.extractor.psf import ChromaticPSF, MoffatGauss
+    >>> from spectractor.extractor.psf import MoffatGauss
+    >>> from spectractor.extractor.chromaticpsf import ChromaticPSF
     >>> from spectractor import parameters
     >>> parameters.DEBUG = True
     >>> psf = MoffatGauss()
@@ -254,7 +256,8 @@ def extract_spectrogram_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1
 
     Build a mock spectrogram with random Poisson noise:
 
-    >>> from spectractor.extractor.psf import ChromaticPSF, MoffatGauss
+    >>> from spectractor.extractor.psf import MoffatGauss
+    >>> from spectractor.extractor.chromaticpsf import ChromaticPSF
     >>> from spectractor import parameters
     >>> parameters.DEBUG = True
     >>> psf = MoffatGauss()
