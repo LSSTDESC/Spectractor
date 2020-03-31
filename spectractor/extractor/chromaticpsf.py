@@ -818,7 +818,7 @@ class ChromaticPSF:
             signal = y
         # fwhm = compute_fwhm(index, signal, minimum=0)
         # Initialize PSF
-        psf = MoffatGauss()
+        psf = self.psf
         guess = np.copy(psf.p_default).astype(float)
         # guess = [2 * np.nanmax(signal), middle, 0.5 * fwhm, 2, 0, 0.1 * fwhm, saturation]
         signal_sum = np.nanmax(signal)
@@ -882,8 +882,8 @@ class ChromaticPSF:
                 guess[0] = float(0.9 *np.abs(np.nanmax(signal)))
             # if guess[0] * (1 + 0*guess[4]) > 1.2 * maxi:
             #     guess[0] = 0.9 * maxi
-            psf_guess = MoffatGauss(p=guess)
-            w = PSFFitWorkspace(psf_guess, signal, data_errors=err[:, x], bgd_model_func=None,
+            psf.p = guess
+            w = PSFFitWorkspace(psf, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False)
             run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=2, verbose=False,
                                             fix=w.fixed)
