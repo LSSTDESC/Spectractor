@@ -59,7 +59,7 @@ class FitWorkspace:
         self.use_grid = False
         if self.filename != "":
             if "." in self.filename:
-                self.emcee_filename = self.filename.split('.')[0] + "_emcee.h5"
+                self.emcee_filename = os.path.splitext(self.filename)[0] + "_emcee.h5"
             else:
                 self.my_logger.warning("\n\tFile name must have an extension.")
         else:
@@ -152,10 +152,11 @@ class FitWorkspace:
         self.p = self.likelihood.mean_vec
         self.simulate(*self.p)
         self.plot_fit()
-        figure_name = self.emcee_filename.replace('.h5', '_triangle.pdf')
+        figure_name = os.path.splitext(self.emcee_filename)[0] + '_triangle.pdf'
         self.likelihood.triangle_plots(output_filename=figure_name)
 
     def plot_fit(self):
+        fig = plt.figure()
         plt.errorbar(self.x, self.data, yerr=self.err, fmt='ko', label='Data')
         if self.truth is not None:
             x, truth, truth_err = self.simulate(*self.truth)
@@ -179,6 +180,7 @@ class FitWorkspace:
         plt.grid()
         if parameters.DISPLAY:
             plt.show()
+        return fig
 
     def chain2likelihood(self, pdfonly=False, walker_index=-1):
         if walker_index >= 0:
