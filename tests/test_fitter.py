@@ -72,7 +72,6 @@ def test_fitworkspace():
 
     assert w.chains.shape == (5000, 20, 2)
     assert np.all(w.gelmans < 0.03)
-    assert os.path.exists("test_linefitworkspace.txt")
     assert os.path.exists(file_name.replace(".txt", "_emcee.h5"))
     assert os.path.exists(file_name.replace(".txt", "_emcee_convergence.pdf"))
     assert os.path.exists(file_name.replace(".txt", "_emcee_triangle.pdf"))
