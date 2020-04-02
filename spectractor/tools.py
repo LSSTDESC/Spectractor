@@ -2236,6 +2236,28 @@ def imgslice(slicespec):
     return np.s_[ybegin:yend, xbegin:xend]
 
 
+def compute_correlation_matrix(cov):
+    rho = np.zeros_like(cov)
+    for i in range(cov.shape[0]):
+        for j in range(cov.shape[1]):
+            rho[i, j] = cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
+    return rho
+
+
+def plot_correlation_matrix_simple(ax, cov, axis_names, ipar=None):
+    rho = compute_correlation_matrix(cov=cov)
+    im = plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
+    if ipar is None:
+        ipar = np.arange(0, cov.shape[0]).astype(int)
+    ax.set_title("Correlation matrix")
+    names = [axis_names[ip] for ip in ipar]
+    plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=11)
+    plt.yticks(np.arange(ipar.size), names, fontsize=11)
+    cbar = plt.colorbar(im)
+    cbar.ax.tick_params(labelsize=9)
+    plt.gcf().tight_layout()
+
+
 if __name__ == "__main__":
     import doctest
 

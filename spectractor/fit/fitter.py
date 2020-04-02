@@ -11,7 +11,7 @@ import multiprocessing
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import formatting_numbers
+from spectractor.tools import formatting_numbers, compute_correlation_matrix, plot_correlation_matrix_simple
 from spectractor.fit.statistics import Likelihood
 
 
@@ -372,28 +372,10 @@ class FitWorkspace:
         f.write(txt)
         f.close()
 
-    def compute_correlation_matrix(self):
-        rho = np.zeros_like(self.cov)
-        for i in range(self.cov.shape[0]):
-            for j in range(self.cov.shape[1]):
-                rho[i, j] = self.cov[i, j] / np.sqrt(self.cov[i, i] * self.cov[j, j])
-        self.rho = rho
-        return rho
-
     def plot_correlation_matrix(self, ipar=None):
         fig = plt.figure()
-        rho = self.compute_correlation_matrix()
-        im = plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
-        if ipar is None:
-            ipar = np.arange(0, self.cov.shape[0]).astype(int)
-        self.rho = rho
-        plt.title("Correlation matrix")
-        axis_names = [self.axis_names[ip] for ip in ipar]
-        plt.xticks(np.arange(ipar.size), axis_names, rotation='vertical', fontsize=11)
-        plt.yticks(np.arange(ipar.size), axis_names, fontsize=11)
-        cbar = fig.colorbar(im)
-        cbar.ax.tick_params(labelsize=9)
-        fig.tight_layout()
+        self.rho = compute_correlation_matrix(self.cov)
+        plot_correlation_matrix_simple(plt.gca(), self.cov, axis_names=self.axis_names, ipar=ipar)
         if parameters.SAVE and self.filename != "":
             figname = os.path.splitext(self.filename)[0] + "_correlation.pdf"
             self.my_logger.info(f"Save figure {figname}.")
