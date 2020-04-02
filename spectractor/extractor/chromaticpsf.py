@@ -948,7 +948,7 @@ class ChromaticPSF:
 
         Build a mock spectrogram with random Poisson noise using the full 2D PSF model:
 
-        >>> psf = MoffatGauss()
+        >>> psf = Moffat()
         >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=4, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
@@ -980,6 +980,10 @@ class ChromaticPSF:
         >>> w.plot_fit()
         >>> amplitude_residuals.append([s0.poly_params[:s0.Nx], w.amplitude_params-s0.poly_params[:s0.Nx],
         ... w.amplitude_params_err])
+        >>> from spectractor.tools import compute_correlation_matrix
+        >>> rho = compute_correlation_matrix(w.amplitude_cov_matrix[10:20,10:20])
+        >>> plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
+        >>> plt.show()
 
         ..  doctest::
             :hide:
@@ -1003,6 +1007,7 @@ class ChromaticPSF:
         ...                  fmt="+", label=label)  # doctest: +ELLIPSIS
         <ErrorbarContainer ... artists>
         >>> plt.ylim((-1,1))
+        (-1, 1)
         >>> plt.grid()
         >>> plt.legend()  # doctest: +ELLIPSIS
         <matplotlib.legend.Legend object at ...>
@@ -1117,7 +1122,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # prepare results
         self.amplitude_params = np.zeros(self.Nx)
         self.amplitude_params_err = np.zeros(self.Nx)
-        self.cov_matrix = np.zeros((self.Nx, self.Nx))
+        self.amplitude_cov_matrix = np.zeros((self.Nx, self.Nx))
 
         # priors on amplitude parameters
         self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed']
@@ -1131,6 +1136,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             # TODO: use the covariance matrix from the psf1d fit ?
             # TODO: Fit on one example for the best PSF_FIT_REG_PARAMS parameter
             self.Q = parameters.PSF_FIT_REG_PARAM * np.diag([1 / np.sum(self.err[:, x] ** 2) for x in range(self.Nx)])
+            # self.Q = 0.01 * parameters.PSF_FIT_REG_PARAM * np.identity(self.Nx)
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
         if self.amplitude_priors_method == "fixed":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
@@ -1348,7 +1354,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x])
                                               if cov_matrix[x, x] > 0 else 0 for x in range(self.Nx)])
-        self.cov_matrix = np.copy(cov_matrix)
+        self.amplitude_cov_matrix = np.copy(cov_matrix)
         poly_params[:self.Nx] = amplitude_params
         self.poly_params = np.copy(poly_params)
         poly_params[self.Nx + self.y_mean_0_index] += self.bgd_width
@@ -1528,8 +1534,11 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             # Compute the minimizing amplitudes
             M_dot_W_dot_M = M.T @ W_dot_M
             if self.amplitude_priors_method != "psf1d":
-                L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-                cov_matrix = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
+                try:
+                    L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
+                    cov_matrix = L.T @ L
+                except np.linalg.LinAlgError:
+                    cov_matrix = np.linalg.inv(M_dot_W_dot_M)
                 amplitude_params = cov_matrix @ (M.T @ self.W_dot_data)
                 if self.amplitude_priors_method == "positive":
                     amplitude_params[amplitude_params < 0] = 0
@@ -1551,8 +1560,11 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                     pass
             else:
                 M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.Q
-                L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-                cov_matrix = L.T @ L  # np.linalg.inv(J_dot_W_dot_J)
+                try:
+                    L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
+                    cov_matrix = L.T @ L
+                except np.linalg.LinAlgError:
+                    cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
                 amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + self.Q_dot_A0)
         else:
             amplitude_params = np.copy(self.amplitude_priors)
@@ -1565,7 +1577,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.amplitude_params = np.copy(amplitude_params)
         # TODO: propagate and marginalize over the shape parameter uncertainties ?
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
-        self.cov_matrix = np.copy(cov_matrix)
+        self.amplitude_cov_matrix = np.copy(cov_matrix)
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
