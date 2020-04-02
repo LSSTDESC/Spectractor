@@ -6,6 +6,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import os
 import multiprocessing
 
 from spectractor import parameters
@@ -156,17 +157,21 @@ class FitWorkspace:
 
     def plot_fit(self):
         plt.errorbar(self.x, self.data, yerr=self.err, fmt='ko', label='Data')
-        plt.plot(self.x, self.model, label='Best fitting model')
         if self.truth is not None:
             x, truth, truth_err = self.simulate(*self.truth)
             plt.plot(self.x, truth, label="Truth")
+        plt.plot(self.x, self.model, label='Best fitting model')
         plt.xlabel('$x$')
         plt.ylabel('$y$')
         title = ""
         for i, label in enumerate(self.input_labels):
-            title += f"{label} = {self.p[i]:.3g}"
             if self.cov.size > 0:
-                title += rf" $\pm$ {np.sqrt(self.cov[i, i]):.3g}"
+                err = np.sqrt(self.cov[i, i])
+                formatting_numbers(self.p[i], err, err)
+                _, par, err, _ = formatting_numbers(self.p[i], err, err, label=label)
+                title += rf"{label} = {par} $\pm$ {err}"
+            else:
+                title += f"{label} = {self.p[i]:.3g}"
             if i < len(self.input_labels) - 1:
                 title += ", "
         plt.title(title)
@@ -194,7 +199,7 @@ class FitWorkspace:
                             likelihood.contours[i][j].fill_histogram(chains[:, i], chains[:, j], weights=None)
             output_file = ""
             if self.filename != "":
-                output_file = self.filename.replace('.fits', '_bestfit.txt')
+                output_file = os.path.splitext(self.filename)[0] + "_bestfit.txt"
             likelihood.stats(output=output_file)
         else:
             for i in rangedim:
@@ -352,7 +357,7 @@ class FitWorkspace:
         print('************************************')
 
     def save_parameters_summary(self, header=""):
-        output_filename = self.filename.replace("."+self.filename.split('.')[-1], "_bestfit.txt")
+        output_filename = os.path.splitext(self.filename)[0] + "_bestfit.txt"
         f = open(output_filename, 'w')
         txt = self.filename + "\n"
         if header != "":
@@ -390,7 +395,7 @@ class FitWorkspace:
         cbar.ax.tick_params(labelsize=9)
         fig.tight_layout()
         if parameters.SAVE and self.filename != "":
-            figname = self.filename.replace(self.filename.split('.')[-1], "_correlation.pdf")
+            figname = os.path.splitext(self.filename)[0] + "_correlation.pdf"
             self.my_logger.info(f"Save figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
         if parameters.DISPLAY:
@@ -406,7 +411,8 @@ class FitWorkspace:
             good_indices = self.not_outliers
             model_err = model_err.flatten()[good_indices]
             err = self.err.flatten()[good_indices]
-            res = (model.flatten()[good_indices] - self.data.flatten()[good_indices]) / np.sqrt(model_err * model_err + err * err)
+            res = (model.flatten()[good_indices] - self.data.flatten()[good_indices]) / np.sqrt(
+                model_err * model_err + err * err)
         else:
             res = ((model - self.data) / np.sqrt(model_err * model_err + self.err * self.err)).flatten()
         return res
@@ -583,7 +589,7 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
     fig.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
     if parameters.SAVE and fit_workspace.filename != "":
-        figname = fit_workspace.filename.replace("."+fit_workspace.filename.split('.')[-1], "_fitting.pdf")
+        figname = os.path.splitext(fit_workspace.filename)[0] + "_fitting.pdf"
         fit_workspace.my_logger.info(f"\n\tSave figure {figname}.")
         fig.savefig(figname, dpi=100, bbox_inches='tight')
     if parameters.DISPLAY:
@@ -601,7 +607,7 @@ def save_gradient_descent(fit_workspace, costs, params_table):
     t[1] = costs
     t[2:] = params_table.T
     h = 'iter,costs,' + ','.join(fit_workspace.input_labels)
-    output_filename = fit_workspace.filename.replace(fit_workspace.filename.split('.')[-1], "_fitting.txt")
+    output_filename = os.path.splitext(fit_workspace.filename)[0] + "_fitting.txt"
     np.savetxt(output_filename, t.T, header=h, delimiter=",")
     fit_workspace.my_logger.info(f"\n\tSave gradient descent log {output_filename}.")
 
@@ -638,7 +644,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
     if method == "minimize":
         start = time.time()
         result = optimize.minimize(nll, fit_workspace.p, method='L-BFGS-B',
-                                   options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True,
+                                   options={'ftol': 1e-20, 'gtol': 1e-20, 'disp': True,
                                             'maxiter': 100000,
                                             'maxls': 50, 'maxcor': 30},
                                    bounds=bounds)
@@ -692,6 +698,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
                                                    fix=fix, xtol=xtol, ftol=ftol, niter=niter, verbose=verbose)
         fit_workspace.costs = costs
+        fit_workspace.params_table = params_table
         if verbose:
             my_logger.debug(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
@@ -769,4 +776,3 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod()
-
