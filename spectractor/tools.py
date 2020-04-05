@@ -2245,10 +2245,10 @@ def compute_correlation_matrix(cov):
 
 
 def plot_correlation_matrix_simple(ax, cov, axis_names, ipar=None):
-    rho = compute_correlation_matrix(cov=cov)
-    im = plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
     if ipar is None:
-        ipar = np.arange(0, cov.shape[0]).astype(int)
+        ipar = np.arange(cov.shape[0]).astype(int)
+    rho = compute_correlation_matrix(cov=cov[ipar[:, None], ipar])
+    im = plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
     ax.set_title("Correlation matrix")
     names = [axis_names[ip] for ip in ipar]
     plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=11)
