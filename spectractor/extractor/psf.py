@@ -403,13 +403,13 @@ class PSFFitWorkspace(FitWorkspace):
         self.data = data
         self.err = data_errors
         self.bgd_model_func = bgd_model_func
-        self.p = np.copy(self.psf.p) #[1:])
+        self.p = np.copy(self.psf.p)  # [1:])
         self.guess = np.copy(self.psf.p)
         self.saturation = self.psf.p[-1]
         self.fixed = [False] * len(self.p)
         self.fixed[-1] = True  # fix saturation parameter
-        self.input_labels = list(np.copy(self.psf.param_names))  #[1:]))
-        self.axis_names = list(np.copy(self.psf.axis_names)) #[1:]))
+        self.input_labels = list(np.copy(self.psf.param_names))  # [1:]))
+        self.axis_names = list(np.copy(self.psf.axis_names))  # [1:]))
         self.bounds = self.psf.bounds  # [1:]
         self.nwalkers = max(2 * self.ndim, nwalkers)
 
