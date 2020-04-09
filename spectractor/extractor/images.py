@@ -591,6 +591,15 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
         The x position of the target.
     y0: float
         The y position of the target.
+
+    Examples
+    --------
+    >>> im = Image('tests/data/reduc_20170605_028.fits')
+    >>> im.plot_image()
+    >>> guess = [820, 580]
+    >>> parameters.VERBOSE = True
+    >>> parameters.DEBUG = True
+    >>> x1, y1 = find_target(im, guess)
     """
     my_logger = set_logger(__name__)
     target_pixcoords = [-1, -1]
@@ -638,9 +647,9 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
                                                                      widths=[Dx, Dy])
             # find the target
             try:
-                avX, avY = find_target_2Dprofile(image, sub_image, guess, sub_errors=sub_errors)
-            except Exception:
-                avX, avY = find_target_2DprofileASTROPY(image, sub_image, guess, sub_errors=sub_errors)
+                avX, avY = find_target_2Dprofile(image, sub_image, sub_errors=sub_errors)
+            except (Exception, ValueError):
+                avX, avY = find_target_2DprofileASTROPY(image, sub_image, sub_errors=sub_errors)
             # compute target position
             theX = x0 - Dx + avX
             theY = y0 - Dy + avY
@@ -787,7 +796,7 @@ def find_target_1Dprofile(image, sub_image, guess):
     return avX, avY
 
 
-def find_target_2Dprofile(image, sub_image, guess=None, sub_errors=None):
+def find_target_2Dprofile(image, sub_image, sub_errors=None):
     """
     Find precisely the position of the targeted object fitting a PSF model.
     A polynomial 2D background is subtracted first. Saturated pixels are masked with np.nan values.
@@ -812,7 +821,7 @@ def find_target_2Dprofile(image, sub_image, guess=None, sub_errors=None):
     >>> sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False) #, widths=[30,30])
     >>> xmax = np.argmax(np.sum(sub_image, axis=0))
     >>> ymax = np.argmax(np.sum(sub_image, axis=1))
-    >>> x1, y1 = find_target_2Dprofile(im, sub_image, guess, sub_errors=sub_errors)
+    >>> x1, y1 = find_target_2Dprofile(im, sub_image, sub_errors=sub_errors)
 
     .. doctest::
         :hide:
@@ -821,7 +830,6 @@ def find_target_2Dprofile(image, sub_image, guess=None, sub_errors=None):
         >>> assert np.isclose(y1, ymax, rtol=1e-2)
 
     """
-    # TODO: replace with minuit and test on image _133.fits or decrease mean_prior
     # fit and subtract smooth polynomial background
     # with 3sigma rejection of outliers (star peaks)
     NY, NX = sub_image.shape
@@ -832,11 +840,8 @@ def find_target_2Dprofile(image, sub_image, guess=None, sub_errors=None):
     image.target_bkgd2D = bkgd_2D
     sub_image_subtracted = sub_image - bkgd_2D(X, Y)
     # find a first guess of the target position
-    if guess is None:
-        avX, sigX = weighted_avg_and_std(XX, np.sum(sub_image_subtracted, axis=0) ** 4)
-        avY, sigY = weighted_avg_and_std(YY, np.sum(sub_image_subtracted, axis=1) ** 4)
-    else:
-        avX, avY = guess
+    avX, sigX = weighted_avg_and_std(XX, np.sum(sub_image_subtracted, axis=0) ** 4)
+    avY, sigY = weighted_avg_and_std(YY, np.sum(sub_image_subtracted, axis=1) ** 4)
     # fit a 2D star profile close to this position
     # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2Ds
     # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
@@ -905,7 +910,7 @@ def find_target_2Dprofile(image, sub_image, guess=None, sub_errors=None):
     return new_avX, new_avY
 
 
-def find_target_2DprofileASTROPY(image, sub_image, guess, sub_errors=None):
+def find_target_2DprofileASTROPY(image, sub_image, sub_errors=None):
     """
     Find precisely the position of the targeted object fitting a PSF model.
     A polynomial 2D background is subtracted first. Saturated pixels are masked with np.nan values.
@@ -918,8 +923,6 @@ def find_target_2DprofileASTROPY(image, sub_image, guess, sub_errors=None):
         The Image instance.
     sub_image: array_like
         The cropped image data array where the fit is performed.
-    guess: array_like
-        Two parameter array giving the estimated position of the target in the image.
     sub_errors: array_like
         The image data uncertainties.
 
@@ -931,7 +934,7 @@ def find_target_2DprofileASTROPY(image, sub_image, guess, sub_errors=None):
     >>> sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False)
     >>> xmax = np.argmax(np.sum(sub_image, axis=0))
     >>> ymax = np.argmax(np.sum(sub_image, axis=1))
-    >>> x1, y1 = find_target_2DprofileASTROPY(im, sub_image, guess)
+    >>> x1, y1 = find_target_2DprofileASTROPY(im, sub_image)
 
     .. doctest::
         :hide:
