@@ -399,6 +399,12 @@ class Spectrum:
             self.data = raw_data[1]
             if len(raw_data) > 2:
                 self.err = raw_data[2]
+            if self.header['DATE-OBS'] != "":
+                self.date_obs = self.header['DATE-OBS']
+            if self.header['EXPTIME'] != "":
+                self.expo = self.header['EXPTIME']
+            if self.header['AIRMASS'] != "":
+                self.disperser_label = self.header['AIRMASS']
             if self.header['GRATING'] != "":
                 self.disperser_label = self.header['GRATING']
             if self.header['TARGET'] != "":

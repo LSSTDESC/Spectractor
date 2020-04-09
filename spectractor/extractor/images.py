@@ -59,7 +59,7 @@ class Image(object):
         self.file_name = file_name
         self.units = 'ADU'
         self.expo = -1
-        self.airmass = None
+        self.airmass = -1
         self.date_obs = None
         self.disperser = None
         self.disperser_label = disperser_label
