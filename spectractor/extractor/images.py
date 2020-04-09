@@ -554,12 +554,16 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
     image.data = image.data.T[:, ::-1]
-    image.airmass = 0.5 * (float(image.header["AMSTART"]) + float(image.header["AMEND"]))
+    if image.header["AMSTART"] is not None:
+        image.airmass = 0.5 * (float(image.header["AMSTART"]) + float(image.header["AMEND"]))
+    else:
+        image.airmass = -1
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
     image.disperser_label = image.header['GRATING']
+    image.read_out_noise = np.zeros_like(image.data)
 
 
 def find_target(image, guess=None, rotated=False, use_wcs=True):
@@ -633,7 +637,10 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
             sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
                                                                      widths=[Dx, Dy])
             # find the target
-            avX, avY = find_target_2Dprofile(image, sub_image, guess, sub_errors=sub_errors)
+            try:
+                avX, avY = find_target_2Dprofile(image, sub_image, guess, sub_errors=sub_errors)
+            except Exception:
+                avX, avY = find_target_2DprofileASTROPY(image, sub_image, guess, sub_errors=sub_errors)
             # compute target position
             theX = x0 - Dx + avX
             theY = y0 - Dy + avY
@@ -780,12 +787,10 @@ def find_target_1Dprofile(image, sub_image, guess):
     return avX, avY
 
 
-def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
+def find_target_2Dprofile(image, sub_image, guess=None, sub_errors=None):
     """
     Find precisely the position of the targeted object fitting a PSF model.
     A polynomial 2D background is subtracted first. Saturated pixels are masked with np.nan values.
-
-    THE ERROR ARRAY IS NOT USED FOR THE MOMENT.
 
     Parameters
     ----------
@@ -793,8 +798,8 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
         The Image instance.
     sub_image: array_like
         The cropped image data array where the fit is performed.
-    guess: array_like
-        Two parameter array giving the estimated position of the target in the image.
+    guess: array_like, optional
+        Two parameter array giving the estimated position of the target in the image (default: None).
     sub_errors: array_like
         The image data uncertainties.
 
@@ -827,10 +832,13 @@ def find_target_2Dprofile(image, sub_image, guess, sub_errors=None):
     image.target_bkgd2D = bkgd_2D
     sub_image_subtracted = sub_image - bkgd_2D(X, Y)
     # find a first guess of the target position
-    avX, sigX = weighted_avg_and_std(XX, np.sum(sub_image_subtracted, axis=0) ** 4)
-    avY, sigY = weighted_avg_and_std(YY, np.sum(sub_image_subtracted, axis=1) ** 4)
+    if guess is None:
+        avX, sigX = weighted_avg_and_std(XX, np.sum(sub_image_subtracted, axis=0) ** 4)
+        avY, sigY = weighted_avg_and_std(YY, np.sum(sub_image_subtracted, axis=1) ** 4)
+    else:
+        avX, avY = guess
     # fit a 2D star profile close to this position
-    # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2D
+    # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2Ds
     # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
     psf = Moffat()
     total_flux = np.sum(sub_image_subtracted)
