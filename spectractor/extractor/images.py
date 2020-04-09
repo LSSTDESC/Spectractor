@@ -122,6 +122,9 @@ class Image(object):
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.header["GRATING"] = self.disperser_label
+        self.header["AIRMASS"] = self.airmass
+        self.header["DATE-OBS"] = self.date_obs
+        self.header["EXPTIME"] = self.expo
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
         self.compute_statistical_error()
@@ -512,6 +515,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.data = data[::-1, :].T
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
+    image.airmass = -1
     parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
     if "mm" not in hdus["XYZ"].header.comments["ZPOS"]:
         image.my_logger.error(f'\n\tmm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
@@ -550,6 +554,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['EXPTIME'])
     image.data = image.data.T[:, ::-1]
+    image.airmass = 0.5 * (float(image.header["AMSTART"]) + float(image.header["AMEND"]))
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
