@@ -122,7 +122,7 @@ class ChromaticPSF:
         ..  doctest::
             :hide:
 
-            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 2, 0, 5, 0, 2, 0, -0.4, -0.4, 1,0,20000])))
+            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 2, 0, 5, 0, 2, 0, -0.4, -0.4,1,0,20000])))
 
         """
         if not isinstance(self.psf, MoffatGauss) and not isinstance(self.psf, Moffat):
@@ -216,12 +216,13 @@ class ChromaticPSF:
         profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:, 1] = np.arange(self.Nx)  # replace x_mean
         output = np.zeros((self.Ny, self.Nx))
-        for x in range(self.Nx):
-            if mode == "1D":
+        if mode == "1D":
+            for x in range(self.Nx):
                 output[:, x] = self.psf.evaluate(pixels, p=profile_params[x, :])
-            elif mode == "2D":
+        elif mode == "2D":
+            for x in range(self.Nx):
                 output += self.psf.evaluate(pixels, p=profile_params[x, :])
-        return output
+        return np.clip(output, 0, self.saturation)
 
     def fill_table_with_profile_params(self, profile_params):
         """
@@ -696,7 +697,7 @@ class ChromaticPSF:
         PSF_models = []
         PSF_truth = []
         if truth is not None:
-            PSF_truth = truth.from_poly_params_to_profile_params(truth.poly_params)
+            PSF_truth = truth.from_poly_params_to_profile_params(truth.poly_params, apply_bounds=True)
         all_pixels = np.arange(self.profile_params.shape[0])
         for i, name in enumerate(self.psf.param_names):
             fit, cov, model = fit_poly1d(all_pixels, self.profile_params[:, i], order=self.degrees[name])
@@ -982,7 +983,8 @@ class ChromaticPSF:
         ... w.amplitude_params_err])
         >>> from spectractor.tools import compute_correlation_matrix
         >>> rho = compute_correlation_matrix(w.amplitude_cov_matrix[10:20,10:20])
-        >>> plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
+        >>> plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)  # doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at ...>
         >>> plt.show()
 
         ..  doctest::
@@ -1031,7 +1033,6 @@ class ChromaticPSF:
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose)
         else:
             self.my_logger.error(f"\n\tUnknown fitting mode={mode}. Must be '1D' or '2D'.")
-        w.live_fit = True
         run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
         self.poly_params = w.poly_params
 
