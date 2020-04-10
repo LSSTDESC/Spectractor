@@ -36,6 +36,7 @@ def __getattr__(name):
 # Paths
 mypath = os.path.dirname(__file__)
 DISPERSER_DIR = os.path.join(mypath, "extractor/dispersers/")
+CONFIG_DIR = os.path.join(mypath, "../config/")
 THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
 ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
 LIBRADTRAN_DIR = os.getenv('LIBRADTRAN_DIR') + '/'
@@ -108,7 +109,7 @@ BGD_ORDER = 1  # the order of the polynomial background to fit in the transverse
 
 # PSF
 PSF_POLY_ORDER = 2  # the order of the polynomials to model wavelength dependence of the PSF shape parameters
-PSF_FIT_REG_PARAM = 0.01  # regularisation parameter for the chisq minimisation to extract the spectrum
+PSF_FIT_REG_PARAM = 0.002  # regularisation parameter for the chisq minimisation to extract the spectrum
 
 # Detection line algorithm
 CALIB_BGD_ORDER = 3  # order of the background polynome to fit

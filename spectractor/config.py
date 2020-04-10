@@ -24,8 +24,8 @@ def from_config_to_parameters(config):
     --------
 
     >>> config = configparser.ConfigParser()
-    >>> config.read("./config/default.ini")
-    ['./config/default.ini']
+    >>> config.read(os.path.join(parameters.CONFIG_DIR,"default.ini"))  # doctest: +ELLIPSIS
+    ['/.../config/default.ini']
     >>> from_config_to_parameters(config)
     >>> assert parameters.OBS_NAME == "DEFAULT"
 
@@ -77,11 +77,11 @@ def load_config(config_filename):
         >>> os.rename("./config/default.ini.bak", "./config/default.ini")
 
     """
-    if not os.path.isfile("./config/default.ini"):
-        sys.exit('Config file ./config/default.ini does not exist.')
+    if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, "default.ini")):
+        sys.exit('Config file default.ini does not exist.')
     # Load the configuration file
     config = configparser.ConfigParser()
-    config.read("./config/default.ini")
+    config.read(os.path.join(parameters.CONFIG_DIR, "default.ini"))
     from_config_to_parameters(config)
 
     if not os.path.isfile(config_filename):
@@ -147,7 +147,7 @@ def set_logger(logger):
     """
     my_logger = logging.getLogger(logger)
     coloredlogs.DEFAULT_LEVEL_STYLES['warn'] = {'color': 'yellow'}
-    coloredlogs.DEFAULT_FIELD_STYLES['levelname'] = {'color':  'white', 'bold': True}
+    coloredlogs.DEFAULT_FIELD_STYLES['levelname'] = {'color': 'white', 'bold': True}
     if parameters.VERBOSE > 0:
         my_logger.setLevel(logging.INFO)
         coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.INFO)
