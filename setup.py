@@ -3,6 +3,8 @@ import os
 import re
 
 reqs = open('requirements.txt', 'r').read().strip().splitlines()
+if os.getenv('READTHEDOCS'):
+    reqs.remove('mpi4py')
 
 with open('README.md') as file:
     long_description = file.read()
@@ -26,7 +28,8 @@ setup(
     test_suite='nose.collector',
     tests_require=['nose'],
     package_dir={'spectractor': './spectractor'},
-    package_data={'spectractor.extractor': ['dispersers/HoloPhAg/*.txt', 'dispersers/HoloPhP/*.txt',
+    package_data={'spectractor': ['../config/*.ini'],
+                  'spectractor.extractor': ['dispersers/HoloPhAg/*.txt', 'dispersers/HoloPhP/*.txt',
                                             'dispersers/HoloAmAg/*.txt', 'dispersers/Thor300/*.txt',
                                             'dispersers/Ron200/*.txt', 'dispersers/Ron400/*.txt'],
                   'spectractor.simulation': ['CTIOThroughput/*.txt']},
