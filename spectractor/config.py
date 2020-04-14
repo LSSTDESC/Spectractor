@@ -106,6 +106,10 @@ def load_config(config_filename):
                                    * parameters.g_disperser_ronchi).decompose()).value
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
 
+    # check consistency
+    if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
+        sys.exit(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
+
     if parameters.VERBOSE:
         for section in config.sections():
             print(f"Section: {section}")
