@@ -649,6 +649,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
             try:
                 avX, avY = find_target_2Dprofile(image, sub_image, sub_errors=sub_errors)
             except (Exception, ValueError):
+                image.target_star2D = None
                 avX, avY = find_target_2DprofileASTROPY(image, sub_image, sub_errors=sub_errors)
             # compute target position
             theX = x0 - Dx + avX
