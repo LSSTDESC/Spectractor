@@ -1125,7 +1125,18 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Extract the background on the rotated image
+    bgd_index = np.concatenate((np.arange(0, Ny//2 - ws[0]), np.arange(Ny//2 + ws[0], Ny))).astype(int)
     bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
+    bgd_res = ((data - bgd_model_func(np.arange(Nx), np.arange(Ny)))/err)[bgd_index]
+    while np.mean(bgd_res)/np.std(bgd_res) < -0.5:
+        parameters.PIXWIDTH_BOXSIZE //= 2
+        my_logger.warning(f"\n\tPull distribution of background residuals has a negative mean which may lead to "
+                          f"background over-subtraction: mean(pull)/RMS(pull)={np.mean(bgd_res)/np.std(bgd_res)}."
+                          f"This value should be greater than -0.5. To do so, parameters.PIXWIDTH_BOXSIZE is divided "
+                          f"by 2 from {parameters.PIXWIDTH_BOXSIZE*2} -> {parameters.PIXWIDTH_BOXSIZE}.")
+        bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
+        bgd_res = ((data - bgd_model_func(np.arange(Nx), np.arange(Ny)))/err)[bgd_index]
+
     # bgd_model_func = extract_spectrogram_background_poly2D(data, ws=ws)
 
     # Fit the transverse profile
@@ -1150,8 +1161,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                    f'mode={mode} and amplitude_priors_method={method}...')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
                             amplitude_priors_method=method, mode=mode)
-    w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
-                            amplitude_priors_method="psf1d", mode="2D", verbose=True)
+    #w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
+    #                        amplitude_priors_method="psf1d", mode="2D", verbose=True)
     if parameters.DEBUG:
         s.plot_summary()
         w.plot_fit()
