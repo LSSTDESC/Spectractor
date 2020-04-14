@@ -36,6 +36,7 @@ def __getattr__(name):
 # Paths
 mypath = os.path.dirname(__file__)
 DISPERSER_DIR = os.path.join(mypath, "extractor/dispersers/")
+CONFIG_DIR = os.path.join(mypath, "../config/")
 THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
 ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
 LIBRADTRAN_DIR = os.getenv('LIBRADTRAN_DIR') + '/'
