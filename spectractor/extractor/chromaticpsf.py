@@ -866,9 +866,11 @@ class ChromaticPSF:
                 signal = y - bgd_model_func(x, index)[:, 0]
             else:
                 signal = y
+            if np.mean(signal[bgd_index]) < 0:
+                signal -= np.mean(signal[bgd_index])
             # in case guess amplitude is too low
             # pdf = np.abs(signal)
-            signal_sum = np.nansum(np.abs(signal[middle - ws[0]:middle + ws[0]]))
+            signal_sum = np.nansum(signal[middle - ws[0]:middle + ws[0]])
             # if signal_sum > 0:
             #     pdf /= signal_sum
             # mean = np.nansum(pdf * index)
@@ -879,8 +881,8 @@ class ChromaticPSF:
             # if guess[4] > -1:
             #    guess[0] = np.max(signal) / (1 + guess[4])
             # std = np.sqrt(np.nansum(pdf * (index - mean) ** 2))
-            if guess[0] < 3 * np.nanstd(bgd):
-                guess[0] = float(0.9 *np.abs(np.nanmax(signal)))
+            # if guess[0] < 3 * np.nanstd(bgd):
+            #     guess[0] = float(0.9 * np.abs(np.nanmax(signal)))
             # if guess[0] * (1 + 0*guess[4]) > 1.2 * maxi:
             #     guess[0] = 0.9 * maxi
             psf.p = guess
