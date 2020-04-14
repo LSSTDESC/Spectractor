@@ -1128,10 +1128,10 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     bgd_index = np.concatenate((np.arange(0, Ny//2 - ws[0]), np.arange(Ny//2 + ws[0], Ny))).astype(int)
     bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
     bgd_res = ((data - bgd_model_func(np.arange(Nx), np.arange(Ny)))/err)[bgd_index]
-    while np.mean(bgd_res)/np.std(bgd_res) < -0.5:
-        parameters.PIXWIDTH_BOXSIZE //= 2
+    while np.nanmean(bgd_res)/np.nanstd(bgd_res) < -0.2 and parameters.PIXWIDTH_BOXSIZE >= 5:
+        parameters.PIXWIDTH_BOXSIZE = max(5, parameters.PIXWIDTH_BOXSIZE // 2)
         my_logger.warning(f"\n\tPull distribution of background residuals has a negative mean which may lead to "
-                          f"background over-subtraction: mean(pull)/RMS(pull)={np.mean(bgd_res)/np.std(bgd_res)}."
+                          f"background over-subtraction: mean(pull)/RMS(pull)={np.nanmean(bgd_res)/np.nanstd(bgd_res)}."
                           f"This value should be greater than -0.5. To do so, parameters.PIXWIDTH_BOXSIZE is divided "
                           f"by 2 from {parameters.PIXWIDTH_BOXSIZE*2} -> {parameters.PIXWIDTH_BOXSIZE}.")
         bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
