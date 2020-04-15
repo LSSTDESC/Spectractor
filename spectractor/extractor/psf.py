@@ -91,10 +91,74 @@ def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
 
 
 @njit
-def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev):  # pragma: nocover
+def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
+    r"""Compute a 1D Moffat-Gaussian function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(y) \propto A |left\lbrace \frac{1}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
+         - \eta e^{-(y-y_0)^2/(2\sigma^2)}\right\rbrace
+        \quad\text{with}\quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
+        \quad\text{ and } \quad \eta < 0
+
+
+    Parameters
+    ----------
+    y: array_like
+        1D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    y_mean: float
+        Center  :math:`y_0` of the function.
+    gamma: float
+        Width  :math:`\gamma` of the Moffat function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+    eta_gauss: float
+        Relative negative amplitude of the Gaussian function.
+    sigma: float
+        Width :math:`\sigma` of the Gaussian function.
+
+    Returns
+    -------
+    output: array_like
+        1D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Ny = 50
+    >>> y = np.arange(Ny)
+    >>> amplitude = 10
+    >>> a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_mean=Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
+    >>> print(f"{np.sum(a):.6f}")
+    10.000000
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(np.sum(a), amplitude)
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Ny = 50
+        y = np.arange(Ny)
+        amplitude = 10
+        a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_mean=Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
+        plt.plot(a)
+        plt.grid()
+        plt.xlabel("y")
+        plt.ylabel("Moffat")
+        plt.show()
+
+    """
     rr = (y - y_mean) * (y - y_mean)
     rr_gg = rr / (gamma * gamma)
-    a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
+    a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * sigma * sigma)))
     dx = y[1] - y[0]
     integral = np.sum(a) * dx
     norm = amplitude
@@ -106,6 +170,74 @@ def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev
 
 @njit
 def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):  # pragma: nocover
+    r"""Compute a 2D Moffat function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(x, y) = \frac{A (\alpha - 1)}{\pi \gamma^2} \frac{1}{
+        \left[ 1 +\frac{\left(x-x_0\right)^2+\left(y-y_0\right)^2}{\gamma^2} \right]^\alpha}
+        \quad\text{with}\quad
+        \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
+
+    Note that the normalisation of a 2D Moffat function is analytical so it is not expected that
+    the sum of the output array is equal to :math:`A`, but lower.
+
+    Parameters
+    ----------
+    x: array_like
+        2D array of pixels :math:`x`, regularly spaced.
+    y: array_like
+        2D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    x_mean: float
+        X axis center  :math:`x_0` of the function.
+    y_mean: float
+        Y axis center  :math:`y_0` of the function.
+    gamma: float
+        Width  :math:`\gamma` of the function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+
+    Returns
+    -------
+    output: array_like
+        2D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Nx = 50
+    >>> Ny = 50
+    >>> xx, yy = np.mgrid[:Nx, :Ny]
+    >>> amplitude = 10
+    >>> a = evaluate_moffat2d(xx, yy, amplitude=amplitude, x_mean=Nx/2, y_mean=Ny/2, gamma=5, alpha=2)
+    >>> print(f"{np.sum(a):.6f}")
+    9.683129
+
+    .. doctest::
+        :hide:
+
+        >>> assert not np.isclose(np.sum(a), amplitude)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Nx = 50
+        Ny = 50
+        xx, yy = np.mgrid[:Nx, :Ny]
+        amplitude = 10
+        a = evaluate_moffat2d(xx, yy, amplitude=amplitude, y_mean=Ny/2, x_mean=Nx/2, gamma=5, alpha=2)
+        im = plt.pcolor(xx, yy, a)
+        plt.grid()
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.colorbar(im, label="Moffat 2D")
+        plt.show()
+
+    """
     rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha)
@@ -115,11 +247,84 @@ def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):  # pragma:
 
 
 @njit
-def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev):  # pragma: nocover
+def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
+    r"""Compute a 2D Moffat-Gaussian function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(x, y) = \frac{A}{\frac{\pi \gamma^2}{\alpha-1} + 2 \pi \eta \sigma^2}\left\lbrace \frac{1}{
+        \left[ 1 +\frac{\left(x-x_0\right)^2+\left(y-y_0\right)^2}{\gamma^2} \right]^\alpha}
+         + \eta e^{-\left[ \left(x-x_0\right)^2+\left(y-y_0\right)^2\right]/(2 \sigma^2)}
+        \right\rbrace
+        \quad\text{with}\quad
+        \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
+        \quad\text{and} \quad \eta < 0
+
+    Parameters
+    ----------
+    x: array_like
+        2D array of pixels :math:`x`, regularly spaced.
+    y: array_like
+        2D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    x_mean: float
+        X axis center  :math:`x_0` of the function.
+    y_mean: float
+        Y axis center  :math:`y_0` of the function.
+    gamma: float
+        Width  :math:`\gamma` of the function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+    eta_gauss: float
+        Relative negative amplitude of the Gaussian function.
+    sigma: float
+        Width :math:`\sigma` of the Gaussian function.
+
+    Returns
+    -------
+    output: array_like
+        2D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Nx = 50
+    >>> Ny = 50
+    >>> xx, yy = np.mgrid[:Nx, :Ny]
+    >>> amplitude = 10
+    >>> a = evaluate_moffatgauss2d(xx, yy, amplitude=amplitude, x_mean=Nx/2, y_mean=Ny/2, gamma=5, alpha=2,
+    ... eta_gauss=-0.1, sigma=1)
+    >>> print(f"{np.sum(a):.6f}")
+    9.680573
+
+    .. doctest::
+        :hide:
+
+        >>> assert not np.isclose(np.sum(a), amplitude)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Nx = 50
+        Ny = 50
+        xx, yy = np.mgrid[:Nx, :Ny]
+        amplitude = 10
+        a = evaluate_moffatgauss2d(xx, yy, amplitude, Nx/2, Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
+        im = plt.pcolor(xx, yy, a)
+        plt.grid()
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.colorbar(im, label="Moffat 2D")
+        plt.show()
+
+    """
     rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
     rr_gg = rr / (gamma * gamma)
-    a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
-    norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * stddev * stddev
+    a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * sigma * sigma)))
+    norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * sigma * sigma
     a *= amplitude / norm
     return a.T
 
