@@ -3,19 +3,14 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to Spectractor's documentation!
-=======================================
+.. mdinclude:: ../README.md
+
 
 .. toctree::
     :maxdepth: 4
     :caption: Contents:
 
     source/modules
-
-Readme File
-===========
-
-.. mdinclude:: ../README.md
 
 Indices and tables
 ==================
