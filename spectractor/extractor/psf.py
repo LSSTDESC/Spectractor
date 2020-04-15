@@ -20,6 +20,68 @@ from numba import njit
 
 @njit
 def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):
+    r"""Compute a 1D Moffat function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
+
+    .. math ::
+
+        \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
+
+
+    Parameters
+    ----------
+    y: array_like
+        1D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    y_mean: float
+        Center  :math:`y_0` of the function.
+    gamma: float
+        Width  :math:`\gamma` of the function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+
+    Returns
+    -------
+    output: array_like
+        1D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Ny = 50
+    >>> y = np.arange(Ny)
+    >>> amplitude = 10
+    >>> a = evaluate_moffat1d(y, amplitude=amplitude, y_mean=Ny/2, gamma=5, alpha=2)
+    >>> print(f"{np.sum(a):.6f}")
+    10.000000
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(np.sum(a), amplitude)
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
+
+    .. plot::
+        :include-source:
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Ny = 50
+        y = np.arange(Ny)
+        amplitude = 10
+        a = evaluate_moffat1d(y, amplitude=amplitude, y_mean=Ny/2, gamma=5, alpha=2)
+        plt.plot(a)
+        plt.grid()
+        plt.xlabel("y")
+        plt.ylabel("Moffat")
+        plt.show()
+
+    """
     rr = (y - y_mean) * (y - y_mean)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha)
