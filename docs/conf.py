@@ -21,6 +21,7 @@ import os
 import sys
 
 from unittest.mock import MagicMock
+from recommonmark.transform import AutoStructify
 
 sys.path.insert(0, os.path.abspath('../'))
 
@@ -44,21 +45,21 @@ sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['sphinx.ext.autodoc',
-    'sphinx.ext.doctest',
-    'sphinx.ext.intersphinx',
-    'sphinx.ext.todo',
-    'sphinx.ext.coverage',
-    'sphinx.ext.mathjax',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.githubpages',
-    'sphinx.ext.napoleon',
-    'matplotlib.sphinxext.plot_directive',
-    'sphinx.ext.autosummary',
-              'm2r'] #
+              'sphinx.ext.doctest',
+              'sphinx.ext.intersphinx',
+              'sphinx.ext.todo',
+              'sphinx.ext.coverage',
+              'sphinx.ext.mathjax',
+              'sphinx.ext.viewcode',
+              'sphinx.ext.githubpages',
+              'sphinx.ext.napoleon',
+              'matplotlib.sphinxext.plot_directive',
+              'sphinx.ext.autosummary',
+              'm2r']  #
 
 plot_html_show_source_link = True
 plot_html_show_formats = False
-plot_include_source  = False
+plot_include_source = False
 plot_working_directory = '../'
 plot_basedir = '../'
 
@@ -76,14 +77,11 @@ templates_path = ['_templates']
 source_suffix = ['.rst', '.md']
 # source_suffix = '.rst'
 
-# At top on conf.py (with other import statements)
-import recommonmark
-from recommonmark.transform import AutoStructify
 
 # At the bottom of conf.py
 def setup(app):
     app.add_config_value('recommonmark_config', {
-        #'url_resolver': lambda url: github_doc_root + url,
+        # 'url_resolver': lambda url: github_doc_root + url,
         'auto_toc_tree_section': 'Contents',
         'enable_math': False,
         'enable_inline_math': False,
@@ -127,13 +125,12 @@ pygments_style = 'sphinx'
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
 
-
 # -- Options for HTML output ----------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'  #'alabaster'
+html_theme = 'sphinx_rtd_theme'  # 'alabaster'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -161,12 +158,10 @@ html_sidebars = {
     ]
 }
 
-
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'Spectractordoc'
-
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -196,7 +191,6 @@ latex_documents = [
      'Jeremy Neveu', 'manual'),
 ]
 
-
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples
@@ -205,7 +199,6 @@ man_pages = [
     (master_doc, 'spectractor', 'Spectractor Documentation',
      [author], 1)
 ]
-
 
 # -- Options for Texinfo output -------------------------------------------
 
@@ -217,9 +210,6 @@ texinfo_documents = [
      author, 'Spectractor', 'One line description of project.',
      'Miscellaneous'),
 ]
-
-
-
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {'https://docs.python.org/': None}
