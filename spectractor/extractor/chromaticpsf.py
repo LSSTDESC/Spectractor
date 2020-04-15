@@ -17,18 +17,18 @@ class ChromaticPSF:
     """Class to store a PSF evolving with wavelength.
 
     The wavelength evolution is stored in an Astropy table instance. Whatever the PSF model, the common keywords are:
-    - lambdas: the wavelength [nm]
-    - Dx: the distance along X axis to order 0 position of the PSF model centroid  [pixels]
-    - Dy: the distance along Y axis to order 0 position of the PSF model centroid [pixels]
-    - Dy_mean: the distance along Y axis to order 0 position of the mean dispersion axis [pixels]
-    - flux_sum: the transverse sum of the data flux [spectrogram units]
-    - flux_integral: the integral of the best fitting PSF model to the data (should be equal to the amplitude parameter
+    * lambdas: the wavelength [nm]
+    * Dx: the distance along X axis to order 0 position of the PSF model centroid  [pixels]
+    * Dy: the distance along Y axis to order 0 position of the PSF model centroid [pixels]
+    * Dy_mean: the distance along Y axis to order 0 position of the mean dispersion axis [pixels]
+    * flux_sum: the transverse sum of the data flux [spectrogram units]
+    * flux_integral: the integral of the best fitting PSF model to the data (should be equal to the amplitude parameter
     of the PSF model if the model is correclty normalized to one) [spectrogram units]
-    - flux_err: the uncertainty on flux_sum [spectrogram units]
-    - fwhm: the FWHM of the best fitting PSF model [pixels]
-    - Dy_fwhm_sup: the distance along Y axis to order 0 position of the upper FWHM edge [pixels]
-    - Dy_fwhm_inf: the distance along Y axis to order 0 position of the lower FWHM edge [pixels]
-    - Dx_rot: the distance along X axis to order 0 position in the rotated spectrogram (no angle) [pixels]
+    * flux_err: the uncertainty on flux_sum [spectrogram units]
+    * fwhm: the FWHM of the best fitting PSF model [pixels]
+    * Dy_fwhm_sup: the distance along Y axis to order 0 position of the upper FWHM edge [pixels]
+    * Dy_fwhm_inf: the distance along Y axis to order 0 position of the lower FWHM edge [pixels]
+    * Dx_rot: the distance along X axis to order 0 position in the rotated spectrogram (no angle) [pixels]
 
     Then all the specific parameter of the PSF model are stored in other columns with their wavelength evolution
     (read from PSF.param_names attribute).
@@ -183,17 +183,33 @@ class ChromaticPSF:
         Examples
         --------
 
-        .. doctest::
+        >>> psf = MoffatGauss()
+        >>> s = ChromaticPSF(psf, Nx=100, Ny=20, deg=4, saturation=20000)
+        >>> poly_params = s.generate_test_poly_params()
 
-            >>> psf = MoffatGauss()
-            >>> s = ChromaticPSF(psf, Nx=100, Ny=20, deg=4, saturation=20000)
-            >>> poly_params = s.generate_test_poly_params()
+        1D evaluation:
+
+        .. doctest::
 
             >>> output = s.evaluate(poly_params, mode="1D")
             >>> im = plt.imshow(output, origin='lower')  # doctest: +ELLIPSIS
             >>> plt.colorbar(im)  # doctest: +ELLIPSIS
             <matplotlib.colorbar.Colorbar object at 0x...>
             >>> plt.show()
+
+        .. plot ::
+
+            from spectractor.extractor.chromaticpsf import ChromaticPSF
+            from spectractor.extractor.psf import MoffatGauss
+            psf = MoffatGauss()
+            s = ChromaticPSF(psf, Nx=100, Ny=20, deg=4, saturation=20000)
+            poly_params = s.generate_test_poly_params()
+            output = s.evaluate(poly_params, mode="1D")
+            im = plt.imshow(output, origin='lower')
+            plt.colorbar(im)
+            plt.show()
+
+        2D evaluation:
 
         .. doctest::
 
@@ -203,6 +219,17 @@ class ChromaticPSF:
             <matplotlib.colorbar.Colorbar object at 0x...>
             >>> plt.show()
 
+        .. plot ::
+
+            from spectractor.extractor.chromaticpsf import ChromaticPSF
+            from spectractor.extractor.psf import MoffatGauss
+            psf = MoffatGauss()
+            s = ChromaticPSF(psf, Nx=100, Ny=20, deg=4, saturation=20000)
+            poly_params = s.generate_test_poly_params()
+            output = s.evaluate(poly_params, mode="2D")
+            im = plt.imshow(output, origin='lower')
+            plt.colorbar(im)
+            plt.show()
 
         """
         pixels = self.pixels
