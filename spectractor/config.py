@@ -162,3 +162,10 @@ def set_logger(logger):
         my_logger.setLevel(logging.DEBUG)
         coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.DEBUG)
     return my_logger
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
+
