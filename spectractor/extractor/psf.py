@@ -19,7 +19,7 @@ from numba import njit
 
 
 @njit
-def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):
+def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
     r"""Compute a 1D Moffat function, whose integral is normalised to unity.
 
     .. math ::
@@ -95,7 +95,7 @@ def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):
 
 
 @njit
-def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev):
+def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev):  # pragma: nocover
     rr = (y - y_mean) * (y - y_mean)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
@@ -109,7 +109,7 @@ def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev
 
 
 @njit
-def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):
+def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):  # pragma: nocover
     rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha)
@@ -119,7 +119,7 @@ def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):
 
 
 @njit
-def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev):
+def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev):  # pragma: nocover
     rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
@@ -970,7 +970,7 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
 
 
 @deprecated(reason='Use MoffatGauss1D class instead.')
-class PSF1DAstropy(Fittable1DModel):
+class PSF1DAstropy(Fittable1DModel):   # pragma: nocover
     n_inputs = 1
     n_outputs = 1
     # inputs = ('x',)
@@ -1179,7 +1179,7 @@ class PSF1DAstropy(Fittable1DModel):
 
 
 @deprecated(reason='Use MoffatGauss1D class instead.')
-def PSF1D_chisq(params, model, xx, yy, yy_err=None):
+def PSF1D_chisq(params, model, xx, yy, yy_err=None):  # pragma: nocover
     m = model.evaluate(xx, *params)
     if len(m) == 0 or len(yy) == 0:
         return 1e20
@@ -1193,7 +1193,7 @@ def PSF1D_chisq(params, model, xx, yy, yy_err=None):
 
 
 @deprecated(reason='Use MoffatGauss1D class instead.')
-def PSF1D_chisq_jac(params, model, xx, yy, yy_err=None):
+def PSF1D_chisq_jac(params, model, xx, yy, yy_err=None):  # pragma: nocover
     diff = model.evaluate(xx, *params) - yy
     jac = model.fit_deriv(xx, *params)
     if yy_err is None:
@@ -1204,7 +1204,7 @@ def PSF1D_chisq_jac(params, model, xx, yy, yy_err=None):
 
 
 @deprecated(reason='Use MoffatGauss1D class instead.')
-def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimize'):
+def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimize'):  # pragma: nocover
     """Fit a PSF 1D Astropy model with parameters :
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
 
@@ -1283,7 +1283,7 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
 
 @deprecated(reason='Use MoffatGauss1D class instead. Mainly because PSF integral must be normalized to one.')
 def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, guess=None, bounds=None, method='minimize',
-                              niter_basinhopping=5, T_basinhopping=0.2):
+                              niter_basinhopping=5, T_basinhopping=0.2):  # pragma: nocover
     """Fit a PSF 1D Astropy model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
 
@@ -1401,7 +1401,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
 
 
 @deprecated(reason='Use MoffatGauss1D class instead.')
-def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
+def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):  # pragma: nocover
     """Fit a PSF 1D Astropy model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
 
@@ -1480,7 +1480,8 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
 
 
 @deprecated(reason='Use MoffatGauss1D class instead.')
-def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=None, sigma=3, niter=2, consecutive=3):
+def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=None, sigma=3,
+                                     niter=2, consecutive=3):  # pragma: nocover
     """Fit a PSF Astropy 1D model with parameters:
         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
 
@@ -1598,7 +1599,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
 
 
 @deprecated(reason="Use new MoffatGauss2D class.")
-class PSF2DAstropy(Fittable2DModel):
+class PSF2DAstropy(Fittable2DModel):  # pragma: nocover
     n_inputs = 2
     n_outputs = 1
     # inputs = ('x', 'y',)

@@ -352,7 +352,7 @@ class ChromaticPSF:
                 poly_params = np.concatenate([poly_params, fit])
         return poly_params
 
-    def from_table_to_profile_params(self):
+    def from_table_to_profile_params(self):  # pragma: nocover
         """
         Extract the profile parameters from self.table and fill an array of profile parameters.
 
@@ -382,7 +382,7 @@ class ChromaticPSF:
             profile_params[:, k] = self.table[name]
         return profile_params
 
-    def from_table_to_poly_params(self):
+    def from_table_to_poly_params(self):  # pragma: nocover
         """
         Extract the polynomial parameters from self.table and fill an array with polynomial parameters.
 
@@ -556,7 +556,7 @@ class ChromaticPSF:
             bounds[1] += tmp_bounds[1]
         return np.array(bounds).T
 
-    def set_bounds_for_minuit(self, data=None):
+    def set_bounds_for_minuit(self, data=None):  # pragma: nocover
         """
         This function returns an array of bounds for iminuit. It is very touchy, change the values with caution !
 
@@ -609,7 +609,7 @@ class ChromaticPSF:
             bounds[1] += tmp_bounds[1]
         return np.array(bounds).T
 
-    def check_bounds(self, poly_params, noise_level=0):
+    def check_bounds(self, poly_params, noise_level=0):  # pragma: nocover
         """
         Evaluate the PSF profile parameters from the polynomial coefficients and check if they are within priors.
 
