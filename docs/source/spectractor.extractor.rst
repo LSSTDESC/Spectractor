@@ -33,7 +33,6 @@ spectractor\.extractor\.psf module
 
 .. automodule:: spectractor.extractor.psf
     :members:
-    :undoc-members:
     :show-inheritance:
 
 spectractor\.extractor\.spectroscopy module
