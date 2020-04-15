@@ -96,7 +96,7 @@ def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, sigma)
 
     .. math ::
 
-        f(y) \propto A |left\lbrace \frac{1}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
+        f(y) \propto A \left\lbrace \frac{1}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
          - \eta e^{-(y-y_0)^2/(2\sigma^2)}\right\rbrace
         \quad\text{with}\quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
         \quad\text{ and } \quad \eta < 0
@@ -256,6 +256,8 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_ga
         \left[ 1 +\frac{\left(x-x_0\right)^2+\left(y-y_0\right)^2}{\gamma^2} \right]^\alpha}
          + \eta e^{-\left[ \left(x-x_0\right)^2+\left(y-y_0\right)^2\right]/(2 \sigma^2)}
         \right\rbrace
+
+    .. math ::
         \quad\text{with}\quad
         \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
         \quad\text{and} \quad \eta < 0
@@ -1447,7 +1449,7 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
     >>> guess = (60, 20, 3.2, 1.2, -0.1, 2,  60)
     >>> bounds = ((0, 200), (10, 40), (0.5, 10), (0.5, 5), (-10, 200), (0.01, 10), (0, 400))
 
-    Fit with error bars:
+    # Fit with error bars:
     # >>> model = fit_PSF1D(X, Y, guess=guess, bounds=bounds, data_errors=Y_err)
     # >>> res = [getattr(model, p).value for p in model.param_names]
     # >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
@@ -1537,7 +1539,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
     >>> guess = (600, 27, 3.2, 1.2, -0.1, 2,  6000)
     >>> bounds = ((0, 6000), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000))
 
-    Fit without bars:
+    # Fit without bars:
     # >>> model, outliers = fit_PSF1D_outlier_removal(X, Y, guess=guess, bounds=bounds,
     # ... sigma=3, niter=5, method="minimize")
     # >>> res = [getattr(model, p).value for p in model.param_names]
@@ -1642,7 +1644,7 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):  # pra
     >>> guess = (60, 20, 3.2, 1.2, -0.1, 2,  60)
     >>> bounds = ((0, 200), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 400))
 
-    Fit with error bars:
+    # Fit with error bars:
     # >>> model = fit_PSF1D_minuit(X, Y, guess=guess, bounds=bounds, data_errors=Y_err)
     # >>> res = [getattr(model, p).value for p in model.param_names]
     # >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-2))
@@ -1732,7 +1734,7 @@ def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=No
     >>> guess = (600, 20, 3.2, 1.2, -0.1, 2,  6000)
     >>> bounds = ((0, 6000), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000))
 
-    Fit with error bars:
+    # Fit with error bars:
     # >>> model, outliers = fit_PSF1D_minuit_outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err,
     # ... sigma=3, niter=2, consecutive=3)
     # >>> res = [getattr(model, p).value for p in model.param_names]

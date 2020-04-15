@@ -210,7 +210,6 @@ class Image(object):
             >>> im.plot_statistical_error()
 
         .. plot::
-            :include-source:
 
             from spectractor.extractor.images import Image
             im = Image('tests/data/reduc_20170530_134.fits')
@@ -310,7 +309,6 @@ class Image(object):
             >>> im.plot_statistical_error()
 
         .. plot::
-            :include-source:
 
             from spectractor.extractor.images import Image
             im = Image('tests/data/reduc_20170530_134.fits')
