@@ -7,7 +7,7 @@ Welcome to Spectractor's documentation!
 =======================================
 
 .. toctree::
-    :maxdepth: 4
+    :maxdepth: 5
     :caption: Contents:
 
     source/modules
