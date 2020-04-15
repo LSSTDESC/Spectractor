@@ -4,6 +4,14 @@ spectractor\.extractor package
 Submodules
 ----------
 
+spectractor\.extractor\.chromaticpsf module
+----------------------------------
+
+.. automodule:: spectractor.extractor.chromaticpsf
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 spectractor\.extractor\.dispersers module
 -----------------------------------------
 
@@ -33,6 +41,7 @@ spectractor\.extractor\.psf module
 
 .. automodule:: spectractor.extractor.psf
     :members:
+    :undoc-members:
     :show-inheritance:
 
 spectractor\.extractor\.spectroscopy module
