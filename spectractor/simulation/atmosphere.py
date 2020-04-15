@@ -574,3 +574,9 @@ class AtmosphereGrid(Atmosphere):
         atm = self.model(points)
         self.transmission = interp1d(self.lambdas, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
         return self.transmission
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
