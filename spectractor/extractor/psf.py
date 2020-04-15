@@ -25,10 +25,7 @@ def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
     .. math ::
 
         f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
-
-    .. math ::
-
-        \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
+        \quad\text{with}\quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
 
 
     Parameters
@@ -66,7 +63,6 @@ def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
         >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
 
     .. plot::
-        :include-source:
 
         import numpy as np
         import matplotlib.pyplot as plt
@@ -233,7 +229,6 @@ class PSF:
             >>> assert np.all(np.isclose(w.p[2], p0[2], atol=1e-1))
 
         .. plot::
-            :include-source:
 
             import numpy as np
             import matplotlib.pyplot as plt
