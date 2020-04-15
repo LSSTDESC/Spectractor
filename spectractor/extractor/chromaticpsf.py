@@ -1585,3 +1585,9 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
