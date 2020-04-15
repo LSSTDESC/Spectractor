@@ -17,6 +17,7 @@ class ChromaticPSF:
     """Class to store a PSF evolving with wavelength.
 
     The wavelength evolution is stored in an Astropy table instance. Whatever the PSF model, the common keywords are:
+    
     * lambdas: the wavelength [nm]
     * Dx: the distance along X axis to order 0 position of the PSF model centroid  [pixels]
     * Dy: the distance along Y axis to order 0 position of the PSF model centroid [pixels]
