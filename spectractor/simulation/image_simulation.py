@@ -507,6 +507,12 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.save_image(output_filename, overwrite=True)
     return image
 
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
+
 #
 # if __name__ == "__main__":
 #     from spectractor.logbook import LogBook
