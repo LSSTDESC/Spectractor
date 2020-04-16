@@ -80,6 +80,16 @@ class Spectrum:
         self.spectrogram_err = None
         self.spectrogram_residuals = None
         self.spectrogram_fit = None
+        self.spectrogram_x0 = None
+        self.spectrogram_y0 = None
+        self.spectrogram_xmin = None
+        self.spectrogram_xmax = None
+        self.spectrogram_ymin = None
+        self.spectrogram_ymax = None
+        self.spectrogram_deg = None
+        self.spectrogram_saturation = None
+        self.spectrogram_Nx = None
+        self.spectrogram_Ny = None
         if file_name != "":
             self.filename = file_name
             self.load_spectrum(file_name)
@@ -458,14 +468,14 @@ class Spectrum:
             self.spectrogram = hdu_list[0].data
             self.spectrogram_err = hdu_list[1].data
             self.spectrogram_bgd = hdu_list[2].data
-            self.spectrogram_x0 = header['S_X0']
-            self.spectrogram_y0 = header['S_Y0']
-            self.spectrogram_xmin = header['S_XMIN']
-            self.spectrogram_xmax = header['S_XMAX']
-            self.spectrogram_ymin = header['S_YMIN']
-            self.spectrogram_ymax = header['S_YMAX']
-            self.spectrogram_deg = header['S_DEG']
-            self.spectrogram_saturation = header['S_SAT']
+            self.spectrogram_x0 = float(header['S_X0'])
+            self.spectrogram_y0 = float(header['S_Y0'])
+            self.spectrogram_xmin = int(header['S_XMIN'])
+            self.spectrogram_xmax = int(header['S_XMAX'])
+            self.spectrogram_ymin = int(header['S_YMIN'])
+            self.spectrogram_ymax = int(header['S_YMAX'])
+            self.spectrogram_deg = int(header['S_DEG'])
+            self.spectrogram_saturation = float(header['S_SAT'])
             self.spectrogram_Nx = self.spectrogram_xmax - self.spectrogram_xmin
             self.spectrogram_Ny = self.spectrogram_ymax - self.spectrogram_ymin
             hdu_list.close()  # need to free allocation for file descripto
@@ -513,7 +523,6 @@ def calibrate_spectrum(spectrum, xlim=None):
         List of minimum and maximum abscisses
 
     """
-    my_logger = set_logger(__name__)
     if xlim is None:
         left_cut, right_cut = [0, spectrum.data.size]
     else:
@@ -564,6 +573,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         shift output and to print it in the outpur table (default: 3)
     ax: Axes, optional
         An Axes instance to over plot the result of the fit (default: None).
+    calibration_lines_only: bool, optional
+        If True, try to detect only the lines with use_for_calibration attributes set True.
     xlim: array, optional
         (min, max) list limiting the wavelength interval where to detect spectral lines (default:
         (parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
@@ -615,8 +626,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     """
 
     # main settings
-    my_logger = set_logger(__name__)
-    bgd_npar = parameters.CALIB_BGD_NPARAMS
     peak_width = parameters.CALIB_PEAK_WIDTH
     bgd_width = parameters.CALIB_BGD_WIDTH
     # if lines.hydrogen_only:
@@ -954,8 +963,6 @@ def calibrate_spectrum_with_lines(spectrum):
     >>> lambdas = calibrate_spectrum_with_lines(spectrum)
     >>> spectrum.plot_spectrum()
     """
-    my_logger = set_logger(__name__)
-
     # Convert back to ADU rate units because of lambda*dlambda normalisation in flam units
     # if spectrum.units == "erg/s/cm$^2$/nm":
     #     spectrum.convert_from_flam_to_ADUrate()
