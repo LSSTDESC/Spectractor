@@ -887,6 +887,41 @@ class PSFFitWorkspace(FitWorkspace):
             fig.savefig(figname, dpi=100, bbox_inches='tight')
 
 
+def load_PSF(psf_type=parameters.PSF_TYPE):
+    """Load the PSF model with a keyword.
+
+    Parameters
+    ----------
+    psf_type: str
+        PSF model keyword.
+
+    Returns
+    -------
+    psf: PSF
+        An instance of the selected PSF model.
+
+    Examples
+    --------
+
+    >>> load_PSF(psf_type="Moffat")  # doctest: +ELLIPSIS
+    <psf.Moffat object at ...>
+    >>> load_PSF(psf_type="MoffatGauss")  # doctest: +ELLIPSIS
+    <psf.MoffatGauss object at ...>
+    >>> load_PSF(psf_type="unknown")  # doctest: +ELLIPSIS
+    <psf.PSF object at ...>
+
+    """
+    my_logger = set_logger(__name__)
+    psf = PSF()
+    if psf_type == "Moffat":
+        psf = Moffat()
+    elif psf_type == "MoffatGauss":
+        psf = MoffatGauss()
+    else:
+        my_logger.error(f"\n\tUnknown PSF_TYPE={psf_type}. Must be either Moffat or MoffatGauss.")
+    return psf
+
+
 def PSF2D_chisq(params, model, xx, yy, zz, zz_err=None):
     mod = model.evaluate(xx, yy, *params)
     if zz_err is None:
