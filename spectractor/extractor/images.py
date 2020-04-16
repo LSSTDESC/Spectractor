@@ -12,7 +12,7 @@ from spectractor import parameters
 from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
-from spectractor.extractor.psf import fit_PSF2D_minuit, PSF, MoffatGauss, Moffat, PSFFitWorkspace
+from spectractor.extractor.psf import fit_PSF2D_minuit, Moffat
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, fit_poly1d,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
@@ -645,7 +645,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
         for i in range(niter):
             # find the target
             try:
-                avX, avY = find_target_2Dprofile(image, sub_image_subtracted, sub_errors=sub_errors)
+                avX, avY = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
             except (Exception, ValueError):
                 image.target_star2D = None
                 avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
@@ -818,9 +818,9 @@ def find_target_1Dprofile(image, sub_image, guess):
     return avX, avY
 
 
-def find_target_2Dprofile(image, sub_image_subtracted, sub_errors=None):
+def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     """
-    Find precisely the position of the targeted object fitting a PSF model.
+    Find precisely the position of the targeted object fitting a Moffat PSF model.
     A polynomial 2D background is subtracted first. Saturated pixels are masked with np.nan values.
 
     Parameters
@@ -841,7 +841,7 @@ def find_target_2Dprofile(image, sub_image_subtracted, sub_errors=None):
     >>> sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False) #, widths=[30,30])
     >>> xmax = np.argmax(np.sum(sub_image_subtracted, axis=0))
     >>> ymax = np.argmax(np.sum(sub_image_subtracted, axis=1))
-    >>> x1, y1 = find_target_2Dprofile(im, sub_image_subtracted, sub_errors=sub_errors)
+    >>> x1, y1 = find_target_Moffat2D(im, sub_image_subtracted, sub_errors=sub_errors)
 
     .. doctest::
         :hide:
