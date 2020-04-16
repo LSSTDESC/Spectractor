@@ -840,7 +840,6 @@ class ChromaticPSF:
         y = data[:, xmax_index]
         # first fit with moffat only to initialize the guess
         # hypothesis that max of spectrum if well describe by a focused PSF
-        bgd = data[bgd_index, xmax_index]
         if bgd_model_func is not None:
             signal = y - bgd_model_func(xmax_index, index)[:, 0]
         else:
@@ -1210,7 +1209,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             plt.draw()
             plt.pause(1e-8)
             plt.close()
-        else:
+        else:  # pragma: no cover
             if parameters.DISPLAY and self.verbose:
                 plt.show()
         if parameters.SAVE:  # pragma: no cover
@@ -1524,7 +1523,21 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
             >>> s.plot_summary(truth=s0)
 
-        Simulate the data:
+        Simulate the data with fixed amplitude priors:
+
+        .. doctest::
+
+            >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
+            ... amplitude_priors_method="fixed", verbose=True)
+            >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:])
+            >>> w.plot_fit()
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None
+
+        Simulate the data with a Tikhonov prior on amplitude parameters:
 
         .. doctest::
 
