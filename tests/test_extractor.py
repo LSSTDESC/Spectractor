@@ -3,6 +3,7 @@ from numpy.testing import run_module_suite
 from spectractor import parameters
 from spectractor.extractor.extractor import Spectractor
 from spectractor.logbook import LogBook
+from spectractor.config import load_config
 import os
 import numpy as np
 
@@ -24,16 +25,17 @@ def test_extractor():
     output_directory = "./outputs"
 
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+    load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
 
     for file_name in file_names:
         tag = file_name.split('/')[-1]
-        disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-        if target is None or xpos is None or ypos is None:
+        disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+        if target_label is None or xpos is None or ypos is None:
             continue
-        spectrum = Spectractor(file_name, output_directory, target, [xpos, ypos], disperser_label,
-                               config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
+        spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
+                               line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
@@ -64,7 +66,6 @@ def extractor_auxtel():
     target_label = "HD107696"
 
     for file_name in file_names:
-        tag = file_name.split('/')[-1]
         # disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
                                config='./config/auxtel.ini', line_detection=True, atmospheric_lines=True)
