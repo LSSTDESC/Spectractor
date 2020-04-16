@@ -13,7 +13,7 @@ from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
-from spectractor.extractor.psf import MoffatGauss, PSF, Moffat
+from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 
 
@@ -72,7 +72,7 @@ class Spectrum:
         self.filters = None
         self.units = 'ADU/s'
         self.gain = parameters.CCD_GAIN
-        self.psf = PSF()
+        self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
         self.chromatic_psf = ChromaticPSF(self.psf, Nx=1, Ny=1, deg=1, saturation=1)
         self.rotation_angle = 0
         self.spectrogram = None
@@ -483,15 +483,17 @@ class Spectrum:
 
         Examples
         --------
+        >>> parameters.PSF_TYPE = "MoffatGauss"
         >>> s = Spectrum()
-        >>> s.load_spectrum('outputs/reduc_20170530_134_spectrum.fits')
+        >>> s.load_spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
+        >>> print(s.chromatic_psf.table)  # doctest: +ELLIPSIS
+             lambdas               Dx         ...
         """
         if os.path.isfile(input_file_name):
-            psf = MoffatGauss()
-            self.chromatic_psf = ChromaticPSF(psf, self.spectrogram_Nx, self.spectrogram_Ny,
+            self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
+            self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
                                               deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,
                                               file_name=input_file_name)
-            # self.chromatic_psf.table = Table.read(input_file_name)
             self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
