@@ -29,7 +29,7 @@ from spectractor.extractor.images import Image
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import Target
-from spectractor.extractor.psf import MoffatGauss
+from spectractor.extractor.psf import load_PSF
 from spectractor.tools import fftconvolve_gaussian, ensure_dir, rebin
 from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
@@ -199,6 +199,7 @@ class SpectrogramModel(Spectrum):
         self.data = None
         self.err = None
         self.model = lambda x, y: np.zeros((x.size, y.size))
+        self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
         self.psf_cube = None
         self.fhcube = None
         self.fix_psf_cube = False
@@ -334,12 +335,11 @@ class SpectrogramModel(Spectrum):
         simul = np.zeros((self.spectrogram_Ny, self.spectrogram_Nx))
         nlbda = dispersion_law.size
         # cannot use directly ChromaticPSF2D class because it does not include the rotation of the spectrogram
-        psf = MoffatGauss()
         # TODO: increase rapidity (multithreading, optimisation...)
         for i in range(0, nlbda, 1):
             # here spectrum[i] is in ADU/s
             p = np.array([spectrum[i], dispersion_law[i].real, dispersion_law[i].imag] + list(profile_params[i, 3:]))
-            psf_lambda = psf.evaluate(pixels, p=p)
+            psf_lambda = self.psf.evaluate(pixels, p=p)
             simul += psf_lambda
         return simul
 
@@ -500,7 +500,7 @@ class SpectrogramModel(Spectrum):
             cube = pyfftw.zeros_aligned((nlbda, nima, nima), dtype='float32')
             shape_params = np.array([self.chromatic_psf.table[name] for name in MoffatGauss.param_names[3:]]).T
             for lbda in range(nlbda):
-                ima = MoffatGauss.evaluate(x, y, 1, 0, 0, *shape_params[lbda])
+                ima = self.psf.evaluate(x, y, 1, 0, 0, *shape_params[lbda])
                 # norm = MoffatGauss.normalisation(1, *shape_params[l])
                 # if norm != 0.:
                 #     ima /= norm  # Flux normalization: the flux should go in the spectrum
