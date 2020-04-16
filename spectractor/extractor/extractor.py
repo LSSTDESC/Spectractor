@@ -57,10 +57,11 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> for file_name in file_names:
         ...     tag = file_name.split('/')[-1]
-        ...     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-        ...     if target is None or xpos is None or ypos is None:
+        ...     disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+        ...     if target_label is None or xpos is None or ypos is None:
         ...         continue
-        ...     spectrum = Spectractor(file_name, './tests/data/', [xpos, ypos], target, disperser_label, './config/ctio.ini')
+        ...     spectrum = Spectractor(file_name, './tests/data/', guess=[xpos, ypos], target_label=target_label,
+        ...                            disperser_label=disperser_label, config='./config/ctio.ini')
 
     .. doctest::
         :hide:
@@ -89,12 +90,12 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
-    target_pixcoords = find_target(image, guess, use_wcs=True)
+    find_target(image, guess, use_wcs=True)
     # Rotate the image
     turn_image(image)
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-    target_pixcoords_rotated = find_target(image, guess, rotated=True, use_wcs=True)
+    find_target(image, guess, rotated=True, use_wcs=True)
     # Create Spectrum object
     spectrum = Spectrum(image=image)
     # Subtract background and bad pixels
@@ -121,7 +122,6 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     spectrum.chromatic_psf.table['lambdas'] = lambdas
     spectrum.chromatic_psf.table.write(output_filename_psf, overwrite=True)
     return spectrum
-
 
 
 def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=parameters.CCD_IMSIZE - 200):
@@ -167,7 +167,6 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     # Lateral bands to remove sky background
     Ny, Nx = data.shape
-    x0 = int(image.target_pixcoords_rotated[0])
     y0 = int(image.target_pixcoords_rotated[1])
     ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
@@ -225,8 +224,8 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                    f'mode={mode} and amplitude_priors_method={method}...')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
                             amplitude_priors_method=method, mode=mode)
-    #w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
-    #                        amplitude_priors_method="psf1d", mode="2D", verbose=True)
+    # w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
+    #                         amplitude_priors_method="psf1d", mode="2D", verbose=True)
     if parameters.DEBUG:
         s.plot_summary()
         w.plot_fit()
@@ -406,4 +405,3 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         if parameters.LSST_SAVEFIGPATH:
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'spectrum.pdf'))
     return spectrum
-
