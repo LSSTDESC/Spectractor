@@ -66,6 +66,7 @@ def extractor_auxtel():
     target_label = "HD107696"
 
     for file_name in file_names:
+        # tag = file_name.split('/')[-1]
         # disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
                                config='./config/auxtel.ini', line_detection=True, atmospheric_lines=True)
