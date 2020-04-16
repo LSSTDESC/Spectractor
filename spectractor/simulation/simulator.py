@@ -433,7 +433,7 @@ class SpectrogramModel(Spectrum):
         return self.lambdas, self.data, self.err
 
     def simulate_FFT(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
-                     shift_x=0., shift_y=0., angle=0., psf_poly_params=None):
+                     shift_x=0., shift_y=0., angle=0., psf_poly_params=None):  # pragma: nocover
         """
         DEPRECATED
 
