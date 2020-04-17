@@ -401,7 +401,7 @@ class PSF:
 
         Fit the data in 2D:
 
-        >>> p = np.array([100000, 19, 31, 3, 3, -0.1, 3, 400000])
+        >>> p = np.array([150000, 19, 31, 4, 3, -0.1, 3, 400000])
         >>> psf = MoffatGauss(p)
         >>> w = psf.fit_psf(data, data_errors=data_errors, bgd_model_func=None)
         >>> w.plot_fit()
@@ -904,11 +904,11 @@ def load_PSF(psf_type=parameters.PSF_TYPE):
     --------
 
     >>> load_PSF(psf_type="Moffat")  # doctest: +ELLIPSIS
-    <psf.Moffat object at ...>
+    <....Moffat object at ...>
     >>> load_PSF(psf_type="MoffatGauss")  # doctest: +ELLIPSIS
-    <psf.MoffatGauss object at ...>
+    <....MoffatGauss object at ...>
     >>> load_PSF(psf_type="unknown")  # doctest: +ELLIPSIS
-    <psf.PSF object at ...>
+    <....PSF object at ...>
 
     """
     my_logger = set_logger(__name__)

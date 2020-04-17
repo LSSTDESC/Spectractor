@@ -55,7 +55,7 @@ class StarModel:
         >>> from spectractor.extractor.psf import Moffat
         >>> p = (100, 50, 50, 5, 2, 200)
         >>> psf = Moffat(p)
-        >>> s = StarModel((20, 10), psf, 200, target=None)
+        >>> s = StarModel((20, 10), psf, 200)
         >>> s.plot_model()
         >>> s.x0
         20
