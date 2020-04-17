@@ -857,33 +857,26 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             
             x_norm = rescale_x_for_legendre(lambdas[index])
 
-            X=np.arange(int((peak_pos - 5*np.abs(popt[bgd_npar + 3 * j + 2]))*10)/10,int((peak_pos + 5*np.abs(popt[bgd_npar + 3 * j + 2]))*10)/10,0.1)
+            x_int=np.arange(peak_pos - 5*np.abs(popt[bgd_npar + 3 * j + 2]),peak_pos + 5*np.abs(popt[bgd_npar + 3 * j + 2]))
+            
 
             middle = 0.5 * (np.max(lambdas[index]) + np.min(lambdas[index]))
-            X_norm = X - middle
+            x_int_norm = x_int - middle
             if np.max(lambdas[index]-middle) != 0:
-                X_norm = X_norm / np.max(lambdas[index]-middle)
+                x_int_norm = x_int_norm / np.max(lambdas[index]-middle)
+                
+            jmin=np.argmin(np.abs(lambdas-(peak_pos - 5*np.abs(popt[bgd_npar + 3 * j + 2]))))
+            jmax=np.argmin(np.abs(lambdas-(peak_pos + 5*np.abs(popt[bgd_npar + 3 * j + 2]))))
+            spectr_data=interp1d(lambdas[jmin:jmax],spec[jmin:jmax])(x_int)
 
-            test=0
-            for loop in range(len(lambdas)):
-                if lambdas[loop]>int((peak_pos - 5*np.abs(popt[bgd_npar + 3 * j + 2]))*10)/10 and test==0:
-                    jmin=loop-1
-                    test=1
-                if lambdas[loop]>int((peak_pos + 5*np.abs(popt[bgd_npar + 3 * j + 2]))*10)/10:
-                    jmax=loop+1
-                    break
-
-            spectr=interp1d(lambdas[jmin:jmax],spec[jmin:jmax])
-            spectr_data=spectr(X)
-
-            Continuum=np.polynomial.legendre.legval(X_norm, popt[:bgd_npar])
-            Gauss=gauss(X, *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
+            Continuum=np.polynomial.legendre.legval(x_int_norm, popt[:bgd_npar])
+            Gauss=gauss(x_int, *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
 
             Y=-Gauss/Continuum
             Ydata=1-spectr_data/Continuum
 
-            line.fit_eqwidth_mod = integrate.simps(Y,X) #sol1
-            line.fit_eqwidth_data = integrate.simps(Ydata,X) #sol2
+            line.fit_eqwidth_mod = integrate.simps(Y,x_int) #sol1
+            line.fit_eqwidth_data = integrate.simps(Ydata,x_int) #sol2
           
             line.fit_popt = popt
             line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
