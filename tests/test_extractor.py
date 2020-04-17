@@ -27,7 +27,7 @@ def test_extractor():
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
-    parameters.DEBUG = True
+    parameters.DEBUG = False
 
     for file_name in file_names:
         tag = file_name.split('/')[-1]
