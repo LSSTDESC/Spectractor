@@ -857,7 +857,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             
             x_norm = rescale_x_for_legendre(lambdas[index])
 
-            x_int=np.arange(peak_pos - 5*np.abs(popt[bgd_npar + 3 * j + 2]),peak_pos + 5*np.abs(popt[bgd_npar + 3 * j + 2]))
+            x_int=np.arange(peak_pos - 5*np.abs(popt[bgd_npar + 3 * j + 2]),peak_pos + 5*np.abs(popt[bgd_npar + 3 * j + 2]),0.1)
             
 
             middle = 0.5 * (np.max(lambdas[index]) + np.min(lambdas[index]))
