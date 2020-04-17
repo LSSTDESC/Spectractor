@@ -349,7 +349,7 @@ class ChromaticPSF:
         ..  doctest::
             :hide:
 
-            >>> assert(np.all(np.isclose(profile_params[0], [0, 0, 50, 5, 2, 0, 1, 8e3])))
+            >>> assert(np.all(np.isclose(profile_params[0], [10, 0, 50, 5, 2, 0, 1, 8e3])))
 
         From the profile parameters to the polynomial parameters:
 
@@ -480,7 +480,7 @@ class ChromaticPSF:
         ..  doctest::
             :hide:
 
-            >>> assert(np.all(np.isclose(profile_params[0], [0, 0, 50, 5, 2, 0, 1, 8e3])))
+            >>> assert(np.all(np.isclose(profile_params[0], [10, 0, 50, 5, 2, 0, 1, 8e3])))
 
         From the profile parameters to the polynomial parameters:
 
@@ -673,10 +673,10 @@ class ChromaticPSF:
 
         >>> in_bounds, penalty, outbound_parameter_name = s.check_bounds(poly_params_test)
 
-        .. dpctest::
+        .. doctest::
             :hide:
 
-            >>> assert in_bounds is False
+            >>> assert in_bounds is True
             >>> assert np.isclose(penalty, 0, atol=1e-16)
             >>> assert outbound_parameter_name is not None
 
@@ -1037,8 +1037,8 @@ class ChromaticPSF:
         ...                  yerr=amplitude_residuals[k][2]/s0.poly_params[:s0.Nx],
         ...                  fmt="+", label=label)  # doctest: +ELLIPSIS
         <ErrorbarContainer ... artists>
-        >>> plt.ylim((-1,1))
-        (-1, 1)
+        >>> plt.ylim((-1,1))  # doctest: +ELLIPSIS
+        (-1..., 1...)
         >>> plt.grid()
         >>> plt.legend()  # doctest: +ELLIPSIS
         <matplotlib.legend.Legend object at ...>

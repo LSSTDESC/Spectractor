@@ -69,12 +69,7 @@ def load_config(config_filename):
         Traceback (most recent call last):
         ...
         SystemExit: Config file ./config/unknown_file.ini does not exist.
-        >>> os.rename("./config/default.ini", "./config/default.ini.bak")
         >>> load_config("./config/ctio.ini")
-        Traceback (most recent call last):
-        ...
-        SystemExit: Config file ./config/default.ini does not exist.
-        >>> os.rename("./config/default.ini.bak", "./config/default.ini")
 
     """
     if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, "default.ini")):
