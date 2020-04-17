@@ -2,7 +2,7 @@ from astropy.table import Table
 from scipy.interpolate import interp1d
 import numpy as np
 import copy
-import csv
+
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -283,7 +283,7 @@ class Lines:
                             xycoords='axes fraction', color=color, fontsize=fontsize)
         return ax
 
-    def plot_detected_lines(self, ax=None, print_table=False):
+    def plot_detected_lines(self,output_file_name,overwrite=False,ax=None, print_table=False):
         """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
         around emission or absorption tabulated lines, and to select surrounding pixels
         to fit a (positive or negative) gaussian and a polynomial background. If several regions
@@ -335,9 +335,6 @@ class Lines:
         rows = []
         j = 0
 
-        fichier=open("detedted_lines.csv","wt")
-        Detected_lines=csv.writer(fichier,delimiter=";")
-        Detected_lines.writerow(["Line", "Tabulated", "Detected", "Shift", "FWHM", "Amplitude", "SNR", "Chisq","Eqwidth_mod","Eqwidth_data"])
         
         for line in self.lines:
             if line.fitted is True:
@@ -360,16 +357,22 @@ class Lines:
                     rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength,
                                  FWHM, signal_level, line.fit_snr, line.fit_chisq,line.fit_eqwidth_mod,line.fit_eqwidth_data))
                     
-                    Detected_lines.writerow([str(line.label),str(line.wavelength),str(peak_pos),str(peak_pos-line.wavelength),str(FWHM),str(signal_level),str(line.fit_snr),str(line.fit_chisq),str(line.fit_eqwidth_mod),str(line.fit_eqwidth_data)])
-           
+                   
                 j += 1
-        fichier.close()
-        if print_table and len(rows) > 0:
+        
+        if len(rows) > 0:
             t = Table(rows=rows, names=('Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq','Eqwidth_mod','Eqwidth_data'),
                       dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4','f4','f4'))
             for col in t.colnames[1:-3]:
                 t[col].unit = 'nm'
             t[t.colnames[-1]].unit = 'reduced'
+
+            output_directory = '/'.join(output_file_name.split('/')[:-1])
+            ensure_dir(output_directory)
+             
+            t.write(output_file_name[:-4]+"csv", overwrite=overwrite)
+
+        if print_table:
             print(t)
 
 
