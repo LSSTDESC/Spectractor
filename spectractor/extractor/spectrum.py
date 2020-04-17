@@ -1,6 +1,7 @@
 from scipy.signal import argrelextrema, savgol_filter
 from scipy.interpolate import interp1d
 from astropy.io import fits
+from scipy import integrate #integation
 from iminuit import Minuit
 import matplotlib.pyplot as plt
 import numpy as np
@@ -569,6 +570,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     >>> if parameters.DISPLAY: plt.show()
     """
 
+   
     # main settings
     my_logger = set_logger(__name__)
     bgd_npar = parameters.CALIB_BGD_NPARAMS
@@ -838,6 +840,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         global_chisq += chisq
         if spec_err is not None:
             noise_level = np.sqrt(np.mean(spec_err[index] ** 2))
+        
         for j in range(len(new_lines_list[k])):
             line = new_lines_list[k][j]
             peak_pos = popt[bgd_npar + 3 * j + 1]
@@ -851,9 +854,40 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             # save fit results
             line.fitted = True
             line.fit_lambdas = lambdas[index]
+            
+            x_norm = rescale_x_for_legendre(lambdas[index])
+
+            X=np.arange(int((peak_pos - 5*np.abs(popt[bgd_npar + 3 * j + 2]))*10)/10,int((peak_pos + 5*np.abs(popt[bgd_npar + 3 * j + 2]))*10)/10,0.1)
+
+            middle = 0.5 * (np.max(lambdas[index]) + np.min(lambdas[index]))
+            X_norm = X - middle
+            if np.max(lambdas[index]-middle) != 0:
+                X_norm = X_norm / np.max(lambdas[index]-middle)
+
+            test=0
+            for loop in range(len(lambdas)):
+                if lambdas[loop]>int((peak_pos - 5*np.abs(popt[bgd_npar + 3 * j + 2]))*10)/10 and test==0:
+                    jmin=loop-1
+                    test=1
+                if lambdas[loop]>int((peak_pos + 5*np.abs(popt[bgd_npar + 3 * j + 2]))*10)/10:
+                    jmax=loop+1
+                    break
+
+            spectr=interp1d(lambdas[jmin:jmax],spec[jmin:jmax])
+            spectr_data=spectr(X)
+
+            Continuum=np.polynomial.legendre.legval(X_norm, popt[:bgd_npar])
+            Gauss=gauss(X, *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
+
+            Y=-Gauss/Continuum
+            Ydata=1-spectr_data/Continuum
+
+            line.fit_eqwidth_mod = integrate.simps(Y,X) #sol1
+            line.fit_eqwidth_data = integrate.simps(Ydata,X) #sol2
+          
             line.fit_popt = popt
             line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
-            x_norm = rescale_x_for_legendre(lambdas[index])
+            
             line.fit_bgd = np.polynomial.legendre.legval(x_norm, popt[:bgd_npar])
             line.fit_snr = snr
             line.fit_chisq = chisq
@@ -880,6 +914,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         # lines.my_logger.debug(
         #    f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}\n\tTotal chisq: {global_chisq:.3f}')
     return global_chisq
+
 
 
 # noinspection PyArgumentList

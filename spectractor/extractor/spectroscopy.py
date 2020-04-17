@@ -2,6 +2,7 @@ from astropy.table import Table
 from scipy.interpolate import interp1d
 import numpy as np
 import copy
+import csv
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -65,6 +66,8 @@ class Line:
         self.fit_fwhm = None
         self.fit_popt = None
         self.fit_chisq = None
+        self.fit_eqwidth_mod = None
+        self.fit_eqwidth_data = None 
         self.fit_bgd_npar = parameters.CALIB_BGD_NPARAMS
 
     def gaussian_model(self, lambdas, A=1, sigma=2, use_fit=False):
@@ -331,6 +334,11 @@ class Lines:
         lambdas = np.zeros(1)
         rows = []
         j = 0
+
+        fichier=open("detedted_lines.csv","wt")
+        Detected_lines=csv.writer(fichier,delimiter=";")
+        Detected_lines.writerow(["Line", "Tabulated", "Detected", "Shift", "FWHM", "Amplitude", "SNR", "Chisq","Eqwidth_mod","Eqwidth_data"])
+        
         for line in self.lines:
             if line.fitted is True:
                 # look for lines in subset fit
@@ -350,11 +358,15 @@ class Lines:
                 signal_level = popt[bgd_npar + 3 * j]
                 if line.high_snr:
                     rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength,
-                                 FWHM, signal_level, line.fit_snr, line.fit_chisq))
+                                 FWHM, signal_level, line.fit_snr, line.fit_chisq,line.fit_eqwidth_mod,line.fit_eqwidth_data))
+                    
+                    Detected_lines.writerow([str(line.label),str(line.wavelength),str(peak_pos),str(peak_pos-line.wavelength),str(FWHM),str(signal_level),str(line.fit_snr),str(line.fit_chisq),str(line.fit_eqwidth_mod),str(line.fit_eqwidth_data)])
+           
                 j += 1
+        fichier.close()
         if print_table and len(rows) > 0:
-            t = Table(rows=rows, names=('Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq'),
-                      dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
+            t = Table(rows=rows, names=('Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq','Eqwidth_mod','Eqwidth_data'),
+                      dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4','f4','f4'))
             for col in t.colnames[1:-3]:
                 t[col].unit = 'nm'
             t[t.colnames[-1]].unit = 'reduced'
