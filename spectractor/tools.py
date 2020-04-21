@@ -18,6 +18,8 @@ import warnings
 from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
+from scipy.interpolate import interp1d
+from scipy.integrate import quad
 
 from skimage.feature import hessian_matrix
 from spectractor.config import set_logger
@@ -46,6 +48,7 @@ def gauss(x, A, x0, sigma):
 
     Examples
     --------
+
     >>> x = np.arange(50)
     >>> y = gauss(x, 10, 25, 3)
     >>> print(y.shape)
@@ -77,6 +80,7 @@ def gauss_jacobian(x, A, x0, sigma):
 
     Examples
     --------
+
     >>> x = np.arange(50)
     >>> jac = gauss_jacobian(x, 10, 25, 3)
     >>> print(jac.shape)
@@ -119,6 +123,7 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> x = np.arange(600.,700.,2)
@@ -129,7 +134,11 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
     10.0
     >>> guess = (2,630,2)
     >>> popt, pcov = fit_gauss(x, y, guess=guess, bounds=((1,600,1),(100,700,100)), sigma=y_err)
-    >>> assert np.all(np.isclose(p,popt))
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p,popt))
     """
     popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds, tr_solver='exact', jac=gauss_jacobian,
                            sigma=sigma, method='dogbox', verbose=0, xtol=1e-20, ftol=1e-20)
@@ -155,6 +164,7 @@ def multigauss_and_line(x, *params):
 
     Examples
     --------
+
     >>> x = np.arange(600.,800.,1)
     >>> y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)
     >>> print(y[0])
@@ -194,6 +204,7 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
 
     Examples
     --------
+
     >>> x = np.arange(600.,800.,1)
     >>> y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)
     >>> print(y[0])
@@ -239,16 +250,22 @@ def multigauss_and_bgd(x, *params):
 
     Examples
     --------
-    >>> import spectractor.parameters as parameters
     >>> parameters.CALIB_BGD_NPARAMS = 4
-    >>> x = np.arange(600.,800.,1)
+    >>> x = np.arange(600., 800., 1)
     >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
     >>> print(f'{y[0]:.2f}')
     19.00
 
-    ..plot:
-        import matplotlib.pyplot as plt
+    .. plot::
+
+        from spectractor import parameters
+        from spectractor.tools import multigauss_and_bgd
+        import numpy as np
+        parameters.CALIB_BGD_NPARAMS = 4
+        x = np.arange(600., 800., 1)
+        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
+        y = multigauss_and_bgd(x, *p)
         plt.plot(x,y,'r-')
         plt.show()
 
@@ -283,6 +300,7 @@ def multigauss_and_bgd_jacobian(x, *params):
 
     Examples
     --------
+
     >>> import spectractor.parameters as parameters
     >>> parameters.CALIB_BGD_NPARAMS = 4
     >>> x = np.arange(600.,800.,1)
@@ -340,6 +358,7 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
 
     Examples
     --------
+
     >>> x = np.arange(600.,800.,1)
     >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
@@ -352,8 +371,20 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     >>> assert np.all(np.isclose(p,popt,rtol=1e-4))
     >>> fit = multigauss_and_bgd(x, *popt)
 
-    ..plot:
+    .. plot::
+
         import matplotlib.pyplot as plt
+        import numpy as np
+        from spectractor.tools import multigauss_and_bgd, fit_multigauss_and_bgd
+        x = np.arange(600.,800.,1)
+        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
+        y = multigauss_and_bgd(x, *p)
+        err = 0.1 * np.sqrt(y)
+        guess = (15,0,0,0,10,640,2,20,750,7)
+        bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
+        popt, pcov = fit_multigauss_and_bgd(x, y, guess=guess, bounds=bounds, sigma=err)
+        fit = multigauss_and_bgd(x, *popt)
+        fig = plt.figure()
         plt.errorbar(x,y,yerr=err,linestyle='None')
         plt.plot(x,fit,'r-')
         plt.plot(x,multigauss_and_bgd(x, *guess),'k--')
@@ -429,16 +460,29 @@ def fit_poly1d(x, y, order, w=None):
 
     Examples
     --------
+
     >>> x = np.arange(500., 1000., 1)
     >>> p = [3, 2, 1, 1]
     >>> y = np.polyval(p, x)
     >>> err = np.ones_like(y)
     >>> fit, cov, model = fit_poly1d(x, y, order=3)
-    >>> assert np.all(np.isclose(p, fit, 1e-5))
-    >>> assert np.all(np.isclose(model, y))
-    >>> assert cov.shape == (4, 4)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p, fit, 1e-5))
+        >>> assert np.all(np.isclose(model, y))
+        >>> assert cov.shape == (4, 4)
+
+    With uncertainties:
+
     >>> fit, cov2, model2 = fit_poly1d(x, y, order=3, w=err)
-    >>> assert np.all(np.isclose(p, fit, 1e-5))
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p, fit, 1e-5))
+
     >>> fit, cov3, model3 = fit_poly1d([0, 1], [1, 1], order=3, w=err)
     >>> print(fit)
     [0 0 0 0]
@@ -482,6 +526,7 @@ def fit_poly1d_legendre(x, y, order, w=None):
 
     Examples
     --------
+
     >>> x = np.arange(500., 1000., 1)
     >>> p = [-1e-6, -1e-4, 1, 1]
     >>> y = np.polyval(p, x)
@@ -494,8 +539,16 @@ def fit_poly1d_legendre(x, y, order, w=None):
     >>> print(fit)
     [0 0 0 0]
 
-    ..plot:
+    .. plot::
+
         import matplotlib.pyplot as plt
+        import numpy as np
+        from spectractor.tools import fit_poly1d_legendre
+        p = [-1e-6, -1e-4, 1, 1]
+        x = np.arange(500., 1000., 1)
+        y = np.polyval(p, x)
+        err = np.ones_like(y)
+        fit, cov2, model2 = fit_poly1d_legendre(x,y,order=3,w=err)
         plt.errorbar(x,y,yerr=err,fmt='ro')
         plt.plot(x,model2)
         plt.show()
@@ -533,15 +586,20 @@ def fit_poly2d(x, y, z, order):
 
     Examples
     --------
+
     >>> x, y = np.mgrid[:50,:50]
     >>> z = x**2 + y**2 - 2*x*y
     >>> fit = fit_poly2d(x, y, z, order=2)
-    >>> assert np.isclose(fit.c0_0.value, 0)
-    >>> assert np.isclose(fit.c1_0.value, 0)
-    >>> assert np.isclose(fit.c2_0.value, 1)
-    >>> assert np.isclose(fit.c0_1.value, 0)
-    >>> assert np.isclose(fit.c0_2.value, 1)
-    >>> assert np.isclose(fit.c1_1.value, -2)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(fit.c0_0.value, 0)
+        >>> assert np.isclose(fit.c1_0.value, 0)
+        >>> assert np.isclose(fit.c2_0.value, 1)
+        >>> assert np.isclose(fit.c0_1.value, 0)
+        >>> assert np.isclose(fit.c0_2.value, 1)
+        >>> assert np.isclose(fit.c1_1.value, -2)
     """
     p_init = models.Polynomial2D(degree=order)
     fit_p = fitting.LevMarLSQFitter()
@@ -577,6 +635,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
 
     Examples
     --------
+
     >>> x = np.arange(500., 1000., 1)
     >>> p = [3,2,1,0]
     >>> y = np.polyval(p, x)
@@ -646,16 +705,21 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
 
     Examples
     --------
+
     >>> x, y = np.mgrid[:50,:50]
     >>> z = x**2 + y**2 - 2*x*y
     >>> z[::10,::10] = 0.
     >>> fit = fit_poly2d_outlier_removal(x,y,z,order=2,sigma=3)
-    >>> assert np.isclose(fit.c0_0.value, 0)
-    >>> assert np.isclose(fit.c1_0.value, 0)
-    >>> assert np.isclose(fit.c2_0.value, 1)
-    >>> assert np.isclose(fit.c0_1.value, 0)
-    >>> assert np.isclose(fit.c0_2.value, 1)
-    >>> assert np.isclose(fit.c1_1.value, -2)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(fit.c0_0.value, 0)
+        >>> assert np.isclose(fit.c1_0.value, 0)
+        >>> assert np.isclose(fit.c2_0.value, 1)
+        >>> assert np.isclose(fit.c0_1.value, 0)
+        >>> assert np.isclose(fit.c0_2.value, 1)
+        >>> assert np.isclose(fit.c1_1.value, -2)
 
     """
     my_logger = set_logger(__name__)
@@ -680,8 +744,8 @@ def tied_circular_gauss2d(g1):
 
 
 def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=None, circular=False):
-    """Fit an astropy Gaussian 2D model with parameters :
-        amplitude, x_mean,y_mean,x_stddev, y_stddev,theta
+    """
+    Fit an astropy Gaussian 2D model with parameters : amplitude, x_mean, y_mean, x_stddev, y_stddev, theta
     using outlier removal methods.
 
     Parameters
@@ -710,6 +774,7 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -718,9 +783,18 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
     >>> p = (50, 25, 25, 5, 5, 0)
     >>> Z = PSF.evaluate(X, Y, *p)
 
-    ..plot:
-        plt.imshow(Z, origin='loxer') #doctest: +ELLIPSIS
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        X, Y = np.mgrid[:50,:50]
+        PSF = models.Gaussian2D()
+        p = (50, 25, 25, 5, 5, 0)
+        Z = PSF.evaluate(X, Y, *p)
+        plt.imshow(Z, origin='lower')
         plt.show()
+
     >>> guess = (45, 20, 20, 7, 7, 0)
     >>> bounds = ((1, 10, 10, 1, 1, -90), (100, 40, 40, 10, 10, 90))
     >>> fit = fit_gauss2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, circular=True)
@@ -728,9 +802,20 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
     >>> print(res)
     [50.0, 25.0, 25.0, 5.0, 5.0, 0.0]
 
-    ..plot:
-        plt.imshow(Z-fit(X, Y), origin='loxer') #doctest: +ELLIPSIS
-        <matplotlib.image.AxesImage object at 0x...>
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        from spectractor.tools import fit_gauss2d_outlier_removal
+        X, Y = np.mgrid[:50,:50]
+        PSF = models.Gaussian2D()
+        p = (50, 25, 25, 5, 5, 0)
+        Z = PSF.evaluate(X, Y, *p)
+        guess = (45, 20, 20, 7, 7, 0)
+        bounds = ((1, 10, 10, 1, 1, -90), (100, 40, 40, 10, 10, 90))
+        fit = fit_gauss2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, circular=True)
+        plt.imshow(Z-fit(X, Y), origin='lower')
         plt.show()
 
     """
@@ -759,8 +844,8 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
 
 
 def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=None):
-    """Fit an astropy Moffat 2D model with parameters :
-        amplitude, x_mean, y_mean, gamma, alpha
+    """
+    Fit an astropy Moffat 2D model with parameters: amplitude, x_mean, y_mean, gamma, alpha
     using outlier removal methods.
 
     Parameters
@@ -787,6 +872,7 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -795,16 +881,41 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
     >>> p = (50, 50, 50, 5, 2)
     >>> Z = PSF.evaluate(X, Y, *p)
 
-    ..plot:
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        X, Y = np.mgrid[:100,:100]
+        PSF = models.Moffat2D()
+        p = (50, 50, 50, 5, 2)
+        Z = PSF.evaluate(X, Y, *p)
         plt.imshow(Z, origin='loxer')
         plt.show()
+
     >>> guess = (45, 48, 52, 4, 2)
     >>> bounds = ((1, 10, 10, 1, 1), (100, 90, 90, 10, 10))
     >>> fit = fit_moffat2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, niter=3)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
-    >>> assert(np.all(np.isclose(p, res, 1e-1)))
 
-    ..plot:
+    .. doctest::
+        :hide:
+
+        >>> assert(np.all(np.isclose(p, res, 1e-1)))
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        from spectractor.tools import fit_moffat2d_outlier_removal
+        X, Y = np.mgrid[:100,:100]
+        PSF = models.Moffat2D()
+        p = (50, 50, 50, 5, 2)
+        Z = PSF.evaluate(X, Y, *p)
+        guess = (45, 48, 52, 4, 2)
+        bounds = ((1, 10, 10, 1, 1), (100, 90, 90, 10, 10))
+        fit = fit_moffat2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, niter=3)
         plt.imshow(Z-fit(X, Y), origin='loxer')
         plt.show()
     """
@@ -830,8 +941,8 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
 
 
 def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=None):
-    """Fit an astropy Moffat 1D model with parameters :
-        amplitude, x_mean, gamma, alpha
+    """
+    Fit an astropy Moffat 1D model with parameters: amplitude, x_mean, gamma, alpha
     using outlier removal methods.
 
     Parameters
@@ -856,6 +967,7 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -864,17 +976,42 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
     >>> p = (50, 50, 5, 2)
     >>> Y = PSF.evaluate(X, *p)
 
-    ..plot:
-        plt.imshow(Z, origin='loxer')
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        X = np.arange(100)
+        PSF = models.Moffat1D()
+        p = (50, 50, 5, 2)
+        Y = PSF.evaluate(X, *p)
+        plt.plot(X, Y)
         plt.show()
+
     >>> guess = (45, 48, 4, 2)
     >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
     >>> fit = fit_moffat1d_outlier_removal(X, Y, guess=guess, bounds=bounds, niter=3)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
-    >>> assert(np.all(np.isclose(p, res, 1e-6)))
 
-    ..plot:
-        plt.imshow(Z-fit(X, Y), origin='loxer')
+    .. doctest::
+        :hide:
+
+        >>> assert(np.all(np.isclose(p, res, 1e-6)))
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        from spectractor.tools import fit_moffat1d_outlier_removal
+        X = np.arange(100)
+        PSF = models.Moffat1D()
+        p = (50, 50, 5, 2)
+        Y = PSF.evaluate(X, *p)
+        guess = (45, 48, 4, 2)
+        bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
+        fit = fit_moffat1d_outlier_removal(X, Y, guess=guess, bounds=bounds, niter=3)
+        plt.plot(X, Y-fit(X))
         plt.show()
     """
     my_logger = set_logger(__name__)
@@ -920,6 +1057,7 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -928,17 +1066,38 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
     >>> p = (50, 50, 5, 2)
     >>> Y = PSF.evaluate(X, *p)
 
-    ..plot:
-        plt.imshow(Z, origin='lower')
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        X = np.arange(100)
+        PSF = models.Moffat1D()
+        p = (50, 50, 5, 2)
+        Y = PSF.evaluate(X, *p)
+        plt.plot(X, Y)
         plt.show()
+
     >>> guess = (45, 48, 4, 2)
     >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
     >>> fit = fit_moffat1d(X, Y, guess=guess, bounds=bounds)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
     >>> assert(np.all(np.isclose(p, res, 1e-6)))
 
-    ..plot:
-        plt.imshow(Z-fit(X, Y), origin='lower')
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        from spectractor.tools import fit_moffat1d
+        X = np.arange(100)
+        PSF = models.Moffat1D()
+        p = (50, 50, 5, 2)
+        Y = PSF.evaluate(X, *p)
+        guess = (45, 48, 4, 2)
+        bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
+        fit = fit_moffat1d(X, Y, guess=guess, bounds=bounds)
+        plt.plot(X, Y-fit(X))
         plt.show()
     """
     my_logger = set_logger(__name__)
@@ -986,6 +1145,186 @@ class LevMarLSQFitterWithNan(fitting.LevMarLSQFitter):
             a = np.ravel(weights * (model(*args[2: -1]) - meas))
             a[~np.isfinite(a)] = 0
             return a
+
+
+def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
+    """
+    Compute the full width half maximum of y(x) curve,
+    using an interpolation of the data points and dichotomie method.
+
+    Parameters
+    ----------
+    x: array_like
+        The abscisse array.
+    y: array_like
+        The function array.
+    minimum: float, optional
+        The minimum reference from which to compyte half the height (default: 0).
+    center: float, optional
+        The center of the curve. If None, the weighted averageof the y(x) distribution is computed (default: None).
+    full_output: bool, optional
+        If True, half maximum, the edges of the curve and the curve center are given in output (default: False).
+
+    Returns
+    -------
+    FWHM: float
+        The full width half maximum of the curve.
+    half: float, optional
+        The half maximum value. Only if full_output=True.
+    center: float, optional
+        The y(x) center value. Only if full_output=True.
+    left_edge: float, optional
+        The left_edge value at half maximum. Only if full_output=True.
+    right_edge: float, optional
+        The right_edge value at half maximum. Only if full_output=True.
+
+    Examples
+    --------
+
+    Gaussian example
+
+    >>> x = np.arange(0, 100, 1)
+    >>> stddev = 4
+    >>> middle = 40
+    >>> psf = gauss(x, 1, middle, stddev)
+    >>> fwhm, half, center, a, b = compute_fwhm(x, psf, full_output=True)
+    >>> print(f"{fwhm:.4f} {2.355*stddev:.4f} {center:.4f}")
+    9.4192 9.4200 40.0000
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(fwhm, 2.355*stddev, atol=1e-3)
+        >>> assert np.isclose(center, middle, atol=1e-3)
+
+    .. plot ::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from spectractor.tools import gauss, compute_fwhm
+        x = np.arange(0, 100, 1)
+        stddev = 4
+        middle = 40
+        psf = gauss(x, 1, middle, stddev)
+        fwhm, half, center, a, b = compute_fwhm(x, psf, full_output=True)
+        plt.figure()
+        plt.plot(x, psf, label="function")
+        plt.axvline(center, color="gray", label="center")
+        plt.axvline(a, color="k", label="edges at half max")
+        plt.axvline(b, color="k", label="edges at half max")
+        plt.axhline(half, color="r", label="half max")
+        plt.legend()
+        plt.title(f"FWHM={fwhm:.3f}")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.show()
+
+    Defocused PSF example
+
+    >>> from spectractor.extractor.psf import MoffatGauss
+    >>> p = [2,40,40,4,2,-0.4,1,10]
+    >>> psf = MoffatGauss(p)
+    >>> fwhm, half, center, a, b = compute_fwhm(x, psf.evaluate(x), full_output=True)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(fwhm, 6.96, atol=1e-2)
+        >>> assert np.isclose(center, p[1], atol=1e-2)
+
+    .. plot ::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from spectractor.tools import gauss, compute_fwhm
+        from spectractor.extractor.psf import MoffatGauss
+        x = np.arange(0, 100, 1)
+        p = [2,40,40,4,2,-0.4,1,10]
+        psf = MoffatGauss(p)
+        fwhm, half, center, a, b = compute_fwhm(x, psf.evaluate(x), full_output=True)
+        plt.figure()
+        plt.plot(x, psf.evaluate(x, p), label="function")
+        plt.axvline(center, color="gray", label="center")
+        plt.axvline(a, color="k", label="edges at half max")
+        plt.axvline(b, color="k", label="edges at half max")
+        plt.axhline(half, color="r", label="half max")
+        plt.legend()
+        plt.title(f"FWHM={fwhm:.3f}")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.show()
+    """
+    if y.ndim > 1:
+        # TODO: implement fwhm for 2D curves
+        return -1
+    interp = interp1d(x, y, kind="cubic", bounds_error=False, fill_value="extrapolate")
+    maximum = np.max(y) - minimum
+    imax = np.argmax(y)
+    a = imax + np.argmin(np.abs(y[imax:] - 0.9 * maximum))
+    b = imax + np.argmin(np.abs(y[imax:] - 0.1 * maximum))
+
+    def eq(xx):
+        return interp(xx) - 0.5 * maximum
+    res = dichotomie(eq, a, b, 1e-3)
+    if center is None:
+        center = np.average(x, weights=y)
+    fwhm = abs(2 * (res - center))
+    if not full_output:
+        return fwhm
+    else:
+        return fwhm, 0.5*maximum, center, res, center - abs(res-center)
+
+
+def compute_integral(x, y, bounds=None):
+    """
+    Compute the integral of an y(x) curve. The curve is interpolated and extrapolated with cubic splines.
+    If not provided, bounds are set to the x array edges.
+
+    Parameters
+    ----------
+    x: array_like
+        The abscisse array.
+    y: array_like
+        The function array.
+    bounds: array_like, optional
+        The bounds of the integral. If None, the edges of thex array are taken (default bounds=None).
+
+    Returns
+    -------
+    result: float
+        The integral of the PSF model.
+
+    Examples
+    --------
+
+    Gaussian example
+
+    .. doctest::
+
+        >>> x = np.arange(0, 100, 0.5)
+        >>> stddev = 4
+        >>> middle = 40
+        >>> psf = gauss(x, 1/(stddev*np.sqrt(2*np.pi)), middle, stddev)
+        >>> integral = compute_integral(x, psf)
+        >>> print(f"{integral:.6f}")
+        1.000000
+
+    Defocused PSF example
+
+    .. doctest::
+
+        >>> from spectractor.extractor.psf import MoffatGauss
+        >>> p = [2,30,30,4,2,-0.5,1,10]
+        >>> psf = MoffatGauss(p)
+        >>> integral = compute_integral(x, psf.evaluate(x))
+        >>> assert np.isclose(integral, p[0], atol=1e-3)
+
+    """
+    if bounds is None:
+        bounds = (np.min(x), np.max(x))
+    interp = interp1d(x, y, kind="cubic", bounds_error=False, fill_value="extrapolate")
+    integral = quad(interp, bounds[0], bounds[1], limit=200)
+    return integral[0]
 
 
 def find_nearest(array, value):
@@ -1233,11 +1572,15 @@ def pixel_rotation(x, y, theta, x0=0, y0=0):
     >>> pixel_rotation(0, 0, 45)
     (0.0, 0.0)
     >>> u, v = pixel_rotation(1, 0, np.pi/4)
-    >>> assert np.isclose(u, 1/np.sqrt(2))
-    >>> assert np.isclose(v, -1/np.sqrt(2))
-    >>> u, v = pixel_rotation(1, 2, -np.pi/2, x0=1, y0=0)
-    >>> assert np.isclose(u, -2)
-    >>> assert np.isclose(v, 0)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(u, 1/np.sqrt(2))
+        >>> assert np.isclose(v, -1/np.sqrt(2))
+        >>> u, v = pixel_rotation(1, 2, -np.pi/2, x0=1, y0=0)
+        >>> assert np.isclose(u, -2)
+        >>> assert np.isclose(v, 0)
     """
     u = np.cos(theta) * (x - x0) + np.sin(theta) * (y - y0)
     v = -np.sin(theta) * (x - x0) + np.cos(theta) * (y - y0)
@@ -1269,9 +1612,13 @@ def detect_peaks(image):
     >>> im[10,20] = -3
     >>> im[49,49] = 1
     >>> detected_peaks = detect_peaks(im)
-    >>> assert detected_peaks[4,6]
-    >>> assert not detected_peaks[10,20]
-    >>> assert detected_peaks[49,49]
+
+    .. doctest::
+        :hide:
+
+        >>> assert detected_peaks[4,6]
+        >>> assert not detected_peaks[10,20]
+        >>> assert detected_peaks[49,49]
     """
 
     # define an 8-connected neighborhood
@@ -1353,13 +1700,19 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
 
     Examples
     --------
-    >>> import matplotlib.pyplot as plt
-    >>> from spectractor.extractor.images import Image
-    >>> f, ax = plt.subplots(1,1)
-    >>> im = Image('tests/data/reduc_20170605_028.fits')
-    >>> plot_image_simple(ax, im.data, scale="log10", units="ADU", target_pixcoords=(815,580),
-    ...                     title="tests/data/reduc_20170605_028.fits")
-    >>> if parameters.DISPLAY: plt.show()
+
+    .. plot::
+        :include-source:
+
+        >>> import matplotlib.pyplot as plt
+        >>> from spectractor.extractor.images import Image
+        >>> from spectractor import parameters
+        >>> from spectractor.tools import plot_image_simple
+        >>> f, ax = plt.subplots(1,1)
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> plot_image_simple(ax, im.data, scale="log10", units="ADU", target_pixcoords=(815,580),
+        ...                     title="tests/data/reduc_20170605_028.fits")
+        >>> if parameters.DISPLAY: plt.show()
     """
     if scale == "log" or scale == "log10":
         # removes the zeros and negative pixels first
@@ -1410,12 +1763,18 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
 
     Examples
     --------
-    >>> import matplotlib.pyplot as plt
-    >>> from spectractor.extractor.spectrum import Spectrum
-    >>> f, ax = plt.subplots(1,1)
-    >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
-    >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=[500,700], color='r', label='test')
-    >>> if parameters.DISPLAY: plt.show()
+
+    .. plot::
+        :include-source:
+
+        >>> import matplotlib.pyplot as plt
+        >>> from spectractor.extractor.spectrum import Spectrum
+        >>> from spectractor import parameters
+        >>> from spectractor.tools import plot_spectrum_simple
+        >>> f, ax = plt.subplots(1,1)
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=[500,700], color='r', label='test')
+        >>> if parameters.DISPLAY: plt.show()
     """
     xs = lambdas
     if xs is None:
@@ -1533,6 +1892,7 @@ def dichotomie(f, a, b, epsilon):
     --------
 
     Search for the Gaussian FWHM:
+
     >>> p = [1,0,1]
     >>> xx = np.arange(-10,10,0.1)
     >>> PSF = gauss(xx, *p)
@@ -1874,6 +2234,28 @@ def imgslice(slicespec):
     xbegin -= 1
     ybegin -= 1
     return np.s_[ybegin:yend, xbegin:xend]
+
+
+def compute_correlation_matrix(cov):
+    rho = np.zeros_like(cov)
+    for i in range(cov.shape[0]):
+        for j in range(cov.shape[1]):
+            rho[i, j] = cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
+    return rho
+
+
+def plot_correlation_matrix_simple(ax, cov, axis_names, ipar=None):
+    if ipar is None:
+        ipar = np.arange(cov.shape[0]).astype(int)
+    rho = compute_correlation_matrix(cov=cov[ipar[:, None], ipar])
+    im = plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
+    ax.set_title("Correlation matrix")
+    names = [axis_names[ip] for ip in ipar]
+    plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=11)
+    plt.yticks(np.arange(ipar.size), names, fontsize=11)
+    cbar = plt.colorbar(im)
+    cbar.ax.tick_params(labelsize=9)
+    plt.gcf().tight_layout()
 
 
 if __name__ == "__main__":

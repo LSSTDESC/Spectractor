@@ -1,12 +1,13 @@
 from astropy.table import Table
 from scipy.interpolate import interp1d
 import numpy as np
+import matplotlib.pyplot as plt
 import copy
 import os
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_for_legendre
+from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_for_legendre, plot_spectrum_simple
 
 
 class Line:
@@ -93,6 +94,7 @@ class Line:
         --------
 
         Give lambdas as a float:
+
         >>> l = Line(656.3, atmospheric=False, label='$H\\alpha$')
         >>> sigma = 2.
         >>> model = l.gaussian_model(656.3, A=1, sigma=sigma, use_fit=False)
@@ -103,6 +105,7 @@ class Line:
         0.5000
 
         Use a fit (for the example we create a mock fit result):
+
         >>> l.fit_lambdas = np.arange(600,700,2)
         >>> l.fit_gauss = gauss(l.fit_lambdas, 1e-10, 650, 2.3)
         >>> l.fit_fwhm = 2.3*2*np.sqrt(2*np.log(2))
@@ -146,11 +149,13 @@ class Lines:
         Examples
         --------
         The default first five lines:
+
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=False, emission_spectrum=False)
         >>> print([lines.lines[i].wavelength for i in range(5)])
         [353.1, 388.8, 397.0, 410.2, 434.0]
 
         The four hydrogen lines only:
+
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=0, atmospheric_lines=False, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(4)])
         [397.0, 410.2, 434.0, 486.3]
@@ -158,11 +163,13 @@ class Lines:
         True
 
         Redshift the hydrogen lines, the atmospheric lines stay unchanged:
+
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(7)])
         [686.719, 762.1, 794.0, 820.4, 822.696, 868.0, 898.765]
 
         Redshift all the spectral lines, except the atmospheric lines:
+
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
         [686.719, 706.2, 762.1, 777.6, 794.0]
@@ -173,6 +180,7 @@ class Lines:
         [397.0, 410.2, 434.0, 486.3, 656.3, 794.0, 820.4, 868.0, 972.6, 1312.6]
 
         Negative redshift:
+
         >>> lines = Lines(HYDROGEN_LINES, redshift=-0.5)
 
         """
@@ -256,18 +264,39 @@ class Lines:
 
         Examples
         --------
+
         >>> import matplotlib.pyplot as plt
         >>> f, ax = plt.subplots(1,1)
         >>> ax.set_xlim(300,1000)
-        (300, 1000.0)
+        (300, 1000)
         >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
         >>> lines.lines[5].fitted = True
         >>> lines.lines[5].high_snr = True
         >>> lines.lines[-1].fitted = True
         >>> lines.lines[-1].high_snr = True
         >>> ax = lines.plot_atomic_lines(ax)
-        >>> assert ax is not None
         >>> if parameters.DISPLAY: plt.show()
+
+        .. doctest::
+            :hide:
+
+            >>> assert ax is not None
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.spectroscopy import *
+            f, ax = plt.subplots(1,1)
+            ax.set_xlim(300,1000)
+            lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
+            lines.lines[5].fitted = True
+            lines.lines[5].high_snr = True
+            lines.lines[-1].fitted = True
+            lines.lines[-1].high_snr = True
+            ax = lines.plot_atomic_lines(ax)
+            plt.show()
+
         """
         xlim = ax.get_xlim()
         for line in self.lines:
@@ -296,7 +325,8 @@ class Lines:
         Examples
         --------
 
-        Creation of a mock spectrum with emission and absorption lines
+        Creation of a mock spectrum with emission and absorption lines:
+
         >>> from spectractor.extractor.spectrum import Spectrum, detect_lines
         >>> lambdas = np.arange(300,1000,1)
         >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
@@ -310,20 +340,50 @@ class Lines:
         >>> spec.err = spectrum_err
         >>> fwhm_func = interp1d(lambdas, 0.01 * lambdas)
 
-        Detect the lines
+        Detect the lines:
+
         >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
         ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
         >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
-        >>> assert(global_chisq < 1)
 
-        Plot the result
-        >>> import matplotlib.pyplot as plt
-        >>> from spectractor.tools import plot_spectrum_simple
+        .. doctest::
+            :hide:
+
+            >>> assert(global_chisq < 1)
+
+        Plot the result:
+
         >>> spec.lines = lines
         >>> fig = plt.figure()
         >>> plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
         >>> lines.plot_detected_lines(plt.gca())
-        >>> if parameters.DISPLAY: plt.show()
+        >>> plt.show()
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            from spectractor.tools import plot_spectrum_simple
+            from spectractor.extractor.spectrum import Spectrum, detect_lines
+            from spectractor.extractor.spectroscopy import *
+            lambdas = np.arange(300,1000,1)
+            spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
+            spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
+            spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
+            spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
+            spectrum_err = np.sqrt(spectrum)
+            spec = Spectrum()
+            spec.lambdas = lambdas
+            spec.data = spectrum
+            spec.err = spectrum_err
+            fwhm_func = interp1d(lambdas, 0.01 * lambdas)
+            lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True, atmospheric_lines=True, redshift=0, emission_spectrum=True)
+            global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
+            spec.lines = lines
+            fig = plt.figure()
+            plot_spectrum_simple(plt.gca(), lambdas, spec.data, data_err=spec.err)
+            lines.plot_detected_lines(plt.gca())
+            plt.show()
+
         """
         lambdas = np.zeros(1)
         for line in self.lines:

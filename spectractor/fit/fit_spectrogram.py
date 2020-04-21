@@ -45,7 +45,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_poly_params = self.psf_poly_params[length:-1]  # remove saturation (fixed parameter)
         self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:-1])
         self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:-1])
-        self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds(data=None)
+        self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
         self.angle = self.spectrum.rotation_angle
@@ -54,7 +54,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
                            self.D, self.shift_x, self.shift_y, self.angle])
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params])
-        self.ndim = self.p.size
         self.input_labels = ["A1", "A2", "ozone [db]", "PWV [mm]", "VAOD", r"D_CCD [mm]",
                              r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]"] + list(self.psf_poly_params_labels)
         self.axis_names = ["$A_1$", "$A_2$", "ozone [db]", "PWV [mm]", "VAOD", r"$D_{CCD}$ [mm]",
@@ -200,17 +199,22 @@ class SpectrogramFitWorkspace(FitWorkspace):
         """
         Examples
         --------
-        >>> file_name = 'outputs/reduc_20170530_130_spectrum.fits'
-        >>> atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-        >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_filename=atmgrid_filename,
-        ... nwalkers=28, nsteps=20000, burnin=10000, nbins=10, verbose=1, plot=True, live_fit=False)
-        >>> A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, angle, *psf = fit_workspace.p
-        >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols,
-        ... D, shift_x, shift_y, shift_t, angle, psf)
-        >>> fit_workspace.lambdas = lambdas
-        >>> fit_workspace.model = model
-        >>> fit_workspace.model_err = model_err
-        >>> fit_workspace.plot_fit()
+
+        .. plot::
+            :include-source:
+
+            >>> from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace
+            >>> file_name = 'tests/data/reduc_20170530_134_spectrum.fits'
+            >>> atmgrid_file_name = file_name.replace('spectrum', 'atmsim')
+            >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_file_name, verbose=True)
+            >>> A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, *psf = fit_workspace.p
+            >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols,
+            ... D, shift_x, shift_y, angle, psf)
+            >>> fit_workspace.lambdas = lambdas
+            >>> fit_workspace.model = model
+            >>> fit_workspace.model_err = model_err
+            >>> fit_workspace.plot_fit()
+
         """
         gs_kw = dict(width_ratios=[3, 0.15, 1, 0.15, 1, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(12, 8), constrained_layout=True, gridspec_kw=gs_kw)
@@ -247,8 +251,8 @@ def lnprob_spectrogram(p):
 
 
 def plot_psf_poly_params(psf_poly_params):
-    from spectractor.extractor.psf import PSF1D
-    psf = PSF1D()
+    from spectractor.extractor.psf import MoffatGauss
+    psf = MoffatGauss()
     truth_psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
                              -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
                              0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
