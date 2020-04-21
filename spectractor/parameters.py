@@ -121,9 +121,7 @@ SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
 TIME_UNIT = 1 * units.s  # flux for 1 second
 hc = const.h * const.c  # h.c product of fontamental constants c and h
 wl_dwl_unit = units.nanometer ** 2  # lambda.dlambda  in wavelength in nm
-g_disperser_ronchi = 0.2  # theoretical gain for order+1 : 10%
-FLAM_TO_ADURATE = (
-    (OBS_SURFACE * SED_UNIT * TIME_UNIT * wl_dwl_unit / hc / CCD_GAIN * g_disperser_ronchi).decompose()).value
+FLAM_TO_ADURATE = ((OBS_SURFACE * SED_UNIT * TIME_UNIT * wl_dwl_unit / hc / CCD_GAIN).decompose()).value
 
 # fit workspace
 # FIT_WORKSPACE = None
