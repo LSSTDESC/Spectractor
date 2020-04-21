@@ -35,6 +35,7 @@ def test_extractor():
         spectrum = Spectractor(file_name, output_directory, target, [xpos, ypos], disperser_label,
                                config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
+        spectrum.my_logger.warning(f"{np.sum(spectrum.data)}")
         assert np.sum(spectrum.data) > 1e-11
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
                                    f"\n\t\tspectrum.lambdas[0]={spectrum.lambdas[0]}"

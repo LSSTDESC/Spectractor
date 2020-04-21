@@ -1,7 +1,7 @@
 from scipy.signal import argrelextrema, savgol_filter
 from scipy.interpolate import interp1d
 from astropy.io import fits
-from scipy import integrate #integation
+from scipy import integrate  # integation
 from iminuit import Minuit
 import matplotlib.pyplot as plt
 import numpy as np
@@ -385,7 +385,8 @@ class Spectrum:
             if self.header['D2CCD'] != "":
                 parameters.DISTANCE2CCD = float(self.header["D2CCD"])
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
-            self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+            self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
+                                      data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
             self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
@@ -397,7 +398,7 @@ class Spectrum:
             self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
             if os.path.isfile(psf_file_name):
                 self.load_chromatic_psf(psf_file_name)
-            else:                
+            else:
                 self.my_logger.error(f"\n\tPSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
@@ -500,7 +501,8 @@ def calibrate_spectrum(spectrum, xlim=None):
     spectrum.header['D2CCD'] = parameters.DISTANCE2CCD
 
 
-def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None, calibration_lines_only=False,
+def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None,
+                 calibration_lines_only=False,
                  xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
     """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
     around emission or absorption tabulated lines, and to select surrounding pixels
@@ -570,7 +572,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     >>> if parameters.DISPLAY: plt.show()
     """
 
-   
     # main settings
     my_logger = set_logger(__name__)
     bgd_npar = parameters.CALIB_BGD_NPARAMS
@@ -580,12 +581,12 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     #     peak_width = 7
     #     bgd_width = 15
     fwhm_to_peak_width_factor = 1.5
-    len_index_to_bgd_npar_factor = 0* 0.12 / 0.024 * parameters.CCD_PIXEL2MM
+    len_index_to_bgd_npar_factor = 0 * 0.12 / 0.024 * parameters.CCD_PIXEL2MM
     baseline_prior = 3  # *sigma gaussian prior on base line fit
     # filter the noise
     # plt.errorbar(lambdas,spec,yerr=spec_err)
     spec = np.copy(spec)
-    spec = savgol_filter(spec, 5, 2)
+    spec = savgol_filter(spec, 7, 2)
     # plt.plot(lambdas,spec)
     # plt.show()
     # initialisation
@@ -840,7 +841,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         global_chisq += chisq
         if spec_err is not None:
             noise_level = np.sqrt(np.mean(spec_err[index] ** 2))
-        
+
         for j in range(len(new_lines_list[k])):
             line = new_lines_list[k][j]
             peak_pos = popt[bgd_npar + 3 * j + 1]
@@ -854,33 +855,34 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             # save fit results
             line.fitted = True
             line.fit_lambdas = lambdas[index]
-            
+
             x_norm = rescale_x_for_legendre(lambdas[index])
 
-            x_int=np.arange(peak_pos - 5*np.abs(popt[bgd_npar + 3 * j + 2]),peak_pos + 5*np.abs(popt[bgd_npar + 3 * j + 2]),0.1)
-            
+            x_int = np.arange(peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2]),
+                              peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2]), 0.1)
 
             middle = 0.5 * (np.max(lambdas[index]) + np.min(lambdas[index]))
             x_int_norm = x_int - middle
-            if np.max(lambdas[index]-middle) != 0:
-                x_int_norm = x_int_norm / np.max(lambdas[index]-middle)
-                
-            jmin=np.argmin(np.abs(lambdas-(peak_pos - 5*np.abs(popt[bgd_npar + 3 * j + 2]))))
-            jmax=np.argmin(np.abs(lambdas-(peak_pos + 5*np.abs(popt[bgd_npar + 3 * j + 2]))))
-            spectr_data=interp1d(lambdas[jmin:jmax],spec[jmin:jmax])(x_int)
+            if np.max(lambdas[index] - middle) != 0:
+                x_int_norm = x_int_norm / np.max(lambdas[index] - middle)
 
-            Continuum=np.polynomial.legendre.legval(x_int_norm, popt[:bgd_npar])
-            Gauss=gauss(x_int, *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
+            jmin = max(0, np.argmin(np.abs(lambdas - (peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2])))) - 1)
+            jmax = min(len(lambdas),
+                       np.argmin(np.abs(lambdas - (peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2])))) + 1)
+            spectr_data = interp1d(lambdas[jmin:jmax], spec[jmin:jmax])(x_int)
 
-            Y=-Gauss/Continuum
-            Ydata=1-spectr_data/Continuum
+            Continuum = np.polynomial.legendre.legval(x_int_norm, popt[:bgd_npar])
+            Gauss = gauss(x_int, *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
 
-            line.fit_eqwidth_mod = integrate.simps(Y,x_int) #sol1
-            line.fit_eqwidth_data = integrate.simps(Ydata,x_int) #sol2
-          
+            Y = -Gauss / Continuum
+            Ydata = 1 - spectr_data / Continuum
+
+            line.fit_eqwidth_mod = integrate.simps(Y, x_int)  # sol1
+            line.fit_eqwidth_data = integrate.simps(Ydata, x_int)  # sol2
+
             line.fit_popt = popt
             line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
-            
+
             line.fit_bgd = np.polynomial.legendre.legval(x_norm, popt[:bgd_npar])
             line.fit_snr = snr
             line.fit_chisq = chisq
@@ -907,7 +909,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         # lines.my_logger.debug(
         #    f'\n\tNumber of calibration lines detected {len(lambda_shifts):d}\n\tTotal chisq: {global_chisq:.3f}')
     return global_chisq
-
 
 
 # noinspection PyArgumentList
@@ -1226,7 +1227,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         ax[0].plot(spectrum.lambdas, np.array(s.table['fwhm']))
         ax[0].set_xlabel(r"$\lambda$ [nm]")
         ax[0].set_ylabel("Transverse FWHM [pixels]")
-        ax[0].set_ylim((0.8*np.min(s.table['fwhm']), 1.2*np.max(s.table['fwhm'][-10:])))
+        ax[0].set_ylim((0.8 * np.min(s.table['fwhm']), 1.2 * np.max(s.table['fwhm'][-10:])))
         ax[0].grid()
         ax[1].plot(spectrum.lambdas, np.array(s.table['x_mean']))
         ax[1].set_xlabel(r"$\lambda$ [nm]")
