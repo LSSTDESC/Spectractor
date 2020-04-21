@@ -339,9 +339,9 @@ class Lines:
                         bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
                         ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
         if print_table:
-            self.print_detected_lines_table(print_table=True)
+            self.print_detected_lines(print_table=True)
 
-    def print_detected_lines_table(self, output_file_name="", overwrite=False, print_table=False):
+    def print_detected_lines(self, output_file_name="", overwrite=False, print_table=False):
         """Print the detected line on screen as an Astropy table, and write it in a file.
 
         Parameters
@@ -383,7 +383,7 @@ class Lines:
 
         Print the result
         >>> spec.lines = lines
-        >>> t = lines.print_detected_lines_table(output_file_name="test_detected_lines.csv")
+        >>> t = lines.print_detected_lines(output_file_name="test_detected_lines.csv")
 
         .. doctest::
             :hide:
@@ -420,7 +420,7 @@ class Lines:
                   dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
         for col in t.colnames[1:-3]:
             t[col].unit = 'nm'
-        for col in t.colnames[-2:-1]:
+        for col in t.colnames[-2:]:
             t[col].unit = 'nm'
         t[t.colnames[-3]].unit = 'reduced'
         if output_file_name != "":
