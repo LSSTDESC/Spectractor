@@ -1,6 +1,7 @@
 from scipy.signal import argrelextrema, savgol_filter
 from scipy.interpolate import interp1d
 from astropy.io import fits
+from scipy import integrate
 from iminuit import Minuit
 import matplotlib.pyplot as plt
 import numpy as np
@@ -637,7 +638,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     # filter the noise
     # plt.errorbar(lambdas,spec,yerr=spec_err)
     spec = np.copy(spec)
-    spec = savgol_filter(spec, 5, 2)
+    spec = savgol_filter(spec, 7, 2)
     # plt.plot(lambdas,spec)
     # plt.show()
     # initialisation
@@ -891,6 +892,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         global_chisq += chisq
         if spec_err is not None:
             noise_level = np.sqrt(np.mean(spec_err[index] ** 2))
+
         for j in range(len(new_lines_list[k])):
             line = new_lines_list[k][j]
             peak_pos = popt[bgd_npar + 3 * j + 1]
@@ -904,9 +906,35 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             # save fit results
             line.fitted = True
             line.fit_lambdas = lambdas[index]
+
+            x_norm = rescale_x_for_legendre(lambdas[index])
+
+            x_step = 0.1  # nm
+            x_int = np.arange(peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2]),
+                              peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2]), x_step)
+
+            middle = 0.5 * (np.max(lambdas[index]) + np.min(lambdas[index]))
+            x_int_norm = x_int - middle
+            if np.max(lambdas[index] - middle) != 0:
+                x_int_norm = x_int_norm / np.max(lambdas[index] - middle)
+
+            # jmin and jmax a bit larger than x_int to avoid extrapolation
+            jmin = max(0, int(np.argmin(np.abs(lambdas - (x_int[0] - x_step))) - 2))
+            jmax = min(len(lambdas), int(np.argmin(np.abs(lambdas - (x_int[-1] + x_step))) + 2))
+            spectr_data = interp1d(lambdas[jmin:jmax], spec[jmin:jmax])(x_int)
+
+            Continuum = np.polynomial.legendre.legval(x_int_norm, popt[:bgd_npar])
+            Gauss = gauss(x_int, *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
+
+            Y = -Gauss / Continuum
+            Ydata = 1 - spectr_data / Continuum
+
+            line.fit_eqwidth_mod = integrate.simps(Y, x_int)  # sol1
+            line.fit_eqwidth_data = integrate.simps(Ydata, x_int)  # sol2
+
             line.fit_popt = popt
             line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
-            x_norm = rescale_x_for_legendre(lambdas[index])
+
             line.fit_bgd = np.polynomial.legendre.legval(x_norm, popt[:bgd_npar])
             line.fit_snr = snr
             line.fit_chisq = chisq

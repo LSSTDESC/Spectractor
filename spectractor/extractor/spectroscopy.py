@@ -3,6 +3,7 @@ from scipy.interpolate import interp1d
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+import os
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -66,6 +67,8 @@ class Line:
         self.fit_fwhm = None
         self.fit_popt = None
         self.fit_chisq = None
+        self.fit_eqwidth_mod = None
+        self.fit_eqwidth_data = None
         self.fit_bgd_npar = parameters.CALIB_BGD_NPARAMS
 
     def gaussian_model(self, lambdas, A=1, sigma=2, use_fit=False):
@@ -310,13 +313,7 @@ class Lines:
         return ax
 
     def plot_detected_lines(self, ax=None, print_table=False):
-        """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
-        around emission or absorption tabulated lines, and to select surrounding pixels
-        to fit a (positive or negative) gaussian and a polynomial background. If several regions
-        overlap, a multi-gaussian fit is performed above a common polynomial background.
-        The mean global shift (in nm) between the detected and tabulated lines is returned, considering
-        only the lines with a signal-to-noise ratio above a threshold.
-        The order of the polynomial background is set in parameters.py with CALIB_BGD_ORDER.
+        """Overplot the fitted lines on a spectrum.
 
         Parameters
         ----------
@@ -389,8 +386,76 @@ class Lines:
 
         """
         lambdas = np.zeros(1)
+        for line in self.lines:
+            if line.fitted is True:
+                # look for lines in subset fit
+                bgd_npar = line.fit_bgd_npar
+                parameters.CALIB_BGD_NPARAMS = bgd_npar
+                if lambdas.shape != line.fit_lambdas.shape or not np.allclose(lambdas, line.fit_lambdas, 1e-3):
+                    lambdas = np.copy(line.fit_lambdas)
+                    if ax is not None:
+                        ax.plot(lambdas, multigauss_and_bgd(lambdas, *line.fit_popt), lw=2, color='b')
+                        x_norm = rescale_x_for_legendre(lambdas)
+                        bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
+                        ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
+        if print_table:
+            self.print_detected_lines(print_table=True)
+
+    def print_detected_lines(self, output_file_name="", overwrite=False, print_table=False):
+        """Print the detected line on screen as an Astropy table, and write it in a file.
+
+        Parameters
+        ----------
+        output_file_name: str, optional
+            Output file name. If not empty, save the table in a file (default: '').
+        overwrite: bool, optional
+            If True, overwrite the existing file if it exists (default: False).
+        print_table: bool, optional
+            If True, print a summary table (default: False).
+
+        Returns
+        -------
+        table: Table
+            Astropy table containing the main line characteristics.
+
+        Examples
+        --------
+
+        Creation of a mock spectrum with emission and absorption lines
+        >>> from spectractor.extractor.spectrum import Spectrum, detect_lines
+        >>> lambdas = np.arange(300,1000,1)
+        >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
+        >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
+        >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
+        >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
+        >>> spectrum_err = np.sqrt(spectrum)
+        >>> spec = Spectrum()
+        >>> spec.lambdas = lambdas
+        >>> spec.data = spectrum
+        >>> spec.err = spectrum_err
+        >>> fwhm_func = interp1d(lambdas, 0.01 * lambdas)
+
+        Detect the lines
+        >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
+        ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
+        >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
+        >>> assert(global_chisq < 1)
+
+        Print the result
+        >>> spec.lines = lines
+        >>> t = lines.print_detected_lines(output_file_name="test_detected_lines.csv")
+
+        .. doctest::
+            :hide:
+
+            >>> assert len(t) > 0
+            >>> assert os.path.isfile('test_detected_lines.csv')
+            >>> os.remove('test_detected_lines.csv')
+        """
+        lambdas = np.zeros(1)
         rows = []
         j = 0
+
         for line in self.lines:
             if line.fitted is True:
                 # look for lines in subset fit
@@ -399,26 +464,30 @@ class Lines:
                 if lambdas.shape != line.fit_lambdas.shape or not np.allclose(lambdas, line.fit_lambdas, 1e-3):
                     j = 0
                     lambdas = np.copy(line.fit_lambdas)
-                    if ax is not None:
-                        ax.plot(lambdas, multigauss_and_bgd(lambdas, *line.fit_popt), lw=2, color='b')
-                        x_norm = rescale_x_for_legendre(lambdas)
-                        bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
-                        ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
                 popt = line.fit_popt
                 peak_pos = popt[bgd_npar + 3 * j + 1]
                 FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
                 signal_level = popt[bgd_npar + 3 * j]
                 if line.high_snr:
                     rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength,
-                                 FWHM, signal_level, line.fit_snr, line.fit_chisq))
+                                 FWHM, signal_level, line.fit_snr, line.fit_chisq, line.fit_eqwidth_mod,
+                                 line.fit_eqwidth_data))
                 j += 1
-        if print_table and len(rows) > 0:
-            t = Table(rows=rows, names=('Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq'),
-                      dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
-            for col in t.colnames[1:-3]:
-                t[col].unit = 'nm'
-            t[t.colnames[-1]].unit = 'reduced'
+
+        t = Table(rows=rows, names=(
+            'Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq', 'Eqwidth_mod',
+            'Eqwidth_data'),
+                  dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
+        for col in t.colnames[1:-3]:
+            t[col].unit = 'nm'
+        for col in t.colnames[-2:]:
+            t[col].unit = 'nm'
+        t[t.colnames[-3]].unit = 'reduced'
+        if output_file_name != "":
+            t.write(output_file_name, overwrite=overwrite)
+        if print_table:
             print(t)
+        return t
 
 
 # Line catalog
