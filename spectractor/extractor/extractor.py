@@ -101,6 +101,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
     spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
+    spectrum.lines.print_detected_lines(output_filename=output_filename.replace('_spectrum.fits', '_lines.csv'))
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
