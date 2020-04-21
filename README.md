@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/LSSTDESC/Spectractor.svg?branch=master)](https://travis-ci.org/LSSTDESC/Spectractor)
 [![Coverage Status](https://coveralls.io/repos/github/LSSTDESC/Spectractor/badge.svg?branch=master)](https://coveralls.io/github/LSSTDESC/Spectractor?branch=master)
+[![Documentation Status](https://readthedocs.org/projects/spectractor/badge/?version=latest)](https://spectractor.readthedocs.io/en/latest/?badge=latest)
 
 # Spectractor
 
@@ -23,11 +24,11 @@ Spectractor is written in Python 3.7. The dependencies are listed in the `requir
 ```
 pip install -r requirements.txt .
 ```
-Be careful, Spectractor can perform fits using the MCMC library [`emcee`](https://emcee.readthedocs.io/en/stable/) with [`mpi4py`](https://mpi4py.readthedocs.io/en/stable/) and [`h5py`](https://www.h5py.org/).  The latter might be better installed using `conda install ...` command to get their own dependencies (openmp and hdf5).
+Be careful, Spectractor can perform fits using the MCMC library [emcee](https://emcee.readthedocs.io/en/stable/) with [mpi4py](https://mpi4py.readthedocs.io/en/stable/) and [h5py](https://www.h5py.org/).  The latter might be better installed using `conda install ...` command to get their own dependencies (openmp and hdf5).
 
 For the simulation of spectra, Spectractor needs the following external libraries:
-- [`libradtran`](http://www.libradtran.org/doku.php) to simulate atmospheric transmission: it needs the installation of [`netcdf`](https://www.unidata.ucar.edu/software/netcdf/) and a python 2 environment (for the compilation only, not the usage).
-- [`pysynphot`](https://pysynphot.readthedocs.io/en/latest/) to get the CALSPEC star spectra: the HST CALSPEC calibration spectra must be downloaded and the environment variable `PYSYN_CDBS` must be created.
+- [libradtran](http://www.libradtran.org/doku.php) to simulate atmospheric transmission: it needs the installation of [netcdf](https://www.unidata.ucar.edu/software/netcdf/) and a python 2 environment (for the compilation only, not the usage).
+- [pysynphot](https://pysynphot.readthedocs.io/en/latest/) to get the CALSPEC star spectra: the HST CALSPEC calibration spectra must be downloaded and the environment variable `PYSYN_CDBS` must be created.
 
 ## Basic extraction
 

@@ -38,8 +38,14 @@ mypath = os.path.dirname(__file__)
 DISPERSER_DIR = os.path.join(mypath, "extractor/dispersers/")
 CONFIG_DIR = os.path.join(mypath, "../config/")
 THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
-ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
-LIBRADTRAN_DIR = os.getenv('LIBRADTRAN_DIR') + '/'
+if 'ASTROMETRYNET_DIR' in os.environ:
+    ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
+else:
+    ASTROMETRYNET_DIR = ''
+if 'LIBRADTRAN_DIR' in os.environ:
+    LIBRADTRAN_DIR = os.getenv('LIBRADTRAN_DIR') + '/'
+else:
+    LIBRADTRAN_DIR = ''
 
 # CCD characteristics
 CCD_IMSIZE = 2048  # size of the image in pixel
@@ -104,10 +110,13 @@ LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, LAMBDA_STEP)
 PIXWIDTH_SIGNAL = 10  # half transverse width of the signal rectangular window in pixels
 PIXDIST_BACKGROUND = 20  # distance from dispersion axis to analyse the background in pixels
 PIXWIDTH_BACKGROUND = 10  # transverse width of the background rectangular window in pixels
-BGD_ORDER = 1  # the order of the polynomial background to fit transversaly
+PIXWIDTH_BOXSIZE = 20 # box size for sextractor evaluation of the background
+BGD_ORDER = 1  # the order of the polynomial background to fit in the transverse direction
 
 # PSF
-PSF_POLY_ORDER = 2  # the order of the polynomials to model wavelength dependence of the shape parameters
+PSF_TYPE = "Moffat"  # the PSF model: Moffat or MoffatGauss
+PSF_POLY_ORDER = 2  # the order of the polynomials to model wavelength dependence of the PSF shape parameters
+PSF_FIT_REG_PARAM = 0.002  # regularisation parameter for the chisq minimisation to extract the spectrum
 
 # Detection line algorithm
 CALIB_BGD_ORDER = 3  # order of the background polynome to fit

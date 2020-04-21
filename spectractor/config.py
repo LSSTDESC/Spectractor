@@ -69,12 +69,7 @@ def load_config(config_filename):
         Traceback (most recent call last):
         ...
         SystemExit: Config file ./config/unknown_file.ini does not exist.
-        >>> os.rename("./config/default.ini", "./config/default.ini.bak")
         >>> load_config("./config/ctio.ini")
-        Traceback (most recent call last):
-        ...
-        SystemExit: Config file ./config/default.ini does not exist.
-        >>> os.rename("./config/default.ini.bak", "./config/default.ini")
 
     """
     if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, "default.ini")):
@@ -104,6 +99,10 @@ def load_config(config_filename):
     parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * parameters.TIME_UNIT
                                    * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
+
+    # check consistency
+    if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
+        sys.exit(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
 
     if parameters.VERBOSE:
         for section in config.sections():
@@ -157,3 +156,10 @@ def set_logger(logger):
         my_logger.setLevel(logging.DEBUG)
         coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.DEBUG)
     return my_logger
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
+

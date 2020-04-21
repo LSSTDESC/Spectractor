@@ -57,21 +57,26 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
     Examples
     --------
 
-    # Build a mock spectrogram with random Poisson noise:
-    >>> from spectractor.extractor.psf import ChromaticPSF1D
+    Build a mock spectrogram with random Poisson noise:
+
+    >>> from spectractor.extractor.psf import MoffatGauss
+    >>> from spectractor.extractor.chromaticpsf import ChromaticPSF
     >>> from spectractor import parameters
     >>> parameters.DEBUG = True
-    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, saturation=1000)
+    >>> psf = MoffatGauss()
+    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
-    >>> data = s0.evaluate(params)
+    >>> data = s0.evaluate(params, mode="1D")
     >>> bgd = 10*np.ones_like(data)
     >>> data += bgd
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
-    # Fit the transverse profile:
+    Fit the transverse profile:
+
     >>> bgd_model = extract_spectrogram_background_fit1D(data, data_errors, deg=1, ws=[30,50], sigma=5, pixel_step=1)
+
     """
     Ny, Nx = data.shape
     middle = Ny // 2
@@ -145,21 +150,26 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     Examples
     --------
 
-    # Build a mock spectrogram with random Poisson noise:
-    >>> from spectractor.extractor.psf import ChromaticPSF1D
+    Build a mock spectrogram with random Poisson noise:
+
+    >>> from spectractor.extractor.psf import MoffatGauss
+    >>> from spectractor.extractor.chromaticpsf import ChromaticPSF
     >>> from spectractor import parameters
     >>> parameters.DEBUG = True
-    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, saturation=1000)
+    >>> psf = MoffatGauss()
+    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
-    >>> data = s0.evaluate(params)
+    >>> data = s0.evaluate(params, mode="1D")
     >>> bgd = 10*np.ones_like(data)
     >>> data += bgd
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
-    # Fit the transverse profile:
+    Fit the transverse profile:
+
     >>> bgd_model = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+
     """
     Ny, Nx = data.shape
     middle = Ny // 2
@@ -174,8 +184,12 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         mask = None
     # windows size in x is set to only 6 pixels to be able to estimate rapid variations of the background on real data
     # filter window size is set to window // 2 so 3
-    bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
-                       filter_size=((ws[1] - ws[0]) // 2, (ws[1] - ws[0]) // 2),
+    # bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
+    #                    filter_size=((ws[1] - ws[0]) // 2, (ws[1] - ws[0]) // 2),
+    #                    sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
+    #                    mask=mask)
+    bkg = Background2D(data, (parameters.PIXWIDTH_BOXSIZE, parameters.PIXWIDTH_BOXSIZE),
+                       filter_size=(parameters.PIXWIDTH_BOXSIZE//2, parameters.PIXWIDTH_BOXSIZE//2),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False,
@@ -184,11 +198,13 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     if parameters.DEBUG:
         fig, ax = plt.subplots(3, 1, figsize=(12, 6), sharex='all')
         bgd_bands = np.copy(data).astype(float)
+        mean = np.nanmean(bgd_bands)
+        std = np.nanstd(bgd_bands)
         bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
-        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=0)
+        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=mean-3*std, vmax=mean+3*std)
         c = plt.colorbar(im, ax=ax[0])
         c.set_label(f'Data units (lin scale)')
-        ax[0].set_title(f'Data background: mean={np.nanmean(bgd_bands):.3f}, std={np.nanstd(bgd_bands):.3f}')
+        ax[0].set_title(f'Data background: mean={mean:.3f}, std={std:.3f}')
         ax[0].set_xlabel('X [pixels]')
         ax[0].set_ylabel('Y [pixels]')
         bkg.plot_meshes(outlines=True, color='#1f77b4', axes=ax[0])
@@ -238,14 +254,17 @@ def extract_spectrogram_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1
     Examples
     --------
 
-    # Build a mock spectrogram with random Poisson noise:
-    >>> from spectractor.extractor.psf import ChromaticPSF1D
+    Build a mock spectrogram with random Poisson noise:
+
+    >>> from spectractor.extractor.psf import MoffatGauss
+    >>> from spectractor.extractor.chromaticpsf import ChromaticPSF
     >>> from spectractor import parameters
     >>> parameters.DEBUG = True
-    >>> s0 = ChromaticPSF1D(Nx=80, Ny=100, saturation=1000)
+    >>> psf = MoffatGauss()
+    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
-    >>> data = s0.evaluate(params)
+    >>> data = s0.evaluate(params, mode="1D")
     >>> bgd = 10.*np.ones_like(data)
     >>> xx, yy = np.meshgrid(np.arange(s0.Nx), np.arange(s0.Ny))
     >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))
@@ -253,8 +272,10 @@ def extract_spectrogram_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
 
-    # Fit the transverse profile:
+    Fit the transverse profile:
+
     >>> bgd_model_func = extract_spectrogram_background_poly2D(data, deg=1, ws=[30,50], sigma=5, pixel_step=1)
+
     """
     Ny, Nx = data.shape
     middle = Ny // 2

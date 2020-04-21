@@ -3,6 +3,7 @@ from numpy.testing import run_module_suite
 from spectractor import parameters
 from spectractor.extractor.extractor import Spectractor
 from spectractor.logbook import LogBook
+from spectractor.config import load_config
 import os
 import numpy as np
 
@@ -24,16 +25,17 @@ def test_extractor():
     output_directory = "./outputs"
 
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+    load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
 
     for file_name in file_names:
         tag = file_name.split('/')[-1]
-        disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-        if target is None or xpos is None or ypos is None:
+        disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+        if target_label is None or xpos is None or ypos is None:
             continue
-        spectrum = Spectractor(file_name, output_directory, target, [xpos, ypos], disperser_label,
-                               config='./config/ctio.ini', line_detection=True, atmospheric_lines=True)
+        spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
+                               line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 2e-11
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
@@ -43,12 +45,12 @@ def test_extractor():
                                    f"\n\t\tspectrum.spectrogram_x0={spectrum.spectrogram_x0}"
                                    f"\n\t\tnp.mean(spectrum.chromatic_psf.table['gamma']="
                                    f"{np.mean(spectrum.chromatic_psf.table['gamma'])}")
-        assert np.isclose(spectrum.lambdas[0], 296, atol=1)
-        assert np.isclose(spectrum.lambdas[-1], 1083.5, atol=1)
+        assert np.isclose(spectrum.lambdas[0], 345, atol=1)
+        assert np.isclose(spectrum.lambdas[-1], 1085.0, atol=1)
         assert np.isclose(spectrum.x0[0], 743.6651370068676, atol=0.5)
         assert np.isclose(spectrum.x0[1], 683.0577836601408, atol=1)
-        assert np.isclose(spectrum.spectrogram_x0, -240, atol=1)
-        assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3
+        assert np.isclose(spectrum.spectrogram_x0, -280, atol=1)
+        assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3.5
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrum.fits'))) is True
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrogram.fits'))) is True
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
@@ -65,7 +67,7 @@ def extractor_auxtel():
     target_label = "HD107696"
 
     for file_name in file_names:
-        tag = file_name.split('/')[-1]
+        # tag = file_name.split('/')[-1]
         # disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
                                config='./config/auxtel.ini', line_detection=True, atmospheric_lines=True)
@@ -89,4 +91,5 @@ def extractor_auxtel():
 
 
 if __name__ == "__main__":
+
     run_module_suite()

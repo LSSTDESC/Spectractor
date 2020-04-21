@@ -3,13 +3,13 @@ scipy
 matplotlib
 pandas
 # pyfftw
-numexpr
+# numexpr
+numba
 astropy>=3.2
 photutils
 astroquery
 coloredlogs
 scikit-image
-pysynphot
 h5py==2.8.0
 emcee==3.0rc2
 tqdm
@@ -19,4 +19,6 @@ iminuit
 coverage<5.0,>=3.6
 configparser
 coveralls
+pysynphot
+deprecated
 pyyaml

@@ -1,13 +1,14 @@
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import (pixel_rotation, detect_peaks, set_wcs_file_name, set_sources_file_name,
+from spectractor.tools import (pixel_rotation, set_wcs_file_name, set_sources_file_name,
                                set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir,
                                plot_image_simple)
 from spectractor.extractor.images import Image, find_target
 from spectractor.astrometry import get_gaia_coords_after_proper_motion, source_detection
-from spectractor.extractor.background import  remove_image_background_sextractor
+from spectractor.extractor.background import remove_image_background_sextractor
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.simulator import SpectrogramSimulatorCore, SimulatorInit
+from spectractor.extractor.psf import PSF
 
 from astropy.io import fits, ascii
 import astropy.units as units
@@ -32,11 +33,9 @@ class StarModel:
         Y position of the star centroid in pixels.
     amplitude: amplitude
         The amplitude of the star in image units.
-    target: Target
-        The associated Target instance (default: None).
     """
 
-    def __init__(self, pixcoords, model, amplitude, target=None):
+    def __init__(self, centroid_coords, psf, amplitude):
         """Create a StarModel instance.
 
         The model is based on an Astropy Fittable2DModel. The centroid and amplitude
@@ -44,55 +43,48 @@ class StarModel:
 
         Parameters
         ----------
-        pixcoords: array_like
+        centroid_coords: array_like
             Tuple of (x,y) coordinates of the desired star centroid in pixels.
-        model: Fittable2DModel
-            Astropy fittable 2D model
+        psf: PSF
+            PSF model
         amplitude: float
             The desired amplitude of the star in image units.
-        target: Target
-            The associated Target instance (default: None).
 
         Examples
         --------
-        >>> from spectractor.extractor.psf import PSF2D
-        >>> from spectractor.extractor.images import fit_PSF2D_minuit
-        >>> p = (100, 50, 50, 3, 2, -0.1, 1, 200)
-        >>> psf = PSF2D(*p)
-        >>> yy, xx = np.mgrid[:100,:50]
-        >>> data = psf.evaluate(xx, yy, *p)
-        >>> model = fit_PSF2D_minuit(xx, yy, data, guess=p)
-        >>> s = StarModel((20, 10), model, 200, target=None)
+        >>> from spectractor.extractor.psf import Moffat
+        >>> p = (100, 50, 50, 5, 2, 200)
+        >>> psf = Moffat(p)
+        >>> s = StarModel((20, 10), psf, 200)
         >>> s.plot_model()
         >>> s.x0
         20
         >>> s.y0
         10
-        >>> s.model.amplitude
+        >>> s.amplitude
         200
         """
         self.my_logger = set_logger(self.__class__.__name__)
-        self.x0 = pixcoords[0]
-        self.y0 = pixcoords[1]
+        self.x0 = centroid_coords[0]
+        self.y0 = centroid_coords[1]
         self.amplitude = amplitude
-        self.target = target
-        self.model = copy.deepcopy(model)
-        self.model.x_mean = self.x0
-        self.model.y_mean = self.y0
-        self.model.amplitude_moffat = amplitude
-        self.my_logger.warning(f"{self.model}")
-        # to be realistic, usually fitted fwhm is too big, divide by 2
-        self.fwhm = self.model.gamma / 2
-        self.sigma = self.model.stddev / 2
+        # self.target = target
+        self.psf = copy.deepcopy(psf)
+        self.psf.p[1] = self.x0
+        self.psf.p[2] = self.y0
+        self.psf.p[0] = amplitude
+        # to be realistic, usually fitted fwhm is too big, divide gamma by 2
+        self.fwhm = self.psf.p[3]
+        # self.sigma = self.model.stddev / 2
 
     def plot_model(self):
         """
         Plot the star model.
         """
-        x = np.linspace(self.x0 - 10 * self.fwhm, self.x0 + 10 * self.fwhm, 50)
-        y = np.linspace(self.y0 - 10 * self.fwhm, self.y0 + 10 * self.fwhm, 50)
+        x = np.arange(self.x0 - 5 * self.fwhm, self.x0 + 5 * self.fwhm)
+        y = np.arange(self.y0 - 5 * self.fwhm, self.y0 + 5 * self.fwhm)
         xx, yy = np.meshgrid(x, y)
-        star = self.model(xx, yy)
+        star = self.psf.evaluate(np.array([xx, yy]))
         fig, ax = plt.subplots(1, 1)
         im = plt.pcolor(x, y, star, cmap='jet')
         ax.grid(color='white', ls='solid')
@@ -128,10 +120,11 @@ class StarFieldModel:
         self.field = None
         self.stars = []
         self.pixcoords = []
-        self.fwhm = base_image.target_star2D.gamma
+        self.fwhm = base_image.target_star2D.p[3]
         self.flux_factor = flux_factor
         self.set_star_list()
 
+    # noinspection PyUnresolvedReferences
     def set_star_list(self):
         x0, y0 = self.image.target_pixcoords
         sources_file_name = set_sources_file_name(self.image.file_name)
@@ -158,7 +151,6 @@ class StarFieldModel:
                 for k, gaia_i in enumerate(gaia_index):
                     x, y = wcs.all_world2pix(gaia_coord_after_motion[gaia_i].ra, gaia_coord_after_motion[gaia_i].dec, 0)
                     A = sources['flux'][k] * self.flux_factor
-                    self.image.my_logger.warning(f"\n\t{x} {y} {A}")
                     self.stars.append(StarModel([x, y], self.image.target_star2D, A))
                     self.pixcoords.append([x, y])
             else:
@@ -196,18 +188,18 @@ class StarFieldModel:
     def model(self, x, y):
         if self.field is None:
             window = int(20 * self.fwhm)
-            self.field = self.stars[0].model(x, y)
+            self.field = self.stars[0].psf.evaluate(np.array([x, y]))
             for k in range(1, len(self.stars)):
                 left = max(0, int(self.pixcoords[0][k]) - window)
                 right = min(parameters.CCD_IMSIZE, int(self.pixcoords[0][k]) + window)
                 low = max(0, int(self.pixcoords[1][k]) - window)
                 up = min(parameters.CCD_IMSIZE, int(self.pixcoords[1][k]) + window)
                 yy, xx = np.mgrid[low:up, left:right]
-                self.field[low:up, left:right] += self.stars[k].model(xx, yy)
+                self.field[low:up, left:right] += self.stars[k].psf.evaluate(np.array([xx, yy]))
         return self.field
 
     def plot_model(self):
-        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
+        xx, yy = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         starfield = self.model(xx, yy)
         fig, ax = plt.subplots(1, 1)
         plot_image_simple(ax, starfield, scale="log10", target_pixcoords=self.pixcoords)
@@ -327,12 +319,11 @@ class ImageModel(Image):
         self.true_spectrum = None
 
     def compute(self, star, background, spectrogram, starfield=None):
-        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
-        self.data = star.model(xx, yy) + background.model()
+        xx, yy = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
+        self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
         self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
-        spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data  # - spectrogram.spectrogram_bgd)
-        self.true_lambdas = spectrogram.lambdas
-        self.true_spectrum = spectrogram.true_spectrum
+                  spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
+        # - spectrogram.spectrogram_bgd)
         if starfield is not None:
             self.data += starfield.model(xx, yy)
 
@@ -358,7 +349,7 @@ class ImageModel(Image):
         hdu0.data = self.data
         hdu0.header = self.header
         hdu1 = fits.ImageHDU()
-        hdu1.data = [self.true_lambdas, self.true_spectrum]
+        # hdu1.data = [self.true_lambdas, self.true_spectrum]
         hdulist = fits.HDUList([hdu0, hdu1])
         hdulist.writeto(output_filename, overwrite=overwrite)
         self.my_logger.info('\n\tImage saved in %s' % output_filename)
@@ -394,7 +385,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image = ImageModel(image_filename, target_label=target)
     guess = [spectrum.header['TARGETX'], spectrum.header['TARGETY']]
     if parameters.DEBUG:
-        image.plot_image(scale='log10', target_pixcoords=guess)
+        image.plot_image(scale='symlog', target_pixcoords=guess)
     # Fit the star 2D profile
     my_logger.info('\n\tSearch for the target in the image...')
     target_pixcoords = find_target(image, guess, use_wcs=False)
@@ -406,16 +397,15 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info('\n\tBackground model...')
     yy, xx = np.mgrid[:parameters.XWINDOW, :parameters.YWINDOW]
     bgd_level = float(np.mean(image.target_bkgd2D(xx, yy)))
-    background = BackgroundModel(level=bgd_level, frame=None)  # frame=(1600, 1650))
+    background = BackgroundModel(level=bgd_level, frame=None)  # (1600, 1650, 100))
     if parameters.DEBUG:
         background.plot_model()
 
     # Target model
     my_logger.info('\n\tStar model...')
     # Spectrogram is simulated with spectrum.x0 target position: must be this position to simualte the target.
-    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.amplitude_moffat.value,
-                     target=image.target)
-    reso = star.sigma
+    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.p[0])
+    # reso = star.fwhm
     if parameters.DEBUG:
         star.plot_model()
     # Star field model
@@ -424,7 +414,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tStar field model...')
         starfield = StarFieldModel(image)
         if parameters.VERBOSE:
-            image.plot_image(scale='log10', target_pixcoords=starfield.pixcoords)
+            image.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
             starfield.plot_model()
 
     # Spectrum model
@@ -433,6 +423,12 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     pressure = image.header['OUTPRESS']
     temperature = image.header['OUTTEMP']
     telescope = TelescopeTransmission(image.filter)
+
+    # Rotation
+    if not with_rotation:
+        rotation_angle = 0
+    else:
+        rotation_angle = spectrum.rotation_angle
 
     # Load PSF
     if psf_poly_params is None:
@@ -445,7 +441,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0.,
-                                           angle=spectrum.rotation_angle,
+                                           angle=rotation_angle,
                                            psf_poly_params=psf_poly_params, with_background=False, fast_sim=False)
 
     # now we include effects related to the wrong extraction of the spectrum:
@@ -458,11 +454,15 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info('\n\tImage model...')
     image.compute(star, background, spectrogram, starfield=starfield)
 
-    # Convert data from ADU/s in ADU
-    image.convert_to_ADU_units()
+    # Recover true spectrum
+    true_lambdas = np.copy(spectrogram.lambdas)
+    true_spectrum = spectrogram.set_true_spectrum(true_lambdas, ozone, pwv, aerosols, shift_t=0)
 
     # Saturation effects
     image.data[image.data > image.saturation] = image.saturation
+
+    # Convert data from ADU/s in ADU
+    image.convert_to_ADU_units()
 
     # Add Poisson and read-out noise
     image.add_poisson_and_read_out_noise()
@@ -472,7 +472,9 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Plot
     if parameters.VERBOSE and parameters.DISPLAY:  # pragma: no cover
-        image.plot_image(scale="log", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
+        image.convert_to_ADU_rate_units()
+        image.plot_image(scale="symlog", title="Image simulation", target_pixcoords=target_pixcoords, units=image.units)
+        image.convert_to_ADU_units()
 
     # Set output path
     ensure_dir(outputdir)
@@ -480,34 +482,26 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     output_filename = (output_filename.replace('reduc', 'sim')).replace('trim', 'sim')
     output_filename = os.path.join(outputdir, output_filename)
 
-    # # Save truth file
-    # txt = f"pwv {pwv}\nozone {ozone}\naerosols{aerosols}\nA1 {A1}\nA2 {A2}\n" \
-    #       f"D {spectrum.disperser.D}\nshift_x 0\nshift_y 0\nshift_t 0\nangle {spectrum.rotation_angle}\n"
-    # for ip, p in enumerate(spectrum.chromatic_psf.poly_params_labels[spectrogram.spectrogram_Nx:]):
-    #     txt += f"{p} {psf_poly_params[ip]}\n"
-    # f = open(output_filename.replace('.fits','_truth.txt'), 'w')
-    # f.write(txt)
-    # f.close()
-    # if parameters.VERBOSE:
-    #     my_logger.info(f"\t\nWrite truth parameters in {output_filename.replace('.fits','_truth.txt')}.")
-
     # Save images and parameters
-    image.header['A1'] = A1
-    image.header['A2'] = A2
+    image.header['A1_T'] = A1
+    image.header['A2_T'] = A2
     image.header['X0_T'] = spectrum.x0[0]
     image.header['Y0_T'] = spectrum.x0[1]
     image.header['D2CCD_T'] = spectrum.disperser.D
-    image.header['OZONE'] = ozone
-    image.header['PWV'] = pwv
-    image.header['VAOD'] = aerosols
+    image.header['OZONE_T'] = ozone
+    image.header['PWV_T'] = pwv
+    image.header['VAOD_T'] = aerosols
     image.header['PSF_DEG'] = spectrum.spectrogram_deg
     psf_poly_params_truth = np.array(psf_poly_params)
     if psf_poly_params_truth.size > spectrum.spectrogram_Nx:
         psf_poly_params_truth = psf_poly_params_truth[spectrum.spectrogram_Nx:]
-    image.header['PSF_POLY'] = np.array_str(psf_poly_params_truth, max_line_width=1000, precision=4)
-    image.header['RESO'] = reso
+    else:
+        psf_poly_params_truth = np.array(list(true_spectrum) + list(psf_poly_params_truth))
+    image.header['PSF_POLY'] = np.array_str(psf_poly_params_truth, max_line_width=1000000, precision=4)
+    image.header['LAMBDAS'] = np.array_str(true_lambdas, max_line_width=1000000, precision=2)
+    # image.header['RESO'] = reso
     image.header['ROTATION'] = int(with_rotation)
-    image.header['ROTANGLE'] = spectrum.rotation_angle
+    image.header['ROTANGLE'] = rotation_angle
     image.header['STARS'] = int(with_stars)
     image.header['BKGD_LEV'] = background.level
     image.save_image(output_filename, overwrite=True)
@@ -515,49 +509,55 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
 
 if __name__ == "__main__":
-    from spectractor.logbook import LogBook
-    from argparse import ArgumentParser
+    import doctest
 
-    parser = ArgumentParser()
-    parser.add_argument("-d", "--debug", dest="debug", action="store_true",
-                        help="Enter debug mode (more verbose and plots).", default=False)
-    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
-                        help="Enter verbose (print more stuff).", default=False)
-    parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
-                        help="Write results in given output directory (default: ./outputs/).")
-    parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
-                        help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
-    args = parser.parse_args()
+    doctest.testmod()
 
-    parameters.VERBOSE = args.verbose
-    if args.debug:
-        parameters.DEBUG = True
-        parameters.VERBOSE = True
-
-    file_names = ['tests/data/reduc_20170530_134.fits']
-    spectrum_file_name = 'outputs/reduc_20170530_134_spectrum.fits'
-    # guess = [720, 670]
-    # hologramme HoloAmAg
-    psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
-                       -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
-                       0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
-                       528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
-    # psf_poly_params = [0.11298966008548948, -0.396825836448203, 10.60387678061209, 2.0649268678546955,
-    #                    -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
-    #                    0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
-    #                    528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
-    # file_name="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
-    # guess = [840, 530]
-    # target = "HD205905"
-    # x = np.linspace(-1, 1, 100)
-    # plt.plot(x, np.polynomial.legendre.legval(x, psf_poly_params[0:3]))
-    # plt.show()
-    logbook = LogBook(logbook=args.logbook)
-    for file_name in file_names:
-        tag = file_name.split('/')[-1]
-        disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-        if target is None or xpos is None or ypos is None:
-            continue
-
-        image = ImageSim(file_name, spectrum_file_name, args.output_directory, A1=1, A2=0.05,
-                         psf_poly_params=psf_poly_params, with_stars=False)
+#
+# if __name__ == "__main__":
+#     from spectractor.logbook import LogBook
+#     from argparse import ArgumentParser
+#
+#     parser = ArgumentParser()
+#     parser.add_argument("-d", "--debug", dest="debug", action="store_true",
+#                         help="Enter debug mode (more verbose and plots).", default=False)
+#     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
+#                         help="Enter verbose (print more stuff).", default=False)
+#     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
+#                         help="Write results in given output directory (default: ./outputs/).")
+#     parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
+#                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
+#     args = parser.parse_args()
+#
+#     parameters.VERBOSE = args.verbose
+#     if args.debug:
+#         parameters.DEBUG = True
+#         parameters.VERBOSE = True
+#
+#     file_names = ['tests/data/reduc_20170530_134.fits']
+#     spectrum_file_name = 'outputs/reduc_20170530_134_spectrum.fits'
+#     # guess = [720, 670]
+#     # hologramme HoloAmAg
+#     psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
+#                        -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
+#                        0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
+#                        528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
+#     # psf_poly_params = [0.11298966008548948, -0.396825836448203, 10.60387678061209, 2.0649268678546955,
+#     #                    -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
+#     #                    0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
+#     #                    528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
+#     # file_name="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
+#     # guess = [840, 530]
+#     # target = "HD205905"
+#     # x = np.linspace(-1, 1, 100)
+#     # plt.plot(x, np.polynomial.legendre.legval(x, psf_poly_params[0:3]))
+#     # plt.show()
+#     logbook = LogBook(logbook=args.logbook)
+#     for file_name in file_names:
+#         tag = file_name.split('/')[-1]
+#         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
+#         if target is None or xpos is None or ypos is None:
+#             continue
+#
+#         image = ImageSim(file_name, spectrum_file_name, args.output_directory, A1=1, A2=0.05,
+#                          psf_poly_params=psf_poly_params, with_stars=False)

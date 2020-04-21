@@ -89,6 +89,7 @@ before_script:
   - conda create -n py37 python=3.7 pip
   - source activate py37
   - python --version
+  - "echo 'disable_jit: 1' > .numba_config.yaml"
 
 
   # - "git clone https://$CI_USER_TOKEN@github.com/jeremyneveu/slitless.git slitless"

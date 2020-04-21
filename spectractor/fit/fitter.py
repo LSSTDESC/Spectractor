@@ -6,11 +6,12 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import os
 import multiprocessing
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import formatting_numbers
+from spectractor.tools import formatting_numbers, compute_correlation_matrix, plot_correlation_matrix_simple
 from spectractor.fit.statistics import Likelihood
 
 
@@ -20,7 +21,6 @@ class FitWorkspace:
                  verbose=0, plot=False, live_fit=False, truth=None):
         self.my_logger = set_logger(self.__class__.__name__)
         self.filename = file_name
-        self.ndim = 0
         self.truth = truth
         self.verbose = verbose
         self.plot = plot
@@ -28,18 +28,19 @@ class FitWorkspace:
         self.p = np.array([])
         self.cov = np.array([[]])
         self.rho = np.array([[]])
-        self.ndim = len(self.p)
         self.data = None
         self.err = None
         self.x = None
+        self.outliers = []
+        self.sigma_clip = 5
         self.model = None
         self.model_err = None
         self.model_noconv = None
         self.input_labels = []
         self.axis_names = []
         self.input_labels = []
-        self.axis_names = []
         self.bounds = ((), ())
+        self.fixed = []
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.nsteps = nsteps
         self.nbins = nbins
@@ -49,6 +50,7 @@ class FitWorkspace:
         self.gelmans = np.array([])
         self.chains = np.array([[]])
         self.lnprobs = np.array([[]])
+        self.costs = np.array([[]])
         self.flat_chains = np.array([[]])
         self.valid_chains = [False] * self.nwalkers
         self.global_average = None
@@ -57,11 +59,22 @@ class FitWorkspace:
         self.use_grid = False
         if self.filename != "":
             if "." in self.filename:
-                self.emcee_filename = self.filename.split('.')[0] + "_emcee.h5"
+                self.emcee_filename = os.path.splitext(self.filename)[0] + "_emcee.h5"
             else:
                 self.my_logger.warning("\n\tFile name must have an extension.")
         else:
             self.emcee_filename = "emcee.h5"
+
+    @property
+    def ndim(self):
+        return len(self.p)
+
+    @property
+    def not_outliers(self):
+        if len(self.outliers) > 0:
+            return [i for i in range(self.data.size) if i not in self.outliers]
+        else:
+            return list(np.arange(self.data.size))
 
     def set_start(self):
         self.start = np.array(
@@ -116,7 +129,11 @@ class FitWorkspace:
         >>> w = FitWorkspace()
         >>> p = np.zeros(3)
         >>> x, model, model_err = w.simulate(*p)
-        >>> assert x is not None
+
+        .. doctest::
+            :hide:
+
+            >>> assert x is not None
 
         """
         x = np.array([])
@@ -135,22 +152,27 @@ class FitWorkspace:
         self.p = self.likelihood.mean_vec
         self.simulate(*self.p)
         self.plot_fit()
-        figure_name = self.emcee_filename.replace('.h5', '_triangle.pdf')
+        figure_name = os.path.splitext(self.emcee_filename)[0] + '_triangle.pdf'
         self.likelihood.triangle_plots(output_filename=figure_name)
 
     def plot_fit(self):
+        fig = plt.figure()
         plt.errorbar(self.x, self.data, yerr=self.err, fmt='ko', label='Data')
-        plt.plot(self.x, self.model, label='Best fitting model')
         if self.truth is not None:
             x, truth, truth_err = self.simulate(*self.truth)
             plt.plot(self.x, truth, label="Truth")
+        plt.plot(self.x, self.model, label='Best fitting model')
         plt.xlabel('$x$')
         plt.ylabel('$y$')
         title = ""
         for i, label in enumerate(self.input_labels):
-            title += f"{label} = {self.p[i]:.3g}"
             if self.cov.size > 0:
-                title += rf" $\pm$ {np.sqrt(self.cov[i, i]):.3g}"
+                err = np.sqrt(self.cov[i, i])
+                formatting_numbers(self.p[i], err, err)
+                _, par, err, _ = formatting_numbers(self.p[i], err, err, label=label)
+                title += rf"{label} = {par} $\pm$ {err}"
+            else:
+                title += f"{label} = {self.p[i]:.3g}"
             if i < len(self.input_labels) - 1:
                 title += ", "
         plt.title(title)
@@ -158,6 +180,7 @@ class FitWorkspace:
         plt.grid()
         if parameters.DISPLAY:
             plt.show()
+        return fig
 
     def chain2likelihood(self, pdfonly=False, walker_index=-1):
         if walker_index >= 0:
@@ -178,7 +201,7 @@ class FitWorkspace:
                             likelihood.contours[i][j].fill_histogram(chains[:, i], chains[:, j], weights=None)
             output_file = ""
             if self.filename != "":
-                output_file = self.filename.replace('.fits', '_bestfit.txt')
+                output_file = os.path.splitext(self.filename)[0] + "_bestfit.txt"
             likelihood.stats(output=output_file)
         else:
             for i in rangedim:
@@ -266,9 +289,9 @@ class FitWorkspace:
             for k in nchains:
                 ARs = []
                 indices = []
-                for l in range(self.burnin + window, self.nsteps, window):
-                    ARs.append(self.compute_local_acceptance_rate(l - window, l, k))
-                    indices.append(l)
+                for pos in range(self.burnin + window, self.nsteps, window):
+                    ARs.append(self.compute_local_acceptance_rate(pos - window, pos, k))
+                    indices.append(pos)
                 if self.valid_chains[k]:
                     ax[self.ndim, 1].plot(indices, ARs, label=f'Walker {k:d}')
                 else:
@@ -295,23 +318,23 @@ class FitWorkspace:
             for i in range(self.ndim):
                 Rs = []
                 lens = []
-                for l in range(self.burnin + step, self.nsteps, step):
+                for pos in range(self.burnin + step, self.nsteps, step):
                     chain_averages = []
                     chain_variances = []
-                    global_average = np.mean(self.chains[self.burnin:l, self.valid_chains, i])
+                    global_average = np.mean(self.chains[self.burnin:pos, self.valid_chains, i])
                     for k in nchains:
                         if not self.valid_chains[k]:
                             continue
-                        chain_averages.append(np.mean(self.chains[self.burnin:l, k, i]))
-                        chain_variances.append(np.var(self.chains[self.burnin:l, k, i], ddof=1))
+                        chain_averages.append(np.mean(self.chains[self.burnin:pos, k, i]))
+                        chain_variances.append(np.var(self.chains[self.burnin:pos, k, i], ddof=1))
                     W = np.mean(chain_variances)
                     B = 0
                     for n in range(len(chain_averages)):
                         B += (chain_averages[n] - global_average) ** 2
-                    B *= ((l + 1) / (len(chain_averages) - 1))
-                    R = (W * l / (l + 1) + B / (l + 1) * (len(chain_averages) + 1) / len(chain_averages)) / W
+                    B *= ((pos + 1) / (len(chain_averages) - 1))
+                    R = (W * pos / (pos + 1) + B / (pos + 1) * (len(chain_averages) + 1) / len(chain_averages)) / W
                     Rs.append(R - 1)
-                    lens.append(l)
+                    lens.append(pos)
                 print(f'\t{self.input_labels[i]}: R-1 = {Rs[-1]:.3f} (l = {lens[-1] - 1:d})')
                 self.gelmans.append(Rs[-1])
                 ax[i, 1].plot(lens, Rs, lw=1, label=self.axis_names[i])
@@ -336,7 +359,7 @@ class FitWorkspace:
         print('************************************')
 
     def save_parameters_summary(self, header=""):
-        output_filename = self.filename.replace(self.filename.split('.')[-1], "_bestfit.txt")
+        output_filename = os.path.splitext(self.filename)[0] + "_bestfit.txt"
         f = open(output_filename, 'w')
         txt = self.filename + "\n"
         if header != "":
@@ -351,30 +374,12 @@ class FitWorkspace:
         f.write(txt)
         f.close()
 
-    def compute_correlation_matrix(self):
-        rho = np.zeros_like(self.cov)
-        for i in range(self.cov.shape[0]):
-            for j in range(self.cov.shape[1]):
-                rho[i, j] = self.cov[i, j] / np.sqrt(self.cov[i, i] * self.cov[j, j])
-        self.rho = rho
-        return rho
-
     def plot_correlation_matrix(self, ipar=None):
         fig = plt.figure()
-        rho = self.compute_correlation_matrix()
-        im = plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
-        if ipar is None:
-            ipar = np.arange(0, self.cov.shape[0]).astype(int)
-        self.rho = rho
-        plt.title("Correlation matrix")
-        axis_names = [self.axis_names[ip] for ip in ipar]
-        plt.xticks(np.arange(ipar.size), axis_names, rotation='vertical', fontsize=11)
-        plt.yticks(np.arange(ipar.size), axis_names, fontsize=11)
-        cbar = fig.colorbar(im)
-        cbar.ax.tick_params(labelsize=9)
-        fig.tight_layout()
+        self.rho = compute_correlation_matrix(self.cov)
+        plot_correlation_matrix_simple(plt.gca(), self.cov, axis_names=self.axis_names, ipar=ipar)
         if parameters.SAVE and self.filename != "":
-            figname = self.filename.replace(self.filename.split('.')[-1], "_correlation.pdf")
+            figname = os.path.splitext(self.filename)[0] + "_correlation.pdf"
             self.my_logger.info(f"Save figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
         if parameters.DISPLAY:
@@ -385,13 +390,20 @@ class FitWorkspace:
                 plt.show()
 
     def weighted_residuals(self, p):
-        lambdas, model, model_err = self.simulate(*p)
-        res = ((model - self.data) / np.sqrt(model_err ** 2 + self.err ** 2)).flatten()
+        x, model, model_err = self.simulate(*p)
+        if len(self.outliers) > 0:
+            good_indices = self.not_outliers
+            model_err = model_err.flatten()[good_indices]
+            err = self.err.flatten()[good_indices]
+            res = (model.flatten()[good_indices] - self.data.flatten()[good_indices]) / np.sqrt(
+                model_err * model_err + err * err)
+        else:
+            res = ((model - self.data) / np.sqrt(model_err * model_err + self.err * self.err)).flatten()
         return res
 
     def chisq(self, p):
         res = self.weighted_residuals(p)
-        chisq = np.sum(res ** 2)
+        chisq = np.sum(res * res)
         return chisq
 
     def lnlike(self, p):
@@ -410,7 +422,7 @@ class FitWorkspace:
 
     def jacobian(self, params, epsilon, fixed_params=None):
         x, model, model_err = self.simulate(*params)
-        model = model.flatten()
+        model = model.flatten()[self.not_outliers]
         J = np.zeros((params.size, model.size))
         for ip, p in enumerate(params):
             if fixed_params[ip]:
@@ -420,7 +432,7 @@ class FitWorkspace:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+            J[ip] = (tmp_model.flatten()[self.not_outliers] - model) / epsilon[ip]
         return J
 
     @staticmethod
@@ -444,7 +456,7 @@ def lnprob(p):
 def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
     my_logger = set_logger(__name__)
     tmp_params = np.copy(params)
-    W = 1 / fit_workspace.err.flatten() ** 2
+    W = 1 / (fit_workspace.err.flatten()[fit_workspace.not_outliers]) ** 2
     ipar = np.arange(params.size)
     if fixed_params is not None:
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
@@ -456,7 +468,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
         # if fit_workspace.live_fit:
         #    fit_workspace.plot_fit()
-        residuals = (tmp_model - fit_workspace.data).flatten()
+        residuals = (tmp_model - fit_workspace.data).flatten()[fit_workspace.not_outliers]
         cost = np.sum((residuals ** 2) * W)
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
         # remove parameters with unexpected null Jacobian vectors
@@ -465,50 +477,65 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                 continue
             if np.all(J[ip] == np.zeros(J.shape[1])):
                 ipar = np.delete(ipar, list(ipar).index(ip))
-                tmp_params[ip] = 0
-                my_logger.warning(f"\n\tStep {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed at 0 "
-                      f"in the following instead of its current value ({tmp_params[ip]}).")
+                # tmp_params[ip] = 0
+                my_logger.warning(
+                    f"\n\tStep {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed "
+                    f"at its last known current value ({tmp_params[ip]}).")
         # remove fixed parameters
         J = J[ipar].T
         # algebra
         JT_W = J.T * W
         JT_W_J = JT_W @ J
-        L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
-        inv_JT_W_J = L.T @ L
-        if fit_workspace.live_fit:
-            fit_workspace.cov = inv_JT_W_J
-            fit_workspace.plot_correlation_matrix(ipar)
+        try:
+            L = np.linalg.inv(np.linalg.cholesky(JT_W_J))  # cholesky is too sensible to the numerical precision
+            inv_JT_W_J = L.T @ L
+        except np.linalg.LinAlgError:
+            inv_JT_W_J = np.linalg.inv(JT_W_J)
         JT_W_R0 = JT_W @ residuals
         dparams = - inv_JT_W_J @ JT_W_R0
 
         def line_search(alpha):
             tmp_params_2 = np.copy(tmp_params)
             tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
+            for ip, p in enumerate(tmp_params_2):
+                if p < fit_workspace.bounds[ip][0]:
+                    tmp_params_2[ip] = fit_workspace.bounds[ip][0]
+                if p > fit_workspace.bounds[ip][1]:
+                    tmp_params_2[ip] = fit_workspace.bounds[ip][1]
             lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
-            return np.sum(((mod - fit_workspace.data) / fit_workspace.err) ** 2)
+            return np.sum(((mod.flatten()[fit_workspace.not_outliers]
+                            - fit_workspace.data.flatten()[fit_workspace.not_outliers])
+                           / fit_workspace.err.flatten()[fit_workspace.not_outliers]) ** 2)
 
         # tol parameter acts on alpha (not func)
-        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2)
+        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2, brack=(-0.1, 0.1))
         tmp_params[ipar] += alpha_min * dparams
         # check bounds
         for ip, p in enumerate(tmp_params):
             if p < fit_workspace.bounds[ip][0]:
-                # print(ip, fit_workspace.axis_names[ip], tmp_params[ip], fit_workspace.bounds[ip][0])
                 tmp_params[ip] = fit_workspace.bounds[ip][0]
             if p > fit_workspace.bounds[ip][1]:
-                # print(ip, fit_workspace.axis_names[ip], tmp_params[ip], fit_workspace.bounds[ip][1])
                 tmp_params[ip] = fit_workspace.bounds[ip][1]
-        # in_bounds, penalty, outbound_parameter_name = \
-        #     fit_workspace.spectrum.chromatic_psf.check_bounds(tmp_params[fit_workspace.psf_params_start_index:])
         # prepare outputs
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
-        my_logger.info(f"\n\tIteration={i}: initial cost={cost:.3f} initial chisq_red={cost / tmp_model.size:.3f}"
-                       f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
-                       f"\n\tParameter shifts: {alpha_min * dparams}"
-                       f"\n\tNew parameters: {tmp_params[ipar]}"
-                       f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} computed in {time.time() - start:.2f}s")
-        if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol :
+        if fit_workspace.verbose:
+            my_logger.info(f"\n\tIteration={i}: initial cost={cost:.3f} initial chisq_red={cost / tmp_model.size:.3f}"
+                           f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
+                           f"\n\tParameter shifts: {alpha_min * dparams}"
+                           f"\n\tNew parameters: {tmp_params[ipar]}"
+                           f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} "
+                           f"computed in {time.time() - start:.2f}s")
+        if fit_workspace.live_fit:
+            fit_workspace.simulate(*tmp_params)
+            fit_workspace.plot_fit()
+            fit_workspace.cov = inv_JT_W_J
+            # fit_workspace.plot_correlation_matrix(ipar)
+        if len(ipar) == 0:
+            my_logger.warning(f"\n\tGradient descent terminated in {i} iterations because all parameters "
+                              f"have null Jacobian.")
+            break
+        if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
             my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
                            f"relative to the sum of the parameters is below xtol={xtol}.")
             break
@@ -525,7 +552,7 @@ def print_parameter_summary(params, cov, labels):
     txt = ""
     for ip in np.arange(0, cov.shape[0]).astype(int):
         txt += "%s: %s +%s -%s\n\t" % formatting_numbers(params[ip], np.sqrt(cov[ip, ip]), np.sqrt(cov[ip, ip]),
-                                                    label=labels[ip])
+                                                         label=labels[ip])
     my_logger.info(f"\n\t{txt}")
 
 
@@ -546,7 +573,7 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
     fig.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
     if parameters.SAVE and fit_workspace.filename != "":
-        figname = fit_workspace.filename.replace(fit_workspace.filename.split('.')[-1], "_fitting.pdf")
+        figname = os.path.splitext(fit_workspace.filename)[0] + "_fitting.pdf"
         fit_workspace.my_logger.info(f"\n\tSave figure {figname}.")
         fig.savefig(figname, dpi=100, bbox_inches='tight')
     if parameters.DISPLAY:
@@ -564,12 +591,12 @@ def save_gradient_descent(fit_workspace, costs, params_table):
     t[1] = costs
     t[2:] = params_table.T
     h = 'iter,costs,' + ','.join(fit_workspace.input_labels)
-    output_filename = fit_workspace.filename.replace(fit_workspace.filename.split('.')[-1], "_fitting.txt")
+    output_filename = os.path.splitext(fit_workspace.filename)[0] + "_fitting.txt"
     np.savetxt(output_filename, t.T, header=h, delimiter=",")
     fit_workspace.my_logger.info(f"\n\tSave gradient descent log {output_filename}.")
 
 
-def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix, xtol, ftol, niter):
+def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix, xtol, ftol, niter, verbose=False):
     fit_workspace.p, fit_workspace.cov, tmp_costs, tmp_params_table = gradient_descent(fit_workspace, guess,
                                                                                        epsilon, niter=niter,
                                                                                        fixed_params=fix,
@@ -579,34 +606,42 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
     ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
     print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
                             [fit_workspace.input_labels[ip] for ip in ipar])
-    if parameters.DEBUG:
+    if parameters.DEBUG and verbose:
         # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
         plot_gradient_descent(fit_workspace, costs, params_table)
         fit_workspace.plot_correlation_matrix(ipar=ipar)
     return params_table, costs
 
 
-def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50):
+def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50,
+                     verbose=False):
     my_logger = set_logger(__name__)
+
     bounds = fit_workspace.bounds
 
     nll = lambda params: -fit_workspace.lnlike(params)
 
     guess = fit_workspace.p.astype('float64')
+    if verbose:
+        my_logger.debug(f"\n\tStart guess: {guess}")
 
     if method == "minimize":
         start = time.time()
         result = optimize.minimize(nll, fit_workspace.p, method='L-BFGS-B',
-                                   options={'ftol': 1e-20, 'xtol': 1e-20, 'gtol': 1e-20, 'disp': True,
+                                   options={'ftol': 1e-20, 'gtol': 1e-20, 'disp': True,
                                             'maxiter': 100000,
                                             'maxls': 50, 'maxcor': 30},
                                    bounds=bounds)
         fit_workspace.p = result['x']
-        my_logger.info(f"\n\tMinimize: total computation time: {time.time() - start}s")
-        fit_workspace.simulate(*fit_workspace.p)
-        fit_workspace.live_fit = False
-        fit_workspace.plot_fit()
-
+        if verbose:
+            my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
+    elif method == 'basinhopping':
+        start = time.time()
+        minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds)
+        result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs)
+        fit_workspace.p = result['x']
+        if verbose:
+            my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
     elif method == "least_squares":
         start = time.time()
         x_scale = np.abs(guess)
@@ -614,10 +649,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         p = optimize.least_squares(fit_workspace.weighted_residuals, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
                                    diff_step=0.001, bounds=bounds.T)
         fit_workspace.p = p.x  # m.np_values()
-        my_logger.info(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
-        fit_workspace.simulate(*fit_workspace.p)
-        fit_workspace.live_fit = False
-        fit_workspace.plot_fit()
+        if verbose:
+            my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
     elif method == "minuit":
         start = time.time()
         # fit_workspace.simulation.fix_psf_cube = False
@@ -625,19 +658,17 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         error[2:5] = 0.3 * np.abs(guess[2:5]) * np.ones_like(guess[2:5])
         z = np.where(np.isclose(error, 0.0, 1e-6))
         error[z] = 1.
-        fix = [False] * guess.size
+        if fix is None:
+            fix = [False] * guess.size
         # noinspection PyArgumentList
         m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
-                                   fix=fix, print_level=2, limit=bounds)
+                                   fix=fix, print_level=verbose, limit=bounds)
         m.tol = 10
         m.migrad()
         fit_workspace.p = m.np_values()
-        my_logger.info(f"\n\tMinuit: total computation time: {time.time() - start}s")
-        fit_workspace.simulate(*fit_workspace.p)
-        fit_workspace.live_fit = False
-        fit_workspace.plot_fit()
+        if verbose:
+            my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
     elif method == "newton":
-        my_logger.info(f"\n\tStart guess: {guess}")
         costs = np.array([fit_workspace.chisq(guess)])
 
         params_table = np.array([guess])
@@ -649,12 +680,48 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
 
         start = time.time()
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fix, xtol=xtol, ftol=ftol, niter=niter)
+                                                   fix=fix, xtol=xtol, ftol=ftol, niter=niter, verbose=verbose)
         fit_workspace.costs = costs
-        my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
+        fit_workspace.params_table = params_table
+        if verbose:
+            my_logger.debug(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             fit_workspace.save_parameters_summary()
             save_gradient_descent(fit_workspace, costs, params_table)
+
+
+def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4,
+                                    niter=50, sigma_clip=5.0, niter_clip=3, verbose=False):
+    my_logger = set_logger(__name__)
+    fit_workspace.sigma_clip = sigma_clip
+    for step in range(niter_clip):
+        if verbose:
+            my_logger.debug(f"\n\tSigma-clipping step {step}/{niter_clip} (sigma={sigma_clip})")
+        run_minimisation(fit_workspace, method=method, epsilon=epsilon, fix=fix, xtol=xtol, ftol=ftol, niter=niter)
+        if verbose:
+            my_logger.debug(f'\n\tBest fitting parameters:\n{fit_workspace.p}')
+        # remove outliers
+        indices_no_nan = ~np.isnan(fit_workspace.data)
+        residuals = np.abs(fit_workspace.model[indices_no_nan]
+                           - fit_workspace.data[indices_no_nan]) / fit_workspace.err[indices_no_nan]
+        outliers = residuals > sigma_clip
+        outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
+        outliers.sort()
+        if len(outliers) > 0:
+            if verbose:
+                my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
+            if np.all(fit_workspace.outliers == outliers):
+                if verbose:
+                    my_logger.debug(f'\n\tOutliers flat index list unchanged since last iteration: '
+                                    f'break the sigma clipping iterations.')
+                break
+            else:
+                fit_workspace.outliers = outliers
+        else:
+            if verbose:
+                my_logger.debug(f'\n\tNo outliers detected at first iteration: '
+                                f'break the sigma clipping iterations.')
+            break
 
 
 def run_emcee(fit_workspace, ln=lnprob):
@@ -687,3 +754,9 @@ def run_emcee(fit_workspace, ln=lnprob):
             continue
     fit_workspace.chains = sampler.chain
     fit_workspace.lnprobs = sampler.lnprobability
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

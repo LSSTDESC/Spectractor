@@ -17,6 +17,8 @@ from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINE
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
 
+Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype')
+
 
 def load_target(label, verbose=False):
     """Load the target properties according to the type set by parameters.OBS_OBJECT_TYPE.
@@ -105,6 +107,7 @@ class ArcLamp(Target):
         --------
 
         Mercury-Argon lamp:
+
         >>> t = ArcLamp("HG-AR", verbose=False)
         >>> print([line.wavelength for line in t.lines.lines][:5])
         [253.652, 296.728, 302.15, 313.155, 334.148]
@@ -168,6 +171,7 @@ class Star(Target):
         --------
 
         Emission line object:
+
         >>> s = Star('3C273')
         >>> print(s.label)
         3C273
@@ -177,6 +181,7 @@ class Star(Target):
         True
 
         Standard star:
+
         >>> s = Star('HD111980')
         >>> print(s.label)
         HD111980
@@ -210,7 +215,7 @@ class Star(Target):
                 self.my_logger.info(f'\n\tSimbad:\n{simbad}')
             self.radec_position = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(u.hourangle, u.deg))
         else:
-            self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
+           self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
         self.get_radec_position_after_pm(date_obs="J2000")
         self.redshift = float(simbad['Z_VALUE'])
         self.load_spectra()
@@ -387,7 +392,5 @@ class Star(Target):
 
 if __name__ == "__main__":
     import doctest
-    # if np.__version__ >= "1.14.0":
-    #    np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
