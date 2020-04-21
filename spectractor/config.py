@@ -97,8 +97,7 @@ def load_config(config_filename):
     parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4.  # Surface of telescope
     parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 1)
     parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * parameters.TIME_UNIT
-                                   * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN
-                                   * parameters.g_disperser_ronchi).decompose()).value
+                                   * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
 
     # check consistency

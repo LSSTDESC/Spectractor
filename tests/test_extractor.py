@@ -37,7 +37,7 @@ def test_extractor():
         spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
                                line_detection=True, atmospheric_lines=True)
         assert spectrum.data is not None
-        assert np.sum(spectrum.data) > 1e-10
+        assert np.sum(spectrum.data) > 2e-11
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
                                    f"\n\t\tspectrum.lambdas[0]={spectrum.lambdas[0]}"
                                    f"\n\t\tspectrum.lambdas[-1]={spectrum.lambdas[-1]}"
@@ -53,6 +53,7 @@ def test_extractor():
         assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3.5
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrum.fits'))) is True
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrogram.fits'))) is True
+        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
 
 
 def extractor_auxtel():
