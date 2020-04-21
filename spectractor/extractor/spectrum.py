@@ -1,7 +1,7 @@
 from scipy.signal import argrelextrema, savgol_filter
 from scipy.interpolate import interp1d
 from astropy.io import fits
-from scipy import integrate  # integation
+from scipy import integrate
 from iminuit import Minuit
 import matplotlib.pyplot as plt
 import numpy as np
@@ -858,17 +858,18 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
 
             x_norm = rescale_x_for_legendre(lambdas[index])
 
+            x_step = 0.1  # nm
             x_int = np.arange(peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2]),
-                              peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2]), 0.1)
+                              peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2]), x_step)
 
             middle = 0.5 * (np.max(lambdas[index]) + np.min(lambdas[index]))
             x_int_norm = x_int - middle
             if np.max(lambdas[index] - middle) != 0:
                 x_int_norm = x_int_norm / np.max(lambdas[index] - middle)
 
-            jmin = max(0, np.argmin(np.abs(lambdas - (peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2])))) - 1)
-            jmax = min(len(lambdas),
-                       np.argmin(np.abs(lambdas - (peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2])))) + 1)
+            # jmin and jmax a bit larger than x_int to avoid extrapolation
+            jmin = max(0, int(np.argmin(np.abs(lambdas - (x_int[0] - x_step))) - 2))
+            jmax = min(len(lambdas), int(np.argmin(np.abs(lambdas - (x_int[-1] + x_step))) + 2))
             spectr_data = interp1d(lambdas[jmin:jmax], spec[jmin:jmax])(x_int)
 
             Continuum = np.polynomial.legendre.legval(x_int_norm, popt[:bgd_npar])
