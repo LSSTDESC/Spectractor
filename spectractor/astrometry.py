@@ -96,7 +96,7 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, m
     sources.sort('mag')
     if parameters.DEBUG:
         positions = np.array((sources['xcentroid'], sources['ycentroid']))
-        plot_image_simple(plt.gca(), data_wo_bkg, scale="log10", target_pixcoords=positions)
+        plot_image_simple(plt.gca(), data_wo_bkg, scale="symlog", target_pixcoords=positions)
         if parameters.DISPLAY:
             # fig.tight_layout()
             plt.show()
