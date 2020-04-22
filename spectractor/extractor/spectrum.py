@@ -910,8 +910,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             x_norm = rescale_x_for_legendre(lambdas[index])
 
             x_step = 0.1  # nm
-            x_int = np.arange(peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2]),
-                              peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2]), x_step)
+            x_int = np.arange(max(lambdas[0], peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2])),
+                              min(lambdas[-1], peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2])), x_step)
 
             middle = 0.5 * (np.max(lambdas[index]) + np.min(lambdas[index]))
             x_int_norm = x_int - middle
@@ -921,7 +921,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             # jmin and jmax a bit larger than x_int to avoid extrapolation
             jmin = max(0, int(np.argmin(np.abs(lambdas - (x_int[0] - x_step))) - 2))
             jmax = min(len(lambdas), int(np.argmin(np.abs(lambdas - (x_int[-1] + x_step))) + 2))
-            spectr_data = interp1d(lambdas[jmin:jmax], spec[jmin:jmax])(x_int)
+            spectr_data = interp1d(lambdas[jmin:jmax], spec[jmin:jmax],
+                                   bounds_error=False, fill_value="extrapolate")(x_int)
 
             Continuum = np.polynomial.legendre.legval(x_int_norm, popt[:bgd_npar])
             Gauss = gauss(x_int, *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
