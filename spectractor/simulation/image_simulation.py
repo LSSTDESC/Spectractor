@@ -86,17 +86,8 @@ class StarModel:
         xx, yy = np.meshgrid(x, y)
         star = self.psf.evaluate(np.array([xx, yy]))
         fig, ax = plt.subplots(1, 1)
-        im = plt.pcolor(x, y, star, cmap='jet')
-        ax.grid(color='white', ls='solid')
-        ax.grid(True)
-        ax.set_xlabel('X [pixels]')
-        ax.set_ylabel('Y [pixels]')
-        ax.set_title('Star model: A=%.2f, fwhm=%.2f' % (self.amplitude, self.fwhm))
-        cb = plt.colorbar(im, ax=ax)
-        cb.formatter.set_powerlimits((0, 0))
-        cb.locator = MaxNLocator(7, prune=None)
-        cb.update_ticks()
-        cb.set_label('Arbitrary units')  # ,fontsize=16)
+        plot_image_simple(ax, star, title=f'Star model: A={self.amplitude:.2f}, fwhm={self.fwhm:.2f}',
+                          units='Arbitrary units')
         if parameters.DISPLAY:
             plt.show()
 
@@ -194,7 +185,7 @@ class StarFieldModel:
                 right = min(parameters.CCD_IMSIZE, int(self.pixcoords[0][k]) + window)
                 low = max(0, int(self.pixcoords[1][k]) - window)
                 up = min(parameters.CCD_IMSIZE, int(self.pixcoords[1][k]) + window)
-                yy, xx = np.mgrid[low:up, left:right]
+                xx, yy = np.mgrid[left:right, low:up]
                 self.field[low:up, left:right] += self.stars[k].psf.evaluate(np.array([xx, yy]))
         return self.field
 
@@ -418,7 +409,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
             starfield.plot_model()
 
     # Spectrum model
-    my_logger.info('\n\tSpectum model...')
+    my_logger.info('\n\tSpectrum model...')
     airmass = image.header['AIRMASS']
     pressure = image.header['OUTPRESS']
     temperature = image.header['OUTTEMP']
@@ -434,8 +425,6 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     if psf_poly_params is None:
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
-        # TODO: solve this Gaussian PSF part issue
-        psf_poly_params[-7:-1] = 0.
 
     # Increase
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
