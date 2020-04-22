@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 import spectractor.parameters as parameters
 from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal
+from spectractor.tools import plot_image_simple
 
 from astropy.stats import SigmaClip
 from photutils import Background2D, SExtractorBackground
@@ -20,10 +21,9 @@ def remove_image_background_sextractor(data, sigma=3.0, box_size=(50, 50), filte
         data_wo_bkg -= np.min(data_wo_bkg)
     if parameters.DEBUG:
         fig, ax = plt.subplots(1, 2, figsize=(11, 5))
-        im = ax[0].imshow(bkg.background, origin='lower')
-        plt.colorbar(im, ax=ax[0])
-        im = ax[1].imshow(np.log10(1 + data_wo_bkg), origin='lower')
-        plt.colorbar(im, ax=ax[1])
+        plot_image_simple(ax[0], bkg.background, scale="lin")
+        plot_image_simple(ax[1], data_wo_bkg, scale="symlog")
+        fig.tight_layout()
         plt.show()
     return data_wo_bkg
 
