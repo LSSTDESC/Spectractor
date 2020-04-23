@@ -46,7 +46,7 @@ if __name__ == "__main__":
     logbook = LogBook(logbook=args.logbook)
     for file_name in file_names:
         disperser_label = ""
-        if args.target_xy != "0,0" and args.target_label == "":
+        if args.target_xy == "0,0" and args.target_label == "":
             tag = file_name.split('/')[-1]
             tag = tag.replace('sim_', 'reduc_')
             disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
