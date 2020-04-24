@@ -27,15 +27,18 @@ pip install -r requirements.txt .
 Be careful, Spectractor can perform fits using the MCMC library [emcee](https://emcee.readthedocs.io/en/stable/) with [mpi4py](https://mpi4py.readthedocs.io/en/stable/) and [h5py](https://www.h5py.org/).  The latter might be better installed using `conda install ...` command to get their own dependencies (openmp and hdf5).
 
 For the simulation of spectra, Spectractor needs the following external libraries:
-- [libradtran](http://www.libradtran.org/doku.php) to simulate atmospheric transmission: it needs the installation of [netcdf](https://www.unidata.ucar.edu/software/netcdf/) and a python 2 environment (for the compilation only, not the usage).
-- [pysynphot](https://pysynphot.readthedocs.io/en/latest/) to get the CALSPEC star spectra: the HST CALSPEC calibration spectra must be downloaded and the environment variable `PYSYN_CDBS` must be created.
+- [libradtran](http://www.libradtran.org/doku.php) to simulate atmospheric transmission: it needs the installation of [netcdf](https://www.unidata.ucar.edu/software/netcdf/) and a python 2 environment (for the compilation only, not the usage); `uvpsec` executable must in the user `$PATH` or the user has to set an environmental variable `$LIBRADTRAN_DIR` pointing to the install directory.
+- [pysynphot](https://pysynphot.readthedocs.io/en/latest/) to get the CALSPEC star spectra: the HST CALSPEC calibration spectra must be downloaded and the environment variable `$PYSYN_CDBS` must be created.
+- [astrometry.net](https://astrometrynet.readthedocs.io/en/latest/) (optional): needed to create World Coordinate System files from the images; `solve-field` exectuable must in the user `$PATH` or the user has to set an environmental variable `$ASTROMETRYNET_DIR` pointing to the install directory.
+
+Detailled command lines for the installation of Spectractor and the external dependencies can be found in the file `.travis.yml`.
 
 ## Basic extraction
 
 The main file is `spectractor/extractor/extractor.py` with the function `Spectractor`. It extracts the spectrum from a science data image (deflatted, debiased), given:
-- the path to the fits image from which to extract the image, 
+- the path to the FITS image from which to extract the image, 
 - the path of the output directory to save the extracted spectrum (created automatically if it does not exist yet),
-- the rough position of the object in the image,
+- the rough pr exact position of the object in the image (in pixels),
 - the name of the disperser (as it is named in the `spectractor/extractor/dispersers/` folder),
 - the name of the config .ini file,
 - optionally the name of the target (to search for the extra-atmospheric spectrum if available).
@@ -51,14 +54,13 @@ target = "HD111980"
 
 Then the spectrum is simply extracted from the image and saved in a new fits file using the `Spectractor` function:
 ```
-spectrum = Spectractor(filename, output_directory, guess, target, disperser_label=disperser_label, config=config)
+spectrum = Spectractor(filename, output_directory, guess=guess, target_label=target, disperser_label=disperser_label, config=config)
 ```
 
 or typing the following command within a terminal:
 ```
-python runExtractor.py ./tests/data/reduc_20170530_134.fits -o outputs --config ./config/ctio.ini --logbook ./ctiofulllogbook_jun2017_v5.csv
+python runExtractor.py ./tests/data/reduc_20170530_134.fits -o outputs --config ./config/ctio.ini --xy [745, 643] --target HD111980 --grating HoloAmAg
 ```
-if the logbook file contains the guess position and the name of the observed object.
 
 Spectractor comes with two verbosity modes, set in the `parameters.py` file:
 - `VERBOSE` (or -v, --verbose) : the first level of verbosity that returns many information along the process to know what the program is doing; it also plots the output spectrum
@@ -68,7 +70,7 @@ Spectractor comes with two verbosity modes, set in the `parameters.py` file:
 
 To see the result of the extraction process, it is possible to load it via the `Spectrum` class and plot it:
 ```
-spectrum = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
+spectrum = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits', config="./config/ctio.ini)
 spectrum.plot_spectrum()
 spectrum.plot_spectrogram()
 ```
