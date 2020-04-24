@@ -496,28 +496,18 @@ class Lines:
 HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02], use_for_calibration=True)
 HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.016, 0.02], use_for_calibration=True)
+HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=False)
+HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.016, 0.02], use_for_calibration=False)
 HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
 
 # Atmospheric lines
-FE1 = Line(382.044, atmospheric=True, label=r'$Fe$',
-           label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-FE2 = Line(430.790, atmospheric=True, label=r'$Fe$',
-           label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-FE3 = Line(438.355, atmospheric=True, label=r'$Fe$',
-           label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-CAII1 = Line(393.366, atmospheric=True, label=r'$Ca_{II}$',
-             label_pos=[0.007, 0.02],
-             use_for_calibration=False)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
-CAII2 = Line(396.847, atmospheric=True, label=r'$Ca_{II}$',
-             label_pos=[0.007, 0.02],
-             use_for_calibration=False)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
           label_pos=[0.007, 0.02],
           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
-# O2_1 = Line( 760.6,atmospheric=True,label='',label_pos=[0.007,0.02]) # libradtran paper fig.3
-# O2_2 = Line( 763.2,atmospheric=True,label='$O_2$',label_pos=[0.007,0.02])  # libradtran paper fig.3
+# O2_1 = Line(760.6, atmospheric=True, label='',
+#             label_pos=[0.007, 0.02], use_for_calibration=True)  # libradtran paper fig.3
+# O2_2 = Line(763.2, atmospheric=True, label='$O_2$',
+#             label_pos=[0.007, 0.02], use_for_calibration=True)  # libradtran paper fig.3
 O2B = Line(686.719, atmospheric=True, label=r'$O_2(B)$',
            label_pos=[0.007, 0.02], use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 O2Y = Line(898.765, atmospheric=True, label=r'$O_2(Y)$',
@@ -529,7 +519,7 @@ H2O_1 = Line(935, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
 H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2]  # , CAII1, CAII2, FE1, FE2, FE3
+ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2]
 
 # ISM lines
 OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
