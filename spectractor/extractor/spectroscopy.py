@@ -495,7 +495,7 @@ class Lines:
 # Hydrogen lines
 HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02], use_for_calibration=True)
 HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=True)
+HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=False)
 HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=False)
 HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.016, 0.02], use_for_calibration=False)
 HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
