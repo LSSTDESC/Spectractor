@@ -478,7 +478,7 @@ class Lines:
             'Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq', 'Eqwidth_mod',
             'Eqwidth_data'),
                   dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
-        for col in t.colnames[1:-3]:
+        for col in t.colnames[1:5]:
             t[col].unit = 'nm'
         for col in t.colnames[-2:]:
             t[col].unit = 'nm'
