@@ -123,6 +123,8 @@ CALIB_BGD_ORDER = 3  # order of the background polynome to fit
 CALIB_BGD_NPARAMS = CALIB_BGD_ORDER + 1  # number of unknown parameters for background
 CALIB_PEAK_WIDTH = 7  # half range to look for local extrema in pixels around tabulated line values
 CALIB_BGD_WIDTH = 10  # size of the peak sides to use to fit spectrum base line
+CALIB_SAVGOL_WINDOW = 5  # window size for the savgol filter in pixels
+CALIB_SAVGOL_ORDER = 2  # polynom order for the savgol filter
 
 # Conversion factor
 # Units of SEDs in flam (erg/s/cm2/nm) :
