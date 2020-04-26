@@ -401,7 +401,7 @@ class Lines:
         if print_table:
             self.print_detected_lines(print_table=True)
 
-    def print_detected_lines(self, output_file_name="", overwrite=False, print_table=False):
+    def print_detected_lines(self, output_file_name="", overwrite=False, print_table=False, amplitude_units=""):
         """Print the detected line on screen as an Astropy table, and write it in a file.
 
         Parameters
@@ -412,6 +412,8 @@ class Lines:
             If True, overwrite the existing file if it exists (default: False).
         print_table: bool, optional
             If True, print a summary table (default: False).
+        amplitude_units: str, optional
+            Units of the line amplitude (default: "").
 
         Returns
         -------
@@ -480,6 +482,7 @@ class Lines:
                   dtype=('a10', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
         for col in t.colnames[1:5]:
             t[col].unit = 'nm'
+        t[t.colnames[5]].unit = amplitude_units
         for col in t.colnames[-2:]:
             t[col].unit = 'nm'
         t[t.colnames[-3]].unit = 'reduced'
