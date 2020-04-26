@@ -517,9 +517,9 @@ O2Z = Line(822.696, atmospheric=True, label=r'$O_2(Z)$',
 # H2O = Line( 960,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(1,50))  #
 H2O_1 = Line(935, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
-             width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1, H2O_2]
+# H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
+#              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
+ATMOSPHERIC_LINES = [O2, O2B, O2Y, O2Z, H2O_1]
 
 # ISM lines
 OIII = Line(500.7, atmospheric=False, label=r'$O_{III}$', label_pos=[0.007, 0.02])
