@@ -448,7 +448,8 @@ class Spectrum:
                 self.spectrogram_fit = hdu_list[1].data
                 self.spectrogram_residuals = hdu_list[2].data
         else:
-            self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
+            self.my_logger.warning(f'\n\tSpectrum file {input_file_name} not found')
+            raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
 
     def load_spectrogram(self, input_file_name):
         """Load the spectrum from a fits file (data, error and wavelengths).
@@ -638,7 +639,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     # filter the noise
     # plt.errorbar(lambdas,spec,yerr=spec_err)
     spec = np.copy(spec)
-    spec_smooth = savgol_filter(spec, 5, 2)
+    spec_smooth = savgol_filter(spec, parameters.CALIB_SAVGOL_WINDOW, parameters.CALIB_SAVGOL_ORDER)
     # plt.plot(lambdas,spec)
     # plt.show()
     # initialisation
