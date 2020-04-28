@@ -73,8 +73,11 @@ before_script:
   - "export LIBRADTRAN_DIR=libRadtran-2.0.2/"
   - export NETPBM_LIB="-L/usr/lib -lnetpbm"
   - export NETPBM_INC="-I/usr/include"
-  - wget http://astrometry.net/downloads/astrometry.net-0.79.tar.gz
-  - tar xvzf astrometry.net-0.79.tar.gz
+  - conda create -n py37 python=3.7 pip
+  - source activate py37
+  - python --version
+  - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
+  - tar xvzf astrometry.net-latest.tar.gz
   - cd astrometry.net-*
   - make
   - make py
@@ -86,9 +89,6 @@ before_script:
   # - make install-indexes
   - cd ../
   - "export ASTROMETRYNET_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET"
-  - conda create -n py37 python=3.7 pip
-  - source activate py37
-  - python --version
   - "echo 'disable_jit: 1' > .numba_config.yaml"
 
 
