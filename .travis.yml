@@ -73,8 +73,8 @@ before_script:
   - "export LIBRADTRAN_DIR=libRadtran-2.0.2/"
   - export NETPBM_LIB="-L/usr/lib -lnetpbm"
   - export NETPBM_INC="-I/usr/include"
-  - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
-  - tar xvzf astrometry.net-latest.tar.gz
+  - wget http://astrometry.net/downloads/astrometry.net-0.79.tar.gz
+  - tar xvzf astrometry.net-0.79.tar.gz
   - cd astrometry.net-*
   - make
   - make py
