@@ -377,7 +377,7 @@ class FitWorkspace:
     def plot_correlation_matrix(self, ipar=None):
         fig = plt.figure()
         self.rho = compute_correlation_matrix(self.cov)
-        plot_correlation_matrix_simple(plt.gca(), self.cov, axis_names=self.axis_names, ipar=ipar)
+        plot_correlation_matrix_simple(plt.gca(), self.rho, axis_names=self.axis_names, ipar=ipar)
         if parameters.SAVE and self.filename != "":
             figname = os.path.splitext(self.filename)[0] + "_correlation.pdf"
             self.my_logger.info(f"Save figure {figname}.")
@@ -535,14 +535,15 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             my_logger.warning(f"\n\tGradient descent terminated in {i} iterations because all parameters "
                               f"have null Jacobian.")
             break
-        if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
-            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
-                           f"relative to the sum of the parameters is below xtol={xtol}.")
-            break
-        if len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2]), 1]) < ftol:
-            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
-                           f"relative change of cost is below ftol={ftol}.")
-            break
+        if fit_workspace.verbose or parameters.DEBUG:
+            if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
+                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
+                               f"relative to the sum of the parameters is below xtol={xtol}.")
+                break
+            if len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2]), 1]) < ftol:
+                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
+                               f"relative change of cost is below ftol={ftol}.")
+                break
     plt.close()
     return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
 
@@ -604,9 +605,10 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
     params_table = np.concatenate([params_table, tmp_params_table])
     costs = np.concatenate([costs, tmp_costs])
     ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
-    print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
-                            [fit_workspace.input_labels[ip] for ip in ipar])
-    if parameters.DEBUG and verbose:
+    if verbose or fit_workspace.verbose:
+        print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
+                                [fit_workspace.input_labels[ip] for ip in ipar])
+    if parameters.DEBUG and (verbose or fit_workspace.verbose):
         # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
         plot_gradient_descent(fit_workspace, costs, params_table)
         fit_workspace.plot_correlation_matrix(ipar=ipar)
