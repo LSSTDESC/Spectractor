@@ -76,8 +76,8 @@ before_script:
   - conda create -n py37 python=3.7 pip
   - source activate py37
   - python --version
-  - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
-  - tar xvzf astrometry.net-latest.tar.gz
+  - wget https://github.com/dstndstn/astrometry.net/releases/download/0.80/astrometry.net-0.80.tar.gz
+  - tar xvzf astrometry.net-0.80.tar.gz
   - cd astrometry.net-*
   - make
   - make py
