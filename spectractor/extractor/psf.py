@@ -6,6 +6,7 @@ from deprecated import deprecated
 from scipy.optimize import basinhopping, minimize
 from scipy.interpolate import interp1d, interp2d
 from scipy.integrate import quad
+from scipy import special
 from iminuit import Minuit
 
 from astropy.modeling import Fittable1DModel, Fittable2DModel, Parameter
@@ -18,15 +19,16 @@ from spectractor.fit.fitter import FitWorkspace, run_minimisation
 from numba import njit
 
 
-@njit
+# @njit
 def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
     r"""Compute a 1D Moffat function, whose integral is normalised to unity.
 
     .. math ::
 
-        f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
-        \quad\text{with}\quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
+        f(y) = \frac{A \Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)} \frac{1}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
+        \quad\text{with}\quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A, \alpha > 1/2
 
+    Note that this function is defined only for :math:`alpha > 1/2`.
 
     Parameters
     ----------
@@ -54,12 +56,11 @@ def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
     >>> amplitude = 10
     >>> a = evaluate_moffat1d(y, amplitude=amplitude, y_mean=Ny/2, gamma=5, alpha=2)
     >>> print(f"{np.sum(a):.6f}")
-    10.000000
+    9.967561
 
     .. doctest::
         :hide:
 
-        >>> assert np.isclose(np.sum(a), amplitude)
         >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
 
     .. plot::
@@ -81,25 +82,30 @@ def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
     rr = (y - y_mean) * (y - y_mean)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha)
-    dx = y[1] - y[0]
-    integral = np.sum(a) * dx
-    norm = amplitude
-    if integral != 0:
-        norm /= integral
-    a *= norm
+    # dx = y[1] - y[0]
+    # integral = np.sum(a) * dx
+    # norm = amplitude
+    # if integral != 0:
+    #     a /= integral
+    # a *= amplitude
+    norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
+    a *= amplitude / norm
     return a.T
 
 
-@njit
+# @njit
 def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
     r"""Compute a 1D Moffat-Gaussian function, whose integral is normalised to unity.
 
     .. math ::
 
-        f(y) \propto A \left\lbrace \frac{1}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
+        f(y) = A \left\lbrace \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}
+        \frac{1}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
          - \eta e^{-(y-y_0)^2/(2\sigma^2)}\right\rbrace
         \quad\text{with}\quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
-        \quad\text{ and } \quad \eta < 0
+        \quad\text{ and } \quad \eta < 0, \alpha > 1/2
+
+    Note that this function is defined only for :math:`alpha > 1/2`.
 
 
     Parameters
@@ -159,12 +165,15 @@ def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, sigma)
     rr = (y - y_mean) * (y - y_mean)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * sigma * sigma)))
-    dx = y[1] - y[0]
-    integral = np.sum(a) * dx
-    norm = amplitude
-    if integral != 0:
-        norm /= integral
-    a *= norm
+    # dx = y[1] - y[0]
+    # integral = np.sum(a) * dx
+    # norm = amplitude
+    # if integral != 0:
+    #     norm /= integral
+    # a *= norm
+    norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha) + \
+           eta_gauss * 2 * np.pi * sigma * sigma
+    a *= amplitude / norm
     return a.T
 
 
@@ -178,6 +187,8 @@ def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):  # pragma:
         \left[ 1 +\frac{\left(x-x_0\right)^2+\left(y-y_0\right)^2}{\gamma^2} \right]^\alpha}
         \quad\text{with}\quad
         \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
+
+    Note that this function is defined only for :math:`alpha > 1`.
 
     Note that the normalisation of a 2D Moffat function is analytical so it is not expected that
     the sum of the output array is equal to :math:`A`, but lower.
@@ -261,6 +272,8 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_ga
         \quad\text{with}\quad
         \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
         \quad\text{and} \quad \eta < 0
+
+    Note that this function is defined only for :math:`alpha > 1`.
 
     Parameters
     ----------
