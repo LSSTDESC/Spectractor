@@ -336,6 +336,10 @@ class SpectrogramModel(Spectrum):
         nlbda = dispersion_law.size
         # cannot use directly ChromaticPSF2D class because it does not include the rotation of the spectrogram
         # TODO: increase rapidity (multithreading, optimisation...)
+        # pixels = np.arange(self.spectrogram_Ny)
+        # for i in range(0, nlbda, 1):
+        #     p = np.array([spectrum[i], dispersion_law[i].real, dispersion_law[i].imag] + list(profile_params[i, 3:]))
+        #     simul[:, i] = self.psf.evaluate(pixels, p=p)
         for i in range(0, nlbda, 1):
             # here spectrum[i] is in ADU/s
             p = np.array([spectrum[i], dispersion_law[i].real, dispersion_law[i].imag] + list(profile_params[i, 3:]))
