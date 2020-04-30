@@ -448,7 +448,8 @@ class Spectrum:
                 self.spectrogram_fit = hdu_list[1].data
                 self.spectrogram_residuals = hdu_list[2].data
         else:
-            self.my_logger.warning('\n\tSpectrum file %s not found' % input_file_name)
+            self.my_logger.warning(f'\n\tSpectrum file {input_file_name} not found')
+            raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
 
     def load_spectrogram(self, input_file_name):
         """Load the spectrum from a fits file (data, error and wavelengths).
@@ -638,7 +639,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     # filter the noise
     # plt.errorbar(lambdas,spec,yerr=spec_err)
     spec = np.copy(spec)
-    spec = savgol_filter(spec, 7, 2)
+    spec_smooth = savgol_filter(spec, parameters.CALIB_SAVGOL_WINDOW, parameters.CALIB_SAVGOL_ORDER)
     # plt.plot(lambdas,spec)
     # plt.show()
     # initialisation
@@ -676,9 +677,9 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             bgd_strategy = np.greater
         index = np.arange(l_index - peak_width, l_index + peak_width, 1).astype(int)
         # skip if data is masked with NaN
-        if np.any(np.isnan(spec[index])):
+        if np.any(np.isnan(spec_smooth[index])):
             continue
-        extrema = argrelextrema(spec[index], line_strategy)
+        extrema = argrelextrema(spec_smooth[index], line_strategy)
         if len(extrema[0]) == 0:
             continue
         peak_index = index[0] + extrema[0][0]
@@ -688,32 +689,32 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
                 test = -1e20
                 for m in extrema[0]:
                     idx = index[0] + m
-                    if spec[idx] > test:
+                    if spec_smooth[idx] > test:
                         peak_index = idx
-                        test = spec[idx]
+                        test = spec_smooth[idx]
             elif line_strategy == np.less:
                 test = 1e20
                 for m in extrema[0]:
                     idx = index[0] + m
-                    if spec[idx] < test:
+                    if spec_smooth[idx] < test:
                         peak_index = idx
-                        test = spec[idx]
+                        test = spec_smooth[idx]
         # search for first local minima around the local maximum
         # or for first local maxima around the local minimum
         # around +/- 3*peak_width
         index_inf = peak_index - 1  # extrema on the left
         while index_inf > max(0, peak_index - 3 * peak_width):
             test_index = np.arange(index_inf, peak_index, 1).astype(int)
-            minm = argrelextrema(spec[test_index], bgd_strategy)
+            minm = argrelextrema(spec_smooth[test_index], bgd_strategy)
             if len(minm[0]) > 0:
                 index_inf = index_inf + minm[0][0]
                 break
             else:
                 index_inf -= 1
         index_sup = peak_index + 1  # extrema on the right
-        while index_sup < min(len(spec) - 1, peak_index + 3 * peak_width):
+        while index_sup < min(len(spec_smooth) - 1, peak_index + 3 * peak_width):
             test_index = np.arange(peak_index, index_sup, 1).astype(int)
-            minm = argrelextrema(spec[test_index], bgd_strategy)
+            minm = argrelextrema(spec_smooth[test_index], bgd_strategy)
             if len(minm[0]) > 0:
                 index_sup = peak_index + minm[0][0]
                 break
@@ -726,19 +727,19 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         index = list(np.arange(max(0, index_inf - bgd_width),
                                min(len(lambdas), index_sup + bgd_width), 1).astype(int))
         # skip if data is masked with NaN
-        if np.any(np.isnan(spec[index])):
+        if np.any(np.isnan(spec_smooth[index])):
             continue
         # first guess and bounds to fit the line properties and
         # the background with CALIB_BGD_ORDER order polynom
-        # guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), lambdas[peak_index],
+        # guess = [0] * bgd_npar + [0.5 * np.max(spec_smooth[index]), lambdas[peak_index],
         #                          0.5 * (line.width_bounds[0] + line.width_bounds[1])]
         bgd_npar = max(parameters.CALIB_BGD_NPARAMS, int(len_index_to_bgd_npar_factor * (index[-1] - index[0])))
         bgd_npar_list.append(bgd_npar)
-        guess = [0] * bgd_npar + [0.5 * np.max(spec[index]), line_wavelength,
+        guess = [0] * bgd_npar + [0.5 * np.max(spec_smooth[index]), line_wavelength,
                                   0.5 * (line.width_bounds[0] + line.width_bounds[1])]
         if line_strategy == np.less:
             # noinspection PyTypeChecker
-            guess[bgd_npar] = -0.5 * np.max(spec[index])  # look for abosrption under bgd
+            guess[bgd_npar] = -0.5 * np.max(spec_smooth[index])  # look for abosrption under bgd
         # bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), lambdas[index_inf], line.width_bounds[0]],
         #          [np.inf] * bgd_npar + [abs(np.max(spec[index])), lambdas[index_sup], line.width_bounds[1]]]
         bounds = [[-np.inf] * bgd_npar + [-abs(np.max(spec[index])), line_wavelength - peak_width / 2,
@@ -859,9 +860,9 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             # guess[n] = getattr(bgd, bgd.param_names[parameters.CALIB_BGD_ORDER - n]).value
             guess[n] = fit[n]
             b = abs(baseline_prior * guess[n])
-            if np.isclose(b, 0, rtol=1e-2 * float(np.mean(spec[bgd_index]))):
-                b = baseline_prior * np.std(spec[bgd_index])
-                if np.isclose(b, 0, rtol=1e-2 * float(np.mean(spec[bgd_index]))):
+            if np.isclose(b, 0, rtol=1e-2 * float(np.mean(spec_smooth[bgd_index]))):
+                b = baseline_prior * np.std(spec_smooth[bgd_index])
+                if np.isclose(b, 0, rtol=1e-2 * float(np.mean(spec_smooth[bgd_index]))):
                     b = np.inf
             bounds[0][n] = guess[n] - b
             bounds[1][n] = guess[n] + b
@@ -869,7 +870,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
             idx = new_peak_index_list[k][j]
             x_norm = rescale_x_for_legendre(lambdas[idx])
             guess[bgd_npar + 3 * j] = np.sign(guess[bgd_npar + 3 * j]) * abs(
-                spec[idx] - np.polynomial.legendre.legval(x_norm, guess[:bgd_npar]))
+                spec_smooth[idx] - np.polynomial.legendre.legval(x_norm, guess[:bgd_npar]))
             if np.sign(guess[bgd_npar + 3 * j]) < 0:  # absorption
                 bounds[0][bgd_npar + 3 * j] = 2 * guess[bgd_npar + 3 * j]
             else:  # emission

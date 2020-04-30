@@ -2244,10 +2244,9 @@ def compute_correlation_matrix(cov):
     return rho
 
 
-def plot_correlation_matrix_simple(ax, cov, axis_names, ipar=None):
+def plot_correlation_matrix_simple(ax, rho, axis_names, ipar=None):
     if ipar is None:
-        ipar = np.arange(cov.shape[0]).astype(int)
-    rho = compute_correlation_matrix(cov=cov[ipar[:, None], ipar])
+        ipar = np.arange(rho.shape[0]).astype(int)
     im = plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
     ax.set_title("Correlation matrix")
     names = [axis_names[ip] for ip in ipar]

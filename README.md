@@ -29,7 +29,7 @@ Be careful, Spectractor can perform fits using the MCMC library [emcee](https://
 For the simulation of spectra, Spectractor needs the following external libraries:
 - [libradtran](http://www.libradtran.org/doku.php) to simulate atmospheric transmission: it needs the installation of [netcdf](https://www.unidata.ucar.edu/software/netcdf/) and a python 2 environment (for the compilation only, not the usage); `uvpsec` executable must in the user `$PATH` or the user has to set an environmental variable `$LIBRADTRAN_DIR` pointing to the install directory.
 - [pysynphot](https://pysynphot.readthedocs.io/en/latest/) to get the CALSPEC star spectra: the HST CALSPEC calibration spectra must be downloaded and the environment variable `$PYSYN_CDBS` must be created.
-- [astrometry.net](https://astrometrynet.readthedocs.io/en/latest/) (optional): needed to create World Coordinate System files from the images; `solve-field` exectuable must in the user `$PATH` or the user has to set an environmental variable `$ASTROMETRYNET_DIR` pointing to the install directory.
+- [astrometry.net](https://astrometrynet.readthedocs.io/en/latest/) (optional): needed to create World Coordinate System files from the images; `solve-field` executable must in the user `$PATH` or the user has to set an environmental variable `$ASTROMETRYNET_DIR` pointing to the install directory. Version below or equal v0.78 should be used.
 
 Detailled command lines for the installation of Spectractor and the external dependencies can be found in the file `.travis.yml`.
 

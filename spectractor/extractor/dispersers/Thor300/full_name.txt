@@ -1,1 +1,1 @@
-Blazed grating 300 lines/mm
+Thorlabs blazed 300 lines/mm

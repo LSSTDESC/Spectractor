@@ -448,6 +448,11 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     true_spectrum = spectrogram.set_true_spectrum(true_lambdas, ozone, pwv, aerosols, shift_t=0)
 
     # Saturation effects
+    saturated_pixels = np.where(spectrogram.data > image.saturation)[0]
+    if len(saturated_pixels) > 0:
+        my_logger.warning(f"\n\t{len(saturated_pixels)} saturated pixels detected above saturation "
+                          f"level at {image.saturation} ADU/s in the spectrogram."
+                          f"\n\tSpectrogram maximum is at {np.max(spectrogram.data)} ADU/s.")
     image.data[image.data > image.saturation] = image.saturation
 
     # Convert data from ADU/s in ADU
