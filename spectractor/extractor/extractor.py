@@ -226,11 +226,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                    f'mode={mode} and amplitude_priors_method={method}...')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
                             amplitude_priors_method=method, mode=mode, verbose=True)
-    # w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
-    #                         amplitude_priors_method="psf1d", mode="2D", verbose=True)
-    if parameters.DEBUG:
-        s.plot_summary()
-        w.plot_fit()
+    w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
+                            amplitude_priors_method="psf1d", mode="2D", verbose=True)
     spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
