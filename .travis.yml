@@ -77,8 +77,8 @@ before_script:
   - source activate py37
   - python --version
   - pip install pyutil numpy
-  - wget http://astrometry.net/downloads/astrometry.net-latest.tar.gz
-  - tar xvzf astrometry.net-latest.tar.gz
+  - wget http://astrometry.net/downloads/astrometry.net-0.78.tar.gz
+  - tar xvzf astrometry.net-0.78.tar.gz
   - cd astrometry.net-*
   - make
   - make py
