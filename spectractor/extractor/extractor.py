@@ -99,7 +99,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     # Create Spectrum object
     spectrum = Spectrum(image=image)
     # Subtract background and bad pixels
-    extract_spectrum_from_image(image, spectrum, w=parameters.PIXWIDTH_SIGNAL,
+    extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
                                 ws=(parameters.PIXDIST_BACKGROUND,
                                     parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND),
                                 right_edge=parameters.CCD_IMSIZE - 200)
@@ -115,7 +115,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     spectrum.save_spectrum(output_filename, overwrite=True)
     spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
     spectrum.lines.print_detected_lines(output_file_name=output_filename.replace('_spectrum.fits', '_lines.csv'),
-                                        overwrite=True)
+                                        overwrite=True, amplitude_units=spectrum.units)
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
@@ -126,7 +126,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     return spectrum
 
 
-def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=parameters.CCD_IMSIZE - 200):
+def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), right_edge=parameters.CCD_IMSIZE - 200):
     """Extract the 1D spectrum from the image.
 
     Method : remove a uniform background estimated from the rectangular lateral bands
@@ -148,7 +148,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
         Image object from which to extract the spectrum
     spectrum: Spectrum
         Spectrum object to store new wavelengths, data and error arrays
-    w: int
+    signal_width: int
         Half width of central region where the spectrum is extracted and summed (default: 10)
     ws: list
         up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
@@ -158,9 +158,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
 
     my_logger = set_logger(__name__)
     if ws is None:
-        ws = [20, 30]
+        ws = [signal_width+20, signal_width+30]
     my_logger.info(
-        f'\n\tExtracting spectrum from image: spectrum with width 2*{w:d} pixels '
+        f'\n\tExtracting spectrum from image: spectrum with width 2*{signal_width:d} pixels '
         f'and background from {ws[0]:d} to {ws[1]:d} pixels')
 
     # Make a data copy
@@ -208,12 +208,12 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     psf = load_PSF(psf_type=parameters.PSF_TYPE)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
-    s.fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=10, sigma_clip=5, bgd_model_func=bgd_model_func,
+    s.fit_transverse_PSF1D_profile(data, err, signal_width, ws, pixel_step=10, sigma_clip=5, bgd_model_func=bgd_model_func,
                                    saturation=image.saturation, live_fit=False)
 
     # Fill spectrum object
     spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
-    spectrum.data = np.copy(s.table['flux_sum'])
+    spectrum.data = np.copy(s.table['amplitude'])
     spectrum.err = np.copy(s.table['flux_err'])
     my_logger.debug(f'\n\tTransverse fit table:\n{s.table}')
     if parameters.DEBUG:
@@ -225,12 +225,9 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
     my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
                    f'mode={mode} and amplitude_priors_method={method}...')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
-                            amplitude_priors_method=method, mode=mode)
+                            amplitude_priors_method=method, mode=mode, verbose=True)
     # w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
     #                         amplitude_priors_method="psf1d", mode="2D", verbose=True)
-    if parameters.DEBUG:
-        s.plot_summary()
-        w.plot_fit()
     spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
@@ -381,7 +378,7 @@ def extract_spectrum_from_image(image, spectrum, w=10, ws=(20, 30), right_edge=p
                       label='Fitted spectrum centers', marker='o', s=10)
         ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
         ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-', label='')
-        ax[2].set_ylim(0, Ny)
+        ax[2].set_ylim(0.5 * Ny - signal_width, 0.5 * Ny + signal_width)
         ax[2].set_xlim(0, xx.size)
         ax[2].legend(loc='best')
         plot_spectrum_simple(ax[0], np.arange(spectrum.data.size), spectrum.data, data_err=spectrum.err,

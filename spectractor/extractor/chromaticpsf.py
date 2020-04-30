@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from scipy.interpolate import interp1d
 
@@ -88,15 +89,15 @@ class ChromaticPSF:
         self.poly_params_names = []  # "$a_{" + str(k) + "}$" for k in range(self.poly_params.size)]
         for ip, p in enumerate(self.psf.param_names):
             if ip == 0:
-                self.poly_params_labels += [f"{p}_{k}" for k in range(len(self.table))]
+                self.poly_params_labels += [f"{p}^{k}" for k in range(len(self.table))]
                 self.poly_params_names += \
-                    ["$" + self.psf.axis_names[ip].replace("$", "") + "_{(" + str(k) + ")}$"
+                    ["$" + self.psf.axis_names[ip].replace("$", "") + "{(" + str(k) + ")}$"
                      for k in range(len(self.table))]
             else:
                 for k in range(self.degrees[p] + 1):
                     self.poly_params_labels.append(f"{p}_{k}")
                     self.poly_params_names.append("$" + self.psf.axis_names[ip].replace("$", "")
-                                                  + "_{(" + str(k) + ")}$")
+                                                  + "^{(" + str(k) + ")}$")
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg
@@ -882,7 +883,7 @@ class ChromaticPSF:
         if 0 not in pixel_range:
             pixel_range.append(0)
         pixel_range = np.array(pixel_range)
-        for x in pixel_range:
+        for x in tqdm(pixel_range, disable=not parameters.VERBOSE):
             guess = np.copy(guess)
             if x == xmax_index:
                 guess = np.copy(init_guess)
@@ -915,8 +916,11 @@ class ChromaticPSF:
             psf.p = guess
             w = PSFFitWorkspace(psf, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False)
-            run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=2, verbose=False,
-                                            fix=w.fixed)
+            try:
+                run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=2, verbose=False,
+                                                fix=w.fixed)
+            except:
+                pass
             best_fit = w.psf.p
             # It is better not to propagate the guess to further pixel columns
             # otherwise fit_chromatic_psf1D is more likely to get trapped in a local minimum
@@ -929,16 +933,22 @@ class ChromaticPSF:
             if live_fit and parameters.DISPLAY:  # pragma: no cover
                 w.plot_fit()
         # interpolate the skipped pixels with splines
-        x = np.arange(Nx)
+        all_pixels = np.arange(Nx)
         xp = np.array(sorted(set(list(pixel_range))))
         self.fitted_pixels = xp
         for i in range(len(self.psf.param_names)):
             yp = self.profile_params[xp, i]
-            self.profile_params[:, i] = interp1d(xp, yp, kind='cubic')(x)
-        self.table['flux_sum'] = interp1d(xp, self.table['flux_sum'][xp], kind='cubic', bounds_error=False,
-                                          fill_value='extrapolate')(x)
-        self.table['flux_err'] = interp1d(xp, self.table['flux_err'][xp], kind='cubic', bounds_error=False,
-                                          fill_value='extrapolate')(x)
+            self.profile_params[:, i] = interp1d(xp, yp, kind='cubic')(all_pixels)
+        for x in all_pixels:
+            y = data[:, x]
+            if bgd_model_func is not None:
+                signal = y - bgd_model_func(x, index)[:, 0]
+            else:
+                signal = y
+            if np.mean(signal[bgd_index]) < 0:
+                signal -= np.mean(signal[bgd_index])
+            self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
+            self.table['flux_sum'][x] = np.sum(signal)
         self.poly_params = self.from_profile_params_to_poly_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
 
