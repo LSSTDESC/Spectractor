@@ -16,7 +16,7 @@ from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
-
+from spectractor.adr.adr_utils_Spectractor import adr_calib
 
 class Spectrum:
 
@@ -533,6 +533,12 @@ def calibrate_spectrum(spectrum, xlim=None):
     pixels = spectrum.pixels[left_cut:right_cut] - spectrum.target_pixcoords_rotated[0]
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
+    pixels += adr_calib(spectrum.lambdas,spectrum)
+    # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
+    
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels,spectrum.target_pixcoords,order=spectrum.order)
+
+    
     spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
     # Cut spectra
     spectrum.lambdas_indices = \
