@@ -16,7 +16,7 @@ from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
-from spectractor.adr.adr_utils_Spectractor import adr_calib
+from spectractor.simulation.adr.adr_utils_Spectractor import adr_calib
 
 class Spectrum:
 
