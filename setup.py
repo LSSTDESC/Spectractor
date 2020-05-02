@@ -23,7 +23,7 @@ print(f'Spectractor version is {current_version}')
 setup(
     name='Spectractor',
     version=current_version,
-    packages=['spectractor', 'spectractor.extractor', 'spectractor.simulation', 'spectractor.fit'],
+    packages=['spectractor', 'spectractor.extractor', 'spectractor.simulation', 'spectractor.fit','spectractor.simulation.adr'],
     install_requires=reqs,
     test_suite='nose.collector',
     tests_require=['nose'],
