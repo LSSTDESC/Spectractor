@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import astropy.coordinates as AC
 from astropy import units as u
-import adr as ADR
+import spectractor.simulation.adr.adr as ADR
 
 """
 Functions to:
