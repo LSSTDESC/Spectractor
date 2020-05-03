@@ -1,8 +1,6 @@
 import matplotlib.pyplot as plt
 import astropy.coordinates as AC
 from astropy import units as u
-import astropy.io.fits as F
-from spectractor.extractor.spectrum import Spectrum
 import adr as ADR
 
 """
@@ -26,14 +24,15 @@ __author__ = "Maxime Rey"
 #          Main functions           #
 # ================================= #
 
-def adr_calib(lambdas,spectrum,lambda_ref=550):
+
+def adr_calib(lambdas,params,lambda_ref=550):
 
     lat,_ = get_lat_tel('CTIO') #header ?
 
-    meadr = instanciation_adr(spectrum, lat, lambdas[0]*10)
+    meadr = instanciation_adr(params, lat, lambdas[0]*10)
 
     xs, ys= get_adr_shift_for_lbdas(meadr, lambdas*10)
-    xs_pix = in_pixel(xs, spectrum)
+    xs_pix = in_pixel(xs, params)
 
     indice_ref=min(len(lambdas), np.argmin(np.abs(lambdas - lambda_ref)))
     x_0=xs_pix[indice_ref] #550 nm
@@ -43,39 +42,18 @@ def adr_calib(lambdas,spectrum,lambda_ref=550):
     return x_shift
 
 
+def instanciation_adr(params,latitude, lbda_ref):
 
-def instanciation_adr(spectrum, latitude, lbda_ref):
-  """
-  Returns an ADR object (from the ADR library, don't get confused between both).
-  hdr should be a dict composed of the keynames of the header and their associated value and the latitude should be geodetic.
-  By default, the latitude is from CTIO, otherwise replace with astropy.coordinates.Latitude object.
-  """
+  dec = AC.Angle(params[0], unit=u.deg)
+  hour_angle = AC.Angle(params[1], unit=u.hourangle)
 
-  hdr=spectrum.header
-
-  test_key_in_hdr(hdr, 'DEC')
-  test_key_in_hdr(hdr, 'HA')
-  test_key_in_hdr(hdr, 'OUTTEMP')
-  test_key_in_hdr(hdr, 'OUTPRESS')
-  test_key_in_hdr(hdr, 'OUTHUM')
-  test_key_in_hdr(hdr, 'AIRMASS')
-  test_key_in_hdr(hdr, 'ROTANGLE')
-
-  dec = AC.Angle(hdr['DEC'], unit=u.deg)
-  hour_angle = AC.Angle(hdr['HA'], unit=u.hourangle)
-
-  temperature = hdr['OUTTEMP']                          # outside temp (C)
-  pressure = hdr['OUTPRESS']                            # outside pressure (mbar)
-  humidity = hdr['OUTHUM']                              # outside humidity (%)
-  airmass = hdr['AIRMASS']                              # airmass
-  rotangle= hdr['ROTANGLE']
+  temperature,pressure,humidity,airmass,rotangle=params[2],params[3],params[4],params[5],params[6]
 
   #+ or - rotangle ?
   _, parangle = ADR.hadec2zdpar(hour_angle.degree, dec.degree, latitude.degree, deg=True)
   adr = ADR.ADR(airmass=airmass, parangle=parangle+rotangle, temperature=temperature,
     pressure=pressure, lbdaref=lbda_ref, relathumidity=humidity)
-
-  return adr
+  
 
 
 def get_adr_shift_for_lbdas(adr_object, lbdas):
@@ -147,22 +125,19 @@ def plot_adr(lbdas, x_shift, y_shift, units='arcsec'):
 #        Utilitary functions        #
 # ================================= #
 
-
-def in_pixel(thing_in_arcsec, spectrum):
+def in_pixel(thing_in_arcsec, params):
   """
   Transform something in arcsec in pixels
   """
 
-  hdr=spectrum.header
+  xpixsize=params[-2]
+  ypixsize=params[-1]
 
-  test_key_in_hdr(hdr, 'XPIXSIZE')
-  test_key_in_hdr(hdr, 'YPIXSIZE')
-
-  if hdr['XPIXSIZE']!=hdr['YPIXSIZE']:
+  if xpixsize!=ypixsize:
     raise ValueError('Pixels in X and Y do not have the same length, too complicated, did not work')
 
 
-  thing_in_pix = thing_in_arcsec/hdr['XPIXSIZE']
+  thing_in_pix = thing_in_arcsec/xpixsize
 
   return thing_in_pix
 
@@ -181,28 +156,3 @@ def get_lat_tel(telescope):
     raise ValueError('not documented yet (you can add the value in the code')
 
 
-
-
-# ================================= #
-#          Test functions           #
-# ================================= #
-
-
-def test_size_2list(list1, list2): ############# How do I return the name of the list ?
-  """
-  Check that 2 lists have the same size.
-  """
-
-  if len(list1)!=len(list2):
-    raise ValueError("{} and {} don't have the same length".format(str(list1), str(list2)))
-
-
-def test_key_in_hdr(dict,key):
-  """
-  Check that keys are indeed in a dictionnary.
-  """
-
-  try:
-    dict[key]
-  except KeyError:
-    raise KeyError('{} is not contained in the fits files and is necessary'.format(key))

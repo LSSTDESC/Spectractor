@@ -511,6 +511,44 @@ class Spectrum:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
 
 
+def open_header_for_adr(spectrum):
+
+  hdr=spectrum.header
+
+  test_key_in_hdr(hdr, 'DEC')
+  test_key_in_hdr(hdr, 'HA')
+  test_key_in_hdr(hdr, 'OUTTEMP')
+  test_key_in_hdr(hdr, 'OUTPRESS')
+  test_key_in_hdr(hdr, 'OUTHUM')
+  test_key_in_hdr(hdr, 'AIRMASS')
+  test_key_in_hdr(hdr, 'ROTANGLE')
+  test_key_in_hdr(hdr, 'XPIXSIZE')
+  test_key_in_hdr(hdr, 'YPIXSIZE')
+
+  dec = AC.Angle(hdr['DEC'], unit=u.deg)
+  hour_angle = AC.Angle(hdr['HA'], unit=u.hourangle)
+
+  temperature = hdr['OUTTEMP']                          # outside temp (C)
+  pressure = hdr['OUTPRESS']                            # outside pressure (mbar)
+  humidity = hdr['OUTHUM']                              # outside humidity (%)
+  airmass = hdr['AIRMASS']                              # airmass
+  rotangle= hdr['ROTANGLE']
+  xpixsize=hdr['XPIXSIZE']
+  ypixsize=hdr['YPIXSIZE']
+
+  return dec,hour_angle,temperature,pressure,humidity,airmass,rotangle,xpixsize,ypixsize
+
+def test_key_in_hdr(dict,key):
+  """
+  Check that keys are indeed in a dictionnary.
+  """
+
+  try:
+    dict[key]
+  except KeyError:
+    raise KeyError('{} is not contained in the fits files and is necessary'.format(key))
+
+
 def calibrate_spectrum(spectrum, xlim=None):
     """Convert pixels into wavelengths given the position of the order 0,
     the data for the spectrum, and the properties of the disperser. Convert the
@@ -533,7 +571,9 @@ def calibrate_spectrum(spectrum, xlim=None):
     pixels = spectrum.pixels[left_cut:right_cut] - spectrum.target_pixcoords_rotated[0]
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
-    pixels += adr_calib(spectrum.lambdas,spectrum)
+
+    pixels += adr_calib_bis(spectrum.lambdas,open_header_for_adr(spectrum))
+
     # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
     
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels,spectrum.target_pixcoords,order=spectrum.order)
