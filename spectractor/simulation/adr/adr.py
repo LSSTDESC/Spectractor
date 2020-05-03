@@ -4,7 +4,7 @@
 import warnings
 import numpy         as np
 
-from baseobject import BaseObject
+from spectractor.simulation.adr.baseobject import BaseObject
 
 """
 Atmospheric Differential Refraction: Evolution of the spatial position as a function of wavelength.
