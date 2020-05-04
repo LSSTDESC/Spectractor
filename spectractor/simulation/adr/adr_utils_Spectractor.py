@@ -33,7 +33,7 @@ def adr_calib(lambdas,params,lambda_ref=550):
 
     meadr = instanciation_adr(params, lat, lambdas[0]*10)
 
-    xs, ys= get_adr_shift_for_lbdas(meadr, lambdas*10)
+    xs, ys= get_adr_shift_for_lbdas(meadr, lambdas*10, params)
     xs_pix = in_pixel(xs, params)
 
     indice_ref=min(len(lambdas), np.argmin(np.abs(lambdas - lambda_ref)))
@@ -58,12 +58,12 @@ def instanciation_adr(params,latitude, lbda_ref):
   return adr
 
 
-def get_adr_shift_for_lbdas(adr_object, lbdas):
+def get_adr_shift_for_lbdas(adr_object, lbdas, params):
   """
   Returns shift in x and y due to adr as arrays in arcsec.
   """
 
-  arcsecshift = adr_object.refract(0, 0, lbdas)
+  arcsecshift = adr_object.refract(0, 0, lbdas, params[-3])
 
   x_shift = (arcsecshift[0])
   y_shift = (arcsecshift[1])
