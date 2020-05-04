@@ -525,8 +525,8 @@ def open_header_for_adr(spectrum):
   test_key_in_hdr(hdr, 'XPIXSIZE')
   test_key_in_hdr(hdr, 'YPIXSIZE')
 
-  dec = AC.Angle(hdr['DEC'], unit=u.deg)
-  hour_angle = AC.Angle(hdr['HA'], unit=u.hourangle)
+  dec = hdr['DEC']
+  hour_angle = hdr['HA']
 
   temperature = hdr['OUTTEMP']                          # outside temp (C)
   pressure = hdr['OUTPRESS']                            # outside pressure (mbar)
@@ -572,18 +572,18 @@ def calibrate_spectrum(spectrum, xlim=None):
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
 
-    pixels += adr_calib_bis(spectrum.lambdas,open_header_for_adr(spectrum))
+    pixels += adr_calib(spectrum.lambdas,open_header_for_adr(spectrum))
 
     # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
     
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels,spectrum.target_pixcoords,order=spectrum.order)
 
-    
     spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
     # Cut spectra
     spectrum.lambdas_indices = \
         np.where(np.logical_and(spectrum.lambdas > parameters.LAMBDA_MIN, spectrum.lambdas < parameters.LAMBDA_MAX))[0]
     spectrum.lambdas = spectrum.lambdas[spectrum.lambdas_indices]
+
     spectrum.lambdas_binwidths = spectrum.lambdas_binwidths[spectrum.lambdas_indices]
     spectrum.data = spectrum.data[spectrum.lambdas_indices]
     if spectrum.err is not None:
