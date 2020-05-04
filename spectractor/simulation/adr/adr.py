@@ -60,7 +60,7 @@ class ADR( BaseObject ):
     # =================== #
     #   Methods           #
     # =================== #
-    def refract(self, x, y, lbda, backward=False, unit=1.,
+    def refract(self, x, y, lbda, rotangle, backward=False, unit=1.,
                     **kwargs):
         """If forward (default), return refracted position(s) at
         wavelength(s) *lbda* [Å] from reference position(s) *x*,*y*
@@ -88,13 +88,13 @@ class ADR( BaseObject ):
         if backward:
             nlbda = len(np.atleast_1d(lbda))
             assert npos == nlbda, "Incompatible x,y and lbda vectors."
-            x = x0 - dz * np.sin(self._parangle_rad)
-            y = y0 + dz * np.cos(self._parangle_rad)  # (nlbda=npos,)
+            x = x0 - dz * np.sin(self._parangle_rad + rotangle*np.pi/180)
+            y = y0 + dz * np.cos(self._parangle_rad + rotangle*np.pi/180)  # (nlbda=npos,)
             out = np.vstack((x, y))           # (2,npos)
         else:
             dz = dz[:, np.newaxis]            # (nlbda,1)
-            x = x0 + dz * np.sin(self._parangle_rad)  # (nlbda,npos)
-            y = y0 - dz * np.cos(self._parangle_rad)  # (nlbda,npos)
+            x = x0 + dz * np.sin(self._parangle_rad + rotangle*np.pi/180)  # (nlbda,npos)
+            y = y0 - dz * np.cos(self._parangle_rad + rotangle*np.pi/180)  # (nlbda,npos)
             out = np.dstack((x.T, y.T)).T     # (2,nlbda,npos)
 
         return out.squeeze()                 # (2,[nlbda],[npos])
@@ -355,7 +355,7 @@ def air_index(lam, pressure=600, temperature=7,
     k1 = (1/lam)**2
     nm1e6 = 64.328 + 29498.1/(146-k1) + 255.4/(41-k1)
 
-    nm1e6 *= pressure * (1 + (1.049-0.0157 * temperature)*1e-6*pressure) / (720.883 * (1 + 0.003661 * t))
+    nm1e6 *= pressure * (1 + (1.049-0.0157 * temperature)*1e-6*pressure) / (720.883 * (1 + 0.003661 * temperature))
 
     nm1e6 -= 0.0624 - 0.000680 * k1 / (1 + 0.003661 * temperature) * f
 
