@@ -39,7 +39,7 @@ def adr_calib(lambdas,params,lambda_ref=550):
     indice_ref=min(len(lambdas), np.argmin(np.abs(lambdas - lambda_ref)))
     x_0=xs_pix[indice_ref] #550 nm
 
-    x_shift=x_0-xs_pix #décalage positif à intégrer pour les faibles longueurs d'ondes
+    x_shift=x_0-xs_pix
 
     return x_shift
 
