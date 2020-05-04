@@ -353,7 +353,7 @@ class Image(object):
         return self.parallactic_angle
 
     def plot_image(self, ax=None, scale="lin", title="", units="", plot_stats=False,
-                   target_pixcoords=None, figsize=[7.3, 6], aspect=None, vmin=None, vmax=None,
+                   target_pixcoords=None, figsize=(7.3, 6), aspect=None, vmin=None, vmax=None,
                    cmap=None, cax=None):
         """Plot image.
 
