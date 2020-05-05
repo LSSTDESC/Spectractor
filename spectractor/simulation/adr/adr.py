@@ -316,32 +316,6 @@ def _saturationVaporPressureOverWater(temperature):
 
     return psv
 
-def air_index(lam, pressure=600, temperature=7,
-                  f=8):
-    """ Returns index of refraction of air-1 at
-        lam in micron at vacuum
-        p is pressure in mm Hg
-        t is temperature in deg C
-        f is water vapor pressure in mm Hg
-    """
-
-    k1 = (1/lam)**2
-    nm1e6 = 64.328 + 29498.1/(146-k1) + 255.4/(41-k1)
-
-    nm1e6 *= pressure * (1 + (1.049-0.0157 * temperature)*1e-6*pressure) / (720.883 * (1 + 0.003661 * temperature))
-
-    nm1e6 -= 0.0624 - 0.000680 * k1 / (1 + 0.003661 * temperature) * f
-
-    return nm1e6/1e6
-
-def atm_disper(l2, l1, airmass, **kwargs):
-    """ atmospheric dispersion in arcsecond between l2 and l1 in micron
-        at a given airmass. See air index for documentation on pressure,
-        temperature, and water vapor pressure"""
-
-    z = np.arccos(1.0/airmass)
-    return 206265 * (air_index(l2, **kwargs) - air_index(l1,
-                                                         **kwargs)) * np.tan(z)
 
 def air_index(lam, pressure=600, temperature=7,
                   f=8):
@@ -405,20 +379,6 @@ def zd_to_airmass(zd):
     alt = 90. - zd     # Altitude in degrees
     return  1. / np.sin((alt + 244. / (165. + 47. * alt**1.1)) / RAD2DEG)
 
-def airmass_to_zd(airmass):
-    """ conversion of airmass into zenith airmass.
-    if you have pynverse (pip install pynverse), then the conversion
-    if made inversing  Pickering (2002).
-    Otherwise, the Plane-parallel atmosphere case is assumed. (airmass = 1/cos(zd)).
-
-    zd is returned in degree
-    """
-    try:
-        from pynverse import inversefunc
-    except:
-        return np.arccos(1./airmass)
-
-    return inversefunc(zd_to_airmass)(airmass)
 
 def alt_to_ha(alt, dec, lat, deg=True):
     """
