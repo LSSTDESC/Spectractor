@@ -35,7 +35,7 @@ from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 import spectractor.parameters as parameters
-
+from spectractor.simulation.adr import adr_calib
 
 class SpectrumSimulation(Spectrum):
 
@@ -290,6 +290,11 @@ class SpectrogramModel(Spectrum):
         if distance.size % 2 == 0:
             distance = distance[:-1]
         self.disperser.D = D
+        lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
+
+        distance -= adr_calib(lambdas,[self.dec,self.hour_angle,self.temperature,self.pressure,
+                        self.humidity,self.airmass,self.rotation_angle,self.xpixsize,self.ypixsize],parameters.OBS_LATITUDE)
+        
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]

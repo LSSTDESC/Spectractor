@@ -421,7 +421,7 @@ class Spectrum:
             if self.header['EXPTIME'] != "":
                 self.expo = self.header['EXPTIME']
             if self.header['AIRMASS'] != "":
-                self.disperser_label = self.header['AIRMASS']
+                self.airmass = self.header['AIRMASS']
             if self.header['GRATING'] != "":
                 self.disperser_label = self.header['GRATING']
             if self.header['TARGET'] != "":
@@ -557,8 +557,6 @@ def calibrate_spectrum(spectrum, xlim=None):
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
     s = spectrum
-    print(adr_calib(s.lambdas,[s.dec,s.hour_angle,s.temperature,s.pressure,
-                        s.humidity,s.airmass,s.rotation_angle,s.xpixsize,s.ypixsize],parameters.OBS_LATITUDE))
 
     pixels += adr_calib(s.lambdas,[s.dec,s.hour_angle,s.temperature,s.pressure,
                         s.humidity,s.airmass,s.rotation_angle,s.xpixsize,s.ypixsize],parameters.OBS_LATITUDE)
