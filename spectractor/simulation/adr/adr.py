@@ -2,9 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import warnings
-import numpy         as np
-
-from spectractor.simulation.adr.baseobject import BaseObject
+import numpy as np
 
 """
 Atmospheric Differential Refraction: Evolution of the spatial position as a function of wavelength.
@@ -14,54 +12,22 @@ Inspiration: SNfactory ToolBox (see also Don Neill's Fork of KPY)
 Original Source: http://emtoolbox.nist.gov/Wavelength/Documentation.asp
 """
 
-__all__ = ["get_adr"]
+class ADR:
 
-def get_adr(**kwargs):
-    """ returns an instance of a ARD object.
-    **kwargs:
-    Set any of the fundamental properties:
-        - airmass []
-        - lbdaref [A]
-        - pressure [mbar]
-        - parangle [deg]
-        - relathumidity [%]
-        - temperature [C]
-        for instance to set the airmarss to 1.4, simply do:
-        self.set(airmass=1.4).
+    def __init__(self, airmass, lbdaref, pressure, parangle, relathumidity, temperature):
 
-    Returns
-    -------
-    ADR
-    """
-    return ADR(**kwargs)
+        self.airmass = airmass
+        self.lbdaref = lbdaref
+        self.pressure = pressure
+        self.parangle = parangle
+        self.relathumidity = relathumidity
+        self.temperature = temperature
 
-
-class ADR( BaseObject ):
-    """ """
-    PROPERTIES = ["airmass",  "lbdaref","parangle", "pressure",
-                 "relathumidity" , "temperature"]
-    DERIVED_PROPERTIES = []
-
-    def __init__(self, **kwargs):
-        """  **kwargs:
-        Set any of the fundamental properties:
-        - airmass []
-        - lbdaref [A]
-        - pressure [mbar]
-        - parangle [deg]
-        - relathumidity [%]
-        - temperature [C]
-        for instance to set the airmarss to 1.4, simply do:
-        self.set(airmass=1.4).
-        """
-        if kwargs:
-            self.set(**kwargs)
 
     # =================== #
     #   Methods           #
     # =================== #
-    def refract(self, x, y, lbda, rotangle, backward=False, unit=1.,
-                    **kwargs):
+    def refract(self, x, y, lbda, rotangle, backward=False, unit=1.):
         """If forward (default), return refracted position(s) at
         wavelength(s) *lbda* [Å] from reference position(s) *x*,*y*
         (in units of *unit* in arcsec).  Return shape is
@@ -73,8 +39,6 @@ class ADR( BaseObject ):
         northward (standard North-up, Est-left orientation).
         Anonymous `kwargs` will be propagated to :meth:`set`.
         """
-        if kwargs:                      # Update parameters if needed
-            self.set(**kwargs)
 
         x0 = np.atleast_1d(x)                 # (npos,)
         y0 = np.atleast_1d(y)
@@ -83,56 +47,32 @@ class ADR( BaseObject ):
 
         npos = len(x0)
 
-        dz = self._delta * self.get_scale(lbda) / unit  # [unit]
+        dz = self._delta() * self.get_scale(lbda) / unit  # [unit]
 
         if backward:
             nlbda = len(np.atleast_1d(lbda))
             assert npos == nlbda, "Incompatible x,y and lbda vectors."
-            x = x0 - dz * np.sin(self._parangle_rad + rotangle*np.pi/180)
-            y = y0 + dz * np.cos(self._parangle_rad + rotangle*np.pi/180)  # (nlbda=npos,)
+            x = x0 - dz * np.sin(self._parangle_rad() + rotangle*np.pi/180)
+            y = y0 + dz * np.cos(self._parangle_rad() + rotangle*np.pi/180)  # (nlbda=npos,)
             out = np.vstack((x, y))           # (2,npos)
         else:
             dz = dz[:, np.newaxis]            # (nlbda,1)
-            x = x0 + dz * np.sin(self._parangle_rad + rotangle*np.pi/180)  # (nlbda,npos)
-            y = y0 - dz * np.cos(self._parangle_rad + rotangle*np.pi/180)  # (nlbda,npos)
+            x = x0 + dz * np.sin(self._parangle_rad() + rotangle*np.pi/180)  # (nlbda,npos)
+            y = y0 - dz * np.cos(self._parangle_rad() + rotangle*np.pi/180)  # (nlbda,npos)
             out = np.dstack((x.T, y.T)).T     # (2,nlbda,npos)
 
         return out.squeeze()                 # (2,[nlbda],[npos])
 
 
-    # ------- #
-    # SETTER  #
-    # ------- #
-    def set(self, **kwargs):
-        """
-        Set any of the fundamental properties:
-        - airmass []
-        - lbdaref [A]
-        - pressure [mbar]
-        - parangle [deg]
-        - relathumidity [%]
-        - temperature [C]
-        for instance to set the airmarss to 1.4, simply do:
-        self.set(airmass=1.4).
-        _Important_: only the aforementioned fundametal properties could be set.
-
-        """
-        for k,v in kwargs.items():
-            if k not in self.PROPERTIES:
-                raise ValueError("unknown property %s, it cannot be set. known properties are: "%k,", ".join(self.PROPERTIES))
-            self._properties[k] = v
-
 
     # ------- #
     # GETTER  #
     # ------- #
-    def get_scale(self, lbda, **kwargs):
+    def get_scale(self, lbda):
         """
         Return ADR scale [arcsec] for wavelength(s) `lbda` [A].
         Anonymous `kwargs` will be propagated to :meth:`set`.
         """
-        if kwargs:                      # Update parameters if needed
-            self.set(**kwargs)
 
         lbda = np.atleast_1d(lbda)       # (nlbda,)
 
@@ -143,74 +83,25 @@ class ADR( BaseObject ):
         #      refractiveIndex(lbda, P=self.P, T=self.T, RH=self.RH)
 
         # Exact ADR expression
-        dz = (self.get_refractive_index(lbda)**-2 - self.nref**-2) * 0.5
+        dz = (self.get_refractive_index(lbda)**-2 - self.get_refractive_index(self.lbdaref)**-2) * 0.5
 
         return dz * 180. * 3600 / np.pi    # (nlbda,) [arcsec]
 
-    def get_refractive_index(self, lbda, **kwargs ):
+    def get_refractive_index(self, lbda):
         """ relative index for the given wavelength.
         Anonymous `kwargs` will be propagated to :meth:`set`.
         """
-        if kwargs:                      # Update parameters if needed
-            self.set(**kwargs)
 
-        return refractive_index(lbda,
-                                pressure=self.pressure, temperature=self.temperature,
-                                relathumidity=self.relathumidity)
+        return refractive_index(lbda,self.pressure,self.temperature,self.relathumidity)
 
-
-
-    # =================== #
-    #   Properties        #
-    # =================== #
-    @property
-    def data(self):
-        return self._properties
-
-    @property
-    def temperature(self):
-        """ temperature in Celcius """
-        return self._properties["temperature"]
-
-    @property
-    def parangle(self):
-        """ parralactic angle in degree """
-        return self._properties["parangle"]
-
-    @property
-    def pressure(self):
-        """ Pressure in mm Hg """
-        return self._properties["pressure"]
-
-    @property
-    def airmass(self):
-        """ Airmass of the target """
-        return self._properties["airmass"]
-
-    @property
-    def relathumidity(self):
-        """ Relative Humidity """
-        return self._properties["relathumidity"]
-
-    @property
-    def lbdaref(self):
-        """ Relative Humidity """
-        return self._properties["lbdaref"]
-
-    # --------- #
-    #  derived  #
-    # --------- #
-    @property
     def nref(self):
         """ reference wavelength refractive index """
         return self.get_refractive_index(self.lbdaref)
 
-    @property
     def _delta(self):
         """ For the refract method: np.tan(np.arccos(1. / self.airmass)) """
         return np.tan(np.arccos(1. / self.airmass))
 
-    @property
     def _parangle_rad(self):
         """ parralactic angle in radian """
         return self.parangle / 180. * np.pi
@@ -352,27 +243,6 @@ def atm_disper(l2, l1, airmass, **kwargs):
 ########################
 RAD2DEG = 180./np.pi
 
-def airmass_to_parangle(airmass, dec, lat):
-    """ conversion of airmass to parallactic angle using
-    airmass_to_ha() to convert airmass to hour angle and then
-    hadec2zdpar() to zd and parangle.
-    """
-    ha = airmass_to_ha(airmass, dec, lat)
-    return hadec2zdpar(ha, dec, lat)[1]
-
-def airmass_to_ha(airmass, dec, lat):
-    """ Conversion of airmass into hour angle given the target
-    declination (stable as function of observation) and observatory latitude.
-    dec and lat should be given in degree
-    """
-    return alt_to_ha(airmass_to_alt(airmass), dec, lat)
-
-def airmass_to_alt(airmass):
-    """ Conversion of airmass into altitude (in degree) assuming the
-    airmass to zenith distance (zd) consersion from `airmass_to_zd`.
-    alt_in_deg = 90 - zd_in_deg
-    """
-    return 90 - airmass_to_zd(airmass)
 
 def zd_to_airmass(zd):
     """ conversion of zenith airmass into airmass assuming Pickering (2002). """
