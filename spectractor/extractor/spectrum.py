@@ -16,7 +16,7 @@ from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
-from spectractor.simulation.adr.adr_utils import adr_calib
+from spectractor.simulation.adr import adr_calib
 
 class Spectrum:
 
@@ -519,10 +519,6 @@ class Spectrum:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
 
 
-def open_header_for_adr(spectrum):
-    s=spectrum
-    return s.dec,s.hour_angle,s.temperature,s.pressure,s.humidity,s.airmass,s.rotation_angle,s.xpixsize,s.ypixsize
-
 def calibrate_spectrum(spectrum, xlim=None):
     """Convert pixels into wavelengths given the position of the order 0,
     the data for the spectrum, and the properties of the disperser. Convert the
@@ -545,8 +541,12 @@ def calibrate_spectrum(spectrum, xlim=None):
     pixels = spectrum.pixels[left_cut:right_cut] - spectrum.target_pixcoords_rotated[0]
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
+    s = spectrum
+    print(adr_calib(s.lambdas,[s.dec,s.hour_angle,s.temperature,s.pressure,
+                        s.humidity,s.airmass,s.rotation_angle,s.xpixsize,s.ypixsize],parameters.OBS_LATITUDE))
 
-    pixels += adr_calib(spectrum.lambdas,open_header_for_adr(spectrum),parameters.OBS_LATITUDE)
+    pixels += adr_calib(s.lambdas,[s.dec,s.hour_angle,s.temperature,s.pressure,
+                        s.humidity,s.airmass,s.rotation_angle,s.xpixsize,s.ypixsize],parameters.OBS_LATITUDE)
 
     # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
     
