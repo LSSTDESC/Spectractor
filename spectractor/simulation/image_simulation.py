@@ -486,13 +486,13 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['PWV_T'] = pwv
     image.header['VAOD_T'] = aerosols
     image.header['PSF_DEG'] = spectrum.spectrogram_deg
+    image.header['PSF_TYPE'] = parameters.PSF_TYPE
     psf_poly_params_truth = np.array(psf_poly_params)
     if psf_poly_params_truth.size > spectrum.spectrogram_Nx:
         psf_poly_params_truth = psf_poly_params_truth[spectrum.spectrogram_Nx:]
-    else:
-        psf_poly_params_truth = np.array(list(true_spectrum) + list(psf_poly_params_truth))
-    image.header['PSF_POLY'] = np.array_str(psf_poly_params_truth, max_line_width=1000000, precision=4)
-    image.header['LAMBDAS'] = np.array_str(true_lambdas, max_line_width=1000000, precision=2)
+    image.header['LBDAS_T'] = np.array_str(true_lambdas, max_line_width=1000000, precision=2)
+    image.header['AMPLIS_T'] = np.array_str(true_spectrum, max_line_width=1000000, precision=2)
+    image.header['PSF_P_T'] = np.array_str(psf_poly_params_truth, max_line_width=1000000, precision=4)
     # image.header['RESO'] = reso
     image.header['ROTATION'] = int(with_rotation)
     image.header['ROTANGLE'] = rotation_angle
