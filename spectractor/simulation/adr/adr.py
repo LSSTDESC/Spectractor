@@ -47,18 +47,18 @@ class ADR:
 
         npos = len(x0)
 
-        dz = self._delta() * self.get_scale(lbda) / unit  # [unit]
+        dz = np.tan(np.arccos(1. / self.airmass)) * self.get_scale(lbda) / unit  # [unit]
 
         if backward:
             nlbda = len(np.atleast_1d(lbda))
             assert npos == nlbda, "Incompatible x,y and lbda vectors."
-            x = x0 - dz * np.sin(self._parangle_rad() + rotangle*np.pi/180)
-            y = y0 + dz * np.cos(self._parangle_rad() + rotangle*np.pi/180)  # (nlbda=npos,)
+            x = x0 - dz * np.sin((self.parangle + rotangle) / 180. * np.pi)
+            y = y0 + dz * np.cos((self.parangle + rotangle) / 180. * np.pi)  # (nlbda=npos,)
             out = np.vstack((x, y))           # (2,npos)
         else:
             dz = dz[:, np.newaxis]            # (nlbda,1)
-            x = x0 + dz * np.sin(self._parangle_rad() + rotangle*np.pi/180)  # (nlbda,npos)
-            y = y0 - dz * np.cos(self._parangle_rad() + rotangle*np.pi/180)  # (nlbda,npos)
+            x = x0 + dz * np.sin((self.parangle + rotangle) / 180. * np.pi)  # (nlbda,npos)
+            y = y0 - dz * np.cos((self.parangle + rotangle) / 180. * np.pi)  # (nlbda,npos)
             out = np.dstack((x.T, y.T)).T     # (2,nlbda,npos)
 
         return out.squeeze()                 # (2,[nlbda],[npos])
@@ -94,17 +94,6 @@ class ADR:
 
         return refractive_index(lbda,self.pressure,self.temperature,self.relathumidity)
 
-    def nref(self):
-        """ reference wavelength refractive index """
-        return self.get_refractive_index(self.lbdaref)
-
-    def _delta(self):
-        """ For the refract method: np.tan(np.arccos(1. / self.airmass)) """
-        return np.tan(np.arccos(1. / self.airmass))
-
-    def _parangle_rad(self):
-        """ parralactic angle in radian """
-        return self.parangle / 180. * np.pi
 
 ##############################
 #                            #
@@ -207,116 +196,12 @@ def _saturationVaporPressureOverWater(temperature):
 
     return psv
 
-
-def air_index(lam, pressure=600, temperature=7,
-                  f=8):
-    """ Returns index of refraction of air-1 at
-        lam in micron at vacuum
-        p is pressure in mm Hg
-        t is temperature in deg C
-        f is water vapor pressure in mm Hg
-    """
-
-    k1 = (1/lam)**2
-    nm1e6 = 64.328 + 29498.1/(146-k1) + 255.4/(41-k1)
-
-    nm1e6 *= pressure * (1 + (1.049-0.0157 * temperature)*1e-6*pressure) / (720.883 * (1 + 0.003661 * temperature))
-
-    nm1e6 -= 0.0624 - 0.000680 * k1 / (1 + 0.003661 * temperature) * f
-
-    return nm1e6/1e6
-
-
-def atm_disper(l2, l1, airmass, **kwargs):
-    """ atmospheric dispersion in arcsecond between l2 and l1 in micron
-        at a given airmass. See air index for documentation on pressure,
-        temperature, and water vapor pressure"""
-
-    z = np.arccos(1.0/airmass)
-    return 206265 * (air_index(l2, **kwargs) - air_index(l1,
-                                                         **kwargs)) * np.tan(z)
-
 ########################
 #
 #  Conversions         #
 #
 ########################
 RAD2DEG = 180./np.pi
-
-
-def zd_to_airmass(zd):
-    """ conversion of zenith airmass into airmass assuming Pickering (2002). """
-    alt = 90. - zd     # Altitude in degrees
-    return  1. / np.sin((alt + 244. / (165. + 47. * alt**1.1)) / RAD2DEG)
-
-
-def alt_to_ha(alt, dec, lat, deg=True):
-    """
-    lat = lattitude
-    dec = declination
-    lha = local hour angle
-
-    alt = asin( sin(lat)*sin(dec) + cos(lat)*cos(dec) *cos(lha) )
-    -> sin(alt) =  sin(lat)*sin(dec) + cos(lat)*cos(dec) *cos(lha)
-    -> sin(alt) - sin(lat)*sin(dec) =  cos(lat)*cos(dec) *cos(lha)
-    -> [sin(alt) - sin(lat)*sin(dec)] / [cos(lat)*cos(dec)] = cos(lha)
-    lha = acos([sin(alt) - sin(lat)*sin(dec)] / [cos(lat)*cos(dec)])
-    """
-    if deg:                             # Convert to radians
-        alt = alt / RAD2DEG
-        dec = dec / RAD2DEG
-        lat = lat / RAD2DEG
-    ha = np.arccos( (np.sin(alt) - np.sin(lat)*np.sin(dec)) / (np.cos(lat)*np.cos(dec) ) )
-    if deg:
-        ha *= RAD2DEG
-    return ha
-
-def get_alt(lat, dec, lha, deg=True):
-    """ """
-    if deg:                             # Convert to radians
-        lha = lha / RAD2DEG
-        dec = dec / RAD2DEG
-        lat = lat / RAD2DEG
-
-    alt = np.arcsin(np.cos(lha) * np.cos(dec) * np.cos(lat) + np.sin(dec) * np.sin(lat))
-    if deg :
-        alt *= RAD2DEG
-    return alt
-
-def hadec2altaz(ha, dec, lat, deg=True):
-    """
-    Conversion of equatorial coordinates *(ha, dec)* (in degrees if *deg*) to
-    horizontal coordinates *(alt, az)* (in degrees if *deg*), for a given
-    geodetic latitude *lat* (in degrees if *deg*).
-    .. Note:: Azimuth is measured EAST of NORTH.
-    .. Author: Y. Copin (y.copin@ipnl.in2p3.fr)
-    """
-    if deg:                             # Convert to radians
-        ha = ha / RAD2DEG
-        dec = dec / RAD2DEG
-        lat = lat / RAD2DEG
-
-    cha, sha = np.cos(ha), np.sin(ha)
-    cdec, sdec = np.cos(dec), np.sin(dec)
-    clat, slat = np.cos(lat), np.sin(lat)
-
-    sAlt     = slat * sdec + clat * cdec * cha
-    cAlt_cAz = clat * sdec - slat * cdec * cha
-    cAlt_sAz =             -        cdec * sha
-
-    cAlt, az = rec2pol(cAlt_cAz, cAlt_sAz)
-    r, alt = rec2pol(cAlt, sAlt)
-
-    assert np.allclose(r, 1), "Precision error"
-
-    # Bring azimuth in [0, 2pi]
-    az = np.where(az < 0, az + 2 * np.pi, az)
-
-    if deg:                             # Convert to degrees
-        alt *= RAD2DEG
-        az *= RAD2DEG
-
-    return alt, az
 
 def hadec2zdpar(ha, dec, lat, deg=True):
     """
@@ -349,6 +234,7 @@ def hadec2zdpar(ha, dec, lat, deg=True):
 
     return z, p
 
+
 def rec2pol(x, y, deg=False):
     """
     Conversion of rectangular *(x, y)* to polar *(r, theta)* coordinates.
@@ -361,48 +247,3 @@ def rec2pol(x, y, deg=False):
 
     return r, t
 
-def ten(*args):
-    """
-    Convert sexagesimal angle [-]DD[,[-]MM[,[-]SS]] or string
-    "[-]DD[:[-]MM[:[-]SS]]" to decimal degrees.  If the input is a tuple, the
-    sign (if any) should be set on the first non-null value.
-    >>> ten(0, -23, 34)
-    -0.39277777777777778
-    >>> ten("-0:23:34")
-    -0.39277777777777778
-    .. Author: Y. Copin (y.copin@ipnl.in2p3.fr)
-    """
-    # Single string arg case
-    if len(args) == 1 and isinstance(args[0], str):
-        # Split the string 'DD:MM:SS' or 'DD MM SS' in tokens
-        if ':' in args[0]:
-            toks = args[0].split(':')
-        elif ' ' in args[0]:
-            toks = args[0].split(' ')
-        else:
-            toks = [args[0], ]
-
-        # Check whether any of the tokens starts with a '-'
-        sign = -1 if [True for tok in toks if tok.startswith('-')] else 1
-        try:
-            args = [sign * float(tok) for tok in toks]
-        except ValueError:
-            raise ValueError("ten() takes up to 3 numbers DD[,MM[,SS.S]] or "
-                             "one 'DD[:MM[:SS.S]]' string as input")
-
-    if not 1 <= len(args) <= 3:
-        raise ValueError("ten() takes up to 3 numbers DD[,MM[,SS.S]] or "
-                         "one 'DD[:MM[:SS.S]]' string as input")
-    if len(args) != 3:          # Complete args with trailing 0s
-        args = list(args) + [0] * (3 - len(args))
-
-    # Main case: 3 numeric args
-    sign = -1 if (min(args) < 0) else 1
-    try:
-        dec = abs(args[0]) + abs(args[1]) / 60. + abs(args[2]) / 3600.
-        dec *= sign
-    except TypeError:
-        raise ValueError("ten() takes 3 numbers DD,MM,SS.S or "
-                         "one 'DD:MM:SS.S' string as input")
-
-    return dec
