@@ -112,6 +112,14 @@ class Spectrum:
             self.gain = image.gain
             self.rotation_angle = image.rotation_angle
             self.my_logger.info('\n\tSpectrum info copied from image')
+            self.dec = image.dec
+            self.hour_angle = image.hour_angle
+            self.temperature = image.temperature
+            self.pressure = image.pressure
+            self.humidity = image.humidity
+            self.xpixsize = image.xpixsize
+            self.ypixsize = image.ypixsize
+
         self.load_filter()
 
     def convert_from_ADUrate_to_flam(self):
@@ -512,42 +520,8 @@ class Spectrum:
 
 
 def open_header_for_adr(spectrum):
-
-  hdr=spectrum.header
-
-  test_key_in_hdr(hdr, 'DEC')
-  test_key_in_hdr(hdr, 'HA')
-  test_key_in_hdr(hdr, 'OUTTEMP')
-  test_key_in_hdr(hdr, 'OUTPRESS')
-  test_key_in_hdr(hdr, 'OUTHUM')
-  test_key_in_hdr(hdr, 'AIRMASS')
-  test_key_in_hdr(hdr, 'ROTANGLE')
-  test_key_in_hdr(hdr, 'XPIXSIZE')
-  test_key_in_hdr(hdr, 'YPIXSIZE')
-
-  dec = hdr['DEC']
-  hour_angle = hdr['HA']
-
-  temperature = hdr['OUTTEMP']                          # outside temp (C)
-  pressure = hdr['OUTPRESS']                            # outside pressure (mbar)
-  humidity = hdr['OUTHUM']                              # outside humidity (%)
-  airmass = hdr['AIRMASS']                              # airmass
-  rotangle= hdr['ROTANGLE']
-  xpixsize=hdr['XPIXSIZE']
-  ypixsize=hdr['YPIXSIZE']
-
-  return dec,hour_angle,temperature,pressure,humidity,airmass,rotangle,xpixsize,ypixsize
-
-def test_key_in_hdr(dict,key):
-  """
-  Check that keys are indeed in a dictionnary.
-  """
-
-  try:
-    dict[key]
-  except KeyError:
-    raise KeyError('{} is not contained in the fits files and is necessary'.format(key))
-
+    s=spectrum
+    return s.dec,s.hour_angle,s.temperature,s.pressure,s.humidity,s.airmass,s.rotation_angle,s.xpixsize,s.ypixsize
 
 def calibrate_spectrum(spectrum, xlim=None):
     """Convert pixels into wavelengths given the position of the order 0,
@@ -572,7 +546,7 @@ def calibrate_spectrum(spectrum, xlim=None):
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
 
-    pixels += adr_calib(spectrum.lambdas,open_header_for_adr(spectrum))
+    pixels += adr_calib(spectrum.lambdas,open_header_for_adr(spectrum),parameters.OBS_LATITUDE)
 
     # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
     

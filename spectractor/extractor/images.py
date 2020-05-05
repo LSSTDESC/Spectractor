@@ -76,6 +76,14 @@ class Image(object):
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
+        self.dec = None
+        self.hour_angle = None
+        self.temperature = 0
+        self.pressure = 0
+        self.humidity = 0
+        self.xpixsize = 0
+        self.ypixsize = 0
+
         if parameters.CALLING_CODE != 'LSST_DM':
             self.load_image(file_name)
         else:
@@ -98,6 +106,7 @@ class Image(object):
         self.header.comments["ROTANGLE"] = "[deg] angle of the dispersion axis"
         self.header['D2CCD'] = parameters.DISTANCE2CCD
         self.header.comments["D2CCD"] = "[mm] distance between disperser and CCD"
+
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
             self.header['REDSHIFT'] = str(self.target.redshift)
@@ -129,6 +138,7 @@ class Image(object):
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
         self.compute_statistical_error()
         self.convert_to_ADU_rate_units()
+
 
     def save_image(self, output_file_name, overwrite=False):
         """Save the image in a fits file.
@@ -422,6 +432,13 @@ def load_CTIO_image(image):
     image.filters = image.header['FILTERS']
     image.filter = image.header['FILTER1']
     image.disperser_label = image.header['FILTER2']
+    image.dec = image.header['DEC']
+    image.hour_angle = image.header['HA']
+    image.temperature = image.header['OUTTEMP']
+    image.pressure = image.header['OUTPRESS']
+    image.humidity = image.header['OUTHUM']
+    image.xpixsize = image.header['XPIXSIZE']
+    image.ypixsize = image.header['YPIXSIZE']
 
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
     parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])

@@ -3,7 +3,8 @@ import astropy.coordinates as AC
 from astropy import units as u
 import spectractor.simulation.adr.adr as ADR
 import numpy as np
-from spectractor import parameters
+
+#from spectractor import parameters
 
 """
 Functions to:
@@ -27,9 +28,14 @@ __author__ = "Maxime Rey"
 # ================================= #
 
 
-def adr_calib(lambdas,params,lambda_ref=550):
+def adr_calib(lambdas,params,lat,lambda_ref=550):
 
-    lat=AC.Latitude(parameters.OBS_LATITUDE, unit=u.deg)
+    if isinstance(lat,str):
+        lat=AC.Latitude(lat, unit=u.deg)
+    elif isinstance(lat,AC):
+        lat=lat
+    else:
+        raise TypeError('latitude type is neither a str nor an astropy.coordinates')
 
     meadr = instanciation_adr(params, lat, lambdas[0]*10)
 
@@ -46,16 +52,25 @@ def adr_calib(lambdas,params,lambda_ref=550):
 
 def instanciation_adr(params,latitude, lbda_ref):
 
-  dec = AC.Angle(params[0], unit=u.deg)
-  hour_angle = AC.Angle(params[1], unit=u.hourangle)
+    dec,hour_angle=params[:2]
 
-  temperature,pressure,humidity,airmass,rotangle=params[2],params[3],params[4],params[5],params[6]
+    if isinstance(dec, str) and isinstance(hour_angle, str):
+        dec = AC.Angle(params[0], unit=u.deg)
+        hour_angle = AC.Angle(params[1], unit=u.hourangle)
 
-  _, parangle = ADR.hadec2zdpar(hour_angle.degree, dec.degree, latitude.degree, deg=True)
-  adr = ADR.ADR(airmass=airmass, parangle=parangle, temperature=temperature,
+    elif isinstance(dec, AC) and isinstance(hour_angle, AC):
+        dec = dec
+        hour_angle = hour_angle
+    else:
+        raise TypeError('dec/hour_angle type is neither a str nor an astropy.coordinates')
+
+    temperature,pressure,humidity,airmass,rotangle=params[2:-2]
+
+    _, parangle = ADR.hadec2zdpar(hour_angle.degree, dec.degree, latitude.degree, deg=True)
+    adr = ADR.ADR(airmass=airmass, parangle=parangle, temperature=temperature,
     pressure=pressure, lbdaref=lbda_ref, relathumidity=humidity)
   
-  return adr
+    return adr
 
 
 def get_adr_shift_for_lbdas(adr_object, lbdas, params):
