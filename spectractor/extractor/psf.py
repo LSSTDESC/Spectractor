@@ -19,16 +19,18 @@ from spectractor.fit.fitter import FitWorkspace, run_minimisation
 from numba import njit
 
 
-# @njit
-def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
-    r"""Compute a 1D Moffat function, whose integral is normalised to unity.
+@njit
+def evaluate_moffat1d_unnormalized(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
+    r"""Compute a 1D Moffat function, whose integral is not normalised to unity.
 
     .. math ::
 
-        f(y) = \frac{A \Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)} \frac{1}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
-        \quad\text{with}\quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A, \alpha > 1/2
+        f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
+        \quad\text{with}, \alpha > 1/2
 
-    Note that this function is defined only for :math:`alpha > 1/2`.
+    Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor
+    :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}` is not included as special functions
+    are not supported by numba library.
 
     Parameters
     ----------
@@ -54,13 +56,18 @@ def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
     >>> Ny = 50
     >>> y = np.arange(Ny)
     >>> amplitude = 10
-    >>> a = evaluate_moffat1d(y, amplitude=amplitude, y_mean=Ny/2, gamma=5, alpha=2)
+    >>> alpha = 2
+    >>> gamma = 5
+    >>> a = evaluate_moffat1d_unnormalized(y, amplitude=amplitude, y_mean=Ny/2, gamma=gamma, alpha=alpha)
+    >>> norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
+    >>> a = a / norm
     >>> print(f"{np.sum(a):.6f}")
     9.967561
 
     .. doctest::
         :hide:
 
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
         >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
 
     .. plot::
@@ -88,24 +95,24 @@ def evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
     # if integral != 0:
     #     a /= integral
     # a *= amplitude
-    norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
-    a *= amplitude / norm
+    a *= amplitude
     return a.T
 
 
-# @njit
-def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
-    r"""Compute a 1D Moffat-Gaussian function, whose integral is normalised to unity.
+@njit
+def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_mean, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
+    r"""Compute a 1D Moffat-Gaussian function, whose integral is not normalised to unity.
 
     .. math ::
 
-        f(y) = A \left\lbrace \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}
+        f(y) \propto A \left\lbrace
         \frac{1}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
          - \eta e^{-(y-y_0)^2/(2\sigma^2)}\right\rbrace
-        \quad\text{with}\quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
         \quad\text{ and } \quad \eta < 0, \alpha > 1/2
 
-    Note that this function is defined only for :math:`alpha > 1/2`.
+    Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor for the Moffat
+    :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}` is not included as special functions
+    are not supproted by the numba library.
 
 
     Parameters
@@ -136,14 +143,21 @@ def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, sigma)
     >>> Ny = 50
     >>> y = np.arange(Ny)
     >>> amplitude = 10
-    >>> a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_mean=Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
+    >>> gamma = 5
+    >>> alpha = 2
+    >>> eta_gauss = -0.1
+    >>> sigma = 1
+    >>> a = evaluate_moffatgauss1d_unnormalized(y, amplitude=amplitude, y_mean=Ny/2, gamma=gamma, alpha=alpha,
+    ... eta_gauss=eta_gauss, sigma=sigma)
+    >>> norm = gamma*np.sqrt(np.pi)*special.gamma(alpha-0.5)/special.gamma(alpha) + eta_gauss*np.sqrt(2*np.pi)*sigma
+    >>> a = a / norm
     >>> print(f"{np.sum(a):.6f}")
-    10.000000
+    9.966492
 
     .. doctest::
         :hide:
 
-        >>> assert np.isclose(np.sum(a), amplitude)
+        >>> assert np.isclose(np.sum(a), amplitude, atol=0.5)
         >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
 
     .. plot::
@@ -171,9 +185,7 @@ def evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, sigma)
     # if integral != 0:
     #     norm /= integral
     # a *= norm
-    norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha) + \
-           eta_gauss * 2 * np.pi * sigma * sigma
-    a *= amplitude / norm
+    a *= amplitude
     return a.T
 
 
@@ -494,9 +506,14 @@ class Moffat(PSF):
                                 (0.1, self.max_half_width), (1.1, 10), (0, np.inf)])
 
     def evaluate(self, pixels, p=None):
-        """Evaluate the Moffat function.
+        r"""Evaluate the Moffat function.
 
-        The function is normalized to have an integral equal to amplitude parameter.
+        The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
+
+        .. math::
+
+            f(y) \propto \frac{A \Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)},
+            \quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
 
         Parameters
         ----------
@@ -542,7 +559,8 @@ class Moffat(PSF):
             return np.clip(evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha), 0, saturation)
         elif pixels.ndim == 1:
             y = np.array(pixels)
-            return np.clip(evaluate_moffat1d(y, amplitude, y_mean, gamma, alpha), 0, saturation)
+            norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
+            return np.clip(evaluate_moffat1d_unnormalized(y, amplitude, y_mean, gamma, alpha) / norm, 0, saturation)
         else:  # pragma: no cover
             self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
                                  f"Here pixels.ndim={pixels.shape}.")
@@ -572,9 +590,14 @@ class MoffatGauss(PSF):
                                 (0, np.inf)])
 
     def evaluate(self, pixels, p=None):
-        """Evaluate the MoffatGauss function.
+        r"""Evaluate the MoffatGauss function.
 
-        The function is normalized to have an integral equal to amplitude parameter.
+        The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
+
+        .. math::
+
+            f(y) \propto  \frac{A}{ \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}+\eta\sqrt{2\pi}\sigma},
+            \quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
 
         Parameters
         ----------
@@ -621,7 +644,11 @@ class MoffatGauss(PSF):
                                                   gamma, alpha, eta_gauss, stddev), 0, saturation)
         elif pixels.ndim == 1:
             y = np.array(pixels)
-            return np.clip(evaluate_moffatgauss1d(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev), 0, saturation)
+            norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha) + eta_gauss * np.sqrt(
+                2 * np.pi) * stddev
+            return np.clip(
+                evaluate_moffatgauss1d_unnormalized(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev) / norm, 0,
+                saturation)
         else:  # pragma: no cover
             self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
                                  f"Here pixels.ndim={pixels.shape}.")
@@ -1220,7 +1247,7 @@ def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
 
 
 @deprecated(reason='Use MoffatGauss1D class instead.')
-class PSF1DAstropy(Fittable1DModel):   # pragma: nocover
+class PSF1DAstropy(Fittable1DModel):  # pragma: nocover
     n_inputs = 1
     n_outputs = 1
     # inputs = ('x',)
