@@ -134,6 +134,14 @@ class Image(object):
         self.header["AIRMASS"] = self.airmass
         self.header["DATE-OBS"] = self.date_obs
         self.header["EXPTIME"] = self.expo
+        self.header['DEC'] = self.dec
+        self.header['HA'] = self.hour_angle
+        self.header['OUTTEMP'] = self.temperature
+        self.header['OUTPRESS'] = self.pressure
+        self.header['OUTHUM'] = self.humidity
+        self.header['XPIXSIZE'] = self.xpixsize
+        self.header['YPIXSIZE'] = self.ypixsize
+
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
         self.compute_statistical_error()
