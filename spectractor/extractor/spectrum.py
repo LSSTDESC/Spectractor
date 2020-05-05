@@ -435,6 +435,21 @@ class Spectrum:
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
             if self.header['D2CCD'] != "":
                 parameters.DISTANCE2CCD = float(self.header["D2CCD"])
+            if self.header['DEC'] != "":
+                self.dec = self.header['DEC']
+            if self.header['HA'] != "":
+                self.hour_angle = self.header['HA']
+            if self.header['OUTTEMP'] != "":
+                self.temperature = self.header['OUTTEMP']
+            if self.header['OUTPRESS'] != "":
+                self.pressure = self.header['OUTPRESS']
+            if self.header['OUTHUM'] != "":
+                self.humidity = self.header['OUTHUM']
+            if self.header['XPIXSIZE'] != "":
+                self.xpixsize = self.header['XPIXSIZE']
+            if self.header['YPIXSIZE'] != "":
+                self.ypixsize = self.header['YPIXSIZE']
+
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                       data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
