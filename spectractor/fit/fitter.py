@@ -375,9 +375,11 @@ class FitWorkspace:
         f.close()
 
     def plot_correlation_matrix(self, ipar=None):
+        if ipar is None:
+            ipar = np.arange(self.cov.shape[0]).astype(int)
         fig = plt.figure()
         self.rho = compute_correlation_matrix(self.cov)
-        plot_correlation_matrix_simple(plt.gca(), self.rho, axis_names=self.axis_names, ipar=ipar)
+        plot_correlation_matrix_simple(plt.gca(), self.rho, axis_names=[self.axis_names[i] for i in ipar])
         if parameters.SAVE and self.filename != "":
             figname = os.path.splitext(self.filename)[0] + "_correlation.pdf"
             self.my_logger.info(f"Save figure {figname}.")
