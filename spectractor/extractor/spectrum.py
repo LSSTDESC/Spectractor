@@ -119,6 +119,8 @@ class Spectrum:
             self.humidity = image.humidity
             self.xpixsize = image.xpixsize
             self.ypixsize = image.ypixsize
+            self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
+                               self.humidity, self.airmass, self.rotation_angle, self.xpixsize, self.ypixsize]
 
         self.load_filter()
 
@@ -456,6 +458,11 @@ class Spectrum:
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
             self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
+
+            self.adr_params = [self.dec, self.hour_angle, self.temperature,
+                               self.pressure, self.humidity, self.airmass, self.rotation_angle, self.xpixsize,
+                               self.ypixsize]
+
             if os.path.isfile(spectrogram_file_name):
                 self.load_spectrogram(spectrogram_file_name)
             else:
@@ -556,10 +563,8 @@ def calibrate_spectrum(spectrum, xlim=None):
     pixels = spectrum.pixels[left_cut:right_cut] - spectrum.target_pixcoords_rotated[0]
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
-    s = spectrum
 
-    pixels += adr_calib(s.lambdas,[s.dec,s.hour_angle,s.temperature,s.pressure,
-                        s.humidity,s.airmass,s.rotation_angle,s.xpixsize,s.ypixsize],parameters.OBS_LATITUDE)
+    pixels += adr_calib(spectrum.lambdas,spectrum.adr_params,parameters.OBS_LATITUDE)
 
     # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
     
