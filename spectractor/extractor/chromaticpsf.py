@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -1222,8 +1223,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             if parameters.DISPLAY and self.verbose:
                 plt.show()
         if parameters.SAVE:  # pragma: no cover
-            figname = self.filename.replace(self.filename.split('.')[-1], "_bestfit.pdf")
-            self.my_logger.info(f"\n\tSave figure {figname}.")
+            figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
+            self.my_logger.warning(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
 
 
@@ -1634,6 +1635,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
+        self.M = M
         return self.pixels, self.model, self.model_err
 
 

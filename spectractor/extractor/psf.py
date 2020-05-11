@@ -1,4 +1,5 @@
 import sys
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from deprecated import deprecated
@@ -922,7 +923,7 @@ class PSFFitWorkspace(FitWorkspace):
             else:
                 plt.close(fig)
         if parameters.SAVE:  # pragma: no cover
-            figname = self.filename.replace(self.filename.split('.')[-1], "_bestfit.pdf")
+            figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
 
