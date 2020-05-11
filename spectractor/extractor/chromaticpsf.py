@@ -1224,7 +1224,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                 plt.show()
         if parameters.SAVE:  # pragma: no cover
             figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
-            self.my_logger.warning(f"\n\tSave figure {figname}.")
+            self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
 
 
