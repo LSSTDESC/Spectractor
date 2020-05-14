@@ -564,11 +564,11 @@ def calibrate_spectrum(spectrum, xlim=None):
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
     lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
-    pixels += adr_calib(spectrum.lambdas,spectrum.adr_params,parameters.OBS_LATITUDE, lambda_ref = lambda_ref)
+    pixels += adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE, lambda_ref = lambda_ref)
 
     # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
     
-    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels,spectrum.target_pixcoords,order=spectrum.order)
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords, order=spectrum.order)
 
     spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
     # Cut spectra
