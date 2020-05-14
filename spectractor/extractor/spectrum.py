@@ -62,6 +62,7 @@ class Spectrum:
         self.target = target
         self.data = None
         self.err = None
+        self.cov_matrix = None
         self.x0 = None
         self.pixels = None
         self.lambdas = None
@@ -335,13 +336,19 @@ class Spectrum:
                                   'second column gives the spectrum in unit UNIT2, ' \
                                   'third column the corresponding errors.'
         hdu1 = fits.PrimaryHDU()
-        hdu2 = fits.ImageHDU()
-        hdu3 = fits.ImageHDU()
         hdu1.header = self.header
+        hdu1.header["EXTNAME"] = "SPECTRUM"
+        hdu2 = fits.ImageHDU()
+        hdu2.header["EXTNAME"] = "S_FIT"
+        hdu3 = fits.ImageHDU()
+        hdu3.header["EXTNAME"] = "S_RES"
+        hdu4 = fits.ImageHDU()
+        hdu4.header["EXTNAME"] = "SPEC_COV"
         hdu1.data = [self.lambdas, self.data, self.err]
         hdu2.data = self.spectrogram_fit
         hdu3.data = self.spectrogram_residuals
-        hdu = fits.HDUList([hdu1, hdu2, hdu3])
+        hdu4.data = self.cov_matrix
+        hdu = fits.HDUList([hdu1, hdu2, hdu3, hdu4])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
@@ -445,8 +452,12 @@ class Spectrum:
                 self.my_logger.error(f"\n\tPSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
-                self.spectrogram_fit = hdu_list[1].data
-                self.spectrogram_residuals = hdu_list[2].data
+                self.spectrogram_fit = hdu_list[0].data
+                self.spectrogram_residuals = hdu_list[1].data
+            if len(hdu_list) > 3:
+                self.cov_matrix = self.cov_matrix
+            else:
+                self.cov_matrix = np.diag(self.err**2)
         else:
             self.my_logger.warning(f'\n\tSpectrum file {input_file_name} not found')
             raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
