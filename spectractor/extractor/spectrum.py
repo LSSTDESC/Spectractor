@@ -455,7 +455,7 @@ class Spectrum:
                 self.spectrogram_fit = hdu_list[0].data
                 self.spectrogram_residuals = hdu_list[1].data
             if len(hdu_list) > 3:
-                self.cov_matrix = self.cov_matrix
+                self.cov_matrix = hdu_list["SPEC_COV"].data
             else:
                 self.cov_matrix = np.diag(self.err**2)
         else:
