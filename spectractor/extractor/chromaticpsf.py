@@ -1170,6 +1170,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # priors on amplitude parameters
         self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed']
         self.amplitude_priors_method = amplitude_priors_method
+        self.reg = parameters.PSF_FIT_REG_PARAM
         self.Q = np.zeros((self.Nx, self.Nx))
         self.Q_dot_A0 = np.zeros(self.Nx)
         if amplitude_priors_method not in self.amplitude_priors_list:
@@ -1178,7 +1179,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
             # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
-            self.Q = parameters.PSF_FIT_REG_PARAM * np.diag([1 / np.sum(self.err[:, x] ** 2) for x in range(self.Nx)])
+            self.Q = np.diag([1 / np.sum(self.err[:, x] ** 2) for x in range(self.Nx)])
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
         if self.amplitude_priors_method == "fixed":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
@@ -1383,10 +1384,10 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                 elif self.amplitude_priors_method == "noprior":
                     pass
             else:
-                M_dot_W_dot_M_plus_Q = [M_dot_W_dot_M[x] + self.Q[x, x] for x in range(self.Nx)]
+                M_dot_W_dot_M_plus_Q = [M_dot_W_dot_M[x] + self.reg * self.Q[x, x] for x in range(self.Nx)]
                 cov_matrix = np.diag([1 / M_dot_W_dot_M_plus_Q[x] if M_dot_W_dot_M_plus_Q[x] > 0 else 0.1 * self.bgd_std
                                       for x in range(self.Nx)])
-                amplitude_params = [cov_matrix[x, x] * (M[x].T @ self.W_dot_data[x] + self.Q_dot_A0[x])
+                amplitude_params = [cov_matrix[x, x] * (M[x].T @ self.W_dot_data[x] + self.reg * self.Q_dot_A0[x])
                                     for x in range(self.Nx)]
             self.M = M
         else:
@@ -1424,6 +1425,18 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
         self.W_dot_data = self.W * self.data.flatten()  # np.diag(self.W) @ self.data.flatten()
+
+        # regularisation matrices
+        self.reg = parameters.PSF_FIT_REG_PARAM
+        self.U = np.diag([1 / np.sum(self.err[:, x]) for x in range(self.Nx)])
+        L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] \
+            + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
+        L.astype(float)
+        L[0, 0] = -1
+        L[-1, -1] = -1
+        self.L = L
+        self.Q = L.T @ self.U.T @ self.U @ L
+        self.Q_dot_A0 = self.Q @ self.amplitude_priors
 
     def simulate(self, *shape_params):
         r"""
@@ -1616,13 +1629,13 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                 elif self.amplitude_priors_method == "noprior":
                     pass
             else:
-                M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.Q
+                M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
                 try:
                     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
                     cov_matrix = L.T @ L
                 except np.linalg.LinAlgError:
                     cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + self.Q_dot_A0)
+                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + self.reg * self.Q_dot_A0)
             self.M = M
         else:
             amplitude_params = np.copy(self.amplitude_priors)
