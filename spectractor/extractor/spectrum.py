@@ -18,7 +18,6 @@ from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.simulation.adr import adr_calib
 
-
 class Spectrum:
 
     def __init__(self, file_name="", image=None, order=1, target=None, config=""):
@@ -564,13 +563,12 @@ def calibrate_spectrum(spectrum, xlim=None):
     pixels = spectrum.pixels[left_cut:right_cut] - spectrum.target_pixcoords_rotated[0]
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
-
-    pixels += adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE)
+    lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
+    pixels += adr_calib(spectrum.lambdas,spectrum.adr_params,parameters.OBS_LATITUDE, lambda_ref = lambda_ref)
 
     # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
-
-    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
-                                                                  order=spectrum.order)
+    
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels,spectrum.target_pixcoords,order=spectrum.order)
 
     spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
     # Cut spectra
