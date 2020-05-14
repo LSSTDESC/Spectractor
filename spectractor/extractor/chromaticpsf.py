@@ -990,8 +990,9 @@ class ChromaticPSF:
         Build a mock spectrogram with random Poisson noise using the full 2D PSF model:
 
         >>> psf = Moffat()
-        >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=4, saturation=1000)
+        >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=100000)
         >>> params = s0.generate_test_poly_params()
+        >>> params[:s0.Nx] *= 10
         >>> s0.poly_params = params
         >>> saturation = params[-1]
         >>> data = s0.evaluate(params, mode="2D")
@@ -1006,7 +1007,7 @@ class ChromaticPSF:
 
         Estimate the first guess values:
 
-        >>> s = ChromaticPSF(psf, Nx=120, Ny=100, deg=4, saturation=saturation)
+        >>> s = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=saturation)
         >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
         ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
         >>> s.plot_summary(truth=s0)
@@ -1021,22 +1022,18 @@ class ChromaticPSF:
         >>> w.plot_fit()
         >>> amplitude_residuals.append([s0.poly_params[:s0.Nx], w.amplitude_params-s0.poly_params[:s0.Nx],
         ... w.amplitude_params_err])
-        >>> from spectractor.tools import compute_correlation_matrix
-        >>> rho = compute_correlation_matrix(w.amplitude_cov_matrix[10:20,10:20])
-        >>> plt.imshow(rho, interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)  # doctest: +ELLIPSIS
-        <matplotlib.image.AxesImage object at ...>
-        >>> plt.show()
 
         ..  doctest::
             :hide:
 
             >>> residuals = (w.data-w.model)/w.err
-            >>> assert w.costs[-1] /(w.Nx*w.Ny) < 1.1
+            >>> assert w.costs[-1] /(w.Nx*w.Ny) < 1.5
             >>> assert np.abs(np.mean(residuals)) < 0.15
             >>> assert np.std(residuals) < 1.2
 
         Fit the data using the full 2D PSF model
 
+        >>> parameters.PSF_FIT_REG_PARAM = 0.002
         >>> w = s.fit_chromatic_psf(data, mode="2D", data_errors=data_errors, bgd_model_func=bgd_model_func,
         ... amplitude_priors_method="psf1d", verbose=True)
         >>> s.plot_summary(truth=s0)
@@ -1044,12 +1041,10 @@ class ChromaticPSF:
         >>> amplitude_residuals.append([s0.poly_params[:s0.Nx], w.amplitude_params-s0.poly_params[:s0.Nx],
         ... w.amplitude_params_err])
         >>> for k, label in enumerate(["Transverse", "PSF1D", "PSF2D"]):
-        ...     plt.errorbar(np.arange(s0.Nx), amplitude_residuals[k][1]/s0.poly_params[:s0.Nx],
-        ...                  yerr=amplitude_residuals[k][2]/s0.poly_params[:s0.Nx],
+        ...     plt.errorbar(np.arange(s0.Nx), amplitude_residuals[k][1]/amplitude_residuals[k][2],
+        ...                  yerr=amplitude_residuals[k][2]/amplitude_residuals[k][2],
         ...                  fmt="+", label=label)  # doctest: +ELLIPSIS
-        <ErrorbarContainer ... artists>
-        >>> plt.ylim((-1,1))  # doctest: +ELLIPSIS
-        (-1..., 1...)
+        <ErrorbarContainer ...>
         >>> plt.grid()
         >>> plt.legend()  # doctest: +ELLIPSIS
         <matplotlib.legend.Legend object at ...>
@@ -1059,9 +1054,10 @@ class ChromaticPSF:
             :hide:
 
             >>> residuals = (w.data-w.model)/w.err
-            >>> assert w.costs[-1] /(w.Nx*w.Ny) < 1.1
+            >>> assert w.costs[-1] /(w.Nx*w.Ny) < 1.2
             >>> assert np.abs(np.mean(residuals)) < 0.15
             >>> assert np.std(residuals) < 1.2
+            >>> assert np.abs(np.mean((w.amplitude_params - s0.poly_params[:s0.Nx])/w.amplitude_params_err)) < 0.1
 
         """
         w = None
@@ -1523,8 +1519,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         .. doctest::
 
-            >>> psf = MoffatGauss()
-            >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=4, saturation=1000)
+            >>> psf = Moffat()
+            >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=1000)
             >>> params = s0.generate_test_poly_params()
             >>> s0.poly_params = params
             >>> saturation = params[-1]
@@ -1544,7 +1540,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         .. doctest::
 
-            >>> s = ChromaticPSF(psf, Nx=120, Ny=100, deg=4, saturation=saturation)
+            >>> s = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=saturation)
             >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
             ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
             >>> s.plot_summary(truth=s0)
@@ -1567,6 +1563,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         .. doctest::
 
+            >>> parameters.PSF_FIT_REG_PARAM = 0.002
             >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
             ... amplitude_priors_method="psf1d", verbose=True)
             >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:])
@@ -1576,6 +1573,10 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             :hide:
 
             >>> assert mod is not None
+            >>> w = ChromaticPSF2DFitWorkspace(s0, data, data_errors, bgd_model_func=bgd_model_func,
+            ... amplitude_priors_method="psf1d", verbose=True)
+            >>> y, mod, mod_err = w.simulate(s0.poly_params[s0.Nx:])
+            >>> assert np.abs(np.mean((w.amplitude_params-s0.poly_params[:s0.Nx])/w.amplitude_params_err)) < 0.05
 
 
         """
