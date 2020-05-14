@@ -2257,6 +2257,11 @@ def plot_correlation_matrix_simple(ax, rho, axis_names, ipar=None):
     plt.gcf().tight_layout()
 
 
+def resolution_operator(cov, Q, reg):
+    N = cov.shape[0]
+    return np.eye(N) - reg * cov @ Q
+
+
 if __name__ == "__main__":
     import doctest
 
