@@ -297,7 +297,7 @@ class SpectrogramModel(Spectrum):
         # convert pixels into lambdas with ADR for spectrum amplitude evaluation
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        distance -= adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE)
+        distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
