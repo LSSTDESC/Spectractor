@@ -1138,7 +1138,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             # xx, yy = np.meshgrid(np.arange(Nx), pixels)
             self.bgd = self.bgd_model_func(np.arange(self.Nx), self.pixels)
         self.data = self.data - self.bgd
-        np.savetxt("test.txt", self.data)
         self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
 
         # crop spectrogram to fit faster
