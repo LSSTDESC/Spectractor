@@ -235,6 +235,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # spectrum.data = np.copy(s.table['amplitude'])
     spectrum.data = np.copy(w.amplitude_params)
     spectrum.err = np.copy(w.amplitude_params_err)
+    spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
 
     # fig, ax = plt.subplots(3, 1, figsize=(9, 9), sharex="all")
     # x = np.arange(spectrum.data.size)
