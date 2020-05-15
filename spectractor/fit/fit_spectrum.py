@@ -6,7 +6,7 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace
+from spectractor.fit.fitter import FitWorkspace, run_gradient_descent, save_gradient_descent
 from spectractor.tools import plot_spectrum_simple
 
 
@@ -39,11 +39,13 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D, self.shift_x])
+        self.fixed = [False] * self.p.size
+        self.fixed[5] = True
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]"]
-        self.bounds = [(0, 2), (0, 0.5), (300, 700), (0, 10), (0, 0.01), (-2, 2), (50, 60), (-2, 2)]
+        self.bounds = [(0, 2), (0, 0.5), (300, 700), (0, 10), (0, 0.01), (-2, 2), (50, 60), (-0.1, 0.1)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -190,6 +192,35 @@ def lnprob_spectrum(p):
     return lp + fit_workspace.lnlike(p)
 
 
+def run_spectrum_minimisation(fit_workspace, method="newton"):
+    my_logger = set_logger(__name__)
+    guess = np.asarray(fit_workspace.p)
+    if method != "newton":
+        run_minimisation(fit_workspace, method=method)
+    else:
+        fit_workspace.simulation.fast_sim = True
+        costs = np.array([fit_workspace.chisq(guess)])
+        if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
+            fit_workspace.plot_fit()
+        params_table = np.array([guess])
+        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
+        epsilon = 1e-4 * guess
+        epsilon[epsilon == 0] = 1e-4
+
+        fit_workspace.simulation.fast_sim = True
+        fit_workspace.simulation.fix_psf_cube = False
+        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+                                                   fix=fit_workspace.fixed, xtol=1e-4, ftol=1e-4, niter=40)
+        if fit_workspace.filename != "":
+            parameters.SAVE = True
+            ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
+            fit_workspace.plot_correlation_matrix(ipar)
+            fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
+            save_gradient_descent(fit_workspace, costs, params_table)
+            fit_workspace.plot_fit()
+            parameters.SAVE = False
+
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
     from spectractor.config import load_config
@@ -221,14 +252,15 @@ if __name__ == "__main__":
     load_config(args.config)
 
     # filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    filename = 'outputs/sim_20170530_131_spectrum.fits'
+    filename = 'outputs/sim_20170530_134_spectrum.fits'
     # 062
     # filename = './outputs/reduc_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     fit_workspace = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                                         burnin=200, nbins=10, verbose=1, plot=True, live_fit=False, fast_sim=True)
-    run_minimisation(fit_workspace, method="newton", xtol=1e-4, ftol=1e-4)
+                                         burnin=200, nbins=10, verbose=1, plot=True, live_fit=False, fast_sim=False)
+    # run_spectrum_minimisation(fit_workspace, method="newton")
+    fit_workspace.simulate(*fit_workspace.p)
     fit_workspace.plot_fit()
     # run_emcee(fit_workspace, ln=lnprob_spectrum)
     # fit_workspace.analyze_chains()
