@@ -610,6 +610,7 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
     if verbose or fit_workspace.verbose:
         print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
                                 [fit_workspace.input_labels[ip] for ip in ipar])
+        fit_workspace.plot_fit()
     if parameters.DEBUG and (verbose or fit_workspace.verbose):
         # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
         plot_gradient_descent(fit_workspace, costs, params_table)
