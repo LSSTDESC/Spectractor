@@ -196,7 +196,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         # if False:
         #     plt.imshow(J, origin="lower", aspect="auto")
         #     plt.show()
-        print(f"\tjacobian time computation = {time.time() - start:.1f}s")
+        self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
     def plot_fit(self):
@@ -359,7 +359,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
 
         # fit all except Gaussian part of the PSF
         guess = np.array(fit_workspace.p)
-        fit_workspace.simulation.fast_sim = False
+        fit_workspace.simulation.fast_sim = True
         fix = [False] * guess.size
         fix[6] = False  # x0
         fix[7] = True  # y0
@@ -368,11 +368,13 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         parameters.SAVE = True
         fit_workspace.simulation.fix_psf_cube = False
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fix, xtol=1e-5, ftol=1e-5, niter=40)
+                                                   fix=fix, xtol=1e-4, ftol=1e-4, niter=40)
+        my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
+            ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
+            fit_workspace.plot_correlation_matrix(ipar)
             fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
             save_gradient_descent(fit_workspace, costs, params_table)
-        print(f"Newton: total computation time: {time.time() - start}s")
 
 
 if __name__ == "__main__":
@@ -411,7 +413,7 @@ if __name__ == "__main__":
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                                burnin=2, nbins=10, verbose=1, plot=True, live_fit=True)
+                                burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()
