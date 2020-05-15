@@ -39,7 +39,7 @@ import spectractor.parameters as parameters
 
 class SpectrumSimulation(Spectrum):
 
-    def __init__(self, spectrum, atmosphere, telescope, disperser):
+    def __init__(self, spectrum, atmosphere, telescope, disperser, fast_sim=True):
         """Class to simulate cross spectrum.
 
         Parameters
@@ -52,6 +52,8 @@ class SpectrumSimulation(Spectrum):
             Telescope transmission.
         disperser: Grating
             Disperser instance.
+        fast_sim: bool, optional
+            If True, do a fast simulation without integrating within the wavelength bins (default: True).
 
         """
         Spectrum.__init__(self)
@@ -61,6 +63,7 @@ class SpectrumSimulation(Spectrum):
         self.disperser = disperser
         self.telescope = telescope
         self.atmosphere = atmosphere
+        self.fast_sim = fast_sim
         # save original pixel distances to zero order
         self.pixels = self.disperser.grating_lambda_to_pixel(self.lambdas, x0=self.x0, order=1)
         # now reset data
@@ -96,7 +99,6 @@ class SpectrumSimulation(Spectrum):
         idx = np.where(self.telescope.transmission(lambdas) > 0)[0]
         self.err[idx] = self.telescope.transmission_err(lambdas)[idx] / self.telescope.transmission(lambdas)[idx]
         self.err[idx] *= self.data[idx]
-        # self.data *= self.lambdas*self.lambdas_binwidths
         return self.data, self.err
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0.,
@@ -127,7 +129,7 @@ class SpectrumSimulation(Spectrum):
         -------
         lambdas: array_like
             The wavelength array in nm used for the interpolation.
-        spectrum: callable
+        spectrum: array_like
             The spectrum interpolated function in Target units.
         spectrum_err: array_like
             The spectrum uncertainties interpolated function in Target units.
@@ -140,11 +142,24 @@ class SpectrumSimulation(Spectrum):
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(self.pixels - shift_x, x0=new_x0, order=1)
-        self.simulate_without_atmosphere(lambdas)
-        atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
-        # np.savetxt('atmospheric_trans_20170530_130.txt',np.array([lambdas,atmospheric_transmission(lambdas)]).T)
-        self.data *= A1 * atmospheric_transmission
-        self.err *= A1 * atmospheric_transmission
+        atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
+        if self.fast_sim:
+            self.data, self.err = self.simulate_without_atmosphere(lambdas)
+            self.data *= A1 * atmospheric_transmission(lambdas)
+            self.err *= A1 * atmospheric_transmission(lambdas)
+        else:
+            def integrand(lbda):
+                return self.target.sed(lbda) * self.telescope.transmission(lbda) \
+                       * self.disperser.transmission(lbda) * atmospheric_transmission(lbda)
+
+            self.data = np.zeros_like(lambdas)
+            self.err = np.zeros_like(lambdas)
+            for i in range(len(lambdas) - 1):
+                self.data[i] = A1 * quad(integrand, lambdas[i], lambdas[i + 1])[0]
+            self.data[-1] = self.data[-2]
+            telescope_transmission = self.telescope.transmission(lambdas)
+            idx = np.where(telescope_transmission > 0)[0]
+            self.err[idx] = self.data[idx] * self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx]
         # Now add the systematics
         if reso > 0.1:
             self.data = fftconvolve_gaussian(self.data, reso)
@@ -163,14 +178,15 @@ class SpectrumSimulation(Spectrum):
         # self.lambdas = self.disperser.grating_pixel_to_lambda(pixels, self.x0, order=1)
         # self.model = interp1d(self.lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
         # self.model_err = interp1d(self.lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
-        min_positive = np.min(self.err[self.err > 0])
-        self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
+        if np.any(self.err > 0):
+            min_positive = np.min(self.err[self.err > 0])
+            self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
         return self.lambdas, self.data, self.err
 
 
 class SpectrogramModel(Spectrum):
 
-    def __init__(self, spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=False):
+    def __init__(self, spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True):
         """Class to simulate a spectrogram.
 
         Parameters
@@ -244,7 +260,6 @@ class SpectrogramModel(Spectrum):
         spectrum = np.zeros_like(lambdas)
         atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
         if self.fast_sim:
-            # TODO: evaluate impact of fast-sim on rapidity/quality of the fit
             spectrum = self.target.sed(lambdas)
             spectrum *= self.disperser.transmission(lambdas - shift_t)
             telescope_transmission = self.telescope.transmission(lambdas - shift_t)
@@ -262,6 +277,7 @@ class SpectrogramModel(Spectrum):
 
             for i in range(len(lambdas) - 1):
                 spectrum[i] = parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i + 1])[0]
+            spectrum[-1] = spectrum[-2]
 
         return spectrum, np.zeros_like(spectrum)
 
@@ -276,11 +292,12 @@ class SpectrogramModel(Spectrum):
         self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['y_mean'])
         # derotate
         # self.my_logger.warning(f"\n\tbefore\n {self.chromatic_psf.table[['Dx_rot','Dx','Dy','Dy_mean']][:5]} {angle}")
+        # TODO: check if it is useful to rotate
         self.chromatic_psf.rotate_table(-self.rotation_angle)
         self.chromatic_psf.profile_params = self.chromatic_psf.from_table_to_profile_params()
         if parameters.DEBUG:
             self.chromatic_psf.plot_summary()
-        # self.my_logger.warning(f"\n\tafter\n {self.chromatic_psf.table[['Dx_rot','Dx','Dy','Dy_mean']][:5]} {angle}")
+        # self.my_logger.warning(f"\n\tafter\n {self.chromatic_psf.table[['Dx_rot','Dx','Dy','Dy_mean']][:5]} {self.rotation_angle}")
         return self.chromatic_psf.profile_params
 
     def simulate_dispersion(self, D, shift_x, shift_y, r0):
