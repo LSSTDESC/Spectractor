@@ -43,9 +43,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.D = self.spectrum.header['D2CCD']
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
         length = len(self.spectrum.chromatic_psf.table)
-        self.psf_poly_params = self.psf_poly_params[length:-1]  # remove saturation (fixed parameter)
-        self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:-1])
-        self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:-1])
+        self.psf_poly_params = self.psf_poly_params[length:]
+        self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:])
+        self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:])
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny // 2)
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
@@ -65,7 +65,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
                            r"$\theta$ [deg]"] + list(self.psf_poly_params_names)
         self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (1, 10), (0, 1),
                                                 (50, 60), (-0.1, 0.1), (-3, 3), (-90, 90)]),
-                                      psf_poly_params_bounds[:-1]])  # remove saturation
+                                      psf_poly_params_bounds])
+        self.fixed = [False] * self.p.size
+        for k, par in enumerate(self.input_labels):
+            if "x_mean" in par or "saturation" in par:
+                self.fixed[k] = True
+        self.fixed[7] = True  # Delta y
+        self.fixed[8] = True  # angle
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -281,100 +287,33 @@ def plot_psf_poly_params(psf_poly_params):
 
 def run_spectrogram_minimisation(fit_workspace, method="newton"):
     my_logger = set_logger(__name__)
-    bounds = fit_workspace.bounds
-
-    nll = lambda params: -fit_workspace.lnlike(params)
-
-    # sim_134
-    # guess = fit_workspace.p
-    # truth sim_134
-    # guess = np.array([1., 0.05, 300, 5, 0.03, 55.45, 0.0, 0.0, -1.54, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
-    guess = np.array(
-        [1., 0.05, 300, 5, 0.03, 55.45, -0.275, 0.0, -1.54, -1.47570237e-01, -5.00195918e-01, 4.74296776e-01,
-         2.85776501e+00, -1.86436219e+00, 1.83899390e+00, 1.89342052e+00,
-         -9.43239034e-01, 1.06985560e+00, 0.00000000e+00, 0.00000000e+00,
-         0.00000000e+00, 1.44368271e+00, -9.95896258e-01, 1.59015965e+00])
-    # 5.00000000e+02
-    guess = fit_workspace.p
+    guess = np.asarray(fit_workspace.p)
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
         fit_workspace.simulation.fast_sim = True
         costs = np.array([fit_workspace.chisq(guess)])
-        if parameters.DISPLAY:
+        if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
             fit_workspace.plot_fit()
         params_table = np.array([guess])
         start = time.time()
-        epsilon = 1e-4 * guess
-        epsilon[epsilon == 0] = 1e-3
-        epsilon[0] = 1e-4  # A1
-        epsilon[1] = 1e-4  # A2
-        epsilon[2] = 1  # ozone
-        epsilon[3] = 0.001  # pwv
-        epsilon[4] = 0.001  # aerosols
-        epsilon[5] = 0.001  # DCCD
-        epsilon[6] = 0.0005  # shift_x
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
+        epsilon = 1e-4 * guess
+        epsilon[epsilon == 0] = 1e-4
 
-        # cancel the Gaussian part of the PSF
-        # TODO: solve this Gaussian PSF part issue
-        # guess[-6:] = 0
-
-        # fit trace
-        fix = [True] * guess.size
-        fix[0] = False  # A1
-        fix[1] = False  # A2
-        fix[6] = True  # x0
-        fix[7] = True  # y0
-        fix[8] = True  # angle
         fit_workspace.simulation.fast_sim = True
-        fix[fit_workspace.psf_params_start_index+3:fit_workspace.psf_params_start_index + 6] = [False] * 3
-        fit_workspace.simulation.fix_psf_cube = False
-        #params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-        #                                           fix=fix, xtol=1e-3, ftol=1e-3, niter=20)
-
-        # fit PSF
-        guess = np.array(fit_workspace.p)
-        fix = [True] * guess.size
-        fix[0] = False  # A1
-        fix[1] = False  # A2
-        fit_workspace.simulation.fast_sim = True
-        fix[fit_workspace.psf_params_start_index+3:fit_workspace.psf_params_start_index + 12] = [False] * 9
-        # fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
-        fit_workspace.simulation.fix_psf_cube = False
-        #params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-        #                                           fix=fix, xtol=1e-3, ftol=1e-3, niter=20)
-
-        # fit dispersion
-        guess = np.array(fit_workspace.p)
-        fix = [True] * guess.size
-        fix[0] = False
-        fix[1] = False
-        fix[5] = False  # DCCD
-        fix[6] = False  # x0
-        fit_workspace.simulation.fix_psf_cube = True
-        fit_workspace.simulation.fast_sim = True
-        #params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-        #                                           fix=fix, xtol=1e-3, ftol=1e-3, niter=10)
-
-        # fit all except Gaussian part of the PSF
-        guess = np.array(fit_workspace.p)
-        fit_workspace.simulation.fast_sim = True
-        fix = [False] * guess.size
-        fix[6] = False  # x0
-        fix[7] = True  # y0
-        fix[8] = True  # angle
-        fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 3] = [True] * 3  # x_mean
-        parameters.SAVE = True
         fit_workspace.simulation.fix_psf_cube = False
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fix, xtol=1e-4, ftol=1e-4, niter=40)
+                                                   fix=fit_workspace.fixed, xtol=1e-4, ftol=1e-4, niter=40)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
-            ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
+            parameters.SAVE = True
+            ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
             fit_workspace.plot_correlation_matrix(ipar)
             fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
             save_gradient_descent(fit_workspace, costs, params_table)
+            fit_workspace.plot_fit()
+            parameters.SAVE = False
 
 
 if __name__ == "__main__":
@@ -414,6 +353,9 @@ if __name__ == "__main__":
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-    run_spectrogram_minimisation(w, method="newton")
+    poly =[3.3400e+02,  3.3400e+02, -2.3320e-13, -3.7956e-01, -3.9282e-01, 4.2573e-01,  2.5306e+00 ,-1.5941e+00,  9.2998e-01,  1.6213e+00 ,-7.5356e-01 , 4.6481e-01,  4.5429e+01]
+    w.simulate(1, 0, 300, 5, 0.03, 56.308, 0., 0, -1.6352, *poly)
+    w.plot_fit()
+    # run_spectrogram_minimisation(w, method="newton")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()
