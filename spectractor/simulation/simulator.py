@@ -282,12 +282,8 @@ class SpectrogramModel(Spectrum):
         return spectrum, np.zeros_like(spectrum)
 
     def simulate_psf(self, psf_poly_params):
-        psf_poly_params_with_saturation = np.concatenate([psf_poly_params, [self.spectrogram_saturation]])
-        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params_with_saturation,
-                                                                               apply_bounds=True)
+        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params, apply_bounds=True)
         self.chromatic_psf.fill_table_with_profile_params(profile_params)
-        # self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
-        # self.chromatic_psf.table['Dx'] = np.arange(self.spectrogram_Nx) - self.spec
         self.chromatic_psf.table['Dy_mean'] = 0
         self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['y_mean'])
         # derotate
