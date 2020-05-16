@@ -415,7 +415,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     temperature = image.header['OUTTEMP']
     telescope = TelescopeTransmission(image.filter)
 
-    # Rotation
+    # Rotation: useful only to fill the Dy_disp_axis column in PSF table
     if not with_rotation:
         rotation_angle = 0
     else:
@@ -426,12 +426,12 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
 
-    # Increase
+    # Simulate spectrogram
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0.,
-                                           angle=rotation_angle,
-                                           psf_poly_params=psf_poly_params, with_background=False, fast_sim=False)
+                                           psf_poly_params=psf_poly_params, angle=rotation_angle, with_background=False,
+                                           fast_sim=False)
 
     # now we include effects related to the wrong extraction of the spectrum:
     # wrong estimation of the order 0 position and wrong DISTANCE2CCD

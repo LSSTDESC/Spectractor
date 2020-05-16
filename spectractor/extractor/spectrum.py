@@ -522,37 +522,29 @@ class Spectrum:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
 
 
-def calibrate_spectrum(spectrum, xlim=None):
+def calibrate_spectrum(spectrum):
     """Convert pixels into wavelengths given the position of the order 0,
     the data for the spectrum, and the properties of the disperser. Convert the
-    spectrum amplitude from ADU rate to flams. Truncate the outputs to the wavelenghts
-    between parameters.LAMBDA_MIN and parameters.LAMBDA_MAX.
+    spectrum amplitude from ADU rate to flams.
 
     Parameters
     ----------
     spectrum: Spectrum
         Spectrum object to calibrate
-    xlim: list, optional
-        List of minimum and maximum abscisses
 
     """
-    if xlim is None:
-        left_cut, right_cut = [0, spectrum.data.size]
-    else:
-        left_cut, right_cut = xlim
-    spectrum.data = spectrum.data[left_cut:right_cut]
-    pixels = spectrum.pixels[left_cut:right_cut] - spectrum.target_pixcoords_rotated[0]
-    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
+    distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
     spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
-    # Cut spectra
-    spectrum.lambdas_indices = \
-        np.where(np.logical_and(spectrum.lambdas > parameters.LAMBDA_MIN, spectrum.lambdas < parameters.LAMBDA_MAX))[0]
-    spectrum.lambdas = spectrum.lambdas[spectrum.lambdas_indices]
-    spectrum.lambdas_binwidths = spectrum.lambdas_binwidths[spectrum.lambdas_indices]
-    spectrum.data = spectrum.data[spectrum.lambdas_indices]
-    if spectrum.err is not None:
-        spectrum.err = spectrum.err[spectrum.lambdas_indices]
+    # Cut spectra : do not cut because then spectrum has not the sahpe of the psf table nor the cov_amtrix
+    # spectrum.lambdas_indices = \
+    #  np.where(np.logical_and(spectrum.lambdas > parameters.LAMBDA_MIN, spectrum.lambdas < parameters.LAMBDA_MAX))[0]
+    # spectrum.lambdas = spectrum.lambdas[spectrum.lambdas_indices]
+    # spectrum.lambdas_binwidths = spectrum.lambdas_binwidths[spectrum.lambdas_indices]
+    # spectrum.data = spectrum.data[spectrum.lambdas_indices]
+    # if spectrum.err is not None:
+    #     spectrum.err = spectrum.err[spectrum.lambdas_indices]
     spectrum.convert_from_ADUrate_to_flam()
     spectrum.header['PIXSHIFT'] = 0
     spectrum.header['D2CCD'] = parameters.DISTANCE2CCD
