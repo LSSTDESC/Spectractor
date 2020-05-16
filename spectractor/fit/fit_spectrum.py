@@ -45,7 +45,7 @@ class SpectrumFitWorkspace(FitWorkspace):
                              r"alpha_pix [pix]"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]"]
-        self.bounds = [(0, 2), (0, 0.5), (300, 700), (0, 10), (0, 0.01), (-2, 2), (50, 60), (-0.1, 0.1)]
+        self.bounds = [(0, 2), (0, 0.5), (300, 700), (0, 10), (0, 0.01), (-2, 2), (50, 60), (-2, 2)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -126,7 +126,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         if len(self.outliers) > 0:
             raise NotImplementedError("Weighted residuals function not implemented for outlier rejection.")
         else:
-            cov = self.spectrum.cov_matrix[:-1,:-1] + np.diag(model_err * model_err)
+            cov = self.spectrum.cov_matrix + np.diag(model_err * model_err)
             try:
                 L = np.linalg.inv(np.linalg.cholesky(cov))
                 inv_cov = L.T @ L
@@ -258,9 +258,9 @@ if __name__ == "__main__":
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     fit_workspace = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                                         burnin=200, nbins=10, verbose=1, plot=True, live_fit=False, fast_sim=False)
-    # run_spectrum_minimisation(fit_workspace, method="newton")
-    fit_workspace.simulate(*fit_workspace.p)
-    fit_workspace.plot_fit()
+                                         burnin=200, nbins=10, verbose=1, plot=True, live_fit=False, fast_sim=True)
+    run_spectrum_minimisation(fit_workspace, method="newton")
+    # fit_workspace.simulate(*fit_workspace.p)
+    # fit_workspace.plot_fit()
     # run_emcee(fit_workspace, ln=lnprob_spectrum)
     # fit_workspace.analyze_chains()

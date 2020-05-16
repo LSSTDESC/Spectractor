@@ -23,7 +23,7 @@ class ChromaticPSF:
     * lambdas: the wavelength [nm]
     * Dx: the distance along X axis to order 0 position of the PSF model centroid  [pixels]
     * Dy: the distance along Y axis to order 0 position of the PSF model centroid [pixels]
-    * Dy_mean: the distance along Y axis to order 0 position of the mean dispersion axis [pixels]
+    * Dy_disp_axis: the distance along Y axis to order 0 position of the mean dispersion axis [pixels]
     * flux_sum: the transverse sum of the data flux [spectrogram units]
     * flux_integral: the integral of the best fitting PSF model to the data (should be equal to the amplitude parameter
     of the PSF model if the model is correclty normalized to one) [spectrogram units]
@@ -31,7 +31,6 @@ class ChromaticPSF:
     * fwhm: the FWHM of the best fitting PSF model [pixels]
     * Dy_fwhm_sup: the distance along Y axis to order 0 position of the upper FWHM edge [pixels]
     * Dy_fwhm_inf: the distance along Y axis to order 0 position of the lower FWHM edge [pixels]
-    * Dx_rot: the distance along X axis to order 0 position in the rotated spectrogram (no angle) [pixels]
 
     Then all the specific parameter of the PSF model are stored in other columns with their wavelength evolution
     (read from PSF.param_names attribute).
@@ -70,12 +69,12 @@ class ChromaticPSF:
         self.profile_params = np.zeros((Nx, len(self.psf.param_names)))
         self.pixels = np.mgrid[:Nx, :Ny]
         if file_name == '':
-            arr = np.zeros((Nx, len(self.psf.param_names) + 11))
-            self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_mean', 'flux_sum', 'flux_integral', 'flux_err',
-                                           'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf', 'Dx_rot'] + list(self.psf.param_names))
+            arr = np.zeros((Nx, len(self.psf.param_names) + 10))
+            self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
+                                           'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(self.psf.param_names))
         else:
             self.table = Table.read(file_name)
-        self.psf_param_start_index = 11
+        self.psf_param_start_index = 10
         self.n_poly_params = len(self.table)
         self.fitted_pixels = np.arange(len(self.table)).astype(int)
         self.saturation = saturation
@@ -296,7 +295,7 @@ class ChromaticPSF:
 
         >>> psf = MoffatGauss()
         >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=8000)
-        >>> s.table['Dx_rot'] = np.arange(100)
+        >>> s.table['Dx'] = np.arange(100)
         >>> s.rotate_table(45)
 
         ..  doctest::
@@ -310,8 +309,8 @@ class ChromaticPSF:
         angle = angle_degree * np.pi / 180.
         rotmat = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
         # finish with Dy_mean to get correct Dx
-        for name in ['Dy', 'Dy_fwhm_inf', 'Dy_fwhm_sup', 'Dy_mean']:
-            vec = list(np.array([self.table['Dx_rot'], self.table[name]]).T)
+        for name in ['Dy', 'Dy_fwhm_inf', 'Dy_fwhm_sup', 'Dy_disp_axis']:
+            vec = list(np.array([self.table['Dx'], self.table[name]]).T)
             rot_vec = np.array([np.dot(rotmat, v) for v in vec])
             self.table[name] = rot_vec.T[1]
         self.table['Dx'] = rot_vec.T[0]
@@ -517,7 +516,8 @@ class ChromaticPSF:
                 if len(poly_params) > length:
                     profile_params[:, k] = \
                         np.polynomial.legendre.legval(pixels,
-                                                      poly_params[length + shift:length + shift + self.degrees[name]+1])
+                                                      poly_params[
+                                                      length + shift:length + shift + self.degrees[name] + 1])
                 else:
                     p = poly_params[shift:shift + self.degrees[name] + 1]
                     if len(p) > 0:  # to avoid saturation parameters in case not set
@@ -563,7 +563,7 @@ class ChromaticPSF:
             fwhm = compute_fwhm(self.pixels[1, 0, :], out, center=p[2], minimum=0)
             self.table['flux_integral'][x] = p[0]  # if MoffatGauss1D normalized
             self.table['fwhm'][x] = fwhm
-            self.table['Dy_mean'][x] = 0
+            self.table['Dy_disp_axis'][x] = 0
 
     def set_bounds(self):
         """
@@ -720,7 +720,7 @@ class ChromaticPSF:
         return in_bounds, penalty, outbound_parameter_name
 
     def get_distance_along_dispersion_axis(self, shift_x=0, shift_y=0):
-        return np.sqrt((self.table['Dx'] - shift_x) ** 2 + (self.table['Dy_mean'] - shift_y) ** 2)
+        return np.sqrt((self.table['Dx'] - shift_x) ** 2 + (self.table['Dy_disp_axis'] - shift_y) ** 2)
 
     def plot_summary(self, truth=None):
         fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12, 6))

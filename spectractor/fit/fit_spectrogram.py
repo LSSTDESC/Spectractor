@@ -49,7 +49,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny // 2)
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
-
         self.shift_x = 0  # self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
         self.angle = self.spectrum.rotation_angle
@@ -64,7 +63,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
                            r"$\theta$ [deg]"] + list(self.psf_poly_params_names)
         self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (1, 10), (0, 1),
-                                                (50, 60), (-0.1, 0.1), (-3, 3), (-90, 90)]),
+                                                (50, 60), (-2, 2), (-3, 3), (-90, 90)]),
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
@@ -83,17 +82,14 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
     def crop_spectrogram(self):
         bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
-        # spectrogram must have odd size in y for the fourier simulation
-        yeven = 0
-        if (self.spectrum.spectrogram_Ny - 2 * bgd_width) % 2 == 0:
-            yeven = 1
-        self.spectrum.spectrogram_ymax = self.spectrum.spectrogram_ymax - bgd_width + yeven
+        self.spectrum.spectrogram_ymax = self.spectrum.spectrogram_ymax - bgd_width
         self.spectrum.spectrogram_ymin += bgd_width
-        self.spectrum.spectrogram_bgd = self.spectrum.spectrogram_bgd[bgd_width:-bgd_width + yeven, :]
-        self.spectrum.spectrogram = self.spectrum.spectrogram[bgd_width:-bgd_width + yeven, :]
-        self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width + yeven, :]
+        self.spectrum.spectrogram_bgd = self.spectrum.spectrogram_bgd[bgd_width:-bgd_width, :]
+        self.spectrum.spectrogram = self.spectrum.spectrogram[bgd_width:-bgd_width, :]
+        self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width, :]
         self.spectrum.spectrogram_y0 -= bgd_width
         self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram.shape
+        self.spectrum.chromatic_psf.table["y_mean"] -= bgd_width
         self.my_logger.debug(f'\n\tSize of the spectrogram region after cropping: '
                              f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')
 
@@ -353,9 +349,9 @@ if __name__ == "__main__":
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-    poly =[3.3400e+02,  3.3400e+02, -2.3320e-13, -3.7956e-01, -3.9282e-01, 4.2573e-01,  2.5306e+00 ,-1.5941e+00,  9.2998e-01,  1.6213e+00 ,-7.5356e-01 , 4.6481e-01,  4.5429e+01]
-    w.simulate(1, 0, 300, 5, 0.03, 56.308, 0., 0, -1.6352, *poly)
-    w.plot_fit()
-    # run_spectrogram_minimisation(w, method="newton")
+    poly =[3.3400e+02,  3.3400e+02, -2.3320e-13, 1.3831e+02, -9.3958e+00 ,4.2649e-01,  2.5306e+00 ,-1.5941e+00,  9.2998e-01,  1.6213e+00 ,-7.5356e-01 , 4.6481e-01,  4.5429e+01]
+    #w.simulate(1, 0, 300, 5, 0.03, 56.308, 0., 0, -1.6352, *poly)
+    #w.plot_fit()
+    run_spectrogram_minimisation(w, method="newton")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()
