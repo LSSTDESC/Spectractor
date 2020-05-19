@@ -156,6 +156,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         Right-hand pixel position above which no pixel should be used (default: 1800)
     """
 
+    if parameters.PSF_EXTRACTION_MODE != "PSF_1D" and parameters.PSF_EXTRACTION_MODE != "PSF_2D":
+        raise NotImplementedError(f"PSF_EXTRACTION_MODE must PSF_1D or PSF_2D. Found {parameters.PSF_EXTRACTION_MODE}.")
+
     my_logger = set_logger(__name__)
     if ws is None:
         ws = [signal_width+20, signal_width+30]
@@ -228,6 +231,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     spectrum.data = np.copy(w.amplitude_params)
     spectrum.err = np.copy(w.amplitude_params_err)
     spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
+    spectrum.chromatic_psf = s
 
     Dx_rot = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
     s.table['Dx'] = Dx_rot
@@ -275,56 +279,36 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
 
     # 2D extraction
-    s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
-    s.table['Dx'] = np.arange(xmin, xmax, 1) - image.target_pixcoords[0]
-    s.table["amplitude"] = np.interp(np.arange(xmin, xmax, 1), Dx_rot, flux)
-    s.table["flux_err"] = np.interp(np.arange(xmin, xmax, 1), Dx_rot, flux_err)
-    psf_poly_priors[w.y_mean_0_index] += image.target_pixcoords[1] - ymin
-    s.poly_params = np.concatenate((s.table["amplitude"], psf_poly_priors))
-    s.profile_params = s.from_poly_params_to_profile_params(s.poly_params, apply_bounds=True)
-    s.fill_table_with_profile_params(s.profile_params)
-    method = "psf1d"
-    mode = "2D"
-    my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
-                   f'mode={mode} and amplitude_priors_method={method}...')
-    my_logger.debug(f"\n\tTransverse fit table before derotation:"
-                    f"\n{s.table[['amplitude', 'x_mean', 'y_mean', 'Dx', 'Dy', 'Dy_disp_axis']]}")
-    w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
-                            amplitude_priors_method=method, mode=mode, verbose=True)
-    spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
-    spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
-                                                                                       np.arange(Ny))) / err
-    spectrum.data = np.copy(w.amplitude_params)
-    spectrum.err = np.copy(w.amplitude_params_err)
-    spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
-    spectrum.pixels = np.copy(s.table['Dx'])
+    if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
+        s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
+        s.table['Dx'] = np.arange(xmin, xmax, 1) - image.target_pixcoords[0]
+        s.table["amplitude"] = np.interp(np.arange(xmin, xmax, 1), Dx_rot, flux)
+        s.table["flux_err"] = np.interp(np.arange(xmin, xmax, 1), Dx_rot, flux_err)
+        psf_poly_priors[w.y_mean_0_index] += image.target_pixcoords[1] - ymin
+        s.poly_params = np.concatenate((s.table["amplitude"], psf_poly_priors))
+        s.profile_params = s.from_poly_params_to_profile_params(s.poly_params, apply_bounds=True)
+        s.fill_table_with_profile_params(s.profile_params)
+        method = "psf1d"
+        mode = "2D"
+        my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
+                       f'mode={mode} and amplitude_priors_method={method}...')
+        my_logger.debug(f"\n\tTransverse fit table before derotation:"
+                        f"\n{s.table[['amplitude', 'x_mean', 'y_mean', 'Dx', 'Dy', 'Dy_disp_axis']]}")
+        w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
+                                amplitude_priors_method=method, mode=mode, verbose=True)
+        spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
+        spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
+                                                                                           np.arange(Ny))) / err
+        spectrum.data = np.copy(w.amplitude_params)
+        spectrum.err = np.copy(w.amplitude_params_err)
+        spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
+        spectrum.pixels = np.copy(s.table['Dx'])
 
-    s.table['Dy'] = s.table['y_mean'] - (image.target_pixcoords[1] - ymin)
-    s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
-    s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
-    s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
-    spectrum.chromatic_psf = s
-
-    # Crop the background lateral regions
-    # bgd_width = ws[1] - w
-    # yeven = 0
-    # if (Ny - 2 * bgd_width) % 2 == 0:  # spectrogram must have odd size in y for the fourier simulation
-    #     yeven = 1
-    # ymax = ymax - bgd_width + yeven
-    # ymin += bgd_width
-    # bgd = bgd[bgd_width:-bgd_width + yeven, :]
-    # data = data[bgd_width:-bgd_width + yeven, :]
-    # err = err[bgd_width:-bgd_width + yeven, :]
-    # Ny, Nx = data.shape
-    # target_pixcoords_spectrogram[1] -= bgd_width
-
-    # Spectrogram must have odd size in y for the fourier simulation
-    #if Ny % 2 == 0:
-    #    ymax = ymax - 1
-    #    bgd = bgd[:-1, :]
-    ##    data = data[:-1, :]
-    #   err = err[:-1, :]
-    #    Ny, Nx = data.shape
+        s.table['Dy'] = s.table['y_mean'] - (image.target_pixcoords[1] - ymin)
+        s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
+        s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
+        s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
+        spectrum.chromatic_psf = s
 
     # First guess for lambdas
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_distance_along_dispersion_axis(),
