@@ -45,8 +45,12 @@ def test_extractor():
                                    f"\n\t\tspectrum.spectrogram_x0={spectrum.spectrogram_x0}"
                                    f"\n\t\tnp.mean(spectrum.chromatic_psf.table['gamma']="
                                    f"{np.mean(spectrum.chromatic_psf.table['gamma'])}")
-        assert np.isclose(spectrum.lambdas[0], 343, atol=1)
-        assert np.isclose(spectrum.lambdas[-1], 1084.0, atol=1)
+        if parameters.PSF_EXTRACTION_MODE == "PSD_2D":
+            assert np.isclose(spectrum.lambdas[0], 343, atol=1)
+            assert np.isclose(spectrum.lambdas[-1], 1084.0, atol=1)
+        elif parameters.PSF_EXTRACTION_MODE == "PSF_1D":
+            assert np.isclose(spectrum.lambdas[0], 345, atol=1)
+            assert np.isclose(spectrum.lambdas[-1], 1085.0, atol=1)
         assert np.isclose(spectrum.x0[0], 743.6651370068676, atol=0.5)
         assert np.isclose(spectrum.x0[1], 683.0577836601408, atol=1)
         assert np.isclose(spectrum.spectrogram_x0, -280, atol=1)
