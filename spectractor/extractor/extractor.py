@@ -209,8 +209,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     psf = load_PSF(psf_type=parameters.PSF_TYPE)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
-    s.fit_transverse_PSF1D_profile(data, err, signal_width, ws, pixel_step=10, sigma_clip=5, bgd_model_func=bgd_model_func,
-                                   saturation=image.saturation, live_fit=False)
+    s.fit_transverse_PSF1D_profile(data, err, signal_width, ws, pixel_step=10, sigma_clip=5,
+                                   bgd_model_func=bgd_model_func, saturation=image.saturation, live_fit=False)
 
     # Fill spectrum object
     spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
@@ -226,7 +226,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
                    f'mode={mode} and amplitude_priors_method={method}...')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
-                            amplitude_priors_method=method, mode=mode, verbose=True)
+                            amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
     # spectrum.data = np.copy(s.table['amplitude'])
     spectrum.data = np.copy(w.amplitude_params)
     spectrum.err = np.copy(w.amplitude_params_err)
@@ -295,7 +295,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         my_logger.debug(f"\n\tTransverse fit table before derotation:"
                         f"\n{s.table[['amplitude', 'x_mean', 'y_mean', 'Dx', 'Dy', 'Dy_disp_axis']]}")
         w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
-                                amplitude_priors_method=method, mode=mode, verbose=True)
+                                amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
         spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
         spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                            np.arange(Ny))) / err

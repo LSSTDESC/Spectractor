@@ -1083,10 +1083,10 @@ class ChromaticPSF:
         self.profile_params[:self.Nx, 1] = np.arange(self.Nx)
         self.fill_table_with_profile_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
-        if parameters.DEBUG:
-            # Plot data, best fit model and residuals:
-            self.plot_summary()
-            w.plot_fit()
+        #if parameters.DEBUG:
+        #    # Plot data, best fit model and residuals:
+        #    self.plot_summary()
+        #    w.plot_fit()
         return w
 
 
