@@ -35,7 +35,7 @@ from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 import spectractor.parameters as parameters
-
+from spectractor.simulation.adr import adr_calib
 
 class SpectrumSimulation(Spectrum):
 
@@ -62,10 +62,9 @@ class SpectrumSimulation(Spectrum):
         self.telescope = telescope
         self.atmosphere = atmosphere
         # save original pixel distances to zero order
-        self.pixels = self.disperser.grating_lambda_to_pixel(self.lambdas, x0=self.x0, order=1)
+        # self.disperser.grating_lambda_to_pixel(self.lambdas, x0=self.x0, order=1)
         # now reset data
         self.lambdas = None
-        self.data = None
         self.err = None
         self.model = lambda x: np.zeros_like(x)
         self.model_err = lambda x: np.zeros_like(x)
@@ -133,18 +132,22 @@ class SpectrumSimulation(Spectrum):
             The spectrum uncertainties interpolated function in Target units.
 
         """
-        # distance = np.array(self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x, shift_y=0))
-        # pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0] - shift
-        # self.disperser.D = float(self.header["D2CCD"])
-        # pixels = self.disperser.grating_lambda_to_pixel(lambdas, x0=self.x0, order=1)
+        # find lambdas including ADR effect
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
-        lambdas = self.disperser.grating_pixel_to_lambda(self.pixels - shift_x, x0=new_x0, order=1)
+        distance = self.chromatic_psf.table['Dx_rot']
+        lambdas = self.disperser.grating_pixel_to_lambda(distance - shift_x, x0=new_x0, order=1)
+        lambda_ref = np.sum(lambdas * self.data) / np.sum(self.data)
+        distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref = lambda_ref)
+        lambdas = self.disperser.grating_pixel_to_lambda(distance - shift_x, x0=new_x0, order=1)
+        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - shift_x, x0=new_x0, order=2)
+        # simulate order 1 spectrum amplitude
         self.simulate_without_atmosphere(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
         # np.savetxt('atmospheric_trans_20170530_130.txt',np.array([lambdas,atmospheric_transmission(lambdas)]).T)
         self.data *= A1 * atmospheric_transmission
         self.err *= A1 * atmospheric_transmission
+
         # Now add the systematics
         if reso > 0.1:
             self.data = fftconvolve_gaussian(self.data, reso)
@@ -152,10 +155,9 @@ class SpectrumSimulation(Spectrum):
         if A2 > 0.:
             sim_conv = interp1d(lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
             err_conv = interp1d(lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
-            self.model = lambda x: sim_conv(x) + A2 * sim_conv(x / 2)
-            self.model_err = lambda x: np.sqrt(np.abs((err_conv(x)) ** 2 + (0.5 * A2 * err_conv(x / 2)) ** 2))
-            self.data = self.model(lambdas)
-            self.err = self.model_err(lambdas)
+            self.data = sim_conv(lambdas) + A2 * sim_conv(lambdas_order2)
+            self.err = err_conv(lambdas) + A2 * err_conv(lambdas_order2)
+
         # now we include effects related to the wrong extraction of the spectrum:
         # wrong estimation of the order 0 position and wrong DISTANCE2CCD
         # pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0]
@@ -196,7 +198,6 @@ class SpectrogramModel(Spectrum):
         self.true_lambdas = None
         self.true_spectrum = None
         self.lambdas = None
-        self.data = None
         self.err = None
         self.model = lambda x, y: np.zeros((x.size, y.size))
         self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
@@ -289,7 +290,12 @@ class SpectrogramModel(Spectrum):
         # must have odd size
         if distance.size % 2 == 0:
             distance = distance[:-1]
+
+        # convert pixels into lambdas with ADR for spectrum amplitude evaluation
         self.disperser.D = D
+        lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
+        lambda_ref = np.sum(lambdas * self.data) / np.sum(self.data)
+        distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref = lambda_ref)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
@@ -304,10 +310,13 @@ class SpectrogramModel(Spectrum):
         #             Dy_mean_func(lambdas_order2) + dy_func(lambdas_order2) - shift_y)
         # Dx_func = interp1d(lambdas, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
         # Dy_mean_func = interp1d(lambdas, self.chromatic_psf.table['Dy_mean'], bounds_error=False, fill_value=(0, 0))
+
+        # dispersion laws from the PSF table
         dy_func = interp1d(lambdas,
                            self.chromatic_psf.table['Dy'][:distance.size] - self.chromatic_psf.table['Dy_mean'][
                                                                             :distance.size],
                            bounds_error=False, fill_value=(0, 0))
+
         dispersion_law = r0 + (self.chromatic_psf.table['Dx'][:distance.size] - shift_x) + 1j * (
                 self.chromatic_psf.table['Dy'][:distance.size] - shift_y)
         dispersion_law_order2 = r0 + (distances_order2 * np.cos(np.pi * self.rotation_angle / 180) - shift_x) + 1j * (
