@@ -198,6 +198,8 @@ class SpectrogramModel(Spectrum):
         self.true_lambdas = None
         self.true_spectrum = None
         self.lambdas = None
+        self.lambdas_order2 = None
+        self.lambdas_binwidths_order2 = None
         self.err = None
         self.model = lambda x, y: np.zeros((x.size, y.size))
         self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
@@ -321,10 +323,12 @@ class SpectrogramModel(Spectrum):
                 self.chromatic_psf.table['Dy'][:distance.size] - shift_y)
         dispersion_law_order2 = r0 + (distances_order2 * np.cos(np.pi * self.rotation_angle / 180) - shift_x) + 1j * (
                 distances_order2 * np.sin(np.pi * self.rotation_angle / 180) + dy_func(lambdas_order2) - shift_y)
-        dispersion_law_order2 = dispersion_law_order2[::2]
-        lambdas_order2 = lambdas_order2[::2]
+
+        self.lambdas_order2 = lambdas_order2
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
+        self.lambdas_binwidths_order2 = np.gradient(lambdas_order2)
+
         if parameters.DEBUG:
             from spectractor.tools import from_lambda_to_colormap
             plt.plot(self.chromatic_psf.table['Dx'], self.chromatic_psf.table['Dy_mean'], 'k-', label="mean")
@@ -336,7 +340,7 @@ class SpectrogramModel(Spectrum):
             plt.legend()
             plt.show()
 
-        return lambdas, dispersion_law, dispersion_law_order2
+        return lambdas, lambdas_order2, dispersion_law, dispersion_law_order2
 
     def build_spectrogram(self, profile_params, spectrum, dispersion_law):
         # Spectrum units must in ADU/s
@@ -397,7 +401,7 @@ class SpectrogramModel(Spectrum):
         self.my_logger.debug(f'\n\tAfter psf: {time.time() - start}')
         start = time.time()
         r0 = self.spectrogram_x0 + 1j * self.spectrogram_y0
-        lambdas, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
+        lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y, r0)
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
@@ -412,7 +416,9 @@ class SpectrogramModel(Spectrum):
         ima2 = np.zeros_like(ima1)
         if A2 > 0.:
             nlbda_order2 = dispersion_law_order2.size
-            ima2 = self.build_spectrogram(profile_params[-nlbda_order2:], spectrum[:nlbda_order2],
+            spectrum_order1 = interp1d(lambdas,spectrum,bounds_error=False, fill_value=(0, 0))
+            spectrum_order2 = spectrum_order1(lambdas_order2) * self.lambdas_binwidths_order2 / self.lambdas_binwidths[-nlbda_order2:]
+            ima2 = self.build_spectrogram(profile_params[-nlbda_order2:], spectrum_order2,
                                           dispersion_law_order2)
 
         self.my_logger.debug(f'\n\tAfter build ima2: {time.time() - start}')
@@ -925,3 +931,4 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod()
+
