@@ -141,6 +141,7 @@ class SpectrumSimulation(Spectrum):
         distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref = lambda_ref)
         lambdas = self.disperser.grating_pixel_to_lambda(distance - shift_x, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - shift_x, x0=new_x0, order=2)
+        #lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
         # simulate order 1 spectrum amplitude
         self.simulate_without_atmosphere(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
@@ -153,10 +154,13 @@ class SpectrumSimulation(Spectrum):
             self.data = fftconvolve_gaussian(self.data, reso)
             self.err = np.sqrt(np.abs(fftconvolve_gaussian(self.err ** 2, reso)))
         if A2 > 0.:
-            sim_conv = interp1d(lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
-            err_conv = interp1d(lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
-            self.data = sim_conv(lambdas) + A2 * sim_conv(lambdas_order2)
-            self.err = err_conv(lambdas) + A2 * err_conv(lambdas_order2)
+            lambdas_binwidths_order2 = np.gradient(lambdas_order2)
+            sim_conv = interp1d(lambdas, self.data * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
+            err_conv = interp1d(lambdas, self.err * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
+            spectrum_order2 = sim_conv(lambdas_order2) * lambdas_binwidths_order2 / self.lambdas_binwidths
+            err_order2 = err_conv(lambdas_order2) * lambdas_binwidths_order2 / self.lambdas_binwidths
+            self.data = (sim_conv(lambdas) + A2 * spectrum_order2) / lambdas
+            self.err = (err_conv(lambdas) + A2 * err_order2) / lambdas
 
         # now we include effects related to the wrong extraction of the spectrum:
         # wrong estimation of the order 0 position and wrong DISTANCE2CCD
@@ -416,18 +420,8 @@ class SpectrogramModel(Spectrum):
         ima2 = np.zeros_like(ima1)
         if A2 > 0.:
             nlbda_order2 = dispersion_law_order2.size
-            spectrum_order1 = interp1d(lambdas,spectrum,bounds_error=False, fill_value=(0, 0))
-            lambdas_binwidths_O1_for_O2 = np.zeros(nlbda_order2)
-            for i in range(nlbda_order2):
-                jmin = max(np.argmin(abs(lambdas - lambdas_order2[i])),0)
-                if lambdas[jmin] > lambdas_order2[i]:
-                    jmax = jmin
-                    jmin -=1
-                else:
-                    jmax = jmin + 1
-                lambdas_binwidths_O1_for_O2[i] = lambdas[jmax] - lambdas[jmin]
-
-            spectrum_order2 = spectrum_order1(lambdas_order2) * self.lambdas_binwidths_order2 / lambdas_binwidths_O1_for_O2
+            spectrum_order1 = interp1d(lambdas,spectrum / self.lambdas_binwidths,bounds_error=False, fill_value=(0, 0))
+            spectrum_order2 = spectrum_order1(lambdas_order2) * self.lambdas_binwidths_order2
             ima2 = self.build_spectrogram(profile_params[-nlbda_order2:], spectrum_order2,
                                           dispersion_law_order2)
 
