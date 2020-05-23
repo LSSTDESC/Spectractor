@@ -203,7 +203,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
         bgd_res = ((data - bgd_model_func(np.arange(Nx), np.arange(Ny)))/err)[bgd_index]
 
-    # bgd_model_func = extract_spectrogram_background_poly2D(data, ws=ws)
+    # Propagate background uncertainties
+    err = np.sqrt(err*err + bgd_model_func(np.arange(Nx), np.arange(Ny)))
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
@@ -277,6 +278,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Extract the non rotated background
     bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
+
+    # Propagate background uncertainties
+    err = np.sqrt(err*err + bgd_model_func(np.arange(Nx), np.arange(Ny)))
 
     # 2D extraction
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
