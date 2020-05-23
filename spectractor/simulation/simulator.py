@@ -417,7 +417,17 @@ class SpectrogramModel(Spectrum):
         if A2 > 0.:
             nlbda_order2 = dispersion_law_order2.size
             spectrum_order1 = interp1d(lambdas,spectrum,bounds_error=False, fill_value=(0, 0))
-            spectrum_order2 = spectrum_order1(lambdas_order2) * self.lambdas_binwidths_order2 / self.lambdas_binwidths[-nlbda_order2:]
+            lambdas_binwidths_O1_for_O2 = np.zeros(nlbda_order2)
+            for i in range(nlbda_order2):
+                jmin = max(np.argmin(abs(lambdas - lambdas_order2[i])),0)
+                if lambdas[jmin] > lambdas_order2[i]:
+                    jmax = jmin
+                    jmin -=1
+                else:
+                    jmax = jmin + 1
+                lambdas_binwidths_O1_for_O2[i] = lambdas[jmax] - lambdas[jmin]
+
+            spectrum_order2 = spectrum_order1(lambdas_order2) * self.lambdas_binwidths_order2 / lambdas_binwidths_O1_for_O2
             ima2 = self.build_spectrogram(profile_params[-nlbda_order2:], spectrum_order2,
                                           dispersion_law_order2)
 
