@@ -409,7 +409,7 @@ class SpectrogramModel(Spectrum):
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
-        self.true_spectrum = spectrum
+        self.true_spectrum = A1 * spectrum / (parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas))
         self.my_logger.debug(f'\n\tAfter spectrum: {time.time() - start}')
         start = time.time()
         ima1 = self.build_spectrogram(profile_params, spectrum, dispersion_law)
@@ -422,6 +422,7 @@ class SpectrogramModel(Spectrum):
             nlbda_order2 = dispersion_law_order2.size
             spectrum_order1 = interp1d(lambdas,spectrum / self.lambdas_binwidths,bounds_error=False, fill_value=(0, 0))
             spectrum_order2 = spectrum_order1(lambdas_order2) * self.lambdas_binwidths_order2
+            self.true_spectrum = A1 * (spectrum + A2 * np.array(list(np.zeros(len(spectrum)-nlbda_order2))+list(spectrum_order2))) / (parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas))
             ima2 = self.build_spectrogram(profile_params[-nlbda_order2:], spectrum_order2,
                                           dispersion_law_order2)
 
