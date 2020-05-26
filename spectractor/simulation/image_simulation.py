@@ -404,7 +404,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     if with_stars:
         my_logger.info('\n\tStar field model...')
         starfield = StarFieldModel(image)
-        if parameters.VERBOSE:
+        if parameters.DEBUG:
             image.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
             starfield.plot_model()
 
