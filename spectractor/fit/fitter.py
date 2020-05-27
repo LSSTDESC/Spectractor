@@ -456,6 +456,22 @@ def lnprob(p):
 
 
 def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
+    """
+
+    Parameters
+    ----------
+    fit_workspace: FitWorkspace
+    params
+    epsilon
+    niter
+    fixed_params
+    xtol
+    ftol
+
+    Returns
+    -------
+
+    """
     my_logger = set_logger(__name__)
     tmp_params = np.copy(params)
     W = 1 / (fit_workspace.err.flatten()[fit_workspace.not_outliers]) ** 2
@@ -471,7 +487,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # if fit_workspace.live_fit:
         #    fit_workspace.plot_fit()
         residuals = (tmp_model - fit_workspace.data).flatten()[fit_workspace.not_outliers]
-        cost = np.sum((residuals ** 2) * W)
+        cost = residuals @ (W * residuals)
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):
@@ -504,10 +520,10 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                     tmp_params_2[ip] = fit_workspace.bounds[ip][0]
                 if p > fit_workspace.bounds[ip][1]:
                     tmp_params_2[ip] = fit_workspace.bounds[ip][1]
-            lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
-            return np.sum(((mod.flatten()[fit_workspace.not_outliers]
-                            - fit_workspace.data.flatten()[fit_workspace.not_outliers])
-                           / fit_workspace.err.flatten()[fit_workspace.not_outliers]) ** 2)
+            # lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
+            # res = mod.flatten()[fit_workspace.not_outliers] - fit_workspace.data.flatten()[fit_workspace.not_outliers]
+            w_res = fit_workspace.weighted_residuals(tmp_params_2)
+            return w_res @ w_res  # res @ (W * res)
 
         # tol parameter acts on alpha (not func)
         alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2, brack=(-0.1, 0.1))
