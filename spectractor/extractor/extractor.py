@@ -204,7 +204,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         bgd_res = ((data - bgd_model_func(np.arange(Nx), np.arange(Ny)))/err)[bgd_index]
 
     # Propagate background uncertainties
-    err = np.sqrt(err*err + bgd_model_func(np.arange(Nx), np.arange(Ny)))
+    # err = np.sqrt(err*err + bgd_model_func(np.arange(Nx), np.arange(Ny))/image.gain[ymin:ymax, pixel_start:pixel_end]**2)
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
@@ -243,11 +243,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     my_logger.debug(f"\n\tTransverse fit table before derotation:"
                     f"\n{s.table[['amplitude', 'x_mean', 'y_mean', 'Dx', 'Dy', 'Dy_disp_axis']]}")
 
-    # rotate and save the table
+    # Rotate and save the table
     s.rotate_table(-image.rotation_angle)
-    s.table['y_mean'] = s.table['Dy']
-    psf_poly_priors = s.from_table_to_poly_params()[s.Nx:]
-    Dy_disp_axis = np.copy(s.table["Dy_disp_axis"])
     flux = np.copy(s.table["amplitude"])
     flux_err = np.copy(s.table["flux_err"])
     my_logger.debug(f"\n\tTransverse fit table after derotation:"
@@ -267,8 +264,13 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     lambda_max_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0))))
     xmin = int(s.table['Dx'][lambda_min_index] + x0)
     xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
+
     # Position of the order 0 in the spectrogram coordinates
     target_pixcoords_spectrogram = [image.target_pixcoords[0] - xmin, image.target_pixcoords[1] - ymin]
+
+    # Update y_mean and x_mean after rotation
+    s.table['y_mean'] = s.table['Dy'] + target_pixcoords_spectrogram[1]
+    s.table['x_mean'] = s.table['Dx'] + target_pixcoords_spectrogram[0]
 
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
@@ -280,18 +282,24 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
 
     # Propagate background uncertainties
-    err = np.sqrt(err*err + bgd_model_func(np.arange(Nx), np.arange(Ny)))
+    # err = np.sqrt(err*err + bgd_model_func(np.arange(Nx), np.arange(Ny))/image.gain[ymin:ymax, xmin:xmax]**2)
 
     # 2D extraction
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
+        # build 1D priors
+        s.table['y_mean'] = s.table['Dy']
+        psf_poly_priors = s.from_table_to_poly_params()[s.Nx:]
+        psf_poly_priors[w.y_mean_0_index] += target_pixcoords_spectrogram[1]
+        Dy_disp_axis = np.copy(s.table["Dy_disp_axis"])
+        # initialize a new ChromaticPSF
         s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
         s.table['Dx'] = np.arange(xmin, xmax, 1) - image.target_pixcoords[0]
         s.table["amplitude"] = np.interp(np.arange(xmin, xmax, 1), Dx_rot, flux)
         s.table["flux_err"] = np.interp(np.arange(xmin, xmax, 1), Dx_rot, flux_err)
-        psf_poly_priors[w.y_mean_0_index] += image.target_pixcoords[1] - ymin
         s.poly_params = np.concatenate((s.table["amplitude"], psf_poly_priors))
         s.profile_params = s.from_poly_params_to_profile_params(s.poly_params, apply_bounds=True)
         s.fill_table_with_profile_params(s.profile_params)
+        # deconvolve and regularize with 1D priors
         method = "psf1d"
         mode = "2D"
         my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
@@ -308,7 +316,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
         spectrum.pixels = np.copy(s.table['Dx'])
 
-        s.table['Dy'] = s.table['y_mean'] - (image.target_pixcoords[1] - ymin)
+        s.table['Dy'] = s.table['y_mean'] - target_pixcoords_spectrogram[1]
         s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
         s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
         s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
