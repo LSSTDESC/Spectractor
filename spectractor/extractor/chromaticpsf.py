@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from scipy.interpolate import interp1d
+from scipy.optimize import minimize, basinhopping
 
 from astropy.table import Table
 
@@ -71,7 +72,8 @@ class ChromaticPSF:
         if file_name == '':
             arr = np.zeros((Nx, len(self.psf.param_names) + 10))
             self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
-                                           'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(self.psf.param_names))
+                                           'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(
+                self.psf.param_names))
         else:
             self.table = Table.read(file_name)
         self.psf_param_start_index = 10
@@ -990,20 +992,26 @@ class ChromaticPSF:
         Build a mock spectrogram with random Poisson noise using the full 2D PSF model:
 
         >>> psf = Moffat()
-        >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=100000)
+        >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=10000000)
         >>> params = s0.generate_test_poly_params()
-        >>> params[:s0.Nx] *= 10
+        >>> params[:s0.Nx] *= 1
         >>> s0.poly_params = params
         >>> saturation = params[-1]
         >>> data = s0.evaluate(params, mode="2D")
         >>> bgd = 10*np.ones_like(data)
         >>> data += bgd
         >>> data = np.random.poisson(data)
-        >>> data_errors = np.sqrt(data+1)
+        # >>> np.save("test_data.npy", data)
+        >>> data = np.load("test_data.npy")
+        >>> data_errors = np.sqrt(data)
 
         Extract the background:
 
         >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+
+        Propagate background uncertainties:
+
+        >>> data_errors = np.sqrt(data_errors**2 + bgd_model_func(np.arange(s0.Nx), np.arange(s0.Ny)))
 
         Estimate the first guess values:
 
@@ -1064,12 +1072,67 @@ class ChromaticPSF:
         if mode == "1D":
             w = ChromaticPSF1DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose)
+            run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
         elif mode == "2D":
+            parameters.VERBOSE = True
+            parameters.DEBUG = True
             w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose)
+            w.amplitude_priors_method = "psf1d"
+            w.reg_optimisation = False
+            #run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-3, niter=50, fix=w.fixed)
+            run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
+            w.plot_fit()
+            #w.reg_optimisation = True
+            #w.amplitude_priors_method = "psf1d"
+            #self.my_logger.warning(f"Start opt reg")
+            #run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
         else:
             self.my_logger.error(f"\n\tUnknown fitting mode={mode}. Must be '1D' or '2D'.")
-        run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
+
+        # if w.amplitude_priors_method == "psf1d" and mode == "2D":
+        #     w_reg = RegFitWorkspace(w)
+        #     self.my_logger.warning(f"{w_reg.reg} {w.amplitude_params}")
+        #     regs = [1e-6, 5e-6, 1e-5, 5e-5, 0.0001, 0.0002, 0.0005, 0.0008, 0.001, 0.002, 0.003, 0.004, 0.005, 0.01,
+        #             0.02, 0.05, 0.1, 0.5, 1]
+        #     Gs = []
+        #     chisqs = []
+        #     resolutions = []
+        #     for r in regs:
+        #         self.my_logger.warning(f"{r}")
+        #         w_reg.simulate(np.log10(r))
+        #         Gs.append(w_reg.G)
+        #         chisqs.append(w_reg.chisquare)
+        #         resolutions.append(np.trace(w_reg.resolution))
+        #     opt_reg = regs[np.argmin(Gs)]
+        #     fig, ax = plt.subplots(3, 1, figsize=(10, 6), sharex="all")
+        #     ax[0].plot(regs, Gs)
+        #     ax[0].axvline(opt_reg, color="k")
+        #     ax[1].axvline(opt_reg, color="k")
+        #     ax[2].axvline(opt_reg, color="k")
+        #     ax[0].set_ylabel(r"$G(r)$")
+        #     ax[0].set_xlabel("Regularisation hyper-parameter $r$")
+        #     ax[0].grid()
+        #     ax[1].plot(regs, chisqs)
+        #     ax[1].set_ylabel("Chi2")
+        #     ax[1].set_xlabel("Regularisation hyper-parameter $r$")
+        #     ax[1].grid()
+        #     ax[1].set_xscale("log")
+        #     # ax[0].set_ylim((np.min(chisqs)-0.01, np.min(chisqs)+0.05))
+        #     # ax[1].set_ylim((residuals[1],residuals[-1]))
+        #     ax[2].set_xscale("log")
+        #     ax[2].plot(regs, resolutions)
+        #     ax[2].set_ylabel(r"$\mathrm{Tr}(R)$")
+        #     ax[2].set_xlabel("Regularisation hyper-parameter $r$")
+        #     ax[2].grid()
+        #     plt.subplots_adjust(hspace=0)
+        #     plt.show()
+        #
+        #     parameters.DEBUG = True
+        #     parameters.VERBOSE = True
+        #     #run_minimisation(w_reg, method="newton", ftol=1e-3, xtol=1e-3, niter=50, epsilon=[0.5], verbose=2)
+        #     self.my_logger.warning(f"{w_reg.p} {w.amplitude_params}")
+
         self.poly_params = w.poly_params
 
         # add background crop to y_mean
@@ -1084,9 +1147,10 @@ class ChromaticPSF:
         self.fill_table_with_profile_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
         # if parameters.DEBUG:
-        #    # Plot data, best fit model and residuals:
-        #    self.plot_summary()
-        #    w.plot_fit()
+        #     # Plot data, best fit model and residuals:
+        #     self.plot_summary()
+        #     w.plot_fit()
+        self.my_logger.warning(f"{w.reg}")
         return w
 
 
@@ -1140,6 +1204,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # crop spectrogram to fit faster
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         self.data = self.data[self.bgd_width:-self.bgd_width, :]
+        self.data_flat = self.data.flatten()
         self.pixels = np.arange(self.data.shape[0])
         self.err = np.copy(self.err[self.bgd_width:-self.bgd_width, :])
         self.Ny, self.Nx = self.data.shape
@@ -1153,10 +1218,11 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
-        self.W_dot_data = self.W * self.data.flatten()  # np.diag(self.W) @ self.data.flatten()
+        self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
 
         # design matrix
         self.M = np.zeros((self.Nx, self.data.size))
+        self.M_dot_W_dot_M = np.zeros((self.Nx, self.Nx))
 
         # prepare results
         self.amplitude_params = np.zeros(self.Nx)
@@ -1386,6 +1452,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                 amplitude_params = [cov_matrix[x, x] * (M[x].T @ self.W_dot_data[x] + self.reg * self.Q_dot_A0[x])
                                     for x in range(self.Nx)]
             self.M = M
+            self.M_dot_W_dot_M = M_dot_W_dot_M
         else:
             amplitude_params = np.copy(self.amplitude_priors)
             err2 = np.copy(amplitude_params)
@@ -1420,7 +1487,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
-        self.W_dot_data = self.W * self.data.flatten()  # np.diag(self.W) @ self.data.flatten()
+        self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
 
         # regularisation matrices
         self.reg = parameters.PSF_FIT_REG_PARAM
@@ -1433,6 +1500,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.L = L
         self.Q = L.T @ self.U.T @ self.U @ L
         self.Q_dot_A0 = self.Q @ self.amplitude_priors
+        self.reg_optimisation = True
 
     def simulate(self, *shape_params):
         r"""
@@ -1520,8 +1588,9 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         .. doctest::
 
             >>> psf = Moffat()
-            >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=1000)
+            >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=100000)
             >>> params = s0.generate_test_poly_params()
+            >>> params[:s0.Nx] *= 10
             >>> s0.poly_params = params
             >>> saturation = params[-1]
             >>> data = s0.evaluate(params, mode="2D")
@@ -1591,17 +1660,9 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # profile_params[:self.Nx, 2] -= self.bgd_width
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
-            # W_dot_M = np.zeros((self.Ny * self.Nx, self.Nx))
-            # M = np.zeros((self.Ny * self.Nx, self.Nx))
             M = np.array([self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
                           for x in range(self.Nx)]).T
             W_dot_M = np.array([M[:, x] * self.W for x in range(self.Nx)]).T
-            # for x in range(self.Nx):
-            # self.my_logger.warning(f'\n\t{x} {profile_params[x, :]}')
-            # plt.imshow(self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]), origin="lower")
-            # plt.imshow(self.data, origin="lower")
-            # plt.title(f"{x}")
-            # plt.show()
             # Compute the minimizing amplitudes
             M_dot_W_dot_M = M.T @ W_dot_M
             if self.amplitude_priors_method != "psf1d":
@@ -1630,14 +1691,81 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                 elif self.amplitude_priors_method == "noprior":
                     pass
             else:
-                M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
-                try:
-                    L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-                    cov_matrix = L.T @ L
-                except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + self.reg * self.Q_dot_A0)
+
+                def regularisation(reg):
+                    M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + reg * self.Q
+                    try:
+                        L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
+                        cov_matrix = L.T @ L
+                    except np.linalg.LinAlgError:
+                        cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
+                    amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + reg * self.Q_dot_A0)
+                    return amplitude_params, cov_matrix
+
+                def G(reg):
+                    A, cov = regularisation(reg)
+                    resolution = np.eye(A.size) - reg * cov @ self.Q
+                    diff = self.data_flat - M @ A
+                    chisquare = diff @ (self.W * diff)
+                    # plt.errorbar(x=np.arange(len(A)), y=A, yerr=[np.sqrt(cov[i,i]) for i in range(len(A))])
+                    # plt.title(f"{reg} {self.w.data_flat.size} {np.trace(self.resolution)}")
+                    # plt.grid()
+                    # plt.draw()
+                    # plt.pause(1e-8)
+                    # plt.close()
+                    return chisquare / (self.data_flat.size - np.trace(resolution)), chisquare, np.trace(resolution)
+
+                if self.reg_optimisation:
+                    # regs = [1e-6, 5e-6, 1e-5, 5e-5, 0.0001, 0.0002, 0.0005, 0.0008, 0.001, 0.002, 0.003, 0.004, 0.005, 0.01,
+                    #         0.02, 0.05, 0.1, 0.5, 1]
+                    # Gs = []
+                    # chisqs = []
+                    # resolutions = []
+                    # for r in regs:
+                    #     GG, chi, R = G(r)
+                    #     Gs.append(GG)
+                    #     chisqs.append(chi)
+                    #     resolutions.append(R)
+
+                    Gmin = lambda rr: G(rr)[0]
+                    res = minimize(Gmin, x0=np.asarray([parameters.PSF_FIT_REG_PARAM]),tol=1e-6, bounds=[(0, 10)]) #  bounds=[(0, 10)],
+                    # opt_reg = regs[int(np.argmin(Gs))]
+                    opt_reg = res.x
+                    # fig, ax = plt.subplots(3, 1, figsize=(10, 10))
+                    # log_regs = np.arange(-8,0,1e-3)
+                    # Gs = [Glog(logr) for logr in log_regs]
+                    # ax[0].plot(log_regs, Gs)
+                    # ax[0].axvline(np.log10(opt_reg), color="k")
+                    # # ax[2].axvline(opt_reg, color="k")
+                    # ax[0].set_ylabel(r"$G(r)$")
+                    # ax[0].set_xlabel("Regularisation hyper-parameter $r$")
+                    # ax[0].grid()
+                    # ax[0].set_title(f"opt_reg={opt_reg} G_opt={Glog(res.x)}")
+                    # #ax[0].set_xscale("log")
+                    # log_regs = np.arange(np.log10(opt_reg)-0.001, np.log10(opt_reg)+0.001, 1e-5)
+                    # Gs = [Glog(logr) for logr in log_regs]
+                    # ax[2].plot(log_regs, Gs, 'b+')
+                    # ax[2].set_ylabel("G(r)")
+                    # ax[2].set_xlabel("Regularisation hyper-parameter $r$")
+                    # ax[2].grid()
+                    # # ax[1].set_xscale("log")
+                    # ax[2].axvline(np.log10(opt_reg), color="k")
+                    # # # ax[0].set_ylim((np.min(chisqs)-0.01, np.min(chisqs)+0.05))
+                    # # ax[1].set_ylim((0.995*np.min(Gs), 1.005*np.max(Gs)))
+                    # # ax[2].plot(regs, resolutions)
+                    # # ax[2].set_ylabel(r"$\mathrm{Tr}(R)$")
+                    # # ax[2].set_xlabel("Regularisation hyper-parameter $r$")
+                    # # ax[2].grid()
+                    # # plt.subplots_adjust(hspace=0)
+                    # plt.show()
+                else:
+                    opt_reg = parameters.PSF_FIT_REG_PARAM
+
+                amplitude_params, cov_matrix = regularisation(opt_reg)
+                self.reg = opt_reg
+
             self.M = M
+            self.M_dot_W_dot_M = M_dot_W_dot_M
         else:
             amplitude_params = np.copy(self.amplitude_priors)
             err2 = np.copy(amplitude_params)
@@ -1654,6 +1782,64 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
+
+    # def jacobian(self, params, epsilon, fixed_params=None):
+    #     tmp_reg_optimisation = np.copy(self.reg_optimisation)
+    #     self.reg_optimisation = True
+    #     J = super().jacobian(params, epsilon, fixed_params=fixed_params)
+    #     self.reg_optimisation = tmp_reg_optimisation
+    #     return J
+
+
+class RegFitWorkspace(FitWorkspace):
+
+    def __init__(self, w):
+        """
+
+        Parameters
+        ----------
+        w: ChromaticPSFFitWorkspace
+        """
+        FitWorkspace.__init__(self)
+        self.data = np.array([0])
+        self.err = np.array([1])
+        self.w = w
+        self.p = np.asarray([np.log10(w.reg)])
+        print("ini", self.p, w.reg)
+        self.bounds = [(-np.inf, np.inf)]
+        self.input_labels = ["log10_reg"]
+        self.axis_names = [r"$\log_{10} r$"]
+        self.fixed = [False] * self.p.size
+        self.reg = 10 ** self.p[0]
+        self.resolution = np.zeros_like((self.w.amplitude_params.size, self.w.amplitude_params.size))
+        self.chisquare = -1
+
+    def simulate(self, log10_r):
+        reg = 10 ** log10_r
+        M_dot_W_dot_M_plus_Q = self.w.M_dot_W_dot_M + reg * self.w.Q
+        try:
+            L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
+            cov = L.T @ L
+        except np.linalg.LinAlgError:
+            cov = np.linalg.inv(M_dot_W_dot_M_plus_Q)
+        A = cov @ (self.w.M.T @ self.w.W_dot_data + reg * self.w.Q_dot_A0)
+        self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
+        diff = self.w.data_flat - self.w.M @ A
+        self.chisquare = diff @ (self.w.W * diff)
+        self.w.amplitude_params = A
+        self.w.amplitude_cov_matrix = cov
+        #self.w.live_fit = True
+        #self.w.plot_fit()
+        #plt.errorbar(x=np.arange(len(A)), y=A, yerr=[np.sqrt(cov[i,i]) for i in range(len(A))])
+        #plt.title(f"{reg} {self.w.data_flat.size} {np.trace(self.resolution)}")
+        #plt.grid()
+        #plt.draw()
+        #plt.pause(1e-8)
+        #plt.close()
+
+        self.reg = reg
+        self.G = self.chisquare / (self.w.data_flat.size - np.trace(self.resolution))
+        return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
 
 if __name__ == "__main__":

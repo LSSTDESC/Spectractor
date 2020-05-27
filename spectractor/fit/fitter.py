@@ -109,12 +109,10 @@ class FitWorkspace:
 
     def simulate(self, *p):
         """Compute the model prediction given a set of parameters.
-
         Parameters
         ----------
         p: array_like
             Array of parameters for the computation of the model.
-
         Returns
         -------
         x: array_like
@@ -123,18 +121,14 @@ class FitWorkspace:
             The model prediction.
         model_err: array_like
             The uncertainty on the model prediction.
-
         Examples
         --------
         >>> w = FitWorkspace()
         >>> p = np.zeros(3)
         >>> x, model, model_err = w.simulate(*p)
-
         .. doctest::
             :hide:
-
             >>> assert x is not None
-
         """
         x = np.array([])
         self.model = np.array([])
