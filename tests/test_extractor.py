@@ -49,7 +49,7 @@ def test_extractor():
             assert np.isclose(spectrum.lambdas[0], 343, atol=1)
             assert np.isclose(spectrum.lambdas[-1], 1084.0, atol=1)
         elif parameters.PSF_EXTRACTION_MODE == "PSF_1D":
-            assert np.isclose(spectrum.lambdas[0], 345, atol=1)
+            assert np.isclose(spectrum.lambdas[0], 347, atol=1)
             assert np.isclose(spectrum.lambdas[-1], 1085.0, atol=1)
         assert np.isclose(spectrum.x0[0], 743.6651370068676, atol=0.5)
         assert np.isclose(spectrum.x0[1], 683.0577836601408, atol=1)
