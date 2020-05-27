@@ -69,6 +69,7 @@ class SpectrumSimulation(Spectrum):
         self.model = lambda x: np.zeros_like(x)
         self.model_err = lambda x: np.zeros_like(x)
 
+
     def simulate_without_atmosphere(self, lambdas):
         """Compute the spectrum of an object and its uncertainties
         after its transmission throught the instrument except the atmosphere.
@@ -89,6 +90,10 @@ class SpectrumSimulation(Spectrum):
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         self.data = self.disperser.transmission(lambdas)
+        print(self.data)
+        print(lambdas)
+
+        print(self.telescope.transmission(lambdas))
         self.data *= self.telescope.transmission(lambdas)
         self.data *= self.target.sed(lambdas)
         self.err = np.zeros_like(self.data)
@@ -99,10 +104,9 @@ class SpectrumSimulation(Spectrum):
         return self.data, self.err
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0.,
-                 D=parameters.DISTANCE2CCD, shift_x=0.):
+                         D=parameters.DISTANCE2CCD, shift_x=0.):
         """Simulate the cross spectrum of an object and its uncertainties
         after its transmission throught the instrument and the atmosphere.
-
         Parameters
         ----------
         A1: float
@@ -121,27 +125,26 @@ class SpectrumSimulation(Spectrum):
             Distance between the CCD and the disperser in mm (default: parameters.DISTANCE2CCD)
         shift_x: float
             Shift in pixels of the order 0 position estimate (default: 0).
-
         Returns
         -------
         lambdas: array_like
             The wavelength array in nm used for the interpolation.
-        spectrum: callable
+        spectrum: array_like
             The spectrum interpolated function in Target units.
         spectrum_err: array_like
             The spectrum uncertainties interpolated function in Target units.
-
         """
+
         # find lambdas including ADR effect
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
-        distance = self.chromatic_psf.table['Dx_rot']
+        distance = np.array(self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x, shift_y=0))
         lambdas = self.disperser.grating_pixel_to_lambda(distance - shift_x, x0=new_x0, order=1)
-        lambda_ref = np.sum(lambdas * self.data) / np.sum(self.data)
-        distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref = lambda_ref)
+        #lambda_ref = np.sum(lambdas * self.data) / np.sum(self.data)
+        #distance -= adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
         lambdas = self.disperser.grating_pixel_to_lambda(distance - shift_x, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - shift_x, x0=new_x0, order=2)
-        #lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
+        # lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
         # simulate order 1 spectrum amplitude
         self.simulate_without_atmosphere(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)(lambdas)
@@ -153,7 +156,8 @@ class SpectrumSimulation(Spectrum):
         if reso > 0.1:
             self.data = fftconvolve_gaussian(self.data, reso)
             self.err = np.sqrt(np.abs(fftconvolve_gaussian(self.err ** 2, reso)))
-        if A2 > 0.:
+        if A2 > 0.01:
+            """
             lambdas_binwidths_order2 = np.gradient(lambdas_order2)
             sim_conv = interp1d(lambdas, self.data * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
             err_conv = interp1d(lambdas, self.err * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
@@ -161,6 +165,11 @@ class SpectrumSimulation(Spectrum):
             err_order2 = err_conv(lambdas_order2) * lambdas_binwidths_order2 / self.lambdas_binwidths
             self.data = (sim_conv(lambdas) + A2 * spectrum_order2) / lambdas
             self.err = (err_conv(lambdas) + A2 * err_order2) / lambdas
+            """
+            sim_conv = interp1d(lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
+            err_conv = interp1d(lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
+            self.data = sim_conv(lambdas) + A2 * sim_conv(lambdas_order2)
+            self.err = err_conv(lambdas) + A2 * err_conv(lambdas_order2)
 
         # now we include effects related to the wrong extraction of the spectrum:
         # wrong estimation of the order 0 position and wrong DISTANCE2CCD
@@ -172,6 +181,8 @@ class SpectrumSimulation(Spectrum):
         min_positive = np.min(self.err[self.err > 0])
         self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
         return self.lambdas, self.data, self.err
+
+
 
 
 class SpectrogramModel(Spectrum):
