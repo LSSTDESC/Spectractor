@@ -458,7 +458,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Set output path
     ensure_dir(outputdir)
     output_filename = image_filename.split('/')[-1]
-    output_filename = (output_filename.replace('reduc', 'sim')).replace('trim', 'sim')
+    output_filename = (output_filename.replace('reduc', 'sim_oder2=0.5')).replace('trim', 'sim')
     output_filename = os.path.join(outputdir, output_filename)
 
     # Save images and parameters
