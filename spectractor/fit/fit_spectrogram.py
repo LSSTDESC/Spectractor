@@ -1,4 +1,5 @@
 import time
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -42,11 +43,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.D = self.spectrum.header['D2CCD']
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
         length = len(self.spectrum.chromatic_psf.table)
-        self.psf_poly_params = self.psf_poly_params[length:-1]  # remove saturation (fixed parameter)
-        self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:-1])
-        self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:-1])
+        self.psf_poly_params = self.psf_poly_params[length:]
+        self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:])
+        self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:])
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
-        self.shift_x = self.spectrum.header['PIXSHIFT']
+        self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny // 2)
+        psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
+        self.shift_x = 0  # self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
         self.angle = self.spectrum.rotation_angle
         self.saturation = self.spectrum.spectrogram_saturation
@@ -60,8 +63,14 @@ class SpectrogramFitWorkspace(FitWorkspace):
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
                            r"$\theta$ [deg]"] + list(self.psf_poly_params_names)
         self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (1, 10), (0, 1),
-                                                (50, 60), (-3, 3), (-3, 3), (-90, 90)]),
-                                      self.psf_poly_params_bounds[:-1]])  # remove saturation
+                                                (50, 60), (-2, 2), (-3, 3), (-90, 90)]),
+                                      psf_poly_params_bounds])
+        self.fixed = [False] * self.p.size
+        for k, par in enumerate(self.input_labels):
+            if "x_mean" in par or "saturation" in par:
+                self.fixed[k] = True
+        self.fixed[7] = True  # Delta y
+        self.fixed[8] = True  # angle
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -73,17 +82,14 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
     def crop_spectrogram(self):
         bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
-        # spectrogram must have odd size in y for the fourier simulation
-        yeven = 0
-        if (self.spectrum.spectrogram_Ny - 2 * bgd_width) % 2 == 0:
-            yeven = 1
-        self.spectrum.spectrogram_ymax = self.spectrum.spectrogram_ymax - bgd_width + yeven
+        self.spectrum.spectrogram_ymax = self.spectrum.spectrogram_ymax - bgd_width
         self.spectrum.spectrogram_ymin += bgd_width
-        self.spectrum.spectrogram_bgd = self.spectrum.spectrogram_bgd[bgd_width:-bgd_width + yeven, :]
-        self.spectrum.spectrogram = self.spectrum.spectrogram[bgd_width:-bgd_width + yeven, :]
-        self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width + yeven, :]
+        self.spectrum.spectrogram_bgd = self.spectrum.spectrogram_bgd[bgd_width:-bgd_width, :]
+        self.spectrum.spectrogram = self.spectrum.spectrogram[bgd_width:-bgd_width, :]
+        self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width, :]
         self.spectrum.spectrogram_y0 -= bgd_width
         self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram.shape
+        self.spectrum.chromatic_psf.table["y_mean"] -= bgd_width
         self.my_logger.debug(f'\n\tSize of the spectrogram region after cropping: '
                              f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')
 
@@ -112,21 +118,21 @@ class SpectrogramFitWorkspace(FitWorkspace):
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
             norm = np.max(self.spectrum.spectrogram[:, sub])
-            plot_image_simple(ax[0, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
+            plot_image_simple(ax[0, 0], data=self.spectrum.spectrogram[:, sub] / norm, title='Data', aspect='auto',
+                              cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)')
+            ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+            plot_image_simple(ax[1, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
                               units='1/max(data)')
             if dispersion:
-                x = self.spectrum.chromatic_psf.table['Dx'][sub[2:-3]] + self.spectrum.spectrogram_x0 - sub[0]
+                x = self.spectrum.chromatic_psf.table['Dx'][sub[5:-5]] + self.spectrum.spectrogram_x0 - sub[0]
                 y = np.ones_like(x)
-                ax[0, 0].scatter(x, y, cmap=from_lambda_to_colormap(self.lambdas[sub[2:-3]]), edgecolors='None',
-                                 c=self.lambdas[sub[2:-3]],
+                ax[1, 0].scatter(x, y, cmap=from_lambda_to_colormap(self.lambdas[sub[5:-5]]), edgecolors='None',
+                                 c=self.lambdas[sub[5:-5]],
                                  label='', marker='o', s=10)
             # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
-                ax[0, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
-            plot_image_simple(ax[1, 0], data=self.spectrum.spectrogram[:, sub] / norm, title='Data', aspect='auto',
-                              cax=ax[1, 1], vmin=0, vmax=1, units='1/max(data)')
-            ax[1, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+                ax[1, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
             residuals = (self.spectrum.spectrogram - self.model)
             # residuals_err = self.spectrum.spectrogram_err / self.model
             norm = self.spectrum.spectrogram_err
@@ -192,7 +198,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         # if False:
         #     plt.imshow(J, origin="lower", aspect="auto")
         #     plt.show()
-        print(f"\tjacobian time computation = {time.time() - start:.1f}s")
+        self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
     def plot_fit(self):
@@ -216,19 +222,25 @@ class SpectrogramFitWorkspace(FitWorkspace):
             >>> fit_workspace.plot_fit()
 
         """
-        gs_kw = dict(width_ratios=[3, 0.15, 1, 0.15, 1, 0.15], height_ratios=[1, 1, 1, 1])
-        fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(12, 8), constrained_layout=True, gridspec_kw=gs_kw)
+        gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
+        fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
 
         A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, *psf = self.p
         plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
-                     f'D={D:.2f}mm, shift_x={shift_x:.2f}pix, shift_y={shift_y:.2f}pix')
+                     f'D={D:.2f}mm, shift_x={shift_x:.2f}pix, shift_y={shift_y:.2f}pix', y=1)
         # main plot
         self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
         # zoom O2
         self.plot_spectrogram_comparison_simple(ax[:, 2:4], extent=[730, 800], title='Zoom $O_2$', dispersion=True)
         # zoom H2O
         self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, 1000], title='Zoom $H_2 O$', dispersion=True)
-        # fig.tight_layout()
+        for i in range(3):  # clear middle colorbars
+            for j in range(2):
+                plt.delaxes(ax[i, 2*j+1])
+        for i in range(4):  # clear middle y axis labels
+            for j in range(1, 3):
+                ax[i, 2*j].set_ylabel("")
+        fig.tight_layout()
         if self.live_fit:
             plt.draw()
             plt.pause(1e-8)
@@ -237,7 +249,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             if parameters.DISPLAY and self.verbose:
                 plt.show()
         if parameters.SAVE:
-            figname = self.filename.replace(self.filename.split('.')[-1], "_bestfit.pdf")
+            figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
 
@@ -271,99 +283,33 @@ def plot_psf_poly_params(psf_poly_params):
 
 def run_spectrogram_minimisation(fit_workspace, method="newton"):
     my_logger = set_logger(__name__)
-    bounds = fit_workspace.bounds
-
-    nll = lambda params: -fit_workspace.lnlike(params)
-
-    # sim_134
-    # guess = fit_workspace.p
-    # truth sim_134
-    # guess = np.array([1., 0.05, 300, 5, 0.03, 55.45, 0.0, 0.0, -1.54, 0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955, -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901, 0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673, 528.3594585697788, 628.4966480821147, 12.438043546369354])
-    guess = np.array(
-        [1., 0.05, 300, 5, 0.03, 55.45, -0.275, 0.0, -1.54, -1.47570237e-01, -5.00195918e-01, 4.74296776e-01,
-         2.85776501e+00, -1.86436219e+00, 1.83899390e+00, 1.89342052e+00,
-         -9.43239034e-01, 1.06985560e+00, 0.00000000e+00, 0.00000000e+00,
-         0.00000000e+00, 1.44368271e+00, -9.95896258e-01, 1.59015965e+00])
-    # 5.00000000e+02
-    guess = fit_workspace.p
+    guess = np.asarray(fit_workspace.p)
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
         fit_workspace.simulation.fast_sim = True
         costs = np.array([fit_workspace.chisq(guess)])
-        if parameters.DISPLAY:
+        if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
             fit_workspace.plot_fit()
         params_table = np.array([guess])
         start = time.time()
+        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
         epsilon = 1e-4 * guess
-        epsilon[epsilon == 0] = 1e-3
-        epsilon[0] = 1e-3  # A1
-        epsilon[1] = 1e-4  # A2
-        epsilon[2] = 1  # ozone
-        epsilon[3] = 0.01  # pwv
-        epsilon[4] = 0.001  # aerosols
-        epsilon[5] = 0.001  # DCCD
-        epsilon[6] = 0.0005  # shift_x
-        my_logger.info(f"\n\tStart guess: {guess}")
+        epsilon[epsilon == 0] = 1e-4
 
-        # cancel the Gaussian part of the PSF
-        # TODO: solve this Gaussian PSF part issue
-        guess[-6:] = 0
-
-        # fit trace
-        fix = [True] * guess.size
-        fix[0] = False  # A1
-        fix[1] = False  # A2
-        fix[6] = True  # x0
-        fix[7] = True  # y0
-        fix[8] = True  # angle
         fit_workspace.simulation.fast_sim = True
-        fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 3] = [False] * 3
         fit_workspace.simulation.fix_psf_cube = False
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fix, xtol=1e-2, ftol=1e-2, niter=20)
-
-        # fit PSF
-        guess = np.array(fit_workspace.p)
-        fix = [True] * guess.size
-        fix[0] = False  # A1
-        fix[1] = False  # A2
-        fit_workspace.simulation.fast_sim = True
-        fix[fit_workspace.psf_params_start_index:fit_workspace.psf_params_start_index + 9] = [False] * 9
-        # fix[fit_workspace.psf_params_start_index:] = [False] * (guess.size - fit_workspace.psf_params_start_index)
-        fit_workspace.simulation.fix_psf_cube = False
-        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fix, xtol=1e-2, ftol=1e-2, niter=20)
-
-        # fit dispersion
-        guess = np.array(fit_workspace.p)
-        fix = [True] * guess.size
-        fix[0] = False
-        fix[1] = False
-        fix[5] = False  # DCCD
-        fix[6] = False  # x0
-        fit_workspace.simulation.fix_psf_cube = True
-        fit_workspace.simulation.fast_sim = True
-        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fix, xtol=1e-3, ftol=1e-2, niter=10)
-
-        # fit all except Gaussian part of the PSF
-        # TODO: solve this Gaussian PSF part issue
-        guess = np.array(fit_workspace.p)
-        fit_workspace.simulation.fast_sim = False
-        fix = [False] * guess.size
-        fix[6] = False  # x0
-        fix[7] = True  # y0
-        fix[8] = True  # angle
-        fix[-6:] = [True] * 6  # gaussian part
-        parameters.SAVE = True
-        fit_workspace.simulation.fix_psf_cube = False
-        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fix, xtol=1e-5, ftol=1e-5, niter=40)
+                                                   fix=fit_workspace.fixed, xtol=1e-4, ftol=1e-4, niter=40)
+        my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
+            parameters.SAVE = True
+            ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
+            fit_workspace.plot_correlation_matrix(ipar)
             fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
             save_gradient_descent(fit_workspace, costs, params_table)
-        print(f"Newton: total computation time: {time.time() - start}s")
+            fit_workspace.plot_fit()
+            parameters.SAVE = False
 
 
 if __name__ == "__main__":
@@ -396,13 +342,16 @@ if __name__ == "__main__":
     load_config(args.config)
 
     # filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    # filename = 'outputs/sim_20170530_134_spectrum.fits'
+    filename = 'outputs/sim_20170530_134_spectrum.fits'
     # 062
-    filename = 'CTIODataJune2017_reduced_RG715_v2_prod6/data_30may17/sim_20170530_067_spectrum.fits'
+    # filename = 'CTIODataJune2017_reduced_RG715_v2_prod6/data_30may17/sim_20170530_067_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
+    poly =[3.3400e+02,  3.3400e+02, -2.3320e-13, 1.3831e+02, -9.3958e+00 ,4.2649e-01,  2.5306e+00 ,-1.5941e+00,  9.2998e-01,  1.6213e+00 ,-7.5356e-01 , 4.6481e-01,  4.5429e+01]
+    #w.simulate(1, 0, 300, 5, 0.03, 56.308, 0., 0, -1.6352, *poly)
+    #w.plot_fit()
     run_spectrogram_minimisation(w, method="newton")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()
