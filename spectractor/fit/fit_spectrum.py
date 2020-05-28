@@ -122,6 +122,21 @@ class SpectrumFitWorkspace(FitWorkspace):
         return lambdas, model, model_err
 
 
+    def weighted_residuals(self, p):
+        x, model, model_err = self.simulate(*p)
+        if len(self.outliers) > 0:
+            raise NotImplementedError("Weighted residuals function not implemented for outlier rejection.")
+        else:
+            cov = self.spectrum.cov_matrix + np.diag(model_err * model_err)
+            try:
+                L = np.linalg.inv(np.linalg.cholesky(cov))
+                inv_cov = L.T @ L
+            except np.linalg.LinAlgError:
+                inv_cov = np.linalg.inv(cov)
+            res = inv_cov @ (model - self.data)
+        return res
+
+
     def plot_fit(self):
         """
         Examples
@@ -248,3 +263,4 @@ if __name__ == "__main__":
     # fit_workspace.plot_fit()
     # run_emcee(fit_workspace, ln=lnprob_spectrum)
     # fit_workspace.analyze_chains()
+

@@ -147,7 +147,6 @@ class Image(object):
         self.compute_statistical_error()
         self.convert_to_ADU_rate_units()
 
-
     def save_image(self, output_file_name, overwrite=False):
         """Save the image in a fits file.
 

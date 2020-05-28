@@ -10,14 +10,14 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument(dest="input", metavar='path', default=["tests/data/reduc_20170530_134_spectrum.fits"],
+    parser.add_argument(dest="input", metavar='path', default=["tests/data/reduc_20170530_134.fits"],
                         help="Input fits file name. It can be a list separated by spaces, or it can use * as wildcard.",
                         nargs='*')
     parser.add_argument("-d", "--debug", dest="debug", action="store_true",
                         help="Enter debug mode (more verbose and plots).", default=False)
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
                         help="Enter verbose (print more stuff).", default=False)
-    parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
+    parser.add_argument("-o", "--output_directory", dest="output_directory", default="tests/data/",
                         help="Write results in given output directory (default: ./outputs/).")
     parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
@@ -40,11 +40,12 @@ if __name__ == "__main__":
         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None:
             continue
-        spectrum_file_name = args.output_directory+'/'+tag.replace('.fits', '_spectrum.fits')
+        spectrum_file_name = args.output_directory+tag.replace('.fits', '_spectrum.fits')
         atmgrid = AtmosphereGrid(file_name)
         SpectrumSimulatorSimGrid(spectrum_file_name, args.output_directory)
-        image = ImageSim(file_name, spectrum_file_name, args.output_directory, A1=1, A2=0.0,
+        image = ImageSim(file_name, spectrum_file_name, args.output_directory, A1=1, A2=0,
                          pwv=5, ozone=300, aerosols=0.03,
                          psf_poly_params=None, with_stars=True)
-        sim_file_name = args.output_directory+'/'+tag.replace('reduc_', 'sim_')
+        sim_file_name = args.output_directory+tag.replace('reduc_', 'sim_')
+        print(sim_file_name)
         Spectractor(sim_file_name, args.output_directory, target, [xpos, ypos], disperser_label, args.config)
