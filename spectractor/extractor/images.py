@@ -142,6 +142,7 @@ class Image(object):
         self.header['XPIXSIZE'] = self.xpixsize
         self.header['YPIXSIZE'] = self.ypixsize
 
+
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
         self.compute_statistical_error()
@@ -446,6 +447,7 @@ def load_CTIO_image(image):
     image.humidity = image.header['OUTHUM']
     image.xpixsize = image.header['XPIXSIZE']
     image.ypixsize = image.header['YPIXSIZE']
+
 
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
     parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])

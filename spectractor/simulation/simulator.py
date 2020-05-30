@@ -94,10 +94,6 @@ class SpectrumSimulation(Spectrum):
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         self.data = self.disperser.transmission(lambdas)
-        print(self.data)
-        print(lambdas)
-
-        print(self.telescope.transmission(lambdas))
         self.data *= self.telescope.transmission(lambdas)
         self.data *= self.target.sed(lambdas)
         self.err = np.zeros_like(self.data)
@@ -143,7 +139,7 @@ class SpectrumSimulation(Spectrum):
         self.disperser.D = D
         distance = self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        lambda_ref = np.sum(lambdas * self.data) / np.sum(self.data)
+        lambda_ref = self.lambda_ref
         distance -= adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
@@ -170,8 +166,7 @@ class SpectrumSimulation(Spectrum):
         if reso > 0.1:
             self.data = fftconvolve_gaussian(self.data, reso)
             self.err = np.sqrt(np.abs(fftconvolve_gaussian(self.err ** 2, reso)))
-        if A2 > 0.01:
-            """
+        if A2 > 0.001:
             lambdas_binwidths_order2 = np.gradient(lambdas_order2)
             sim_conv = interp1d(lambdas, self.data * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
             err_conv = interp1d(lambdas, self.err * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
@@ -184,7 +179,7 @@ class SpectrumSimulation(Spectrum):
             err_conv = interp1d(lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
             self.data = sim_conv(lambdas) + A2 * sim_conv(lambdas_order2)
             self.err = err_conv(lambdas) + A2 * err_conv(lambdas_order2)
-
+            """
         # now we include effects related to the wrong extraction of the spectrum:
         # wrong estimation of the order 0 position and wrong DISTANCE2CCD
         # pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0]
@@ -320,7 +315,7 @@ class SpectrogramModel(Spectrum):
         # convert pixels into lambdas with ADR for spectrum amplitude evaluation
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        lambda_ref = np.sum(lambdas * self.data) / np.sum(self.data)
+        lambda_ref = self.lambda_ref
         distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
@@ -592,6 +587,7 @@ def SimulatorInit(filename):
     # ------------------------
     if not isinstance(spectrum.target, str):
         target = spectrum.target
+
     else:
         target = Target(spectrum.target)
 

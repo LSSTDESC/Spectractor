@@ -36,7 +36,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.data = self.spectrum.spectrogram
         self.err = self.spectrum.spectrogram_err
         self.A1 = 1.0
-        self.A2 = 0.01
+        self.A2 = 0.
         self.ozone = 400.
         self.pwv = 3
         self.aerosols = 0.05
@@ -66,6 +66,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                                                 (50, 60), (-2, 2), (-3, 3), (-90, 90)]),
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
+        #self.fixed[1] = True
         for k, par in enumerate(self.input_labels):
             if "x_mean" in par or "saturation" in par:
                 self.fixed[k] = True
@@ -342,10 +343,10 @@ if __name__ == "__main__":
     load_config(args.config)
 
     # filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    filename = 'outputs/sim_20170530_134_spectrum.fits'
+    filename = 'tests/data/sim_order2=0.5_20170530_134_spectrum.fits'
     # 062
     # filename = 'CTIODataJune2017_reduced_RG715_v2_prod6/data_30may17/sim_20170530_067_spectrum.fits'
-    atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+    atmgrid_filename = filename.replace('sim_order2=0.5', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
