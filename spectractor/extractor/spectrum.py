@@ -69,6 +69,7 @@ class Spectrum:
         self.lambdas = None
         self.lambdas_binwidths = None
         self.lambdas_indices = None
+        self.lambda_ref = None
         self.order = order
         self.chromatic_psf = None
         self.filter = None
@@ -346,6 +347,7 @@ class Spectrum:
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
                                   'second column gives the spectrum in unit UNIT2, ' \
                                   'third column the corresponding errors.'
+        self.header['LAMBDA_REF'] = self.lambda_ref
         hdu1 = fits.PrimaryHDU()
         hdu1.header = self.header
         hdu1.header["EXTNAME"] = "SPECTRUM"
@@ -459,7 +461,8 @@ class Spectrum:
                 self.xpixsize = self.header['XPIXSIZE']
             if self.header['YPIXSIZE'] != "":
                 self.ypixsize = self.header['YPIXSIZE']
-
+            if self.header['LAMBDA_REF'] != "":
+                self.lambda_ref = self.header['LAMBDA_REF']
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                       data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
@@ -568,6 +571,7 @@ def calibrate_spectrum(spectrum):
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
     lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
+    spectrum.lambda_ref = lambda_ref
     distance += adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
 
     # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
