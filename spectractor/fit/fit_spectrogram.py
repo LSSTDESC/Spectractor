@@ -52,18 +52,19 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.shift_x = 0  # self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
         self.angle = self.spectrum.rotation_angle
+        self.B = 1
         self.saturation = self.spectrum.spectrogram_saturation
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols,
-                           self.D, self.shift_x, self.shift_y, self.angle])
+                           self.D, self.shift_x, self.shift_y, self.angle, self.B])
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params])
         self.input_labels = ["A1", "A2", "ozone [db]", "PWV [mm]", "VAOD", r"D_CCD [mm]",
-                             r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]"] + list(self.psf_poly_params_labels)
+                             r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"] + list(self.psf_poly_params_labels)
         self.axis_names = ["$A_1$", "$A_2$", "ozone [db]", "PWV [mm]", "VAOD", r"$D_{CCD}$ [mm]",
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
-                           r"$\theta$ [deg]"] + list(self.psf_poly_params_names)
+                           r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names)
         self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (1, 10), (0, 1),
-                                                (50, 60), (-2, 2), (-3, 3), (-90, 90)]),
+                                                (50, 60), (-2, 2), (-3, 3), (-90, 90), (0.8, 1.2)]),
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
@@ -105,9 +106,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
             shiftx_truth = 0
             shifty_truth = 0
             rotation_angle = self.spectrum.header['ROT_T']
+            B = 1
             poly_truth = np.fromstring(self.spectrum.header['PSF_P_T'][1:-1], sep=' ', dtype=float)
             self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth,
-                          D_truth, shiftx_truth, shifty_truth, rotation_angle, *poly_truth)
+                          D_truth, shiftx_truth, shifty_truth, rotation_angle, B, *poly_truth)
             self.lambdas_truth = np.fromstring(self.spectrum.header['LBDAS_T'][1:-1], sep=' ', dtype=float)
             self.amplitude_truth = np.fromstring(self.spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
         else:
@@ -163,14 +165,14 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[3, 0].legend(fontsize=7)
             ax[3, 0].grid(True)
 
-    def simulate(self, A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, *psf_poly_params):
+    def simulate(self, A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, *psf_poly_params):
         global plot_counter
         self.simulation.fix_psf_cube = False
         if np.all(np.isclose(psf_poly_params, self.p[self.psf_params_start_index:], rtol=1e-6)):
             self.simulation.fix_psf_cube = True
         lambdas, model, model_err = \
-            self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, psf_poly_params)
-        self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle] + list(psf_poly_params))
+            self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, psf_poly_params)
+        self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B] + list(psf_poly_params))
         self.lambdas = lambdas
         self.model = model
         self.model_err = model_err
