@@ -549,11 +549,12 @@ class Spectrum:
         if os.path.isfile(input_file_name):
             self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
             self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
+                                              x0=self.spectrogram_x0, y0=self.spectrogram_y0,
                                               deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,
                                               file_name=input_file_name)
-            self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
+            self.my_logger.info(f'\n\tSpectrogram loaded from {input_file_name}')
         else:
-            self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
+            self.my_logger.warning(f'\n\tSpectrogram file {input_file_name} not found')
 
 
 def calibrate_spectrum(spectrum):
