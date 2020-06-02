@@ -180,15 +180,18 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # and end 0 nm after parameters.LAMBDA_MAX
     lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
                                                       x0=image.target_pixcoords)
-    pixel_start = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
-    pixel_end = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0)))))
+    xmin = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
+    xmax = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0)))))
 
     # Create spectrogram
-    data = data[ymin:ymax, pixel_start:pixel_end]
-    err = err[ymin:ymax, pixel_start:pixel_end]
+    data = data[ymin:ymax, xmin:xmax]
+    err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
     my_logger.info(
-        f'\n\tExtract spectrogram: crop rotated image [{pixel_start}:{pixel_end},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
+        f'\n\tExtract spectrogram: crop rotated image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
+
+    # Position of the order 0 in the spectrogram coordinates
+    target_pixcoords_spectrogram = [image.target_pixcoords_rotated[0] - xmin, image.target_pixcoords_rotated[1] - ymin]
 
     # Extract the background on the rotated image
     bgd_index = np.concatenate((np.arange(0, Ny//2 - ws[0]), np.arange(Ny//2 + ws[0], Ny))).astype(int)
@@ -209,12 +212,13 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     psf = load_PSF(psf_type=parameters.PSF_TYPE)
-    s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
+    s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
+                     deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
     s.fit_transverse_PSF1D_profile(data, err, signal_width, ws, pixel_step=10, sigma_clip=5,
                                    bgd_model_func=bgd_model_func, saturation=image.saturation, live_fit=False)
 
     # Fill spectrum object
-    spectrum.pixels = np.arange(pixel_start, pixel_end, 1).astype(int)
+    spectrum.pixels = np.arange(xmin, xmax, 1).astype(int)
     spectrum.data = np.copy(s.table['amplitude'])
     spectrum.err = np.copy(s.table['flux_err'])
     my_logger.debug(f'\n\tTransverse fit table:\n{s.table}')
@@ -228,7 +232,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                    f'mode={mode} and amplitude_priors_method={method}...')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
                             amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
-    # spectrum.data = np.copy(s.table['amplitude'])
     spectrum.data = np.copy(w.amplitude_params)
     spectrum.err = np.copy(w.amplitude_params_err)
     spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
@@ -236,19 +239,19 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     Dx_rot = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
     s.table['Dx'] = Dx_rot
-    s.table['Dy'] = s.table['y_mean'] - (image.target_pixcoords_rotated[1] - ymin)
+    s.table['Dy'] = s.table['y_c'] - (image.target_pixcoords_rotated[1] - ymin)
     s.table['Dy_disp_axis'] = 0
     s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
     s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
     my_logger.debug(f"\n\tTransverse fit table before derotation:"
-                    f"\n{s.table[['amplitude', 'x_mean', 'y_mean', 'Dx', 'Dy', 'Dy_disp_axis']]}")
+                    f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
 
     # Rotate and save the table
     s.rotate_table(-image.rotation_angle)
     flux = np.copy(s.table["amplitude"])
     flux_err = np.copy(s.table["flux_err"])
     my_logger.debug(f"\n\tTransverse fit table after derotation:"
-                    f"\n{s.table[['amplitude', 'x_mean', 'y_mean', 'Dx', 'Dy', 'Dy_disp_axis']]}")
+                    f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
 
     # Extract the spectrogram edges
     data = np.copy(image.data)[:, 0:right_edge]
@@ -268,9 +271,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Position of the order 0 in the spectrogram coordinates
     target_pixcoords_spectrogram = [image.target_pixcoords[0] - xmin, image.target_pixcoords[1] - ymin]
 
-    # Update y_mean and x_mean after rotation
-    s.table['y_mean'] = s.table['Dy'] + target_pixcoords_spectrogram[1]
-    s.table['x_mean'] = s.table['Dx'] + target_pixcoords_spectrogram[0]
+    # Update y_c and x_c after rotation
+    s.table['y_c'] = s.table['Dy'] + target_pixcoords_spectrogram[1]
+    s.table['x_c'] = s.table['Dx'] + target_pixcoords_spectrogram[0]
 
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
@@ -287,12 +290,13 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # 2D extraction
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
         # build 1D priors
-        s.table['y_mean'] = s.table['Dy']
+        s.table['y_c'] = s.table['Dy']
         psf_poly_priors = s.from_table_to_poly_params()[s.Nx:]
-        psf_poly_priors[w.y_mean_0_index] += target_pixcoords_spectrogram[1]
+        psf_poly_priors[w.y_c_0_index] += target_pixcoords_spectrogram[1]
         Dy_disp_axis = np.copy(s.table["Dy_disp_axis"])
         # initialize a new ChromaticPSF
-        s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
+        s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
+                         deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
         s.table['Dx'] = np.arange(xmin, xmax, 1) - image.target_pixcoords[0]
         s.table["amplitude"] = np.interp(np.arange(xmin, xmax, 1), Dx_rot, flux)
         s.table["flux_err"] = np.interp(np.arange(xmin, xmax, 1), Dx_rot, flux_err)
@@ -305,7 +309,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
                        f'mode={mode} and amplitude_priors_method={method}...')
         my_logger.debug(f"\n\tTransverse fit table before derotation:"
-                        f"\n{s.table[['amplitude', 'x_mean', 'y_mean', 'Dx', 'Dy', 'Dy_disp_axis']]}")
+                        f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
         w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
                                 amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
         spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
@@ -316,7 +320,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
         spectrum.pixels = np.copy(s.table['Dx'])
 
-        s.table['Dy'] = s.table['y_mean'] - target_pixcoords_spectrogram[1]
+        s.table['Dy'] = s.table['y_c'] - target_pixcoords_spectrogram[1]
         s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
         s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
         s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
@@ -353,7 +357,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         ax[0].set_ylabel("Transverse FWHM [pixels]")
         ax[0].set_ylim((0.8 * np.min(s.table['fwhm']), 1.2 * np.max(s.table['fwhm'])))  # [-10:])))
         ax[0].grid()
-        ax[1].plot(spectrum.lambdas, np.array(s.table['y_mean']))
+        ax[1].plot(spectrum.lambdas, np.array(s.table['y_c']))
         ax[1].set_xlabel(r"$\lambda$ [nm]")
         ax[1].set_ylabel("Distance from mean dispersion axis [pixels]")
         # ax[1].set_ylim((0.8*np.min(s.table['Dy']), 1.2*np.max(s.table['fwhm'][-10:])))

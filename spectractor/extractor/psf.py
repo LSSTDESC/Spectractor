@@ -21,12 +21,12 @@ from numba import njit
 
 
 @njit
-def evaluate_moffat1d_unnormalized(y, amplitude, y_mean, gamma, alpha):  # pragma: nocover
+def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):  # pragma: nocover
     r"""Compute a 1D Moffat function, whose integral is not normalised to unity.
 
     .. math ::
 
-        f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
+        f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}
         \quad\text{with}, \alpha > 1/2
 
     Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor
@@ -39,8 +39,8 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_mean, gamma, alpha):  # pragm
         1D array of pixels :math:`y`, regularly spaced.
     amplitude: float
         Integral :math:`A` of the function.
-    y_mean: float
-        Center  :math:`y_0` of the function.
+    y_c: float
+        Center  :math:`y_c` of the function.
     gamma: float
         Width  :math:`\gamma` of the function.
     alpha: float
@@ -59,7 +59,7 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_mean, gamma, alpha):  # pragm
     >>> amplitude = 10
     >>> alpha = 2
     >>> gamma = 5
-    >>> a = evaluate_moffat1d_unnormalized(y, amplitude=amplitude, y_mean=Ny/2, gamma=gamma, alpha=alpha)
+    >>> a = evaluate_moffat1d_unnormalized(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha)
     >>> norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
     >>> a = a / norm
     >>> print(f"{np.sum(a):.6f}")
@@ -79,7 +79,7 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_mean, gamma, alpha):  # pragm
         Ny = 50
         y = np.arange(Ny)
         amplitude = 10
-        a = evaluate_moffat1d(y, amplitude=amplitude, y_mean=Ny/2, gamma=5, alpha=2)
+        a = evaluate_moffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma=5, alpha=2)
         plt.plot(a)
         plt.grid()
         plt.xlabel("y")
@@ -87,7 +87,7 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_mean, gamma, alpha):  # pragm
         plt.show()
 
     """
-    rr = (y - y_mean) * (y - y_mean)
+    rr = (y - y_c) * (y - y_c)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha)
     # dx = y[1] - y[0]
@@ -101,14 +101,14 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_mean, gamma, alpha):  # pragm
 
 
 @njit
-def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_mean, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
+def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
     r"""Compute a 1D Moffat-Gaussian function, whose integral is not normalised to unity.
 
     .. math ::
 
         f(y) \propto A \left\lbrace
-        \frac{1}{\left[ 1 +\left(\frac{y-y_0}{\gamma}\right)^2 \right]^\alpha}
-         - \eta e^{-(y-y_0)^2/(2\sigma^2)}\right\rbrace
+        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}
+         - \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
         \quad\text{ and } \quad \eta < 0, \alpha > 1/2
 
     Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor for the Moffat
@@ -122,8 +122,8 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_mean, gamma, alpha, eta_
         1D array of pixels :math:`y`, regularly spaced.
     amplitude: float
         Integral :math:`A` of the function.
-    y_mean: float
-        Center  :math:`y_0` of the function.
+    y_c: float
+        Center  :math:`y_c` of the function.
     gamma: float
         Width  :math:`\gamma` of the Moffat function.
     alpha: float
@@ -148,7 +148,7 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_mean, gamma, alpha, eta_
     >>> alpha = 2
     >>> eta_gauss = -0.1
     >>> sigma = 1
-    >>> a = evaluate_moffatgauss1d_unnormalized(y, amplitude=amplitude, y_mean=Ny/2, gamma=gamma, alpha=alpha,
+    >>> a = evaluate_moffatgauss1d_unnormalized(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
     ... eta_gauss=eta_gauss, sigma=sigma)
     >>> norm = gamma*np.sqrt(np.pi)*special.gamma(alpha-0.5)/special.gamma(alpha) + eta_gauss*np.sqrt(2*np.pi)*sigma
     >>> a = a / norm
@@ -169,7 +169,7 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_mean, gamma, alpha, eta_
         Ny = 50
         y = np.arange(Ny)
         amplitude = 10
-        a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_mean=Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
+        a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
         plt.plot(a)
         plt.grid()
         plt.xlabel("y")
@@ -177,7 +177,7 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_mean, gamma, alpha, eta_
         plt.show()
 
     """
-    rr = (y - y_mean) * (y - y_mean)
+    rr = (y - y_c) * (y - y_c)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * sigma * sigma)))
     # dx = y[1] - y[0]
@@ -191,13 +191,13 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_mean, gamma, alpha, eta_
 
 
 @njit
-def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):  # pragma: nocover
+def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocover
     r"""Compute a 2D Moffat function, whose integral is normalised to unity.
 
     .. math ::
 
         f(x, y) = \frac{A (\alpha - 1)}{\pi \gamma^2} \frac{1}{
-        \left[ 1 +\frac{\left(x-x_0\right)^2+\left(y-y_0\right)^2}{\gamma^2} \right]^\alpha}
+        \left[ 1 +\frac{\left(x-x_c\right)^2+\left(y-y_c\right)^2}{\gamma^2} \right]^\alpha}
         \quad\text{with}\quad
         \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
 
@@ -214,10 +214,10 @@ def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):  # pragma:
         2D array of pixels :math:`y`, regularly spaced.
     amplitude: float
         Integral :math:`A` of the function.
-    x_mean: float
-        X axis center  :math:`x_0` of the function.
-    y_mean: float
-        Y axis center  :math:`y_0` of the function.
+    x_c: float
+        X axis center  :math:`x_c` of the function.
+    y_c: float
+        Y axis center  :math:`y_c` of the function.
     gamma: float
         Width  :math:`\gamma` of the function.
     alpha: float
@@ -235,7 +235,7 @@ def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):  # pragma:
     >>> Ny = 50
     >>> xx, yy = np.mgrid[:Nx, :Ny]
     >>> amplitude = 10
-    >>> a = evaluate_moffat2d(xx, yy, amplitude=amplitude, x_mean=Nx/2, y_mean=Ny/2, gamma=5, alpha=2)
+    >>> a = evaluate_moffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2)
     >>> print(f"{np.sum(a):.6f}")
     9.683129
 
@@ -253,7 +253,7 @@ def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):  # pragma:
         Ny = 50
         xx, yy = np.mgrid[:Nx, :Ny]
         amplitude = 10
-        a = evaluate_moffat2d(xx, yy, amplitude=amplitude, y_mean=Ny/2, x_mean=Nx/2, gamma=5, alpha=2)
+        a = evaluate_moffat2d(xx, yy, amplitude=amplitude, y_c=Ny/2, x_c=Nx/2, gamma=5, alpha=2)
         im = plt.pcolor(xx, yy, a)
         plt.grid()
         plt.xlabel("x")
@@ -262,7 +262,7 @@ def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):  # pragma:
         plt.show()
 
     """
-    rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
+    rr = ((x - x_c) ** 2 + (y - y_c) ** 2)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha)
     norm = (np.pi * gamma * gamma) / (alpha - 1)
@@ -271,14 +271,14 @@ def evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha):  # pragma:
 
 
 @njit
-def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
+def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
     r"""Compute a 2D Moffat-Gaussian function, whose integral is normalised to unity.
 
     .. math ::
 
         f(x, y) = \frac{A}{\frac{\pi \gamma^2}{\alpha-1} + 2 \pi \eta \sigma^2}\left\lbrace \frac{1}{
-        \left[ 1 +\frac{\left(x-x_0\right)^2+\left(y-y_0\right)^2}{\gamma^2} \right]^\alpha}
-         + \eta e^{-\left[ \left(x-x_0\right)^2+\left(y-y_0\right)^2\right]/(2 \sigma^2)}
+        \left[ 1 +\frac{\left(x-x_c\right)^2+\left(y-y_c\right)^2}{\gamma^2} \right]^\alpha}
+         + \eta e^{-\left[ \left(x-x_c\right)^2+\left(y-y_c\right)^2\right]/(2 \sigma^2)}
         \right\rbrace
 
     .. math ::
@@ -296,10 +296,10 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_ga
         2D array of pixels :math:`y`, regularly spaced.
     amplitude: float
         Integral :math:`A` of the function.
-    x_mean: float
-        X axis center  :math:`x_0` of the function.
-    y_mean: float
-        Y axis center  :math:`y_0` of the function.
+    x_c: float
+        X axis center  :math:`x_c` of the function.
+    y_c: float
+        Y axis center  :math:`y_c` of the function.
     gamma: float
         Width  :math:`\gamma` of the function.
     alpha: float
@@ -321,7 +321,7 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_ga
     >>> Ny = 50
     >>> xx, yy = np.mgrid[:Nx, :Ny]
     >>> amplitude = 10
-    >>> a = evaluate_moffatgauss2d(xx, yy, amplitude=amplitude, x_mean=Nx/2, y_mean=Ny/2, gamma=5, alpha=2,
+    >>> a = evaluate_moffatgauss2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2,
     ... eta_gauss=-0.1, sigma=1)
     >>> print(f"{np.sum(a):.6f}")
     9.680573
@@ -349,7 +349,7 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_ga
         plt.show()
 
     """
-    rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
+    rr = ((x - x_c) ** 2 + (y - y_c) ** 2)
     rr_gg = rr / (gamma * gamma)
     a = np.power(1 + rr_gg, -alpha) + eta_gauss * np.exp(-(rr / (2. * sigma * sigma)))
     norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * sigma * sigma
@@ -360,8 +360,8 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_ga
 class PSF:
     """Generic PSF model class.
 
-    The PSF models must contain at least the "amplitude", "x_mean" and "y_mean" parameters as the first three parameters
-    (in this order) and "saturation" parameter as the last parameter. "amplitude", "x_mean" and "y_mean"
+    The PSF models must contain at least the "amplitude", "x_c" and "y_c" parameters as the first three parameters
+    (in this order) and "saturation" parameter as the last parameter. "amplitude", "x_c" and "y_c"
     stands respectively for the general amplitude of the model, the position along the dispersion axis and the
     transverse position with respect to the dispersion axis (assumed to be the X axis).
     Last "saturation" parameter must be express in the same units as the signal to model and as the "amplitude"
@@ -373,8 +373,8 @@ class PSF:
     def __init__(self):
         self.my_logger = set_logger(self.__class__.__name__)
         self.p = np.array([])
-        self.param_names = ["amplitude", "x_mean", "y_mean", "saturation"]
-        self.axis_names = ["$A$", r"$x_0$", r"$y_0$", "saturation"]
+        self.param_names = ["amplitude", "x_c", "y_c", "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", "saturation"]
         self.bounds = [[]]
         self.p_default = np.array([1, 0, 0, 1])
         self.max_half_width = np.inf
@@ -382,7 +382,7 @@ class PSF:
     def evaluate(self, pixels, p=None):  # pragma: no cover
         if p is not None:
             self.p = np.asarray(p).astype(float)
-        # amplitude, x_mean, y_mean, saturation = self.p
+        # amplitude, x_c, y_c, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             return np.zeros_like(pixels)
         elif pixels.ndim == 1:
@@ -495,8 +495,8 @@ class Moffat(PSF):
             self.p = np.asarray(p).astype(float)
         else:
             self.p = np.copy(self.p_default)
-        self.param_names = ["amplitude", "x_mean", "y_mean", "gamma", "alpha", "saturation"]
-        self.axis_names = ["$A$", r"$x_0$", r"$y_0$", r"$\gamma$", r"$\alpha$", "saturation"]
+        self.param_names = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
         self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 10),
                                 (0, np.inf)])
 
@@ -554,14 +554,14 @@ class Moffat(PSF):
         """
         if p is not None:
             self.p = np.asarray(p).astype(float)
-        amplitude, x_mean, y_mean, gamma, alpha, saturation = self.p
+        amplitude, x_c, y_c, gamma, alpha, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            return np.clip(evaluate_moffat2d(x, y, amplitude, x_mean, y_mean, gamma, alpha), 0, saturation)
+            return np.clip(evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha), 0, saturation)
         elif pixels.ndim == 1:
             y = np.array(pixels)
             norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
-            return np.clip(evaluate_moffat1d_unnormalized(y, amplitude, y_mean, gamma, alpha) / norm, 0, saturation)
+            return np.clip(evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha) / norm, 0, saturation)
         else:  # pragma: no cover
             self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
                                  f"Here pixels.ndim={pixels.shape}.")
@@ -577,9 +577,9 @@ class MoffatGauss(PSF):
             self.p = np.asarray(p).astype(float)
         else:
             self.p = np.copy(self.p_default)
-        self.param_names = ["amplitude", "x_mean", "y_mean", "gamma", "alpha", "eta_gauss", "stddev",
+        self.param_names = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev",
                             "saturation"]
-        self.axis_names = ["$A$", r"$x_0$", r"$y_0$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
         self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 10),
                                 (-1, 0), (0.1, np.inf), (0, np.inf)])
 
@@ -638,17 +638,17 @@ class MoffatGauss(PSF):
         """
         if p is not None:
             self.p = np.asarray(p).astype(float)
-        amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation = self.p
+        amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            return np.clip(evaluate_moffatgauss2d(x, y, amplitude, x_mean, y_mean,
+            return np.clip(evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c,
                                                   gamma, alpha, eta_gauss, stddev), 0, saturation)
         elif pixels.ndim == 1:
             y = np.array(pixels)
             norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha) + eta_gauss * np.sqrt(
                 2 * np.pi) * stddev
             return np.clip(
-                evaluate_moffatgauss1d_unnormalized(y, amplitude, y_mean, gamma, alpha, eta_gauss, stddev) / norm, 0,
+                evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, stddev) / norm, 0,
                 saturation)
         else:  # pragma: no cover
             self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
@@ -984,7 +984,7 @@ def PSF2D_chisq_jac(params, model, xx, yy, zz, zz_err=None):
 # DO NOT WORK
 # def fit_PSF2D_outlier_removal(x, y, data, sigma=3.0, niter=3, guess=None, bounds=None):
 #     """Fit a PSF 2D model with parameters:
-#         amplitude_gauss, x_mean, stddev, amplitude, alpha, gamma, saturation
+#         amplitude_gauss, x_c, stddev, amplitude, alpha, gamma, saturation
 #     using scipy. Find outliers data point above sigma*data_errors from the fit over niter iterations.
 #
 #     Parameters
@@ -1057,7 +1057,7 @@ def PSF2D_chisq_jac(params, model, xx, yy, zz, zz_err=None):
 
 def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='minimize'):
     """
-    Fit a PSF 2D model with parameters: amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
+    Fit a PSF 2D model with parameters: amplitude, x_c, y_c, stddev, eta, alpha, gamma, saturation
     using basin hopping global minimization method.
 
     Parameters
@@ -1151,7 +1151,7 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
 
 def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
     """
-    Fit a PSF 2D model with parameters: amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
+    Fit a PSF 2D model with parameters: amplitude, x_c, y_c, stddev, eta, alpha, gamma, saturation
     using basin hopping global minimization method.
 
     Parameters
@@ -1255,7 +1255,7 @@ class PSF1DAstropy(Fittable1DModel):  # pragma: nocover
     # outputs = ('y',)
 
     amplitude_moffat = Parameter('amplitude_moffat', default=0.5)
-    x_mean = Parameter('x_mean', default=0)
+    x_c = Parameter('x_c', default=0)
     gamma = Parameter('gamma', default=3)
     alpha = Parameter('alpha', default=3)
     eta_gauss = Parameter('eta_gauss', default=1)
@@ -1265,8 +1265,8 @@ class PSF1DAstropy(Fittable1DModel):  # pragma: nocover
     axis_names = ["A", "y", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
 
     @staticmethod
-    def evaluate(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = (x - x_mean) * (x - x_mean)
+    def evaluate(x, amplitude_moffat, x_c, gamma, alpha, eta_gauss, stddev, saturation):
+        rr = (x - x_c) * (x - x_c)
         rr_gg = rr / (gamma * gamma)
         # use **(-alpha) instead of **(alpha) to avoid overflow power errors due to high alpha exponents
         # import warnings
@@ -1275,34 +1275,34 @@ class PSF1DAstropy(Fittable1DModel):  # pragma: nocover
             a = amplitude_moffat * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
         except RuntimeWarning:  # pragma: no cover
             my_logger = set_logger(__name__)
-            my_logger.warning(f"{[amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation]}")
+            my_logger.warning(f"{[amplitude_moffat, x_c, gamma, alpha, eta_gauss, stddev, saturation]}")
             a = amplitude_moffat * eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
         return np.clip(a, 0, saturation)
 
     @staticmethod
-    def fit_deriv(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = (x - x_mean) * (x - x_mean)
+    def fit_deriv(x, amplitude_moffat, x_c, gamma, alpha, eta_gauss, stddev, saturation):
+        rr = (x - x_c) * (x - x_c)
         rr_gg = rr / (gamma * gamma)
         gauss_norm = np.exp(-(rr / (2. * stddev * stddev)))
         d_eta_gauss = amplitude_moffat * gauss_norm
         moffat_norm = (1 + rr_gg) ** (-alpha)
         d_amplitude_moffat = moffat_norm + eta_gauss * gauss_norm
-        d_x_mean = amplitude_moffat * (eta_gauss * (x - x_mean) / (stddev * stddev) * gauss_norm
-                                       - alpha * moffat_norm * (-2 * x + 2 * x_mean) / (
+        d_x_c = amplitude_moffat * (eta_gauss * (x - x_c) / (stddev * stddev) * gauss_norm
+                                       - alpha * moffat_norm * (-2 * x + 2 * x_c) / (
                                                gamma * gamma * (1 + rr_gg)))
         d_stddev = amplitude_moffat * eta_gauss * rr / (stddev ** 3) * gauss_norm
         d_alpha = - amplitude_moffat * moffat_norm * np.log(1 + rr_gg)
         d_gamma = 2 * amplitude_moffat * alpha * moffat_norm * (rr_gg / (gamma * (1 + rr_gg)))
         d_saturation = saturation * np.zeros_like(x)
-        return np.array([d_amplitude_moffat, d_x_mean, d_gamma, d_alpha, d_eta_gauss, d_stddev, d_saturation])
+        return np.array([d_amplitude_moffat, d_x_c, d_gamma, d_alpha, d_eta_gauss, d_stddev, d_saturation])
 
     @staticmethod
-    def deriv(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = (x - x_mean) * (x - x_mean)
+    def deriv(x, amplitude_moffat, x_c, gamma, alpha, eta_gauss, stddev, saturation):
+        rr = (x - x_c) * (x - x_c)
         rr_gg = rr / (gamma * gamma)
         d_eta_gauss = np.exp(-(rr / (2. * stddev * stddev)))
-        d_gauss = - eta_gauss * (x - x_mean) / (stddev * stddev) * d_eta_gauss
-        d_moffat = -  alpha * 2 * (x - x_mean) / (gamma * gamma * (1 + rr_gg) ** (alpha + 1))
+        d_gauss = - eta_gauss * (x - x_c) / (stddev * stddev) * d_eta_gauss
+        d_moffat = -  alpha * 2 * (x - x_c) / (gamma * gamma * (1 + rr_gg) ** (alpha + 1))
         return amplitude_moffat * (d_gauss + d_moffat)
 
     def interpolation(self, x_array):
@@ -1446,14 +1446,14 @@ class PSF1DAstropy(Fittable1DModel):  # pragma: nocover
                 return interp(x) - 0.5 * maximum
         else:
             maximum = self.amplitude_moffat.value * (1 + self.eta_gauss.value)
-            a = self.x_mean.value
-            b = self.x_mean.value + 3 * max(self.gamma.value, self.stddev.value)
+            a = self.x_c.value
+            b = self.x_c.value + 3 * max(self.gamma.value, self.stddev.value)
 
             def eq(x):
                 return self.evaluate(x, *params) - 0.5 * maximum
         res = dichotomie(eq, a, b, 1e-2)
         # res = newton()
-        return abs(2 * (res - self.x_mean.value))
+        return abs(2 * (res - self.x_c.value))
 
 
 @deprecated(reason='Use MoffatGauss1D class instead.')
@@ -1484,7 +1484,7 @@ def PSF1D_chisq_jac(params, model, xx, yy, yy_err=None):  # pragma: nocover
 @deprecated(reason='Use MoffatGauss1D class instead.')
 def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimize'):  # pragma: nocover
     """Fit a PSF 1D Astropy model with parameters :
-        amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+        amplitude_gauss, x_c, stddev, amplitude_moffat, alpha, gamma, saturation
 
     using basin hopping global minimization method.
 
@@ -1563,7 +1563,7 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
 def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, guess=None, bounds=None, method='minimize',
                               niter_basinhopping=5, T_basinhopping=0.2):  # pragma: nocover
     """Fit a PSF 1D Astropy model with parameters:
-        amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+        amplitude_gauss, x_c, stddev, amplitude_moffat, alpha, gamma, saturation
 
     using scipy. Find outliers data point above sigma*data_errors from the fit over niter iterations.
 
@@ -1681,7 +1681,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
 @deprecated(reason='Use MoffatGauss1D class instead.')
 def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):  # pragma: nocover
     """Fit a PSF 1D Astropy model with parameters:
-        amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+        amplitude_gauss, x_c, stddev, amplitude_moffat, alpha, gamma, saturation
 
     using Minuit.
 
@@ -1761,7 +1761,7 @@ def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):  # pra
 def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=None, sigma=3,
                                      niter=2, consecutive=3):  # pragma: nocover
     """Fit a PSF Astropy 1D model with parameters:
-        amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
+        amplitude_gauss, x_c, stddev, amplitude_moffat, alpha, gamma, saturation
 
     using Minuit. Find outliers data point above sigma*data_errors from the fit over niter iterations.
     Only at least 3 consecutive outliers are considered.
@@ -1884,8 +1884,8 @@ class PSF2DAstropy(Fittable2DModel):  # pragma: nocover
     # outputs = ('z',)
 
     amplitude_moffat = Parameter('amplitude_moffat', default=1)
-    x_mean = Parameter('x_mean', default=0)
-    y_mean = Parameter('y_mean', default=0)
+    x_c = Parameter('x_c', default=0)
+    y_c = Parameter('y_c', default=0)
     gamma = Parameter('gamma', default=3)
     alpha = Parameter('alpha', default=3)
     eta_gauss = Parameter('eta_gauss', default=0.)
@@ -1895,8 +1895,8 @@ class PSF2DAstropy(Fittable2DModel):  # pragma: nocover
     param_titles = ["A", "x", "y", r"\gamma", r"\alpha", r"\eta", r"\sigma", "saturation"]
 
     @staticmethod
-    def evaluate(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
+    def evaluate(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev, saturation):
+        rr = ((x - x_c) ** 2 + (y - y_c) ** 2)
         rr_gg = rr / (gamma * gamma)
         a = amplitude * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
         return np.clip(a, 0, saturation)
@@ -1906,22 +1906,22 @@ class PSF2DAstropy(Fittable2DModel):  # pragma: nocover
         return amplitude * ((np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * stddev * stddev)
 
     @staticmethod
-    def fit_deriv(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
+    def fit_deriv(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev, saturation):
+        rr = ((x - x_c) ** 2 + (y - y_c) ** 2)
         rr_gg = rr / (gamma * gamma)
         gauss_norm = np.exp(-(rr / (2. * stddev * stddev)))
         d_eta_gauss = amplitude * gauss_norm
         moffat_norm = (1 + rr_gg) ** (-alpha)
         d_amplitude = moffat_norm + eta_gauss * gauss_norm
-        d_x_mean = amplitude * eta_gauss * (x - x_mean) / (stddev * stddev) * gauss_norm \
-                   - amplitude * alpha * moffat_norm * (-2 * x + 2 * x_mean) / (gamma ** 2 * (1 + rr_gg))
-        d_y_mean = amplitude * eta_gauss * (y - y_mean) / (stddev * stddev) * gauss_norm \
-                   - amplitude * alpha * moffat_norm * (-2 * y + 2 * y_mean) / (gamma ** 2 * (1 + rr_gg))
+        d_x_c = amplitude * eta_gauss * (x - x_c) / (stddev * stddev) * gauss_norm \
+                   - amplitude * alpha * moffat_norm * (-2 * x + 2 * x_c) / (gamma ** 2 * (1 + rr_gg))
+        d_y_c = amplitude * eta_gauss * (y - y_c) / (stddev * stddev) * gauss_norm \
+                   - amplitude * alpha * moffat_norm * (-2 * y + 2 * y_c) / (gamma ** 2 * (1 + rr_gg))
         d_stddev = amplitude * eta_gauss * rr / (stddev ** 3) * gauss_norm
         d_alpha = - amplitude * moffat_norm * np.log(1 + rr_gg)
         d_gamma = 2 * amplitude * alpha * moffat_norm * (rr_gg / (gamma * (1 + rr_gg)))
         d_saturation = saturation * np.zeros_like(x)
-        return [d_amplitude, d_x_mean, d_y_mean, d_gamma, d_alpha, d_eta_gauss, d_stddev, d_saturation]
+        return [d_amplitude, d_x_c, d_y_c, d_gamma, d_alpha, d_eta_gauss, d_stddev, d_saturation]
 
     def interpolation(self, x_array, y_array):
         """

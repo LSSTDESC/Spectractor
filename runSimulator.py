@@ -10,7 +10,7 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument(dest="input", metavar='path', default=["tests/data/reduc_20170530_134.fits"],
+    parser.add_argument(dest="input", metavar='path', default=["tests/data/reduc_20170530_191.fits"],
                         help="Input fits file name. It can be a list separated by spaces, or it can use * as wildcard.",
                         nargs='*')
     parser.add_argument("-d", "--debug", dest="debug", action="store_true",

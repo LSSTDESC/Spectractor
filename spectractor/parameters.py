@@ -114,7 +114,7 @@ PIXWIDTH_BOXSIZE = 20 # box size for sextractor evaluation of the background
 BGD_ORDER = 1  # the order of the polynomial background to fit in the transverse direction
 
 # PSF
-PSF_EXTRACTION_MODE = "PSF_1D"  # extraction mode: 1D or 2D
+PSF_EXTRACTION_MODE = "PSF_2D"  # extraction mode: 1D or 2D
 PSF_TYPE = "Moffat"  # the PSF model: Moffat or MoffatGauss
 PSF_POLY_ORDER = 2  # the order of the polynomials to model wavelength dependence of the PSF shape parameters
 PSF_FIT_REG_PARAM = 0.01  # regularisation parameter for the chisq minimisation to extract the spectrum
