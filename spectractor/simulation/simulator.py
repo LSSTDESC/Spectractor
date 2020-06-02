@@ -360,7 +360,7 @@ class SpectrogramModel(Spectrum):
 
     # @profile
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
-                 shift_x=0., shift_y=0., angle=0., psf_poly_params=None):
+                 shift_x=0., shift_y=0., angle=0., B=1., psf_poly_params=None):
         """
 
         Parameters
@@ -375,6 +375,7 @@ class SpectrogramModel(Spectrum):
         shift_x
         shift_y
         angle
+        B
 
         Returns
         -------
@@ -422,7 +423,7 @@ class SpectrogramModel(Spectrum):
         # self.data is in ADU/s units here
         self.data = A1 * (ima1 + A2 * ima2)
         if self.with_background:
-            self.data += self.spectrogram_bgd
+            self.data += B * self.spectrogram_bgd
         self.err = np.zeros_like(self.data)
         self.my_logger.debug(f'\n\tAfter all: {time.time() - start}')
         if parameters.DEBUG:
@@ -593,7 +594,7 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
 def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
                              pwv=5, ozone=300, aerosols=0.05, A1=1.0, A2=0.,
                              D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0.,
-                             psf_poly_params=None, with_background=True, fast_sim=False):
+                             B=1., psf_poly_params=None, with_background=True, fast_sim=False):
     """ SimulatorCore
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
@@ -610,7 +611,7 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
     # --------------------
     spectrogram_simulation = SpectrogramModel(spectrum, atmosphere, telescope, disperser,
                                               with_background=with_background, fast_sim=fast_sim)
-    spectrogram_simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, psf_poly_params)
+    spectrogram_simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, psf_poly_params)
     return spectrogram_simulation
 
 
@@ -710,7 +711,8 @@ def SpectrumSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A
 
 
 def SpectrogramSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A1=1., A2=0.,
-                         D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0., psf_poly_params=None):
+                         D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0., B=1.,
+                         psf_poly_params=None):
     """ Simulator
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
@@ -733,7 +735,7 @@ def SpectrogramSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05
     spectrogram_simulation = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                                       temperature, pwv, ozone, aerosols,
                                                       D=D, shift_x=shift_x,
-                                                      shift_y=shift_y, shift_t=shift_t, angle=angle,
+                                                      shift_y=shift_y, shift_t=shift_t, angle=angle, B=B,
                                                       psf_poly_params=psf_poly_params)
 
     # Save the spectrum
