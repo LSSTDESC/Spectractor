@@ -67,7 +67,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
-            if "x_mean" in par or "saturation" in par:
+            if "x_c" in par or "saturation" in par:
                 self.fixed[k] = True
         self.fixed[7] = True  # Delta y
         self.fixed[8] = True  # angle
@@ -88,27 +88,30 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.spectrogram = self.spectrum.spectrogram[bgd_width:-bgd_width, :]
         self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width, :]
         self.spectrum.spectrogram_y0 -= bgd_width
+        self.spectrum.chromatic_psf.y0 -= bgd_width
         self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram.shape
-        self.spectrum.chromatic_psf.table["y_mean"] -= bgd_width
+        self.spectrum.chromatic_psf.table["y_c"] -= bgd_width
         self.my_logger.debug(f'\n\tSize of the spectrogram region after cropping: '
                              f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')
 
     def get_spectrogram_truth(self):
-        if 'A1' in list(self.spectrum.header.keys()):
-            A1_truth = self.spectrum.header['A1']
-            A2_truth = self.spectrum.header['A2']
-            ozone_truth = self.spectrum.header['OZONE']
-            pwv_truth = self.spectrum.header['PWV']
-            aerosols_truth = self.spectrum.header['VAOD']
-            D_truth = self.spectrum.header['D2CCD']
-            # shift_x_truth = self.spectrum.header['X0SHIFT']
-            # shift_y_truth = self.spectrum.header['Y0SHIFT']
-            angle_truth = self.spectrum.header['ROTANGLE']
+        if 'A1_T' in list(self.spectrum.header.keys()):
+            A1_truth = self.spectrum.header['A1_T']
+            A2_truth = self.spectrum.header['A2_T']
+            ozone_truth = self.spectrum.header['OZONE_T']
+            pwv_truth = self.spectrum.header['PWV_T']
+            aerosols_truth = self.spectrum.header['VAOD_T']
+            D_truth = self.spectrum.header['D2CCD_T']
+            shiftx_truth = 0
+            shifty_truth = 0
+            rotation_angle = self.spectrum.header['ROT_T']
+            poly_truth = np.fromstring(self.spectrum.header['PSF_P_T'][1:-1], sep=' ', dtype=float)
             self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth,
-                          D_truth, angle_truth)
+                          D_truth, shiftx_truth, shifty_truth, rotation_angle, *poly_truth)
+            self.lambdas_truth = np.fromstring(self.spectrum.header['LBDAS_T'][1:-1], sep=' ', dtype=float)
+            self.amplitude_truth = np.fromstring(self.spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
         else:
             self.truth = None
-        self.truth = None
 
     def plot_spectrogram_comparison_simple(self, ax, title='', extent=None, dispersion=False):
         lambdas = self.spectrum.lambdas
@@ -349,9 +352,8 @@ if __name__ == "__main__":
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-    poly =[3.3400e+02,  3.3400e+02, -2.3320e-13, 1.3831e+02, -9.3958e+00 ,4.2649e-01,  2.5306e+00 ,-1.5941e+00,  9.2998e-01,  1.6213e+00 ,-7.5356e-01 , 4.6481e-01,  4.5429e+01]
-    #w.simulate(1, 0, 300, 5, 0.03, 56.308, 0., 0, -1.6352, *poly)
-    #w.plot_fit()
+    w.simulate(*w.truth)
+    w.plot_fit()
     run_spectrogram_minimisation(w, method="newton")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()

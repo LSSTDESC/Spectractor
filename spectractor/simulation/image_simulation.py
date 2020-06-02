@@ -305,7 +305,7 @@ class ImageModel(Image):
 
     def __init__(self, filename, target_label=None):
         self.my_logger = set_logger(self.__class__.__name__)
-        Image.__init__(self, filename, target_label=target_label.label)
+        Image.__init__(self, filename, target_label=target_label)
         self.true_lambdas = None
         self.true_spectrum = None
 
@@ -373,7 +373,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
     # Load reduced image
     spectrum, telescope, disperser, target = SimulatorInit(spectrum_filename)
-    image = ImageModel(image_filename, target_label=target)
+    image = ImageModel(image_filename, target_label=target.label)
     guess = [spectrum.header['TARGETX'], spectrum.header['TARGETY']]
     if parameters.DEBUG:
         image.plot_image(scale='symlog', target_pixcoords=guess)
@@ -485,6 +485,10 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['OZONE_T'] = ozone
     image.header['PWV_T'] = pwv
     image.header['VAOD_T'] = aerosols
+    image.header['ROT_T'] = rotation_angle
+    image.header['ROTATION'] = int(with_rotation)
+    image.header['STARS'] = int(with_stars)
+    image.header['BKGD_LEV'] = background.level
     image.header['PSF_DEG'] = spectrum.spectrogram_deg
     image.header['PSF_TYPE'] = parameters.PSF_TYPE
     psf_poly_params_truth = np.array(psf_poly_params)
@@ -493,11 +497,6 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['LBDAS_T'] = np.array_str(true_lambdas, max_line_width=1000000, precision=2)
     image.header['AMPLIS_T'] = np.array_str(true_spectrum, max_line_width=1000000, precision=2)
     image.header['PSF_P_T'] = np.array_str(psf_poly_params_truth, max_line_width=1000000, precision=4)
-    # image.header['RESO'] = reso
-    image.header['ROTATION'] = int(with_rotation)
-    image.header['ROTANGLE'] = rotation_angle
-    image.header['STARS'] = int(with_stars)
-    image.header['BKGD_LEV'] = background.level
     image.save_image(output_filename, overwrite=True)
     return image
 

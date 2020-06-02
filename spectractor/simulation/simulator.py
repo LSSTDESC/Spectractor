@@ -208,8 +208,6 @@ class SpectrogramModel(Spectrum):
         self.disperser = disperser
         self.telescope = telescope
         self.atmosphere = atmosphere
-        # self.pixels_x = np.arange(self.chromatic_psf.Nx).astype(int)
-        # self.pixels_y = np.arange(self.chromatic_psf.Ny).astype(int)
         self.true_lambdas = None
         self.true_spectrum = None
         self.lambdas = None
@@ -284,26 +282,21 @@ class SpectrogramModel(Spectrum):
     def simulate_psf(self, psf_poly_params):
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params, apply_bounds=True)
         self.chromatic_psf.fill_table_with_profile_params(profile_params)
-        self.chromatic_psf.table['Dy_disp_axis'] = np.tan(self.rotation_angle * np.pi / 180) * self.chromatic_psf.table[
-            'Dx']
-        self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['y_mean']) - self.spectrogram_y0
+        self.chromatic_psf.table['Dy_disp_axis'] = np.tan(self.rotation_angle*np.pi/180)*self.chromatic_psf.table['Dx']
+        self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['y_c']) - self.spectrogram_y0
         self.chromatic_psf.profile_params = self.chromatic_psf.from_table_to_profile_params()
         if parameters.DEBUG:
             self.chromatic_psf.plot_summary()
-        # self.my_logger.warning(f"\n\tafter\n {self.chromatic_psf.table[['Dx','Dy','Dy_disp_axis']][:5]} {self.rotation_angle}")
         return self.chromatic_psf.profile_params
 
     def simulate_dispersion(self, D, shift_x, shift_y, r0):
         new_x0 = [self.x0[0] - shift_x, self.x0[1] - shift_y]
         distance = np.array(self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x, shift_y=shift_y))
-        # must have odd size
-        if distance.size % 2 == 0:
-            distance = distance[:-1]
 
         # convert pixels into lambdas with ADR for spectrum amplitude evaluation
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        lambda_ref = np.sum(lambdas * self.data) / np.sum(self.data)
+        lambda_ref = 550  # np.sum(self.lambdas * self.data) / np.sum(self.data)
         distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
