@@ -146,11 +146,13 @@ class Spectrum:
             self.my_logger.warning(f"You ask to convert spectrum already in {self.units}"
                                    f" in erg/s/cm^2/nm... check your code ! Skip the instruction.")
             return
-        self.data = self.data / parameters.FLAM_TO_ADURATE
-        self.data /= self.lambdas * self.lambdas_binwidths
+        ldl = parameters.FLAM_TO_ADURATE * self.lambdas * self.lambdas_binwidths
+        self.data /= ldl
         if self.err is not None:
-            self.err = self.err / parameters.FLAM_TO_ADURATE
-            self.err /= (self.lambdas * self.lambdas_binwidths)
+            self.err /= ldl
+        if self.cov_matrix is not None:
+            ldl_mat = np.outer(ldl, ldl)
+            self.cov_matrix /= ldl_mat
         self.units = 'erg/s/cm$^2$/nm'
 
     def convert_from_flam_to_ADUrate(self):
@@ -173,11 +175,13 @@ class Spectrum:
             self.my_logger.warning(f"You ask to convert spectrum already in {self.units} in ADU/s... check your code ! "
                                    f"Skip the instruction")
             return
-        self.data = self.data * parameters.FLAM_TO_ADURATE
-        self.data *= self.lambdas_binwidths * self.lambdas
+        ldl = parameters.FLAM_TO_ADURATE * self.lambdas * self.lambdas_binwidths
+        self.data *= ldl
         if self.err is not None:
-            self.err = self.err * parameters.FLAM_TO_ADURATE
-            self.err *= self.lambdas_binwidths * self.lambdas
+            self.err *= ldl
+        if self.cov_matrix is not None:
+            ldl_mat = np.outer(ldl, ldl)
+            self.cov_matrix *= ldl_mat
         self.units = 'ADU/s'
 
     def load_filter(self):
