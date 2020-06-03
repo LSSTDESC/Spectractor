@@ -145,7 +145,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                              f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')
 
     def get_spectrogram_truth(self):
-        """Load the trith parameters (if provided) from the file header.
+        """Load the truth parameters (if provided) from the file header.
 
         """
         if 'A1_T' in list(self.spectrum.header.keys()):
@@ -382,7 +382,7 @@ def lnprob_spectrogram(p):
     Returns
     -------
     lp: float
-        Log of the likelihoof function.
+        Log of the likelihood function.
 
     """
     global fit_workspace
