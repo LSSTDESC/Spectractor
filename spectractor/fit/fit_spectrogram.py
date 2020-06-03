@@ -17,6 +17,47 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
     def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
+        """Class to fit a spectrogram extracted with Spectractor.
+
+        First the spectrogram is cropped using the parameters.PIXWIDTH_SIGNAL parameter to increase speedness.
+        The truth parameters are loaded from the file header if provided.
+        If provided, the atmospheric grid is used for the atmospheric transmission simulations and interpolated
+        with splines, otherwise Libradtran is called at each step (slower).
+
+        Parameters
+        ----------
+        file_name: str
+            Spectrum file name.
+        atmgrid_file_name: str, optional
+            Atmospheric grid file name (default: "").
+        nwalkers: int, optional
+            Number of walkers for MCMC fitting.
+        nsteps: int, optional
+            Number of steps for MCMC fitting.
+        burnin: int, optional
+            Number of burn-in steps for MCMC fitting.
+        nbins: int, optional
+            Number of bins for MCMC chains analysis.
+        verbose: int, optional
+            Verbosity level (default: 0).
+        plot: bool, optional
+            If True, many plots are produced (default: False).
+        live_fit: bool, optional
+            If True, many plots along the fitting procedure are produced to see convergence in live (default: False).
+        truth: array_like, optional
+            Array of truth parameters to compare with the best fit result (default: None).
+
+        Examples
+        --------
+
+        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
+        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
+        >>> w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
+        ... burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
+        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> w.plot_fit()
+
+        """
         FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
                               live_fit, truth=truth)
         if "spectrum" not in file_name:
@@ -85,6 +126,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.get_spectrogram_truth()
 
     def crop_spectrogram(self):
+        """Crop the spectrogram in the middle, keeping a vertical width of 2*parameters.PIXWIDTH_SIGNAL around
+        the signal region.
+
+        """
         bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         self.spectrum.spectrogram_ymax = self.spectrum.spectrogram_ymax - bgd_width
         self.spectrum.spectrogram_ymin += bgd_width
@@ -99,6 +144,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
                              f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')
 
     def get_spectrogram_truth(self):
+        """Load the trith parameters (if provided) from the file header.
+
+        """
         if 'A1_T' in list(self.spectrum.header.keys()):
             A1_truth = self.spectrum.header['A1_T']
             A2_truth = self.spectrum.header['A2_T']
@@ -119,6 +167,19 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.truth = None
 
     def plot_spectrogram_comparison_simple(self, ax, title='', extent=None, dispersion=False):
+        """Method to plot a spectrogram issued from data and compare it with simulations.
+
+        Parameters
+        ----------
+        ax: Axes
+            Axes instance of shape (4, 2).
+        title: str, optional
+            Title for the simulation plot (default: '').
+        extent: array_like, optional
+            Extent argument for imshow to crop plots (default: None).
+        dispersion: bool, optional
+            If True, plot a colored bar to see the associated wavelength color along the x axis (default: False).
+        """
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
         sub = np.where(sub < self.spectrum.spectrogram_Nx)[0]
@@ -156,10 +217,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
-            # ax[0, 0].get_yaxis().set_label_coords(-0.15, 0.6)
-            # ax[2, 0].get_yaxis().set_label_coords(-0.15, 0.5)
-            # remove the underlying axes
-            # for ax in ax[3, 1]:
             ax[3, 1].remove()
             ax[3, 0].plot(self.lambdas[sub], self.spectrum.spectrogram.sum(axis=0)[sub], label='Data')
             ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
@@ -169,6 +226,52 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[3, 0].grid(True)
 
     def simulate(self, A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, *psf_poly_params):
+        """Interface method to simulate a spectrogram.
+
+        Parameters
+        ----------
+        A1: float
+            Main amplitude parameter.
+        A2: float
+            Relative amplitude of the order 2 spectrogram.
+        ozone: float
+            Ozone parameter for Libradtran (in db).
+        pwv: float
+            Precipitable Water Vapor quantity for Libradtran (in mm).
+        aerosols: float
+            Vertical Aerosols Optical Depth quantity for Libradtran (no units).
+        D: float
+            Distance between the CCD and the disperser (in mm).
+        shift_x: float
+            Shift of the order 0 position along the X axis (in pixels).
+        shift_y: float
+            Shift of the order 0 position along the Y axis (in pixels).
+        angle: float
+            Angle of the dispersion axis with respect to the X axis (in degrees).
+        B: float
+            Amplitude of the simulated background.
+        psf_poly_params: array_like
+            PSF polynomial parameters formatted with the ChromaticPSF class.
+
+        Returns
+        -------
+        lambdas: array_like
+            Array of wavelengths (1D).
+        model: array_like
+            2D array of the spectrogram simulation.
+        model_err: array_like
+            2D array of the spectrogram simulation uncertainty.
+
+        Examples
+        --------
+
+        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
+        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
+        >>> w = SpectrogramFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
+        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> w.plot_fit()
+
+        """
         global plot_counter
         self.simulation.fix_psf_cube = False
         if np.all(np.isclose(psf_poly_params, self.p[self.psf_params_start_index:], rtol=1e-6)):
@@ -202,32 +305,35 @@ class SpectrogramFitWorkspace(FitWorkspace):
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
             J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
-            # print(ip, self.input_labels[ip], p, tmp_p[ip] + epsilon[ip], J[ip])
-        # if False:
-        #     plt.imshow(J, origin="lower", aspect="auto")
-        #     plt.show()
         self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
     def plot_fit(self):
-        """
+        """Plot the fit result.
+
         Examples
         --------
+
+        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
+        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
+        >>> w = SpectrogramFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
+        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> w.plot_fit()
 
         .. plot::
             :include-source:
 
-            >>> from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace
-            >>> file_name = 'tests/data/reduc_20170530_134_spectrum.fits'
-            >>> atmgrid_file_name = file_name.replace('spectrum', 'atmsim')
-            >>> fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_file_name, verbose=True)
-            >>> A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, *psf = fit_workspace.p
-            >>> lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols,
-            ... D, shift_x, shift_y, angle, psf)
-            >>> fit_workspace.lambdas = lambdas
-            >>> fit_workspace.model = model
-            >>> fit_workspace.model_err = model_err
-            >>> fit_workspace.plot_fit()
+            from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace
+            file_name = 'tests/data/reduc_20170530_134_spectrum.fits'
+            atmgrid_file_name = file_name.replace('spectrum', 'atmsim')
+            fit_workspace = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_file_name, verbose=True)
+            A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, *psf = fit_workspace.p
+            lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x,
+                                                                          shift_y, angle, psf)
+            fit_workspace.lambdas = lambdas
+            fit_workspace.model = model
+            fit_workspace.model_err = model_err
+            fit_workspace.plot_fit()
 
         """
         gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
@@ -263,6 +369,19 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
 
 def lnprob_spectrogram(p):
+    """Logarithmic likelihood function to maximize in MCMC exploration.
+
+    Parameters
+    ----------
+    p: array_like
+        Array of SpectrogramFitWorkspace parameters.
+
+    Returns
+    -------
+    lp: float
+        Log of the likelihoof function.
+
+    """
     global fit_workspace
     lp = fit_workspace.lnprior(p)
     if not np.isfinite(lp):
@@ -270,26 +389,26 @@ def lnprob_spectrogram(p):
     return lp + fit_workspace.lnlike_spectrogram(p)
 
 
-def plot_psf_poly_params(psf_poly_params):
-    from spectractor.extractor.psf import MoffatGauss
-    psf = MoffatGauss()
-    truth_psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
-                             -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
-                             0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
-                             528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
-
-    x = np.linspace(-1, 1, 100)
-    for i in range(5):
-        plt.plot(x, np.polynomial.legendre.legval(x, truth_psf_poly_params[3 * i:3 * i + 3]),
-                 label="truth " + psf.param_names[1 + i])
-        plt.plot(x, np.polynomial.legendre.legval(x, psf_poly_params[3 * i:3 * i + 3]),
-                 label="fit " + psf.param_names[1 + i])
-
-        plt.legend()
-        plt.show()
-
-
 def run_spectrogram_minimisation(fit_workspace, method="newton"):
+    """Interface function to fit spectrogram simulation parameters to data.
+
+    Parameters
+    ----------
+    fit_workspace: SpectrogramFitWorkspace
+        An instance of the SpectrogramFitWorkspace class.
+    method: str, optional
+        Fitting method (default: 'newton').
+
+    Examples
+    --------
+
+    >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
+    >>> atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+    >>> w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, verbose=1, plot=True, live_fit=False)
+    >>> parameters.VERBOSE = True
+    >>> run_spectrogram_minimisation(w, method="newton")
+
+    """
     my_logger = set_logger(__name__)
     guess = np.asarray(fit_workspace.p)
     if method != "newton":
@@ -351,14 +470,12 @@ if __name__ == "__main__":
 
     # filename = 'outputs/reduc_20170530_130_spectrum.fits'
     filename = 'outputs/sim_20170530_134_spectrum.fits'
-    # 062
-    # filename = 'CTIODataJune2017_reduced_RG715_v2_prod6/data_30may17/sim_20170530_067_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-    w.simulate(*w.truth)
-    w.plot_fit()
+    # w.simulate(*w.truth)
+    # w.plot_fit()
     run_spectrogram_minimisation(w, method="newton")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()
