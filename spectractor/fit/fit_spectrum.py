@@ -241,7 +241,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         if len(self.outliers) > 0:
             raise NotImplementedError("Weighted residuals function not implemented for outlier rejection.")
         else:
-            cov = self.spectrum.cov_matrix + 0*np.diag(model_err * model_err)
+            cov = self.spectrum.cov_matrix + np.diag(model_err * model_err)
             L = np.linalg.inv(np.linalg.cholesky(cov))
             res = L @ (model - self.data)
         return res
