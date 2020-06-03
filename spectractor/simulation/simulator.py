@@ -69,6 +69,7 @@ class SpectrumSimulation(Spectrum):
         # self.disperser.grating_lambda_to_pixel(self.lambdas, x0=self.x0, order=1)
         # now reset data
         self.lambdas = None
+        self.lambdas_order2 = None
         self.err = None
         self.model = lambda x: np.zeros_like(x)
         self.model_err = lambda x: np.zeros_like(x)
@@ -143,6 +144,7 @@ class SpectrumSimulation(Spectrum):
         distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
+        self.lambdas_order2 = lambdas_order2
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
         if self.fast_sim:
             self.data, self.err = self.simulate_without_atmosphere(lambdas)
@@ -308,11 +310,7 @@ class SpectrogramModel(Spectrum):
         # convert pixels into lambdas with ADR for spectrum amplitude evaluation
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-<<<<<<< HEAD
         lambda_ref = self.lambda_ref
-=======
-        lambda_ref = 550  # np.sum(self.lambdas * self.data) / np.sum(self.data)
->>>>>>> a3607234ab7d43164fbcdc170abce586c443c577
         distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
@@ -565,6 +563,7 @@ def SimulatorInit(filename):
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SIMULATOR initialisation')
     # Load data spectrum
+    spectrum = Spectrum(filename)
     try:
         spectrum = Spectrum(filename)
     except:
