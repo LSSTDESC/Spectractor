@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.simulation.simulator import SimulatorInit, SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
@@ -52,6 +52,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
+        >>> load_config("config/ctio.ini")
         >>> w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
         ... burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
@@ -265,8 +266,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
+        >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
+        >>> load_config("config/ctio.ini")
         >>> w = SpectrogramFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
         >>> w.plot_fit()
@@ -316,6 +318,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
+        >>> load_config("config/ctio.ini")
         >>> w = SpectrogramFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
         >>> w.plot_fit()
@@ -404,6 +407,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
 
     >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
     >>> atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+    >>> load_config("config/ctio.ini")
     >>> w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, verbose=1, plot=True, live_fit=False)
     >>> parameters.VERBOSE = True
     >>> run_spectrogram_minimisation(w, method="newton")
@@ -411,6 +415,8 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
     """
     my_logger = set_logger(__name__)
     guess = np.asarray(fit_workspace.p)
+    fit_workspace.simulate(*guess)
+    fit_workspace.plot_fit()
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
@@ -423,9 +429,25 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
         epsilon = 1e-4 * guess
         epsilon[epsilon == 0] = 1e-4
+        fixed = np.copy(fit_workspace.fixed)
 
         fit_workspace.simulation.fast_sim = True
         fit_workspace.simulation.fix_psf_cube = False
+        fit_workspace.fixed = np.copy(fixed)
+        fit_workspace.fixed[:fit_workspace.psf_params_start_index] = True
+        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+                                                   fix=fit_workspace.fixed, xtol=1e-3, ftol=1e-2, niter=10)
+
+        fit_workspace.simulation.fast_sim = True
+        fit_workspace.simulation.fix_psf_cube = False
+        fit_workspace.fixed = np.copy(fixed)
+        guess = fit_workspace.p
+        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+                                                   fix=fit_workspace.fixed, xtol=1e-3, ftol=1e-2, niter=10)
+
+        fit_workspace.simulation.fast_sim = False
+        fit_workspace.simulation.fix_psf_cube = False
+        guess = fit_workspace.p
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
                                                    fix=fit_workspace.fixed, xtol=1e-4, ftol=1e-4, niter=40)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
@@ -456,7 +478,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
     parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
-                        help="INI config file. (default: config.ctio.ini).")
+                        help="INI config file. (default: config/ctio.ini).")
     args = parser.parse_args()
 
     parameters.VERBOSE = args.verbose
@@ -474,8 +496,8 @@ if __name__ == "__main__":
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-    # w.simulate(*w.truth)
-    # w.plot_fit()
+    #w.simulate(*w.truth)
+    #w.plot_fit()
     run_spectrogram_minimisation(w, method="newton")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()
