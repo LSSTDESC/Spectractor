@@ -19,6 +19,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
                  verbose=0, plot=False, live_fit=False, truth=None):
         FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
                               live_fit, truth=truth)
+        if "spectrum" not in file_name:
+            raise ValueError("file_name argument must contain spectrum keyword and be an output from Spectractor.")
+        self.filename = self.filename.replace("spectrum", "spectrogram")
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
         self.airmass = self.spectrum.header['AIRMASS']
         self.pressure = self.spectrum.header['OUTPRESS']

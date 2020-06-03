@@ -15,6 +15,8 @@ class SpectrumFitWorkspace(FitWorkspace):
     def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None, fast_sim=True):
         FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit, truth=truth)
+        if "spectrum" not in file_name:
+            raise ValueError("file_name argument must contain spectrum keyword and be an output from Spectractor.")
         self.my_logger = set_logger(self.__class__.__name__)
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
         self.airmass = self.spectrum.header['AIRMASS']
