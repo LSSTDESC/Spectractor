@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
+from scipy.interpolate import interp1d
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -182,6 +183,18 @@ class SpectrumFitWorkspace(FitWorkspace):
                 self.my_logger.info(f'Save figure {figname}.')
                 fig.savefig(figname, dpi=100, bbox_inches='tight')
 
+    def decontaminate_order2(self):
+        lambdas = self.spectrum.lambdas
+        lambdas_order2 = self.simulation.lambdas_order2
+        A1, A2, ozone, pwv, aerosols, reso, D, shift = self.p
+        lambdas_binwidths_order2 = np.gradient(lambdas_order2)
+        lambdas_binwidths = np.gradient(lambdas)
+        sim_conv = interp1d(lambdas, self.model * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
+        err_conv = interp1d(lambdas, self.model_err * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
+        spectrum_order2 = sim_conv(lambdas_order2) * lambdas_binwidths_order2 / lambdas_binwidths
+        err_order2 = err_conv(lambdas_order2) * lambdas_binwidths_order2 / lambdas_binwidths
+        self.model = (sim_conv(lambdas) - A2 * spectrum_order2) / lambdas
+        self.model_err = (err_conv(lambdas) - A2 * err_order2) / lambdas
 
 def lnprob_spectrum(p):
     global fit_workspace
@@ -218,7 +231,6 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
             save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
-
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -259,6 +271,9 @@ if __name__ == "__main__":
     fit_workspace = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                          burnin=200, nbins=10, verbose=1, plot=True, live_fit=False, fast_sim=True)
     run_spectrum_minimisation(fit_workspace, method="newton")
+    fit_workspace.plot_fit()
+    fit_workspace.decontaminate_order2()
+    fit_workspace.plot_fit()
     # fit_workspace.simulate(*fit_workspace.p)
     # fit_workspace.plot_fit()
     # run_emcee(fit_workspace, ln=lnprob_spectrum)
