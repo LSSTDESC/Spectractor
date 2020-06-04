@@ -467,6 +467,7 @@ class Spectrum:
                 self.ypixsize = self.header['YPIXSIZE']
             if self.header['LAMBDA_REF'] != "":
                 self.lambda_ref = self.header['LAMBDA_REF']
+
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                       data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)

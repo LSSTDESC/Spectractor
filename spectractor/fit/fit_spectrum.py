@@ -5,7 +5,7 @@ from scipy.interpolate import interp1d
 from astropy.io import fits
 
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import FitWorkspace, run_gradient_descent, save_gradient_descent
@@ -264,6 +264,7 @@ class SpectrumFitWorkspace(FitWorkspace):
 
         .. plot::
             :include-source:
+
             from spectractor.fit.fit_spectrum import SpectrumFitWorkspace
             file_name = 'tests/data/reduc_20170530_134_spectrum.fits'
             atmgrid_file_name = file_name.replace('spectrum', 'atmsim')
@@ -361,6 +362,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
 
     Examples
     --------
+
     >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
     >>> atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
     >>> load_config("config/ctio.ini")
@@ -390,11 +392,12 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         if fit_workspace.filename != "":
             parameters.SAVE = True
             ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
-            #fit_workspace.plot_correlation_matrix(ipar)
+            fit_workspace.plot_correlation_matrix(ipar)
             fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
             save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
+
 
 if __name__ == "__main__":
     from argparse import ArgumentParser

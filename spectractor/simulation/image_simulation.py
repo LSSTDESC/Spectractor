@@ -24,6 +24,7 @@ import os
 
 class StarModel:
     """Class to model a star in the image simulation process.
+
     Attributes
     ----------
     x0: float
@@ -36,8 +37,10 @@ class StarModel:
 
     def __init__(self, centroid_coords, psf, amplitude):
         """Create a StarModel instance.
+
         The model is based on an Astropy Fittable2DModel. The centroid and amplitude
         parameters of the given model are updated by the dedicated arguments.
+
         Parameters
         ----------
         centroid_coords: array_like
@@ -46,6 +49,7 @@ class StarModel:
             PSF model
         amplitude: float
             The desired amplitude of the star in image units.
+
         Examples
         --------
         >>> from spectractor.extractor.psf import Moffat
@@ -94,11 +98,13 @@ class StarFieldModel:
         """
         Examples
         --------
+
         >>> from spectractor.extractor.images import Image, find_target
         >>> im = Image('tests/data/reduc_20170530_134.fits', target_label="HD111980")
         >>> x0, y0 = find_target(im, guess=(740, 680), use_wcs=False)
         >>> s = StarFieldModel(im)
         >>> s.plot_model()
+
         """
         self.image = base_image
         self.target = base_image.target
@@ -205,7 +211,9 @@ class StarFieldModel:
 
 class BackgroundModel:
     """Class to model the background of the simulated image.
+
     The background model size is set with the parameters.CCD_IMSIZE global keyword.
+
     Attributes
     ----------
     level: float
@@ -217,7 +225,9 @@ class BackgroundModel:
 
     def __init__(self, level, frame=None):
         """Create a BackgroundModel instance.
+
         The background model size is set with the parameters.CCD_IMSIZE global keyword.
+
         Parameters
         ----------
         level: float
@@ -225,6 +235,7 @@ class BackgroundModel:
         frame: array_like, None
             (x, y, smooth) right and upper limits in pixels of a vignetting frame,
             and the smoothing gaussian width (default: None).
+
         Examples
         --------
         >>> from spectractor import parameters
@@ -246,12 +257,15 @@ class BackgroundModel:
 
     def model(self):
         """Compute the background model for the image simulation in image units.
+
         A shadowing vignetting frame is roughly simulated if self.frame is set.
         The background model size is set with the parameters.CCD_IMSIZE global keyword.
+
         Returns
         -------
         bkgd: array_like
             The array of the background model.
+
         """
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         bkgd = self.level * np.ones_like(xx)
@@ -268,6 +282,7 @@ class BackgroundModel:
 
     def plot_model(self):
         """Plot the background model.
+
         """
         bkgd = self.model()
         fig, ax = plt.subplots(1, 1)
@@ -389,7 +404,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     if with_stars:
         my_logger.info('\n\tStar field model...')
         starfield = StarFieldModel(image)
-        if parameters.VERBOSE:
+        if parameters.DEBUG:
             image.plot_image(scale='symlog', target_pixcoords=starfield.pixcoords)
             starfield.plot_model()
 
@@ -400,7 +415,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     temperature = image.header['OUTTEMP']
     telescope = TelescopeTransmission(image.filter)
 
-    # Rotation
+    # Rotation: useful only to fill the Dy_disp_axis column in PSF table
     if not with_rotation:
         rotation_angle = 0
     else:
@@ -411,7 +426,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
 
-    # Increase
+    # Simulate spectrogram
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0., B=1.,
@@ -479,7 +494,6 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     psf_poly_params_truth = np.array(psf_poly_params)
     if psf_poly_params_truth.size > spectrum.spectrogram_Nx:
         psf_poly_params_truth = psf_poly_params_truth[spectrum.spectrogram_Nx:]
-
     image.header['LBDAS_T'] = np.array_str(true_lambdas, max_line_width=1000000, precision=2)
     image.header['AMPLIS_T'] = np.array_str(true_spectrum, max_line_width=1000000, precision=2)
     image.header['PSF_P_T'] = np.array_str(psf_poly_params_truth, max_line_width=1000000, precision=4)

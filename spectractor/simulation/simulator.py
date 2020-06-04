@@ -74,7 +74,6 @@ class SpectrumSimulation(Spectrum):
         self.model = lambda x: np.zeros_like(x)
         self.model_err = lambda x: np.zeros_like(x)
 
-
     def simulate_without_atmosphere(self, lambdas):
         """Compute the spectrum of an object and its uncertainties
         after its transmission throught the instrument except the atmosphere.
@@ -104,9 +103,10 @@ class SpectrumSimulation(Spectrum):
         return self.data, self.err
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0.,
-                         D=parameters.DISTANCE2CCD, shift_x=0.):
+                D=parameters.DISTANCE2CCD, shift_x=0.):
         """Simulate the cross spectrum of an object and its uncertainties
         after its transmission throught the instrument and the atmosphere.
+
         Parameters
         ----------
         A1: float
@@ -125,6 +125,7 @@ class SpectrumSimulation(Spectrum):
             Distance between the CCD and the disperser in mm (default: parameters.DISTANCE2CCD)
         shift_x: float
             Shift in pixels of the order 0 position estimate (default: 0).
+
         Returns
         -------
         lambdas: array_like
@@ -133,8 +134,8 @@ class SpectrumSimulation(Spectrum):
             The spectrum interpolated function in Target units.
         spectrum_err: array_like
             The spectrum uncertainties interpolated function in Target units.
-        """
 
+        """
         # find lambdas including ADR effect
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
@@ -155,7 +156,6 @@ class SpectrumSimulation(Spectrum):
                 return self.target.sed(lbda) * self.telescope.transmission(lbda) \
                        * self.disperser.transmission(lbda) * atmospheric_transmission(lbda)
 
-
             self.data = np.zeros_like(lambdas)
             self.err = np.zeros_like(lambdas)
             for i in range(len(lambdas) - 1):
@@ -168,7 +168,7 @@ class SpectrumSimulation(Spectrum):
         if reso > 0.1:
             self.data = fftconvolve_gaussian(self.data, reso)
             self.err = np.sqrt(np.abs(fftconvolve_gaussian(self.err ** 2, reso)))
-        if A2 > 0.001:
+        if A2 > 0:
             lambdas_binwidths_order2 = np.gradient(lambdas_order2)
             sim_conv = interp1d(lambdas, self.data * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
             err_conv = interp1d(lambdas, self.err * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
@@ -176,12 +176,6 @@ class SpectrumSimulation(Spectrum):
             err_order2 = err_conv(lambdas_order2) * lambdas_binwidths_order2 / self.lambdas_binwidths
             self.data = (sim_conv(lambdas) + A2 * spectrum_order2) / lambdas
             self.err = (err_conv(lambdas) + A2 * err_order2) / lambdas
-            """
-            sim_conv = interp1d(lambdas, self.data, kind="linear", bounds_error=False, fill_value=(0, 0))
-            err_conv = interp1d(lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
-            self.data = sim_conv(lambdas) + A2 * sim_conv(lambdas_order2)
-            self.err = err_conv(lambdas) + A2 * err_conv(lambdas_order2)
-            """
         # now we include effects related to the wrong extraction of the spectrum:
         # wrong estimation of the order 0 position and wrong DISTANCE2CCD
         # pixels = np.arange(0, parameters.CCD_IMSIZE) - self.x0[0]
@@ -193,8 +187,6 @@ class SpectrumSimulation(Spectrum):
             min_positive = np.min(self.err[self.err > 0])
             self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
         return self.lambdas, self.data, self.err
-
-
 
 
 class SpectrogramModel(Spectrum):
@@ -337,12 +329,10 @@ class SpectrogramModel(Spectrum):
                 self.chromatic_psf.table['Dy'][:distance.size] - shift_y)
         dispersion_law_order2 = r0 + (distances_order2 * np.cos(np.pi * self.rotation_angle / 180) - shift_x) + 1j * (
                 distances_order2 * np.sin(np.pi * self.rotation_angle / 180) + dy_func(lambdas_order2) - shift_y)
-
         self.lambdas_order2 = lambdas_order2
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         self.lambdas_binwidths_order2 = np.gradient(lambdas_order2)
-
         if parameters.DEBUG:
             from spectractor.tools import from_lambda_to_colormap
             plt.plot(self.chromatic_psf.table['Dx'], self.chromatic_psf.table['Dy_disp_axis'], 'k-', label="mean")
@@ -563,7 +553,6 @@ def SimulatorInit(filename):
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SIMULATOR initialisation')
     # Load data spectrum
-
     try:
         spectrum = Spectrum(filename)
     except:
@@ -584,7 +573,6 @@ def SimulatorInit(filename):
     # ------------------------
     if not isinstance(spectrum.target, str):
         target = spectrum.target
-
     else:
         target = Target(spectrum.target)
 
@@ -783,4 +771,3 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod()
-
