@@ -411,13 +411,11 @@ if __name__ == "__main__":
 
     load_config(args.config)
 
-    filename = 'outputs/sim_20170530_191_spectrum.fits'
+    filename = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     fit_workspace = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                          burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
-    fit_workspace.simulate(*fit_workspace.truth)
-    fit_workspace.plot_fit()
     run_spectrum_minimisation(fit_workspace, method="newton")
     # run_emcee(fit_workspace, ln=lnprob_spectrum)
     # fit_workspace.analyze_chains()
