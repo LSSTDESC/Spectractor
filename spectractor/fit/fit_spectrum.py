@@ -310,7 +310,7 @@ class SpectrumFitWorkspace(FitWorkspace):
     def decontaminate_order2(self):
         lambdas = self.spectrum.lambdas
         lambdas_order2 = self.simulation.lambdas_order2
-        A1, A2, ozone, pwv, aerosols, reso, D, shift = self.p
+        A1, A2, ozone, pwv, aerosols, reso, D, shift, B = self.p
         lambdas_binwidths_order2 = np.gradient(lambdas_order2)
         lambdas_binwidths = np.gradient(lambdas)
         sim_conv = interp1d(lambdas, self.model * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
