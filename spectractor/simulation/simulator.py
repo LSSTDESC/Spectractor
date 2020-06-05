@@ -102,7 +102,7 @@ class SpectrumSimulation(Spectrum):
         return self.data, self.err
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0.,
-                 D=parameters.DISTANCE2CCD, shift_x=0.):
+                 D=parameters.DISTANCE2CCD, shift_x=0., B=0.):
         """Simulate the cross spectrum of an object and its uncertainties
         after its transmission throught the instrument and the atmosphere.
 
@@ -124,6 +124,8 @@ class SpectrumSimulation(Spectrum):
             Distance between the CCD and the disperser in mm (default: parameters.DISTANCE2CCD)
         shift_x: float
             Shift in pixels of the order 0 position estimate (default: 0).
+        B: float
+            Amplitude level for the background (default: 0).
 
         Returns
         -------
@@ -159,6 +161,7 @@ class SpectrumSimulation(Spectrum):
             for i in range(len(lambdas) - 1):
                 self.data[i] = A1 * quad(integrand, lambdas[i], lambdas[i + 1])[0]
             self.data[-1] = self.data[-2]
+            self.data /= np.gradient(lambdas)
             telescope_transmission = self.telescope.transmission(lambdas)
             idx = np.where(telescope_transmission > 0)[0]
             self.err[idx] = self.data[idx] * self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx]
@@ -171,6 +174,8 @@ class SpectrumSimulation(Spectrum):
             err_conv = interp1d(lambdas, self.err, kind="linear", bounds_error=False, fill_value=(0, 0))
             self.data = sim_conv(lambdas) + A2 * sim_conv(lambdas_order2)
             self.err = err_conv(lambdas) + A2 * err_conv(lambdas_order2)
+        if B != 0:
+            self.data += B / (lambdas * np.gradient(lambdas))
 
         # now we include effects related to the wrong extraction of the spectrum:
         # wrong estimation of the order 0 position and wrong DISTANCE2CCD
