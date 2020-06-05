@@ -1,7 +1,7 @@
 from spectractor import parameters
 from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace, run_spectrogram_minimisation
+from spectractor.fit.fit_spectrum import SpectrumFitWorkspace, run_spectrum_minimisation
 from spectractor.config import load_config
-
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
     parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
-                        help="INI config file. (default: config.ctio.ini).")
+                        help="INI config file. (default: config/ctio.ini).")
     args = parser.parse_args()
 
     parameters.VERBOSE = args.verbose
@@ -33,9 +33,9 @@ if __name__ == "__main__":
 
     for file_name in file_names:
         atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-
+        w = SpectrumFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
+                                 burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
+        run_spectrum_minimisation(w, method="newton")
         w = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=2000,
-                                                burnin=1000, nbins=10, verbose=0, plot=False, live_fit=False)
+                                    burnin=1000, nbins=10, verbose=1, plot=True, live_fit=False)
         run_spectrogram_minimisation(w, method="newton")
-        # run_emcee(fit_workspace)
-        # fit_workspace.analyze_chains()
