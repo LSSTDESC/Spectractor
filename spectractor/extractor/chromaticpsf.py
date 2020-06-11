@@ -571,12 +571,14 @@ class ChromaticPSF:
         """
         self.fill_table_with_profile_params(profile_params)
         pixel_x = np.arange(self.Nx).astype(int)
+        # oversampling for precise computation of the PSF
+        # pixels.shape = (2, Nx, Ny): self.pixels[1<-y, 0<-first pixel value column, :]
+        pixel_eval = np.arange(self.pixels[1, 0, 0], self.pixels[1, 0, -1], 0.1)
         for x in pixel_x:
             p = profile_params[x, :]
             # compute FWHM transverse to dispersion axis (assuming revolution symmetry of the PSF)
-            # pixels.shape = (2, Nx, Ny): self.pixels[1<-y, 0<-first pixel value column, :]
-            out = self.psf.evaluate(self.pixels[1, 0, :], p=p)
-            fwhm = compute_fwhm(self.pixels[1, 0, :], out, center=p[2], minimum=0)
+            out = self.psf.evaluate(pixel_eval, p=p)
+            fwhm = compute_fwhm(pixel_eval, out, center=p[2], minimum=0)
             self.table['flux_integral'][x] = p[0]  # if MoffatGauss1D normalized
             self.table['fwhm'][x] = fwhm
             self.table['Dy_disp_axis'][x] = 0

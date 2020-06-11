@@ -1257,11 +1257,11 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
     if y.ndim > 1:
         # TODO: implement fwhm for 2D curves
         return -1
-    interp = interp1d(x, y, kind="cubic", bounds_error=False, fill_value="extrapolate")
+    interp = interp1d(x, y, kind="linear", bounds_error=False, fill_value="extrapolate")
     maximum = np.max(y) - minimum
     imax = np.argmax(y)
-    a = imax + np.argmin(np.abs(y[imax:] - 0.9 * maximum))
-    b = imax + np.argmin(np.abs(y[imax:] - 0.1 * maximum))
+    a = x[imax + np.argmin(np.abs(y[imax:] - 0.9 * maximum))]
+    b = x[imax + np.argmin(np.abs(y[imax:] - 0.1 * maximum))]
 
     def eq(xx):
         return interp(xx) - 0.5 * maximum
