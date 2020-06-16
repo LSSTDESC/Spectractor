@@ -313,6 +313,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                        f'mode={mode} and amplitude_priors_method={method}...')
         my_logger.debug(f"\n\tTransverse fit table before PSF_2D fit:"
                         f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
+        # w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
+        #                         amplitude_priors_method="fixed", mode=mode, verbose=parameters.VERBOSE)
         w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
                                 amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
         # save results
