@@ -143,11 +143,15 @@ class SpectrumSimulation(Spectrum):
         self.disperser.D = D
         distance = self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        lambda_ref = self.lambda_ref
-        distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
+        lambda_ref = self.lambda_ref
+        distance_order1 = distance + adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        distance_order2 = distance + adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
+                                               lambda_ref=lambda_ref)
+        lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
+        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
         self.lambdas_order2 = lambdas_order2
+
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
         if self.fast_sim:
             self.data, self.err = self.simulate_without_atmosphere(lambdas)
@@ -301,12 +305,13 @@ class SpectrogramModel(Spectrum):
         # convert pixels into lambdas with ADR for spectrum amplitude evaluation
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        lambda_ref = self.lambda_ref
-        distance += adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
-        lambdas_order2 = lambdas_order2[lambdas_order2 > np.min(lambdas)]
-        distances_order2 = self.disperser.grating_lambda_to_pixel(lambdas_order2, x0=new_x0, order=2)
+        lambda_ref = self.lambda_ref
+        distance_order1 = distance + adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        distance_order2 = distance + adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
+        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
+
         # Dx_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
         # Dy_mean_func=interp1d(lambdas/2,self.chromatic_psf.table['Dy_disp_axis'],bounds_error=False,fill_value=(0,0))
         # dy_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_disp_axis'],
@@ -326,8 +331,7 @@ class SpectrogramModel(Spectrum):
 
         dispersion_law = r0 + (self.chromatic_psf.table['Dx'][:distance.size] - shift_x) + 1j * (
                 self.chromatic_psf.table['Dy'][:distance.size] - shift_y)
-        dispersion_law_order2 = r0 + (distances_order2 * np.cos(np.pi * self.rotation_angle / 180) - shift_x) + 1j * (
-                distances_order2 * np.sin(np.pi * self.rotation_angle / 180) + dy_func(lambdas_order2) - shift_y)
+        dispersion_law_order2 = dispersion_law
         self.lambdas_order2 = lambdas_order2
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
@@ -420,14 +424,11 @@ class SpectrogramModel(Spectrum):
         # Add order 2
         ima2 = np.zeros_like(ima1)
         if A2 > 0.:
-            nlbda_order2 = dispersion_law_order2.size
             spectrum_order1 = interp1d(lambdas, spectrum / self.lambdas_binwidths, bounds_error=False,
                                        fill_value=(0, 0))
             spectrum_order2 = spectrum_order1(lambdas_order2) * self.lambdas_binwidths_order2
-            self.true_spectrum = A1 * (spectrum + A2 * np.array(list(np.zeros(len(spectrum) - nlbda_order2)) +
-                                                                list(spectrum_order2))) / \
-                                 (parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas))
-            ima2 = self.build_spectrogram(profile_params[-nlbda_order2:], spectrum_order2,
+            self.true_spectrum = A1 * (spectrum + A2 *spectrum_order2) / (parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas))
+            ima2 = self.build_spectrogram(profile_params, spectrum_order2,
                                           dispersion_law_order2)
 
         self.my_logger.debug(f'\n\tAfter build ima2: {time.time() - start}')
