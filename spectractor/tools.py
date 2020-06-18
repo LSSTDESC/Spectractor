@@ -1787,7 +1787,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
     if xlim is None and lambdas is not None:
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
     ax.set_xlim(xlim)
-    ax.set_ylim(0., np.nanmax(data) * 1.2)
+    ax.set_ylim(0., np.nanmax(data[np.logical_and(xs > xlim[0], xs < xlim[1])]) * 1.2)
     if lambdas is not None:
         ax.set_xlabel(r'$\lambda$ [nm]')
     else:
