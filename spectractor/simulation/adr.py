@@ -277,18 +277,13 @@ def adr_calib(lambdas, params, lat, lambda_ref=550):
     else:
         raise TypeError('latitude type is neither a str nor an astropy.coordinates')
 
-    meadr = instanciation_adr(params, lat, lambdas[0] * 10)
+    meadr = instanciation_adr(params, lat, lambda_ref * 10)
 
-    xs, ys = get_adr_shift_for_lbdas(meadr, lambdas * 10, params)
-    xs_pix = in_pixel(xs, params)
-    ys_pix = in_pixel(ys, params)
+    disp_axis, trans_axis = get_adr_shift_for_lbdas(meadr, lambdas * 10, params)
+    disp_axis_pix = in_pixel(disp_axis, params)
+    trans_axis = in_pixel(trans_axis, params)
 
-    indice_ref = min(len(lambdas), int(np.argmin(np.abs(lambdas - lambda_ref))))
-
-    rotangle = params[-3] * np.pi / 180
-    r_0 = xs_pix[indice_ref] * np.cos(rotangle) + ys_pix[indice_ref] * np.sin(rotangle)
-    r_shift = r_0 - xs_pix * np.cos(rotangle) - ys_pix * np.sin(rotangle)
-    return r_shift
+    return disp_axis_pix
 
 
 def instanciation_adr(params, latitude, lbda_ref):
