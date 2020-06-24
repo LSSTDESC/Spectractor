@@ -665,7 +665,7 @@ class Astrometry(Image):
         if self.sources is not None:
             plt.scatter(self.sources['xcentroid'], self.sources['ycentroid'], s=100, lw=2,
                         edgecolor='black', facecolor='none', label="all sources")
-        vmax_2 = min(vmax, np.max(np.abs(self.dist_desc.to(u.arcsec).value)))
+        vmax_2 = min(vmax, np.max(np.abs(self.dist_dec.to(u.arcsec).value)))
         sc = plt.scatter(gaia_x, gaia_y, s=100, c=self.dist_dec.to(u.arcsec).value,
                          cmap="bwr", vmin=-vmax_2, vmax=vmax_2,
                          label=f"Gaia Stars", lw=1)
