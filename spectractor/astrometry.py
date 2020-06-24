@@ -1155,7 +1155,7 @@ class Astrometry(Image):
         # after the shift the histograms must be centered on zero
         total_shift = np.array(
             [dra_median / np.cos(self.target_radec_position_after_pm.dec.radian), ddec_median]) * u.arcsec
-        self.my_logger.info(f"\n\tShift original CRVAL value {self.wcs.wcs.crval} of {total_shift}.")
+        self.my_logger.info(f"\n\tShift original CRVAL value {self.wcs.wcs.crval * u.deg} of {total_shift}.")
         self.wcs.wcs.crval = self.wcs.wcs.crval * u.deg + total_shift
         # if parameters.DEBUG:
         #     self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,
