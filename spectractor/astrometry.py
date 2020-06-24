@@ -136,6 +136,7 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin):
     """
     from astroquery.gaia import Gaia
     my_logger = set_logger("load_gaia_catalog")
+    Gaia.ROW_LIMIT = -1
     job = Gaia.cone_search_async(coord, radius=radius, verbose=False)
     my_logger.debug(f"\n\t{job}")
     gaia_catalog = job.get_results()
