@@ -46,7 +46,7 @@ def test_astrometry():
             assert np.isclose(a.target_radec_position_after_pm.ra.value, 224.97283917)
             assert np.isclose(a.target_radec_position_after_pm.dec.value, -54.30209)
             a.my_logger.warning(f"{a.wcs.wcs.crval}")
-            assert np.isclose(a.wcs.wcs.crval[0], 224.9718998, atol=0.0005)
+            assert np.isclose(a.wcs.wcs.crval[0], 224.9718998, atol=0.03)
             assert np.isclose(a.wcs.wcs.crval[1], -54.28912925, atol=0.0002)
         if file_name == 'tests/data/sim_20170530_134.fits':
             im = Image(file_name, target_label=target)
