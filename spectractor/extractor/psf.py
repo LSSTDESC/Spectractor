@@ -497,14 +497,14 @@ class Moffat(PSF):
             self.p = np.copy(self.p_default)
         self.param_names = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
         self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 10),
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 100),
                                 (0, np.inf)])
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
         self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
-                                (0.1, self.max_half_width), (1.1, 10), (0, np.inf)])
+                                (0.1, self.max_half_width), (1.1, 100), (0, np.inf)])
 
     def evaluate(self, pixels, p=None):
         r"""Evaluate the Moffat function.
@@ -721,12 +721,12 @@ class PSFFitWorkspace(FitWorkspace):
         # prepare the fit
         if data.ndim == 2:
             self.Ny, self.Nx = self.data.shape
-            self.psf.apply_max_width_to_bounds(self.Ny // 2)
+            self.psf.apply_max_width_to_bounds(self.Ny)
             self.pixels = np.mgrid[:self.Nx, :self.Ny]
         elif data.ndim == 1:
             self.Ny = self.data.size
             self.Nx = 1
-            self.psf.apply_max_width_to_bounds(self.Ny // 2)
+            self.psf.apply_max_width_to_bounds(self.Ny)
             self.pixels = np.arange(self.Ny)
             self.fixed[1] = True
         else:
@@ -826,7 +826,6 @@ class PSFFitWorkspace(FitWorkspace):
         return self.pixels, self.model, self.model_err
 
     def plot_fit(self):
-        fig = plt.figure()
         if self.data.ndim == 1:
             fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex='all', gridspec_kw={'height_ratios': [5, 1]})
             data = np.copy(self.data)
