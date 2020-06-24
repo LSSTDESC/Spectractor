@@ -648,8 +648,9 @@ class Astrometry(Image):
         if self.sources is not None:
             plt.scatter(self.sources['xcentroid'], self.sources['ycentroid'], s=100, lw=2,
                         edgecolor='black', facecolor='none', label="Detected sources")
+        vmax_2 = min(vmax, np.max(np.abs(self.dist_ra.to(u.arcsec).value)))
         sc = plt.scatter(gaia_x, gaia_y, s=100, c=self.dist_ra.to(u.arcsec).value,
-                         cmap="bwr", vmin=-vmax, vmax=vmax,
+                         cmap="bwr", vmin=-vmax_2, vmax=vmax_2,
                          label=f"Gaia stars", lw=1)
         plt.xlim(max(0, int(target_x - margin)), min(int(target_x + margin), self.data.shape[1]))
         plt.ylim(max(0, int(target_y - margin)), min(int(target_y + margin), self.data.shape[0]))
@@ -664,8 +665,9 @@ class Astrometry(Image):
         if self.sources is not None:
             plt.scatter(self.sources['xcentroid'], self.sources['ycentroid'], s=100, lw=2,
                         edgecolor='black', facecolor='none', label="all sources")
+        vmax_2 = min(vmax, np.max(np.abs(self.dist_desc.to(u.arcsec).value)))
         sc = plt.scatter(gaia_x, gaia_y, s=100, c=self.dist_dec.to(u.arcsec).value,
-                         cmap="bwr", vmin=-vmax, vmax=vmax,
+                         cmap="bwr", vmin=-vmax_2, vmax=vmax_2,
                          label=f"Gaia Stars", lw=1)
         plt.xlim(max(0, int(target_x - margin)), min(int(target_x + margin), self.data.shape[1]))
         plt.ylim(max(0, int(target_y - margin)), min(int(target_y + margin), self.data.shape[0]))
@@ -1108,7 +1110,6 @@ class Astrometry(Image):
                 self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
                                     f"arcsec from {self.target.label} {self.target.radec_position}...")
                 self.gaia_catalog = load_gaia_catalog(self.target.radec_position, radius=radius)
-                self.my_logger.warning(f"Length table {len(self.gaia_catalog)}")
                 ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
             self.my_logger.info(f"\n\tGaia catalog loaded.")
 
