@@ -1107,6 +1107,7 @@ class Astrometry(Image):
                 self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
                                     f"arcsec from {self.target.label} {self.target.radec_position}...")
                 self.gaia_catalog = load_gaia_catalog(self.target.radec_position, radius=radius)
+                self.my_logger.warning(f"Length table {len(self.gaia_catalog)}")
                 ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
             self.my_logger.info(f"\n\tGaia catalog loaded.")
 
