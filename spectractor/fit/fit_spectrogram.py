@@ -92,7 +92,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:])
         self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:])
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
-        self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny // 2)
+        self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
         self.shift_x = 0  # self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
