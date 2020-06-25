@@ -320,15 +320,6 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.model = (sim_conv(lambdas) - A2 * spectrum_order2) / lambdas
         self.model_err = (err_conv(lambdas) - A2 * err_order2) / lambdas
 
-        hdu1 = fits.PrimaryHDU()
-        hdu1.header = self.spectrum.header
-        hdu1.header["EXTNAME"] = "SPEC_NO2"
-        hdu1.data = [lambdas, self.model, self.model_err]
-        hdu = fits.HDUList([hdu1])
-        hdu.writeto(self.output_file_name, overwrite=True)
-        self.my_logger.info(
-            f'\n\tSpectrum decontaminated from diffraction second order saved in {self.output_file_name}')
-
     def get_truth_without_order2(self):
         lambdas, model, model_err = self.simulation.simulate(1., 0., self.ozone, self.pwv, self.aerosols, self.reso,
                                                              self.D, self.shift_x)

@@ -281,7 +281,7 @@ def adr_calib(lambdas, params, lat, lambda_ref=550):
 
     disp_axis, trans_axis = get_adr_shift_for_lbdas(meadr, lambdas * 10, params)
     disp_axis_pix = in_pixel(disp_axis, params)
-    trans_axis = in_pixel(trans_axis, params)
+    trans_axis_pix = in_pixel(trans_axis, params)
 
     return disp_axis_pix
 

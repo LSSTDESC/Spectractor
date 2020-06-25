@@ -578,7 +578,7 @@ def calibrate_spectrum(spectrum):
                                                                   order=spectrum.order)
     lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
     spectrum.lambda_ref = lambda_ref
-    distance += adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+    distance -= adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
 
     # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.target_pixcoords,
