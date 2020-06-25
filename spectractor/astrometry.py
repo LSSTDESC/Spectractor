@@ -136,6 +136,7 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin):
     """
     from astroquery.gaia import Gaia
     my_logger = set_logger("load_gaia_catalog")
+    Gaia.ROW_LIMIT = -1
     job = Gaia.cone_search_async(coord, radius=radius, verbose=False)
     my_logger.debug(f"\n\t{job}")
     gaia_catalog = job.get_results()
@@ -647,8 +648,9 @@ class Astrometry(Image):
         if self.sources is not None:
             plt.scatter(self.sources['xcentroid'], self.sources['ycentroid'], s=100, lw=2,
                         edgecolor='black', facecolor='none', label="Detected sources")
+        vmax_2 = min(vmax, np.max(np.abs(self.dist_ra.to(u.arcsec).value)))
         sc = plt.scatter(gaia_x, gaia_y, s=100, c=self.dist_ra.to(u.arcsec).value,
-                         cmap="bwr", vmin=-vmax, vmax=vmax,
+                         cmap="bwr", vmin=-vmax_2, vmax=vmax_2,
                          label=f"Gaia stars", lw=1)
         plt.xlim(max(0, int(target_x - margin)), min(int(target_x + margin), self.data.shape[1]))
         plt.ylim(max(0, int(target_y - margin)), min(int(target_y + margin), self.data.shape[0]))
@@ -663,8 +665,9 @@ class Astrometry(Image):
         if self.sources is not None:
             plt.scatter(self.sources['xcentroid'], self.sources['ycentroid'], s=100, lw=2,
                         edgecolor='black', facecolor='none', label="all sources")
+        vmax_2 = min(vmax, np.max(np.abs(self.dist_dec.to(u.arcsec).value)))
         sc = plt.scatter(gaia_x, gaia_y, s=100, c=self.dist_dec.to(u.arcsec).value,
-                         cmap="bwr", vmin=-vmax, vmax=vmax,
+                         cmap="bwr", vmin=-vmax_2, vmax=vmax_2,
                          label=f"Gaia Stars", lw=1)
         plt.xlim(max(0, int(target_x - margin)), min(int(target_x + margin), self.data.shape[1]))
         plt.ylim(max(0, int(target_y - margin)), min(int(target_y + margin), self.data.shape[0]))
@@ -1152,7 +1155,7 @@ class Astrometry(Image):
         # after the shift the histograms must be centered on zero
         total_shift = np.array(
             [dra_median / np.cos(self.target_radec_position_after_pm.dec.radian), ddec_median]) * u.arcsec
-        self.my_logger.info(f"\n\tShift original CRVAL value {self.wcs.wcs.crval} of {total_shift}.")
+        self.my_logger.info(f"\n\tShift original CRVAL value {self.wcs.wcs.crval * u.deg} of {total_shift}.")
         self.wcs.wcs.crval = self.wcs.wcs.crval * u.deg + total_shift
         # if parameters.DEBUG:
         #     self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_radec_positions_after_pm,

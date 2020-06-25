@@ -3,7 +3,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config
+from spectractor.config import set_logger
 from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import FitWorkspace, run_gradient_descent, save_gradient_descent
@@ -391,7 +391,7 @@ if __name__ == "__main__":
                         help="Input fits file name. It can be a list separated by spaces, or it can use * as wildcard.",
                         nargs='*')
     parser.add_argument("-d", "--debug", dest="debug", action="store_true",
-                        help="Enter debug mode (more verbose and plots).", default=True)
+                        help="Enter debug mode (more verbose and plots).", default=False)
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
                         help="Enter verbose (print more stuff).", default=False)
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",

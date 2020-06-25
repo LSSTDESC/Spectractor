@@ -158,7 +158,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     if parameters.PSF_EXTRACTION_MODE != "PSF_1D" and parameters.PSF_EXTRACTION_MODE != "PSF_2D":
         raise NotImplementedError(f"PSF_EXTRACTION_MODE must PSF_1D or PSF_2D. Found {parameters.PSF_EXTRACTION_MODE}.")
-
     my_logger = set_logger(__name__)
     if ws is None:
         ws = [signal_width+20, signal_width+30]

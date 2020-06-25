@@ -69,7 +69,6 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):  # pragma: 
         :hide:
 
         >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
-        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
 
     .. plot::
 
@@ -114,7 +113,6 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gau
     Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor for the Moffat
     :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}` is not included as special functions
     are not supproted by the numba library.
-
 
     Parameters
     ----------
@@ -382,7 +380,6 @@ class PSF:
     def evaluate(self, pixels, p=None):  # pragma: no cover
         if p is not None:
             self.p = np.asarray(p).astype(float)
-        # amplitude, x_c, y_c, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             return np.zeros_like(pixels)
         elif pixels.ndim == 1:
@@ -826,6 +823,7 @@ class PSFFitWorkspace(FitWorkspace):
         return self.pixels, self.model, self.model_err
 
     def plot_fit(self):
+        fig = plt.figure()
         if self.data.ndim == 1:
             fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex='all', gridspec_kw={'height_ratios': [5, 1]})
             data = np.copy(self.data)
@@ -978,80 +976,6 @@ def PSF2D_chisq_jac(params, model, xx, yy, zz, zz_err=None):
     else:
         zz_err2 = zz_err * zz_err
         return np.array([np.nansum(2 * jac[p] * diff / zz_err2) for p in range(len(params))])
-
-
-# DO NOT WORK
-# def fit_PSF2D_outlier_removal(x, y, data, sigma=3.0, niter=3, guess=None, bounds=None):
-#     """Fit a PSF 2D model with parameters:
-#         amplitude_gauss, x_c, stddev, amplitude, alpha, gamma, saturation
-#     using scipy. Find outliers data point above sigma*data_errors from the fit over niter iterations.
-#
-#     Parameters
-#     ----------
-#     x: np.array
-#         2D array of the x coordinates.
-#     y: np.array
-#         2D array of the y coordinates.
-#     data: np.array
-#         the 1D array profile.
-#     guess: array_like, optional
-#         list containing a first guess for the PSF parameters (default: None).
-#     bounds: list, optional
-#         2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
-#     sigma: int
-#         the sigma limit to exclude data points (default: 3).
-#     niter: int
-#         the number of loop iterations to exclude  outliers and refit the model (default: 2).
-#
-#     Returns
-#     -------
-#     fitted_model: MoffatGauss2D
-#         the MoffatGauss2D fitted model.
-#
-#     Examples
-#     --------
-#
-#     Create the model:
-#     >>> X, Y = np.mgrid[:50,:50]
-#     >>> PSF = MoffatGauss2D()
-#     >>> p = (1000, 25, 25, 5, 1, -0.2, 1, 6000)
-#     >>> Z = PSF.evaluate(X, Y, *p)
-#     >>> Z += 100*np.exp(-((X-10)**2+(Y-10)**2)/4)
-#     >>> Z_err = np.sqrt(1+Z)
-#
-#     Prepare the fit:
-#     >>> guess = (1000, 27, 23, 3.2, 1.2, -0.1, 2,  6000)
-#     >>> bounds = np.array(((0, 6000), (10, 40), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000)))
-#     >>> bounds = bounds.T
-#
-#     Fit without bars:
-#     >>> model = fit_PSF2D_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, sigma=7, niter=5)
-#     >>> res = [getattr(model, p).value for p in model.param_names]
-#     >>> print(res, p)
-#     >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
-#     """
-#     gg_init = MoffatGauss2D()
-#     if guess is not None:
-#         for ip, p in enumerate(gg_init.param_names):
-#             getattr(gg_init, p).value = guess[ip]
-#     if bounds is not None:
-#         for ip, p in enumerate(gg_init.param_names):
-#             getattr(gg_init, p).min = bounds[0][ip]
-#             getattr(gg_init, p).max = bounds[1][ip]
-#     gg_init.saturation.fixed = True
-#     with warnings.catch_warnings():
-#         # Ignore model linearity warning from the fitter
-#         warnings.simplefilter('ignore')
-#         fit = LevMarLSQFitterWithNan()
-#         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
-#         # get fitted model and filtered data
-#         or_fitted_model, filtered_data = or_fit(gg_init, x, y, data)
-#         if parameters.VERBOSE:
-#             print(or_fitted_model)
-#         if parameters.DEBUG:
-#             print(fit.fit_info)
-#         print(fit.fit_info)
-#         return or_fitted_model
 
 
 def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='minimize'):

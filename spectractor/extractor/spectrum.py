@@ -613,8 +613,11 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
         The spectrum amplitude array
     spec_err: float array, optional
         The spectrum amplitude uncertainty array (default: None)
+<<<<<<< HEAD
     cov_matrix: float array, optional
         The spectrum amplitude 2D covariance matrix array (default: None)
+=======
+>>>>>>> c49ce111b2fc6364065a2ea7eb62f22aadd78c52
     fwhm_func: callable, optional
         The fwhm of the cross spectrum to reset CALIB_PEAK_WIDTH parameter as a function of lambda (default: None)
     snr_minlevel: float
@@ -658,7 +661,11 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
 
     >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
     ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
+<<<<<<< HEAD
     >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, cov, fwhm_func=fwhm_func)
+=======
+    >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
+>>>>>>> c49ce111b2fc6364065a2ea7eb62f22aadd78c52
 
     .. doctest::
         :hide:

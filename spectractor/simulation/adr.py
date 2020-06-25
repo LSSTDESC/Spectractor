@@ -275,7 +275,7 @@ def adr_calib(lambdas, params, lat, lambda_ref=550):
     elif isinstance(lat, AC.Latitude):
         lat = lat
     else:
-        raise TypeError('latitude type is neither a str, float or an astropy.coordinates')
+        raise TypeError('Latitude type is neither a str, float nor an astropy.coordinates')
 
     meadr = instanciation_adr(params, lat, lambdas[0] * 10)
 
