@@ -585,7 +585,16 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
     image.disperser_label = image.header['GRATING']
-    image.read_out_noise = np.zeros_like(image.data)
+    # image.dec = image.header['DEC']
+    # image.hour_angle = image.header['HA']
+    # image.temperature = image.header['OUTTEMP']
+    # image.pressure = image.header['OUTPRESS']
+    # image.humidity = image.header['OUTHUM']
+    # image.xpixsize = image.header['XPIXSIZE']
+    # image.ypixsize = image.header['YPIXSIZE']
+    parameters.OBS_ALTITUDE = image.header['OBS-ELEV']
+    parameters.OBS_LATITUDE = image.header['OBS-LAT']
+    image.read_out_noise = 8.5*np.ones_like(image.data)
 
 
 def find_target(image, guess=None, rotated=False, use_wcs=True):
