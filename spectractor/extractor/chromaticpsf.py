@@ -251,7 +251,7 @@ class ChromaticPSF:
             pixels = np.arange(self.Ny)
         else:
             self.my_logger.error(f"\n\tUnknown evaluation mode={mode}. Must be '1D' or '2D'.")
-        self.psf.apply_max_width_to_bounds(max_half_width=self.Ny // 2)
+        self.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
         profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:, 1] = np.arange(self.Nx)  # replace x_c
         output = np.zeros((self.Ny, self.Nx))
@@ -861,7 +861,7 @@ class ChromaticPSF:
         #           (-1, 0),
         #           (0.1, min(Ny // 2, fwhm)),
         #           (0, 2 * saturation)]
-        psf.apply_max_width_to_bounds(max_half_width=Ny // 2)
+        psf.apply_max_width_to_bounds(max_half_width=Ny)
         bounds = np.copy(psf.bounds)
         bounds[0] = (0.1 * signal_sum, 2 * signal_sum)
         bounds[2] = (middle - w, middle + w)
@@ -933,6 +933,7 @@ class ChromaticPSF:
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
             if live_fit and parameters.DISPLAY:  # pragma: no cover
+                w.live_fit = True
                 w.plot_fit()
         # interpolate the skipped pixels with splines
         all_pixels = np.arange(Nx)
@@ -1092,7 +1093,7 @@ class ChromaticPSF:
         self.poly_params[w.Nx + w.y_c_0_index] += w.bgd_width
 
         # fill results
-        self.psf.apply_max_width_to_bounds(max_half_width=w.Ny // 2 + w.bgd_width)
+        self.psf.apply_max_width_to_bounds(max_half_width=w.Ny + 2 * w.bgd_width)
         self.set_bounds()
         self.profile_params = self.from_poly_params_to_profile_params(self.poly_params, apply_bounds=True)
         self.profile_params[:self.Nx, 0] = w.amplitude_params
@@ -1158,7 +1159,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.Ny, self.Nx = self.data.shape
 
         # update the bounds
-        self.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.Ny // 2)
+        self.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
         self.bounds = self.chromatic_psf.set_bounds()
 
         # error matrix
@@ -1725,7 +1726,7 @@ class RegFitWorkspace(FitWorkspace):
         ax[0].set_ylabel(r"$G(r)$")
         ax[0].set_xlabel("Regularisation hyper-parameter $r$")
         ax[0].grid()
-        ax[0].set_title(f"Optimal regularisation parameter: {self.opt_reg:.3g}")
+        ax[0].set_title(f"Optimal regularisation parameter: {opt_reg:.3g}")
         ax[1].plot(regs, chisqs)
         ax[1].set_ylabel("Chi2")
         ax[1].set_xlabel("Regularisation hyper-parameter $r$")
