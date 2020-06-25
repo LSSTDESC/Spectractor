@@ -3,6 +3,7 @@ from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace, run_spectro
 from spectractor.fit.fit_spectrum import SpectrumFitWorkspace, run_spectrum_minimisation
 from spectractor.config import load_config
 
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
 

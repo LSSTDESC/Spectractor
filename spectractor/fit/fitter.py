@@ -109,10 +109,12 @@ class FitWorkspace:
 
     def simulate(self, *p):
         """Compute the model prediction given a set of parameters.
+
         Parameters
         ----------
         p: array_like
             Array of parameters for the computation of the model.
+
         Returns
         -------
         x: array_like
@@ -121,6 +123,7 @@ class FitWorkspace:
             The model prediction.
         model_err: array_like
             The uncertainty on the model prediction.
+
         Examples
         --------
         >>> w = FitWorkspace()
@@ -130,10 +133,10 @@ class FitWorkspace:
             :hide:
             >>> assert x is not None
         """
-        x = np.array([])
+        self.x = np.array([])
         self.model = np.array([])
         self.model_err = np.array([])
-        return x, self.model, self.model_err
+        return self.x, self.model, self.model_err
 
     def analyze_chains(self):
         self.load_chains()
@@ -509,18 +512,18 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         def line_search(alpha):
             tmp_params_2 = np.copy(tmp_params)
             tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
-            for ip, p in enumerate(tmp_params_2):
-                if p < fit_workspace.bounds[ip][0]:
-                    tmp_params_2[ip] = fit_workspace.bounds[ip][0]
-                if p > fit_workspace.bounds[ip][1]:
-                    tmp_params_2[ip] = fit_workspace.bounds[ip][1]
+            for ipp, pp in enumerate(tmp_params_2):
+                if pp < fit_workspace.bounds[ipp][0]:
+                    tmp_params_2[ipp] = fit_workspace.bounds[ipp][0]
+                if pp > fit_workspace.bounds[ipp][1]:
+                    tmp_params_2[ipp] = fit_workspace.bounds[ipp][1]
             # lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
             # res = mod.flatten()[fit_workspace.not_outliers] - fit_workspace.data.flatten()[fit_workspace.not_outliers]
             w_res = fit_workspace.weighted_residuals(tmp_params_2)
             return w_res @ w_res  # res @ (W * res)
 
         # tol parameter acts on alpha (not func)
-        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2, brack=(-0.1, 0.1))
+        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2, brack=(0, 0.1))
         tmp_params[ipar] += alpha_min * dparams
         # check bounds
         for ip, p in enumerate(tmp_params):
@@ -624,7 +627,8 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
         # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
         fit_workspace.plot_fit()
         plot_gradient_descent(fit_workspace, costs, params_table)
-        fit_workspace.plot_correlation_matrix(ipar=ipar)
+        if len(ipar) > 1:
+            fit_workspace.plot_correlation_matrix(ipar=ipar)
     return params_table, costs
 
 

@@ -270,12 +270,12 @@ Example to get shift in pixels:
 
 
 def adr_calib(lambdas, params, lat, lambda_ref=550):
-    if isinstance(lat, str):
+    if isinstance(lat, str) or isinstance(lat, float):
         lat = AC.Latitude(lat, unit=u.deg)
     elif isinstance(lat, AC.Latitude):
         lat = lat
     else:
-        raise TypeError('latitude type is neither a str nor an astropy.coordinates')
+        raise TypeError('Latitude type is neither a str, float nor an astropy.coordinates')
 
     meadr = instanciation_adr(params, lat, lambdas[0] * 10)
 
