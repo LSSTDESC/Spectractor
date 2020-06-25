@@ -69,6 +69,7 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):  # pragma: 
         :hide:
 
         >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
 
     .. plot::
 

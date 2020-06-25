@@ -423,7 +423,7 @@ if __name__ == "__main__":
                         help="Input fits file name. It can be a list separated by spaces, or it can use * as wildcard.",
                         nargs='*')
     parser.add_argument("-d", "--debug", dest="debug", action="store_true",
-                        help="Enter debug mode (more verbose and plots).", default=False)
+                        help="Enter debug mode (more verbose and plots).", default=True)
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
                         help="Enter verbose (print more stuff).", default=False)
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
