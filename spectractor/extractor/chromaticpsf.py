@@ -108,6 +108,7 @@ class ChromaticPSF:
                     self.poly_params_labels.append(f"{p}_{k}")
                     self.poly_params_names.append("$" + self.psf.axis_names[ip].replace("$", "")
                                                   + "^{(" + str(k) + ")}$")
+        self.opt_reg = parameters.PSF_FIT_REG_PARAM
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg
@@ -1086,6 +1087,7 @@ class ChromaticPSF:
             self.my_logger.info(f"\n\tOptimal regularisation parameter: {w_reg.opt_reg}")
             w.reg = np.copy(w_reg.opt_reg)
             w.simulate(*w.p)
+            self.opt_reg = np.copy(w.reg)
 
         self.poly_params = w.poly_params
 

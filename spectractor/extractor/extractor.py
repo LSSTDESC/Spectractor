@@ -289,6 +289,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # err = np.sqrt(err*err + bgd_model_func(np.arange(Nx), np.arange(Ny))/image.gain[ymin:ymax, xmin:xmax]**2)
 
     # 2D extraction
+    opt_reg = -1
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
         # build 1D priors
         psf_poly_priors = s.from_table_to_poly_params()[s.Nx:]
@@ -328,6 +329,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
         s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
         spectrum.chromatic_psf = s
+        opt_reg = s.opt_reg
+    spectrum.header['PSF_REG'] = opt_reg
 
     # First guess for lambdas
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_distance_along_dispersion_axis(),
