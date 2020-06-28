@@ -454,7 +454,8 @@ def lnprob(p):
     return lp + fit_workspace.lnlike(p)
 
 
-def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
+def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3,
+                     with_line_search=True):
     """
 
     Parameters
@@ -511,21 +512,27 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         JT_W_R0 = JT_W @ residuals
         dparams = - inv_JT_W_J @ JT_W_R0
 
-        def line_search(alpha):
-            tmp_params_2 = np.copy(tmp_params)
-            tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
-            for ipp, pp in enumerate(tmp_params_2):
-                if pp < fit_workspace.bounds[ipp][0]:
-                    tmp_params_2[ipp] = fit_workspace.bounds[ipp][0]
-                if pp > fit_workspace.bounds[ipp][1]:
-                    tmp_params_2[ipp] = fit_workspace.bounds[ipp][1]
-            # lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
-            # res = mod.flatten()[fit_workspace.not_outliers] - fit_workspace.data.flatten()[fit_workspace.not_outliers]
-            w_res = fit_workspace.weighted_residuals(tmp_params_2)
-            return w_res @ w_res  # res @ (W * res)
+        if with_line_search:
+            def line_search(alpha):
+                tmp_params_2 = np.copy(tmp_params)
+                tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
+                for ipp, pp in enumerate(tmp_params_2):
+                    if pp < fit_workspace.bounds[ipp][0]:
+                        tmp_params_2[ipp] = fit_workspace.bounds[ipp][0]
+                    if pp > fit_workspace.bounds[ipp][1]:
+                        tmp_params_2[ipp] = fit_workspace.bounds[ipp][1]
+                # lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
+                # res = mod.flatten()[fit_workspace.not_outliers] - fit_workspace.data.flatten()[fit_workspace.not_outliers]
+                w_res = fit_workspace.weighted_residuals(tmp_params_2)
+                return w_res @ w_res  # res @ (W * res)
 
-        # tol parameter acts on alpha (not func)
-        alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2, brack=(0, 0.1))
+            # tol parameter acts on alpha (not func)
+            alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=1e-2, brack=(0, 0.1))
+        else:
+            alpha_min = 1
+            fval = np.copy(cost)
+            funcalls = 0
+            iter = 0
         tmp_params[ipar] += alpha_min * dparams
         # check bounds
         for ip, p in enumerate(tmp_params):
@@ -537,11 +544,11 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
         if fit_workspace.verbose:
-            my_logger.info(f"\n\tIteration={i}: initial cost={cost:.3f} initial chisq_red={cost / tmp_model.size:.3f}"
+            my_logger.info(f"\n\tIteration={i}: initial cost={cost:.5g} initial chisq_red={cost / tmp_model.size:.5g}"
                            f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
                            f"\n\tParameter shifts: {alpha_min * dparams}"
                            f"\n\tNew parameters: {tmp_params[ipar]}"
-                           f"\n\tFinal cost={fval:.3f} final chisq_red={fval / tmp_model.size:.3f} "
+                           f"\n\tFinal cost={fval:.5g} final chisq_red={fval / tmp_model.size:.5g} "
                            f"computed in {time.time() - start:.2f}s")
         if fit_workspace.live_fit:
             fit_workspace.simulate(*tmp_params)
@@ -557,7 +564,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                 my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
                                f"relative to the sum of the parameters is below xtol={xtol}.")
                 break
-            if len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2]), 1]) < ftol:
+            if len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2])]) < ftol:
                 my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
                                f"relative change of cost is below ftol={ftol}.")
                 break
@@ -615,11 +622,13 @@ def save_gradient_descent(fit_workspace, costs, params_table):
     fit_workspace.my_logger.info(f"\n\tSave gradient descent log {output_filename}.")
 
 
-def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix, xtol, ftol, niter, verbose=False):
+def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix, xtol, ftol, niter, verbose=False,
+                         with_line_search=True):
     fit_workspace.p, fit_workspace.cov, tmp_costs, tmp_params_table = gradient_descent(fit_workspace, guess,
                                                                                        epsilon, niter=niter,
                                                                                        fixed_params=fix,
-                                                                                       xtol=xtol, ftol=ftol)
+                                                                                       xtol=xtol, ftol=ftol,
+                                                                                       with_line_search=with_line_search)
     params_table = np.concatenate([params_table, tmp_params_table])
     costs = np.concatenate([costs, tmp_costs])
     ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
@@ -636,7 +645,7 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
 
 
 def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50,
-                     verbose=False):
+                     verbose=False, with_line_search=True):
     my_logger = set_logger(__name__)
 
     bounds = fit_workspace.bounds
@@ -660,9 +669,10 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
     elif method == 'basinhopping':
         start = time.time()
         minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds)
-        result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs)
+        result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs, T=0.1)
         fit_workspace.p = result['x']
         if verbose:
+            fit_workspace.plot_fit()
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
     elif method == "least_squares":
         start = time.time()
@@ -705,7 +715,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
 
         start = time.time()
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fix, xtol=xtol, ftol=ftol, niter=niter, verbose=verbose)
+                                                   fix=fix, xtol=xtol, ftol=ftol, niter=niter, verbose=verbose,
+                                                   with_line_search=with_line_search)
         fit_workspace.costs = costs
         fit_workspace.params_table = params_table
         if verbose:
