@@ -530,7 +530,8 @@ class ChromaticPSF:
                 if len(poly_params) > length:
                     profile_params[:, k] = \
                         np.polynomial.legendre.legval(pixels,
-                                                      poly_params[length+shift:length+shift+self.degrees[name]+1])
+                                                      poly_params[
+                                                      length + shift:length + shift + self.degrees[name] + 1])
                 else:
                     p = poly_params[shift:shift + self.degrees[name] + 1]
                     if len(p) > 0:  # to avoid saturation parameters in case not set
@@ -1076,18 +1077,20 @@ class ChromaticPSF:
         elif mode == "2D":
             w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose)
-            run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
+            # run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
+            run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
+                                            fix=w.fixed, sigma_clip=5, niter_clip=3, verbose=verbose)
         else:
             self.my_logger.error(f"\n\tUnknown fitting mode={mode}. Must be '1D' or '2D'.")
 
         if w.amplitude_priors_method == "psf1d" and mode == "2D":
-            w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM)
-            run_minimisation(w_reg, method="newton", ftol=0.001, xtol=0.001, verbose=2, epsilon=[1e-1])
-            w_reg.opt_reg = 10**w_reg.p[0]
+            w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
+            run_minimisation(w_reg, method="basinhopping", ftol=1e-16, xtol=1e-4, verbose=verbose, epsilon=[1e-1], with_line_search=True)
+            w_reg.opt_reg = 10 ** w_reg.p[0]
             self.my_logger.info(f"\n\tOptimal regularisation parameter: {w_reg.opt_reg}")
             w.reg = np.copy(w_reg.opt_reg)
             w.simulate(*w.p)
-            self.opt_reg = np.copy(w.reg)
+            self.opt_reg = w_reg.opt_reg
 
         self.poly_params = w.poly_params
 
@@ -1669,20 +1672,20 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
 class RegFitWorkspace(FitWorkspace):
 
-    def __init__(self, w, opt_reg=parameters.PSF_FIT_REG_PARAM):
+    def __init__(self, w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=False, live_fit=False):
         """
 
         Parameters
         ----------
         w: ChromaticPSFFitWorkspace
         """
-        FitWorkspace.__init__(self)
+        FitWorkspace.__init__(self, verbose=verbose, live_fit=live_fit)
         self.x = np.array([0])
         self.data = np.array([0])
         self.err = np.array([1])
         self.w = w
         self.p = np.asarray([np.log10(opt_reg)])
-        self.bounds = [(-20, 20)]
+        self.bounds = [(-20, np.log10(self.w.amplitude_priors.size) + 2)]
         self.input_labels = ["log10_reg"]
         self.axis_names = [r"$\log_{10} r$"]
         self.fixed = [False] * self.p.size
@@ -1702,21 +1705,32 @@ class RegFitWorkspace(FitWorkspace):
         A = cov @ (self.w.M.T @ self.w.W_dot_data + reg * self.w.Q_dot_A0)
         self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
         diff = self.w.data_flat - self.w.M @ A
-        self.chisquare = diff @ (self.w.W * diff)
+        self.chisquare = diff[self.w.not_outliers] @ (self.w.W * diff)[self.w.not_outliers]
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
-        self.G = self.chisquare / (self.w.data_flat.size - np.trace(self.resolution))**2
+        self.G = self.chisquare / (self.w.data_flat.size - np.trace(self.resolution)) ** 2
         return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
     def plot_fit(self):
         log10_opt_reg = self.p[0]
-        opt_reg = 10**log10_opt_reg
-        regs = 10**np.arange(min(-10, 0.9*log10_opt_reg), max(3, 1.2*log10_opt_reg), 0.1)
+        opt_reg = 10 ** log10_opt_reg
+        regs = 10 ** np.linspace(min(-10, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
         Gs = []
         chisqs = []
         resolutions = []
+        x = np.arange(len(self.w.amplitude_priors))
         for r in regs:
             self.simulate(np.log10(r))
+            if parameters.DISPLAY and False:
+                fig = plt.figure()
+                plt.errorbar(x, self.w.amplitude_params, yerr=[np.sqrt(self.w.amplitude_cov_matrix[i, i]) for i in x],
+                             label=f"fit r={r:.2g}")
+                plt.plot(x, self.w.amplitude_priors, label="prior")
+                plt.grid()
+                plt.legend()
+                plt.draw()
+                plt.pause(1e-8)
+                plt.close(fig)
             Gs.append(self.G)
             chisqs.append(self.chisquare)
             resolutions.append(np.trace(self.resolution))
