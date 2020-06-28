@@ -351,7 +351,7 @@ class Spectrum:
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
                                   'second column gives the spectrum in unit UNIT2, ' \
                                   'third column the corresponding errors.'
-        self.header['LAMBDA_REF'] = self.lambda_ref
+        self.header['LBDA_REF'] = self.lambda_ref
         hdu1 = fits.PrimaryHDU()
         hdu1.header = self.header
         hdu1.header["EXTNAME"] = "SPECTRUM"
@@ -465,8 +465,8 @@ class Spectrum:
                 self.xpixsize = self.header['XPIXSIZE']
             if self.header['YPIXSIZE'] != "":
                 self.ypixsize = self.header['YPIXSIZE']
-            if self.header['LAMBDA_REF'] != "":
-                self.lambda_ref = self.header['LAMBDA_REF']
+            if self.header['LBDA_REF'] != "":
+                self.lambda_ref = self.header['LBDA_REF']
 
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
