@@ -4,6 +4,7 @@ from schwimmbad import MPIPool
 import emcee
 import time
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import numpy as np
 import sys
 import os
@@ -51,6 +52,7 @@ class FitWorkspace:
         self.chains = np.array([[]])
         self.lnprobs = np.array([[]])
         self.costs = np.array([[]])
+        self.params_table = None
         self.flat_chains = np.array([[]])
         self.valid_chains = [False] * self.nwalkers
         self.global_average = None
@@ -586,6 +588,7 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
     ax[1].set_ylabel("Parameters")
     ax[0].grid()
     ax[1].set_xlabel("Iterations")
+    ax[0].xaxis.set_major_locator(MaxNLocator(integer=True))
     fig.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
     if parameters.SAVE and fit_workspace.filename != "":
@@ -625,7 +628,7 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
                                 [fit_workspace.input_labels[ip] for ip in ipar])
     if parameters.DEBUG and (verbose or fit_workspace.verbose):
         # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
-        fit_workspace.plot_fit()
+        # fit_workspace.plot_fit()
         plot_gradient_descent(fit_workspace, costs, params_table)
         if len(ipar) > 1:
             fit_workspace.plot_correlation_matrix(ipar=ipar)
@@ -688,9 +691,12 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
     elif method == "newton":
-        costs = np.array([fit_workspace.chisq(guess)])
-
-        params_table = np.array([guess])
+        if fit_workspace.costs.size == 0:
+            costs = np.array([fit_workspace.chisq(guess)])
+            params_table = np.array([guess])
+        else:
+            costs = np.concatenate([fit_workspace.costs, np.array([fit_workspace.chisq(guess)])])
+            params_table = np.concatenate([fit_workspace.params_table, np.array([guess])])
         if epsilon is None:
             epsilon = 1e-4 * guess
             epsilon[epsilon == 0] = 1e-4
@@ -715,10 +721,8 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
     fit_workspace.sigma_clip = sigma_clip
     for step in range(niter_clip):
         if verbose:
-            my_logger.debug(f"\n\tSigma-clipping step {step}/{niter_clip} (sigma={sigma_clip})")
+            my_logger.info(f"\n\tSigma-clipping step {step}/{niter_clip} (sigma={sigma_clip})")
         run_minimisation(fit_workspace, method=method, epsilon=epsilon, fix=fix, xtol=xtol, ftol=ftol, niter=niter)
-        if verbose:
-            my_logger.debug(f'\n\tBest fitting parameters:\n{fit_workspace.p}')
         # remove outliers
         indices_no_nan = ~np.isnan(fit_workspace.data)
         residuals = np.abs(fit_workspace.model[indices_no_nan]
@@ -729,17 +733,19 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         if len(outliers) > 0:
             if verbose:
                 my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
+                my_logger.info(f'\n\tOutliers: {len(outliers)} / {fit_workspace.data.size} data points '
+                               f'({100 * len(outliers) / fit_workspace.data.size:.2f}%) '
+                               f'at more than {sigma_clip}-sigma from best-fit model.')
             if np.all(fit_workspace.outliers == outliers):
                 if verbose:
-                    my_logger.debug(f'\n\tOutliers flat index list unchanged since last iteration: '
-                                    f'break the sigma clipping iterations.')
+                    my_logger.info(f'\n\tOutliers flat index list unchanged since last iteration: '
+                                   f'break the sigma clipping iterations.')
                 break
             else:
                 fit_workspace.outliers = outliers
         else:
             if verbose:
-                my_logger.debug(f'\n\tNo outliers detected at first iteration: '
-                                f'break the sigma clipping iterations.')
+                my_logger.info(f'\n\tNo outliers detected at first iteration: break the sigma clipping iterations.')
             break
 
 
