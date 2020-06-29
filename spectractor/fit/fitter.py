@@ -436,14 +436,38 @@ class FitWorkspace:
             J[ip] = (tmp_model.flatten()[self.not_outliers] - model) / epsilon[ip]
         return J
 
-    @staticmethod
-    def hessian(J, W):
-        # algebra
-        JT_W = J.T * W
-        JT_W_J = JT_W @ J
-        L = np.linalg.inv(np.linalg.cholesky(JT_W_J))
-        inv_JT_W_J = L.T @ L
-        return inv_JT_W_J
+    def hessian(self, params, epsilon, fixed_params=None):
+        x, model, model_err = self.simulate(*params)
+        model = model.flatten()[self.not_outliers]
+        J = self.jacobian(params, epsilon, fixed_params=fixed_params)
+        H = np.zeros((params.size, params.size, model.size))
+        tmp_p = np.copy(params)
+        for ip, p1 in enumerate(params):
+            print(ip, p1, params[ip],  tmp_p[ip], self.bounds[ip], epsilon[ip], tmp_p[ip] + epsilon[ip])
+            if fixed_params[ip]:
+                continue
+            if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
+                epsilon[ip] = - epsilon[ip]
+            tmp_p[ip] += epsilon[ip]
+            print(tmp_p)
+            # tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
+            # J[ip] = (tmp_model.flatten()[self.not_outliers] - model) / epsilon[ip]
+        tmp_J = self.jacobian(tmp_p, epsilon, fixed_params=fixed_params)
+        for ip, p1 in enumerate(params):
+            if fixed_params[ip]:
+                continue
+            for jp, p2 in enumerate(params):
+                if fixed_params[jp]:
+                    continue
+                x, modelplus, model_err = self.simulate(params+epsilon)
+                x, modelmoins, model_err = self.simulate(params-epsilon)
+                model = model.flatten()[self.not_outliers]
+
+                print("hh", ip, jp, tmp_J[ip], J[jp], tmp_p[ip], params,  (tmp_J[ip] - J[jp])/epsilon)
+                print((modelplus+modelmoins-2*model)/(np.asarray(epsilon)**2))
+                H[ip, jp] = (tmp_J[ip] - J[jp])/epsilon
+                H[ip, jp] = (modelplus+modelmoins-2*model)/(np.asarray(epsilon)**2)
+        return H
 
 
 def lnprob(p):
@@ -572,6 +596,123 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
 
 
+def simple_newton_minimisation(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
+    """
+
+    Parameters
+    ----------
+    fit_workspace: FitWorkspace
+    params
+    epsilon
+    niter
+    fixed_params
+    xtol
+    ftol
+
+    Returns
+    -------
+
+    """
+    my_logger = set_logger(__name__)
+    tmp_params = np.copy(params)
+    ipar = np.arange(params.size)
+    if fixed_params is not None:
+        ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
+    funcs = []
+    params_table = []
+    inv_H = np.zeros((len(ipar), len(ipar)))
+    for i in range(niter):
+        start = time.time()
+        tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
+        # if fit_workspace.live_fit:
+        #    fit_workspace.plot_fit()
+        J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
+        # remove parameters with unexpected null Jacobian vectors
+        for ip in range(J.shape[0]):
+            if ip not in ipar:
+                continue
+            if np.all(J[ip] == np.zeros(J.shape[1])):
+                ipar = np.delete(ipar, list(ipar).index(ip))
+                # tmp_params[ip] = 0
+                my_logger.warning(
+                    f"\n\tStep {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed "
+                    f"at its last known current value ({tmp_params[ip]}).")
+        # remove fixed parameters
+        J = J[ipar].T
+        # hessian
+        H = fit_workspace.hessian(tmp_params, epsilon, fixed_params=fixed_params)
+        try:
+            L = np.linalg.inv(np.linalg.cholesky(H))  # cholesky is too sensible to the numerical precision
+            inv_H = L.T @ L
+        except np.linalg.LinAlgError:
+            inv_H = np.linalg.inv(H)
+        dparams = - inv_H[:, :, 0] @ J[:, 0]
+        print("dparams", dparams, inv_H, J, H)
+        tmp_params[ipar] += dparams
+
+        # check bounds
+        print("tmp_params", tmp_params, dparams, inv_H, J)
+        for ip, p in enumerate(tmp_params):
+            if p < fit_workspace.bounds[ip][0]:
+                tmp_params[ip] = fit_workspace.bounds[ip][0]
+            if p > fit_workspace.bounds[ip][1]:
+                tmp_params[ip] = fit_workspace.bounds[ip][1]
+
+        tmp_lambdas, new_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
+        new_func = new_model[0]
+        funcs.append(new_func)
+
+        r = np.log10(fit_workspace.regs)
+        js = [fit_workspace.jacobian(np.asarray([rr]), epsilon, fixed_params=fixed_params)[0] for rr in np.array(r)]
+        plt.plot(r, js, label="J")
+        plt.grid()
+        plt.legend()
+        plt.show()
+
+        if parameters.DISPLAY:
+            fig = plt.figure()
+            plt.plot(r, js, label="prior")
+            mod = tmp_model + J[0] * (r - (tmp_params-dparams)[0])
+            plt.plot(r, mod)
+            plt.axvline(tmp_params)
+            plt.axhline(tmp_model)
+            plt.grid()
+            plt.legend()
+            plt.draw()
+            plt.pause(1e-8)
+            plt.close(fig)
+
+        # prepare outputs
+        params_table.append(np.copy(tmp_params))
+        if fit_workspace.verbose:
+            my_logger.info(f"\n\tIteration={i}: initial func={tmp_model[0]:.5g}"
+                           f"\n\tParameter shifts: {dparams}"
+                           f"\n\tNew parameters: {tmp_params[ipar]}"
+                           f"\n\tFinal func={new_func:.5g}"
+                           f" computed in {time.time() - start:.2f}s")
+        if fit_workspace.live_fit:
+            fit_workspace.simulate(*tmp_params)
+            fit_workspace.plot_fit()
+            fit_workspace.cov = inv_H[:, :, 0]
+            print("shape", fit_workspace.cov.shape)
+            # fit_workspace.plot_correlation_matrix(ipar)
+        if len(ipar) == 0:
+            my_logger.warning(f"\n\tGradient descent terminated in {i} iterations because all parameters "
+                              f"have null Jacobian.")
+            break
+        if fit_workspace.verbose or parameters.DEBUG:
+            if np.sum(np.abs(dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
+                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
+                               f"relative to the sum of the parameters is below xtol={xtol}.")
+                break
+            if len(funcs) > 1 and np.abs(funcs[-2] - new_func) / np.max([np.abs(new_func), np.abs(funcs[-2])]) < ftol:
+                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
+                               f"relative change of cost is below ftol={ftol}.")
+                break
+    plt.close()
+    return tmp_params, inv_H[:, :, 0], np.array(funcs), np.array(params_table)
+
+
 def print_parameter_summary(params, cov, labels):
     my_logger = set_logger(__name__)
     txt = ""
@@ -644,8 +785,28 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
     return params_table, costs
 
 
+def run_simple_newton_minimisation(fit_workspace, guess, epsilon, fix=None, xtol=1e-8, ftol=1e-8, niter=50, verbose=False):
+    if fix is None:
+        fix = [False] * guess.size
+    fit_workspace.p, fit_workspace.cov, funcs, params_table = simple_newton_minimisation(fit_workspace, guess,
+                                                                                       epsilon, niter=niter,
+                                                                                       fixed_params=fix,
+                                                                                       xtol=xtol, ftol=ftol)
+    ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
+    if verbose or fit_workspace.verbose:
+        print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
+                                [fit_workspace.input_labels[ip] for ip in ipar])
+    if parameters.DEBUG and (verbose or fit_workspace.verbose):
+        # plot_psf_poly_params(fit_workspace.p[fit_workspace.psf_params_start_index:])
+        # fit_workspace.plot_fit()
+        plot_gradient_descent(fit_workspace, funcs, params_table)
+        if len(ipar) > 1:
+            fit_workspace.plot_correlation_matrix(ipar=ipar)
+    return params_table, funcs
+
+
 def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xtol=1e-4, ftol=1e-4, niter=50,
-                     verbose=False, with_line_search=True):
+                     verbose=False, with_line_search=True, minimizer_method="L-BFGS-B"):
     my_logger = set_logger(__name__)
 
     bounds = fit_workspace.bounds
@@ -658,22 +819,24 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
 
     if method == "minimize":
         start = time.time()
-        result = optimize.minimize(nll, fit_workspace.p, method='L-BFGS-B',
-                                   options={'ftol': 1e-20, 'gtol': 1e-20, 'disp': True,
-                                            'maxiter': 100000,
-                                            'maxls': 50, 'maxcor': 30},
+        result = optimize.minimize(nll, fit_workspace.p, method=minimizer_method,
+                                   options={'ftol': ftol, 'gtol': 1e-20, 'disp': True,
+                                            'maxiter': 100000, 'maxls': 50, 'maxcor': 30},
                                    bounds=bounds)
         fit_workspace.p = result['x']
         if verbose:
+            my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
+            fit_workspace.plot_fit()
     elif method == 'basinhopping':
         start = time.time()
-        minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds)
-        result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs, T=0.1)
+        minimizer_kwargs = dict(method=minimizer_method, bounds=bounds)
+        result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs)
         fit_workspace.p = result['x']
         if verbose:
-            fit_workspace.plot_fit()
+            my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
+            fit_workspace.plot_fit()
     elif method == "least_squares":
         start = time.time()
         x_scale = np.abs(guess)
@@ -682,7 +845,9 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
                                    diff_step=0.001, bounds=bounds.T)
         fit_workspace.p = p.x  # m.np_values()
         if verbose:
+            my_logger.debug(f"\n\t{p}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
+            fit_workspace.plot_fit()
     elif method == "minuit":
         start = time.time()
         # fit_workspace.simulation.fix_psf_cube = False
@@ -699,7 +864,9 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         m.migrad()
         fit_workspace.p = m.np_values()
         if verbose:
+            my_logger.debug(f"\n\t{m}")
             my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
+            fit_workspace.plot_fit()
     elif method == "newton":
         if fit_workspace.costs.size == 0:
             costs = np.array([fit_workspace.chisq(guess)])
