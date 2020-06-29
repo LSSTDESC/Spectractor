@@ -1085,7 +1085,8 @@ class ChromaticPSF:
 
         if w.amplitude_priors_method == "psf1d" and mode == "2D":
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
-            run_minimisation(w_reg, method="basinhopping", ftol=1e-16, xtol=1e-4, verbose=verbose, epsilon=[1e-1], with_line_search=True)
+            run_minimisation(w_reg, method="basinhopping", ftol=1e-8, xtol=1e-4, verbose=verbose, epsilon=[1e-1],
+                             minimizer_method="Nelder-Mead")
             w_reg.opt_reg = 10 ** w_reg.p[0]
             self.my_logger.info(f"\n\tOptimal regularisation parameter: {w_reg.opt_reg}")
             w.reg = np.copy(w_reg.opt_reg)
