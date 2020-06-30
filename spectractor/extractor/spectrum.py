@@ -17,6 +17,7 @@ from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 
+from spectractor.simulation.adr import adr_calib
 
 class Spectrum:
 
@@ -112,6 +113,17 @@ class Spectrum:
             self.gain = image.gain
             self.rotation_angle = image.rotation_angle
             self.my_logger.info('\n\tSpectrum info copied from image')
+
+            self.dec = image.dec
+            self.hour_angle = image.hour_angle
+            self.temperature = image.temperature
+            self.pressure = image.pressure
+            self.humidity = image.humidity
+            self.xpixsize = image.xpixsize
+            self.ypixsize = image.ypixsize
+            self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
+                               self.humidity, self.airmass, self.rotation_angle, self.xpixsize, self.ypixsize]
+
         self.load_filter()
 
     def convert_from_ADUrate_to_flam(self):
@@ -413,7 +425,7 @@ class Spectrum:
             if self.header['EXPTIME'] != "":
                 self.expo = self.header['EXPTIME']
             if self.header['AIRMASS'] != "":
-                self.disperser_label = self.header['AIRMASS']
+                self.airmass = self.header['AIRMASS']
             if self.header['GRATING'] != "":
                 self.disperser_label = self.header['GRATING']
             if self.header['TARGET'] != "":
@@ -427,12 +439,31 @@ class Spectrum:
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
             if self.header['D2CCD'] != "":
                 parameters.DISTANCE2CCD = float(self.header["D2CCD"])
+            if self.header['DEC'] != "":
+                self.dec = self.header['DEC']
+            if self.header['HA'] != "":
+                self.hour_angle = self.header['HA']
+            if self.header['OUTTEMP'] != "":
+                self.temperature = self.header['OUTTEMP']
+            if self.header['OUTPRESS'] != "":
+                self.pressure = self.header['OUTPRESS']
+            if self.header['OUTHUM'] != "":
+                self.humidity = self.header['OUTHUM']
+            if self.header['XPIXSIZE'] != "":
+                self.xpixsize = self.header['XPIXSIZE']
+            if self.header['YPIXSIZE'] != "":
+                self.ypixsize = self.header['YPIXSIZE']
+
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                       data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
             self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
+            self.adr_params = [self.dec, self.hour_angle, self.temperature,
+                               self.pressure, self.humidity, self.airmass, self.rotation_angle, self.xpixsize,
+                               self.ypixsize]
+
             if os.path.isfile(spectrogram_file_name):
                 self.load_spectrogram(spectrogram_file_name)
             else:
@@ -533,11 +564,19 @@ def calibrate_spectrum(spectrum, xlim=None):
     pixels = spectrum.pixels[left_cut:right_cut] - spectrum.target_pixcoords_rotated[0]
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
                                                                   order=spectrum.order)
+    lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
+    pixels += adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE, lambda_ref = lambda_ref)
+
+    # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
+    
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords, order=spectrum.order)
+
     spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
     # Cut spectra
     spectrum.lambdas_indices = \
         np.where(np.logical_and(spectrum.lambdas > parameters.LAMBDA_MIN, spectrum.lambdas < parameters.LAMBDA_MAX))[0]
     spectrum.lambdas = spectrum.lambdas[spectrum.lambdas_indices]
+
     spectrum.lambdas_binwidths = spectrum.lambdas_binwidths[spectrum.lambdas_indices]
     spectrum.data = spectrum.data[spectrum.lambdas_indices]
     if spectrum.err is not None:

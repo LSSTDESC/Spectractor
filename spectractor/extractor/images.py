@@ -76,6 +76,15 @@ class Image(object):
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
+
+        self.dec = None
+        self.hour_angle = None
+        self.temperature = 0
+        self.pressure = 0
+        self.humidity = 0
+        self.xpixsize = 0
+        self.ypixsize = 0
+
         if parameters.CALLING_CODE != 'LSST_DM':
             self.load_image(file_name)
         else:
@@ -98,6 +107,7 @@ class Image(object):
         self.header.comments["ROTANGLE"] = "[deg] angle of the dispersion axis"
         self.header['D2CCD'] = parameters.DISTANCE2CCD
         self.header.comments["D2CCD"] = "[mm] distance between disperser and CCD"
+
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
             self.header['REDSHIFT'] = str(self.target.redshift)
@@ -125,6 +135,15 @@ class Image(object):
         self.header["AIRMASS"] = self.airmass
         self.header["DATE-OBS"] = self.date_obs
         self.header["EXPTIME"] = self.expo
+
+        self.header['DEC'] = self.dec
+        self.header['HA'] = self.hour_angle
+        self.header['OUTTEMP'] = self.temperature
+        self.header['OUTPRESS'] = self.pressure
+        self.header['OUTHUM'] = self.humidity
+        self.header['XPIXSIZE'] = self.xpixsize
+        self.header['YPIXSIZE'] = self.ypixsize
+
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
         self.compute_statistical_error()
@@ -353,7 +372,7 @@ class Image(object):
         return self.parallactic_angle
 
     def plot_image(self, ax=None, scale="lin", title="", units="", plot_stats=False,
-                   target_pixcoords=None, figsize=[7.3, 6], aspect=None, vmin=None, vmax=None,
+                   target_pixcoords=None, figsize=(7.3, 6), aspect=None, vmin=None, vmax=None,
                    cmap=None, cax=None):
         """Plot image.
 
@@ -422,6 +441,13 @@ def load_CTIO_image(image):
     image.filters = image.header['FILTERS']
     image.filter = image.header['FILTER1']
     image.disperser_label = image.header['FILTER2']
+    image.dec = image.header['DEC']
+    image.hour_angle = image.header['HA']
+    image.temperature = image.header['OUTTEMP']
+    image.pressure = image.header['OUTPRESS']
+    image.humidity = image.header['OUTHUM']
+    image.xpixsize = image.header['XPIXSIZE']
+    image.ypixsize = image.header['YPIXSIZE']
 
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
     parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
