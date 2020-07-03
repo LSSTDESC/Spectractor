@@ -590,7 +590,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.read_out_noise = 8.5*np.ones_like(image.data)
 
 
-def find_target(image, guess=None, rotated=False, use_wcs=True):
+def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[parameters.XWINDOW, parameters.YWINDOW]):
     """Find the target in the Image instance.
 
     The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
@@ -608,6 +608,8 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
     use_wcs: bool
         If True, the WCS file (if found) is used to set the target position in pixels,
         guess parameter is then unnecessary.
+    widths: (int, int)
+        Two parameter array to define the width of the cropped image (default: [parameters.XWINDOW, parameters.YWINDOW])
 
     Returns
     -------
@@ -655,19 +657,16 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
     if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
         if guess is None:
             my_logger.error(f"\n\tguess parameter must be set if WCS solution is not found.")
-        Dx = parameters.XWINDOW
-        Dy = parameters.YWINDOW
+        Dx, Dy = widths
         theX, theY = guess
         if rotated:
             guess2 = find_target_after_rotation(image)
             x0 = int(guess2[0])
             y0 = int(guess2[1])
             guess = [x0, y0]
-            Dx = parameters.XWINDOW_ROT
-            Dy = parameters.YWINDOW_ROT
         niter = 2
         sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
-                                                                            widths=[Dx, Dy])
+                                                                            widths=(Dx, Dy))
         for i in range(niter):
             # find the target
             try:
@@ -724,7 +723,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
         Two parameter array giving the estimated position of the target in the image.
     rotated: bool
         If True, the target is searched in the rotated image.
-    widths: array_like
+    widths: (int, int)
         Two parameter array to define the width of the cropped image (default: [parameters.XWINDOW, parameters.YWINDOW])
 
     Returns
@@ -828,13 +827,13 @@ def find_target_1Dprofile(image, sub_image, guess):
         ax2.plot(X, bkgd_X(X), 'g--', lw=2, label='bkgd')
         ax2.axvline(avX, color='b', linestyle='-', label='new', lw=2)
         ax2.grid(True)
-        ax2.set_xlabel('X [pixels]')
+        ax2.set_xlabel(parameters.PLOT_XLABEL)
         ax2.legend(loc=1)
         ax3.plot(Y, profile_Y_raw, 'r-', lw=2)
         ax3.plot(Y, bkgd_Y(Y), 'g--', lw=2, label='bkgd')
         ax3.axvline(avY, color='b', linestyle='-', label='new', lw=2)
         ax3.grid(True)
-        ax3.set_xlabel('Y [pixels]')
+        ax3.set_xlabel(parameters.PLOT_YLABEL)
         ax3.legend(loc=1)
         f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
@@ -929,18 +928,23 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
                           target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax1.legend(loc=1)
 
+        ax1.text(0.05, 0.05, f'Data', color="white",
+                 horizontalalignment='left', verticalalignment='bottom', transform=ax1.transAxes)
+        ax2.text(0.05, 0.05, f'Background+Moffat2D model', color="white",
+                 horizontalalignment='left', verticalalignment='bottom', transform=ax2.transAxes)
+        ax3.text(0.05, 0.05, f'Residuals', color="white",
+                 horizontalalignment='left', verticalalignment='bottom', transform=ax3.transAxes)
         plot_image_simple(ax2, data=star2D, scale="lin", title="",
-                          units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
+                          units=f'{image.units}', vmin=vmin, vmax=vmax)
         plot_image_simple(ax3, data=sub_image_subtracted - star2D, scale="lin", title="",
-                          units=f'Background+Star2D subtracted image\n({image.units})',
-                          target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
+                          units=f'{image.units}', target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax3.legend(loc=1)
 
         f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot2.pdf'))
+            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'order0_centroid_fit.pdf'))
     return new_avX, new_avY
 
 
@@ -1052,8 +1056,8 @@ def find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=None):
 
 
 def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=parameters.YWINDOW,
-                                   right_edge=parameters.CCD_IMSIZE - 200,
-                                   margin_cut=12):
+                                   edges=(0, parameters.CCD_IMSIZE - 200),
+                                   margin_cut=12, pixel_fraction=0.01):
     """Compute the rotation angle in degree of a spectrogram with the Hessian of the image.
     Use the disperser rotation angle map as a prior and the target_pixcoords values to crop the image
     around the spectrogram.
@@ -1066,11 +1070,13 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         Don't consider pixel with Hessian angle outside this range (default: (-10,10)).
     width_cut: int
         Half with of the image to consider in height (default: parameters.YWINDOW).
-    right_edge: int
-        Maximum pixel on the right edge (default: parameters.CCD_IMSIZE - 200).
+    edges: (int, int)
+        Minimum and maximum pixel on the right edge (default: (0, parameters.CCD_IMSIZE - 200)).
     margin_cut: int
         After computing the Hessian, to avoid bad values on the edges the function cut on the
-        edge of image margin_cut pixels.
+        edge of image margin_cut pixels (default: 12).
+    pixel_fraction: float
+        Minimum pixel fraction to keep after thresholding the lambda minus map (default: 0.01).
 
     Returns
     -------
@@ -1104,14 +1110,15 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
     """
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region
-    data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+    left_edge, right_edge = edges
+    data = np.copy(image.data[y0 - width_cut:y0 + width_cut, left_edge:right_edge])
     lambda_plus, lambda_minus, theta = hessian_and_theta(data, margin_cut)
     # thresholds
     lambda_threshold = np.min(lambda_minus)
     mask = np.where(lambda_minus > lambda_threshold)
     theta_mask = np.copy(theta)
     theta_mask[mask] = np.nan
-    minimum_pixels = 0.01 * 2 * width_cut * right_edge
+    minimum_pixels = pixel_fraction * 2 * width_cut * right_edge
     while len(theta_mask[~np.isnan(theta_mask)]) < minimum_pixels:
         lambda_threshold /= 2
         mask = np.where(lambda_minus > lambda_threshold)
@@ -1139,19 +1146,28 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
     #         f'\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels '
     #         f'over {parameters.CCD_IMSIZE:d} pixels: {theta_median:.2f} vs {theta_guess:.2f}')
     if parameters.DEBUG:
-        f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6))
+        gs_kw = dict(width_ratios=[3, 1], height_ratios=[1])
+        f, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(6.5, 3), gridspec_kw=gs_kw)
         xindex = np.arange(data.shape[1])
         x_new = np.linspace(xindex.min(), xindex.max(), 50)
-        y_new = width_cut + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
-        ax1.imshow(theta_mask, origin='lower', cmap=cm.brg, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
-        ax1.plot(x_new, y_new, 'b-')
-        ax1.set_ylim(0, 2 * width_cut)
-        ax1.set_xlabel('X [pixels]')
-        ax1.set_xlabel('Y [pixels]')
+        y_new = width_cut-margin_cut-3 + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
+        cmap = cm.bwr
+        cmap.set_bad(color='lightgrey')
+        im = ax1.imshow(theta_mask, origin='lower', cmap=cmap, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
+        cb = plt.colorbar(im, ax=ax1)
+        cb.set_label(parameters.PLOT_ROT_LABEL, labelpad=-10)
+        ax1.plot(x_new, y_new, 'k-', label=rf"Mean dispersion axis: $\alpha$={theta_median:.2f}°")
+        ax1.set_ylim(0, theta_mask.shape[0])
+        ax1.set_xlim(0, theta_mask.shape[1])
+        ax1.legend()
+        ax1.set_xlabel(parameters.PLOT_XLABEL)
+        ax1.set_ylabel(parameters.PLOT_YLABEL)
         ax1.grid(True)
-        n, bins, patches = ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
-        ax2.plot([theta_median, theta_median], [0, np.max(n)])
-        ax2.set_xlabel("Rotation angles [degrees]")
+        ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
+        ax2.axvline(theta_median, color='k')
+        ax2.set_xlabel(parameters.PLOT_ROT_LABEL)
+        ax2.grid()
+        f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
@@ -1229,7 +1245,7 @@ def turn_image(image):
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
                                                           angle_range=(parameters.ROT_ANGLE_MIN,
                                                                        parameters.ROT_ANGLE_MAX),
-                                                          right_edge=parameters.CCD_IMSIZE - 200)
+                                                          edges=(0, parameters.CCD_IMSIZE - 200))
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)

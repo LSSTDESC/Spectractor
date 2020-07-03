@@ -1730,8 +1730,8 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
     ax.grid(color='silver', ls='solid')
     ax.grid(True)
-    ax.set_xlabel('X [pixels]')
-    ax.set_ylabel('Y [pixels]')
+    ax.set_xlabel(parameters.PLOT_XLABEL)
+    ax.set_ylabel(parameters.PLOT_YLABEL)
     cb = plt.colorbar(im, ax=ax, cax=cax)
     if scale == "lin":
         cb.formatter.set_powerlimits((0, 0))
