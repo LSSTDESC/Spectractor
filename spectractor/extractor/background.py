@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import spectractor.parameters as parameters
-from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal
-from spectractor.tools import plot_image_simple
+from spectractor import parameters
+from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal, plot_image_simple
 
 from astropy.stats import SigmaClip
 from photutils import Background2D, SExtractorBackground
+from photutils import make_source_mask
+
 from scipy.signal import medfilt2d
 from scipy.interpolate import interp2d
 
@@ -173,15 +174,17 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     """
     Ny, Nx = data.shape
     middle = Ny // 2
+
+    # mask sources
+    mask = make_source_mask(data, nsigma=2, npixels=5, dilate_size=11)
+
     # Estimate the background in the two lateral bands together
     sigma_clip = SigmaClip(sigma=3.)
     bkg_estimator = SExtractorBackground()
     if mask_signal_region:
         bgd_bands = np.copy(data).astype(float)
         bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
-        mask = (np.isnan(bgd_bands))
-    else:
-        mask = None
+        mask += (np.isnan(bgd_bands))
     # windows size in x is set to only 6 pixels to be able to estimate rapid variations of the background on real data
     # filter window size is set to window // 2 so 3
     # bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
@@ -194,6 +197,8 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
                        mask=mask)
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False,
                               fill_value=None)
+    bgd_res = ((data - bkg.background)/err)
+    bgd_res[mask] = np.nan
 
     if parameters.DEBUG:
         fig, ax = plt.subplots(3, 1, figsize=(12, 6), sharex='all')
@@ -201,7 +206,8 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         mean = np.nanmean(bgd_bands)
         std = np.nanstd(bgd_bands)
         bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
-        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=mean-3*std, vmax=mean+3*std)
+        bgd_bands[mask] = np.nan
+        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=mean-5*std, vmax=mean+5*std)
         c = plt.colorbar(im, ax=ax[0])
         c.set_label(f'Data units (lin scale)')
         ax[0].set_title(f'Data background: mean={mean:.3f}, std={std:.3f}')
@@ -233,7 +239,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         fig.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-    return bgd_model_func
+    return bgd_model_func, bgd_res, bkg.background_rms
 
 
 def extract_spectrogram_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):

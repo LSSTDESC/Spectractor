@@ -193,22 +193,20 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     target_pixcoords_spectrogram = [image.target_pixcoords_rotated[0] - xmin, image.target_pixcoords_rotated[1] - ymin]
 
     # Extract the background on the rotated image
-    bgd_index = np.concatenate((np.arange(0, Ny//2 - ws[0]), np.arange(Ny//2 + ws[0], Ny))).astype(int)
-    bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
-    bgd_res = ((data - bgd_model_func(np.arange(Nx), np.arange(Ny)))/err)[bgd_index]
+    bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
     # while np.nanmean(bgd_res)/np.nanstd(bgd_res) < -0.2 and parameters.PIXWIDTH_BOXSIZE >= 5:
     my_logger.warning(f"{np.abs(np.nanmean(bgd_res))} {np.nanstd(bgd_res)}")
-    while (np.abs(np.nanmean(bgd_res)) > 1 or np.nanstd(bgd_res) > 2) and parameters.PIXWIDTH_BOXSIZE >= 5:
+    while (np.abs(np.nanmean(bgd_res)) > 1 or np.nanstd(bgd_res) > 2) and parameters.PIXWIDTH_BOXSIZE > 5:
         parameters.PIXWIDTH_BOXSIZE = max(5, parameters.PIXWIDTH_BOXSIZE // 2)
-        my_logger.warning(f"\n\tPull distribution of background residuals has a negative mean which may lead to "
-                          f"background over-subtraction: mean(pull)/RMS(pull)={np.nanmean(bgd_res)/np.nanstd(bgd_res)}."
-                          f"This value should be greater than -0.5. To do so, parameters.PIXWIDTH_BOXSIZE is divided "
+        my_logger.warning(f"\n\tPull distribution of background residuals differs too much from mean=0 and std=1. "
+                          f"\n\t\tmean={np.nanmean(bgd_res)}   std={np.nanstd(bgd_res)}."
+                          f"These value should be smaller in absolute value than 1 and 2. "
+                          f"To do so, parameters.PIXWIDTH_BOXSIZE is divided "
                           f"by 2 from {parameters.PIXWIDTH_BOXSIZE*2} -> {parameters.PIXWIDTH_BOXSIZE}.")
-        bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
-        bgd_res = ((data - bgd_model_func(np.arange(Nx), np.arange(Ny)))/err)[bgd_index]
+        bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
 
     # Propagate background uncertainties
-    # err = np.sqrt(err*err+bgd_model_func(np.arange(Nx),np.arange(Ny))/image.gain[ymin:ymax,pixel_start:pixel_end]**2)
+    err = np.sqrt(err * err + bgd_rms * bgd_rms)
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
@@ -284,11 +282,11 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     Ny, Nx = data.shape
 
     # Extract the non rotated background
-    bgd_model_func = extract_spectrogram_background_sextractor(data, err, ws=ws)
+    bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
 
     # Propagate background uncertainties
-    # err = np.sqrt(err*err + bgd_model_func(np.arange(Nx), np.arange(Ny))/image.gain[ymin:ymax, xmin:xmax]**2)
+    err = np.sqrt(err * err + bgd_rms * bgd_rms)
 
     # 2D extraction
     opt_reg = -1
