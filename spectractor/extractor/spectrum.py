@@ -1013,8 +1013,7 @@ def calibrate_spectrum(spectrum):
     >>> spectrum.plot_spectrum()
     """
     distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
-    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.target_pixcoords,
-                                                                  order=spectrum.order)
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
     lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
     spectrum.lambda_ref = lambda_ref
     adr_pixel_shift = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
@@ -1023,8 +1022,6 @@ def calibrate_spectrum(spectrum):
     if x0 is None:
         x0 = spectrum.target_pixcoords
         spectrum.x0 = x0
-
-    # delta_pixels = spectrum.disperser.grating_lambda_to_pixel(spectrum.lambdas, x0=x0, order=spectrum.order)
 
     # Detect emission/absorption lines and calibrate pixel/lambda
     fwhm_func = interp1d(spectrum.chromatic_psf.table['lambdas'],
