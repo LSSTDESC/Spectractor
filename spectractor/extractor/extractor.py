@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 from spectractor import parameters
 from spectractor.config import set_logger, load_config
 from spectractor.extractor.images import Image, find_target, turn_image
-from spectractor.extractor.spectrum import (Spectrum, calibrate_spectrum,
-                                            calibrate_spectrum_with_lines)
+from spectractor.extractor.spectrum import Spectrum, calibrate_spectrum
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
@@ -14,7 +13,7 @@ from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colo
 
 
 def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='./config/ctio.ini',
-                atmospheric_lines=True, line_detection=True):
+                atmospheric_lines=True):
     """ Spectractor
     Main function to extract a spectrum from an image
 
@@ -35,9 +34,6 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         The config file name (default: "./config/ctio.ini").
     atmospheric_lines: bool, optional
         If True atmospheric lines are used in the calibration fit.
-    line_detection: bool, optional
-        If True the absorption or emission lines are
-        used to calibrate the pixel to wavelength relationship.
 
     Returns
     -------
@@ -96,6 +92,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
     find_target(image, guess, rotated=True, use_wcs=True)
+
     # Create Spectrum object
     spectrum = Spectrum(image=image)
     # Subtract background and bad pixels
@@ -104,18 +101,17 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
                                     parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND),
                                 right_edge=parameters.CCD_IMSIZE - 200)
     spectrum.atmospheric_lines = atmospheric_lines
+
     # Calibrate the spectrum
+    my_logger.info('\n\tCalibrating order %d spectrum...' % spectrum.order)
     calibrate_spectrum(spectrum)
-    if line_detection:
-        my_logger.info('\n\tCalibrating order %d spectrum...' % spectrum.order)
-        calibrate_spectrum_with_lines(spectrum)
-    else:
-        spectrum.header['WARNINGS'] = 'No calibration procedure with spectral features.'
+
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
     spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
     spectrum.lines.print_detected_lines(output_file_name=output_filename.replace('_spectrum.fits', '_lines.csv'),
                                         overwrite=True, amplitude_units=spectrum.units)
+
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
@@ -196,12 +192,11 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Extract the background on the rotated image
     bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
     # while np.nanmean(bgd_res)/np.nanstd(bgd_res) < -0.2 and parameters.PIXWIDTH_BOXSIZE >= 5:
-    my_logger.warning(f"{np.abs(np.nanmean(bgd_res))} {np.nanstd(bgd_res)}")
-    while (np.abs(np.nanmean(bgd_res)) > 1 or np.nanstd(bgd_res) > 2) and parameters.PIXWIDTH_BOXSIZE > 5:
+    while (np.abs(np.nanmean(bgd_res)) > 0.5 or np.nanstd(bgd_res) > 1.3) and parameters.PIXWIDTH_BOXSIZE > 5:
         parameters.PIXWIDTH_BOXSIZE = max(5, parameters.PIXWIDTH_BOXSIZE // 2)
         my_logger.warning(f"\n\tPull distribution of background residuals differs too much from mean=0 and std=1. "
                           f"\n\t\tmean={np.nanmean(bgd_res)}   std={np.nanstd(bgd_res)}."
-                          f"These value should be smaller in absolute value than 1 and 2. "
+                          f"These value should be smaller in absolute value than 0.5 and 1.3. "
                           f"To do so, parameters.PIXWIDTH_BOXSIZE is divided "
                           f"by 2 from {parameters.PIXWIDTH_BOXSIZE*2} -> {parameters.PIXWIDTH_BOXSIZE}.")
         bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
