@@ -176,7 +176,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     middle = Ny // 2
 
     # mask sources
-    mask = make_source_mask(data, nsigma=2, npixels=5, dilate_size=11)
+    mask = make_source_mask(data, nsigma=3, npixels=5, dilate_size=11)
 
     # Estimate the background in the two lateral bands together
     sigma_clip = SigmaClip(sigma=3.)
