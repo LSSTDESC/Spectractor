@@ -76,6 +76,7 @@ class Image(object):
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
+
         self.dec = None
         self.hour_angle = None
         self.temperature = 0

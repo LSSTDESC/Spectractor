@@ -131,9 +131,11 @@ class FitWorkspace:
         >>> w = FitWorkspace()
         >>> p = np.zeros(3)
         >>> x, model, model_err = w.simulate(*p)
+
         .. doctest::
             :hide:
             >>> assert x is not None
+
         """
         self.x = np.array([])
         self.model = np.array([])
