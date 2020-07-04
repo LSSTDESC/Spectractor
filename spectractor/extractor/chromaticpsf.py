@@ -1079,13 +1079,13 @@ class ChromaticPSF:
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose)
             # run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
-                                            fix=w.fixed, sigma_clip=5, niter_clip=3, verbose=verbose)
+                                            fix=w.fixed, sigma_clip=10, niter_clip=3, verbose=verbose)
         else:
             self.my_logger.error(f"\n\tUnknown fitting mode={mode}. Must be '1D' or '2D'.")
 
         if w.amplitude_priors_method == "psf1d" and mode == "2D":
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
-            run_minimisation(w_reg, method="basinhopping", ftol=1e-8, xtol=1e-4, verbose=verbose, epsilon=[1e-1],
+            run_minimisation(w_reg, method="minimize", ftol=1e-4, xtol=1e-2, verbose=verbose, epsilon=[1e-1],
                              minimizer_method="Nelder-Mead")
             w_reg.opt_reg = 10 ** w_reg.p[0]
             self.my_logger.info(f"\n\tOptimal regularisation parameter: {w_reg.opt_reg}")
