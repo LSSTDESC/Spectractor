@@ -190,7 +190,7 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gau
 
 
 @njit
-def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocover
+def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gammax, gammay, alpha):  # pragma: nocover
     r"""Compute a 2D Moffat function, whose integral is normalised to unity.
 
     .. math ::
@@ -234,7 +234,7 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocov
     >>> Ny = 50
     >>> xx, yy = np.mgrid[:Nx, :Ny]
     >>> amplitude = 10
-    >>> a = evaluate_moffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2)
+    >>> a = evaluate_moffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gammax=5, gammay=7, alpha=2)
     >>> print(f"{np.sum(a):.6f}")
     9.683129
 
@@ -261,10 +261,10 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocov
         plt.show()
 
     """
-    rr = ((x - x_c) * (x - x_c) + (y - y_c) * (y - y_c))
-    rr_gg = rr / (gamma * gamma)
+    rr_gg = ((x - x_c) * (x - x_c) / (gammax * gammax) + (y - y_c) * (y - y_c) / (gammay * gammay))
+    # rr_gg = rr / (gamma * gamma)
     a = (1 + rr_gg) ** -alpha
-    norm = (np.pi * gamma * gamma) / (alpha - 1)
+    norm = (np.pi * gammax * gammay) / (alpha - 1)
     a *= amplitude / norm
     return a.T
 
@@ -488,20 +488,20 @@ class Moffat(PSF):
 
     def __init__(self, p=None):
         PSF.__init__(self)
-        self.p_default = np.array([1, 0, 0, 3, 2, 1]).astype(float)
+        self.p_default = np.array([1, 0, 0, 3, 3, 2, 1]).astype(float)
         if p is not None:
             self.p = np.asarray(p).astype(float)
         else:
             self.p = np.copy(self.p_default)
-        self.param_names = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
-        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 100),
+        self.param_names = ["amplitude", "x_c", "y_c", "gamma_x", "gamma_y", "alpha", "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma_x$", r"$\gamma_y$", r"$\alpha$", "saturation"]
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (0.1, np.inf), (1.1, 100),
                                 (0, np.inf)])
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width), (0.1, self.max_half_width),
                                 (0.1, self.max_half_width), (1.1, 100), (0, np.inf)])
 
     def evaluate(self, pixels, p=None):
@@ -552,14 +552,14 @@ class Moffat(PSF):
         """
         if p is not None:
             self.p = np.asarray(p).astype(float)
-        amplitude, x_c, y_c, gamma, alpha, saturation = self.p
+        amplitude, x_c, y_c, gammax, gammay, alpha, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            return np.clip(evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha), 0, saturation)
+            return np.clip(evaluate_moffat2d(x, y, amplitude, x_c, y_c, gammax, gammay, alpha), 0, saturation)
         elif pixels.ndim == 1:
             y = np.array(pixels)
-            norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
-            return np.clip(evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha) / norm, 0, saturation)
+            norm = gammax * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
+            return np.clip(evaluate_moffat1d_unnormalized(y, amplitude, y_c, gammax, alpha) / norm, 0, saturation)
         else:  # pragma: no cover
             self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
                                  f"Here pixels.ndim={pixels.shape}.")
