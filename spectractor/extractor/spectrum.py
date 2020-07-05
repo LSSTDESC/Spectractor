@@ -1099,7 +1099,8 @@ def calibrate_spectrum(spectrum):
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift, x0=x0, order=spectrum.order)
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift - adr_pixel_shift,
+                                                         x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.lambdas_binwidths = np.gradient(lambdas)
     spectrum.convert_from_ADUrate_to_flam()
