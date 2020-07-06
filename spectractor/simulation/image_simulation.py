@@ -351,7 +351,7 @@ class ImageModel(Image):
         # self.true_lambdas, self.true_spectrum = hdu_list[1].data
 
 
-def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=0.05,
+def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1,
              psf_poly_params=None,
              with_rotation=True,
              with_stars=True):

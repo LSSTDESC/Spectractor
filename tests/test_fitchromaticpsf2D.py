@@ -26,7 +26,7 @@ def make_test_image(config="./config/ctio.ini"):
     load_config(config)
     spectrum_filename = "tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = spectrum_filename.replace("_spectrum.fits", ".fits")
-    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=1, A2=0.05,
+    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=1, A2=1,
              psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=True, with_rotation=True)
 
 
