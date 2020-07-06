@@ -36,7 +36,6 @@ if __name__ == "__main__":
         w = SpectrumFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                  burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
         run_spectrum_minimisation(w, method="newton")
-        w.decontaminate_order2()
         w = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=2000,
                                     burnin=1000, nbins=10, verbose=1, plot=True, live_fit=False)
         run_spectrogram_minimisation(w, method="newton")
