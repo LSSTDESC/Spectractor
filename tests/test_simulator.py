@@ -53,11 +53,11 @@ def test_simulator():
         tag = file_name.split('/')[-1]
         # spectrum_simulation = SpectrumSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
         #                                        A1=1.1, A2=0.1, reso=2, D=56, shift=-3)
-        spectrogram_simulation = SpectrogramSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
-                                                      A1=1.1, A2=0.1, D=56, shift_x=-3, shift_y=1, angle=-1)
-        psf_poly_params = spectrogram_simulation.chromatic_psf.from_table_to_poly_params()
-        image_simulation = ImageSim(file_name.replace('_spectrum.fits', '.fits'), file_name, './tests/data/', A2=0.01,
-                                    psf_poly_params=psf_poly_params, with_stars=True)
+        # spectrogram_simulation = SpectrogramSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
+        #                                               A1=1.1, A2=0.9, D=56, shift_x=-3, shift_y=1, angle=-1)
+        # psf_poly_params = spectrogram_simulation.chromatic_psf.from_table_to_poly_params()
+        image_simulation = ImageSim(file_name.replace('_spectrum.fits', '.fits'), file_name, './tests/data/', A2=1,
+                                    psf_poly_params=None, with_stars=True)
         SpectrumSimulatorSimGrid(file_name, './tests/data/', pwv_grid=[0, 10, 2], ozone_grid=[200, 400, 2],
                                  aerosol_grid=[0, 0.1, 2])
         atmgrid = AtmosphereGrid(file_name, file_name.replace('spectrum', 'atmsim'))
