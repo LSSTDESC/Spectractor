@@ -504,7 +504,7 @@ HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.01
 HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
 
 # Atmospheric lines
-O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
+O2 = Line(761.9, atmospheric=True, label=r'$O_2$',
           label_pos=[0.007, 0.02],
           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
 # O2_1 = Line(760.6, atmospheric=True, label='',
