@@ -78,7 +78,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.data = self.spectrum.data
         self.err = self.spectrum.err
         self.A1 = 1.0
-        self.A2 = 0.05
+        self.A2 = 1.0
         self.ozone = 300.
         self.pwv = 5
         self.aerosols = 0.03
@@ -94,7 +94,7 @@ class SpectrumFitWorkspace(FitWorkspace):
                              r"alpha_pix [pix]", "B"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
-        self.bounds = [(0, 2), (0, 0.5), (300, 700), (0, 10), (0, 0.01), (-2, 2), (50, 60), (-0.5, 0.5),
+        self.bounds = [(0, 2), (0, 2), (300, 700), (0, 10), (0, 0.01), (-2, 2), (50, 60), (-0.5, 0.5),
                        (-np.inf, np.inf)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
