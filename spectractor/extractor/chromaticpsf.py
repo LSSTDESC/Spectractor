@@ -7,7 +7,8 @@ from scipy.interpolate import interp1d
 
 from astropy.table import Table
 
-from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm)
+from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm,
+                               plot_correlation_matrix_simple, compute_correlation_matrix)
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss, Moffat
 from spectractor import parameters
@@ -109,6 +110,7 @@ class ChromaticPSF:
                     self.poly_params_names.append("$" + self.psf.axis_names[ip].replace("$", "")
                                                   + "^{(" + str(k) + ")}$")
         self.opt_reg = parameters.PSF_FIT_REG_PARAM
+        self.cov_matrix = np.zeros((Nx, Nx))
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg
@@ -818,7 +820,7 @@ class ChromaticPSF:
 
         Extract the background:
 
-        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+        >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Fit the transverse profile:
 
@@ -1010,7 +1012,7 @@ class ChromaticPSF:
 
         Extract the background:
 
-        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+        >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Propagate background uncertainties:
 
@@ -1094,8 +1096,18 @@ class ChromaticPSF:
             w.reg = np.copy(w_reg.opt_reg)
             w.simulate(*w.p)
             self.opt_reg = w_reg.opt_reg
+            if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
+                self.my_logger.warning(f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
+                                       f"below the trace of the prior covariance matrix "
+                                       f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
+                                       f"high regularisation parameter in case of a bad fit. Therefore the final "
+                                       f"covariance matrix is set at the value of the prior covariance matrix and "
+                                       f"the amplitude parameters are very close the amplitude priors.")
+                w.amplitude_cov_matrix = np.copy(w.amplitude_priors_cov_matrix)
+                w.amplitude_params_err = np.array([np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(self.Nx)])
 
         self.poly_params = w.poly_params
+        self.cov_matrix = np.copy(w.amplitude_cov_matrix)
 
         # add background crop to y_c
         self.poly_params[w.Nx + w.y_c_0_index] += w.bgd_width
@@ -1197,6 +1209,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                                  f"Must be either {self.amplitude_priors_list}.")
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
+            self.amplitude_priors_cov_matrix = np.copy(self.chromatic_psf.cov_matrix)
             # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
             self.Q = np.diag([1 / np.sum(self.err[:, x] ** 2) for x in range(self.Nx)])
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
@@ -1303,7 +1316,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
 
         Extract the background:
 
-        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+        >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
 
@@ -1448,7 +1461,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         # regularisation matrices
         self.reg = parameters.PSF_FIT_REG_PARAM
-        self.U = np.diag([1 / np.sum(self.err[:, x]) for x in range(self.Nx)])
+        # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
+        self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
         L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] \
             + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
         L.astype(float)
@@ -1559,7 +1573,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         .. doctest::
 
-            >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+            >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
 
@@ -1711,6 +1725,7 @@ class RegFitWorkspace(FitWorkspace):
         self.chisquare = diff[self.w.not_outliers] @ (self.w.W * diff)[self.w.not_outliers]
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
+        self.w.amplitude_params_err = np.array([np.sqrt(cov[x, x]) for x in range(cov.shape[0])])
         self.G = self.chisquare / (self.w.data_flat.size - np.trace(self.resolution)) ** 2
         return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
@@ -1762,6 +1777,16 @@ class RegFitWorkspace(FitWorkspace):
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'regularisation.pdf'))
+
+        fig = plt.figure(figsize=(7, 5))
+        rho = compute_correlation_matrix(self.w.amplitude_cov_matrix)
+        plot_correlation_matrix_simple(plt.gca(), rho, axis_names=[''] * self.w.chromatic_psf.Nx)
+        # ipar=np.arange(10, 20))
+        plt.gca().set_title(r"Correlation matrix $\mathbf{\rho}$")
+        if parameters.LSST_SAVEFIGPATH:
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'amplitude_correlation_matrix.pdf'))
+        if parameters.DISPLAY:
+            plt.show()
 
 
 if __name__ == "__main__":

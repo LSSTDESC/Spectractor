@@ -299,6 +299,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         s.table["flux_err"] = np.interp(s.table['Dx'], Dx_rot, flux_err)
         s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
         s.poly_params = np.concatenate((s.table["amplitude"], psf_poly_priors))
+        s.cov_matrix = np.copy(w.amplitude_cov_matrix)
         s.profile_params = s.from_poly_params_to_profile_params(s.poly_params, apply_bounds=True)
         s.fill_table_with_profile_params(s.profile_params)
         s.table['Dy'] = s.table['y_c'] - target_pixcoords_spectrogram[1]
