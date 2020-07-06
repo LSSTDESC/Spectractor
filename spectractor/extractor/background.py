@@ -146,7 +146,11 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     Returns
     -------
     bgd_model_func: callable
-        A 2D function to model the extracted background
+        A 2D function to model the extracted background.
+    bgd_res: array_like
+        The background residuals normalized with their uncertainties.
+    bgd_rms: array_like
+        The background RMS.
 
     Examples
     --------
@@ -169,7 +173,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
 
     Fit the transverse profile:
 
-    >>> bgd_model = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+    >>> bgd_model, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
     """
     Ny, Nx = data.shape
