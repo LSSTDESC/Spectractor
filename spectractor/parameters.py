@@ -155,3 +155,6 @@ DISPLAY = True
 if os.environ.get('DISPLAY', '') == '':
     mpl.use('agg')
     DISPLAY = False
+PLOT_XLABEL = r"$x$ [pixels]"
+PLOT_YLABEL = r"$y$ [pixels]"
+PLOT_ROT_LABEL = r"$\alpha$ [degrees]"
