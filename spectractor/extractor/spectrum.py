@@ -16,7 +16,6 @@ from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
-
 from spectractor.simulation.adr import adr_calib
 
 
@@ -64,11 +63,13 @@ class Spectrum:
         self.target = target
         self.data = None
         self.err = None
+        self.cov_matrix = None
         self.x0 = None
         self.pixels = None
         self.lambdas = None
         self.lambdas_binwidths = None
         self.lambdas_indices = None
+        self.lambda_ref = None
         self.order = order
         self.chromatic_psf = None
         self.filter = None
@@ -114,7 +115,6 @@ class Spectrum:
             self.gain = image.gain
             self.rotation_angle = image.rotation_angle
             self.my_logger.info('\n\tSpectrum info copied from image')
-
             self.dec = image.dec
             self.hour_angle = image.hour_angle
             self.temperature = image.temperature
@@ -147,11 +147,13 @@ class Spectrum:
             self.my_logger.warning(f"You ask to convert spectrum already in {self.units}"
                                    f" in erg/s/cm^2/nm... check your code ! Skip the instruction.")
             return
-        self.data = self.data / parameters.FLAM_TO_ADURATE
-        self.data /= self.lambdas * self.lambdas_binwidths
+        ldl = parameters.FLAM_TO_ADURATE * self.lambdas * self.lambdas_binwidths
+        self.data /= ldl
         if self.err is not None:
-            self.err = self.err / parameters.FLAM_TO_ADURATE
-            self.err /= (self.lambdas * self.lambdas_binwidths)
+            self.err /= ldl
+        if self.cov_matrix is not None:
+            ldl_mat = np.outer(ldl, ldl)
+            self.cov_matrix /= ldl_mat
         self.units = 'erg/s/cm$^2$/nm'
 
     def convert_from_flam_to_ADUrate(self):
@@ -174,11 +176,13 @@ class Spectrum:
             self.my_logger.warning(f"You ask to convert spectrum already in {self.units} in ADU/s... check your code ! "
                                    f"Skip the instruction")
             return
-        self.data = self.data * parameters.FLAM_TO_ADURATE
-        self.data *= self.lambdas_binwidths * self.lambdas
+        ldl = parameters.FLAM_TO_ADURATE * self.lambdas * self.lambdas_binwidths
+        self.data *= ldl
         if self.err is not None:
-            self.err = self.err * parameters.FLAM_TO_ADURATE
-            self.err *= self.lambdas_binwidths * self.lambdas
+            self.err *= ldl
+        if self.cov_matrix is not None:
+            ldl_mat = np.outer(ldl, ldl)
+            self.cov_matrix *= ldl_mat
         self.units = 'ADU/s'
 
     def load_filter(self):
@@ -351,14 +355,21 @@ class Spectrum:
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
                                   'second column gives the spectrum in unit UNIT2, ' \
                                   'third column the corresponding errors.'
+        self.header['LBDA_REF'] = self.lambda_ref
         hdu1 = fits.PrimaryHDU()
-        hdu2 = fits.ImageHDU()
-        hdu3 = fits.ImageHDU()
         hdu1.header = self.header
+        hdu1.header["EXTNAME"] = "SPECTRUM"
+        hdu2 = fits.ImageHDU()
+        hdu2.header["EXTNAME"] = "S_FIT"
+        hdu3 = fits.ImageHDU()
+        hdu3.header["EXTNAME"] = "S_RES"
+        hdu4 = fits.ImageHDU()
+        hdu4.header["EXTNAME"] = "SPEC_COV"
         hdu1.data = [self.lambdas, self.data, self.err]
         hdu2.data = self.spectrogram_fit
         hdu3.data = self.spectrogram_residuals
-        hdu = fits.HDUList([hdu1, hdu2, hdu3])
+        hdu4.data = self.cov_matrix
+        hdu = fits.HDUList([hdu1, hdu2, hdu3, hdu4])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
@@ -458,6 +469,8 @@ class Spectrum:
                 self.xpixsize = self.header['XPIXSIZE']
             if self.header['YPIXSIZE'] != "":
                 self.ypixsize = self.header['YPIXSIZE']
+            if self.header['LBDA_REF'] != "":
+                self.lambda_ref = self.header['LBDA_REF']
 
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
@@ -465,6 +478,7 @@ class Spectrum:
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
             self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
+
             self.adr_params = [self.dec, self.hour_angle, self.temperature,
                                self.pressure, self.humidity, self.airmass, self.rotation_angle, self.xpixsize,
                                self.ypixsize]
@@ -481,8 +495,12 @@ class Spectrum:
                 self.my_logger.error(f"\n\tPSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
-                self.spectrogram_fit = hdu_list[1].data
-                self.spectrogram_residuals = hdu_list[2].data
+                self.spectrogram_fit = hdu_list[0].data
+                self.spectrogram_residuals = hdu_list[1].data
+            if len(hdu_list) > 3:
+                self.cov_matrix = hdu_list["SPEC_COV"].data
+            else:
+                self.cov_matrix = np.diag(self.err ** 2)
         else:
             self.my_logger.warning(f'\n\tSpectrum file {input_file_name} not found')
             raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
@@ -540,58 +558,15 @@ class Spectrum:
         if os.path.isfile(input_file_name):
             self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
             self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
+                                              x0=self.spectrogram_x0, y0=self.spectrogram_y0,
                                               deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,
                                               file_name=input_file_name)
-            self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
+            self.my_logger.info(f'\n\tSpectrogram loaded from {input_file_name}')
         else:
-            self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
+            self.my_logger.warning(f'\n\tSpectrogram file {input_file_name} not found')
 
 
-def calibrate_spectrum(spectrum, xlim=None):
-    """Convert pixels into wavelengths given the position of the order 0,
-    the data for the spectrum, and the properties of the disperser. Convert the
-    spectrum amplitude from ADU rate to flams. Truncate the outputs to the wavelenghts
-    between parameters.LAMBDA_MIN and parameters.LAMBDA_MAX.
-
-    Parameters
-    ----------
-    spectrum: Spectrum
-        Spectrum object to calibrate
-    xlim: list, optional
-        List of minimum and maximum abscisses
-
-    """
-    if xlim is None:
-        left_cut, right_cut = [0, spectrum.data.size]
-    else:
-        left_cut, right_cut = xlim
-    spectrum.data = spectrum.data[left_cut:right_cut]
-    pixels = spectrum.pixels[left_cut:right_cut] - spectrum.target_pixcoords_rotated[0]
-    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords,
-                                                                  order=spectrum.order)
-    lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
-    pixels += adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-
-    # spectrum.lambdas --> pixels_shift_adr --> spectrum.lambdas
-    
-    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(pixels, spectrum.target_pixcoords, order=spectrum.order)
-
-    spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
-    # Cut spectra
-    spectrum.lambdas_indices = \
-        np.where(np.logical_and(spectrum.lambdas > parameters.LAMBDA_MIN, spectrum.lambdas < parameters.LAMBDA_MAX))[0]
-    spectrum.lambdas = spectrum.lambdas[spectrum.lambdas_indices]
-
-    spectrum.lambdas_binwidths = spectrum.lambdas_binwidths[spectrum.lambdas_indices]
-    spectrum.data = spectrum.data[spectrum.lambdas_indices]
-    if spectrum.err is not None:
-        spectrum.err = spectrum.err[spectrum.lambdas_indices]
-    spectrum.convert_from_ADUrate_to_flam()
-    spectrum.header['PIXSHIFT'] = 0
-    spectrum.header['D2CCD'] = parameters.DISTANCE2CCD
-
-
-def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlevel=3, ax=None,
+def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func=None, snr_minlevel=3, ax=None,
                  calibration_lines_only=False,
                  xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
     """Detect and fit the lines in a spectrum. The method is to look at maxima or minima
@@ -612,6 +587,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         The spectrum amplitude array
     spec_err: float array, optional
         The spectrum amplitude uncertainty array (default: None)
+    cov_matrix: float array, optional
+        The spectrum amplitude 2D covariance matrix array (default: None)
     fwhm_func: callable, optional
         The fwhm of the cross spectrum to reset CALIB_PEAK_WIDTH parameter as a function of lambda (default: None)
     snr_minlevel: float
@@ -643,6 +620,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
     >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
     >>> spectrum_err = np.sqrt(spectrum)
+    >>> cov = np.diag(spectrum_err)
     >>> spectrum = np.random.poisson(spectrum)
     >>> spec = Spectrum()
     >>> spec.lambdas = lambdas
@@ -654,7 +632,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
 
     >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
     ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
-    >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
+    >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, cov, fwhm_func=fwhm_func)
 
     .. doctest::
         :hide:
@@ -924,6 +902,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
         sigma = None
         if spec_err is not None:
             sigma = spec_err[index]
+        if cov_matrix is not None:
+            sigma = cov_matrix[index, index]
         # my_logger.warning(f'\n{guess} {np.mean(spec[bgd_index])} {np.std(spec[bgd_index])}')
         popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma)
         # noise level defined as the std of the residuals if no error
@@ -1009,15 +989,14 @@ def detect_lines(lines, lambdas, spec, spec_err=None, fwhm_func=None, snr_minlev
     return global_chisq
 
 
-# noinspection PyArgumentList
-def calibrate_spectrum_with_lines(spectrum):
+def calibrate_spectrum(spectrum):
     """Convert pixels into wavelengths given the position of the order 0,
     the data for the spectrum, the properties of the disperser. Fit the absorption
     (and eventually the emission) lines to perform a second calibration of the
     distance between the CCD and the disperser. The number of fitting steps is
     limited to 30.
 
-    Prerequisites: a first calibration from pixels to wavelengths must have been performed before
+    Finally convert the spectrum amplitude from ADU rate to erg/s/cm2/nm.
 
     Parameters
     ----------
@@ -1034,48 +1013,48 @@ def calibrate_spectrum_with_lines(spectrum):
     >>> spectrum = Spectrum('tests/data/reduc_20170605_028_spectrum.fits')
     >>> parameters.LAMBDA_MIN = 550
     >>> parameters.LAMBDA_MAX = 800
-    >>> lambdas = calibrate_spectrum_with_lines(spectrum)
+    >>> lambdas = calibrate_spectrum(spectrum)
     >>> spectrum.plot_spectrum()
     """
-    # Convert back to ADU rate units because of lambda*dlambda normalisation in flam units
-    # if spectrum.units == "erg/s/cm$^2$/nm":
-    #     spectrum.convert_from_flam_to_ADUrate()
-    # Convert wavelength array into original pixels
+    distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
+    spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
+    lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
+    spectrum.lambda_ref = lambda_ref
+    adr_pixel_shift = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+
     x0 = spectrum.x0
     if x0 is None:
         x0 = spectrum.target_pixcoords
         spectrum.x0 = x0
-    # MFL notes: the logic with D seems confused here
-    D = parameters.DISTANCE2CCD
-    if spectrum.header['D2CCD'] != '':
-        D = spectrum.header['D2CCD']
-    spectrum.disperser.D = D
-    delta_pixels = spectrum.disperser.grating_lambda_to_pixel(spectrum.lambdas, x0=x0, order=spectrum.order)
 
     # Detect emission/absorption lines and calibrate pixel/lambda
-    D = parameters.DISTANCE2CCD
-    D_err = parameters.DISTANCE2CCD_ERR
     fwhm_func = interp1d(spectrum.chromatic_psf.table['lambdas'],
                          spectrum.chromatic_psf.table['fwhm'],
                          fill_value=(parameters.CALIB_PEAK_WIDTH, parameters.CALIB_PEAK_WIDTH), bounds_error=False)
 
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
-        lambdas_test = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - shift,
-                                                                  x0=[x0[0] + shift, x0[1]], order=spectrum.order)
-        chisq = detect_lines(spectrum.lines, lambdas_test, spectrum.data, spec_err=spectrum.err,
+        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - shift - adr_pixel_shift,
+                                                                      x0=[x0[0] + shift, x0[1]], order=spectrum.order)
+        spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
+        spectrum.convert_from_ADUrate_to_flam()
+        chisq = detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None, calibration_lines_only=True)
+        spectrum.convert_from_flam_to_ADUrate()
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             if parameters.LIVE_FIT:
-                spectrum.lambdas = lambdas_test
-                spectrum.plot_spectrum(live_fit=True, label=rf'Order {spectrum.order:d} spectrum'
+                 spectrum.plot_spectrum(live_fit=True, label=rf'Order {spectrum.order:d} spectrum'
                                                             r'\n$D_\mathrm{CCD}'
                                                             rf'={D:.2f}\,$mm, $\delta u_0={shift:.2f}\,$pix')
         return chisq
 
     # grid exploration of the parameters
     # necessary because of the the line detection algo
+    D = parameters.DISTANCE2CCD
+    if spectrum.header['D2CCD'] != '':
+        D = spectrum.header['D2CCD']
+    D_err = parameters.DISTANCE2CCD_ERR
     D_step = D_err / 2
     pixel_shift_step = parameters.PIXSHIFT_PRIOR / 5
     pixel_shift_prior = parameters.PIXSHIFT_PRIOR
@@ -1129,9 +1108,12 @@ def calibrate_spectrum_with_lines(spectrum):
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(delta_pixels - pixel_shift, x0=x0, order=spectrum.order)
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift - adr_pixel_shift,
+                                                         x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
-    spectrum.pixels = delta_pixels - pixel_shift
+    spectrum.lambdas_binwidths = np.gradient(lambdas)
+    spectrum.convert_from_ADUrate_to_flam()
+    spectrum.pixels = distance - pixel_shift
     detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
                  fwhm_func=fwhm_func, ax=None, calibration_lines_only=False)
     # Convert back to flam units

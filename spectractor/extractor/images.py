@@ -135,7 +135,6 @@ class Image(object):
         self.header["AIRMASS"] = self.airmass
         self.header["DATE-OBS"] = self.date_obs
         self.header["EXPTIME"] = self.expo
-
         self.header['DEC'] = self.dec
         self.header['HA'] = self.hour_angle
         self.header['OUTTEMP'] = self.temperature
@@ -587,6 +586,15 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
     image.disperser_label = image.header['GRATING']
+    # image.dec = image.header['DEC']
+    # image.hour_angle = image.header['HA']
+    # image.temperature = image.header['OUTTEMP']
+    # image.pressure = image.header['OUTPRESS']
+    # image.humidity = image.header['OUTHUM']
+    # image.xpixsize = image.header['XPIXSIZE']
+    # image.ypixsize = image.header['YPIXSIZE']
+    parameters.OBS_ALTITUDE = image.header['OBS-ELEV']
+    parameters.OBS_LATITUDE = image.header['OBS-LAT']
     image.read_out_noise = 8.5*np.ones_like(image.data)
 
 

@@ -1257,11 +1257,11 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
     if y.ndim > 1:
         # TODO: implement fwhm for 2D curves
         return -1
-    interp = interp1d(x, y, kind="cubic", bounds_error=False, fill_value="extrapolate")
+    interp = interp1d(x, y, kind="linear", bounds_error=False, fill_value="extrapolate")
     maximum = np.max(y) - minimum
     imax = np.argmax(y)
-    a = imax + np.argmin(np.abs(y[imax:] - 0.9 * maximum))
-    b = imax + np.argmin(np.abs(y[imax:] - 0.1 * maximum))
+    a = x[imax + np.argmin(np.abs(y[imax:] - 0.9 * maximum))]
+    b = x[imax + np.argmin(np.abs(y[imax:] - 0.1 * maximum))]
 
     def eq(xx):
         return interp(xx) - 0.5 * maximum
@@ -1787,7 +1787,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
     if xlim is None and lambdas is not None:
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
     ax.set_xlim(xlim)
-    ax.set_ylim(0., np.nanmax(data) * 1.2)
+    ax.set_ylim(0., np.nanmax(data[np.logical_and(xs > xlim[0], xs < xlim[1])]) * 1.2)
     if lambdas is not None:
         ax.set_xlabel(r'$\lambda$ [nm]')
     else:
@@ -2255,6 +2255,11 @@ def plot_correlation_matrix_simple(ax, rho, axis_names, ipar=None):
     cbar = plt.colorbar(im)
     cbar.ax.tick_params(labelsize=9)
     plt.gcf().tight_layout()
+
+
+def resolution_operator(cov, Q, reg):
+    N = cov.shape[0]
+    return np.eye(N) - reg * cov @ Q
 
 
 if __name__ == "__main__":

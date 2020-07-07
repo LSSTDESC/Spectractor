@@ -26,7 +26,7 @@ def make_test_image(config="./config/ctio.ini"):
     load_config(config)
     spectrum_filename = "tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = spectrum_filename.replace("_spectrum.fits", ".fits")
-    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=1, A2=0.05,
+    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=1, A2=1,
              psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=True, with_rotation=True)
 
 
@@ -45,8 +45,8 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
     >>> from spectractor.extractor.spectrum import Spectrum
     >>> image = Image("./tests/data/sim_20170530_134.fits")
     >>> spectrum = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
-    >>> lambdas_truth = np.fromstring(image.header['LAMBDAS'][1:-1], sep=' ')
-    >>> amplitude_truth = np.fromstring(image.header['PSF_POLY'][1:-1], sep=' ', dtype=float)[:lambdas_truth.size]
+    >>> lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
+    >>> amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)[:lambdas_truth.size]
     >>> plot_residuals(spectrum, lambdas_truth, amplitude_truth)
     """
     fig, ax = plt.subplots(2, 1, figsize=(8, 6), sharex="all", gridspec_kw={'height_ratios': [3, 1]})
@@ -81,8 +81,8 @@ def load_test(sim_image, config="./config/ctio.ini"):
     if not os.path.isfile(sim_image):
         make_test_image(config=config)
     image = Image(sim_image, config=config)
-    lambdas_truth = np.fromstring(image.header['LAMBDAS'][1:-1], sep=' ')
-    amplitude_truth = np.fromstring(image.header['PSF_POLY'][1:-1], sep=' ', dtype=float)[:lambdas_truth.size]
+    lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
+    amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
     parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
     parameters.LAMBDA_TRUTH = np.copy(lambdas_truth)
     parameters.PSF_POLY_ORDER = int(image.header['PSF_DEG'])
@@ -119,4 +119,5 @@ def test_fitchromaticpsf2d_test(sim_image="./tests/data/sim_20170530_134.fits", 
 
 if __name__ == "__main__":
 
-    run_module_suite()
+    test_fitchromaticpsf2d_test("outputs/sim_20170530_134.fits")
+    #run_module_suite()

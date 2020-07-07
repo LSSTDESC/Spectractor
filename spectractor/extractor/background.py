@@ -4,12 +4,13 @@ import matplotlib.gridspec as gridspec
 from matplotlib import cm
 import os
 
-import spectractor.parameters as parameters
-from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal
-from spectractor.tools import plot_image_simple
+from spectractor import parameters
+from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal, plot_image_simple
 
 from astropy.stats import SigmaClip
 from photutils import Background2D, SExtractorBackground
+from photutils import make_source_mask
+
 from scipy.signal import medfilt2d
 from scipy.interpolate import interp2d
 
@@ -148,7 +149,11 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     Returns
     -------
     bgd_model_func: callable
-        A 2D function to model the extracted background
+        A 2D function to model the extracted background.
+    bgd_res: array_like
+        The background residuals normalized with their uncertainties.
+    bgd_rms: array_like
+        The background RMS.
 
     Examples
     --------
@@ -171,20 +176,22 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
 
     Fit the transverse profile:
 
-    >>> bgd_model = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+    >>> bgd_model, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
     """
     Ny, Nx = data.shape
     middle = Ny // 2
+
+    # mask sources
+    mask = make_source_mask(data, nsigma=3, npixels=5, dilate_size=11)
+
     # Estimate the background in the two lateral bands together
     sigma_clip = SigmaClip(sigma=3.)
     bkg_estimator = SExtractorBackground()
     if mask_signal_region:
         bgd_bands = np.copy(data).astype(float)
         bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
-        mask = (np.isnan(bgd_bands))
-    else:
-        mask = None
+        mask += (np.isnan(bgd_bands))
     # windows size in x is set to only 6 pixels to be able to estimate rapid variations of the background on real data
     # filter window size is set to window // 2 so 3
     # bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
@@ -197,6 +204,8 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
                        mask=mask)
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False,
                               fill_value=None)
+    bgd_res = ((data - bkg.background)/err)
+    bgd_res[mask] = np.nan
 
     if parameters.DEBUG:
         gs = gridspec.GridSpec(3, 2, width_ratios=[4, 1], height_ratios=[1, 1, 1], wspace=0.1, hspace=0.04,
@@ -208,6 +217,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         ax3 = plt.subplot(gs[:, 1])
         bgd_bands = np.copy(data).astype(float)
         bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
+        bgd_bands[mask] = np.nan
         mean = np.nanmean(bgd_bands)
         std = np.nanstd(bgd_bands)
         cmap = cm.get_cmap()
@@ -256,7 +266,15 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'background_extraction.pdf'))
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-    return bgd_model_func
+        fig = plt.figure(figsize=(5, 5))
+        plt.hist(res.flatten(), bins=50)
+        plt.grid()
+        plt.title(f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
+        plt.xlabel('Background normalized residuals')
+        fig.tight_layout()
+        if parameters.DISPLAY:  # pragma: no cover
+            plt.show()
+    return bgd_model_func, bgd_res, bkg.background_rms
 
 
 def extract_spectrogram_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):

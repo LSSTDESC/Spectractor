@@ -35,7 +35,7 @@ def test_extractor():
         if target_label is None or xpos is None or ypos is None:
             continue
         spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
-                               line_detection=True, atmospheric_lines=True)
+                               atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 2e-11
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
@@ -45,8 +45,12 @@ def test_extractor():
                                    f"\n\t\tspectrum.spectrogram_x0={spectrum.spectrogram_x0}"
                                    f"\n\t\tnp.mean(spectrum.chromatic_psf.table['gamma']="
                                    f"{np.mean(spectrum.chromatic_psf.table['gamma'])}")
-        assert np.isclose(spectrum.lambdas[0], 347, atol=1)
-        assert np.isclose(spectrum.lambdas[-1], 1085.0, atol=1)
+        if parameters.PSF_EXTRACTION_MODE == "PSD_2D":
+            assert np.isclose(spectrum.lambdas[0], 343, atol=1)
+            assert np.isclose(spectrum.lambdas[-1], 1084.0, atol=1)
+        elif parameters.PSF_EXTRACTION_MODE == "PSF_1D":
+            assert np.isclose(spectrum.lambdas[0], 347, atol=1)
+            assert np.isclose(spectrum.lambdas[-1], 1085.0, atol=1)
         assert np.isclose(spectrum.x0[0], 743.6651370068676, atol=0.5)
         assert np.isclose(spectrum.x0[1], 683.0577836601408, atol=1)
         assert np.isclose(spectrum.spectrogram_x0, -280, atol=1)
@@ -70,7 +74,7 @@ def extractor_auxtel():
         # tag = file_name.split('/')[-1]
         # disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
-                               config='./config/auxtel.ini', line_detection=True, atmospheric_lines=True)
+                               config='./config/auxtel.ini', atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10
         # spectrum.my_logger.warning(f"\n\tQuantities to test:"

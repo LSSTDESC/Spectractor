@@ -86,6 +86,7 @@ PLATE_CENTER_SHIFT_X = -6.  # plate center shift on x in mm in filter frame
 PLATE_CENTER_SHIFT_Y = -8.  # plate center shift on x in mm in filter frame
 PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
 PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
+GRATING_ORDER_2OVER1 = 0.1  # default value for order 2 over order 1 transmission ratio
 
 # Search windows in images
 XWINDOW = 100  # window x size to search for the targeted object
@@ -114,9 +115,10 @@ PIXWIDTH_BOXSIZE = 20 # box size for sextractor evaluation of the background
 BGD_ORDER = 1  # the order of the polynomial background to fit in the transverse direction
 
 # PSF
+PSF_EXTRACTION_MODE = "PSF_1D"  # extraction mode: 1D or 2D
 PSF_TYPE = "Moffat"  # the PSF model: Moffat or MoffatGauss
 PSF_POLY_ORDER = 2  # the order of the polynomials to model wavelength dependence of the PSF shape parameters
-PSF_FIT_REG_PARAM = 0.002  # regularisation parameter for the chisq minimisation to extract the spectrum
+PSF_FIT_REG_PARAM = 0.01  # regularisation parameter for the chisq minimisation to extract the spectrum
 
 # Detection line algorithm
 CALIB_BGD_ORDER = 3  # order of the background polynome to fit
