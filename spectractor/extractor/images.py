@@ -677,11 +677,11 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
                                                                             widths=(Dx, Dy))
         for i in range(niter):
             # find the target
-            try:
-                avX, avY = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
-            except (Exception, ValueError):
-                image.target_star2D = None
-                avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
+            # try:
+            avX, avY = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
+            # except (Exception, ValueError):
+            #     image.target_star2D = None
+            #     avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
             # compute target position
             theX = x0 - Dx + avX
             theY = y0 - Dy + avY

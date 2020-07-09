@@ -1044,7 +1044,7 @@ def calibrate_spectrum(spectrum):
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             if parameters.LIVE_FIT:
-                 spectrum.plot_spectrum(live_fit=True, label=rf'Order {spectrum.order:d} spectrum'
+                spectrum.plot_spectrum(live_fit=True, label=rf'Order {spectrum.order:d} spectrum'
                                                             r'\n$D_\mathrm{CCD}'
                                                             rf'={D:.2f}\,$mm, $\delta u_0={shift:.2f}\,$pix')
         return chisq

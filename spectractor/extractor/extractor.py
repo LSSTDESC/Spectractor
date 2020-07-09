@@ -230,6 +230,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     spectrum.err = np.copy(w.amplitude_params_err)
     spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
     spectrum.chromatic_psf = s
+    fwhm_1d = np.copy(s.table['fwhm'])
 
     Dx_rot = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
     s.table['Dx'] = np.copy(Dx_rot)
@@ -404,4 +405,67 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'spectrum.pdf'))
+
+    if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and 'LBDAS_T' in spectrum.header and parameters.DEBUG:
+        lambdas_truth = np.fromstring(spectrum.header['LBDAS_T'][1:-1], sep=' ', dtype=float)
+        psf_poly_truth = np.fromstring(spectrum.header['PSF_P_T'][1:-1], sep=' ', dtype=float)
+        amplitude_truth = np.fromstring(spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+        amplitude_truth *= parameters.FLAM_TO_ADURATE * lambdas_truth * np.gradient(lambdas_truth)
+
+        s0 = ChromaticPSF(s.psf, lambdas_truth.size, s.Ny, deg=int(spectrum.header["PSF_DEG"]),
+                          saturation=parameters.CCD_MAXADU)
+        s0.poly_params = np.asarray(list(amplitude_truth) + list(psf_poly_truth))
+        s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
+        s0.from_profile_params_to_shape_params(s0.profile_params)
+        gs_kw = dict(width_ratios=[2, 1], height_ratios=[3, 1])
+        fig, ax = plt.subplots(2, 2, figsize=(12, 5), sharex="all", gridspec_kw=gs_kw)
+        ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth")
+        amplitude_priors_err = [np.sqrt(w.amplitude_priors_cov_matrix[x, x]) for x in range(w.Nx)]
+        ax[0, 0].errorbar(s.table["lambdas"], w.amplitude_priors, yerr=amplitude_priors_err, label="prior")
+        ax[0, 0].errorbar(s.table["lambdas"], w.amplitude_params, yerr=w.amplitude_params_err, label="2D")
+        ax[0, 0].grid()
+        ax[0, 0].legend()
+        ax[0, 0].set_xlabel(r"$\lambda$ [nm]")
+        ax[0, 0].set_ylabel(f"Amplitude $A$ [ADU/s]")
+        ax[1, 0].plot(lambdas_truth, np.zeros_like(lambdas_truth), label="truth")
+        amplitude_truth = np.interp(np.arange(s.Nx), np.arange(len(amplitude_truth)), amplitude_truth)
+        res = (w.amplitude_priors - amplitude_truth) / amplitude_priors_err
+        ax[1, 0].errorbar(s.table["lambdas"], res, yerr=np.ones_like(res),
+                          label=f"prior: mean={np.mean(res):.2f}, std={np.std(res):.2f}")
+        res = (w.amplitude_params - amplitude_truth) / w.amplitude_params_err
+        ax[1, 0].errorbar(s.table["lambdas"], res, yerr=np.ones_like(res),
+                          label=f"2D: mean={np.mean(res):.2f}, std={np.std(res):.2f}")
+        ax[1, 0].grid()
+        ax[1, 0].legend()
+        ax[1, 0].set_xlabel(r"$\lambda$ [nm]")
+        ax[1, 0].set_ylim(-5, 5)
+        ax[1, 0].set_ylabel(r"$(A - A_{\rm truth})/\sigma_A$")
+
+        fwhm_prior = np.interp(np.arange(len(s.table)), np.arange(len(s0.table)), s0.table['fwhm'])
+        fwhm_1d = np.interp(np.arange(len(s.table)), np.arange(fwhm_1d.size), fwhm_1d)
+        fwhm_2d = np.interp(np.arange(len(s.table)), np.arange(s.Nx), fwhm_1d)
+        ax[0, 1].plot(lambdas_truth, s0.table["fwhm"], label="truth")
+        ax[0, 1].plot(s.table["lambdas"], fwhm_1d, label="prior")
+        ax[0, 1].plot(s.table["lambdas"], s.table["fwhm"], label="2D")
+        ax[0, 1].grid()
+        ax[0, 1].set_ylim(0, 10)
+        ax[0, 1].legend()
+        ax[0, 1].set_xlabel(r"$\lambda$ [nm]")
+        ax[1, 1].set_xlabel(r"$\lambda$ [nm]")
+        ax[0, 1].set_ylabel(f"FWHM [pix]")
+        ax[1, 1].set_ylabel(r"FWHM - FWHM$_{\rm truth}$ [pix]")
+        ax[1, 1].plot(lambdas_truth, np.zeros_like(lambdas_truth), label="truth")
+        ax[1, 1].plot(s.table["lambdas"], fwhm_1d - fwhm_prior, label="prior")
+        ax[1, 1].plot(s.table["lambdas"], fwhm_2d - fwhm_prior, label="2D")
+        ax[1, 1].grid()
+        ax[1, 1].set_ylim(0, 10)
+        ax[1, 1].legend()
+        plt.subplots_adjust(hspace=0)
+        fig.tight_layout()
+        if parameters.DISPLAY:
+            plt.show()
+        if parameters.LSST_SAVEFIGPATH:
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'deconvolution_truth.pdf'))
+        plt.show()
+
     return spectrum

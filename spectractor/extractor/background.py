@@ -266,14 +266,6 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'background_extraction.pdf'))
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-        fig = plt.figure(figsize=(5, 5))
-        plt.hist(res.flatten(), bins=50)
-        plt.grid()
-        plt.title(f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
-        plt.xlabel('Background normalized residuals')
-        fig.tight_layout()
-        if parameters.DISPLAY:  # pragma: no cover
-            plt.show()
     return bgd_model_func, bgd_res, bkg.background_rms
 
 
