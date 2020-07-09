@@ -94,7 +94,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
-        self.shift_x = 0  # self.spectrum.header['PIXSHIFT']
+        self.shift_x = self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
         self.angle = self.spectrum.rotation_angle
         self.B = 1
@@ -115,6 +115,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         for k, par in enumerate(self.input_labels):
             if "x_c" in par or "saturation" in par:
                 self.fixed[k] = True
+        self.fixed[1] = True  # A2
+        self.fixed[5:7] = [True, True]  # DCCD, x0
         self.fixed[7] = True  # Delta y
         self.fixed[8] = True  # angle
         if atmgrid_file_name != "":
@@ -493,7 +495,7 @@ if __name__ == "__main__":
     load_config(args.config)
 
     # filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    filename = 'outputs/sim_20170530_191_spectrum.fits'
+    filename = 'outputs/reduc_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
