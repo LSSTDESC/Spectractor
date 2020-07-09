@@ -78,7 +78,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.data = self.spectrum.data
         self.err = self.spectrum.err
         self.A1 = 1.0
-        self.A2 = 0.0
+        self.A2 = 1.0
         self.ozone = 300.
         self.pwv = 5
         self.aerosols = 0.03
