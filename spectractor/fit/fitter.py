@@ -359,15 +359,15 @@ class FitWorkspace:
         print(f"Output file: {self.emcee_filename}")
         print('************************************')
 
-    def save_parameters_summary(self, header=""):
+    def save_parameters_summary(self, ipar, header=""):
         output_filename = os.path.splitext(self.filename)[0] + "_bestfit.txt"
         f = open(output_filename, 'w')
         txt = self.filename + "\n"
         if header != "":
             txt += header + "\n"
-        for ip in np.arange(0, self.cov.shape[0]).astype(int):
-            txt += "%s: %s +%s -%s\n" % formatting_numbers(self.p[ip], np.sqrt(self.cov[ip, ip]),
-                                                           np.sqrt(self.cov[ip, ip]),
+        for k, ip in enumerate(ipar):
+            txt += "%s: %s +%s -%s\n" % formatting_numbers(self.p[ip], np.sqrt(self.cov[k, k]),
+                                                           np.sqrt(self.cov[k, k]),
                                                            label=self.input_labels[ip])
         for row in self.cov:
             txt += np.array_str(row, max_line_width=20 * self.cov.shape[0]) + '\n'
@@ -891,7 +891,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
-            fit_workspace.save_parameters_summary()
+            ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
+            fit_workspace.save_parameters_summary(ipar)
             save_gradient_descent(fit_workspace, costs, params_table)
 
 

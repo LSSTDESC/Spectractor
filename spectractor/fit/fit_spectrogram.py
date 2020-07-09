@@ -108,8 +108,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.axis_names = ["$A_1$", "$A_2$", "ozone [db]", "PWV [mm]", "VAOD", r"$D_{CCD}$ [mm]",
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
                            r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names)
-        self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 800), (1, 10), (0, 1),
-                                                (50, 60), (-2, 2), (-3, 3), (-90, 90), (0.8, 1.2)]),
+        self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 800), (1, 10),
+                                                (0, 1), (50, 60), (-2, 2), (-3, 3), (-90, 90), (0.8, 1.2)]),
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
@@ -456,7 +456,8 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
             parameters.SAVE = True
             ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
             fit_workspace.plot_correlation_matrix(ipar)
-            fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
+            fit_workspace.save_parameters_summary(ipar, header=f"{fit_workspace.spectrum.date_obs}\n"
+                                                               f"{costs[-1] / fit_workspace.data.size}")
             save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
