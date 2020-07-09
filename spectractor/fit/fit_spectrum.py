@@ -84,7 +84,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.aerosols = 0.03
         self.reso = -1
         self.D = self.spectrum.header['D2CCD']
-        self.shift_x = self.spectrum.header['PIXSHIFT']
+        self.shift_x = 0  # self.spectrum.header['PIXSHIFT']
         self.B = 0
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D,
                            self.shift_x, self.B])
