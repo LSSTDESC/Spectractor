@@ -94,8 +94,8 @@ class SpectrumFitWorkspace(FitWorkspace):
                              r"alpha_pix [pix]", "B"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
-        self.bounds = [(0, 2), (0, 2), (300, 700), (0, 10), (0, 0.01), (-2, 2), (50, 60), (-0.5, 0.5),
-                       (-np.inf, np.inf)]
+        self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (300, 700), (0, 10), (0, 0.01),
+                       (-2, 2), (50, 60), (-0.5, 0.5), (-np.inf, np.inf)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -398,7 +398,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
             parameters.SAVE = True
             ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
             fit_workspace.plot_correlation_matrix(ipar)
-            fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
+            fit_workspace.save_parameters_summary(ipar, header=f"{fit_workspace.spectrum.date_obs}\n{costs[-1]}")
             save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
