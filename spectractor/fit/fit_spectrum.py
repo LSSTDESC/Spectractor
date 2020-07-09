@@ -78,7 +78,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.data = self.spectrum.data
         self.err = self.spectrum.err
         self.A1 = 1.0
-        self.A2 = 1.0
+        self.A2 = 0.0
         self.ozone = 300.
         self.pwv = 5
         self.aerosols = 0.03
@@ -90,6 +90,8 @@ class SpectrumFitWorkspace(FitWorkspace):
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
         self.fixed[5] = True
+        self.fixed[1] = True
+        self.fixed[-1] = True
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]", "B"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
@@ -435,7 +437,7 @@ if __name__ == "__main__":
 
     load_config(args.config)
 
-    filename = 'outputs/sim_20170530_134_spectrum.fits'
+    filename = 'outputs/reduc_20170530_139_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
