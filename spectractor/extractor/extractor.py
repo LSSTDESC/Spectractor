@@ -71,6 +71,8 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     my_logger.info('\n\tStart SPECTRACTOR')
     # Load config file
     load_config(config)
+    if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+        ensure_dir(parameters.LSST_SAVEFIGPATH)
 
     # Load reduced image
     image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
@@ -132,7 +134,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
         s0.from_profile_params_to_shape_params(s0.profile_params)
         gs_kw = dict(width_ratios=[2, 1], height_ratios=[3, 1])
-        fig, ax = plt.subplots(2, 2, figsize=(12, 5), sharex="all", gridspec_kw=gs_kw)
+        fig, ax = plt.subplots(2, 2, figsize=(9, 5), sharex="all", gridspec_kw=gs_kw)
         ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth")
         amplitude_priors_err = [np.sqrt(w.amplitude_priors_cov_matrix[x, x]) for x in range(w.Nx)]
         ax[0, 0].errorbar(spectrum.lambdas, w.amplitude_priors, yerr=amplitude_priors_err, label="prior")

@@ -1262,7 +1262,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                 plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH,
-                                     f'fit_chromatic_psf_best_fit_{self.amplitude_priors_method}.png'),
+                                     f'fit_chromatic_psf_best_fit_{self.amplitude_priors_method}.pdf'),
                         dpi=100, bbox_inches='tight')
 
 
@@ -1755,7 +1755,7 @@ class RegFitWorkspace(FitWorkspace):
             Gs.append(self.G)
             chisqs.append(self.chisquare)
             resolutions.append(np.trace(self.resolution))
-        fig, ax = plt.subplots(3, 1, figsize=(10, 6), sharex="all")
+        fig, ax = plt.subplots(3, 1, figsize=(7, 5), sharex="all")
         ax[0].plot(regs, Gs)
         ax[0].axvline(opt_reg, color="k")
         ax[1].axvline(opt_reg, color="k")

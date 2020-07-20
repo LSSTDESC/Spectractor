@@ -350,7 +350,7 @@ class Image(object):
                           units=self.units, target_pixcoords=None, aspect="auto", cmap=None)
         fig.tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.png'))
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.pdf'))
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
@@ -419,6 +419,8 @@ class Image(object):
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         plt.legend()
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'))
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
