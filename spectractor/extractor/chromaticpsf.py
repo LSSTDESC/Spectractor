@@ -1119,6 +1119,10 @@ class ChromaticPSF:
         self.profile_params[:self.Nx, 1] = np.arange(self.Nx)
         self.fill_table_with_profile_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
+
+        # save plots
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            w.plot_fit()
         return w
 
 
@@ -1245,7 +1249,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                           label='Data', fmt='k.', markersize=0.1)
         ax[3, 0].plot(np.arange(self.Nx), self.model.sum(axis=0), label='Model')
         ax[3, 0].set_ylabel('Transverse sum')
-        ax[3, 0].set_xlabel(r'X [pixels]')
+        ax[3, 0].set_xlabel(parameters.PLOT_XLABEL)
         ax[3, 0].legend(fontsize=7)
         ax[3, 0].set_xlim((0, self.data.shape[1]))
         ax[3, 0].grid(True)
@@ -1256,10 +1260,10 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         else:  # pragma: no cover
             if parameters.DISPLAY and self.verbose:
                 plt.show()
-        if parameters.SAVE:  # pragma: no cover
-            figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
-            self.my_logger.info(f"\n\tSave figure {figname}.")
-            fig.savefig(figname, dpi=100, bbox_inches='tight')
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH,
+                                     f'fit_chromatic_psf_best_fit_{self.amplitude_priors_method}.png'),
+                        dpi=100, bbox_inches='tight')
 
 
 class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
@@ -1761,13 +1765,13 @@ class RegFitWorkspace(FitWorkspace):
         ax[0].grid()
         ax[0].set_title(f"Optimal regularisation parameter: {opt_reg:.3g}")
         ax[1].plot(regs, chisqs)
-        ax[1].set_ylabel("Chi2")
+        ax[1].set_ylabel(r"$\chi^2(\mathbf{A}(r) \vert \mathbf{\theta})$")
         ax[1].set_xlabel("Regularisation hyper-parameter $r$")
         ax[1].grid()
         ax[1].set_xscale("log")
         ax[2].set_xscale("log")
         ax[2].plot(regs, resolutions)
-        ax[2].set_ylabel(r"$\mathrm{Tr}(R)$")
+        ax[2].set_ylabel(r"$\mathrm{Tr}\,\mathbf{R}$")
         ax[2].set_xlabel("Regularisation hyper-parameter $r$")
         ax[2].grid()
         fig.tight_layout()
