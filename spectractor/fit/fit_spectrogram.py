@@ -119,6 +119,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.fixed[5:7] = [True, True]  # DCCD, x0
         self.fixed[7] = True  # Delta y
         self.fixed[8] = True  # angle
+        self.fixed[9] = True  # B
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -447,7 +448,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
                                                    fix=fit_workspace.fixed, xtol=1e-5, ftol=1e-3, niter=10)
 
-        fit_workspace.simulation.fast_sim = False
+        fit_workspace.simulation.fast_sim = True  # False
         fit_workspace.simulation.fix_psf_cube = False
         guess = fit_workspace.p
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
@@ -495,13 +496,14 @@ if __name__ == "__main__":
     load_config(args.config)
 
     # filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    filename = 'outputs/reduc_20170530_134_spectrum.fits'
+    filename = 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits'
+    # filename = 'outputs/sim_20170530_134_spectrum.fits'
     atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
     w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-    #w.simulate(*w.truth)
-    #w.plot_fit()
+    # w.simulate(*w.truth)
+    # w.plot_fit()
     run_spectrogram_minimisation(w, method="newton")
     # run_emcee(w, ln=lnprob_spectrogram)
     # w.analyze_chains()

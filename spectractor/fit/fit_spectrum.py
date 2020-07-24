@@ -2,13 +2,12 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 from scipy.interpolate import interp1d
-from astropy.io import fits
 
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_gradient_descent, save_gradient_descent
+from spectractor.fit.fitter import FitWorkspace, run_gradient_descent, save_gradient_descent, run_minimisation_sigma_clipping
 from spectractor.tools import plot_spectrum_simple
 
 
@@ -92,6 +91,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         # self.fixed[0] = True
         self.fixed[5] = True
         self.fixed[6:8] = [True, True]
+        # self.fixed[7] = False
         self.fixed[1] = True
         self.fixed[-1] = True
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
@@ -99,7 +99,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
         self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (300, 700), (0, 10), (0, 0.01),
-                       (-2, 2), (50, 60), (-0.5, 0.5), (-np.inf, np.inf)]
+                       (0, 2), (50, 60), (-0.5, 0.5), (-np.inf, np.inf)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -250,7 +250,12 @@ class SpectrumFitWorkspace(FitWorkspace):
         """
         x, model, model_err = self.simulate(*p)
         if len(self.outliers) > 0:
-            raise NotImplementedError("Weighted residuals function not implemented for outlier rejection.")
+            good_indices = np.asarray(self.not_outliers, dtype=int)
+            cov = self.spectrum.cov_matrix + np.diag(model_err * model_err)
+            cov = cov[good_indices[:, None], good_indices]
+            L = np.linalg.inv(np.linalg.cholesky(cov))
+            res = L @ (model[good_indices] - self.data[good_indices])
+            # raise NotImplementedError("Weighted residuals function not implemented for outlier rejection.")
         else:
             cov = self.spectrum.cov_matrix + np.diag(model_err * model_err)
             L = np.linalg.inv(np.linalg.cholesky(cov))
@@ -393,6 +398,8 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
                                                    fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
                                                    niter=40)
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
+                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=5, niter_clip=3, verbose=False)
         # fit_workspace.simulation.fast_sim = False
         # guess = fit_workspace.p
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
@@ -439,13 +446,42 @@ if __name__ == "__main__":
 
     load_config(args.config)
 
-    filename = 'outputs/reduc_20170530_141_spectrum.fits'
-    atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+    filenames = ['outputs/sim_20170530_134_spectrum.fits']
+    # filenames = ['outputs/sim_20170530_119_spectrum.fits',
+    #              'outputs/sim_20170530_124_spectrum.fits',
+    #              'outputs/sim_20170530_129_spectrum.fits',
+    #              'outputs/sim_20170530_134_spectrum.fits',
+    #              'outputs/sim_20170530_139_spectrum.fits',
+    #              'outputs/sim_20170530_144_spectrum.fits',
+    #              'outputs/sim_20170530_149_spectrum.fits',
+    #              'outputs/sim_20170530_154_spectrum.fits']
+    pwvs = []
+    aerosols = []
+    chisqs = []
+    ozones = []
+    for filename in filenames:
+        atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-    w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                             burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
-    run_spectrum_minimisation(w, method="newton")
-    w.decontaminate_order2()
+        w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
+                                 burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
+        run_spectrum_minimisation(w, method="newton")
+        pwvs.append(w.p[4])
+        aerosols.append(w.p[3])
+        ozones.append(w.p[2])
+        chisqs.append(w.costs[-1])
+
+    fig, ax = plt.subplots(1, 4)
+    print(pwvs, aerosols, ozones, chisqs)
+    ax[0].plot(pwvs)
+    ax[1].plot(aerosols)
+    ax[2].plot(ozones)
+    ax[3].plot(chisqs)
+    plt.show()
+
+
+
+
+    # w.decontaminate_order2()
     # fit_workspace.simulate(*fit_workspace.p)
     # fit_workspace.plot_fit()
     # run_emcee(fit_workspace, ln=lnprob_spectrum)
