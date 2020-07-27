@@ -913,21 +913,18 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
         outliers.sort()
         if len(outliers) > 0:
-            if verbose:
-                my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
-                my_logger.info(f'\n\tOutliers: {len(outliers)} / {fit_workspace.data.size} data points '
-                               f'({100 * len(outliers) / fit_workspace.data.size:.2f}%) '
-                               f'at more than {sigma_clip}-sigma from best-fit model.')
+            my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
+            my_logger.info(f'\n\tOutliers: {len(outliers)} / {fit_workspace.data.size} data points '
+                           f'({100 * len(outliers) / fit_workspace.data.size:.2f}%) '
+                           f'at more than {sigma_clip}-sigma from best-fit model.')
             if np.all(fit_workspace.outliers == outliers):
-                if verbose:
-                    my_logger.info(f'\n\tOutliers flat index list unchanged since last iteration: '
-                                   f'break the sigma clipping iterations.')
+                my_logger.info(f'\n\tOutliers flat index list unchanged since last iteration: '
+                               f'break the sigma clipping iterations.')
                 break
             else:
                 fit_workspace.outliers = outliers
         else:
-            if verbose:
-                my_logger.info(f'\n\tNo outliers detected at first iteration: break the sigma clipping iterations.')
+            my_logger.info(f'\n\tNo outliers detected at first iteration: break the sigma clipping iterations.')
             break
 
 
