@@ -81,7 +81,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.ozone = 300.
         self.pwv = 5
         self.aerosols = 0.03
-        self.reso = -1
+        self.reso = 1
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.B = 0
@@ -89,17 +89,17 @@ class SpectrumFitWorkspace(FitWorkspace):
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
         # self.fixed[0] = True
-        self.fixed[5] = True
-        self.fixed[6:8] = [True, True]
+        # self.fixed[5] = True
+        # self.fixed[6:8] = [True, True]
         # self.fixed[7] = False
-        self.fixed[1] = True
-        self.fixed[-1] = True
+        # self.fixed[1] = True
+        # self.fixed[-1] = True
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]", "B"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
         self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (300, 700), (0, 10), (0, 0.01),
-                       (0, 2), (50, 60), (-0.5, 0.5), (-np.inf, np.inf)]
+                       (0, 2), (50, 60), (-2, 2), (-np.inf, np.inf)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -400,11 +400,11 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
                                                    niter=40)
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
                                         xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=5, niter_clip=3, verbose=False)
-        # fit_workspace.simulation.fast_sim = False
-        # guess = fit_workspace.p
-        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-        #                                          fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
-        #                                            niter=40)
+        fit_workspace.simulation.fast_sim = False
+        guess = fit_workspace.p
+        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+                                                   fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
+                                                   niter=40)
         if fit_workspace.filename != "":
             parameters.SAVE = True
             ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
@@ -447,35 +447,45 @@ if __name__ == "__main__":
     load_config(args.config)
 
     filenames = ['outputs/sim_20170530_134_spectrum.fits']
-    # filenames = ['outputs/sim_20170530_119_spectrum.fits',
-    #              'outputs/sim_20170530_124_spectrum.fits',
-    #              'outputs/sim_20170530_129_spectrum.fits',
-    #              'outputs/sim_20170530_134_spectrum.fits',
-    #              'outputs/sim_20170530_139_spectrum.fits',
-    #              'outputs/sim_20170530_144_spectrum.fits',
-    #              'outputs/sim_20170530_149_spectrum.fits',
-    #              'outputs/sim_20170530_154_spectrum.fits']
-    pwvs = []
-    aerosols = []
+    filenames = [
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_104_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_109_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_114_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_119_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_124_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_129_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_139_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_144_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_149_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_154_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_159_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_164_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_169_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_174_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_179_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_184_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_189_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_194_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
+    params = []
     chisqs = []
-    ozones = []
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
         w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                  burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
         run_spectrum_minimisation(w, method="newton")
-        pwvs.append(w.p[4])
-        aerosols.append(w.p[3])
-        ozones.append(w.p[2])
+        params.append(w.p)
         chisqs.append(w.costs[-1])
+    params = np.asarray(params).T
 
-    fig, ax = plt.subplots(1, 4)
-    print(pwvs, aerosols, ozones, chisqs)
-    ax[0].plot(pwvs)
-    ax[1].plot(aerosols)
-    ax[2].plot(ozones)
-    ax[3].plot(chisqs)
+    fig, ax = plt.subplots(1, len(params))
+    for ip, p in enumerate(params):
+        print(f"{w.input_labels[ip]}:", np.mean(p), np.std(p))
+        ax[ip].plot(p, label=f"{w.input_labels[ip]}")
+        ax[ip].grid()
+        ax[ip].legend()
     plt.show()
 
 
