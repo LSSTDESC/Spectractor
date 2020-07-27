@@ -448,7 +448,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
                                                    fix=fit_workspace.fixed, xtol=1e-5, ftol=1e-3, niter=10)
 
-        fit_workspace.simulation.fast_sim = True  # False
+        fit_workspace.simulation.fast_sim = False
         fit_workspace.simulation.fix_psf_cube = False
         fit_workspace.fixed = np.copy(fixed)
         # guess = fit_workspace.p
