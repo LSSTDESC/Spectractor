@@ -399,11 +399,11 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         #                                            fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
         #                                            niter=40)
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=5, niter_clip=3, verbose=False)
+                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3, verbose=False)
 
         fit_workspace.simulation.fast_sim = False
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=5, niter_clip=3, verbose=False)
+                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3, verbose=False)
         # guess = fit_workspace.p
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
         #                                            fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
