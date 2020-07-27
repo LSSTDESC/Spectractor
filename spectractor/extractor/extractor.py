@@ -104,7 +104,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     spectrum.atmospheric_lines = atmospheric_lines
 
     # Calibrate the spectrum
-    my_logger.info('\n\tCalibrating order %d spectrum...' % spectrum.order)
+    my_logger.info(f'\n\tCalibrating order {spectrum.order:d} spectrum...')
     calibrate_spectrum(spectrum)
 
     # Save the spectrum

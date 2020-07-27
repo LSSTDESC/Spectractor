@@ -374,7 +374,7 @@ class Spectrum:
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
         # OLD: save_fits(output_file_name, self.header, [self.lambdas, self.data, self.err], overwrite=overwrite)
-        self.my_logger.info('\n\tSpectrum saved in %s' % output_file_name)
+        self.my_logger.info(f'\n\tSpectrum saved in {output_file_name}')
 
     def save_spectrogram(self, output_file_name, overwrite=False):
         """Save the spectrogram into a fits file (data, error and background).
