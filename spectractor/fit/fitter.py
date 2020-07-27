@@ -521,6 +521,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                 continue
             if np.all(J[ip] == np.zeros(J.shape[1])):
                 ipar = np.delete(ipar, list(ipar).index(ip))
+                fixed_params[ip] = True
                 # tmp_params[ip] = 0
                 my_logger.warning(
                     f"\n\tStep {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed "
