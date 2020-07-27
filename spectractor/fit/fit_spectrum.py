@@ -99,7 +99,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
         self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (300, 700), (0, 10), (0, 0.01),
-                       (0, 2), (50, 60), (-2, 2), (-np.inf, np.inf)]
+                       (0, 10), (50, 60), (-2, 2), (-np.inf, np.inf)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -384,10 +384,10 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         run_minimisation(fit_workspace, method=method)
     else:
         fit_workspace.simulation.fast_sim = True
-        costs = np.array([fit_workspace.chisq(guess)])
+        # costs = np.array([fit_workspace.chisq(guess)])
         if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
             fit_workspace.plot_fit()
-        params_table = np.array([guess])
+        # params_table = np.array([guess])
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
         epsilon = 1e-4 * guess
         epsilon[epsilon == 0] = 1e-4
@@ -395,23 +395,26 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
 
         fit_workspace.simulation.fast_sim = True
         fit_workspace.simulation.fix_psf_cube = False
-        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
-                                                   niter=40)
+        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+        #                                            fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
+        #                                            niter=40)
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
                                         xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=5, niter_clip=3, verbose=False)
+
         fit_workspace.simulation.fast_sim = False
-        guess = fit_workspace.p
-        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
-                                                   niter=40)
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
+                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=5, niter_clip=3, verbose=False)
+        # guess = fit_workspace.p
+        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+        #                                            fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
+        #                                            niter=40)
         if fit_workspace.filename != "":
             parameters.SAVE = True
             ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
             fit_workspace.plot_correlation_matrix(ipar)
             fit_workspace.save_parameters_summary(ipar, header=f"{fit_workspace.spectrum.date_obs}\n"
-                                                               f"chi2: {costs[-1] / fit_workspace.data.size}")
-            save_gradient_descent(fit_workspace, costs, params_table)
+                                                               f"chi2: {fit_workspace.costs[-1] / fit_workspace.data.size}")
+            # save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
 
