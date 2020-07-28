@@ -235,9 +235,11 @@ class Spectrum:
             plt.figure(figsize=[12, 6])
             ax = plt.gca()
         if label == '':
-            label = f'Order {self.order:d} spectrum\nD={self.disperser.D:.2f}mm'
+            label = f'Order {self.order:d} spectrum\n' \
+                    r'$D_{\mathrm{CCD}}=' \
+                    rf'{self.disperser.D:.2f}\,$mm'
         if self.x0 is not None:
-            label += f', x0={self.x0[0]:.2f}pix'
+            label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title=title, units=self.units)
@@ -252,6 +254,8 @@ class Spectrum:
         ax.legend(loc='best')
         if self.filters is not None:
             ax.get_legend().set_title(self.filters)
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, f'{self.target.label}_spectrum.pdf'))
         if parameters.DISPLAY:
             if live_fit:
                 plt.draw()
@@ -370,7 +374,7 @@ class Spectrum:
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
         # OLD: save_fits(output_file_name, self.header, [self.lambdas, self.data, self.err], overwrite=overwrite)
-        self.my_logger.info('\n\tSpectrum saved in %s' % output_file_name)
+        self.my_logger.info(f'\n\tSpectrum saved in {output_file_name}')
 
     def save_spectrogram(self, output_file_name, overwrite=False):
         """Save the spectrogram into a fits file (data, error and background).
@@ -1040,8 +1044,9 @@ def calibrate_spectrum(spectrum):
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             if parameters.LIVE_FIT:
-                spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum'
-                                                            f'\nD={D:.2f}mm, shift={shift:.2f}pix')
+                spectrum.plot_spectrum(live_fit=True, label=rf'Order {spectrum.order:d} spectrum'
+                                                            r'\n$D_\mathrm{CCD}'
+                                                            rf'={D:.2f}\,$mm, $\delta u_0={shift:.2f}\,$pix')
         return chisq
 
     # grid exploration of the parameters
@@ -1066,7 +1071,8 @@ def calibrate_spectrum(spectrum):
     start = np.array([D, pixel_shift])
     if imin == 0 or imin == Ds.size or jmin == 0 or jmin == pixel_shifts.size:
         spectrum.my_logger.warning('\n\tMinimum chisq is on the edge of the exploration grid.')
-    if parameters.DEBUG and parameters.DISPLAY:
+    if parameters.DEBUG:
+        fig = plt.figure(figsize=(7, 4))
         im = plt.imshow(np.log10(chisq_grid), origin='lower', aspect='auto',
                         extent=(
                             np.min(pixel_shifts) - pixel_shift_step / 2, np.max(pixel_shifts) + pixel_shift_step / 2,
@@ -1075,10 +1081,13 @@ def calibrate_spectrum(spectrum):
                           label='Minimum', linewidth=2)
         c = plt.colorbar(im)
         c.set_label('Log10(chisq)')
-        plt.xlabel('Pixel shift [pix]')
-        plt.ylabel('D [mm]')
+        plt.xlabel(r'Pixel shift $\delta u_0$ [pix]')
+        plt.ylabel(r'$D_\mathrm{CCD}$ [mm]')
         plt.legend()
-        plt.show()
+        if parameters.DISPLAY:  # pragma: no cover
+            plt.show()
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'D2CCD_x0_fit.pdf'))
     # now minimize around the global minimum found previously
     # res = opt.minimize(shift_minimizer, start, args=(), method='L-BFGS-B',
     #                    options={'maxiter': 200, 'ftol': 1e-3},
@@ -1099,7 +1108,8 @@ def calibrate_spectrum(spectrum):
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift, x0=x0, order=spectrum.order)
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift - adr_pixel_shift,
+                                                         x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.lambdas_binwidths = np.gradient(lambdas)
     spectrum.convert_from_ADUrate_to_flam()

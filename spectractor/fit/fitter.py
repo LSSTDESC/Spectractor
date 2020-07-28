@@ -359,15 +359,15 @@ class FitWorkspace:
         print(f"Output file: {self.emcee_filename}")
         print('************************************')
 
-    def save_parameters_summary(self, header=""):
+    def save_parameters_summary(self, ipar, header=""):
         output_filename = os.path.splitext(self.filename)[0] + "_bestfit.txt"
         f = open(output_filename, 'w')
         txt = self.filename + "\n"
         if header != "":
             txt += header + "\n"
-        for ip in np.arange(0, self.cov.shape[0]).astype(int):
-            txt += "%s: %s +%s -%s\n" % formatting_numbers(self.p[ip], np.sqrt(self.cov[ip, ip]),
-                                                           np.sqrt(self.cov[ip, ip]),
+        for k, ip in enumerate(ipar):
+            txt += "%s: %s +%s -%s\n" % formatting_numbers(self.p[ip], np.sqrt(self.cov[k, k]),
+                                                           np.sqrt(self.cov[k, k]),
                                                            label=self.input_labels[ip])
         for row in self.cov:
             txt += np.array_str(row, max_line_width=20 * self.cov.shape[0]) + '\n'
@@ -521,6 +521,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                 continue
             if np.all(J[ip] == np.zeros(J.shape[1])):
                 ipar = np.delete(ipar, list(ipar).index(ip))
+                fixed_params[ip] = True
                 # tmp_params[ip] = 0
                 my_logger.warning(
                     f"\n\tStep {i}: {fit_workspace.input_labels[ip]} has a null Jacobian; parameter is fixed "
@@ -891,7 +892,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
-            fit_workspace.save_parameters_summary()
+            ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
+            fit_workspace.save_parameters_summary(ipar)
             save_gradient_descent(fit_workspace, costs, params_table)
 
 
@@ -911,21 +913,18 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
         outliers.sort()
         if len(outliers) > 0:
-            if verbose:
-                my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
-                my_logger.info(f'\n\tOutliers: {len(outliers)} / {fit_workspace.data.size} data points '
-                               f'({100 * len(outliers) / fit_workspace.data.size:.2f}%) '
-                               f'at more than {sigma_clip}-sigma from best-fit model.')
+            my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
+            my_logger.info(f'\n\tOutliers: {len(outliers)} / {fit_workspace.data.size} data points '
+                           f'({100 * len(outliers) / fit_workspace.data.size:.2f}%) '
+                           f'at more than {sigma_clip}-sigma from best-fit model.')
             if np.all(fit_workspace.outliers == outliers):
-                if verbose:
-                    my_logger.info(f'\n\tOutliers flat index list unchanged since last iteration: '
-                                   f'break the sigma clipping iterations.')
+                my_logger.info(f'\n\tOutliers flat index list unchanged since last iteration: '
+                               f'break the sigma clipping iterations.')
                 break
             else:
                 fit_workspace.outliers = outliers
         else:
-            if verbose:
-                my_logger.info(f'\n\tNo outliers detected at first iteration: break the sigma clipping iterations.')
+            my_logger.info(f'\n\tNo outliers detected at first iteration: break the sigma clipping iterations.')
             break
 
 

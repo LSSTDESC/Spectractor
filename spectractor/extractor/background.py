@@ -1,5 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+from matplotlib import cm
+import os
 
 from spectractor import parameters
 from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal, plot_image_simple
@@ -103,22 +106,22 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
         c = plt.colorbar(im, ax=ax[0])
         c.set_label(f'Data units (lin scale)')
         ax[0].set_title(f'Data background: mean={np.nanmean(bgd_bands):.3f}, std={np.nanstd(bgd_bands):.3f}')
-        ax[0].set_xlabel('X [pixels]')
-        ax[0].set_ylabel('Y [pixels]')
+        ax[0].set_xlabel(parameters.PLOT_XLABEL)
+        ax[0].set_ylabel(parameters.PLOT_YLABEL)
         x = np.arange(Nx)
         y = np.arange(Ny)
         # noinspection PyTypeChecker
         b = bgd_model_func(x, y)
         im = ax[1].imshow(b, origin='lower', aspect="auto")
-        ax[1].set_xlabel('X [pixels]')
-        ax[1].set_ylabel('Y [pixels]')
+        ax[1].set_xlabel(parameters.PLOT_XLABEL)
+        ax[1].set_ylabel(parameters.PLOT_YLABEL)
         c2 = plt.colorbar(im, ax=ax[1])
         c2.set_label(f'Data units (lin scale)')
         ax[1].set_title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')
         res = (bgd_bands - b) / err
         im = ax[2].imshow(res, origin='lower', aspect="auto", vmin=-5, vmax=5)
-        ax[2].set_xlabel('X [pixels]')
-        ax[2].set_ylabel('Y [pixels]')
+        ax[2].set_xlabel(parameters.PLOT_XLABEL)
+        ax[2].set_ylabel(parameters.PLOT_YLABEL)
         c2 = plt.colorbar(im, ax=ax[2])
         c2.set_label(f'Data units (lin scale)')
         ax[2].set_title(f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
@@ -146,7 +149,11 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     Returns
     -------
     bgd_model_func: callable
-        A 2D function to model the extracted background
+        A 2D function to model the extracted background.
+    bgd_res: array_like
+        The background residuals normalized with their uncertainties.
+    bgd_rms: array_like
+        The background RMS.
 
     Examples
     --------
@@ -169,7 +176,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
 
     Fit the transverse profile:
 
-    >>> bgd_model = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+    >>> bgd_model, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
     """
     Ny, Nx = data.shape
@@ -192,7 +199,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     #                    sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
     #                    mask=mask)
     bkg = Background2D(data, (parameters.PIXWIDTH_BOXSIZE, parameters.PIXWIDTH_BOXSIZE),
-                       filter_size=(parameters.PIXWIDTH_BOXSIZE//2, parameters.PIXWIDTH_BOXSIZE//2),
+                       filter_size=(parameters.PIXWIDTH_BOXSIZE // 2, parameters.PIXWIDTH_BOXSIZE // 2),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False,
@@ -201,42 +208,62 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     bgd_res[mask] = np.nan
 
     if parameters.DEBUG:
-        fig, ax = plt.subplots(3, 1, figsize=(12, 6), sharex='all')
+        gs = gridspec.GridSpec(3, 2, width_ratios=[4, 1], height_ratios=[1, 1, 1], wspace=0.1, hspace=0.04,
+                               right=0.98, left=0.1, top=0.98, bottom=0.1)
+        fig = plt.figure(figsize=(7, 5))
+        ax0 = plt.subplot(gs[0, 0])
+        ax1 = plt.subplot(gs[1, 0])
+        ax2 = plt.subplot(gs[2, 0])
+        ax3 = plt.subplot(gs[:, 1])
         bgd_bands = np.copy(data).astype(float)
-        mean = np.nanmean(bgd_bands)
-        std = np.nanstd(bgd_bands)
         bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
         bgd_bands[mask] = np.nan
-        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=mean-5*std, vmax=mean+5*std)
-        c = plt.colorbar(im, ax=ax[0])
-        c.set_label(f'Data units (lin scale)')
-        ax[0].set_title(f'Data background: mean={mean:.3f}, std={std:.3f}')
-        ax[0].set_xlabel('X [pixels]')
-        ax[0].set_ylabel('Y [pixels]')
-        bkg.plot_meshes(outlines=True, color='#1f77b4', axes=ax[0])
+        mean = np.nanmean(bgd_bands)
+        std = np.nanstd(bgd_bands)
+        cmap = cm.get_cmap()
+        cmap.set_bad(color='lightgrey')
+        im = ax0.imshow(bgd_bands, origin='lower', aspect="auto", vmin=mean - 3 * std, vmax=mean + 3 * std)
+        v1 = np.linspace(mean - 3 * std, mean + 3 * std, 5, endpoint=True)
+        cb = plt.colorbar(im, ticks=v1, ax=ax0, label=f'Data units')
+        cb.ax.set_yticklabels(["{:2.0f}".format(i) for i in v1])
+        ax0.text(0.05, 0.95, f'Data background', color="white",
+                 horizontalalignment='left', verticalalignment='top', transform=ax0.transAxes)  # : mean={np.mean(b):.3f}, std={np.std(b):.3f}')
+        ax0.set_xlabel(parameters.PLOT_XLABEL)
+        ax0.set_ylabel(parameters.PLOT_YLABEL)
+        ax0.set_xticks([])
+        ax1.set_xticks([])
+        bkg.plot_meshes(outlines=True, color='red', axes=ax1, linewidth=0.5)
         b = bkg.background
-        im = ax[1].imshow(b, origin='lower', aspect="auto")
-        ax[1].set_xlabel('X [pixels]')
-        ax[1].set_ylabel('Y [pixels]')
-        c2 = plt.colorbar(im, ax=ax[1])
-        c2.set_label(f'Data units (lin scale)')
-        ax[1].set_title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')
+        im = ax1.imshow(b, origin='lower', aspect="auto")
+        ax1.set_xlabel(parameters.PLOT_XLABEL)
+        ax1.set_ylabel(parameters.PLOT_YLABEL)
+        v1 = np.linspace(np.nanmin(b), np.nanmax(b), 5, endpoint=True)
+        cb1 = plt.colorbar(im, ticks=v1, ax=ax1, label=f'Data units')
+        cb1.ax.set_yticklabels(["{:2.0f}".format(i) for i in v1])
+        ax1.text(0.05, 0.95, f'Fitted background', color="white",
+                 horizontalalignment='left', verticalalignment='top', transform=ax1.transAxes)  # : mean={np.mean(b):.3f}, std={np.std(b):.3f}')
         res = (bgd_bands - b) / err
-        im = ax[2].imshow(res, origin='lower', aspect="auto", vmin=-5, vmax=5)
-        ax[2].set_xlabel('X [pixels]')
-        ax[2].set_ylabel('Y [pixels]')
-        c2 = plt.colorbar(im, ax=ax[2])
-        c2.set_label(f'Data units (lin scale)')
-        ax[2].set_title(f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
-        fig.tight_layout()
-        if parameters.DISPLAY:  # pragma: no cover
-            plt.show()
-        fig = plt.figure(figsize=(5, 5))
-        plt.hist(res.flatten(), bins=50)
-        plt.grid()
-        plt.title(f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
-        plt.xlabel('Background normalized residuals')
-        fig.tight_layout()
+        im = ax2.imshow(res, origin='lower', aspect="auto", vmin=-5, vmax=5)
+        ax2.set_xlabel(parameters.PLOT_XLABEL)
+        ax2.set_ylabel(parameters.PLOT_YLABEL)
+        ax2.text(0.05, 0.95, f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}', color="white",
+                 horizontalalignment='left', verticalalignment='top', transform=ax2.transAxes)  # : mean={np.mean(b):.3f}, std={np.std(b):.3f}')
+        v1 = np.array([-5, -2, 0, 2, 5])
+        cb2 = plt.colorbar(im, ticks=v1, ax=ax2, label=f'')
+        cb2.ax.set_yticklabels(["{:1.0f}".format(i) for i in v1])
+        # ax3.set_title(f'Pull')  #  mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
+        hist_res = res[~np.isnan(res)].flatten()
+        hist_res = hist_res[hist_res < 5]
+        hist_res = hist_res[hist_res > -5]
+        ax3.hist(hist_res, bins=10)
+        ax3.grid()
+        ax3.set_yticks([])
+        # ax3.set_xlim((-5, 5))
+        # ax3.set_xticks(v1)
+        ax3.set_xlabel('Pull distribution')
+        # fig.tight_layout()
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'background_extraction.pdf'))
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
     return bgd_model_func, bgd_res, bkg.background_rms
@@ -314,13 +341,13 @@ def extract_spectrogram_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1
         c = plt.colorbar(im, ax=ax[0])
         c.set_label(f'Data units (lin scale)')
         ax[0].set_title(f'Data background: mean={np.nanmean(bgd_bands):.3f}, std={np.nanstd(bgd_bands):.3f}')
-        ax[0].set_xlabel('X [pixels]')
-        ax[0].set_ylabel('Y [pixels]')
+        ax[0].set_xlabel(parameters.PLOT_XLABEL)
+        ax[0].set_ylabel(parameters.PLOT_YLABEL)
         # noinspection PyTypeChecker
         b = bgd_model_func(np.arange(Nx), np.arange(Ny))
         im = ax[1].imshow(b, origin='lower', aspect="auto")
-        ax[1].set_xlabel('X [pixels]')
-        ax[1].set_ylabel('Y [pixels]')
+        ax[1].set_xlabel(parameters.PLOT_XLABEL)
+        ax[1].set_ylabel(parameters.PLOT_YLABEL)
         c2 = plt.colorbar(im, ax=ax[1])
         c2.set_label(f'Data units (lin scale)')
         ax[1].set_title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')

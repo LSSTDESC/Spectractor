@@ -86,6 +86,7 @@ PLATE_CENTER_SHIFT_X = -6.  # plate center shift on x in mm in filter frame
 PLATE_CENTER_SHIFT_Y = -8.  # plate center shift on x in mm in filter frame
 PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
 PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
+GRATING_ORDER_2OVER1 = 0.1  # default value for order 2 over order 1 transmission ratio
 
 # Search windows in images
 XWINDOW = 100  # window x size to search for the targeted object
@@ -154,3 +155,6 @@ DISPLAY = True
 if os.environ.get('DISPLAY', '') == '':
     mpl.use('agg')
     DISPLAY = False
+PLOT_XLABEL = r"$x$ [pixels]"
+PLOT_YLABEL = r"$y$ [pixels]"
+PLOT_ROT_LABEL = r"$\alpha$ [degrees]"
