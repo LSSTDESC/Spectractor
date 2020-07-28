@@ -97,7 +97,7 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):  # pragma: 
     #     a /= integral
     # a *= amplitude
     a *= amplitude
-    return a.T
+    return a
 
 
 @njit
@@ -186,7 +186,7 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gau
     #     norm /= integral
     # a *= norm
     a *= amplitude
-    return a.T
+    return a
 
 
 @njit
@@ -232,11 +232,11 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gammax, gammay, alpha):  # prag
 
     >>> Nx = 50
     >>> Ny = 50
-    >>> xx, yy = np.mgrid[:Nx, :Ny]
+    >>> yy, xx = np.mgrid[:Ny, :Nx]
     >>> amplitude = 10
     >>> a = evaluate_moffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gammax=5, gammay=7, alpha=2)
     >>> print(f"{np.sum(a):.6f}")
-    9.683129
+    9.531042
 
     .. doctest::
         :hide:
@@ -250,7 +250,7 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gammax, gammay, alpha):  # prag
         from spectractor.extractor.psf import *
         Nx = 50
         Ny = 50
-        xx, yy = np.mgrid[:Nx, :Ny]
+        yy, xx = np.mgrid[:Nx, :Ny]
         amplitude = 10
         a = evaluate_moffat2d(xx, yy, amplitude=amplitude, y_c=Ny/2, x_c=Nx/2, gamma=5, alpha=2)
         im = plt.pcolor(xx, yy, a)
@@ -266,7 +266,7 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gammax, gammay, alpha):  # prag
     a = (1 + rr_gg) ** -alpha
     norm = (np.pi * gammax * gammay) / (alpha - 1)
     a *= amplitude / norm
-    return a.T
+    return a
 
 
 @njit
@@ -318,7 +318,7 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
 
     >>> Nx = 50
     >>> Ny = 50
-    >>> xx, yy = np.mgrid[:Nx, :Ny]
+    >>> yy, xx = np.mgrid[:Ny, :Nx]
     >>> amplitude = 10
     >>> a = evaluate_moffatgauss2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2,
     ... eta_gauss=-0.1, sigma=1)
@@ -337,7 +337,7 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
         from spectractor.extractor.psf import *
         Nx = 50
         Ny = 50
-        xx, yy = np.mgrid[:Nx, :Ny]
+        yy, xx = np.mgrid[:Nx, :Ny]
         amplitude = 10
         a = evaluate_moffatgauss2d(xx, yy, amplitude, Nx/2, Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
         im = plt.pcolor(xx, yy, a)
@@ -353,7 +353,7 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
     a = (1 + rr_gg) ** -alpha + eta_gauss * np.exp(-(rr / (2. * sigma * sigma)))
     norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * sigma * sigma
     a *= amplitude / norm
-    return a.T
+    return a
 
 
 class PSF:
@@ -418,7 +418,7 @@ class PSF:
 
         >>> p0 = np.array([200000, 20, 30, 5, 2, -0.1, 2, 400000])
         >>> psf0 = MoffatGauss(p0)
-        >>> xx, yy = np.mgrid[:50, :60]
+        >>> yy, xx = np.mgrid[:50, :60]
         >>> data = psf0.evaluate(np.array([xx, yy]), p0)
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
@@ -466,7 +466,7 @@ class PSF:
             from spectractor.extractor.psf import *
             p = np.array([200000, 20, 30, 5, 2, -0.1, 2, 400000])
             psf = MoffatGauss(p)
-            xx, yy = np.mgrid[:50, :60]
+            yy, xx = np.mgrid[:50, :60]
             data = psf.evaluate(np.array([xx, yy]), p)
             data = np.random.poisson(data)
             data_errors = np.sqrt(data+1)
@@ -529,9 +529,9 @@ class Moffat(PSF):
 
         Examples
         --------
-        >>> p = [2,20,30,4,2,10]
+        >>> p = [2,20,30,4,4,2,10]
         >>> psf = Moffat(p)
-        >>> xx, yy = np.mgrid[:50, :60]
+        >>> yy, xx = np.mgrid[:50, :60]
         >>> out = psf.evaluate(pixels=np.array([xx, yy]))
 
         .. plot::
@@ -541,7 +541,7 @@ class Moffat(PSF):
             from spectractor.extractor.psf import Moffat
             p = [2,20,30,4,2,10]
             psf = Moffat(p)
-            xx, yy = np.mgrid[:50, :60]
+            yy, xx = np.mgrid[:50, :60]
             out = psf.evaluate(pixels=np.array([xx, yy]))
             fig = plt.figure(figsize=(5,5))
             plt.imshow(out, origin="lower")
@@ -615,7 +615,7 @@ class MoffatGauss(PSF):
         --------
         >>> p = [2,20,30,4,2,-0.5,1,10]
         >>> psf = MoffatGauss(p)
-        >>> xx, yy = np.mgrid[:50, :60]
+        >>> yy, xx = np.mgrid[:50, :60]
         >>> out = psf.evaluate(pixels=np.array([xx, yy]))
 
         .. plot::
@@ -625,7 +625,7 @@ class MoffatGauss(PSF):
             from spectractor.extractor.psf import MoffatGauss
             p = [2,20,30,4,2,-0.5,1,10]
             psf = MoffatGauss(p)
-            xx, yy = np.mgrid[:50, :60]
+            yy, xx = np.mgrid[:50, :60]
             out = psf.evaluate(pixels=np.array([xx, yy]))
             fig = plt.figure(figsize=(5,5))
             plt.imshow(out, origin="lower")
@@ -720,7 +720,8 @@ class PSFFitWorkspace(FitWorkspace):
         if data.ndim == 2:
             self.Ny, self.Nx = self.data.shape
             self.psf.apply_max_width_to_bounds(self.Ny)
-            self.pixels = np.mgrid[:self.Nx, :self.Ny]
+            yy, xx = np.mgrid[:self.Ny, :self.Nx]
+            self.pixels = np.asarray([xx, yy])
         elif data.ndim == 1:
             self.Ny = self.data.size
             self.Nx = 1
@@ -759,7 +760,7 @@ class PSFFitWorkspace(FitWorkspace):
 
         >>> p = np.array([200000, 20, 30, 5, 2, -0.1, 2, 400000])
         >>> psf = MoffatGauss(p)
-        >>> xx, yy = np.mgrid[:50, :60]
+        >>> yy, xx = np.mgrid[:50, :60]
         >>> data = psf.evaluate(np.array([xx, yy]), p)
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
@@ -798,7 +799,7 @@ class PSFFitWorkspace(FitWorkspace):
             from spectractor.extractor.psf import *
             p = np.array([2000, 20, 30, 5, 2, -0.1, 2, 400])
             psf = MoffatGauss(p)
-            xx, yy = np.mgrid[:50, :60]
+            yy, xx = np.mgrid[:50, :60]
             data = psf.evaluate(np.array([xx, yy]), p)
             data = np.random.poisson(data)
             data_errors = np.sqrt(data+1)

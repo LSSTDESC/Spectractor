@@ -152,7 +152,11 @@ class ChromaticPSF:
                           - 2000 * np.exp(-((np.arange(self.Nx) - 50) / 2) ** 2))
         params += [0.] * (self.degrees['x_c'] - 1) + [0, 0]  # x mean
         params += [0.] * (self.degrees['y_c'] - 1) + [0, 0]  # y mean
-        params += [0.] * (self.degrees['gamma'] - 1) + [0, 5]  # gamma
+        if isinstance(self.psf, MoffatGauss):
+            params += [0.] * (self.degrees['gamma'] - 1) + [0, 5]  # gamma
+        elif isinstance(self.psf, Moffat):
+            params += [0.] * (self.degrees['gamma_x'] - 1) + [0, 5]  # gamma_x
+            params += [0.] * (self.degrees['gamma_y'] - 1) + [0, 5]  # gamma_y
         params += [0.] * (self.degrees['alpha'] - 1) + [0, 2]  # alpha
         if isinstance(self.psf, MoffatGauss):
             params += [0.] * (self.degrees['eta_gauss'] - 1) + [-0.4, -0.4]  # eta_gauss
@@ -249,7 +253,8 @@ class ChromaticPSF:
         """
         pixels = self.pixels
         if mode == "2D":
-            pixels = np.mgrid[:self.Nx, :self.Ny]
+            yy, xx = np.mgrid[:self.Ny, :self.Nx]
+            pixels = np.asarray([xx, yy])
         elif mode == "1D":
             pixels = np.arange(self.Ny)
         else:
