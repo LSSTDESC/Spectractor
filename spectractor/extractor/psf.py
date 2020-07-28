@@ -495,14 +495,14 @@ class Moffat(PSF):
             self.p = np.copy(self.p_default)
         self.param_names = ["amplitude", "x_c", "y_c", "gamma_x", "gamma_y", "alpha", "saturation"]
         self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma_x$", r"$\gamma_y$", r"$\alpha$", "saturation"]
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (0.1, np.inf), (1.1, 100),
-                                (0, np.inf)])
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (0.1, np.inf),
+                                (1.1, 100), (0, np.inf)])
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
         self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width), (0.1, self.max_half_width),
-                                (0.1, self.max_half_width), (1.1, 100), (0, np.inf)])
+                                (0.1, 2 * self.max_half_width), (1.1, 100), (0, np.inf)])
 
     def evaluate(self, pixels, p=None):
         r"""Evaluate the Moffat function.
@@ -539,7 +539,7 @@ class Moffat(PSF):
             import matplotlib.pyplot as plt
             import numpy as np
             from spectractor.extractor.psf import Moffat
-            p = [2,20,30,4,2,10]
+            p = [2,20,30,4,4,2,10]
             psf = Moffat(p)
             yy, xx = np.mgrid[:50, :60]
             out = psf.evaluate(pixels=np.array([xx, yy]))
@@ -559,7 +559,7 @@ class Moffat(PSF):
         elif pixels.ndim == 1:
             y = np.array(pixels)
             norm = gammax * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
-            return np.clip(evaluate_moffat1d_unnormalized(y, amplitude, y_c, gammax, alpha) / norm, 0, saturation)
+            return np.clip(evaluate_moffat1d_unnormalized(y, amplitude, y_c, gammay, alpha) / norm, 0, saturation)
         else:  # pragma: no cover
             self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
                                  f"Here pixels.ndim={pixels.shape}.")
