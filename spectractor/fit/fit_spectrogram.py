@@ -119,7 +119,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         # self.fixed[5:7] = [True, True]  # DCCD, x0
         self.fixed[7] = True  # Delta y
         self.fixed[8] = True  # angle
-        # self.fixed[9] = True  # B
+        self.fixed[9] = True  # B
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -463,7 +463,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
             ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
             fit_workspace.plot_correlation_matrix(ipar)
             fit_workspace.save_parameters_summary(ipar, header=f"{fit_workspace.spectrum.date_obs}\n"
-                                                               f"chi2: {fit_workspace.costs[-1] / fit_workspace.data.size}")
+                                                               f"chi2: {costs[-1] / fit_workspace.data.size}")
             # save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
@@ -524,6 +524,7 @@ if __name__ == "__main__":
                  'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
     params = []
     chisqs = []
+    filenames = ['outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
