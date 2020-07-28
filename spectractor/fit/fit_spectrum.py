@@ -385,8 +385,8 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
     else:
         fit_workspace.simulation.fast_sim = True
         # costs = np.array([fit_workspace.chisq(guess)])
-        if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
-            fit_workspace.plot_fit()
+        # if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
+        #     fit_workspace.plot_fit()
         # params_table = np.array([guess])
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
         epsilon = 1e-4 * guess
@@ -399,11 +399,11 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         #                                            fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
         #                                            niter=40)
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3, verbose=False)
+                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
 
         fit_workspace.simulation.fast_sim = False
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3, verbose=False)
+                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
         # guess = fit_workspace.p
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
         #                                            fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
@@ -473,6 +473,7 @@ if __name__ == "__main__":
                  'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
     params = []
     chisqs = []
+    filenames = ['outputs/data_30may17_HoloAmAg_prod6.9/reduc_20170530_224_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 

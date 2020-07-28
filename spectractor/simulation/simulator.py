@@ -54,6 +54,9 @@ class SpectrumSimulation(Spectrum):
         self.err = None
         self.model = lambda x: np.zeros_like(x)
         self.model_err = lambda x: np.zeros_like(x)
+        lbdas_sed = self.target.wavelengths[0]
+        sub = np.where((lbdas_sed > parameters.LAMBDA_MIN) & (lbdas_sed < parameters.LAMBDA_MAX))
+        self.lambdas_step = min(parameters.LAMBDA_STEP, np.min(lbdas_sed[sub]))
 
     def simulate_without_atmosphere(self, lambdas):
         """Compute the spectrum of an object and its uncertainties
@@ -132,7 +135,6 @@ class SpectrumSimulation(Spectrum):
         lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
         self.lambdas_order2 = lambdas_order2
-
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
         if self.fast_sim:
             self.data, self.err = self.simulate_without_atmosphere(lambdas)
@@ -142,13 +144,14 @@ class SpectrumSimulation(Spectrum):
             def integrand(lbda):
                 return self.target.sed(lbda) * self.telescope.transmission(lbda) \
                        * self.disperser.transmission(lbda) * atmospheric_transmission(lbda)
-
             self.data = np.zeros_like(lambdas)
             self.err = np.zeros_like(lambdas)
             for i in range(len(lambdas) - 1):
-                self.data[i] = A1 * quad(integrand, lambdas[i], lambdas[i + 1])[0]
+                lbdas = np.arange(lambdas[i], lambdas[i+1], self.lambdas_step)
+                self.data[i] = A1 * np.mean(integrand(lbdas))
+                # self.data[i] = A1 * quad(integrand, lambdas[i], lambdas[i + 1])[0]
             self.data[-1] = self.data[-2]
-            self.data /= np.gradient(lambdas)
+            # self.data /= np.gradient(lambdas)
             telescope_transmission = self.telescope.transmission(lambdas)
             idx = np.where(telescope_transmission > 0)[0]
             self.err[idx] = self.data[idx] * self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx]
@@ -207,6 +210,9 @@ class SpectrogramModel(Spectrum):
         self.fix_psf_cube = False
         self.fast_sim = fast_sim
         self.with_background = with_background
+        lbdas_sed = self.target.wavelengths[0]
+        sub = np.where((lbdas_sed > parameters.LAMBDA_MIN) & (lbdas_sed < parameters.LAMBDA_MAX))
+        self.lambdas_step = min(parameters.LAMBDA_STEP, np.min(lbdas_sed[sub]))
 
     def set_true_spectrum(self, lambdas, ozone, pwv, aerosols, shift_t=0.):
         atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
@@ -262,7 +268,9 @@ class SpectrogramModel(Spectrum):
                        * self.disperser.transmission(lbda - shift_t) * atmosphere(lbda)
 
             for i in range(len(lambdas) - 1):
-                spectrum[i] = parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i + 1])[0]
+                # spectrum[i] = parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i + 1])[0]
+                lbdas = np.arange(lambdas[i], lambdas[i+1], self.lambdas_step)
+                spectrum[i] = parameters.FLAM_TO_ADURATE * np.mean(integrand(lbdas)) * (lambdas[i+1]-lambdas[i])
             spectrum[-1] = spectrum[-2]
 
         return spectrum, np.zeros_like(spectrum)

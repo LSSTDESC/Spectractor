@@ -451,12 +451,12 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         fit_workspace.simulation.fast_sim = False
         fit_workspace.simulation.fix_psf_cube = False
         fit_workspace.fixed = np.copy(fixed)
-        # guess = fit_workspace.p
-        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-        #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
-        #                                            niter=40)
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3, verbose=False)
+        guess = fit_workspace.p
+        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+                                                   fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
+                                                   niter=40)
+        # run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
+        #                                 xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             parameters.SAVE = True
