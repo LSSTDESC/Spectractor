@@ -207,7 +207,6 @@ class SpectrogramModel(Spectrum):
         self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
         self.psf_cube = None
         self.fhcube = None
-        self.fix_psf_cube = False
         self.fast_sim = fast_sim
         self.with_background = with_background
         lbdas_sed = self.target.wavelengths[0]
