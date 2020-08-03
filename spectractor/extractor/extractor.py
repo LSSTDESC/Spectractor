@@ -10,6 +10,127 @@ from spectractor.extractor.background import extract_spectrogram_background_sext
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
 from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple
+from spectractor.fit.fitter import FitWorkspace
+
+
+class FullForwardModelFitWorkspace(FitWorkspace):
+
+    def __init__(self, spectrum, amplitude_priors_method="noprior", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False, truth=None):
+        """Class to fit a full forward model on data to extract a spectrum, with ADR prediction and order 2 subtraction.
+
+        Parameters
+        ----------
+        spectrum: Spectrum
+        amplitude_priors_method
+        nwalkers
+        nsteps
+        burnin
+        nbins
+        verbose
+        plot
+        live_fit
+        truth
+
+        Examples
+        --------
+        >>> load_config("./config/ctio.ini")
+        >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> w = FullForwardModelFitWorkspace(spectrum=spec)
+        """
+        FitWorkspace.__init__(self, spectrum.filename, nwalkers, nsteps, burnin, nbins, verbose, plot,
+                              live_fit, truth=truth)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.spectrum = spectrum
+
+        # check the shapes
+        self.Ny, self.Nx = spectrum.spectrogram.shape
+        if self.Ny != self.spectrum.chromatic_psf.Ny:
+            raise AttributeError(f"Data y shape {self.Ny} different from "
+                                 f"ChromaticPSF input Ny {spectrum.chromatic_psf.Ny}.")
+        if self.Nx != self.spectrum.chromatic_psf.Nx:
+            raise AttributeError(f"Data x shape {self.Nx} different from "
+                                 f"ChromaticPSF input Nx {spectrum.chromatic_psf.Nx}.")
+        #self.pixels = np.arange(self.Ny)
+
+        # crop data to fit faster
+        self.lambdas = self.spectrum.lambdas
+        self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
+        self.data = spectrum.spectrogram[self.bgd_width:-self.bgd_width, :]
+        self.data_flat = self.data.flatten()
+        self.pixels = np.arange(self.data.shape[0])
+        self.err = spectrum.spectrogram_err[self.bgd_width:-self.bgd_width, :]
+        self.bgd = spectrum.spectrogram_bgd[self.bgd_width:-self.bgd_width, :]
+        self.Ny, self.Nx = self.data.shape
+
+        # prepare parameters to fit
+        self.A2 = 1.0
+        self.D = self.spectrum.header['D2CCD']
+        self.shift_x = self.spectrum.header['PIXSHIFT']
+        self.shift_y = 0.
+        self.angle = self.spectrum.rotation_angle
+        self.B = 1
+        self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
+        length = len(self.spectrum.chromatic_psf.table) + 2 * (parameters.PSF_POLY_ORDER + 1)
+        self.psf_poly_params = self.psf_poly_params[length:]
+        self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:])
+        self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:])
+        self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
+        self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
+        psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
+        self.saturation = self.spectrum.spectrogram_saturation
+        self.p = np.array([self.A2, self.D, self.shift_x, self.shift_y, self.angle, self.B])
+        self.psf_params_start_index = self.p.size
+        self.p = np.concatenate([self.p, self.psf_poly_params])
+        self.input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]",
+                             r"angle [deg]", "B"] + list(self.psf_poly_params_labels)
+        self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
+                           r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names)
+        self.bounds = np.concatenate([np.array([(0, 2/parameters.GRATING_ORDER_2OVER1), (50, 60), (-2, 2), (-3, 3),
+                                                (-90, 90), (0.8, 1.2)]), psf_poly_params_bounds])
+        self.fixed = [False] * self.p.size
+        self.fixed[0] = True  # A2
+        self.fixed[-1] = True  # saturation
+        #self.fixed[7] = True  # Delta y
+        #self.fixed[8] = True  # angle
+        #self.fixed[9] = True  # B
+        self.nwalkers = max(2 * self.ndim, nwalkers)
+
+        # prepare the background, data and errors
+        self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
+
+        # error matrix
+        # here image uncertainties are assumed to be uncorrelated
+        # (which is not exactly true in rotated images)
+        self.W = 1. / (self.err * self.err)
+        self.W = self.W.flatten()
+        self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
+
+        # design matrix
+        self.M = np.zeros((self.Nx, self.data.size))
+        self.M_dot_W_dot_M = np.zeros((self.Nx, self.Nx))
+
+        # prepare results
+        self.amplitude_params = np.zeros(self.Nx)
+        self.amplitude_params_err = np.zeros(self.Nx)
+        self.amplitude_cov_matrix = np.zeros((self.Nx, self.Nx))
+
+        # priors on amplitude parameters
+        self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'spectrum', 'fixed']
+        self.amplitude_priors_method = amplitude_priors_method
+        self.reg = parameters.PSF_FIT_REG_PARAM
+        self.Q = np.zeros((self.Nx, self.Nx))
+        self.Q_dot_A0 = np.zeros(self.Nx)
+        if amplitude_priors_method not in self.amplitude_priors_list:
+            raise ValueError(f"Unknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
+                             f"Must be either {self.amplitude_priors_list}.")
+        if self.amplitude_priors_method == "spectrum":
+            self.amplitude_priors = np.copy(self.spectrum.data)
+            self.amplitude_priors_cov_matrix = np.copy(self.spectrum.cov_matrix)
+            self.Q = np.diag([1 / np.sum(self.err[:, x] ** 2) for x in range(self.Nx)])
+            self.Q_dot_A0 = self.Q @ self.amplitude_priors
+        if self.amplitude_priors_method == "fixed":
+            self.amplitude_priors = np.copy(self.spectrum.data)
 
 
 def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='./config/ctio.ini',
