@@ -336,7 +336,8 @@ class SpectrogramModel(Spectrum):
 
     def build_spectrogram(self, profile_params, spectrum, dispersion_law):
         # Spectrum units must in ADU/s
-        pixels = np.mgrid[:self.spectrogram_Nx, :self.spectrogram_Ny]
+        yy, xx = np.mgrid[:self.spectrogram_Ny, :self.spectrogram_Nx]
+        pixels = np.asarray([xx, yy])
         simul = np.zeros((self.spectrogram_Ny, self.spectrogram_Nx))
         nlbda = dispersion_law.size
         # cannot use directly ChromaticPSF2D class because it does not include the rotation of the spectrogram
