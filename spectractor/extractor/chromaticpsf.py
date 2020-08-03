@@ -1079,9 +1079,9 @@ class ChromaticPSF:
             run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
         elif mode == "2D":
             w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
-                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose, live_fit=True)
+                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose)
             # run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
-            run_minimisation_sigma_clipping(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
+            run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
                                             fix=w.fixed, sigma_clip=10, niter_clip=3, verbose=verbose)
         else:
             self.my_logger.error(f"\n\tUnknown fitting mode={mode}. Must be '1D' or '2D'.")
