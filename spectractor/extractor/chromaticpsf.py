@@ -762,7 +762,7 @@ class ChromaticPSF:
         ax[0].grid()
         ax[1].grid(color='white', ls='solid')
         ax[1].grid(True)
-        ax[0].set_yscale('symlog', linthreshy=10)
+        ax[0].set_yscale('symlog', linthresh=10)
         ax[1].legend(title='PSF(x)')
         ax[0].legend()
         fig.tight_layout()
