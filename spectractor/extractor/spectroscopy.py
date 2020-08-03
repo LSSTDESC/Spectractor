@@ -267,8 +267,8 @@ class Lines:
 
         >>> import matplotlib.pyplot as plt
         >>> f, ax = plt.subplots(1,1)
-        >>> ax.set_xlim(300,1000)
-        (300, 1000)
+        >>> ax.set_xlim(300,1000)  # doctest: +ELLIPSIS
+        (300..., 1000...)
         >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
         >>> lines.lines[5].fitted = True
         >>> lines.lines[5].high_snr = True
