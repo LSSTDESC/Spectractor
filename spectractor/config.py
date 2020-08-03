@@ -73,14 +73,14 @@ def load_config(config_filename):
 
     """
     if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, "default.ini")):
-        sys.exit('Config file default.ini does not exist.')
+        raise FileNotFoundError('Config file default.ini does not exist.')
     # Load the configuration file
     config = configparser.ConfigParser()
     config.read(os.path.join(parameters.CONFIG_DIR, "default.ini"))
     from_config_to_parameters(config)
 
     if not os.path.isfile(config_filename):
-        sys.exit(f'Config file {config_filename} does not exist.')
+        raise FileNotFoundError(f'Config file {config_filename} does not exist.')
     # Load the configuration file
     config = configparser.ConfigParser()
     config.read(config_filename)

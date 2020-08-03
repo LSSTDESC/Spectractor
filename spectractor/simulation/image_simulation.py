@@ -320,7 +320,7 @@ class ImageModel(Image):
 
     def add_poisson_and_read_out_noise(self):
         if self.units != 'ADU':
-            self.my_logger.error('\n\tPoisson noise procedure has to be applied on map in ADU units')
+            raise AttributeError('Poisson noise procedure has to be applied on map in ADU units')
         d = np.copy(self.data).astype(float)
         # convert to electron counts
         d *= self.gain

@@ -385,9 +385,7 @@ class PSF:
         elif pixels.ndim == 1:
             return np.zeros_like(pixels)
         else:
-            self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
-                                 f"Here pixels.ndim={pixels.shape}.")
-            return None
+            raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
     def apply_max_width_to_bounds(self, max_half_width=None):  # pragma: no cover
         pass
@@ -560,9 +558,7 @@ class Moffat(PSF):
             norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
             return np.clip(evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha) / norm, 0, saturation)
         else:  # pragma: no cover
-            self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
-                                 f"Here pixels.ndim={pixels.shape}.")
-            return None
+            raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
 
 class MoffatGauss(PSF):
@@ -648,9 +644,7 @@ class MoffatGauss(PSF):
                 evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, stddev) / norm, 0,
                 saturation)
         else:  # pragma: no cover
-            self.my_logger.error(f"\n\tPixels array must have dimension 1 or shape=(2,Nx,Ny). "
-                                 f"Here pixels.ndim={pixels.shape}.")
-            return None
+            raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
 
 class PSFFitWorkspace(FitWorkspace):
@@ -699,8 +693,8 @@ class PSFFitWorkspace(FitWorkspace):
                               live_fit=live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         if data.shape != data_errors.shape:
-            self.my_logger.error(f"\n\tData and uncertainty arrays must have the same shapes. "
-                                 f"Here data.shape={data.shape} and data_errors.shape={data_errors.shape}.")
+            raise ValueError(f"Data and uncertainty arrays must have the same shapes. "
+                             f"Here data.shape={data.shape} and data_errors.shape={data_errors.shape}.")
         self.psf = psf
         self.data = data
         self.err = data_errors
@@ -728,7 +722,7 @@ class PSFFitWorkspace(FitWorkspace):
             self.pixels = np.arange(self.Ny)
             self.fixed[1] = True
         else:
-            self.my_logger.error(f"\n\tData array must have dimension 1 or 2. Here pixels.ndim={data.ndim}.")
+            raise ValueError(f"Data array must have dimension 1 or 2. Here pixels.ndim={data.ndim}.")
 
         # update bounds
         self.bounds = self.psf.bounds  # [1:]
@@ -910,7 +904,7 @@ class PSFFitWorkspace(FitWorkspace):
             ax[3, 0].legend(fontsize=7)
             ax[3, 0].grid(True)
         else:
-            self.my_logger.error(f"\n\tData array must have dimension 1 or 2. Here data.ndim={self.data.ndim}.")
+            raise ValueError(f"Data array must have dimension 1 or 2. Here data.ndim={self.data.ndim}.")
         if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
@@ -957,7 +951,7 @@ def load_PSF(psf_type=parameters.PSF_TYPE):
     elif psf_type == "MoffatGauss":
         psf = MoffatGauss()
     else:
-        my_logger.error(f"\n\tUnknown PSF_TYPE={psf_type}. Must be either Moffat or MoffatGauss.")
+        raise ValueError(f"Unknown PSF_TYPE={psf_type}. Must be either Moffat or MoffatGauss.")
     return psf
 
 
@@ -1065,8 +1059,7 @@ def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='min
                                 args=(model, x, y, data, data_errors))
         res = basinhopping(PSF2D_chisq, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
     else:
-        my_logger.error(f'\n\tUnknown method {method}.')
-        sys.exit()
+        raise ValueError(f'Unknown method {method}.')
     my_logger.debug(f'\n{res}')
     psf = PSF2DAstropy(*res.x)
     my_logger.debug(f'\n\tPSF best fitting parameters:\n{psf}')
@@ -1475,8 +1468,7 @@ def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimi
                                 args=(model, x, data, data_errors), jac=PSF1D_chisq_jac)
         res = basinhopping(PSF1D_chisq, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
     else:
-        my_logger.error(f'\n\tUnknown method {method}.')
-        sys.exit()
+        raise ValueError(f'Unknown method {method}.')
     my_logger.debug(f'\n{res}')
     psf = PSF1DAstropy(*res.x)
     my_logger.debug(f'\n\tPSF best fitting parameters:\n{psf}')
@@ -1578,8 +1570,7 @@ def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, gue
             res = basinhopping(PSF1D_chisq, guess, T=T_basinhopping, niter=niter_basinhopping,
                                minimizer_kwargs=minimizer_kwargs)
         else:
-            my_logger.error(f'\n\tUnknown method {method}.')
-            sys.exit()
+            raise ValueError(f'Unknown method {method}.')
         if parameters.DEBUG:
             my_logger.debug(f'\n\tniter={step}\n{res}')
         # update the model and the guess

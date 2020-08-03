@@ -486,13 +486,13 @@ class Spectrum:
             if os.path.isfile(spectrogram_file_name):
                 self.load_spectrogram(spectrogram_file_name)
             else:
-                self.my_logger.error(f"\n\tSpectrogram file {spectrogram_file_name} does not exist.")
+                raise FileNotFoundError(f"Spectrogram file {spectrogram_file_name} does not exist.")
             psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
             self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
             if os.path.isfile(psf_file_name):
                 self.load_chromatic_psf(psf_file_name)
             else:
-                self.my_logger.error(f"\n\tPSF file {psf_file_name} does not exist.")
+                raise FileNotFoundError(f"PSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
                 self.spectrogram_fit = hdu_list[0].data

@@ -141,8 +141,7 @@ class ChromaticPSF:
 
         """
         if not isinstance(self.psf, MoffatGauss) and not isinstance(self.psf, Moffat):
-            self.my_logger.error(f"\n\tIn this test function, PSF model must be MoffatGauss or Moffat. "
-                                 f"Gave {type(self.psf)}.")
+            raise TypeError(f"In this test function, PSF model must be MoffatGauss or Moffat. Gave {type(self.psf)}.")
         params = [50 * i for i in range(self.Nx)]
         params[0] = 10
         # add absorption lines
@@ -254,7 +253,7 @@ class ChromaticPSF:
         elif mode == "1D":
             pixels = np.arange(self.Ny)
         else:
-            self.my_logger.error(f"\n\tUnknown evaluation mode={mode}. Must be '1D' or '2D'.")
+            raise ValueError(f"Unknown evaluation mode={mode}. Must be '1D' or '2D'.")
         self.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
         profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:, 1] = np.arange(self.Nx)  # replace x_c
@@ -721,7 +720,7 @@ class ChromaticPSF:
             #         penalty = 1
             #         break
             # else:
-            #    self.my_logger.error(f'Unknown parameter name {name} in set_bounds_for_minuit.')
+            #    raise ValueError(f'Unknown parameter name {name} in set_bounds_for_minuit.')
         penalty *= self.Nx * self.Ny
         return in_bounds, penalty, outbound_parameter_name
 
@@ -1084,7 +1083,7 @@ class ChromaticPSF:
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
                                             fix=w.fixed, sigma_clip=10, niter_clip=3, verbose=verbose)
         else:
-            self.my_logger.error(f"\n\tUnknown fitting mode={mode}. Must be '1D' or '2D'.")
+            raise ValueError(f"Unknown fitting mode={mode}. Must be '1D' or '2D'.")
 
         if w.amplitude_priors_method == "psf1d" and mode == "2D":
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
@@ -1159,11 +1158,11 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # prepare the fit
         self.Ny, self.Nx = self.data.shape
         if self.Ny != self.chromatic_psf.Ny:
-            self.my_logger.error(
-                f"\n\tData y shape {self.Ny} different from ChromaticPSF input Ny {self.chromatic_psf.Ny}.")
+            raise AttributeError(f"Data y shape {self.Ny} different from "
+                                 f"ChromaticPSF input Ny {self.chromatic_psf.Ny}.")
         if self.Nx != self.chromatic_psf.Nx:
-            self.my_logger.error(
-                f"\n\tData x shape {self.Nx} different from ChromaticPSF input Nx {self.chromatic_psf.Nx}.")
+            raise AttributeError(f"Data x shape {self.Nx} different from "
+                                 f"ChromaticPSF input Nx {self.chromatic_psf.Nx}.")
         self.pixels = np.arange(self.Ny)
 
         # prepare the background, data and errors
@@ -1209,8 +1208,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.Q = np.zeros((self.Nx, self.Nx))
         self.Q_dot_A0 = np.zeros(self.Nx)
         if amplitude_priors_method not in self.amplitude_priors_list:
-            self.my_logger.error(f"\n\tUnknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
-                                 f"Must be either {self.amplitude_priors_list}.")
+            raise ValueError(f"Unknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
+                             f"Must be either {self.amplitude_priors_list}.")
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
             self.amplitude_priors_cov_matrix = np.copy(self.chromatic_psf.cov_matrix)

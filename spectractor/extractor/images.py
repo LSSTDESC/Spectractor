@@ -56,6 +56,8 @@ class Image(object):
         self.my_logger = set_logger(self.__class__.__name__)
         if config != "":
             load_config(config)
+        if not os.path.isfile(file_name):
+            raise FileNotFoundError(f"File {file_name} does not exist.")
         self.file_name = file_name
         self.units = 'ADU'
         self.expo = -1
@@ -236,7 +238,7 @@ class Image(object):
 
         """
         if self.units != 'ADU':
-            self.my_logger.error(f'\n\tNoise must be estimated on an image in ADU units. '
+            raise AttributeError(f'Noise must be estimated on an image in ADU units. '
                                  f'Currently self.units={self.units}.')
         # removes the zeros and negative pixels first
         # set to minimum positive value
@@ -293,7 +295,7 @@ class Image(object):
 
         """
         if self.units != "ADU":
-            self.my_logger.error(f"\n\tNoise map must be in ADU units to be plotted and analyzed. "
+            raise AttributeError(f"Noise map must be in ADU units to be plotted and analyzed. "
                                  f"Currently self.units={self.units}.")
         data = np.copy(self.data)
         min_noz = np.min(data[data > 0])
@@ -543,8 +545,8 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.airmass = -1
     parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
     if "mm" not in hdus["XYZ"].header.comments["ZPOS"]:
-        image.my_logger.error(f'\n\tmm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
-                              f'Distances along Z axis must be in mm.')
+        raise KeyError(f'mm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
+                       f'Distances along Z axis must be in mm.')
     image.my_logger.info(f'\n\tDistance to CCD adjusted to {parameters.DISTANCE2CCD} mm '
                          f'considering XYZ platform is set at ZPOS={float(hdus["XYZ"].header["ZPOS"])} mm.')
     # compute CCD gain map
@@ -666,7 +668,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
     if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
         if guess is None:
-            my_logger.error(f"\n\tguess parameter must be set if WCS solution is not found.")
+            raise ValueError(f"Guess parameter must be set if WCS solution is not found.")
         Dx, Dy = widths
         theX, theY = guess
         if rotated:
