@@ -205,13 +205,17 @@ class SpectrogramModel(Spectrum):
         self.err = None
         self.model = lambda x, y: np.zeros((x.size, y.size))
         self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
+        self.profile_params = None
         self.psf_cube = None
-        self.fhcube = None
+        self.psf_cube_order2 = None
+        self.fix_psf_cube = False
         self.fast_sim = fast_sim
         self.with_background = with_background
         lbdas_sed = self.target.wavelengths[0]
         sub = np.where((lbdas_sed > parameters.LAMBDA_MIN) & (lbdas_sed < parameters.LAMBDA_MAX))
         self.lambdas_step = min(parameters.LAMBDA_STEP, np.min(lbdas_sed[sub]))
+        self.yy, self.xx = np.mgrid[:self.spectrogram_Ny, :self.spectrogram_Nx]
+        self.pixels = np.asarray([self.xx, self.yy])
 
     def set_true_spectrum(self, lambdas, ozone, pwv, aerosols, shift_t=0.):
         atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
@@ -335,26 +339,7 @@ class SpectrogramModel(Spectrum):
 
         return lambdas, lambdas_order2, dispersion_law, dispersion_law_order2
 
-    def build_spectrogram(self, profile_params, spectrum, dispersion_law):
-        # Spectrum units must in ADU/s
-        yy, xx = np.mgrid[:self.spectrogram_Ny, :self.spectrogram_Nx]
-        pixels = np.asarray([xx, yy])
-        simul = np.zeros((self.spectrogram_Ny, self.spectrogram_Nx))
-        nlbda = dispersion_law.size
-        # cannot use directly ChromaticPSF2D class because it does not include the rotation of the spectrogram
-        # TODO: increase rapidity (multithreading, optimisation...)
-        # pixels = np.arange(self.spectrogram_Ny)
-        # for i in range(0, nlbda, 1):
-        #     p = np.array([spectrum[i], dispersion_law[i].real, dispersion_law[i].imag] + list(profile_params[i, 3:]))
-        #     simul[:, i] = self.psf.evaluate(pixels, p=p)
-        for i in range(0, nlbda, 1):
-            # here spectrum[i] is in ADU/s
-            p = np.array([spectrum[i], dispersion_law[i].real, dispersion_law[i].imag] + list(profile_params[i, 3:]))
-            psf_lambda = self.psf.evaluate(pixels, p=p)
-            simul += psf_lambda
-        return simul
-
-    # @profile
+   # @profile
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
                  shift_x=0., shift_y=0., angle=0., B=1., psf_poly_params=None):
         """
@@ -392,8 +377,9 @@ class SpectrogramModel(Spectrum):
         import time
         start = time.time()
         self.rotation_angle = angle
-        profile_params = self.simulate_psf(psf_poly_params)
-        self.my_logger.debug(f'\n\tAfter psf: {time.time() - start}')
+        if self.profile_params is None or not self.fix_psf_cube:
+            self.profile_params = self.simulate_psf(psf_poly_params)
+        self.my_logger.debug(f'\n\tAfter psf params: {time.time() - start}')
         start = time.time()
         r0 = self.spectrogram_x0 + 1j * self.spectrogram_y0
         lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y,
@@ -403,32 +389,52 @@ class SpectrogramModel(Spectrum):
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
         self.true_spectrum = A1 * spectrum / (parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas))
         self.my_logger.debug(f'\n\tAfter spectrum: {time.time() - start}')
+        # Fill the order 1 cube
+        nlbda = dispersion_law.size
+        if self.psf_cube is None or not self.fix_psf_cube:
+            start = time.time()
+            self.psf_cube = np.zeros((nlbda, self.spectrogram_Ny, self.spectrogram_Nx))
+            for i in range(0, nlbda, 1):
+                p = np.array([1, dispersion_law[i].real, dispersion_law[i].imag] + list(self.profile_params[i, 3:]))
+                self.psf_cube[i] = self.psf.evaluate(self.pixels, p=p)
+            self.my_logger.debug(f'\n\tAfter psf cube: {time.time() - start}')
         start = time.time()
-        ima1 = self.build_spectrogram(profile_params, spectrum, dispersion_law)
+        ima1 = np.zeros((self.spectrogram_Ny, self.spectrogram_Nx))
+        for i in range(0, nlbda, 1):
+            # here spectrum[i] is in ADU/s
+            ima1 += spectrum[i] * self.psf_cube[i]
         self.my_logger.debug(f'\n\tAfter build ima1: {time.time() - start}')
-        start = time.time()
 
         # Add order 2
-        ima2 = np.zeros_like(ima1)
         if A2 > 0.:
-            # spectrum_order1 = interp1d(lambdas, spectrum / self.lambdas_binwidths, bounds_error=False,
-            #                            fill_value=(0, 0))
-            # spectrum_order2 = self.disperser.ratio_order_2over1(lambdas_order2) * spectrum_order1(lambdas_order2) \
-            #                  * self.lambdas_binwidths_order2
             spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(lambdas_order2) * \
                                                    self.simulate_spectrum(lambdas_order2, ozone, pwv, aerosols)
             self.true_spectrum = A1 * (spectrum + A2 * spectrum_order2) / \
                                  (parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas))
-            ima2 = self.build_spectrogram(profile_params, spectrum_order2, dispersion_law_order2)
-
-        self.my_logger.debug(f'\n\tAfter build ima2: {time.time() - start}')
+            nlbda = dispersion_law_order2.size
+            if self.psf_cube_order2 is None or not self.fix_psf_cube:
+                start = time.time()
+                self.psf_cube_order2 = np.zeros((nlbda, self.spectrogram_Ny, self.spectrogram_Nx))
+                for i in range(0, nlbda, 1):
+                    p = np.array([1, dispersion_law_order2[i].real,
+                                  dispersion_law_order2[i].imag] + list(self.profile_params[i, 3:]))
+                    self.psf_cube_order2[i] = self.psf.evaluate(self.pixels, p=p)
+                self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')
+            start = time.time()
+            ima2 = np.zeros_like(ima1)
+            for i in range(0, nlbda, 1):
+                # here spectrum[i] is in ADU/s
+                ima2 += spectrum_order2[i] * self.psf_cube_order2[i]
+            # self.data is in ADU/s units here
+            self.data = A1 * (ima1 + A2 * ima2)
+            self.my_logger.debug(f'\n\tAfter build ima2: {time.time() - start}')
+        else:
+            self.data = A1 * ima1
         start = time.time()
-        # self.data is in ADU/s units here
-        self.data = A1 * (ima1 + A2 * ima2)
         if self.with_background:
             self.data += B * self.spectrogram_bgd
         self.err = np.zeros_like(self.data)
-        self.my_logger.debug(f'\n\tAfter all: {time.time() - start}')
+        self.my_logger.debug(f'\n\tAfter bgd: {time.time() - start}')
         if parameters.DEBUG:
             fig, ax = plt.subplots(3, 1, sharex="all", figsize=(12, 9))
             ax[0].imshow(self.data, origin='lower')

@@ -101,6 +101,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.saturation = self.spectrum.spectrogram_saturation
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols,
                            self.D, self.shift_x, self.shift_y, self.angle, self.B])
+        self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 9])
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params])
         self.input_labels = ["A1", "A2", "ozone [db]", "PWV [mm]", "VAOD", r"D_CCD [mm]",
@@ -280,6 +281,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         """
         global plot_counter
+        self.simulation.fix_psf_cube = False
+        if np.all(np.isclose(psf_poly_params, self.p[self.psf_params_start_index:], rtol=1e-6)):
+            self.simulation.fix_psf_cube = True
         lambdas, model, model_err = \
             self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, psf_poly_params)
         self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B] + list(psf_poly_params))
@@ -290,6 +294,27 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.plot_fit()
         plot_counter += 1
         return lambdas, model, model_err
+
+    def jacobian(self, params, epsilon, fixed_params=None):
+        start = time.time()
+        lambdas, model, model_err = self.simulate(*params)
+        model = model.flatten()
+        J = np.zeros((params.size, model.size))
+        for ip, p in enumerate(params):
+            if fixed_params[ip]:
+                continue
+            if ip in self.fixed_psf_params:
+                self.simulation.fix_psf_cube = True
+            else:
+                self.simulation.fix_psf_cube = False
+            tmp_p = np.copy(params)
+            if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
+                epsilon[ip] = - epsilon[ip]
+            tmp_p[ip] += epsilon[ip]
+            tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
+            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+        self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
+        return J
 
     def plot_fit(self):
         """Plot the fit result.
@@ -413,18 +438,21 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         fixed = np.copy(fit_workspace.fixed)
 
         fit_workspace.simulation.fast_sim = True
+        fit_workspace.simulation.fix_psf_cube = False
         fit_workspace.fixed = np.copy(fixed)
         fit_workspace.fixed[:fit_workspace.psf_params_start_index] = True
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
                                                    fix=fit_workspace.fixed, xtol=1e-3, ftol=1e-2, niter=10)
 
         fit_workspace.simulation.fast_sim = True
+        fit_workspace.simulation.fix_psf_cube = False
         fit_workspace.fixed = np.copy(fixed)
         guess = fit_workspace.p
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
                                                    fix=fit_workspace.fixed, xtol=1e-5, ftol=1e-3, niter=10)
 
         fit_workspace.simulation.fast_sim = False
+        fit_workspace.simulation.fix_psf_cube = False
         fit_workspace.fixed = np.copy(fixed)
         guess = fit_workspace.p
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
