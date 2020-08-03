@@ -283,7 +283,7 @@ def adr_calib(lambdas, params, lat, lambda_ref=550):
     disp_axis_pix = in_pixel(disp_axis, params)
     trans_axis_pix = in_pixel(trans_axis, params)
 
-    return disp_axis_pix
+    return disp_axis_pix, trans_axis_pix
 
 
 def instanciation_adr(params, latitude, lbda_ref):

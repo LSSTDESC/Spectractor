@@ -128,9 +128,10 @@ class SpectrumSimulation(Spectrum):
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         lambda_ref = self.lambda_ref
-        distance_order1 = distance - adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        distance_order1 = distance - adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
+                                               lambda_ref=lambda_ref)[0]
         distance_order2 = distance - adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
-                                               lambda_ref=lambda_ref)
+                                               lambda_ref=lambda_ref)[0]
         lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
         self.lambdas_order2 = lambdas_order2
@@ -294,9 +295,10 @@ class SpectrogramModel(Spectrum):
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         lambda_ref = self.lambda_ref
-        distance_order1 = distance - adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        distance_order1 = distance - adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
+                                               lambda_ref=lambda_ref)[0]
         distance_order2 = distance - adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
-                                               lambda_ref=lambda_ref)
+                                               lambda_ref=lambda_ref)[0]
         lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
 

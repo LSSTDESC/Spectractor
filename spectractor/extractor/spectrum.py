@@ -1020,7 +1020,8 @@ def calibrate_spectrum(spectrum):
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
     lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
     spectrum.lambda_ref = lambda_ref
-    adr_pixel_shift = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+    adr_disp_pixel_shift, _ = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
+                                        lambda_ref=lambda_ref)
 
     x0 = spectrum.x0
     if x0 is None:
@@ -1034,7 +1035,7 @@ def calibrate_spectrum(spectrum):
 
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
-        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - shift - adr_pixel_shift,
+        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - shift - adr_disp_pixel_shift,
                                                                       x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
         spectrum.convert_from_ADUrate_to_flam()
@@ -1108,7 +1109,7 @@ def calibrate_spectrum(spectrum):
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift - adr_pixel_shift,
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift - adr_disp_pixel_shift,
                                                          x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.lambdas_binwidths = np.gradient(lambdas)
