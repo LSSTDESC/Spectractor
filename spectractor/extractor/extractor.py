@@ -361,7 +361,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                          deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
         # fill a first table with first guess
         s.table['Dx'] = np.arange(xmin, xmax, 1) - image.target_pixcoords[0]
-        s.table['gamma_y'] = np.copy(s.table['gamma_x'])
         s.table["amplitude"] = np.interp(s.table['Dx'], Dx_rot, flux)
         s.table["flux_err"] = np.interp(s.table['Dx'], Dx_rot, flux_err)
         s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
