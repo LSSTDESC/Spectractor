@@ -1119,10 +1119,10 @@ def calibrate_spectrum(spectrum):
     # Convert back to flam units
     # spectrum.convert_from_ADUrate_to_flam()
     spectrum.my_logger.info(
-        '\n\tOrder0 total shift: {:.2f}pix'
-        '\n\tD = {:.2f} mm (default: DISTANCE2CCD = {:.2f} +/- {:.2f} mm, {:.1f} sigma shift)'.format(
-            pixel_shift, D, parameters.DISTANCE2CCD, parameters.DISTANCE2CCD_ERR,
-            (D - parameters.DISTANCE2CCD) / parameters.DISTANCE2CCD_ERR))
+        f"\n\tOrder0 total shift: {pixel_shift:.2f}pix"
+        f"\n\tD = {D:.2f} mm (default: DISTANCE2CCD = {parameters.DISTANCE2CCD:.2f} "
+        f"+/- {parameters.DISTANCE2CCD_ERR:.2f} mm, "
+        f"{(D - parameters.DISTANCE2CCD) / parameters.DISTANCE2CCD_ERR:.1f} sigma shift)")
     spectrum.header['PIXSHIFT'] = pixel_shift
     spectrum.header['D2CCD'] = D
     return lambdas

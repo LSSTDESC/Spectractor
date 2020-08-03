@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config
+from spectractor.config import set_logger
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.simulation.simulator import SimulatorInit, SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_gradient_descent, save_gradient_descent, run_minimisation_sigma_clipping
+from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_gradient_descent, run_minimisation_sigma_clipping
 
 plot_counter = 0
 
@@ -127,6 +127,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
                                            with_background=True, fast_sim=False)
+        self.lambdas_truth = None
+        self.amplitude_truth = None
         self.get_spectrogram_truth()
 
     def crop_spectrogram(self):
@@ -456,7 +458,8 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
                                                    fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
                                                    niter=40)
         # run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-        #                                 xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
+        #                                 xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
+        #                                 verbose=False)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             parameters.SAVE = True

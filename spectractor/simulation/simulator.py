@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 
 from scipy.interpolate import interp1d
-from scipy.integrate import quad
 
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.dispersers import Grating, Hologram

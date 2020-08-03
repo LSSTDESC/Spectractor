@@ -7,7 +7,7 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_gradient_descent, save_gradient_descent, run_minimisation_sigma_clipping
+from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping
 from spectractor.tools import plot_spectrum_simple
 
 
@@ -395,25 +395,20 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
 
         fit_workspace.simulation.fast_sim = True
         fit_workspace.simulation.fix_psf_cube = False
-        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-        #                                            fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
-        #                                            niter=40)
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
+                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
+                                        verbose=False)
 
         fit_workspace.simulation.fast_sim = False
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
-        # guess = fit_workspace.p
-        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-        #                                            fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
-        #                                            niter=40)
+                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
+                                        verbose=False)
         if fit_workspace.filename != "":
             parameters.SAVE = True
             ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
             fit_workspace.plot_correlation_matrix(ipar)
-            fit_workspace.save_parameters_summary(ipar, header=f"{fit_workspace.spectrum.date_obs}\n"
-                                                               f"chi2: {fit_workspace.costs[-1] / fit_workspace.data.size}")
+            header = f"{fit_workspace.spectrum.date_obs}\nchi2: {fit_workspace.costs[-1] / fit_workspace.data.size}"
+            fit_workspace.save_parameters_summary(ipar, header=header)
             # save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
@@ -491,9 +486,6 @@ if __name__ == "__main__":
         ax[ip].grid()
         ax[ip].legend()
     plt.show()
-
-
-
 
     # w.decontaminate_order2()
     # fit_workspace.simulate(*fit_workspace.p)
