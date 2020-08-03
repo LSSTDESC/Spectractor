@@ -10,10 +10,10 @@ from spectractor.extractor.background import extract_spectrogram_background_sext
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
 from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple
-from spectractor.fit.fitter import FitWorkspace
+from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace
 
 
-class FullForwardModelFitWorkspace(FitWorkspace):
+class FullForwardModelFitWorkspace(SpectrogramFitWorkspace):
 
     def __init__(self, spectrum, amplitude_priors_method="noprior", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
@@ -34,12 +34,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> load_config("./config/ctio.ini")
-        >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
         >>> w = FullForwardModelFitWorkspace(spectrum=spec)
         """
-        FitWorkspace.__init__(self, spectrum.filename, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                              live_fit, truth=truth)
+        SpectrogramFitWorkspace.__init__(self, spectrum.filename, "", nwalkers, nsteps, burnin, nbins, verbose, plot,
+                                         live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.spectrum = spectrum
 
@@ -51,7 +50,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if self.Nx != self.spectrum.chromatic_psf.Nx:
             raise AttributeError(f"Data x shape {self.Nx} different from "
                                  f"ChromaticPSF input Nx {spectrum.chromatic_psf.Nx}.")
-        #self.pixels = np.arange(self.Ny)
 
         # crop data to fit faster
         self.lambdas = self.spectrum.lambdas
