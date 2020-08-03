@@ -565,13 +565,13 @@ class MoffatGauss(PSF):
                             "saturation"]
         self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
         self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 100),
-                                (-1, np.inf), (0.1, np.inf), (0, np.inf)])
+                                (-1, 0), (0.1, np.inf), (0, np.inf)])
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
         self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
-                                (0.1, self.max_half_width), (1.1, 100), (-1, np.inf), (0.1, self.max_half_width),
+                                (0.1, self.max_half_width), (1.1, 100), (-1, 0), (0.1, self.max_half_width),
                                 (0, np.inf)])
 
     def evaluate(self, pixels, p=None):
