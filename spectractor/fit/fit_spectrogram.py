@@ -5,7 +5,7 @@ import numpy as np
 import copy
 
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.simulation.simulator import SimulatorInit, SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
@@ -194,8 +194,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
-            norm = np.max(self.spectrum.spectrogram[:, sub])
-            plot_image_simple(ax[0, 0], data=self.spectrum.spectrogram[:, sub] / norm, title='Data', aspect='auto',
+            norm = np.max(self.data[:, sub])
+            plot_image_simple(ax[0, 0], data=self.data[:, sub] / norm, title='Data', aspect='auto',
                               cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)')
             ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
             plot_image_simple(ax[1, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
@@ -210,9 +210,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
                 ax[1, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
-            residuals = (self.spectrum.spectrogram - self.model)
+            residuals = (self.data - self.model)
             # residuals_err = self.spectrum.spectrogram_err / self.model
-            norm = self.spectrum.spectrogram_err
+            norm = self.err
             residuals /= norm
             std = float(np.std(residuals[:, sub]))
             plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
@@ -226,7 +226,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[3, 1].remove()
-            ax[3, 0].plot(self.lambdas[sub], self.spectrum.spectrogram.sum(axis=0)[sub], label='Data')
+            ax[3, 0].plot(self.lambdas[sub], self.data.sum(axis=0)[sub], label='Data')
             ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
             ax[3, 0].set_ylabel('Cross spectrum')
             ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
