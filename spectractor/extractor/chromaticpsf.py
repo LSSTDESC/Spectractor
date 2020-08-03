@@ -249,7 +249,8 @@ class ChromaticPSF:
         """
         pixels = self.pixels
         if mode == "2D":
-            pixels = np.mgrid[:self.Nx, :self.Ny]
+            yy, xx = np.mgrid[:self.Ny, :self.Nx]
+            pixels = np.asarray([xx, yy])
         elif mode == "1D":
             pixels = np.arange(self.Ny)
         else:
@@ -746,11 +747,11 @@ class ChromaticPSF:
             if truth is not None:
                 ax[0].plot(all_pixels, PSF_truth[:, i], color=p[0].get_color(), linestyle='--')
         img = np.zeros((self.Ny, self.Nx)).astype(float)
-        pixels = np.mgrid[:self.Nx, :self.Ny]
+        yy, xx = np.mgrid[:self.Ny, :self.Nx]
         for x in all_pixels[::self.Nx // 10]:
             params = [PSF_models[p][x] for p in range(len(self.psf.param_names))]
             params[:3] = [1, x, self.Ny // 2]
-            out = self.psf.evaluate(pixels, p=params)
+            out = self.psf.evaluate(np.asarray([xx, yy]), p=params)
             out /= np.max(out)
             img += out
         ax[1].imshow(img, origin='lower')  # , extent=[0, self.Nx,
@@ -1453,7 +1454,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                                           plot,
                                           live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.pixels = np.mgrid[:self.Nx, :self.Ny]
+        yy, xx = np.mgrid[:self.Ny, :self.Nx]
+        self.pixels = np.asarray([xx, yy])
 
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
@@ -1464,16 +1466,17 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         # regularisation matrices
         self.reg = parameters.PSF_FIT_REG_PARAM
-        # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
-        self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
-        L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] \
-            + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
-        L.astype(float)
-        L[0, 0] = -1
-        L[-1, -1] = -1
-        self.L = L
-        self.Q = L.T @ self.U.T @ self.U @ L
-        self.Q_dot_A0 = self.Q @ self.amplitude_priors
+        if amplitude_priors_method == "psf1d":
+            # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
+            self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
+            L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] \
+                + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
+            L.astype(float)
+            L[0, 0] = -1
+            L[-1, -1] = -1
+            self.L = L
+            self.Q = L.T @ self.U.T @ self.U @ L
+            self.Q_dot_A0 = self.Q @ self.amplitude_priors
 
     def simulate(self, *shape_params):
         r"""
@@ -1593,8 +1596,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
             >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
             ... amplitude_priors_method="fixed", verbose=True)
-            # >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:])
-            # >>> w.plot_fit()
+            >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:])
+            >>> w.plot_fit()
 
         .. doctest::
             :hide:
@@ -1606,18 +1609,21 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         .. doctest::
 
             >>> parameters.PSF_FIT_REG_PARAM = 0.002
+            >>> s.table['gamma_y'] = np.copy(s.table['gamma_x'])
+            >>> s.poly_params = s.from_table_to_poly_params()
             >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
             ... amplitude_priors_method="psf1d", verbose=True)
-            # >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:])
-            # >>> w.plot_fit()
+            >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:])
+            >>> w.plot_fit()
 
         .. doctest::
             :hide:
 
             >>> assert mod is not None
             >>> w = ChromaticPSF2DFitWorkspace(s0, data, data_errors, bgd_model_func=bgd_model_func,
-            ... amplitude_priors_method="psf1d", verbose=True)
+            ... amplitude_priors_method="fixed", verbose=True)
             >>> y, mod, mod_err = w.simulate(s0.poly_params[s0.Nx:])
+            >>> w.plot_fit()
             >>> assert np.abs(np.mean((w.amplitude_params-s0.poly_params[:s0.Nx])/w.amplitude_params_err)) < 0.05
 
         """
