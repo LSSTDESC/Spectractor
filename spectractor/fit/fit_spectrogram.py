@@ -2,6 +2,7 @@ import time
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import copy
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -300,6 +301,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         lambdas, model, model_err = self.simulate(*params)
         model = model.flatten()
         J = np.zeros((params.size, model.size))
+        strategy = copy(self.simulation.fix_psf_cube)
         for ip, p in enumerate(params):
             if fixed_params[ip]:
                 continue
@@ -313,6 +315,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
             J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+        self.simulation.fix_psf_cube = strategy
         self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
