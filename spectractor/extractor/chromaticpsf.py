@@ -1608,7 +1608,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         .. doctest::
 
             >>> parameters.PSF_FIT_REG_PARAM = 0.002
-            >>> s.table['gamma_y'] = np.copy(s.table['gamma_x'])
             >>> s.poly_params = s.from_table_to_poly_params()
             >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
             ... amplitude_priors_method="psf1d", verbose=True)
