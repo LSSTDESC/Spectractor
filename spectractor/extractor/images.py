@@ -13,7 +13,7 @@ from spectractor import parameters
 from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
-from spectractor.extractor.psf import fit_PSF2D_minuit, Moffat
+from spectractor.extractor.psf import Moffat
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, fit_poly1d,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
@@ -958,113 +958,6 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'order0_centroid_fit.pdf'))
-    return new_avX, new_avY
-
-
-def find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=None):
-    """
-    Find precisely the position of the targeted object fitting a PSF model.
-    A polynomial 2D background was subtracted before. Saturated pixels are masked with np.nan values.
-
-    THE ERROR ARRAY IS NOT USED FOR THE MOMENT.
-
-    Parameters
-    ----------
-    image: Image
-        The Image instance.
-    sub_image_subtracted: array_like
-        The cropped image data array where the fit is performed.
-    sub_errors: array_like
-        The image data uncertainties.
-
-    Examples
-    --------
-    >>> im = Image('tests/data/reduc_20170605_028.fits')
-    >>> guess = [820, 580]
-    >>> parameters.DEBUG = True
-    >>> sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False)
-    >>> xmax = np.argmax(np.sum(sub_image_subtracted, axis=0))
-    >>> ymax = np.argmax(np.sum(sub_image_subtracted, axis=1))
-    >>> x1, y1 = find_target_2DprofileASTROPY(im, sub_image_subtracted)
-
-    .. doctest::
-        :hide:
-
-        >>> assert np.isclose(x1, xmax, rtol=1e-2)
-        >>> assert np.isclose(y1, ymax, rtol=1e-2)
-
-    """
-    # TODO: replace with minuit and test on image _133.fits or decrease mean_prior
-    # fit and subtract smooth polynomial background
-    # with 3sigma rejection of outliers (star peaks)
-    NY, NX = sub_image_subtracted.shape
-    XX = np.arange(NX)
-    YY = np.arange(NY)
-    Y, X = np.mgrid[:NY, :NX]
-    # find a first guess of the target position
-    avX, sigX = weighted_avg_and_std(XX, np.sum(sub_image_subtracted, axis=0) ** 4)
-    avY, sigY = weighted_avg_and_std(YY, np.sum(sub_image_subtracted, axis=1) ** 4)
-    # fit a 2D star profile close to this position
-    # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2D
-    # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
-    guess = [np.max(sub_image_subtracted), avX, avY, 1, 1, 0.1, 2, image.saturation]
-    if image.target_star2D is not None:
-        guess = fitting._model_to_fit_params(image.target_star2D)[0]
-        guess[1] = avX
-        guess[2] = avY
-    mean_prior = 10  # in pixels
-    # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf],
-    # [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] #for Moffat2D
-    # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,0,0],
-    # [100*image.saturation,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] #for Gauss2D
-    # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation],
-    # [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
-    bounds = [[0.1 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 1, 0, -100, 1,
-               0.9 * image.saturation],
-              [10 * image.saturation, avX + mean_prior, avY + mean_prior, 30, 10, 200, 15, 1.1 * image.saturation]]
-    sub_image = sub_image_subtracted + image.target_bkgd2D(X, Y)
-    saturated_pixels = np.where(sub_image >= image.saturation)
-    if len(saturated_pixels[0]) > 0:
-        if parameters.DEBUG:
-            image.my_logger.info(
-                f'\n\t{len(saturated_pixels[0])} saturated pixels: set saturation level '
-                f'to {image.saturation} {image.units}.')
-        sub_image_subtracted[sub_image >= 0.9 * image.saturation] = np.nan
-        sub_image_subtracted[sub_image >= 0.9 * image.saturation] = np.nan
-    # fit
-    bounds = list(np.array(bounds).T)
-    # star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
-    star2D = fit_PSF2D_minuit(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
-    new_avX = star2D.x_mean.value
-    new_avY = star2D.y_mean.value
-    image.target_star2D = star2D
-    # check target positions
-    dist = np.sqrt((new_avY - avY) ** 2 + (new_avX - avX) ** 2)
-    if dist > mean_prior / 2:
-        image.my_logger.warning(
-            f'\n\tX={new_avX:.2f}, Y={new_avY:.2f} target position determination probably wrong: '
-            f'{dist:.1f} pixels from profile detection ({avX:.2f}, {avY:.2f})')
-    # debugging plots
-    if parameters.DEBUG:
-        f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
-        vmin = 0
-        vmax = float(np.nanmax(sub_image_subtracted))
-        plot_image_simple(ax1, data=sub_image_subtracted, scale="lin", title="", units=image.units,
-                          target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
-        ax1.legend(loc=1)
-
-        plot_image_simple(ax2, data=star2D(X, Y), scale="lin", title="",
-                          units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
-        plot_image_simple(ax3, data=sub_image_subtracted - star2D(X, Y), scale="lin", title="",
-                          units=f'Background+Star2D subtracted image\n({image.units})',
-                          target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
-        ax3.legend(loc=1)
-
-        f.tight_layout()
-        if parameters.DISPLAY:  # pragma: no cover
-            plt.show()
-        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot2.pdf'))
     return new_avX, new_avY
 
 
