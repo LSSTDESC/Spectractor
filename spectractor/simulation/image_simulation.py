@@ -320,7 +320,7 @@ class ImageModel(Image):
 
     def add_poisson_and_read_out_noise(self):
         if self.units != 'ADU':
-            self.my_logger.error('\n\tPoisson noise procedure has to be applied on map in ADU units')
+            raise AttributeError('Poisson noise procedure has to be applied on map in ADU units')
         d = np.copy(self.data).astype(float)
         # convert to electron counts
         d *= self.gain
@@ -351,12 +351,12 @@ class ImageModel(Image):
         # self.true_lambdas, self.true_spectrum = hdu_list[1].data
 
 
-def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=0.05,
+def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1,
              psf_poly_params=None,
              with_rotation=True,
              with_stars=True):
     """ The basic use of the extractor consists first to define:
-    - the path to the fits image from which to extract the image, 
+    - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
     - the rough position of the object in the image,
     - the name of the target (to search for the extra-atmospheric spectrum if available).
@@ -445,7 +445,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Recover true spectrum
     true_lambdas = np.copy(spectrogram.lambdas)
-    true_spectrum = spectrogram.set_true_spectrum(true_lambdas, ozone, pwv, aerosols, shift_t=0)
+    true_spectrum = np.copy(spectrogram.true_spectrum)
 
     # Saturation effects
     saturated_pixels = np.where(spectrogram.data > image.saturation)[0]

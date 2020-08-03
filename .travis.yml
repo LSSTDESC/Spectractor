@@ -98,15 +98,18 @@ before_script:
   # - git checkout spectractor
   # - "pip install ."
   # - "cd ../"
-
-script:
   - pip install numpy nose coloredlogs six
   - pip install -r requirements.txt
   # - python setup.py build
   # - python setup.py install
   - pip install .
-  - nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
-  - ./coverage_and_test.sh
+
+jobs:
+  include:
+  - stage: nosetests
+    script: nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
+  - stage: doctests and coverage
+    script: ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py
 #- coverage run -a --source=spectractor extractor simulator fit
 

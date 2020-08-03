@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 from spectractor import parameters
 from spectractor.config import set_logger, load_config
 from spectractor.extractor.images import Image, find_target, turn_image
-from spectractor.extractor.spectrum import (Spectrum, calibrate_spectrum,
-                                            calibrate_spectrum_with_lines)
+from spectractor.extractor.spectrum import Spectrum, calibrate_spectrum
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
@@ -14,7 +13,7 @@ from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colo
 
 
 def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='./config/ctio.ini',
-                atmospheric_lines=True, line_detection=True):
+                atmospheric_lines=True):
     """ Spectractor
     Main function to extract a spectrum from an image
 
@@ -35,9 +34,6 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         The config file name (default: "./config/ctio.ini").
     atmospheric_lines: bool, optional
         If True atmospheric lines are used in the calibration fit.
-    line_detection: bool, optional
-        If True the absorption or emission lines are
-        used to calibrate the pixel to wavelength relationship.
 
     Returns
     -------
@@ -75,6 +71,8 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     my_logger.info('\n\tStart SPECTRACTOR')
     # Load config file
     load_config(config)
+    if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+        ensure_dir(parameters.LSST_SAVEFIGPATH)
 
     # Load reduced image
     image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
@@ -90,32 +88,31 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
     # Find the exact target position in the raw cut image: several methods
     my_logger.info('\n\tSearch for the target in the image...')
-    find_target(image, guess, use_wcs=True)
+    find_target(image, guess, use_wcs=True, widths=(parameters.XWINDOW, parameters.YWINDOW))
     # Rotate the image
     turn_image(image)
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-    find_target(image, guess, rotated=True, use_wcs=True)
+    find_target(image, guess, rotated=True, use_wcs=True, widths=(parameters.XWINDOW_ROT, parameters.YWINDOW_ROT))
     # Create Spectrum object
     spectrum = Spectrum(image=image)
     # Subtract background and bad pixels
-    extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
-                                ws=(parameters.PIXDIST_BACKGROUND,
-                                    parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND),
-                                right_edge=parameters.CCD_IMSIZE - 200)
+    w = extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
+                                    ws=(parameters.PIXDIST_BACKGROUND,
+                                        parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND),
+                                    right_edge=parameters.CCD_IMSIZE - 200)
     spectrum.atmospheric_lines = atmospheric_lines
+
     # Calibrate the spectrum
+    my_logger.info(f'\n\tCalibrating order {spectrum.order:d} spectrum...')
     calibrate_spectrum(spectrum)
-    if line_detection:
-        my_logger.info('\n\tCalibrating order %d spectrum...' % spectrum.order)
-        calibrate_spectrum_with_lines(spectrum)
-    else:
-        spectrum.header['WARNINGS'] = 'No calibration procedure with spectral features.'
+
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
     spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
     spectrum.lines.print_detected_lines(output_file_name=output_filename.replace('_spectrum.fits', '_lines.csv'),
                                         overwrite=True, amplitude_units=spectrum.units)
+
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
@@ -123,6 +120,70 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     lambdas = np.interp(distance, spectrum.pixels, spectrum.lambdas)
     spectrum.chromatic_psf.table['lambdas'] = lambdas
     spectrum.chromatic_psf.table.write(output_filename_psf, overwrite=True)
+
+    if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and 'LBDAS_T' in spectrum.header and parameters.DEBUG:
+        s = spectrum.chromatic_psf
+        lambdas_truth = np.fromstring(spectrum.header['LBDAS_T'][1:-1], sep=' ')
+        psf_poly_truth = np.fromstring(spectrum.header['PSF_P_T'][1:-1], sep=' ', dtype=float)
+        amplitude_truth = np.fromstring(spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+        amplitude_truth *= parameters.FLAM_TO_ADURATE * lambdas_truth * np.gradient(lambdas_truth)
+
+        s0 = ChromaticPSF(s.psf, lambdas_truth.size, s.Ny, deg=int(spectrum.header["PSF_DEG"]),
+                          saturation=parameters.CCD_MAXADU)
+        s0.poly_params = np.asarray(list(amplitude_truth) + list(psf_poly_truth))
+        s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
+        s0.from_profile_params_to_shape_params(s0.profile_params)
+        gs_kw = dict(width_ratios=[2, 1], height_ratios=[3, 1])
+        fig, ax = plt.subplots(2, 2, figsize=(9, 5), sharex="all", gridspec_kw=gs_kw)
+        ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth")
+        amplitude_priors_err = [np.sqrt(w.amplitude_priors_cov_matrix[x, x]) for x in range(w.Nx)]
+        ax[0, 0].errorbar(spectrum.lambdas, w.amplitude_priors, yerr=amplitude_priors_err, label="prior")
+        ax[0, 0].errorbar(spectrum.lambdas, w.amplitude_params, yerr=w.amplitude_params_err, label="2D")
+        ax[0, 0].grid()
+        ax[0, 0].legend()
+        ax[0, 0].set_xlabel(r"$\lambda$ [nm]")
+        ax[0, 0].set_ylabel(f"Amplitude $A$ [ADU/s]")
+        ax[1, 0].plot(lambdas_truth, np.zeros_like(lambdas_truth), label="truth")
+        amplitude_truth_interp = np.interp(spectrum.lambdas, lambdas_truth, amplitude_truth)
+        res = (w.amplitude_priors - amplitude_truth_interp) / amplitude_priors_err
+        ax[1, 0].errorbar(spectrum.lambdas, res, yerr=np.ones_like(res),
+                          label=f"prior: mean={np.mean(res):.2f}, std={np.std(res):.2f}")
+        res = (w.amplitude_params - amplitude_truth_interp) / w.amplitude_params_err
+        ax[1, 0].errorbar(spectrum.lambdas, res, yerr=np.ones_like(res),
+                          label=f"2D: mean={np.mean(res):.2f}, std={np.std(res):.2f}")
+        ax[1, 0].grid()
+        ax[1, 0].legend()
+        ax[1, 0].set_xlabel(r"$\lambda$ [nm]")
+        ax[1, 0].set_ylim(-5, 5)
+        ax[1, 0].set_ylabel(r"$(A - A_{\rm truth})/\sigma_A$")
+
+        fwhm_prior = np.interp(np.arange(len(s.table)), np.arange(len(s0.table)), s0.table['fwhm'])
+        fwhm_1d = np.interp(np.arange(len(s.table)), np.arange(w.fwhm_1d.size), w.fwhm_1d)
+        fwhm_2d = np.interp(np.arange(len(s.table)), np.arange(s.Nx), fwhm_1d)
+        ax[0, 1].plot(lambdas_truth, s0.table["fwhm"], label="truth")
+        ax[0, 1].plot(spectrum.lambdas, fwhm_1d, label="prior")
+        ax[0, 1].plot(spectrum.lambdas, s.table["fwhm"], label="2D")
+        ax[0, 1].grid()
+        ax[0, 1].set_ylim(0, 10)
+        ax[0, 1].legend()
+        ax[0, 1].set_xlabel(r"$\lambda$ [nm]")
+        ax[1, 1].set_xlabel(r"$\lambda$ [nm]")
+        ax[0, 1].set_ylabel(f"FWHM [pix]")
+        ax[1, 1].set_ylabel(r"FWHM - FWHM$_{\rm truth}$ [pix]")
+        ax[1, 1].plot(lambdas_truth, np.zeros_like(lambdas_truth), label="truth")
+        ax[1, 1].plot(s.table["lambdas"], fwhm_1d - fwhm_prior, label="prior")
+        ax[1, 1].plot(s.table["lambdas"], fwhm_2d - fwhm_prior, label="2D")
+        ax[1, 1].grid()
+        ax[1, 1].set_ylim(0, 10)
+        ax[1, 1].legend()
+        plt.subplots_adjust(hspace=0)
+        fig.tight_layout()
+        if parameters.DISPLAY:
+            plt.show()
+        if parameters.LSST_SAVEFIGPATH:
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'deconvolution_truth.pdf'))
+        plt.show()
+
     return spectrum
 
 
@@ -158,9 +219,10 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     if parameters.PSF_EXTRACTION_MODE != "PSF_1D" and parameters.PSF_EXTRACTION_MODE != "PSF_2D":
         raise NotImplementedError(f"PSF_EXTRACTION_MODE must PSF_1D or PSF_2D. Found {parameters.PSF_EXTRACTION_MODE}.")
+
     my_logger = set_logger(__name__)
     if ws is None:
-        ws = [signal_width+20, signal_width+30]
+        ws = [signal_width + 20, signal_width + 30]
     my_logger.info(
         f'\n\tExtracting spectrum from image: spectrum with width 2*{signal_width:d} pixels '
         f'and background from {ws[0]:d} to {ws[1]:d} pixels')
@@ -195,14 +257,13 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Extract the background on the rotated image
     bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
     # while np.nanmean(bgd_res)/np.nanstd(bgd_res) < -0.2 and parameters.PIXWIDTH_BOXSIZE >= 5:
-    my_logger.warning(f"{np.abs(np.nanmean(bgd_res))} {np.nanstd(bgd_res)}")
-    while (np.abs(np.nanmean(bgd_res)) > 1 or np.nanstd(bgd_res) > 2) and parameters.PIXWIDTH_BOXSIZE > 5:
+    while (np.abs(np.nanmean(bgd_res)) > 0.5 or np.nanstd(bgd_res) > 1.3) and parameters.PIXWIDTH_BOXSIZE > 5:
         parameters.PIXWIDTH_BOXSIZE = max(5, parameters.PIXWIDTH_BOXSIZE // 2)
         my_logger.warning(f"\n\tPull distribution of background residuals differs too much from mean=0 and std=1. "
                           f"\n\t\tmean={np.nanmean(bgd_res)}   std={np.nanstd(bgd_res)}."
-                          f"These value should be smaller in absolute value than 1 and 2. "
+                          f"These value should be smaller in absolute value than 0.5 and 1.3. "
                           f"To do so, parameters.PIXWIDTH_BOXSIZE is divided "
-                          f"by 2 from {parameters.PIXWIDTH_BOXSIZE*2} -> {parameters.PIXWIDTH_BOXSIZE}.")
+                          f"by 2 from {parameters.PIXWIDTH_BOXSIZE * 2} -> {parameters.PIXWIDTH_BOXSIZE}.")
         bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
 
     # Propagate background uncertainties
@@ -235,6 +296,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     spectrum.err = np.copy(w.amplitude_params_err)
     spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
     spectrum.chromatic_psf = s
+    fwhm_1d = np.copy(s.table['fwhm'])
 
     Dx_rot = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
     s.table['Dx'] = np.copy(Dx_rot)
@@ -303,6 +365,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         s.table["flux_err"] = np.interp(s.table['Dx'], Dx_rot, flux_err)
         s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
         s.poly_params = np.concatenate((s.table["amplitude"], psf_poly_priors))
+        s.cov_matrix = np.copy(w.amplitude_cov_matrix)
         s.profile_params = s.from_poly_params_to_profile_params(s.poly_params, apply_bounds=True)
         s.fill_table_with_profile_params(s.profile_params)
         s.table['Dy'] = s.table['y_c'] - target_pixcoords_spectrogram[1]
@@ -313,11 +376,10 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                        f'mode={mode} and amplitude_priors_method={method}...')
         my_logger.debug(f"\n\tTransverse fit table before PSF_2D fit:"
                         f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
-        # w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
-        #                         amplitude_priors_method="fixed", mode=mode, verbose=parameters.VERBOSE)
         w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
                                 amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
         # save results
+        w.fwhm_1d = fwhm_1d
         spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
         spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                            np.arange(Ny))) / err
@@ -410,4 +472,5 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'spectrum.pdf'))
-    return spectrum
+
+    return w

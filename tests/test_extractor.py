@@ -35,7 +35,7 @@ def test_extractor():
         if target_label is None or xpos is None or ypos is None:
             continue
         spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
-                               line_detection=True, atmospheric_lines=True)
+                               atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 2e-11
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
@@ -74,7 +74,7 @@ def extractor_auxtel():
         # tag = file_name.split('/')[-1]
         # disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
-                               config='./config/auxtel.ini', line_detection=True, atmospheric_lines=True)
+                               config='./config/auxtel.ini', atmospheric_lines=True)
         assert spectrum.data is not None
         assert np.sum(spectrum.data) > 1e-10
         # spectrum.my_logger.warning(f"\n\tQuantities to test:"

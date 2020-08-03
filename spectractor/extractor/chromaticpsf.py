@@ -7,7 +7,8 @@ from scipy.interpolate import interp1d
 
 from astropy.table import Table
 
-from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm)
+from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm,
+                               plot_correlation_matrix_simple, compute_correlation_matrix)
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss, Moffat
 from spectractor import parameters
@@ -109,6 +110,7 @@ class ChromaticPSF:
                     self.poly_params_names.append("$" + self.psf.axis_names[ip].replace("$", "")
                                                   + "^{(" + str(k) + ")}$")
         self.opt_reg = parameters.PSF_FIT_REG_PARAM
+        self.cov_matrix = np.zeros((Nx, Nx))
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg
@@ -139,8 +141,7 @@ class ChromaticPSF:
 
         """
         if not isinstance(self.psf, MoffatGauss) and not isinstance(self.psf, Moffat):
-            self.my_logger.error(f"\n\tIn this test function, PSF model must be MoffatGauss or Moffat. "
-                                 f"Gave {type(self.psf)}.")
+            raise TypeError(f"In this test function, PSF model must be MoffatGauss or Moffat. Gave {type(self.psf)}.")
         params = [50 * i for i in range(self.Nx)]
         params[0] = 10
         # add absorption lines
@@ -247,11 +248,12 @@ class ChromaticPSF:
         """
         pixels = self.pixels
         if mode == "2D":
-            pixels = np.mgrid[:self.Nx, :self.Ny]
+            yy, xx = np.mgrid[:self.Ny, :self.Nx]
+            pixels = np.asarray([xx, yy])
         elif mode == "1D":
             pixels = np.arange(self.Ny)
         else:
-            self.my_logger.error(f"\n\tUnknown evaluation mode={mode}. Must be '1D' or '2D'.")
+            raise ValueError(f"Unknown evaluation mode={mode}. Must be '1D' or '2D'.")
         self.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
         profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:, 1] = np.arange(self.Nx)  # replace x_c
@@ -718,7 +720,7 @@ class ChromaticPSF:
             #         penalty = 1
             #         break
             # else:
-            #    self.my_logger.error(f'Unknown parameter name {name} in set_bounds_for_minuit.')
+            #    raise ValueError(f'Unknown parameter name {name} in set_bounds_for_minuit.')
         penalty *= self.Nx * self.Ny
         return in_bounds, penalty, outbound_parameter_name
 
@@ -744,11 +746,11 @@ class ChromaticPSF:
             if truth is not None:
                 ax[0].plot(all_pixels, PSF_truth[:, i], color=p[0].get_color(), linestyle='--')
         img = np.zeros((self.Ny, self.Nx)).astype(float)
-        pixels = np.mgrid[:self.Nx, :self.Ny]
+        yy, xx = np.mgrid[:self.Ny, :self.Nx]
         for x in all_pixels[::self.Nx // 10]:
             params = [PSF_models[p][x] for p in range(len(self.psf.param_names))]
             params[:3] = [1, x, self.Ny // 2]
-            out = self.psf.evaluate(pixels, p=params)
+            out = self.psf.evaluate(np.asarray([xx, yy]), p=params)
             out /= np.max(out)
             img += out
         ax[1].imshow(img, origin='lower')  # , extent=[0, self.Nx,
@@ -760,7 +762,7 @@ class ChromaticPSF:
         ax[0].grid()
         ax[1].grid(color='white', ls='solid')
         ax[1].grid(True)
-        ax[0].set_yscale('symlog', linthreshy=10)
+        ax[0].set_yscale('symlog', linthresh=10)
         ax[1].legend(title='PSF(x)')
         ax[0].legend()
         fig.tight_layout()
@@ -818,7 +820,7 @@ class ChromaticPSF:
 
         Extract the background:
 
-        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+        >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Fit the transverse profile:
 
@@ -1010,7 +1012,7 @@ class ChromaticPSF:
 
         Extract the background:
 
-        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+        >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Propagate background uncertainties:
 
@@ -1081,7 +1083,7 @@ class ChromaticPSF:
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
                                             fix=w.fixed, sigma_clip=10, niter_clip=3, verbose=verbose)
         else:
-            self.my_logger.error(f"\n\tUnknown fitting mode={mode}. Must be '1D' or '2D'.")
+            raise ValueError(f"Unknown fitting mode={mode}. Must be '1D' or '2D'.")
 
         if w.amplitude_priors_method == "psf1d" and mode == "2D":
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
@@ -1092,8 +1094,19 @@ class ChromaticPSF:
             w.reg = np.copy(w_reg.opt_reg)
             w.simulate(*w.p)
             self.opt_reg = w_reg.opt_reg
+            if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
+                self.my_logger.warning(f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
+                                       f"below the trace of the prior covariance matrix "
+                                       f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
+                                       f"high regularisation parameter in case of a bad fit. Therefore the final "
+                                       f"covariance matrix is mulitiplied by the ratio of the traces and "
+                                       f"the amplitude parameters are very close the amplitude priors.")
+                r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
+                w.amplitude_cov_matrix *= r
+                w.amplitude_params_err = np.array([np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(self.Nx)])
 
         self.poly_params = w.poly_params
+        self.cov_matrix = np.copy(w.amplitude_cov_matrix)
 
         # add background crop to y_c
         self.poly_params[w.Nx + w.y_c_0_index] += w.bgd_width
@@ -1106,6 +1119,10 @@ class ChromaticPSF:
         self.profile_params[:self.Nx, 1] = np.arange(self.Nx)
         self.fill_table_with_profile_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
+
+        # save plots
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            w.plot_fit()
         return w
 
 
@@ -1141,11 +1158,11 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # prepare the fit
         self.Ny, self.Nx = self.data.shape
         if self.Ny != self.chromatic_psf.Ny:
-            self.my_logger.error(
-                f"\n\tData y shape {self.Ny} different from ChromaticPSF input Ny {self.chromatic_psf.Ny}.")
+            raise AttributeError(f"Data y shape {self.Ny} different from "
+                                 f"ChromaticPSF input Ny {self.chromatic_psf.Ny}.")
         if self.Nx != self.chromatic_psf.Nx:
-            self.my_logger.error(
-                f"\n\tData x shape {self.Nx} different from ChromaticPSF input Nx {self.chromatic_psf.Nx}.")
+            raise AttributeError(f"Data x shape {self.Nx} different from "
+                                 f"ChromaticPSF input Nx {self.chromatic_psf.Nx}.")
         self.pixels = np.arange(self.Ny)
 
         # prepare the background, data and errors
@@ -1191,10 +1208,11 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.Q = np.zeros((self.Nx, self.Nx))
         self.Q_dot_A0 = np.zeros(self.Nx)
         if amplitude_priors_method not in self.amplitude_priors_list:
-            self.my_logger.error(f"\n\tUnknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
-                                 f"Must be either {self.amplitude_priors_list}.")
+            raise ValueError(f"Unknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
+                             f"Must be either {self.amplitude_priors_list}.")
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
+            self.amplitude_priors_cov_matrix = np.copy(self.chromatic_psf.cov_matrix)
             # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
             self.Q = np.diag([1 / np.sum(self.err[:, x] ** 2) for x in range(self.Nx)])
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
@@ -1231,7 +1249,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                           label='Data', fmt='k.', markersize=0.1)
         ax[3, 0].plot(np.arange(self.Nx), self.model.sum(axis=0), label='Model')
         ax[3, 0].set_ylabel('Transverse sum')
-        ax[3, 0].set_xlabel(r'X [pixels]')
+        ax[3, 0].set_xlabel(parameters.PLOT_XLABEL)
         ax[3, 0].legend(fontsize=7)
         ax[3, 0].set_xlim((0, self.data.shape[1]))
         ax[3, 0].grid(True)
@@ -1242,10 +1260,10 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         else:  # pragma: no cover
             if parameters.DISPLAY and self.verbose:
                 plt.show()
-        if parameters.SAVE:  # pragma: no cover
-            figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
-            self.my_logger.info(f"\n\tSave figure {figname}.")
-            fig.savefig(figname, dpi=100, bbox_inches='tight')
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH,
+                                     f'fit_chromatic_psf_best_fit_{self.amplitude_priors_method}.pdf'),
+                        dpi=100, bbox_inches='tight')
 
 
 class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
@@ -1301,7 +1319,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
 
         Extract the background:
 
-        >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+        >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
 
@@ -1435,7 +1453,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                                           plot,
                                           live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.pixels = np.mgrid[:self.Nx, :self.Ny]
+        yy, xx = np.mgrid[:self.Ny, :self.Nx]
+        self.pixels = np.asarray([xx, yy])
 
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
@@ -1446,15 +1465,17 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         # regularisation matrices
         self.reg = parameters.PSF_FIT_REG_PARAM
-        self.U = np.diag([1 / np.sum(self.err[:, x]) for x in range(self.Nx)])
-        L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] \
-            + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
-        L.astype(float)
-        L[0, 0] = -1
-        L[-1, -1] = -1
-        self.L = L
-        self.Q = L.T @ self.U.T @ self.U @ L
-        self.Q_dot_A0 = self.Q @ self.amplitude_priors
+        if amplitude_priors_method == "psf1d":
+            # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
+            self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
+            L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] \
+                + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
+            L.astype(float)
+            L[0, 0] = -1
+            L[-1, -1] = -1
+            self.L = L
+            self.Q = L.T @ self.U.T @ self.U @ L
+            self.Q_dot_A0 = self.Q @ self.amplitude_priors
 
     def simulate(self, *shape_params):
         r"""
@@ -1557,7 +1578,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         .. doctest::
 
-            >>> bgd_model_func = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+            >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
 
         Estimate the first guess values:
 
@@ -1574,8 +1595,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
             >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
             ... amplitude_priors_method="fixed", verbose=True)
-            # >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:])
-            # >>> w.plot_fit()
+            >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:])
+            >>> w.plot_fit()
 
         .. doctest::
             :hide:
@@ -1587,18 +1608,20 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         .. doctest::
 
             >>> parameters.PSF_FIT_REG_PARAM = 0.002
+            >>> s.poly_params = s.from_table_to_poly_params()
             >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
             ... amplitude_priors_method="psf1d", verbose=True)
-            # >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:])
-            # >>> w.plot_fit()
+            >>> y, mod, mod_err = w.simulate(s.poly_params[s.Nx:])
+            >>> w.plot_fit()
 
         .. doctest::
             :hide:
 
             >>> assert mod is not None
             >>> w = ChromaticPSF2DFitWorkspace(s0, data, data_errors, bgd_model_func=bgd_model_func,
-            ... amplitude_priors_method="psf1d", verbose=True)
+            ... amplitude_priors_method="fixed", verbose=True)
             >>> y, mod, mod_err = w.simulate(s0.poly_params[s0.Nx:])
+            >>> w.plot_fit()
             >>> assert np.abs(np.mean((w.amplitude_params-s0.poly_params[:s0.Nx])/w.amplitude_params_err)) < 0.05
 
         """
@@ -1709,6 +1732,7 @@ class RegFitWorkspace(FitWorkspace):
         self.chisquare = diff[self.w.not_outliers] @ (self.w.W * diff)[self.w.not_outliers]
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
+        self.w.amplitude_params_err = np.array([np.sqrt(cov[x, x]) for x in range(cov.shape[0])])
         self.G = self.chisquare / (self.w.data_flat.size - np.trace(self.resolution)) ** 2
         return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
@@ -1735,7 +1759,7 @@ class RegFitWorkspace(FitWorkspace):
             Gs.append(self.G)
             chisqs.append(self.chisquare)
             resolutions.append(np.trace(self.resolution))
-        fig, ax = plt.subplots(3, 1, figsize=(10, 6), sharex="all")
+        fig, ax = plt.subplots(3, 1, figsize=(7, 5), sharex="all")
         ax[0].plot(regs, Gs)
         ax[0].axvline(opt_reg, color="k")
         ax[1].axvline(opt_reg, color="k")
@@ -1745,13 +1769,13 @@ class RegFitWorkspace(FitWorkspace):
         ax[0].grid()
         ax[0].set_title(f"Optimal regularisation parameter: {opt_reg:.3g}")
         ax[1].plot(regs, chisqs)
-        ax[1].set_ylabel("Chi2")
+        ax[1].set_ylabel(r"$\chi^2(\mathbf{A}(r) \vert \mathbf{\theta})$")
         ax[1].set_xlabel("Regularisation hyper-parameter $r$")
         ax[1].grid()
         ax[1].set_xscale("log")
         ax[2].set_xscale("log")
         ax[2].plot(regs, resolutions)
-        ax[2].set_ylabel(r"$\mathrm{Tr}(R)$")
+        ax[2].set_ylabel(r"$\mathrm{Tr}\,\mathbf{R}$")
         ax[2].set_xlabel("Regularisation hyper-parameter $r$")
         ax[2].grid()
         fig.tight_layout()
@@ -1760,6 +1784,16 @@ class RegFitWorkspace(FitWorkspace):
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'regularisation.pdf'))
+
+        fig = plt.figure(figsize=(7, 5))
+        rho = compute_correlation_matrix(self.w.amplitude_cov_matrix)
+        plot_correlation_matrix_simple(plt.gca(), rho, axis_names=[''] * self.w.chromatic_psf.Nx)
+        # ipar=np.arange(10, 20))
+        plt.gca().set_title(r"Correlation matrix $\mathbf{\rho}$")
+        if parameters.LSST_SAVEFIGPATH:
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'amplitude_correlation_matrix.pdf'))
+        if parameters.DISPLAY:
+            plt.show()
 
 
 if __name__ == "__main__":

@@ -7,12 +7,13 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import copy
 
 from spectractor import parameters
 from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
-from spectractor.extractor.psf import fit_PSF2D_minuit, Moffat
+from spectractor.extractor.psf import Moffat
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, fit_poly1d,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
@@ -56,6 +57,8 @@ class Image(object):
         self.my_logger = set_logger(self.__class__.__name__)
         if config != "":
             load_config(config)
+        if not os.path.isfile(file_name):
+            raise FileNotFoundError(f"File {file_name} does not exist.")
         self.file_name = file_name
         self.units = 'ADU'
         self.expo = -1
@@ -236,7 +239,7 @@ class Image(object):
 
         """
         if self.units != 'ADU':
-            self.my_logger.error(f'\n\tNoise must be estimated on an image in ADU units. '
+            raise AttributeError(f'Noise must be estimated on an image in ADU units. '
                                  f'Currently self.units={self.units}.')
         # removes the zeros and negative pixels first
         # set to minimum positive value
@@ -293,7 +296,7 @@ class Image(object):
 
         """
         if self.units != "ADU":
-            self.my_logger.error(f"\n\tNoise map must be in ADU units to be plotted and analyzed. "
+            raise AttributeError(f"Noise map must be in ADU units to be plotted and analyzed. "
                                  f"Currently self.units={self.units}.")
         data = np.copy(self.data)
         min_noz = np.min(data[data > 0])
@@ -350,7 +353,7 @@ class Image(object):
                           units=self.units, target_pixcoords=None, aspect="auto", cmap=None)
         fig.tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.png'))
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'uncertainty_map.pdf'))
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
@@ -419,6 +422,8 @@ class Image(object):
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         plt.legend()
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'))
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
@@ -541,8 +546,8 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.airmass = -1
     parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
     if "mm" not in hdus["XYZ"].header.comments["ZPOS"]:
-        image.my_logger.error(f'\n\tmm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
-                              f'Distances along Z axis must be in mm.')
+        raise KeyError(f'mm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
+                       f'Distances along Z axis must be in mm.')
     image.my_logger.info(f'\n\tDistance to CCD adjusted to {parameters.DISTANCE2CCD} mm '
                          f'considering XYZ platform is set at ZPOS={float(hdus["XYZ"].header["ZPOS"])} mm.')
     # compute CCD gain map
@@ -598,7 +603,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.read_out_noise = 8.5*np.ones_like(image.data)
 
 
-def find_target(image, guess=None, rotated=False, use_wcs=True):
+def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[parameters.XWINDOW, parameters.YWINDOW]):
     """Find the target in the Image instance.
 
     The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
@@ -616,6 +621,8 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
     use_wcs: bool
         If True, the WCS file (if found) is used to set the target position in pixels,
         guess parameter is then unnecessary.
+    widths: (int, int)
+        Two parameter array to define the width of the cropped image (default: [parameters.XWINDOW, parameters.YWINDOW])
 
     Returns
     -------
@@ -662,27 +669,24 @@ def find_target(image, guess=None, rotated=False, use_wcs=True):
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
     if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
         if guess is None:
-            my_logger.error(f"\n\tguess parameter must be set if WCS solution is not found.")
-        Dx = parameters.XWINDOW
-        Dy = parameters.YWINDOW
+            raise ValueError(f"Guess parameter must be set if WCS solution is not found.")
+        Dx, Dy = widths
         theX, theY = guess
         if rotated:
             guess2 = find_target_after_rotation(image)
             x0 = int(guess2[0])
             y0 = int(guess2[1])
             guess = [x0, y0]
-            Dx = parameters.XWINDOW_ROT
-            Dy = parameters.YWINDOW_ROT
         niter = 2
         sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
-                                                                            widths=[Dx, Dy])
+                                                                            widths=(Dx, Dy))
         for i in range(niter):
             # find the target
-            try:
-                avX, avY = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
-            except (Exception, ValueError):
-                image.target_star2D = None
-                avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
+            # try:
+            avX, avY = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
+            # except (Exception, ValueError):
+            #     image.target_star2D = None
+            #     avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
             # compute target position
             theX = x0 - Dx + avX
             theY = y0 - Dy + avY
@@ -732,7 +736,7 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
         Two parameter array giving the estimated position of the target in the image.
     rotated: bool
         If True, the target is searched in the rotated image.
-    widths: array_like
+    widths: (int, int)
         Two parameter array to define the width of the cropped image (default: [parameters.XWINDOW, parameters.YWINDOW])
 
     Returns
@@ -836,13 +840,13 @@ def find_target_1Dprofile(image, sub_image, guess):
         ax2.plot(X, bkgd_X(X), 'g--', lw=2, label='bkgd')
         ax2.axvline(avX, color='b', linestyle='-', label='new', lw=2)
         ax2.grid(True)
-        ax2.set_xlabel('X [pixels]')
+        ax2.set_xlabel(parameters.PLOT_XLABEL)
         ax2.legend(loc=1)
         ax3.plot(Y, profile_Y_raw, 'r-', lw=2)
         ax3.plot(Y, bkgd_Y(Y), 'g--', lw=2, label='bkgd')
         ax3.axvline(avY, color='b', linestyle='-', label='new', lw=2)
         ax3.grid(True)
-        ax3.set_xlabel('Y [pixels]')
+        ax3.set_xlabel(parameters.PLOT_YLABEL)
         ax3.legend(loc=1)
         f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
@@ -937,131 +941,29 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
                           target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax1.legend(loc=1)
 
+        ax1.text(0.05, 0.05, f'Data', color="white",
+                 horizontalalignment='left', verticalalignment='bottom', transform=ax1.transAxes)
+        ax2.text(0.05, 0.05, f'Background+Moffat2D model', color="white",
+                 horizontalalignment='left', verticalalignment='bottom', transform=ax2.transAxes)
+        ax3.text(0.05, 0.05, f'Residuals', color="white",
+                 horizontalalignment='left', verticalalignment='bottom', transform=ax3.transAxes)
         plot_image_simple(ax2, data=star2D, scale="lin", title="",
-                          units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
+                          units=f'{image.units}', vmin=vmin, vmax=vmax)
         plot_image_simple(ax3, data=sub_image_subtracted - star2D, scale="lin", title="",
-                          units=f'Background+Star2D subtracted image\n({image.units})',
-                          target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
+                          units=f'{image.units}', target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
         ax3.legend(loc=1)
 
         f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot2.pdf'))
-    return new_avX, new_avY
-
-
-def find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=None):
-    """
-    Find precisely the position of the targeted object fitting a PSF model.
-    A polynomial 2D background was subtracted before. Saturated pixels are masked with np.nan values.
-
-    THE ERROR ARRAY IS NOT USED FOR THE MOMENT.
-
-    Parameters
-    ----------
-    image: Image
-        The Image instance.
-    sub_image_subtracted: array_like
-        The cropped image data array where the fit is performed.
-    sub_errors: array_like
-        The image data uncertainties.
-
-    Examples
-    --------
-    >>> im = Image('tests/data/reduc_20170605_028.fits')
-    >>> guess = [820, 580]
-    >>> parameters.DEBUG = True
-    >>> sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(im, guess, rotated=False)
-    >>> xmax = np.argmax(np.sum(sub_image_subtracted, axis=0))
-    >>> ymax = np.argmax(np.sum(sub_image_subtracted, axis=1))
-    >>> x1, y1 = find_target_2DprofileASTROPY(im, sub_image_subtracted)
-
-    .. doctest::
-        :hide:
-
-        >>> assert np.isclose(x1, xmax, rtol=1e-2)
-        >>> assert np.isclose(y1, ymax, rtol=1e-2)
-
-    """
-    # TODO: replace with minuit and test on image _133.fits or decrease mean_prior
-    # fit and subtract smooth polynomial background
-    # with 3sigma rejection of outliers (star peaks)
-    NY, NX = sub_image_subtracted.shape
-    XX = np.arange(NX)
-    YY = np.arange(NY)
-    Y, X = np.mgrid[:NY, :NX]
-    # find a first guess of the target position
-    avX, sigX = weighted_avg_and_std(XX, np.sum(sub_image_subtracted, axis=0) ** 4)
-    avY, sigY = weighted_avg_and_std(YY, np.sum(sub_image_subtracted, axis=1) ** 4)
-    # fit a 2D star profile close to this position
-    # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2D
-    # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
-    guess = [np.max(sub_image_subtracted), avX, avY, 1, 1, 0.1, 2, image.saturation]
-    if image.target_star2D is not None:
-        guess = fitting._model_to_fit_params(image.target_star2D)[0]
-        guess[1] = avX
-        guess[2] = avY
-    mean_prior = 10  # in pixels
-    # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf],
-    # [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] #for Moffat2D
-    # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,0,0],
-    # [100*image.saturation,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] #for Gauss2D
-    # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation],
-    # [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
-    bounds = [[0.1 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 1, 0, -100, 1,
-               0.9 * image.saturation],
-              [10 * image.saturation, avX + mean_prior, avY + mean_prior, 30, 10, 200, 15, 1.1 * image.saturation]]
-    sub_image = sub_image_subtracted + image.target_bkgd2D(X, Y)
-    saturated_pixels = np.where(sub_image >= image.saturation)
-    if len(saturated_pixels[0]) > 0:
-        if parameters.DEBUG:
-            image.my_logger.info(
-                f'\n\t{len(saturated_pixels[0])} saturated pixels: set saturation level '
-                f'to {image.saturation} {image.units}.')
-        sub_image_subtracted[sub_image >= 0.9 * image.saturation] = np.nan
-        sub_image_subtracted[sub_image >= 0.9 * image.saturation] = np.nan
-    # fit
-    bounds = list(np.array(bounds).T)
-    # star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
-    star2D = fit_PSF2D_minuit(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
-    new_avX = star2D.x_mean.value
-    new_avY = star2D.y_mean.value
-    image.target_star2D = star2D
-    # check target positions
-    dist = np.sqrt((new_avY - avY) ** 2 + (new_avX - avX) ** 2)
-    if dist > mean_prior / 2:
-        image.my_logger.warning(
-            f'\n\tX={new_avX:.2f}, Y={new_avY:.2f} target position determination probably wrong: '
-            f'{dist:.1f} pixels from profile detection ({avX:.2f}, {avY:.2f})')
-    # debugging plots
-    if parameters.DEBUG:
-        f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
-        vmin = 0
-        vmax = float(np.nanmax(sub_image_subtracted))
-        plot_image_simple(ax1, data=sub_image_subtracted, scale="lin", title="", units=image.units,
-                          target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
-        ax1.legend(loc=1)
-
-        plot_image_simple(ax2, data=star2D(X, Y), scale="lin", title="",
-                          units=f'Background+Star2D ({image.units})', vmin=vmin, vmax=vmax)
-        plot_image_simple(ax3, data=sub_image_subtracted - star2D(X, Y), scale="lin", title="",
-                          units=f'Background+Star2D subtracted image\n({image.units})',
-                          target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
-        ax3.legend(loc=1)
-
-        f.tight_layout()
-        if parameters.DISPLAY:  # pragma: no cover
-            plt.show()
-        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot2.pdf'))
+            f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'order0_centroid_fit.pdf'))
     return new_avX, new_avY
 
 
 def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=parameters.YWINDOW,
-                                   right_edge=parameters.CCD_IMSIZE - 200,
-                                   margin_cut=12):
+                                   edges=(0, parameters.CCD_IMSIZE - 200),
+                                   margin_cut=12, pixel_fraction=0.01):
     """Compute the rotation angle in degree of a spectrogram with the Hessian of the image.
     Use the disperser rotation angle map as a prior and the target_pixcoords values to crop the image
     around the spectrogram.
@@ -1074,11 +976,13 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         Don't consider pixel with Hessian angle outside this range (default: (-10,10)).
     width_cut: int
         Half with of the image to consider in height (default: parameters.YWINDOW).
-    right_edge: int
-        Maximum pixel on the right edge (default: parameters.CCD_IMSIZE - 200).
+    edges: (int, int)
+        Minimum and maximum pixel on the right edge (default: (0, parameters.CCD_IMSIZE - 200)).
     margin_cut: int
         After computing the Hessian, to avoid bad values on the edges the function cut on the
-        edge of image margin_cut pixels.
+        edge of image margin_cut pixels (default: 12).
+    pixel_fraction: float
+        Minimum pixel fraction to keep after thresholding the lambda minus map (default: 0.01).
 
     Returns
     -------
@@ -1112,14 +1016,15 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
     """
     x0, y0 = np.array(image.target_pixcoords).astype(int)
     # extract a region
-    data = np.copy(image.data[y0 - width_cut:y0 + width_cut, 0:right_edge])
+    left_edge, right_edge = edges
+    data = np.copy(image.data[y0 - width_cut:y0 + width_cut, left_edge:right_edge])
     lambda_plus, lambda_minus, theta = hessian_and_theta(data, margin_cut)
     # thresholds
     lambda_threshold = np.min(lambda_minus)
     mask = np.where(lambda_minus > lambda_threshold)
     theta_mask = np.copy(theta)
     theta_mask[mask] = np.nan
-    minimum_pixels = 0.01 * 2 * width_cut * right_edge
+    minimum_pixels = pixel_fraction * 2 * width_cut * right_edge
     while len(theta_mask[~np.isnan(theta_mask)]) < minimum_pixels:
         lambda_threshold /= 2
         mask = np.where(lambda_minus > lambda_threshold)
@@ -1147,19 +1052,28 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
     #         f'\n\tInterpolated angle and fitted angle disagrees with more than 20 pixels '
     #         f'over {parameters.CCD_IMSIZE:d} pixels: {theta_median:.2f} vs {theta_guess:.2f}')
     if parameters.DEBUG:
-        f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6))
+        gs_kw = dict(width_ratios=[3, 1], height_ratios=[1])
+        f, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(6.5, 3), gridspec_kw=gs_kw)
         xindex = np.arange(data.shape[1])
         x_new = np.linspace(xindex.min(), xindex.max(), 50)
-        y_new = width_cut + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
-        ax1.imshow(theta_mask, origin='lower', cmap=cm.brg, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
-        ax1.plot(x_new, y_new, 'b-')
-        ax1.set_ylim(0, 2 * width_cut)
-        ax1.set_xlabel('X [pixels]')
-        ax1.set_xlabel('Y [pixels]')
+        y_new = width_cut-margin_cut-3 + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
+        cmap = copy.copy(cm.get_cmap('bwr'))
+        cmap.set_bad(color='lightgrey')
+        im = ax1.imshow(theta_mask, origin='lower', cmap=cmap, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
+        cb = plt.colorbar(im, ax=ax1)
+        cb.set_label(parameters.PLOT_ROT_LABEL, labelpad=-10)
+        ax1.plot(x_new, y_new, 'k-', label=rf"Mean dispersion axis: $\alpha$={theta_median:.2f}°")
+        ax1.set_ylim(0, theta_mask.shape[0])
+        ax1.set_xlim(0, theta_mask.shape[1])
+        ax1.legend()
+        ax1.set_xlabel(parameters.PLOT_XLABEL)
+        ax1.set_ylabel(parameters.PLOT_YLABEL)
         ax1.grid(True)
-        n, bins, patches = ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
-        ax2.plot([theta_median, theta_median], [0, np.max(n)])
-        ax2.set_xlabel("Rotation angles [degrees]")
+        ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
+        ax2.axvline(theta_median, color='k')
+        ax2.set_xlabel(parameters.PLOT_ROT_LABEL)
+        ax2.grid()
+        f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
@@ -1237,7 +1151,7 @@ def turn_image(image):
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
                                                           angle_range=(parameters.ROT_ANGLE_MIN,
                                                                        parameters.ROT_ANGLE_MAX),
-                                                          right_edge=parameters.CCD_IMSIZE - 200)
+                                                          edges=(0, parameters.CCD_IMSIZE - 200))
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)

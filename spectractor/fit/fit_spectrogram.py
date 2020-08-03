@@ -8,7 +8,7 @@ from spectractor.config import set_logger
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.simulation.simulator import SimulatorInit, SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_gradient_descent, save_gradient_descent
+from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_gradient_descent, run_minimisation_sigma_clipping
 
 plot_counter = 0
 
@@ -81,7 +81,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.data = self.spectrum.spectrogram
         self.err = self.spectrum.spectrogram_err
         self.A1 = 1.0
-        self.A2 = 0.01
+        self.A2 = 1.0
         self.ozone = 400.
         self.pwv = 3
         self.aerosols = 0.05
@@ -94,7 +94,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
-        self.shift_x = 0  # self.spectrum.header['PIXSHIFT']
+        self.shift_x = self.spectrum.header['PIXSHIFT']
         self.shift_y = 0.
         self.angle = self.spectrum.rotation_angle
         self.B = 1
@@ -108,15 +108,18 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.axis_names = ["$A_1$", "$A_2$", "ozone [db]", "PWV [mm]", "VAOD", r"$D_{CCD}$ [mm]",
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
                            r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names)
-        self.bounds = np.concatenate([np.array([(0, 2), (0, 0.5), (0, 800), (1, 10), (0, 1),
-                                                (50, 60), (-2, 2), (-3, 3), (-90, 90), (0.8, 1.2)]),
+        self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 800), (1, 10),
+                                                (0, 1), (50, 60), (-2, 2), (-3, 3), (-90, 90), (0.8, 1.2)]),
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
             if "x_c" in par or "saturation" in par:
                 self.fixed[k] = True
+        # self.fixed[1] = True  # A2
+        # self.fixed[5:7] = [True, True]  # DCCD, x0
         self.fixed[7] = True  # Delta y
         self.fixed[8] = True  # angle
+        self.fixed[9] = True  # B
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -124,6 +127,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
                                            with_background=True, fast_sim=False)
+        self.lambdas_truth = None
+        self.amplitude_truth = None
         self.get_spectrogram_truth()
 
     def crop_spectrogram(self):
@@ -443,21 +448,26 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         fit_workspace.fixed = np.copy(fixed)
         guess = fit_workspace.p
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fit_workspace.fixed, xtol=1e-3, ftol=1e-2, niter=10)
+                                                   fix=fit_workspace.fixed, xtol=1e-5, ftol=1e-3, niter=10)
 
         fit_workspace.simulation.fast_sim = False
         fit_workspace.simulation.fix_psf_cube = False
+        fit_workspace.fixed = np.copy(fixed)
         guess = fit_workspace.p
         params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fit_workspace.fixed, xtol=1e-4, ftol=1 / fit_workspace.data.size,
+                                                   fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
                                                    niter=40)
+        # run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
+        #                                 xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
+        #                                 verbose=False)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             parameters.SAVE = True
             ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
             fit_workspace.plot_correlation_matrix(ipar)
-            fit_workspace.save_parameters_summary(header=fit_workspace.spectrum.date_obs)
-            save_gradient_descent(fit_workspace, costs, params_table)
+            fit_workspace.save_parameters_summary(ipar, header=f"{fit_workspace.spectrum.date_obs}\n"
+                                                               f"chi2: {costs[-1] / fit_workspace.data.size}")
+            # save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
 
@@ -492,11 +502,50 @@ if __name__ == "__main__":
     load_config(args.config)
 
     # filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    filename = 'outputs/sim_20170530_191_spectrum.fits'
-    atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+    filename = 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits'
+    # filename = 'outputs/sim_20170530_134_spectrum.fits'
+    filenames = [
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_104_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_109_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_114_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_119_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_124_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_129_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_139_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_144_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_149_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_154_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_159_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_164_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_169_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_174_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_179_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_184_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_189_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_194_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
+    params = []
+    chisqs = []
+    filenames = ['outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits']
+    for filename in filenames:
+        atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
-    w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                                burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-    run_spectrogram_minimisation(w, method="newton")
-    # run_emcee(w, ln=lnprob_spectrogram)
-    # w.analyze_chains()
+        w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
+                                    burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
+        # w.simulate(*w.truth)
+        # w.plot_fit()
+        run_spectrogram_minimisation(w, method="newton")
+        # run_emcee(w, ln=lnprob_spectrogram)
+        # w.analyze_chains()
+        params.append(w.p)
+        chisqs.append(w.costs[-1])
+    params = np.asarray(params).T
+
+    fig, ax = plt.subplots(1, len(params))
+    for ip, p in enumerate(params):
+        print(f"{w.input_labels[ip]}:", np.mean(p), np.std(p))
+        ax[ip].plot(p, label=f"{w.input_labels[ip]}")
+        ax[ip].grid()
+        ax[ip].legend()
+    plt.show()

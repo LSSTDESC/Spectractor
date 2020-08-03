@@ -166,13 +166,13 @@ class Lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(7)])
-        [686.719, 762.1, 794.0, 820.4, 822.696, 868.0, 898.765]
+        [686.719, 761.9, 794.0, 820.4, 822.696, 868.0, 898.765]
 
         Redshift all the spectral lines, except the atmospheric lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
-        [686.719, 706.2, 762.1, 777.6, 794.0]
+        [686.719, 706.2, 761.9, 777.6, 794.0]
 
         Hydrogen lines at order 1 and 2:
         >>> lines = Lines(HYDROGEN_LINES, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True, orders=[1, 2])
@@ -267,8 +267,8 @@ class Lines:
 
         >>> import matplotlib.pyplot as plt
         >>> f, ax = plt.subplots(1,1)
-        >>> ax.set_xlim(300,1000)
-        (300, 1000)
+        >>> ax.set_xlim(300,1000)  # doctest: +ELLIPSIS
+        (300..., 1000...)
         >>> lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES)
         >>> lines.lines[5].fitted = True
         >>> lines.lines[5].high_snr = True
@@ -496,15 +496,15 @@ class Lines:
 # Line catalog
 
 # Hydrogen lines
-HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.016, 0.02], use_for_calibration=True)
+HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.04, 0.02], use_for_calibration=True)
 HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=False)
 HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=False)
-HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.016, 0.02], use_for_calibration=False)
+HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.04, 0.02], use_for_calibration=False)
 HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
 
 # Atmospheric lines
-O2 = Line(762.1, atmospheric=True, label=r'$O_2$',
+O2 = Line(761.9, atmospheric=True, label=r'$O_2$',
           label_pos=[0.007, 0.02],
           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
 # O2_1 = Line(760.6, atmospheric=True, label='',
