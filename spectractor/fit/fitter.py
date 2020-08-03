@@ -20,6 +20,35 @@ class FitWorkspace:
 
     def __init__(self, file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
+        """Generic class to create a fit workspace with parameters, bounds and general fitting methods.
+
+        Parameters
+        ----------
+        file_name: str, optional
+            The generic file name to save results. If file_name=="", nothing is saved ond disk (default: "").
+        nwalkers: int, optional
+            Number of walkers for MCMC exploration (default: 18).
+        nsteps: int, optional
+            Number of steps for MCMC exploration (default: 1000).
+        burnin: int, optional
+            Number of burn-in steps for MCMC exploration (default: 100).
+        nbins: int, optional
+            Number of bins to make histograms after MCMC exploration (default: 10).
+        verbose: int, optional
+            Level of verbosity (default: 0).
+        plot: bool, optional
+            Level of plotting (default: False).
+        live_fit: bool, optional, optional
+            If True, model, data and residuals plots are made along the fitting procedure (default: False).
+        truth: array_like, optional
+            Array of true parameters (default: None).
+
+        Examples
+        --------
+        >>> w = FitWorkspace()
+        >>> w.ndim
+        0
+        """
         self.my_logger = set_logger(self.__class__.__name__)
         self.filename = file_name
         self.truth = truth
@@ -69,23 +98,66 @@ class FitWorkspace:
 
     @property
     def ndim(self):
+        """Number of parameters of the model.
+
+        Returns
+        -------
+        ndim: int
+
+        """
         return len(self.p)
 
     @property
     def not_outliers(self):
+        """List of points that are not outliers rejected by a sigma-clipping method or other masking method.
+
+        Returns
+        -------
+        not_outliers: list
+
+        """
         if len(self.outliers) > 0:
             return [i for i in range(self.data.size) if i not in self.outliers]
         else:
             return list(np.arange(self.data.size))
 
-    def set_start(self):
+    def set_start(self, percent=0.02, a_random=1e-5):
+        """Set the random starting points for MCMC exploration.
+
+        A set of parameters are drawn with a uniform distribution between +/- percent times the starting guess.
+        For null guess parameters, starting points are drawn from a uniform distribution between +/- a_random.
+
+        Parameters
+        ----------
+        percent: float, optional
+            Percent of the guess parameters to set the uniform interval to draw random points (default: 0.02).
+        a_random: float, optional
+            Absolute value to set the +/- uniform interval to draw random points
+            for null guess parameters (default: 1e-5).
+
+        Returns
+        -------
+        start: np.array
+            Array of starting points of shape (ndim, nwalkers).
+
+        """
         self.start = np.array(
-            [np.random.uniform(self.p[i] - 0.02 * self.p[i], self.p[i] + 0.02 * self.p[i], self.nwalkers)
+            [np.random.uniform(self.p[i] - percent * self.p[i], self.p[i] + percent * self.p[i], self.nwalkers)
              for i in range(self.ndim)]).T
-        self.start[self.start == 0] = 1e-5 * np.random.uniform(0, 1)
+        self.start[self.start == 0] = a_random * np.random.uniform(-1, 1)
         return self.start
 
     def load_chains(self):
+        """Load the MCMC chains from a hdf5 file. The burn-in points are not rejected at this stage.
+
+        Returns
+        -------
+        chains: np.array
+            Array of the chains.
+        lnprobs: np.array
+            Array of the logarithmic posterior probability.
+
+        """
         self.chains = [[]]
         self.lnprobs = [[]]
         self.nsteps = 0
@@ -106,6 +178,14 @@ class FitWorkspace:
         return self.chains, self.lnprobs
 
     def build_flat_chains(self):
+        """Flatten the chains array and apply burn-in.
+
+        Returns
+        -------
+        flat_chains: np.array
+            Flat chains.
+
+        """
         self.flat_chains = self.chains[self.burnin:, self.valid_chains, :].reshape((-1, self.ndim))
         return self.flat_chains
 
@@ -143,6 +223,10 @@ class FitWorkspace:
         return self.x, self.model, self.model_err
 
     def analyze_chains(self):
+        """Load the chains, build the probability densities for the parameters, compute the best fitting values
+        and the uncertainties and covariance matrices, and plot.
+
+        """
         self.load_chains()
         self.set_chain_validity()
         self.convergence_tests()
@@ -157,6 +241,14 @@ class FitWorkspace:
         self.likelihood.triangle_plots(output_filename=figure_name)
 
     def plot_fit(self):
+        """Generic function to plot the result of the fit for 1D curves.
+
+        Returns
+        -------
+        fig: plt.FigureClass
+            The figure.
+
+        """
         fig = plt.figure()
         plt.errorbar(self.x, self.data, yerr=self.err, fmt='ko', label='Data')
         if self.truth is not None:
@@ -179,11 +271,26 @@ class FitWorkspace:
         plt.title(title)
         plt.legend()
         plt.grid()
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         return fig
 
     def chain2likelihood(self, pdfonly=False, walker_index=-1):
+        """Convert the chains to a psoterior probability density function via histograms.
+
+        Parameters
+        ----------
+        pdfonly: bool, optional
+            If True, do not compute the covariances and the 2D correlation plots (default: False).
+        walker_index: int, optional
+            The walker index to plot. If -1, all walkers are selected (default: -1).
+
+        Returns
+        -------
+        likelihood: np.array
+            Posterior density function.
+
+        """
         if walker_index >= 0:
             chains = self.chains[self.burnin:, walker_index, :]
         else:
@@ -210,6 +317,23 @@ class FitWorkspace:
         return likelihood
 
     def compute_local_acceptance_rate(self, start_index, last_index, walker_index):
+        """Compute the local acceptance rate in a chain.
+
+        Parameters
+        ----------
+        start_index: int
+            Beginning index.
+        last_index: int
+            End index.
+        walker_index: int
+            Index of the walker.
+
+        Returns
+        -------
+        freq: float
+            The acceptance rate.
+
+        """
         frequences = []
         test = -2 * self.lnprobs[start_index, walker_index]
         counts = 1
@@ -225,6 +349,14 @@ class FitWorkspace:
         return 1.0 / np.mean(frequences)
 
     def set_chain_validity(self):
+        """Test the validity of a chain: reject chains whose chi2 is far from the mean of the others.
+
+        Returns
+        -------
+        valid_chains: list
+            List of boolean values, True if the chain is valid, or False if invalid.
+
+        """
         nchains = [k for k in range(self.nwalkers)]
         chisq_averages = []
         chisq_std = []
@@ -249,6 +381,9 @@ class FitWorkspace:
         return self.valid_chains
 
     def convergence_tests(self):
+        """Compute the convergence tests (Gelman-Rubin, acceptance rate).
+
+        """
         chains = self.chains[self.burnin:, :, :]  # .reshape((-1, self.ndim))
         nchains = [k for k in range(self.nwalkers)]
         fig, ax = plt.subplots(self.ndim + 1, 2, figsize=(16, 7), sharex='all')
@@ -347,19 +482,33 @@ class FitWorkspace:
         self.gelmans = np.array(self.gelmans)
         fig.tight_layout()
         plt.subplots_adjust(hspace=0)
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         figure_name = self.emcee_filename.replace('.h5', '_convergence.pdf')
         print(f'Save figure: {figure_name}')
         fig.savefig(figure_name, dpi=100)
 
     def print_settings(self):
+        """Print the main settings of the FitWorkspace.
+
+        """
         print('************************************')
         print(f"Input file: {self.filename}\nWalkers: {self.nwalkers}\t Steps: {self.nsteps}")
         print(f"Output file: {self.emcee_filename}")
         print('************************************')
 
     def save_parameters_summary(self, ipar, header=""):
+        """Save the best fitting parameter summary in a text file.
+
+        The file name is build from self.file_name, adding the suffix _bestfit.txt.
+
+        Parameters
+        ----------
+        ipar: list
+            The list of parameter indices to save.
+        header: str, optional
+            A header to add to the file (default: "").
+        """
         output_filename = os.path.splitext(self.filename)[0] + "_bestfit.txt"
         f = open(output_filename, 'w')
         txt = self.filename + "\n"
@@ -376,16 +525,33 @@ class FitWorkspace:
         f.close()
 
     def plot_correlation_matrix(self, ipar=None):
+        """Compute and plot a correlation matrix.
+
+        Save the plot if parameters.SAVE is True. The output file name is build from self.file_name,
+        adding the suffix _correlation.pdf.
+
+        Parameters
+        ----------
+        ipar: list, optional
+            The list of parameter indices to include in the matrix.
+
+        Examples
+        --------
+        >>> w = FitWorkspace()
+        >>> w.axis_names = ["x", "y", "z"]
+        >>> w.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
+        >>> w.plot_correlation_matrix()
+        """
         if ipar is None:
             ipar = np.arange(self.cov.shape[0]).astype(int)
         fig = plt.figure()
         self.rho = compute_correlation_matrix(self.cov)
         plot_correlation_matrix_simple(plt.gca(), self.rho, axis_names=[self.axis_names[i] for i in ipar])
-        if parameters.SAVE and self.filename != "":
+        if parameters.SAVE and self.filename != "":  # pragma: no cover
             figname = os.path.splitext(self.filename)[0] + "_correlation.pdf"
             self.my_logger.info(f"Save figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             if self.live_fit:
                 plt.draw()
                 plt.pause(1e-8)
@@ -393,6 +559,21 @@ class FitWorkspace:
                 plt.show()
 
     def weighted_residuals(self, p):
+        """Compute the weighted residuals array for a set of model parameters p.
+
+        The uncertainties are assumed to be uncorrelated.
+
+        Parameters
+        ----------
+        p: array_like
+            The array of model parameters.
+
+        Returns
+        -------
+        residuals: np.array
+            The array of weighted residuals.
+
+        """
         x, model, model_err = self.simulate(*p)
         if len(self.outliers) > 0:
             good_indices = self.not_outliers
@@ -405,14 +586,55 @@ class FitWorkspace:
         return res
 
     def chisq(self, p):
+        """Compute the chi square for a set of model parameters p.
+
+        Parameters
+        ----------
+        p: array_like
+            The array of model parameters.
+
+        Returns
+        -------
+        chisq: float
+            The chi square value.
+
+        """
         res = self.weighted_residuals(p)
         chisq = np.sum(res * res)
         return chisq
 
     def lnlike(self, p):
+        """Compute the logarithmic likelihood for a set of model parameters p as -0.5*chisq.
+
+        Parameters
+        ----------
+        p: array_like
+            The array of model parameters.
+
+        Returns
+        -------
+        lnlike: float
+            The logarithmic likelihood value.
+
+        """
         return -0.5 * self.chisq(p)
 
     def lnprior(self, p):
+        """Compute the logarithmic prior for a set of model parameters p.
+
+        The function returns 0 for good parameters, and -np.inf for parameters out of their boundaries.
+
+        Parameters
+        ----------
+        p: array_like
+            The array of model parameters.
+
+        Returns
+        -------
+        lnprior: float
+            The logarithmic value fo the prior.
+
+        """
         in_bounds = True
         for npar, par in enumerate(p):
             if par < self.bounds[npar][0] or par > self.bounds[npar][1]:
@@ -424,6 +646,23 @@ class FitWorkspace:
             return -np.inf
 
     def jacobian(self, params, epsilon, fixed_params=None):
+        """Generic function to compute the Jacobian matrix of a model, with numerical derivatives.
+
+        Parameters
+        ----------
+        params: array_like
+            The array of model parameters.
+        epsilon: array_like
+            The array of small steps to compute the partial derivatives of the model.
+        fixed_params: array_like
+            List of boolean values. If True, the parameter is considered fixed and no derivative are computed.
+
+        Returns
+        -------
+        J: np.array
+            The Jacobian matrix.
+
+        """
         x, model, model_err = self.simulate(*params)
         model = model.flatten()[self.not_outliers]
         J = np.zeros((params.size, model.size))
@@ -439,6 +678,21 @@ class FitWorkspace:
         return J
 
     def hessian(self, params, epsilon, fixed_params=None):
+        """Experimental function to compute the hessian of a model.
+
+        Parameters
+        ----------
+        params: array_like
+            The array of model parameters.
+        epsilon: array_like
+            The array of small steps to compute the partial derivatives of the model.
+        fixed_params: array_like
+            List of boolean values. If True, the parameter is considered fixed and no derivative are computed.
+
+        Returns
+        -------
+
+        """
         x, model, model_err = self.simulate(*params)
         model = model.flatten()[self.not_outliers]
         J = self.jacobian(params, epsilon, fixed_params=fixed_params)
@@ -472,7 +726,7 @@ class FitWorkspace:
         return H
 
 
-def lnprob(p):
+def lnprob(p):  # pragma: no cover
     global fit_workspace
     lp = fit_workspace.lnprior(p)
     if not np.isfinite(lp):
@@ -481,7 +735,7 @@ def lnprob(p):
 
 
 def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3,
-                     with_line_search=True):
+                     with_line_search=True):  # pragma: no cover
     """
 
     Parameters
@@ -577,7 +831,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                            f"\n\tNew parameters: {tmp_params[ipar]}"
                            f"\n\tFinal cost={fval:.5g} final chisq_red={fval / tmp_model.size:.5g} "
                            f"computed in {time.time() - start:.2f}s")
-        if fit_workspace.live_fit:
+        if fit_workspace.live_fit:  # pragma: no cover
             fit_workspace.simulate(*tmp_params)
             fit_workspace.plot_fit()
             fit_workspace.cov = inv_JT_W_J
@@ -599,8 +853,9 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
 
 
-def simple_newton_minimisation(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3):
-    """
+def simple_newton_minimisation(fit_workspace, params, epsilon, niter=10, fixed_params=None,
+                               xtol=1e-3, ftol=1e-3):   # pragma: no cover
+    """Experimental function to minimize a function.
 
     Parameters
     ----------
@@ -717,6 +972,17 @@ def simple_newton_minimisation(fit_workspace, params, epsilon, niter=10, fixed_p
 
 
 def print_parameter_summary(params, cov, labels):
+    """Print the best fitting parameters on screen.
+
+    Parameters
+    ----------
+    params: array_like
+        The best fitting parameter values.
+    cov: array_like
+        The associated covariance matrix.
+    labels: array_like
+        The list of associated parameter labels.
+    """
     my_logger = set_logger(__name__)
     txt = ""
     for ip in np.arange(0, cov.shape[0]).astype(int):
@@ -742,11 +1008,11 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
     ax[0].xaxis.set_major_locator(MaxNLocator(integer=True))
     fig.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
-    if parameters.SAVE and fit_workspace.filename != "":
+    if parameters.SAVE and fit_workspace.filename != "":  # pragma: no cover
         figname = os.path.splitext(fit_workspace.filename)[0] + "_fitting.pdf"
         fit_workspace.my_logger.info(f"\n\tSave figure {figname}.")
         fig.savefig(figname, dpi=100, bbox_inches='tight')
-    if parameters.DISPLAY:
+    if parameters.DISPLAY:  # pragma: no cover
         plt.show()
 
     fit_workspace.simulate(*fit_workspace.p)
@@ -788,7 +1054,8 @@ def run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs, fix
     return params_table, costs
 
 
-def run_simple_newton_minimisation(fit_workspace, guess, epsilon, fix=None, xtol=1e-8, ftol=1e-8, niter=50, verbose=False):
+def run_simple_newton_minimisation(fit_workspace, guess, epsilon, fix=None, xtol=1e-8, ftol=1e-8,
+                                   niter=50, verbose=False):  # pragma: no cover
     if fix is None:
         fix = [False] * guess.size
     fit_workspace.p, fit_workspace.cov, funcs, params_table = simple_newton_minimisation(fit_workspace, guess,
@@ -935,7 +1202,7 @@ def run_emcee(fit_workspace, ln=lnprob):
     p0 = fit_workspace.set_start()
     filename = fit_workspace.emcee_filename
     backend = emcee.backends.HDFBackend(filename)
-    try:
+    try:  # pragma: no cover
         pool = MPIPool()
         if not pool.is_master():
             pool.wait()
