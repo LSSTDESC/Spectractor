@@ -487,7 +487,7 @@ class Moffat(PSF):
 
     def __init__(self, p=None):
         PSF.__init__(self)
-        self.p_default = np.array([1, 0, 0, 3, 3, 2, 1]).astype(float)
+        self.p_default = np.array([1, 0, 0, 3, 2, 1]).astype(float)
         if p is not None:
             self.p = np.asarray(p).astype(float)
         else:
@@ -538,7 +538,7 @@ class Moffat(PSF):
             import matplotlib.pyplot as plt
             import numpy as np
             from spectractor.extractor.psf import Moffat
-            p = [2,20,30,4,4,2,10]
+            p = [2,20,30,4,2,10]
             psf = Moffat(p)
             yy, xx = np.mgrid[:50, :60]
             out = psf.evaluate(pixels=np.array([xx, yy]))
