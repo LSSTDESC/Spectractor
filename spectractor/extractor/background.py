@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib import cm
 import os
+import copy
 
 from spectractor import parameters
 from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal, plot_image_simple
@@ -220,7 +221,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         bgd_bands[mask] = np.nan
         mean = np.nanmean(bgd_bands)
         std = np.nanstd(bgd_bands)
-        cmap = cm.get_cmap()
+        cmap = copy.copy(cm.get_cmap())
         cmap.set_bad(color='lightgrey')
         im = ax0.imshow(bgd_bands, origin='lower', aspect="auto", vmin=mean - 3 * std, vmax=mean + 3 * std)
         v1 = np.linspace(mean - 3 * std, mean + 3 * std, 5, endpoint=True)

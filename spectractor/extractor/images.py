@@ -7,6 +7,7 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import copy
 
 from spectractor import parameters
 from spectractor.config import set_logger, load_config
@@ -1163,7 +1164,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         xindex = np.arange(data.shape[1])
         x_new = np.linspace(xindex.min(), xindex.max(), 50)
         y_new = width_cut-margin_cut-3 + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
-        cmap = cm.bwr
+        cmap = copy.copy(cm.get_cmap('bwr'))
         cmap.set_bad(color='lightgrey')
         im = ax1.imshow(theta_mask, origin='lower', cmap=cmap, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
         cb = plt.colorbar(im, ax=ax1)
