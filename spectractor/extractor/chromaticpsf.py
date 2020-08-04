@@ -13,7 +13,7 @@ from spectractor.extractor.background import extract_spectrogram_background_sext
 from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss, Moffat
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping
+from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping, RegFitWorkspace
 
 
 class ChromaticPSF:
@@ -1692,108 +1692,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
-
-
-class RegFitWorkspace(FitWorkspace):
-
-    def __init__(self, w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=False, live_fit=False):
-        """
-
-        Parameters
-        ----------
-        w: ChromaticPSFFitWorkspace
-        """
-        FitWorkspace.__init__(self, verbose=verbose, live_fit=live_fit)
-        self.x = np.array([0])
-        self.data = np.array([0])
-        self.err = np.array([1])
-        self.w = w
-        self.p = np.asarray([np.log10(opt_reg)])
-        self.bounds = [(-20, np.log10(self.w.amplitude_priors.size) + 2)]
-        self.input_labels = ["log10_reg"]
-        self.axis_names = [r"$\log_{10} r$"]
-        self.fixed = [False] * self.p.size
-        self.opt_reg = opt_reg
-        self.resolution = np.zeros_like((self.w.amplitude_params.size, self.w.amplitude_params.size))
-        self.G = 0
-        self.chisquare = -1
-
-    def simulate(self, log10_r):
-        reg = 10 ** log10_r
-        M_dot_W_dot_M_plus_Q = self.w.M_dot_W_dot_M + reg * self.w.Q
-        try:
-            L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-            cov = L.T @ L
-        except np.linalg.LinAlgError:
-            cov = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-        A = cov @ (self.w.M.T @ self.w.W_dot_data + reg * self.w.Q_dot_A0)
-        self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
-        diff = self.w.data_flat - self.w.M @ A
-        self.chisquare = diff[self.w.not_outliers] @ (self.w.W * diff)[self.w.not_outliers]
-        self.w.amplitude_params = A
-        self.w.amplitude_cov_matrix = cov
-        self.w.amplitude_params_err = np.array([np.sqrt(cov[x, x]) for x in range(cov.shape[0])])
-        self.G = self.chisquare / (self.w.data_flat.size - np.trace(self.resolution)) ** 2
-        return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
-
-    def plot_fit(self):
-        log10_opt_reg = self.p[0]
-        opt_reg = 10 ** log10_opt_reg
-        regs = 10 ** np.linspace(min(-10, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
-        Gs = []
-        chisqs = []
-        resolutions = []
-        x = np.arange(len(self.w.amplitude_priors))
-        for r in regs:
-            self.simulate(np.log10(r))
-            if parameters.DISPLAY and False:
-                fig = plt.figure()
-                plt.errorbar(x, self.w.amplitude_params, yerr=[np.sqrt(self.w.amplitude_cov_matrix[i, i]) for i in x],
-                             label=f"fit r={r:.2g}")
-                plt.plot(x, self.w.amplitude_priors, label="prior")
-                plt.grid()
-                plt.legend()
-                plt.draw()
-                plt.pause(1e-8)
-                plt.close(fig)
-            Gs.append(self.G)
-            chisqs.append(self.chisquare)
-            resolutions.append(np.trace(self.resolution))
-        fig, ax = plt.subplots(3, 1, figsize=(7, 5), sharex="all")
-        ax[0].plot(regs, Gs)
-        ax[0].axvline(opt_reg, color="k")
-        ax[1].axvline(opt_reg, color="k")
-        ax[2].axvline(opt_reg, color="k")
-        ax[0].set_ylabel(r"$G(r)$")
-        ax[0].set_xlabel("Regularisation hyper-parameter $r$")
-        ax[0].grid()
-        ax[0].set_title(f"Optimal regularisation parameter: {opt_reg:.3g}")
-        ax[1].plot(regs, chisqs)
-        ax[1].set_ylabel(r"$\chi^2(\mathbf{A}(r) \vert \mathbf{\theta})$")
-        ax[1].set_xlabel("Regularisation hyper-parameter $r$")
-        ax[1].grid()
-        ax[1].set_xscale("log")
-        ax[2].set_xscale("log")
-        ax[2].plot(regs, resolutions)
-        ax[2].set_ylabel(r"$\mathrm{Tr}\,\mathbf{R}$")
-        ax[2].set_xlabel("Regularisation hyper-parameter $r$")
-        ax[2].grid()
-        fig.tight_layout()
-        plt.subplots_adjust(hspace=0)
-        if parameters.DISPLAY:
-            plt.show()
-        if parameters.LSST_SAVEFIGPATH:
-            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'regularisation.pdf'))
-
-        fig = plt.figure(figsize=(7, 5))
-        rho = compute_correlation_matrix(self.w.amplitude_cov_matrix)
-        plot_correlation_matrix_simple(plt.gca(), rho, axis_names=[''] * self.w.chromatic_psf.Nx)
-        # ipar=np.arange(10, 20))
-        plt.gca().set_title(r"Correlation matrix $\mathbf{\rho}$")
-        if parameters.LSST_SAVEFIGPATH:
-            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'amplitude_correlation_matrix.pdf'))
-        if parameters.DISPLAY:
-            plt.show()
 
 
 if __name__ == "__main__":
