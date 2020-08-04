@@ -15,7 +15,7 @@ from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 import spectractor.parameters as parameters
-from spectractor.simulation.adr import adr_calib
+from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 
 
 class SpectrumSimulation(Spectrum):
@@ -128,10 +128,14 @@ class SpectrumSimulation(Spectrum):
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         lambda_ref = self.lambda_ref
-        distance_order1 = distance - adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
-                                               lambda_ref=lambda_ref)[0]
-        distance_order2 = distance - adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
-                                               lambda_ref=lambda_ref)[0]
+        adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                               dispersion_axis_angle=self.rotation_angle)
+        distance_order1 = distance - adr_u
+        adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                               dispersion_axis_angle=self.rotation_angle)
+        distance_order2 = distance - adr_u
         lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
         self.lambdas_order2 = lambdas_order2
@@ -144,10 +148,11 @@ class SpectrumSimulation(Spectrum):
             def integrand(lbda):
                 return self.target.sed(lbda) * self.telescope.transmission(lbda) \
                        * self.disperser.transmission(lbda) * atmospheric_transmission(lbda)
+
             self.data = np.zeros_like(lambdas)
             self.err = np.zeros_like(lambdas)
             for i in range(len(lambdas) - 1):
-                lbdas = np.arange(lambdas[i], lambdas[i+1], self.lambdas_step)
+                lbdas = np.arange(lambdas[i], lambdas[i + 1], self.lambdas_step)
                 self.data[i] = A1 * np.mean(integrand(lbdas))
                 # self.data[i] = A1 * quad(integrand, lambdas[i], lambdas[i + 1])[0]
             self.data[-1] = self.data[-2]
@@ -272,8 +277,8 @@ class SpectrogramModel(Spectrum):
 
             for i in range(len(lambdas) - 1):
                 # spectrum[i] = parameters.FLAM_TO_ADURATE * quad(integrand, lambdas[i], lambdas[i + 1])[0]
-                lbdas = np.arange(lambdas[i], lambdas[i+1], self.lambdas_step)
-                spectrum[i] = parameters.FLAM_TO_ADURATE * np.mean(integrand(lbdas)) * (lambdas[i+1]-lambdas[i])
+                lbdas = np.arange(lambdas[i], lambdas[i + 1], self.lambdas_step)
+                spectrum[i] = parameters.FLAM_TO_ADURATE * np.mean(integrand(lbdas)) * (lambdas[i + 1] - lambdas[i])
             spectrum[-1] = spectrum[-2]
 
         return spectrum, np.zeros_like(spectrum)
@@ -298,10 +303,14 @@ class SpectrogramModel(Spectrum):
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         lambda_ref = self.lambda_ref
-        distance_order1 = distance - adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
-                                               lambda_ref=lambda_ref)[0]
-        distance_order2 = distance - adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
-                                               lambda_ref=lambda_ref)[0]
+        adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                                   dispersion_axis_angle=self.rotation_angle)
+        distance_order1 = distance - adr_u
+        adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                                   dispersion_axis_angle=self.rotation_angle)
+        distance_order2 = distance - adr_u
         lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
 
@@ -339,7 +348,7 @@ class SpectrogramModel(Spectrum):
 
         return lambdas, lambdas_order2, dispersion_law, dispersion_law_order2
 
-   # @profile
+    # @profile
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
                  shift_x=0., shift_y=0., angle=0., B=1., psf_poly_params=None):
         """

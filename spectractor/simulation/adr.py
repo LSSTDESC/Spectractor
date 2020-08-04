@@ -5,6 +5,7 @@
 import astropy.coordinates as AC
 from astropy import units as u
 import numpy as np
+from spectractor import parameters
 
 """
 Atmospheric Differential Refraction: Evolution of the spatial position as a function of wavelength.
@@ -29,7 +30,7 @@ class ADR:
     # =================== #
     #   Methods           #
     # =================== #
-    def refract(self, x, y, lbda, rotangle, backward=False, unit=1.):
+    def refract(self, x, y, lbda, backward=False, unit=1.):
         """If forward (default), return refracted position(s) at
         wavelength(s) *lbda* [Å] from reference position(s) *x*,*y*
         (in units of *unit* in arcsec).  Return shape is
@@ -54,13 +55,13 @@ class ADR:
         if backward:
             nlbda = len(np.atleast_1d(lbda))
             assert npos == nlbda, "Incompatible x,y and lbda vectors."
-            x = x0 - dz * np.sin((self.parangle + rotangle) / 180. * np.pi)
-            y = y0 + dz * np.cos((self.parangle + rotangle) / 180. * np.pi)  # (nlbda=npos,)
+            x = x0 - dz * np.sin(self.parangle / 180. * np.pi)
+            y = y0 + dz * np.cos(self.parangle / 180. * np.pi)  # (nlbda=npos,)
             out = np.vstack((x, y))  # (2,npos)
         else:
             dz = dz[:, np.newaxis]  # (nlbda,1)
-            x = x0 + dz * np.sin((self.parangle + rotangle) / 180. * np.pi)  # (nlbda,npos)
-            y = y0 - dz * np.cos((self.parangle + rotangle) / 180. * np.pi)  # (nlbda,npos)
+            x = x0 + dz * np.sin(self.parangle / 180. * np.pi)  # (nlbda,npos)
+            y = y0 - dz * np.cos(self.parangle / 180. * np.pi)  # (nlbda,npos)
             out = np.dstack((x.T, y.T)).T  # (2,nlbda,npos)
 
         return out.squeeze()  # (2,[nlbda],[npos])
@@ -279,7 +280,7 @@ def adr_calib(lambdas, params, lat, lambda_ref=550):
 
     meadr = instanciation_adr(params, lat, lambda_ref * 10)
 
-    disp_axis, trans_axis = get_adr_shift_for_lbdas(meadr, lambdas * 10, params)
+    disp_axis, trans_axis = get_adr_shift_for_lbdas(meadr, lambdas * 10)
     disp_axis_pix = in_pixel(disp_axis, params)
     trans_axis_pix = in_pixel(trans_axis, params)
 
@@ -299,7 +300,7 @@ def instanciation_adr(params, latitude, lbda_ref):
     else:
         raise TypeError('dec/hour_angle type is neither a str nor an astropy.coordinates')
 
-    temperature, pressure, humidity, airmass, rotangle = params[2:-2]
+    temperature, pressure, humidity, airmass = params[2:-2]
 
     _, parangle = hadec2zdpar(hour_angle.degree, dec.degree, latitude.degree, deg=True)
     adr = ADR(airmass=airmass, parangle=parangle, temperature=temperature,
@@ -308,12 +309,12 @@ def instanciation_adr(params, latitude, lbda_ref):
     return adr
 
 
-def get_adr_shift_for_lbdas(adr_object, lbdas, params):
+def get_adr_shift_for_lbdas(adr_object, lbdas):
     """
-  Returns shift in x and y due to adr as arrays in arcsec.
-  """
+    Returns shift in x and y due to adr as arrays in arcsec.
+    """
 
-    arcsecshift = adr_object.refract(0, 0, lbdas, params[-3])
+    arcsecshift = adr_object.refract(0, 0, lbdas)
 
     x_shift = (arcsecshift[0])
     y_shift = (arcsecshift[1])
@@ -328,8 +329,8 @@ def get_adr_shift_for_lbdas(adr_object, lbdas, params):
 
 def in_pixel(thing_in_arcsec, params):
     """
-  Transform something in arcsec in pixels
-  """
+    Transform something in arcsec in pixels
+    """
 
     xpixsize = params[-2]
     ypixsize = params[-1]
@@ -340,3 +341,62 @@ def in_pixel(thing_in_arcsec, params):
     thing_in_pix = thing_in_arcsec / xpixsize
 
     return thing_in_pix
+
+
+def flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0):
+    """Flip and rotate the ADR shifts in pixels along (RA,DEC) directions to (x, y) image coordinates.
+
+    Parameters
+    ----------
+    adr_ra: array_like
+        ADR shift in pixel along the RA direction.
+    adr_dec: array_like
+        ADR shift in pixel along the DEC direction.
+    dispersion_axis_angle: float, optional
+        Optional additional angle of the dispersion axis in the (x,y) frame (default: 0).
+
+    Returns
+    -------
+    adr_x: array_like
+        ADR shift in pixel along the x direction.
+    adr_y: array_like
+        ADR shift in pixel along the y direction.
+
+    Examples
+    --------
+
+    >>> from spectractor.extractor.spectrum import Spectrum
+    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
+
+    Compute ADR in (RA, DEC) frame
+
+    >>> adr_ra, adr_dec = adr_calib(spec.lambdas, spec.adr_params, lat=parameters.OBS_LATITUDE, lambda_ref=550)
+
+    Compute ADR in (x, y) frame
+
+    >>> adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+    >>> assert np.all(np.isclose(adr_x, adr_ra))
+    >>> assert np.all(np.isclose(adr_y, -adr_dec))
+
+    Compute ADR in (u, v) spectrogram frame
+
+    >>> adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=-1.54)
+    >>> assert adr_x[0] > adr_u[0]
+    >>> assert adr_y[0] > adr_v[0]
+
+    """
+    flip = np.array([[parameters.OBS_CAMERA_RA_FLIP_SIGN, 0], [0, parameters.OBS_CAMERA_DEC_FLIP_SIGN]], dtype=float)
+    a = - parameters.OBS_CAMERA_ROTATION * np.pi / 180
+    # minus sign as rotation matrix is apply on the right on the adr vector
+    rotation = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]], dtype=float)
+    transformation = flip @ rotation
+    adr_x, adr_y = (np.asarray([adr_ra, adr_dec]).T @ transformation).T
+    if not np.isclose(dispersion_axis_angle, 0, atol=0.001):
+        # minus sign as rotation matrix is apply on the right on the adr vector
+        a = - dispersion_axis_angle * np.pi / 180
+        rotation = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]], dtype=float)
+        adr_u, adr_v = (np.asarray([adr_x, adr_y]).T @ rotation).T
+        return adr_u, adr_v
+    else:
+        return adr_x, adr_y
+

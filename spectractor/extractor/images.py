@@ -598,6 +598,9 @@ def load_AUXTEL_image(image):  # pragma: no cover
     # image.humidity = image.header['OUTHUM']
     # image.xpixsize = image.header['XPIXSIZE']
     # image.ypixsize = image.header['YPIXSIZE']
+    image.my_logger.warning("\n\tNeed to set the camera rotation angle ? Angle must be counted positive from "
+                            "north to east direction. Need to flip the signs ?")
+    # parameters.OBS_CAMERA_ROTATION = image.header["rr"]
     parameters.OBS_ALTITUDE = image.header['OBS-ELEV']
     parameters.OBS_LATITUDE = image.header['OBS-LAT']
     image.read_out_noise = 8.5*np.ones_like(image.data)

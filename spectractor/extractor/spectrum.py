@@ -16,7 +16,7 @@ from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
-from spectractor.simulation.adr import adr_calib
+from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 
 
 class Spectrum:
@@ -123,7 +123,7 @@ class Spectrum:
             self.xpixsize = image.xpixsize
             self.ypixsize = image.ypixsize
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
-                               self.humidity, self.airmass, self.rotation_angle, self.xpixsize, self.ypixsize]
+                               self.humidity, self.airmass, self.xpixsize, self.ypixsize]
 
         self.load_filter()
 
@@ -480,8 +480,7 @@ class Spectrum:
             self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
 
             self.adr_params = [self.dec, self.hour_angle, self.temperature,
-                               self.pressure, self.humidity, self.airmass, self.rotation_angle, self.xpixsize,
-                               self.ypixsize]
+                               self.pressure, self.humidity, self.airmass, self.xpixsize, self.ypixsize]
 
             if os.path.isfile(spectrogram_file_name):
                 self.load_spectrogram(spectrogram_file_name)
@@ -1020,8 +1019,12 @@ def calibrate_spectrum(spectrum):
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
     lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
     spectrum.lambda_ref = lambda_ref
-    adr_disp_pixel_shift, _ = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
-                                        lambda_ref=lambda_ref)
+    # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
+    # Must project ADR along dispersion axis
+    adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
+                                lambda_ref=lambda_ref)
+    adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                           dispersion_axis_angle=spectrum.rotation_angle)
 
     x0 = spectrum.x0
     if x0 is None:
@@ -1035,7 +1038,7 @@ def calibrate_spectrum(spectrum):
 
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
-        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - shift - adr_disp_pixel_shift,
+        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - shift - adr_u,
                                                                       x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
         spectrum.convert_from_ADUrate_to_flam()
@@ -1109,7 +1112,7 @@ def calibrate_spectrum(spectrum):
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift - adr_disp_pixel_shift,
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift - adr_u,
                                                          x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.lambdas_binwidths = np.gradient(lambdas)
