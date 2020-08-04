@@ -299,9 +299,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
     def jacobian(self, params, epsilon, fixed_params=None):
         start = time.time()
         lambdas, model, model_err = self.simulate(*params)
-        model = model.flatten()
+        model = model.flatten()[self.not_outliers]
         J = np.zeros((params.size, model.size))
-        strategy = copy(self.simulation.fix_psf_cube)
+        #strategy = copy(self.simulation.fix_psf_cube)
         for ip, p in enumerate(params):
             if fixed_params[ip]:
                 continue
@@ -314,8 +314,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
-        self.simulation.fix_psf_cube = strategy
+            J[ip] = (tmp_model.flatten()[self.not_outliers] - model) / epsilon[ip]
+        #self.simulation.fix_psf_cube = strategy
         self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
