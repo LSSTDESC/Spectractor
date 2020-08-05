@@ -503,6 +503,17 @@ HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.
 HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.04, 0.02], use_for_calibration=False)
 HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
 
+# Stellar lines (Fraunhofer lines) https://en.wikipedia.org/wiki/Fraunhofer_lines
+FE1 = Line(382.044, atmospheric=False, label=r'$Fe_{I}$', label_pos=[-0.016, 0.02])
+CAII1 = Line(393.366, atmospheric=False, label=r'$Ca_{II}$', label_pos=[-0.016, 0.02])
+CAII2 = Line(396.847, atmospheric=False, label=r'$Ca_{II}$', label_pos=[-0.016, 0.02])
+FE2 = Line(430.790, atmospheric=False, label=r'$Fe_{I}$', label_pos=[-0.016, 0.02])
+FE3 = Line(438.355, atmospheric=False, label=r'$Fe_{I}$', label_pos=[-0.016, 0.02])
+MG1 = Line(517.27, atmospheric=False, label=r'$Mg_{I}$', label_pos=[-0.016, 0.02])
+MG2 = Line(518.36, atmospheric=False, label=r'$Mg_{I}$', label_pos=[-0.016, 0.02])
+FE4 = Line(527.039, atmospheric=False, label=r'$Fe_{I}$', label_pos=[-0.016, 0.02])
+STELLAR_LINES = [FE1, FE2, FE3, FE4, CAII1, CAII2, MG1, MG2]
+
 # Atmospheric lines
 O2 = Line(761.9, atmospheric=True, label=r'$O_2$',
           label_pos=[0.007, 0.02],
