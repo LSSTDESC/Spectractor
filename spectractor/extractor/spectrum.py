@@ -81,6 +81,7 @@ class Spectrum:
         self.rotation_angle = 0
         self.spectrogram = None
         self.spectrogram_bgd = None
+        self.spectrogram_bgd_rms = None
         self.spectrogram_err = None
         self.spectrogram_residuals = None
         self.spectrogram_fit = None
@@ -360,16 +361,10 @@ class Spectrum:
         hdu1.header = self.header
         hdu1.header["EXTNAME"] = "SPECTRUM"
         hdu2 = fits.ImageHDU()
-        hdu2.header["EXTNAME"] = "S_FIT"
-        hdu3 = fits.ImageHDU()
-        hdu3.header["EXTNAME"] = "S_RES"
-        hdu4 = fits.ImageHDU()
-        hdu4.header["EXTNAME"] = "SPEC_COV"
+        hdu2.header["EXTNAME"] = "SPEC_COV"
         hdu1.data = [self.lambdas, self.data, self.err]
-        hdu2.data = self.spectrogram_fit
-        hdu3.data = self.spectrogram_residuals
-        hdu4.data = self.cov_matrix
-        hdu = fits.HDUList([hdu1, hdu2, hdu3, hdu4])
+        hdu2.data = self.cov_matrix
+        hdu = fits.HDUList([hdu1, hdu2])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
@@ -402,13 +397,25 @@ class Spectrum:
         self.header['S_DEG'] = self.spectrogram_deg
         self.header['S_SAT'] = self.spectrogram_saturation
         hdu1 = fits.PrimaryHDU()
+        hdu1.header["EXTNAME"] = "S_DATA"
         hdu2 = fits.ImageHDU()
+        hdu2.header["EXTNAME"] = "S_ERR"
         hdu3 = fits.ImageHDU()
+        hdu3.header["EXTNAME"] = "S_BGD"
+        hdu4 = fits.ImageHDU()
+        hdu4.header["EXTNAME"] = "S_BGD_ER"
+        hdu5 = fits.ImageHDU()
+        hdu5.header["EXTNAME"] = "S_FIT"
+        hdu6 = fits.ImageHDU()
+        hdu6.header["EXTNAME"] = "S_RES"
         hdu1.header = self.header
         hdu1.data = self.spectrogram
         hdu2.data = self.spectrogram_err
         hdu3.data = self.spectrogram_bgd
-        hdu = fits.HDUList([hdu1, hdu2, hdu3])
+        hdu4.data = self.spectrogram_bgd_rms
+        hdu5.data = self.spectrogram_fit
+        hdu6.data = self.spectrogram_residuals
+        hdu = fits.HDUList([hdu1, hdu2, hdu3, hdu4, hdu5, hdu6])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
@@ -494,14 +501,10 @@ class Spectrum:
                 raise FileNotFoundError(f"PSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
-                self.spectrogram_fit = hdu_list[0].data
-                self.spectrogram_residuals = hdu_list[1].data
-            if len(hdu_list) > 3:
                 self.cov_matrix = hdu_list["SPEC_COV"].data
             else:
                 self.cov_matrix = np.diag(self.err ** 2)
         else:
-            self.my_logger.warning(f'\n\tSpectrum file {input_file_name} not found')
             raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
 
     def load_spectrogram(self, input_file_name):
@@ -523,6 +526,10 @@ class Spectrum:
             self.spectrogram = hdu_list[0].data
             self.spectrogram_err = hdu_list[1].data
             self.spectrogram_bgd = hdu_list[2].data
+            if len(hdu_list) > 3:
+                self.spectrogram_bgd_rms = hdu_list[3].data
+                self.spectrogram_fit = hdu_list[4].data
+                self.spectrogram_residuals = hdu_list[5].data
             self.spectrogram_x0 = float(header['S_X0'])
             self.spectrogram_y0 = float(header['S_Y0'])
             self.spectrogram_xmin = int(header['S_XMIN'])
@@ -1038,19 +1045,20 @@ def calibrate_spectrum(spectrum):
 
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
-        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - shift - adr_u,
+        dist = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift)
+        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(dist - adr_u,
                                                                       x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
         spectrum.convert_from_ADUrate_to_flam()
         chisq = detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None, calibration_lines_only=True)
-        spectrum.convert_from_flam_to_ADUrate()
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             if parameters.LIVE_FIT:
-                spectrum.plot_spectrum(live_fit=True, label=rf'Order {spectrum.order:d} spectrum'
-                                                            r'\n$D_\mathrm{CCD}'
+                spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum\n'
+                                                            r'$D_\mathrm{CCD}'
                                                             rf'={D:.2f}\,$mm, $\delta u_0={shift:.2f}\,$pix')
+        spectrum.convert_from_flam_to_ADUrate()
         return chisq
 
     # grid exploration of the parameters
@@ -1112,12 +1120,14 @@ def calibrate_spectrum(spectrum):
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift - adr_u,
-                                                         x0=x0, order=spectrum.order)
+    distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=pixel_shift)
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - adr_u, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.lambdas_binwidths = np.gradient(lambdas)
     spectrum.convert_from_ADUrate_to_flam()
-    spectrum.pixels = distance - pixel_shift
+    spectrum.chromatic_psf.table['Dx'] -= pixel_shift
+    spectrum.chromatic_psf.table['Dy_disp_axis'] = distance * np.sin(spectrum.rotation_angle * np.pi / 180)
+    spectrum.pixels = np.copy(spectrum.chromatic_psf.table['Dx'])
     detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
                  fwhm_func=fwhm_func, ax=None, calibration_lines_only=False)
     # Convert back to flam units
