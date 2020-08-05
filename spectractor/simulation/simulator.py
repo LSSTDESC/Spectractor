@@ -295,24 +295,28 @@ class SpectrogramModel(Spectrum):
         return self.chromatic_psf.profile_params
 
     def simulate_dispersion(self, D, shift_x, shift_y, r0):
-        new_x0 = [self.x0[0] - shift_x, self.x0[1] - shift_y]
-        distance = np.array(self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x, shift_y=shift_y))
+        # Distance in x and y with respect to the true order 0 position at lambda_ref
+        Dx = np.arange(self.spectrogram_Nx) - r0.real - shift_x  # distance in (x,y) spectrogram frame for column x
+        Dy_disp_axis = np.tan(self.rotation_angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
+        distance = np.sqrt(Dx**2 + Dy_disp_axis**2)
 
-        # convert pixels into lambdas with ADR for spectrum amplitude evaluation
+        # Wavelengths using the order 0 shifts (ADR has no impact as it shifts order 0 and order p equally)
+        new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
         self.disperser.D = D
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
-        lambda_ref = self.lambda_ref
-        adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                                   dispersion_axis_angle=self.rotation_angle)
-        distance_order1 = distance - adr_u
-        adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                                   dispersion_axis_angle=self.rotation_angle)
-        distance_order2 = distance - adr_u
-        lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
-        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
+
+        # ADR for order 1
+        adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=self.lambda_ref)
+        adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+        # Position (not distance) in pixel of wavelength lambda order 1 centroid in the (x,y) spectrogram frame
+        dispersion_law = r0 + (Dx + shift_x + adr_x) + 1j * (Dy_disp_axis + adr_y + shift_y)
+
+        # ADR for order 2
+        adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=self.lambda_ref)
+        adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+        # Position (not distance) in pixel of wavelength lambda order 2 centroid in the (x,y) spectrogram frame
+        dispersion_law_order2 = r0 + (Dx + shift_x + adr_x) + 1j * (Dy_disp_axis + adr_y + shift_y)
 
         # Dx_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
         # Dy_mean_func=interp1d(lambdas/2,self.chromatic_psf.table['Dy_disp_axis'],bounds_error=False,fill_value=(0,0))
@@ -326,13 +330,13 @@ class SpectrogramModel(Spectrum):
         # Dy_mean_func=interp1d(lambdas,self.chromatic_psf.table['Dy_dips_axis'],bounds_error=False, fill_value=(0, 0))
 
         # dispersion laws from the PSF table
-        dy_func = interp1d(lambdas, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_disp_axis'],
-                           bounds_error=False, fill_value="extrapolate")
+        # dy_func = interp1d(lambdas, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_disp_axis'],
+        #                    bounds_error=False, fill_value="extrapolate")
+        # dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) \
+        #                  + 1j * (self.chromatic_psf.table['Dy'] - shift_y)
+        # dispersion_law_order2 = dispersion_law + 1j * (dy_func(lambdas_order2) - self.chromatic_psf.table['Dy']
+        #                                                + self.chromatic_psf.table['Dy_disp_axis'])
 
-        dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) \
-                         + 1j * (self.chromatic_psf.table['Dy'] - shift_y)
-        dispersion_law_order2 = dispersion_law + 1j * (dy_func(lambdas_order2) - self.chromatic_psf.table['Dy']
-                                                       + self.chromatic_psf.table['Dy_disp_axis'])
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         if parameters.DEBUG:
@@ -342,7 +346,7 @@ class SpectrogramModel(Spectrum):
                         cmap=from_lambda_to_colormap(lambdas), c=lambdas)
             plt.scatter(-r0.real + dispersion_law_order2.real, -r0.imag + dispersion_law_order2.imag,
                         label="dispersion_law_order2", cmap=from_lambda_to_colormap(lambdas_order2), c=lambdas_order2)
-            plt.title(f"{new_x0}")
+            plt.title(f"x0={new_x0}")
             plt.legend()
             plt.show()
 
@@ -418,7 +422,7 @@ class SpectrogramModel(Spectrum):
         if A2 > 0.:
             spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(lambdas_order2) * \
                                                    self.simulate_spectrum(lambdas_order2, ozone, pwv, aerosols)
-            self.true_spectrum = A1 * (spectrum + A2 * spectrum_order2) / \
+            self.true_spectrum = A1 * (spectrum + 0 * A2 * spectrum_order2) / \
                                  (parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas))
             nlbda = dispersion_law_order2.size
             if self.psf_cube_order2 is None or not self.fix_psf_cube:
