@@ -567,6 +567,8 @@ class Spectrum:
                                               x0=self.spectrogram_x0, y0=self.spectrogram_y0,
                                               deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,
                                               file_name=input_file_name)
+            if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
+                self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
             self.my_logger.info(f'\n\tSpectrogram loaded from {input_file_name}')
         else:
             self.my_logger.warning(f'\n\tSpectrogram file {input_file_name} not found')
