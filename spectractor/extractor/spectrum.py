@@ -98,8 +98,8 @@ class Spectrum:
         self.lambdas_order2 = None
         self.data_order2 = None
         self.err_order2 = None
+        self.filename = file_name
         if file_name != "":
-            self.filename = file_name
             self.load_spectrum(file_name)
         if image is not None:
             self.header = image.header
