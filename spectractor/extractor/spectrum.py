@@ -95,6 +95,9 @@ class Spectrum:
         self.spectrogram_saturation = None
         self.spectrogram_Nx = None
         self.spectrogram_Ny = None
+        self.lambdas_order2 = None
+        self.data_order2 = None
+        self.err_order2 = None
         if file_name != "":
             self.filename = file_name
             self.load_spectrum(file_name)
@@ -356,19 +359,20 @@ class Spectrum:
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
                                   'second column gives the spectrum in unit UNIT2, ' \
                                   'third column the corresponding errors.'
-        self.header['LBDA_REF'] = self.lambda_ref
         hdu1 = fits.PrimaryHDU()
         hdu1.header = self.header
         hdu1.header["EXTNAME"] = "SPECTRUM"
         hdu2 = fits.ImageHDU()
         hdu2.header["EXTNAME"] = "SPEC_COV"
+        hdu3 = fits.ImageHDU()
+        hdu3.header["EXTNAME"] = "ORDER2"
         hdu1.data = [self.lambdas, self.data, self.err]
         hdu2.data = self.cov_matrix
-        hdu = fits.HDUList([hdu1, hdu2])
+        hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
+        hdu = fits.HDUList([hdu1, hdu2, hdu3])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
-        # OLD: save_fits(output_file_name, self.header, [self.lambdas, self.data, self.err], overwrite=overwrite)
         self.my_logger.info(f'\n\tSpectrum saved in {output_file_name}')
 
     def save_spectrogram(self, output_file_name, overwrite=False):
@@ -502,6 +506,7 @@ class Spectrum:
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
                 self.cov_matrix = hdu_list["SPEC_COV"].data
+                self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
             else:
                 self.cov_matrix = np.diag(self.err ** 2)
         else:
@@ -1028,6 +1033,7 @@ def calibrate_spectrum(spectrum):
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
     lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
     spectrum.lambda_ref = lambda_ref
+    spectrum.header['LBDA_REF'] = lambda_ref
     # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
     # Must project ADR along dispersion axis
     adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
