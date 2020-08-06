@@ -115,7 +115,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
-            if "x_c" in par or "saturation" in par:
+            if "x_c" in par or "saturation" in par or "y_c" in par:
                 self.fixed[k] = True
         # self.fixed[1] = True  # A2
         # self.fixed[5:7] = [True, True]  # DCCD, x0
@@ -532,6 +532,7 @@ if __name__ == "__main__":
     params = []
     chisqs = []
     filenames = ['outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits']
+    filenames = ['outputs/reduc_20170530_134_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
