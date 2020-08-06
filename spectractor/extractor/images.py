@@ -938,7 +938,7 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
         f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
         vmin = 0
         vmax = float(np.nanmax(sub_image_subtracted))
-        X, Y = np.mgrid[:NX, :NY]
+        Y, X = np.mgrid[:NY, :NX]
         star2D = psf.evaluate(pixels=np.array([X, Y]))
         plot_image_simple(ax1, data=sub_image_subtracted, scale="lin", title="", units=image.units,
                           target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
