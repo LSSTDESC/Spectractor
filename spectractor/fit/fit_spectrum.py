@@ -81,7 +81,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.ozone = 300.
         self.pwv = 5
         self.aerosols = 0.03
-        self.reso = 1
+        self.reso = -1
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.B = 0
@@ -89,7 +89,7 @@ class SpectrumFitWorkspace(FitWorkspace):
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
         # self.fixed[0] = True
-        # self.fixed[5] = True
+        self.fixed[5] = True
         # self.fixed[6:8] = [True, True]
         # self.fixed[7] = False
         # self.fixed[1] = True
@@ -468,7 +468,7 @@ if __name__ == "__main__":
                  'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
     params = []
     chisqs = []
-    filenames = ['outputs/data_30may17_HoloAmAg_prod6.9/reduc_20170530_224_spectrum.fits']
+    filenames = ['outputs/reduc_20170530_134_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
