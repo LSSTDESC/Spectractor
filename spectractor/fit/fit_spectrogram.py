@@ -119,8 +119,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 self.fixed[k] = True
         # self.fixed[1] = True  # A2
         # self.fixed[5:7] = [True, True]  # DCCD, x0
-        self.fixed[7] = True  # Delta y
-        self.fixed[8] = True  # angle
+        # self.fixed[7] = True  # Delta y
+        # self.fixed[8] = True  # angle
         self.fixed[9] = True  # B
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
@@ -440,12 +440,12 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         epsilon[epsilon == 0] = 1e-4
         fixed = np.copy(fit_workspace.fixed)
 
-        fit_workspace.simulation.fast_sim = True
-        fit_workspace.simulation.fix_psf_cube = False
-        fit_workspace.fixed = np.copy(fixed)
-        fit_workspace.fixed[:fit_workspace.psf_params_start_index] = True
-        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fit_workspace.fixed, xtol=1e-3, ftol=1e-2, niter=10)
+        # fit_workspace.simulation.fast_sim = True
+        # fit_workspace.simulation.fix_psf_cube = False
+        # fit_workspace.fixed = np.copy(fixed)
+        # fit_workspace.fixed[:fit_workspace.psf_params_start_index] = True
+        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+        #                                            fix=fit_workspace.fixed, xtol=1e-3, ftol=1e-2, niter=10)
 
         fit_workspace.simulation.fast_sim = True
         fit_workspace.simulation.fix_psf_cube = False
