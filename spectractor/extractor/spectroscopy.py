@@ -166,13 +166,13 @@ class Lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(7)])
-        [686.719, 761.9, 794.0, 820.4, 822.696, 868.0, 898.765]
+        [686.719, 762.2, 794.0, 820.4, 822.696, 868.0, 898.765]
 
         Redshift all the spectral lines, except the atmospheric lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
-        [686.719, 706.2, 761.9, 777.6, 794.0]
+        [686.719, 706.2, 762.2, 777.6, 794.0]
 
         Hydrogen lines at order 1 and 2:
         >>> lines = Lines(HYDROGEN_LINES, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True, orders=[1, 2])
@@ -515,7 +515,7 @@ FE4 = Line(527.039, atmospheric=False, label=r'$Fe_{I}$', label_pos=[-0.016, 0.0
 STELLAR_LINES = [FE1, FE2, FE3, FE4, CAII1, CAII2, MG1, MG2]
 
 # Atmospheric lines
-O2 = Line(761.9, atmospheric=True, label=r'$O_2$',
+O2 = Line(762.2, atmospheric=True, label=r'$O_2$',  # 762.2 is a weighted average of the O2 line simulated by Libradtran
           label_pos=[0.007, 0.02],
           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
 # O2_1 = Line(760.6, atmospheric=True, label='',
