@@ -158,6 +158,10 @@ class Spectrum:
         if self.cov_matrix is not None:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix /= ldl_mat
+        if self.data_order2 is not None:
+            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.gradient(self.lambdas_order2)
+            self.data_order2 /= ldl_2
+            self.err_order2 /= ldl_2
         self.units = 'erg/s/cm$^2$/nm'
 
     def convert_from_flam_to_ADUrate(self):
@@ -187,6 +191,10 @@ class Spectrum:
         if self.cov_matrix is not None:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix *= ldl_mat
+        if self.data_order2 is not None:
+            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.gradient(self.lambdas_order2)
+            self.data_order2 *= ldl_2
+            self.err_order2 *= ldl_2
         self.units = 'ADU/s'
 
     def load_filter(self):
@@ -506,7 +514,8 @@ class Spectrum:
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
                 self.cov_matrix = hdu_list["SPEC_COV"].data
-                self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+                if len(hdu_list) > 2:
+                    self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
             else:
                 self.cov_matrix = np.diag(self.err ** 2)
         else:
