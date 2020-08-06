@@ -66,7 +66,7 @@ def test_simulator():
         assert image_simulation.data is not None
         # assert spectrum_simulation.data is not None
         # assert spectrogram_simulation.data is not None
-        assert os.path.isfile('./tests/data/' + tag.replace('_spectrum.fits', '_sim.fits')) is True
+        assert os.path.isfile('./tests/data/' + tag.replace('reduc', 'sim')) is True
         assert atm.transmission is not None
 
 
