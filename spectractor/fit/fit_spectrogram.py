@@ -282,9 +282,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         """
         global plot_counter
-        self.simulation.fix_psf_cube = False
-        if np.all(np.isclose(psf_poly_params, self.p[self.psf_params_start_index:], rtol=1e-6)):
-            self.simulation.fix_psf_cube = True
         lambdas, model, model_err = \
             self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, psf_poly_params)
         self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B] + list(psf_poly_params))
@@ -301,7 +298,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         lambdas, model, model_err = self.simulate(*params)
         model = model.flatten()[self.not_outliers]
         J = np.zeros((params.size, model.size))
-        #strategy = copy(self.simulation.fix_psf_cube)
+        strategy = copy.copy(self.simulation.fix_psf_cube)
         for ip, p in enumerate(params):
             if fixed_params[ip]:
                 continue
@@ -315,7 +312,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
             J[ip] = (tmp_model.flatten()[self.not_outliers] - model) / epsilon[ip]
-        #self.simulation.fix_psf_cube = strategy
+        self.simulation.fix_psf_cube = strategy
         self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
@@ -532,7 +529,7 @@ if __name__ == "__main__":
     params = []
     chisqs = []
     filenames = ['outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits']
-    filenames = ['outputs/reduc_20170530_134_spectrum.fits']
+    filenames = ['outputs/sim_20170530_134_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
