@@ -262,6 +262,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # linear regression for the amplitude parameters
         # prepare the vectors
         A2, D2CCD, dx0, dy0, angle, B, *poly_params = params
+        self.p = np.asarray(params)
         self.W_dot_data = self.W * (self.data_flat - B * self.bgd_flat)
         profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:, 0] = 1
@@ -303,11 +304,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                                                                               order=2)
 
         # Fill spectrogram trace as a function of the pixel column x
+        profile_params[:, 1] += adr_x + dx0
         profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y + dy0) - self.bgd_width
 
         # Prepare order 2 profile params indexed by the pixel column x
         profile_params_order2 = np.copy(profile_params)
         profile_params_order2[:, 0] = self.spectrum.disperser.ratio_order_2over1(lambdas)
+        profile_params_order2[:, 1] = np.arange(self.Nx) + adr_x_2 + dx0
         profile_params_order2[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y_2 + dy0) - self.bgd_width
 
         # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
@@ -469,10 +472,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
-        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> load_config("config/ctio.ini")
-        >>> w = FullForwardModelFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
+        >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits', config="config/ctio.ini")
+        >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
         >>> w.plot_fit()
 
@@ -495,9 +496,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
 
-        A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, B,  *psf = self.p
-        plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
-                     f'D={D:.2f}mm, shift_x={shift_x:.2f}pix, B={B:.3f}', y=1)
+        A2, D2CCD, dx0, dy0, angle, B, *poly_params  = self.p
+        plt.suptitle(f'A2={A2:.3f}, D={D2CCD:.2f}mm, shift_x={dx0:.3f}pix, shift_y={dy0:.3f}pix, '
+                     f'angle={angle:.2f}pix, B={B:.3f}', y=1)
         # main plot
         self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
         # zoom O2
@@ -538,16 +539,18 @@ def run_ffm_minimisation(w, method="newton"):
     --------
 
     >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
+    >>> spec = Spectrum("./outputs/sim_20170530_191_spectrum.fits", config="./config/ctio.ini")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
+    >>> plot_comparison_truth(spec, w)
 
        Line   Tabulated  Detected ...
 
     .. doctest:
         :hide:
 
-        >>> assert w.costs[-1] / w.data.size < 1.27  # reduced chisq
+        >>> assert w.costs[-1] / w.data.size < 1.22  # reduced chisq
         >>> assert np.isclose(w.p[4], -1.56, rtol=0.05)  # angle
         >>> assert np.isclose(w.p[5], 1, rtol=0.05)  # B
 
@@ -570,7 +573,7 @@ def run_ffm_minimisation(w, method="newton"):
 
         w.fixed = np.copy(fixed)
         run_minimisation_sigma_clipping(w, "newton", epsilon, fixed, xtol=1e-5,
-                                        ftol=1 / w.data.size, sigma_clip=10, niter_clip=3)
+                                        ftol=100 / w.data.size, sigma_clip=10, niter_clip=3)
 
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if w.filename != "":

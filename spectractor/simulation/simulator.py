@@ -428,9 +428,15 @@ class SpectrogramModel(Spectrum):
             if self.psf_cube_order2 is None or not self.fix_psf_cube:
                 start = time.time()
                 self.psf_cube_order2 = np.zeros((nlbda, self.spectrogram_Ny, self.spectrogram_Nx))
+                # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
+                # same PSF as for the order 1 but at the same position
+                profile_params_order2 = np.copy(self.profile_params)
+                for k in range(1, self.profile_params.shape[1]):
+                    profile_params_order2[:, k] = interp1d(lambdas_order2, profile_params_order2[:, k],
+                                                           kind="cubic", fill_value="extrapolate")(lambdas)
                 for i in range(0, nlbda, 1):
                     p = np.array([1, dispersion_law_order2[i].real,
-                                  dispersion_law_order2[i].imag] + list(self.profile_params[i, 3:]))
+                                  dispersion_law_order2[i].imag] + list(profile_params_order2[i, 3:]))
                     self.psf_cube_order2[i] = self.psf.evaluate(self.pixels, p=p)
                 self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')
             start = time.time()
