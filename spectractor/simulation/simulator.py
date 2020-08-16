@@ -400,7 +400,6 @@ class SpectrogramModel(Spectrum):
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
-        self.true_spectrum = A1 * spectrum / (parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas))
         self.my_logger.debug(f'\n\tAfter spectrum: {time.time() - start}')
         # Fill the order 1 cube
         nlbda = dispersion_law.size
@@ -422,8 +421,6 @@ class SpectrogramModel(Spectrum):
         if A2 > 0.:
             spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(lambdas_order2) * \
                                                    self.simulate_spectrum(lambdas_order2, ozone, pwv, aerosols)
-            self.true_spectrum = A1 * (spectrum + 0 * A2 * spectrum_order2) / \
-                                 (parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas))
             nlbda = dispersion_law_order2.size
             if self.psf_cube_order2 is None or not self.fix_psf_cube:
                 start = time.time()
