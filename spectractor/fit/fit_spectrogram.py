@@ -426,7 +426,6 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
-        fit_workspace.simulation.fast_sim = True
         costs = np.array([fit_workspace.chisq(guess)])
         if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
             fit_workspace.plot_fit()
@@ -444,12 +443,12 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
         #                                            fix=fit_workspace.fixed, xtol=1e-3, ftol=1e-2, niter=10)
 
-        fit_workspace.simulation.fast_sim = True
-        fit_workspace.simulation.fix_psf_cube = False
-        fit_workspace.fixed = np.copy(fixed)
-        guess = fit_workspace.p
-        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fit_workspace.fixed, xtol=1e-5, ftol=1e-3, niter=10)
+        # fit_workspace.simulation.fast_sim = True
+        # fit_workspace.simulation.fix_psf_cube = False
+        # fit_workspace.fixed = np.copy(fixed)
+        # guess = fit_workspace.p
+        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+        #                                            fix=fit_workspace.fixed, xtol=1e-5, ftol=1e-3, niter=10)
 
         fit_workspace.simulation.fast_sim = False
         fit_workspace.simulation.fix_psf_cube = False
@@ -528,7 +527,6 @@ if __name__ == "__main__":
                  'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
     params = []
     chisqs = []
-    filenames = ['outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits']
     filenames = ['outputs/sim_20170530_134_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
