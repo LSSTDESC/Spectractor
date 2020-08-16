@@ -60,6 +60,7 @@ class FitWorkspace:
         self.rho = np.array([[]])
         self.data = None
         self.err = None
+        self.data_cov = None
         self.x = None
         self.outliers = []
         self.sigma_clip = 5
@@ -575,14 +576,26 @@ class FitWorkspace:
 
         """
         x, model, model_err = self.simulate(*p)
-        if len(self.outliers) > 0:
-            good_indices = self.not_outliers
-            model_err = model_err.flatten()[good_indices]
-            err = self.err.flatten()[good_indices]
-            res = (model.flatten()[good_indices] - self.data.flatten()[good_indices]) / np.sqrt(
-                model_err * model_err + err * err)
+        if self.data_cov is None:
+            if len(self.outliers) > 0:
+                good_indices = self.not_outliers
+                model_err = model_err.flatten()[good_indices]
+                err = self.err.flatten()[good_indices]
+                res = (model.flatten()[good_indices] - self.data.flatten()[good_indices]) / np.sqrt(
+                    model_err * model_err + err * err)
+            else:
+                res = ((model - self.data) / np.sqrt(model_err * model_err + self.err * self.err)).flatten()
         else:
-            res = ((model - self.data) / np.sqrt(model_err * model_err + self.err * self.err)).flatten()
+            if len(self.outliers) > 0:
+                good_indices = np.asarray(self.not_outliers, dtype=int)
+                cov = self.data_cov + np.diag(model_err * model_err)
+                cov = cov[good_indices[:, None], good_indices]
+                L = np.linalg.inv(np.linalg.cholesky(cov))
+                res = L @ (model[good_indices] - self.data[good_indices])
+            else:
+                cov = self.data_cov + np.diag(model_err * model_err)
+                L = np.linalg.inv(np.linalg.cholesky(cov))
+                res = L @ (model - self.data)
         return res
 
     def chisq(self, p):
@@ -754,7 +767,11 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     """
     my_logger = set_logger(__name__)
     tmp_params = np.copy(params)
-    W = 1 / (fit_workspace.err.flatten()[fit_workspace.not_outliers]) ** 2
+    if fit_workspace.data_cov is None:
+        cov_data = np.asarray(fit_workspace.err.flatten()[fit_workspace.not_outliers] ** 2)
+    else:
+        good_indices = np.asarray(fit_workspace.not_outliers, dtype=int)
+        cov_data = fit_workspace.data_cov[good_indices[:, None], good_indices]
     ipar = np.arange(params.size)
     if fixed_params is not None:
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
@@ -767,7 +784,21 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # if fit_workspace.live_fit:
         #    fit_workspace.plot_fit()
         residuals = (tmp_model - fit_workspace.data).flatten()[fit_workspace.not_outliers]
-        cost = residuals @ (W * residuals)
+        if cov_data.ndim == 1:
+            if np.any(tmp_model_err > 0):
+                cov = cov_data + np.asarray(tmp_model_err.flatten()[fit_workspace.not_outliers] ** 2)
+            else:
+                cov = cov_data
+            W = 1 / cov
+            cost = residuals @ (W * residuals)
+        else:
+            if np.any(tmp_model_err > 0):
+                cov = cov_data + np.diag(tmp_model_err.flatten()[fit_workspace.not_outliers] ** 2)
+            else:
+                cov = cov_data
+            L = np.linalg.inv(np.linalg.cholesky(cov))
+            W = L.T @ L
+            cost = residuals @ W @ residuals
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):
@@ -783,7 +814,10 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # remove fixed parameters
         J = J[ipar].T
         # algebra
-        JT_W = J.T * W
+        if W.ndim == 1:
+            JT_W = J.T * W
+        else:
+            JT_W = J.T @ W
         JT_W_J = JT_W @ J
         try:
             L = np.linalg.inv(np.linalg.cholesky(JT_W_J))  # cholesky is too sensible to the numerical precision

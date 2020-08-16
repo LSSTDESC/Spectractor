@@ -76,11 +76,12 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.lambdas = self.spectrum.lambdas
         self.data = self.spectrum.data
         self.err = self.spectrum.err
+        self.data_cov = self.spectrum.cov_matrix
         self.A1 = 1.0
         self.A2 = 0
-        self.ozone = 300.
-        self.pwv = 5
-        self.aerosols = 0.03
+        self.ozone = 400.
+        self.pwv = 3
+        self.aerosols = 0.05
         self.reso = -1
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
@@ -88,12 +89,12 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D,
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
-        # self.fixed[0] = True
+        self.fixed[1] = True
         self.fixed[5] = True
         # self.fixed[6:8] = [True, True]
         # self.fixed[7] = False
         # self.fixed[1] = True
-        # self.fixed[-1] = True
+        self.fixed[-1] = True
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]", "B"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
@@ -234,34 +235,6 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.model_err = model_err
         return lambdas, model, model_err
 
-    def weighted_residuals(self, p):
-        """Computation of the weighted residuals between model and data using a covariance matrix.
-
-        Parameters
-        ----------
-        p: array_like
-            Array of SpectrogramFitWorkspace parameters.
-
-        Returns
-        -------
-        residuals: array_like
-            The 1D residual array.
-
-        """
-        x, model, model_err = self.simulate(*p)
-        if len(self.outliers) > 0:
-            good_indices = np.asarray(self.not_outliers, dtype=int)
-            cov = self.spectrum.cov_matrix + np.diag(model_err * model_err)
-            cov = cov[good_indices[:, None], good_indices]
-            L = np.linalg.inv(np.linalg.cholesky(cov))
-            res = L @ (model[good_indices] - self.data[good_indices])
-            # raise NotImplementedError("Weighted residuals function not implemented for outlier rejection.")
-        else:
-            cov = self.spectrum.cov_matrix + np.diag(model_err * model_err)
-            L = np.linalg.inv(np.linalg.cholesky(cov))
-            res = L @ (model - self.data)
-        return res
-
     def plot_fit(self):
         """Plot the fit result.
 
@@ -396,12 +369,12 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         fit_workspace.simulation.fast_sim = True
         fit_workspace.simulation.fix_psf_cube = False
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
+                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3,
                                         verbose=False)
 
         fit_workspace.simulation.fast_sim = False
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
+                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3,
                                         verbose=False)
         if fit_workspace.filename != "":
             parameters.SAVE = True
@@ -468,7 +441,7 @@ if __name__ == "__main__":
                  'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
     params = []
     chisqs = []
-    filenames = ['outputs/reduc_20170530_134_spectrum.fits']
+    filenames = ['outputs/sim_20170530_134_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
