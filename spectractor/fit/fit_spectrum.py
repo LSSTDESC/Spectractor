@@ -118,7 +118,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         """
         if 'A1_T' in list(self.spectrum.header.keys()):
             A1_truth = self.spectrum.header['A1_T']
-            A2_truth = self.spectrum.header['A2_T']
+            A2_truth = 0 * self.spectrum.header['A2_T']
             ozone_truth = self.spectrum.header['OZONE_T']
             pwv_truth = self.spectrum.header['PWV_T']
             aerosols_truth = self.spectrum.header['VAOD_T']
@@ -441,7 +441,7 @@ if __name__ == "__main__":
                  'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
     params = []
     chisqs = []
-    filenames = ['outputs/sim_20170530_134_spectrum.fits']
+    filenames = ['outputs/sim_20170530_131_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
