@@ -842,7 +842,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                 return w_res @ w_res  # res @ (W * res)
 
             # tol parameter acts on alpha (not func)
-            alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=5e-1, brack=(0, 0.1))
+            alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=5e-1, brack=(0, 1))
         else:
             alpha_min = 1
             fval = np.copy(cost)
