@@ -89,12 +89,12 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D,
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
-        self.fixed[1] = True
+        # self.fixed[1] = True
         self.fixed[5] = True
         # self.fixed[6:8] = [True, True]
         # self.fixed[7] = False
         # self.fixed[1] = True
-        self.fixed[-1] = True
+        # self.fixed[-1] = True
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]", "B"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
@@ -356,7 +356,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
-        fit_workspace.simulation.fast_sim = True
+        # fit_workspace.simulation.fast_sim = True
         # costs = np.array([fit_workspace.chisq(guess)])
         # if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
         #     fit_workspace.plot_fit()
@@ -366,11 +366,11 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         epsilon[epsilon == 0] = 1e-4
         epsilon[-1] = 0.001 * np.max(fit_workspace.data)
 
-        fit_workspace.simulation.fast_sim = True
-        fit_workspace.simulation.fix_psf_cube = False
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3,
-                                        verbose=False)
+        # fit_workspace.simulation.fast_sim = True
+        # fit_workspace.simulation.fix_psf_cube = False
+        # run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
+        #                                 xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3,
+        #                                 verbose=False)
 
         fit_workspace.simulation.fast_sim = False
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
@@ -452,13 +452,13 @@ if __name__ == "__main__":
         chisqs.append(w.costs[-1])
     params = np.asarray(params).T
 
-    fig, ax = plt.subplots(1, len(params))
-    for ip, p in enumerate(params):
-        print(f"{w.input_labels[ip]}:", np.mean(p), np.std(p))
-        ax[ip].plot(p, label=f"{w.input_labels[ip]}")
-        ax[ip].grid()
-        ax[ip].legend()
-    plt.show()
+    # fig, ax = plt.subplots(1, len(params))
+    # for ip, p in enumerate(params):
+    #     print(f"{w.input_labels[ip]}:", np.mean(p), np.std(p))
+    #     ax[ip].plot(p, label=f"{w.input_labels[ip]}")
+    #     ax[ip].grid()
+    #     ax[ip].legend()
+    # plt.show()
 
     # w.decontaminate_order2()
     # fit_workspace.simulate(*fit_workspace.p)

@@ -539,6 +539,7 @@ def run_ffm_minimisation(w, method="newton"):
     --------
 
     >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
+    >>> spec = Spectrum("./outputs/sim_20170530_191_spectrum.fits", config="./config/ctio.ini")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
