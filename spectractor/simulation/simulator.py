@@ -125,19 +125,19 @@ class SpectrumSimulation(Spectrum):
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
         distance = self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x)
+        # lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
+        # lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
+        # lambda_ref = self.lambda_ref
+        # adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        # adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+        #                                                        dispersion_axis_angle=self.rotation_angle)
+        # distance_order1 = distance - adr_u
+        # adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        # adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+        #                                                        dispersion_axis_angle=self.rotation_angle)
+        # distance_order2 = distance - adr_u
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
-        lambda_ref = self.lambda_ref
-        adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                               dispersion_axis_angle=self.rotation_angle)
-        distance_order1 = distance - adr_u
-        adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                               dispersion_axis_angle=self.rotation_angle)
-        distance_order2 = distance - adr_u
-        lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
-        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
         self.lambdas_order2 = lambdas_order2
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
         if self.fast_sim:
