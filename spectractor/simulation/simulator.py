@@ -431,13 +431,16 @@ class SpectrogramModel(Spectrum):
                 # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
                 # same PSF as for the order 1 but at the same position
                 profile_params_order2 = np.copy(self.profile_params)
-                for k in range(1, self.profile_params.shape[1]):
-                    profile_params_order2[:, k] = interp1d(lambdas_order2, profile_params_order2[:, k],
-                                                           kind="cubic", fill_value="extrapolate")(lambdas)
+                profile_params_order2[:, 0] = 1
+                profile_params_order2[:, 1] = dispersion_law_order2.real
+                profile_params_order2[:, 2] = dispersion_law_order2.imag
+                distance = np.abs(dispersion_law)
+                distance_order2 = np.abs(dispersion_law_order2)
+                for k in range(3, self.profile_params.shape[1]):
+                    profile_params_order2[:, k] = interp1d(distance, profile_params_order2[:, k],
+                                                           kind="cubic", fill_value="extrapolate")(distance_order2)
                 for i in range(0, nlbda, 1):
-                    p = np.array([1, dispersion_law_order2[i].real,
-                                  dispersion_law_order2[i].imag] + list(profile_params_order2[i, 3:]))
-                    self.psf_cube_order2[i] = self.psf.evaluate(self.pixels, p=p)
+                    self.psf_cube_order2[i] = self.psf.evaluate(self.pixels, p=profile_params_order2[i, :])
                 self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')
             start = time.time()
             ima2 = np.zeros_like(ima1)
