@@ -160,4 +160,4 @@ if os.environ.get('DISPLAY', '') == '':
     DISPLAY = False
 PLOT_XLABEL = r"$x$ [pixels]"
 PLOT_YLABEL = r"$y$ [pixels]"
-PLOT_ROT_LABEL = r"$\alpha$ [degrees]"
+PLOT_ROT_LABEL = r"$\varphi_d$ [degrees]"
