@@ -125,19 +125,19 @@ class SpectrumSimulation(Spectrum):
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
         distance = self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x)
-        # lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        # lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
-        # lambda_ref = self.lambda_ref
-        # adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        # adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-        #                                                        dispersion_axis_angle=self.rotation_angle)
-        # distance_order1 = distance - adr_u
-        # adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        # adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-        #                                                        dispersion_axis_angle=self.rotation_angle)
-        # distance_order2 = distance - adr_u
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
+        lambda_ref = self.lambda_ref
+        adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                               dispersion_axis_angle=self.rotation_angle)
+        distance_order1 = distance - adr_u
+        adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                               dispersion_axis_angle=self.rotation_angle)
+        distance_order2 = distance - adr_u
+        lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
+        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
         self.lambdas_order2 = lambdas_order2
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
         if self.fast_sim:
@@ -309,12 +309,20 @@ class SpectrogramModel(Spectrum):
         # ADR for order 1
         adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=self.lambda_ref)
         adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                                   dispersion_axis_angle=self.rotation_angle)
+        # Compute lambdas at pixel column x
+        lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=1)
         # Position (not distance) in pixel of wavelength lambda order 1 centroid in the (x,y) spectrogram frame
         dispersion_law = r0 + (Dx + shift_x + adr_x) + 1j * (Dy_disp_axis + adr_y + shift_y)
 
         # ADR for order 2
         adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=self.lambda_ref)
         adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                                   dispersion_axis_angle=self.rotation_angle)
+        # Compute lambdas at pixel column x
+        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=2)
         # Position (not distance) in pixel of wavelength lambda order 2 centroid in the (x,y) spectrogram frame
         dispersion_law_order2 = r0 + (Dx + shift_x + adr_x) + 1j * (Dy_disp_axis + adr_y + shift_y)
 
@@ -421,6 +429,8 @@ class SpectrogramModel(Spectrum):
         if A2 > 0.:
             spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(lambdas_order2) * \
                                                    self.simulate_spectrum(lambdas_order2, ozone, pwv, aerosols)
+            if np.any(np.isnan(spectrum_order2)):
+                spectrum_order2[np.isnan(spectrum_order2)] = 0.
             nlbda = dispersion_law_order2.size
             if self.psf_cube_order2 is None or not self.fix_psf_cube:
                 start = time.time()
@@ -435,7 +445,7 @@ class SpectrogramModel(Spectrum):
                 distance_order2 = np.abs(dispersion_law_order2)
                 for k in range(3, self.profile_params.shape[1]):
                     profile_params_order2[:, k] = interp1d(distance, profile_params_order2[:, k],
-                                                           kind="cubic", fill_value="extrapolate")(distance_order2)
+                                                           kind="linear", fill_value="extrapolate")(distance_order2)
                 for i in range(0, nlbda, 1):
                     self.psf_cube_order2[i] = self.psf.evaluate(self.pixels, p=profile_params_order2[i, :])
                 self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')

@@ -57,6 +57,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # crop data to fit faster
         self.lambdas = self.spectrum.lambdas
+        self.lambdas_order2 = self.spectrum.lambdas_order2
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         self.data = spectrum.spectrogram[self.bgd_width:-self.bgd_width, :]
         self.data_flat = self.data.flatten()
@@ -535,14 +536,18 @@ def run_ffm_minimisation(w, method="newton"):
     method: str, optional
         Fitting method (default: 'newton').
 
+    Returns
+    -------
+    spectrum: Spectrum
+        The extracted spectrum.
+
     Examples
     --------
 
     >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
-    >>> spec = Spectrum("./outputs/sim_20170530_191_spectrum.fits", config="./config/ctio.ini")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
-    >>> run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
+    >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
     >>> if 'LBDAS_T' in spec.header: plot_comparison_truth(spec, w)
 
        Line   Tabulated  Detected ...
@@ -621,6 +626,8 @@ def run_ffm_minimisation(w, method="newton"):
     w.spectrum.spectrogram_fit = w.model
     w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
     w.spectrum.header['CHI2_FIT'] = w.costs[-1] / w.data.size
+    w.spectrum.header['PIXSHIFT'] = w.p[2]
+    w.spectrum.header['D2CCD'] = w.p[1]
 
     # Propagate parameters
     A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.p
@@ -635,6 +642,8 @@ def run_ffm_minimisation(w, method="newton"):
     w.spectrum.lambdas_order2 = w.lambdas
     w.spectrum.data_order2 = A2 * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
     w.spectrum.err_order2 = A2 * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+
+    return w.spectrum
 
 
 def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='./config/ctio.ini',
@@ -734,10 +743,10 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
     w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
-    run_ffm_minimisation(w, method="newton")
+    spectrum = run_ffm_minimisation(w, method="newton")
 
     # Calibrate the spectrum
-    calibrate_spectrum(w.spectrum)
+    calibrate_spectrum(spectrum)
 
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
