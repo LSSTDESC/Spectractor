@@ -259,17 +259,13 @@ class SpectrogramModel(Spectrum):
         """
         spectrum = np.zeros_like(lambdas)
         atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
+        telescope_transmission = self.telescope.transmission(lambdas - shift_t)
         if self.fast_sim:
             spectrum = self.target.sed(lambdas)
             spectrum *= self.disperser.transmission(lambdas - shift_t)
-            telescope_transmission = self.telescope.transmission(lambdas - shift_t)
             spectrum *= telescope_transmission
             spectrum *= atmosphere(lambdas)
-            spectrum_err = np.zeros_like(spectrum)
-            idx = np.where(telescope_transmission > 0)[0]
             spectrum *= parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas)
-            spectrum_err[idx] = self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[
-                idx]
         else:
             def integrand(lbda):
                 return lbda * self.target.sed(lbda) * self.telescope.transmission(lbda - shift_t) \
@@ -280,8 +276,10 @@ class SpectrogramModel(Spectrum):
                 lbdas = np.arange(lambdas[i], lambdas[i + 1], self.lambdas_step)
                 spectrum[i] = parameters.FLAM_TO_ADURATE * np.mean(integrand(lbdas)) * (lambdas[i + 1] - lambdas[i])
             spectrum[-1] = spectrum[-2]
-
-        return spectrum, np.zeros_like(spectrum)
+        spectrum_err = np.zeros_like(spectrum)
+        idx = telescope_transmission > 0
+        spectrum_err[idx] = self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[idx]
+        return spectrum, spectrum_err
 
     def simulate_psf(self, psf_poly_params):
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params, apply_bounds=True)
@@ -420,9 +418,11 @@ class SpectrogramModel(Spectrum):
             self.my_logger.debug(f'\n\tAfter psf cube: {time.time() - start}')
         start = time.time()
         ima1 = np.zeros((self.spectrogram_Ny, self.spectrogram_Nx))
+        ima1_err2 = np.zeros((self.spectrogram_Ny, self.spectrogram_Nx))
         for i in range(0, nlbda, 1):
             # here spectrum[i] is in ADU/s
             ima1 += spectrum[i] * self.psf_cube[i]
+            ima1_err2 += (spectrum_err[i] * self.psf_cube[i]) ** 2
         self.my_logger.debug(f'\n\tAfter build ima1: {time.time() - start}')
 
         # Add order 2
@@ -451,37 +451,42 @@ class SpectrogramModel(Spectrum):
                 self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')
             start = time.time()
             ima2 = np.zeros_like(ima1)
+            ima2_err2 = np.zeros_like(ima1)
             for i in range(0, nlbda, 1):
                 # here spectrum[i] is in ADU/s
                 ima2 += spectrum_order2[i] * self.psf_cube_order2[i]
+                ima2_err2 += (spectrum_order2_err[i] * self.psf_cube_order2[i]) ** 2
             # self.data is in ADU/s units here
             self.data = A1 * (ima1 + A2 * ima2)
+            self.err = np.sqrt(A1*A1*(ima1_err2 + A2*A2*ima2_err2))
             self.my_logger.debug(f'\n\tAfter build ima2: {time.time() - start}')
         else:
             self.data = A1 * ima1
+            self.err = A1 * np.sqrt(ima1_err2)
         start = time.time()
         if self.with_background:
             self.data += B * self.spectrogram_bgd
-        self.err = np.zeros_like(self.data)
         self.my_logger.debug(f'\n\tAfter bgd: {time.time() - start}')
         if parameters.DEBUG:
-            fig, ax = plt.subplots(3, 1, sharex="all", figsize=(12, 9))
-            ax[0].imshow(self.data, origin='lower')
+            fig, ax = plt.subplots(2, 1, sharex="all", figsize=(12, 9))
+            im = ax[0].imshow(self.data, origin='lower')
+            plt.colorbar(im, ax=ax[0], label=self.units)
             ax[0].set_title('Model')
-            ax[1].imshow(self.spectrogram, origin='lower')
-            ax[1].set_title('Data')
+            im = ax[1].imshow(self.err, origin='lower')
+            plt.colorbar(im, ax=ax[1], label=self.units)
+            ax[1].set_title('Err')
             ax[1].set_xlabel('X [pixels]')
             ax[0].set_ylabel('Y [pixels]')
             ax[1].set_ylabel('Y [pixels]')
             ax[0].grid()
             ax[1].grid()
-            if self.with_background:
-                ax[2].plot(np.sum(self.data, axis=0), label="model")
-            else:
-                ax[2].plot(np.sum(self.data + self.spectrogram_bgd, axis=0), label="model")
-            ax[2].plot(np.sum(self.spectrogram, axis=0), label="data")
-            ax[2].grid()
-            ax[2].legend()
+            # if self.with_background:
+            #     ax[2].plot(np.sum(self.data, axis=0), label="model")
+            # else:
+            #     ax[2].plot(np.sum(self.data + self.spectrogram_bgd, axis=0), label="model")
+            # ax[2].plot(np.sum(self.spectrogram, axis=0), label="data")
+            # ax[2].grid()
+            # ax[2].legend()
             fig.tight_layout()
             plt.show()
         return self.lambdas, self.data, self.err
