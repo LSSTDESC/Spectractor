@@ -21,7 +21,7 @@ from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_x
 
 class Spectrum:
 
-    def __init__(self, file_name="", image=None, order=1, target=None, config=""):
+    def __init__(self, file_name="", image=None, order=1, target=None, config="", fast_load=False):
         """ Spectrum class used to store information and methods
         relative to spectra nd their extraction.
 
@@ -38,6 +38,8 @@ class Spectrum:
             Target object if provided (default: None)
         config: str, optional
             A config file name to load some parameter values for a given instrument (default: "").
+        fast_load: bool, optional
+            If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
 
         Examples
         --------
@@ -57,6 +59,7 @@ class Spectrum:
         >>> print(s.target.label)
         PNG321.0+3.9
         """
+        self.fast_load = fast_load
         self.my_logger = set_logger(self.__class__.__name__)
         if config != "":
             load_config(config)
@@ -501,16 +504,17 @@ class Spectrum:
             self.adr_params = [self.dec, self.hour_angle, self.temperature,
                                self.pressure, self.humidity, self.airmass, self.xpixsize, self.ypixsize]
 
-            if os.path.isfile(spectrogram_file_name):
-                self.load_spectrogram(spectrogram_file_name)
-            else:
-                raise FileNotFoundError(f"Spectrogram file {spectrogram_file_name} does not exist.")
-            psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
-            self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
-            if os.path.isfile(psf_file_name):
-                self.load_chromatic_psf(psf_file_name)
-            else:
-                raise FileNotFoundError(f"PSF file {psf_file_name} does not exist.")
+            if not self.fast_load:
+                if os.path.isfile(spectrogram_file_name):
+                    self.load_spectrogram(spectrogram_file_name)
+                else:
+                    raise FileNotFoundError(f"Spectrogram file {spectrogram_file_name} does not exist.")
+                psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
+                self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
+                if os.path.isfile(psf_file_name):
+                    self.load_chromatic_psf(psf_file_name)
+                else:
+                    raise FileNotFoundError(f"PSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
                 self.cov_matrix = hdu_list["SPEC_COV"].data
