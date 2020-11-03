@@ -1426,6 +1426,9 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                                     for x in range(self.Nx)]
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
+            self.model = np.zeros_like(self.data)
+            for x in range(self.Nx):
+                self.model[:, x] = M[x] * amplitude_params[x]
         else:
             amplitude_params = np.copy(self.amplitude_priors)
             err2 = np.copy(amplitude_params)
@@ -1438,7 +1441,8 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         poly_params[:self.Nx] = amplitude_params
         self.poly_params = np.copy(poly_params)
         poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
-        self.model = self.chromatic_psf.evaluate(poly_params, mode="1D")[self.bgd_width:-self.bgd_width, :]
+        if self.amplitude_priors_method == "fixed":
+            self.model = self.chromatic_psf.evaluate(poly_params, mode="1D")[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
@@ -1676,6 +1680,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                 amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + self.reg * self.Q_dot_A0)
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
+            self.model = (M @ amplitude_params).reshape((self.Ny, self.Nx))
         else:
             amplitude_params = np.copy(self.amplitude_priors)
             err2 = np.copy(amplitude_params)
@@ -1689,7 +1694,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
         self.amplitude_cov_matrix = np.copy(cov_matrix)
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
-        self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
+        if self.amplitude_priors_method == "fixed":
+            self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
