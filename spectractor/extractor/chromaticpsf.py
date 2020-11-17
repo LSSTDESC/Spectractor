@@ -7,8 +7,7 @@ from scipy.interpolate import interp1d
 
 from astropy.table import Table
 
-from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm,
-                               plot_correlation_matrix_simple, compute_correlation_matrix)
+from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm)
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss, Moffat
 from spectractor import parameters
@@ -246,7 +245,6 @@ class ChromaticPSF:
             plt.show()
 
         """
-        pixels = self.pixels
         if mode == "2D":
             yy, xx = np.mgrid[:self.Ny, :self.Nx]
             pixels = np.asarray([xx, yy])
@@ -1071,7 +1069,6 @@ class ChromaticPSF:
             >>> assert np.abs(np.mean((w.amplitude_params - s0.poly_params[:s0.Nx])/w.amplitude_params_err)) < 0.1
 
         """
-        w = None
         if mode == "1D":
             w = ChromaticPSF1DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose)
