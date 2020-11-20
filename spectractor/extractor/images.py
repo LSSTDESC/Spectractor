@@ -1,5 +1,4 @@
-from astropy.coordinates import Angle, SkyCoord
-from astropy.modeling import fitting
+from astropy.coordinates import Angle, SkyCoord, Latitude
 from astropy.io import fits
 import astropy.units as units
 from scipy import ndimage
@@ -67,6 +66,7 @@ class Image(object):
         self.disperser = None
         self.disperser_label = disperser_label
         self.target_label = target_label
+        self.target_guess = None
         self.filter = None
         self.filters = None
         self.header = None
@@ -362,9 +362,7 @@ class Image(object):
 
         Script from A. Guyonnet.
         """
-        latitude = parameters.OBS_LATITUDE.split()
-        latitude = float(latitude[0]) - float(latitude[1]) / 60. - float(latitude[2]) / 3600.
-        latitude = Angle(latitude, units.deg).radian
+        latitude = Latitude(parameters.OBS_LATITUDE, unit=units.deg)
         ha = Angle(self.header['HA'], unit='hourangle').radian
         dec = Angle(self.header['DEC'], unit=units.deg).radian
         parallactic_angle = np.arctan(np.sin(ha) / (np.cos(dec) * np.tan(latitude) - np.sin(dec) * np.cos(ha)))
@@ -579,31 +577,38 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.data = hdu_list[1].data.astype(np.float64)
     hdu_list.close()  # need to free allocation for file descripto
     # image.data = np.concatenate((data[10:-10, 10:-10], data2[10:-10, 10:-10]))
-    image.date_obs = image.header['DATE-OBS']
+    image.date_obs = image.header['DATE']
     image.expo = float(image.header['EXPTIME'])
     image.data = image.data.T[:, ::-1]
     if image.header["AMSTART"] is not None:
         image.airmass = 0.5 * (float(image.header["AMSTART"]) + float(image.header["AMEND"]))
     else:
-        image.airmass = -1
+        image.airmass = float(image.header['AIRMASS'])
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
     image.disperser_label = image.header['GRATING']
-    # image.dec = image.header['DEC']
-    # image.hour_angle = image.header['HA']
-    # image.temperature = image.header['OUTTEMP']
-    # image.pressure = image.header['OUTPRESS']
-    # image.humidity = image.header['OUTHUM']
+    image.dec = image.header['DEC']
+    image.hour_angle = image.header['HA']
+    image.temperature = 0  # image.header['OUTTEMP']
+    image.pressure = 800  # image.header['OUTPRESS']
+    image.humidity = 0  # image.header['OUTHUM']
     # image.xpixsize = image.header['XPIXSIZE']
     # image.ypixsize = image.header['YPIXSIZE']
+    if 'adu' in image.header['BUNIT']:
+        image.units = 'ADU'
     image.my_logger.warning("\n\tNeed to set the camera rotation angle ? Angle must be counted positive from "
                             "north to east direction. Need to flip the signs ?")
-    # parameters.OBS_CAMERA_ROTATION = image.header["rr"]
-    parameters.OBS_ALTITUDE = image.header['OBS-ELEV']
-    parameters.OBS_LATITUDE = image.header['OBS-LAT']
+    parameters.OBS_CAMERA_ROTATION = float(image.header["ROTPA"])
+    parameters.OBS_ALTITUDE = float(image.header['OBS-ELEV']) / 1000
+    parameters.OBS_LATITUDE = Latitude(image.header['OBS-LAT'])
     image.read_out_noise = 8.5*np.ones_like(image.data)
+    image.target_label = image.header["OBJECT"].replace(" ", "")
+    image.target_guess = [float(image.header["OBJECTX"]), float(image.header["OBJECTY"])]
+    image.disperser_label = image.header["GRATING"]
+    parameters.DISTANCE2CCD = float(image.header["LINSPOS"])
+    image.compute_parallactic_angle()
 
 
 def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[parameters.XWINDOW, parameters.YWINDOW]):
