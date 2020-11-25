@@ -11,8 +11,7 @@ from spectractor.extractor.spectrum import Spectrum, calibrate_spectrum
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
-from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple
-from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace
+from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple, rebin
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 from spectractor.fit.fitter import run_minimisation, run_minimisation_sigma_clipping, RegFitWorkspace, FitWorkspace
 
@@ -70,13 +69,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # prepare parameters to fit
         self.A2 = 1
-        self.D = self.spectrum.header['D2CCD']
-        self.shift_x = self.spectrum.header['PIXSHIFT']
+        self.D = np.copy(self.spectrum.header['D2CCD'])
+        self.shift_x = np.copy(self.spectrum.header['PIXSHIFT'])
         self.shift_y = 0.
-        self.angle = self.spectrum.rotation_angle
+        self.angle = np.copy(self.spectrum.rotation_angle)
         self.B = 1
-        self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
-        self.psf_profile_params = self.spectrum.chromatic_psf.from_table_to_profile_params()
+        self.psf_poly_params = np.copy(self.spectrum.chromatic_psf.from_table_to_poly_params())
+        self.psf_profile_params = np.copy(self.spectrum.chromatic_psf.from_table_to_profile_params())
         length = len(self.spectrum.chromatic_psf.table)
         self.psf_poly_params = self.psf_poly_params[length:]
         self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:])
@@ -92,7 +91,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                              r"angle [deg]", "B"] + list(self.psf_poly_params_labels)
         self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
                            r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names)
-        self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), (50, 60), (-2, 2), (-3, 3),
+        bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
+        self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D, (-2, 2), (-3, 3),
                                                 (-90, 90), (0.2, 5)]), psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
@@ -102,11 +102,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # with respect to the true spectrum injected in the simulation
         self.fixed[1] = True  # D2CCD
         self.fixed[2] = True  # delta x
+        self.fixed[5] = True  # B
         self.fixed[-1] = True  # saturation
         self.nwalkers = max(2 * self.ndim, nwalkers)
 
         # prepare the background, data and errors
-        self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
+        self.bgd_std = float(np.std(np.random.poisson(np.abs(self.bgd))))
 
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
@@ -273,11 +274,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Distance in x and y with respect to the true order 0 position at lambda_ref
         Dx = np.arange(self.Nx) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
         Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        distance = np.sqrt(Dx ** 2 + Dy_disp_axis ** 2)
+        distance = np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)
         self.spectrum.chromatic_psf.table["Dy_disp_axis"] = Dy_disp_axis
 
         # First guess of wavelengths
-        self.spectrum.disperser.D = D2CCD
+        self.spectrum.disperser.D = np.copy(D2CCD)
         lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
                                                                   self.spectrum.x0 + np.asarray([dx0, dy0]),
                                                                   order=1)
@@ -497,7 +498,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
 
-        A2, D2CCD, dx0, dy0, angle, B, *poly_params  = self.p
+        A2, D2CCD, dx0, dy0, angle, B, *poly_params = self.p
         plt.suptitle(f'A2={A2:.3f}, D={D2CCD:.2f}mm, shift_x={dx0:.3f}pix, shift_y={dy0:.3f}pix, '
                      f'angle={angle:.2f}pix, B={B:.3f}', y=1)
         # main plot
@@ -646,7 +647,7 @@ def run_ffm_minimisation(w, method="newton"):
     return w.spectrum
 
 
-def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='./config/ctio.ini',
+def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config="",
                 atmospheric_lines=True):
     """ Spectractor
     Main function to extract a spectrum from an image
@@ -704,14 +705,24 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTOR')
     # Load config file
-    load_config(config)
+    if config != "":
+        load_config(config)
     if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
         ensure_dir(parameters.LSST_SAVEFIGPATH)
 
     # Load reduced image
     image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
+    if guess is not None and image.target_guess is None:
+        image.target_guess = np.asarray(guess)
     if parameters.DEBUG:
-        image.plot_image(scale='symlog', target_pixcoords=guess)
+        image.plot_image(scale='symlog', target_pixcoords=image.target_guess)
+
+    # Use fast mode
+    if parameters.CCD_REBIN > 1:
+        image = set_fast_mode(image)
+        if parameters.DEBUG:
+            image.plot_image(scale='symlog', target_pixcoords=image.target_guess)
+
     # Set output path
     ensure_dir(output_directory)
     output_filename = file_name.split('/')[-1]
@@ -721,20 +732,21 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     output_filename_spectrogram = output_filename.replace('spectrum', 'spectrogram')
     output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
     # Find the exact target position in the raw cut image: several methods
-    my_logger.info('\n\tSearch for the target in the image...')
-    find_target(image, guess, use_wcs=True, widths=(parameters.XWINDOW, parameters.YWINDOW))
+    my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
+    find_target(image, image.target_guess, use_wcs=True, widths=(parameters.XWINDOW, parameters.YWINDOW))
     # Rotate the image
     turn_image(image)
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-    find_target(image, guess, rotated=True, use_wcs=True, widths=(parameters.XWINDOW_ROT, parameters.YWINDOW_ROT))
+    find_target(image, image.target_guess, rotated=True, use_wcs=True,
+                widths=(parameters.XWINDOW_ROT, parameters.YWINDOW_ROT))
     # Create Spectrum object
     spectrum = Spectrum(image=image)
     # Subtract background and bad pixels
     extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
                                 ws=(parameters.PIXDIST_BACKGROUND,
                                     parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND),
-                                right_edge=parameters.CCD_IMSIZE - 200)
+                                right_edge=parameters.CCD_IMSIZE)
     spectrum.atmospheric_lines = atmospheric_lines
 
     # Calibrate the spectrum
@@ -742,8 +754,10 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     calibrate_spectrum(spectrum)
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
-    w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
-    spectrum = run_ffm_minimisation(w, method="newton")
+    if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
+        w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=True,
+                                         amplitude_priors_method="spectrum")
+        spectrum = run_ffm_minimisation(w, method="newton")
 
     # Calibrate the spectrum
     calibrate_spectrum(spectrum)
@@ -767,7 +781,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     return spectrum
 
 
-def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), right_edge=parameters.CCD_IMSIZE - 200):
+def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), right_edge=parameters.CCD_IMSIZE):
     """Extract the 1D spectrum from the image.
 
     Method : remove a uniform background estimated from the rectangular lateral bands
@@ -794,7 +808,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     ws: list
         up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
     right_edge: int
-        Right-hand pixel position above which no pixel should be used (default: 1800)
+        Right-hand pixel position above which no pixel should be used (default: parameters.CCD_IMSIZE)
     """
 
     if parameters.PSF_EXTRACTION_MODE != "PSF_1D" and parameters.PSF_EXTRACTION_MODE != "PSF_2D":
@@ -939,7 +953,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
                          deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
         # fill a first table with first guess
-        s.table['Dx'] = np.arange(xmin, xmax, 1) - image.target_pixcoords[0]
+        s.table['Dx'] = (np.arange(xmin, xmax, 1) - image.target_pixcoords[0])[:len(s.table['Dx'])]
         s.table["amplitude"] = np.interp(s.table['Dx'], Dx_rot, flux)
         s.table["flux_err"] = np.interp(s.table['Dx'], Dx_rot, flux_err)
         s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
@@ -1032,6 +1046,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         plot_spectrum_simple(ax[0], np.arange(spectrum.data.size), spectrum.data, data_err=spectrum.err,
                              units=image.units, label='Fitted spectrum', xlim=[0, spectrum.data.size])
         ax[0].plot(xx, s.table['flux_sum'], 'k-', label='Cross spectrum')
+        print(s.table['flux_sum'])
         ax[0].set_xlim(0, xx.size)
         ax[0].legend(loc='best')
         ax[1].plot(xx, (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
@@ -1118,3 +1133,33 @@ def plot_comparison_truth(spectrum, w):
     if parameters.LSST_SAVEFIGPATH:
         fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'deconvolution_truth.pdf'))
     plt.show()
+
+
+def set_fast_mode(image):
+    """Set the parameters for a fast mode run of Spectractor.
+
+    Parameters
+    ----------
+    image: Image
+
+    Returns
+    -------
+    image: Image
+
+    """
+    new_shape = np.asarray(image.data.shape) // parameters.CCD_REBIN
+    image.data = rebin(image.data, new_shape)
+    image.stat_errors = np.sqrt(rebin(image.stat_errors**2, new_shape))
+    image.target_guess = np.asarray(image.target_guess) / parameters.CCD_REBIN
+    parameters.PIXDIST_BACKGROUND //= parameters.CCD_REBIN
+    parameters.PIXWIDTH_BOXSIZE = max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN)
+    parameters.PIXWIDTH_BACKGROUND //= parameters.CCD_REBIN
+    parameters.PIXWIDTH_SIGNAL //= parameters.CCD_REBIN
+    parameters.CCD_IMSIZE //= parameters.CCD_REBIN
+    parameters.CCD_PIXEL2MM *= parameters.CCD_REBIN
+    parameters.CCD_PIXEL2ARCSEC *= parameters.CCD_REBIN
+    parameters.XWINDOW //= parameters.CCD_REBIN
+    parameters.YWINDOW //= parameters.CCD_REBIN
+    parameters.XWINDOW_ROT //= parameters.CCD_REBIN
+    parameters.YWINDOW_ROT //= parameters.CCD_REBIN
+    return image
