@@ -2031,9 +2031,13 @@ def rebin(arr, new_shape):
            [4., 4., 4., 4., 4.],
            [4., 4., 4., 4., 4.]])
     """
+    if np.any(new_shape * parameters.CCD_REBIN != arr.shape):
+        shape_cropped = new_shape * parameters.CCD_REBIN
+        margins = arr.shape - shape_cropped
+        arr = arr[:-margins[0], :-margins[1]]
     shape = (new_shape[0], arr.shape[0] // new_shape[0],
              new_shape[1], arr.shape[1] // new_shape[1])
-    return arr.reshape(shape).sum(-1).sum(1)
+    return arr.reshape(shape).mean(-1).mean(1)
 
 
 def set_wcs_output_directory(file_name, output_directory=""):
