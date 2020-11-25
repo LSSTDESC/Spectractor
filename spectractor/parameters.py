@@ -54,6 +54,7 @@ CCD_PIXEL2ARCSEC = 0.401  # pixel size in arcsec
 CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
 CCD_MAXADU = 60000  # approximate maximum ADU output of the CCD
 CCD_GAIN = 3.  # electronic gain : elec/ADU
+CCD_REBIN = 1  # rebinning of the image in pixel
 
 # Instrument characteristics
 OBS_NAME = 'CTIO'
@@ -67,7 +68,7 @@ OBS_OBJECT_TYPE = 'STAR'  # To choose between STAR, HG-AR, MONOCHROMATOR
 OBS_TELESCOPE_TRANSMISSION = 'ctio_throughput.txt'  # telescope transmission file
 OBS_FULL_INSTRUMENT_TRANSMISSON = 'ctio_throughput_300517_v1.txt'  # full instrument transmission file
 OBS_QUANTUM_EFFICIENCY = "qecurve.txt"  # quantum efficiency of the detector file
-OBS_CAMERA_ROTATION = 0  # Camera (x,y) rotation angle with respect to (north-up, east-left) system
+OBS_CAMERA_ROTATION = 0  # Camera (x,y) rotation angle with respect to (north-up, east-left) system in degrees
 OBS_CAMERA_DEC_FLIP_SIGN = 1  # Camera (x,y) flip signs with respect to (north-up, east-left) system
 OBS_CAMERA_RA_FLIP_SIGN = 1  # Camera (x,y) flip signs with respect to (north-up, east-left) system
 
