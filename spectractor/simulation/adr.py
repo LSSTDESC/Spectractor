@@ -51,7 +51,6 @@ class ADR:
         npos = len(x0)
 
         dz = np.tan(np.arccos(1. / self.airmass)) * self.get_scale(lbda) / unit  # [unit]
-
         if backward:
             nlbda = len(np.atleast_1d(lbda))
             assert npos == nlbda, "Incompatible x,y and lbda vectors."
@@ -63,7 +62,6 @@ class ADR:
             x = x0 + dz * np.sin(self.parangle / 180. * np.pi)  # (nlbda,npos)
             y = y0 - dz * np.cos(self.parangle / 180. * np.pi)  # (nlbda,npos)
             out = np.dstack((x.T, y.T)).T  # (2,nlbda,npos)
-
         return out.squeeze()  # (2,[nlbda],[npos])
 
     # ------- #
@@ -281,8 +279,8 @@ def adr_calib(lambdas, params, lat, lambda_ref=550):
     meadr = instanciation_adr(params, lat, lambda_ref * 10)
 
     disp_axis, trans_axis = get_adr_shift_for_lbdas(meadr, lambdas * 10)
-    disp_axis_pix = in_pixel(disp_axis, params)
-    trans_axis_pix = in_pixel(trans_axis, params)
+    disp_axis_pix = in_pixel(disp_axis)
+    trans_axis_pix = in_pixel(trans_axis)
 
     return disp_axis_pix, trans_axis_pix
 
@@ -290,17 +288,17 @@ def adr_calib(lambdas, params, lat, lambda_ref=550):
 def instanciation_adr(params, latitude, lbda_ref):
     dec, hour_angle = params[:2]
 
-    if isinstance(dec, str) and isinstance(hour_angle, str):
+    if (isinstance(dec, str) and isinstance(hour_angle, str)) \
+            or (isinstance(dec, float) and isinstance(hour_angle, float)):
         dec = AC.Angle(params[0], unit=u.deg)
         hour_angle = AC.Angle(params[1], unit=u.hourangle)
-
     elif isinstance(dec, AC.Angle) and isinstance(hour_angle, AC.Angle):
         dec = dec
         hour_angle = hour_angle
     else:
         raise TypeError('dec/hour_angle type is neither a str nor an astropy.coordinates')
 
-    temperature, pressure, humidity, airmass = params[2:-2]
+    temperature, pressure, humidity, airmass = params[2:]
 
     _, parangle = hadec2zdpar(hour_angle.degree, dec.degree, latitude.degree, deg=True)
     adr = ADR(airmass=airmass, parangle=parangle, temperature=temperature,
@@ -327,13 +325,13 @@ def get_adr_shift_for_lbdas(adr_object, lbdas):
 # ================================= #
 
 
-def in_pixel(thing_in_arcsec, params):
+def in_pixel(thing_in_arcsec):
     """
     Transform something in arcsec in pixels
     """
 
-    xpixsize = params[-2]
-    ypixsize = params[-1]
+    xpixsize = parameters.CCD_PIXEL2ARCSEC
+    ypixsize = parameters.CCD_PIXEL2ARCSEC
 
     if xpixsize != ypixsize:
         raise ValueError('Pixels in X and Y do not have the same length, too complicated, did not work')

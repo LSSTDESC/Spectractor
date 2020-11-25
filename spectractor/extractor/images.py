@@ -80,13 +80,12 @@ class Image(object):
         self.parallactic_angle = None
         self.saturation = None
 
+        self.ra = None
         self.dec = None
         self.hour_angle = None
         self.temperature = 0
         self.pressure = 0
         self.humidity = 0
-        self.xpixsize = 0
-        self.ypixsize = 0
 
         if parameters.CALLING_CODE != 'LSST_DM':
             self.load_image(file_name)
@@ -143,8 +142,6 @@ class Image(object):
         self.header['OUTTEMP'] = self.temperature
         self.header['OUTPRESS'] = self.pressure
         self.header['OUTHUM'] = self.humidity
-        self.header['XPIXSIZE'] = self.xpixsize
-        self.header['YPIXSIZE'] = self.ypixsize
 
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
@@ -365,8 +362,8 @@ class Image(object):
         latitude = Latitude(parameters.OBS_LATITUDE, unit=units.deg)
         ha = Angle(self.header['HA'], unit='hourangle').radian
         dec = Angle(self.header['DEC'], unit=units.deg).radian
-        parallactic_angle = np.arctan(np.sin(ha) / (np.cos(dec) * np.tan(latitude) - np.sin(dec) * np.cos(ha)))
-        self.parallactic_angle = parallactic_angle * 180 / np.pi
+        parallactic_angle = Angle(np.arctan(np.sin(ha) / (np.cos(dec) * np.tan(latitude) - np.sin(dec) * np.cos(ha))))
+        self.parallactic_angle = parallactic_angle.degree
         self.header['PARANGLE'] = self.parallactic_angle
         self.header.comments['PARANGLE'] = 'parallactic angle in degree'
         return self.parallactic_angle
@@ -443,22 +440,18 @@ def load_CTIO_image(image):
     image.filters = image.header['FILTERS']
     image.filter = image.header['FILTER1']
     image.disperser_label = image.header['FILTER2']
+    image.ra = image.header['RA']
     image.dec = image.header['DEC']
     image.hour_angle = image.header['HA']
     image.temperature = image.header['OUTTEMP']
     image.pressure = image.header['OUTPRESS']
     image.humidity = image.header['OUTHUM']
-    image.xpixsize = image.header['XPIXSIZE']
-    image.ypixsize = image.header['YPIXSIZE']
 
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
     parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
     if image.header['YLENGTH'] != parameters.CCD_IMSIZE:
         image.my_logger.warning(
             f'\n\tImage rectangular: X={parameters.CCD_IMSIZE:d} pix, Y={image.header["YLENGTH"]:d} pix')
-    if image.header['YPIXSIZE'] != parameters.CCD_PIXEL2ARCSEC:
-        image.my_logger.warning('\n\tPixel size rectangular: X=%d arcsec, Y=%d arcsec' % (
-            parameters.CCD_PIXEL2ARCSEC, image.header['YPIXSIZE']))
     image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
                            obstime=image.header['DATE-OBS'])
     image.my_logger.info(f'\n\tImage {image.file_name} loaded.')
@@ -589,25 +582,25 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
     image.disperser_label = image.header['GRATING']
+    image.ra = image.header['RA']
     image.dec = image.header['DEC']
     image.hour_angle = image.header['HA']
-    image.temperature = 0  # image.header['OUTTEMP']
-    image.pressure = 800  # image.header['OUTPRESS']
-    image.humidity = 0  # image.header['OUTHUM']
-    # image.xpixsize = image.header['XPIXSIZE']
-    # image.ypixsize = image.header['YPIXSIZE']
+    image.temperature = 5  # image.header['OUTTEMP']
+    image.pressure = 730  # image.header['OUTPRESS']
+    image.humidity = 25  # image.header['OUTHUM']
     if 'adu' in image.header['BUNIT']:
         image.units = 'ADU'
     image.my_logger.warning("\n\tNeed to set the camera rotation angle ? Angle must be counted positive from "
                             "north to east direction. Need to flip the signs ?")
     parameters.OBS_CAMERA_ROTATION = float(image.header["ROTPA"])
     parameters.OBS_ALTITUDE = float(image.header['OBS-ELEV']) / 1000
-    parameters.OBS_LATITUDE = Latitude(image.header['OBS-LAT'])
-    image.read_out_noise = 8.5*np.ones_like(image.data)
+    parameters.OBS_LATITUDE = image.header['OBS-LAT']
+    image.read_out_noise = 8.5 * np.ones_like(image.data)
     image.target_label = image.header["OBJECT"].replace(" ", "")
-    image.target_guess = [float(image.header["OBJECTX"]), float(image.header["OBJECTY"])]
+    image.target_guess = [float(image.header["OBJECTY"]), float(image.header["OBJECTX"])]
     image.disperser_label = image.header["GRATING"]
-    parameters.DISTANCE2CCD = float(image.header["LINSPOS"])
+    image.disperser_label = image.header["GRATING"]
+    parameters.DISTANCE2CCD = 116 + float(image.header["LINSPOS"])  # mm
     image.compute_parallactic_angle()
 
 
@@ -665,7 +658,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
                 # noinspection PyUnresolvedReferences
                 target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra,
                                                               target_coord_after_motion.dec, 0))
-                theX, theY = target_pixcoords
+                theX, theY = target_pixcoords / parameters.CCD_REBIN
             if parameters.DEBUG:
                 plt.figure(figsize=(5, 5))
                 sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
@@ -705,9 +698,9 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
             y0 = int(theY)
             NY, NX = sub_image_subtracted.shape
             sub_image_subtracted = sub_image_subtracted[max(0, int(avY) - Dy):min(NY, int(avY) + Dy),
-                                                        max(0, int(avX) - Dx):min(NX, int(avX) + Dx)]
+                                   max(0, int(avX) - Dx):min(NX, int(avX) + Dx)]
             sub_errors = sub_errors[max(0, int(avY) - Dy):min(NY, int(avY) + Dy),
-                                    max(0, int(avX) - Dx):min(NX, int(avX) + Dx)]
+                         max(0, int(avX) - Dx):min(NX, int(avX) + Dx)]
             if int(avX) - Dx < 0:
                 Dx = int(avX)
             if int(avY) - Dy < 0:
@@ -970,7 +963,7 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
 
 
 def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=parameters.YWINDOW,
-                                   edges=(0, parameters.CCD_IMSIZE - 200),
+                                   edges=(0, parameters.CCD_IMSIZE),
                                    margin_cut=12, pixel_fraction=0.01):
     """Compute the rotation angle in degree of a spectrogram with the Hessian of the image.
     Use the disperser rotation angle map as a prior and the target_pixcoords values to crop the image
@@ -985,7 +978,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
     width_cut: int
         Half with of the image to consider in height (default: parameters.YWINDOW).
     edges: (int, int)
-        Minimum and maximum pixel on the right edge (default: (0, parameters.CCD_IMSIZE - 200)).
+        Minimum and maximum pixel on the right edge (default: (0, parameters.CCD_IMSIZE)).
     margin_cut: int
         After computing the Hessian, to avoid bad values on the edges the function cut on the
         edge of image margin_cut pixels (default: 12).
@@ -1064,7 +1057,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         f, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(6.5, 3), gridspec_kw=gs_kw)
         xindex = np.arange(data.shape[1])
         x_new = np.linspace(xindex.min(), xindex.max(), 50)
-        y_new = width_cut-margin_cut-3 + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
+        y_new = width_cut - margin_cut - 3 + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
         cmap = copy.copy(cm.get_cmap('bwr'))
         cmap.set_bad(color='lightgrey')
         im = ax1.imshow(theta_mask, origin='lower', cmap=cmap, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
@@ -1159,7 +1152,7 @@ def turn_image(image):
     image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
                                                           angle_range=(parameters.ROT_ANGLE_MIN,
                                                                        parameters.ROT_ANGLE_MAX),
-                                                          edges=(0, parameters.CCD_IMSIZE - 200))
+                                                          edges=(0, parameters.CCD_IMSIZE))
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
@@ -1174,7 +1167,7 @@ def turn_image(image):
         min_noz = np.min(image.stat_errors_rotated[image.stat_errors_rotated > 0])
         image.stat_errors_rotated[image.stat_errors_rotated <= 0] = min_noz
     if parameters.DEBUG:
-        margin = 100
+        margin = 100 // parameters.CCD_REBIN
         y0 = int(image.target_pixcoords[1])
         f, (ax1, ax2) = plt.subplots(2, 1, figsize=[8, 8])
         plot_image_simple(ax1, data=image.data[max(0, y0 - 2 * parameters.YWINDOW):
@@ -1182,13 +1175,13 @@ def turn_image(image):
                                     margin:-margin],
                           scale="symlog", title='Raw image (log10 scale)', units=image.units,
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
-        ax1.plot([0, image.data.shape[0] - 2 * margin], [parameters.YWINDOW, parameters.YWINDOW], 'k-')
+        ax2.axhline(parameters.YWINDOW, color='k')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
                                     margin:-margin],
                           scale="symlog", title='Turned image (log10 scale)',
                           units=image.units, target_pixcoords=image.target_pixcoords_rotated, aspect='auto')
-        ax2.plot([0, image.data_rotated.shape[0] - 2 * margin], [2 * parameters.YWINDOW, 2 * parameters.YWINDOW], 'k-')
+        ax2.axhline(2 * parameters.YWINDOW, color='k')
         f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()

@@ -28,6 +28,7 @@ def test_extractor():
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
+    parameters.CCD_REBIN = 1
 
     for file_name in file_names:
         tag = file_name.split('/')[-1]
@@ -37,7 +38,7 @@ def test_extractor():
         spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
                                atmospheric_lines=True)
         assert spectrum.data is not None
-        assert np.sum(spectrum.data) > 2e-11
+        assert np.sum(spectrum.data) * parameters.CCD_REBIN**2 > 2e-11 / parameters.CCD_REBIN
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
                                    f"\n\t\tspectrum.lambdas[0]={spectrum.lambdas[0]}"
                                    f"\n\t\tspectrum.lambdas[-1]={spectrum.lambdas[-1]}"
@@ -45,23 +46,25 @@ def test_extractor():
                                    f"\n\t\tspectrum.spectrogram_x0={spectrum.spectrogram_x0}"
                                    f"\n\t\tnp.mean(spectrum.chromatic_psf.table['gamma']="
                                    f"{np.mean(spectrum.chromatic_psf.table['gamma'])}")
-        if parameters.PSF_EXTRACTION_MODE == "PSD_2D":
-            assert np.isclose(spectrum.lambdas[0], 343, atol=1)
-            assert np.isclose(spectrum.lambdas[-1], 1084.0, atol=1)
-        elif parameters.PSF_EXTRACTION_MODE == "PSF_1D":
-            assert np.isclose(spectrum.lambdas[0], 347, atol=1)
-            assert np.isclose(spectrum.lambdas[-1], 1085.0, atol=1)
-        assert np.isclose(spectrum.x0[0], 743.6651370068676, atol=0.5)
-        assert np.isclose(spectrum.x0[1], 683.0577836601408, atol=1)
-        assert np.isclose(spectrum.spectrogram_x0, -280, atol=1)
-        assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) < 3.5
+        if parameters.CCD_REBIN == 1:
+            if parameters.PSF_EXTRACTION_MODE == "PSD_2D":
+                assert np.isclose(spectrum.lambdas[0], 343, atol=1)
+                assert np.isclose(spectrum.lambdas[-1], 1084.0, atol=1)
+            elif parameters.PSF_EXTRACTION_MODE == "PSF_1D":
+                assert np.isclose(spectrum.lambdas[0], 347, atol=1)
+                assert np.isclose(spectrum.lambdas[-1], 1085.0, atol=1)
+            assert np.isclose(spectrum.spectrogram_x0, -280, atol=1)
+        assert np.isclose(spectrum.x0[0] * parameters.CCD_REBIN, 743.6651370068676, atol=0.5 * parameters.CCD_REBIN)
+        assert np.isclose(spectrum.x0[1] * parameters.CCD_REBIN, 683.0577836601408, atol=1 * parameters.CCD_REBIN)
+        assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) * parameters.CCD_REBIN < 3.5
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrum.fits'))) is True
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrogram.fits'))) is True
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
 
 
-def extractor_auxtel():
-    file_names = ['tests/data/auxtel_first_light-1.fits']
+def test_extractor_auxtel():
+    file_names = ['tests/data/calexp_2020031500162-EMPTY_ronchi90lpmm-det000.fits']
+    #tests/data/auxtel_first_light-1.fits']
 
     # logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
     parameters.VERBOSE = True
@@ -76,7 +79,7 @@ def extractor_auxtel():
         spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
                                config='./config/auxtel.ini', atmospheric_lines=True)
         assert spectrum.data is not None
-        assert np.sum(spectrum.data) > 1e-10
+        assert np.sum(spectrum.data) > 1e-14
         # spectrum.my_logger.warning(f"\n\tQuantities to test:"
         #                            f"\n\t\tspectrum.lambdas[0]={spectrum.lambdas[0]}"
         #                            f"\n\t\tspectrum.lambdas[-1]={spectrum.lambdas[-1]}"
