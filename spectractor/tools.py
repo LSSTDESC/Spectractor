@@ -1742,21 +1742,35 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
                    label='Target', linewidth=2)
 
 
-def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', label='', title='', units=''):
+def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', linestyle='none', lw=2, label='',
+                         title='', units=''):
     """Simple function to plot a spectrum with error bars and labels.
 
     Parameters
     ----------
     ax: Axes
-        Axes instance to make the plot
+        Axes instance to make the plot.
+    lambdas: array
+        The wavelengths array.
+    data: array
+        The spectrum data array.
+    data_err: array, optional
+        The spectrum uncertainty array (default: None).
     xlim: list, optional
-        List of minimum and maximum abscisses
-    color: str
-        String for the color of the spectrum (default: 'r')
-    label: str
-        String label for the plot legend
-    lambdas: array, optional
-        The wavelengths array if it has been given externally (default: None)
+        List of minimum and maximum abscisses (default: None).
+    color: str, optional
+        String for the color of the spectrum (default: 'r').
+    linestyle: str, optional
+        String for the linestyle of the spectrum (default: 'none').
+    lw: int, optional
+        Integer for line width (default: 2).
+    label: str, optional
+        String label for the plot legend (default: '').
+    title: str, optional
+        String label for the plot title (default: '').
+    units: str, optional
+        String label for the plot units (default: '').
+
 
     Examples
     --------
@@ -1769,17 +1783,20 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         >>> from spectractor import parameters
         >>> from spectractor.tools import plot_spectrum_simple
         >>> f, ax = plt.subplots(1,1)
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
-        >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=[500,700], color='r', label='test')
+        # >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
+        # >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=[500,700], color='r', label='test')
+        >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=None, color='r', label='test')
         >>> if parameters.DISPLAY: plt.show()
     """
     xs = lambdas
     if xs is None:
         xs = np.arange(data.size)
     if data_err is not None:
-        ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=1, label=label, zorder=0, markersize=2)
+        ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=lw, label=label,
+                    zorder=0, markersize=2, linestyle=linestyle)
     else:
-        ax.plot(xs, data, f'{color}-', lw=2, label=label)
+        ax.plot(xs, data, f'{color}-', lw=lw, label=label, linestyle=linestyle)
     ax.grid(True)
     if xlim is None and lambdas is not None:
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]

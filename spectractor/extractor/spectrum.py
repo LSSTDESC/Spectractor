@@ -256,6 +256,15 @@ class Spectrum:
         title = self.target.label
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title=title, units=self.units)
+        if self.lambdas_order2 is not None:
+            distance = self.disperser.grating_lambda_to_pixel(self.lambdas_order2, self.x0, order=2)
+            lambdas_order2_contamination = self.disperser.grating_pixel_to_lambda(distance, self.x0, order=1)
+            data_order2_contamination = self.data_order2 * (self.lambdas_order2 * np.gradient(self.lambdas_order2))\
+                                        / (lambdas_order2_contamination * np.gradient(lambdas_order2_contamination))
+            data_interp = interp1d(self.lambdas, self.data, kind="linear", fill_value="0", bounds_error=False)
+            plot_spectrum_simple(ax, lambdas_order2_contamination,
+                                 data_interp(lambdas_order2_contamination) + data_order2_contamination, data_err=None,
+                                 xlim=xlim, label='Order 2 contamination', linestyle="--", lw=1)
         if len(self.target.spectra) > 0:
             for k in range(len(self.target.spectra)):
                 s = self.target.spectra[k] / np.max(self.target.spectra[k]) * np.max(self.data)
