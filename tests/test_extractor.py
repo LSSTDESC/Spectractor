@@ -28,7 +28,7 @@ def test_extractor():
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    parameters.CCD_REBIN = 1
+    parameters.CCD_REBIN = 2
 
     for file_name in file_names:
         tag = file_name.split('/')[-1]
@@ -62,7 +62,7 @@ def test_extractor():
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
 
 
-def test_extractor_auxtel():
+def extractor_auxtel():
     file_names = ['tests/data/calexp_2020031500162-EMPTY_ronchi90lpmm-det000.fits']
     #tests/data/auxtel_first_light-1.fits']
 
