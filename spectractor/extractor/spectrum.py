@@ -127,10 +127,8 @@ class Spectrum:
             self.temperature = image.temperature
             self.pressure = image.pressure
             self.humidity = image.humidity
-            self.xpixsize = image.xpixsize
-            self.ypixsize = image.ypixsize
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
-                               self.humidity, self.airmass, self.xpixsize, self.ypixsize]
+                               self.humidity, self.airmass]
 
         self.load_filter()
 
@@ -378,8 +376,9 @@ class Spectrum:
         hdu3 = fits.ImageHDU()
         hdu3.header["EXTNAME"] = "ORDER2"
         hdu1.data = [self.lambdas, self.data, self.err]
-        hdu2.data = self.cov_matrix
-        hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
+        if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
+            hdu2.data = self.cov_matrix
+            hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
         hdu = fits.HDUList([hdu1, hdu2, hdu3])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
@@ -487,10 +486,6 @@ class Spectrum:
                 self.pressure = self.header['OUTPRESS']
             if self.header['OUTHUM'] != "":
                 self.humidity = self.header['OUTHUM']
-            if self.header['XPIXSIZE'] != "":
-                self.xpixsize = self.header['XPIXSIZE']
-            if self.header['YPIXSIZE'] != "":
-                self.ypixsize = self.header['YPIXSIZE']
             if self.header['LBDA_REF'] != "":
                 self.lambda_ref = self.header['LBDA_REF']
 
@@ -502,7 +497,7 @@ class Spectrum:
             self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
 
             self.adr_params = [self.dec, self.hour_angle, self.temperature,
-                               self.pressure, self.humidity, self.airmass, self.xpixsize, self.ypixsize]
+                               self.pressure, self.humidity, self.airmass]
 
             if not self.fast_load:
                 if os.path.isfile(spectrogram_file_name):
@@ -1053,7 +1048,6 @@ def calibrate_spectrum(spectrum):
                                 lambda_ref=lambda_ref)
     adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
                                                            dispersion_axis_angle=spectrum.rotation_angle)
-
     x0 = spectrum.x0
     if x0 is None:
         x0 = spectrum.target_pixcoords
