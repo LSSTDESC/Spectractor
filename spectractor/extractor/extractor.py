@@ -74,6 +74,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.shift_y = 0.
         self.angle = np.copy(self.spectrum.rotation_angle)
         self.B = 1
+        self.rotation = parameters.OBS_CAMERA_ROTATION
         self.psf_poly_params = np.copy(self.spectrum.chromatic_psf.from_table_to_poly_params())
         self.psf_profile_params = np.copy(self.spectrum.chromatic_psf.from_table_to_profile_params())
         length = len(self.spectrum.chromatic_psf.table)
@@ -84,16 +85,16 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
         self.saturation = self.spectrum.spectrogram_saturation
-        self.p = np.array([self.A2, self.D, self.shift_x, self.shift_y, self.angle, self.B])
+        self.p = np.array([self.A2, self.D, self.shift_x, self.shift_y, self.angle, self.B, self.rotation])
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params])
         self.input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]",
-                             r"angle [deg]", "B"] + list(self.psf_poly_params_labels)
+                             r"angle [deg]", "B", "R"] + list(self.psf_poly_params_labels)
         self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
-                           r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names)
+                           r"$\theta$ [deg]", "$B$", "R"] + list(self.psf_poly_params_names)
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D, (-2, 2), (-3, 3),
-                                                (-90, 90), (0.2, 5)]), psf_poly_params_bounds])
+                                                (-90, 90), (0.2, 5), (-360, 360)]), psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
             if "x_c" in par or "saturation" in par or "y_c" in par:
@@ -103,6 +104,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.fixed[1] = True  # D2CCD
         self.fixed[2] = True  # delta x
         self.fixed[5] = True  # B
+        self.fixed[6] = True  # camera rot
         self.fixed[-1] = True  # saturation
         self.nwalkers = max(2 * self.ndim, nwalkers)
 
@@ -263,7 +265,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         """
         # linear regression for the amplitude parameters
         # prepare the vectors
-        A2, D2CCD, dx0, dy0, angle, B, *poly_params = params
+        A2, D2CCD, dx0, dy0, angle, B, rot, *poly_params = params
+        parameters.OBS_CAMERA_ROTATION = rot
         self.p = np.asarray(params)
         self.W_dot_data = self.W * (self.data_flat - B * self.bgd_flat)
         profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
@@ -498,7 +501,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
 
-        A2, D2CCD, dx0, dy0, angle, B, *poly_params = self.p
+        A2, D2CCD, dx0, dy0, angle, B, rot, *poly_params = self.p
         plt.suptitle(f'A2={A2:.3f}, D={D2CCD:.2f}mm, shift_x={dx0:.3f}pix, shift_y={dy0:.3f}pix, '
                      f'angle={angle:.2f}pix, B={B:.3f}', y=1)
         # main plot
@@ -738,7 +741,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     turn_image(image)
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-    find_target(image, image.target_guess, rotated=True, use_wcs=True,
+    find_target(image, image.target_guess, rotated=True, use_wcs=False,
                 widths=(parameters.XWINDOW_ROT, parameters.YWINDOW_ROT))
     # Create Spectrum object
     spectrum = Spectrum(image=image)
@@ -835,7 +838,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # and end 0 nm after parameters.LAMBDA_MAX
     lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
                                                       x0=image.target_pixcoords)
-    xmin = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
+    xmin = max(0, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0)))))
     xmax = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0)))))
 
     # Create spectrogram
@@ -854,9 +857,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     while (np.abs(np.nanmean(bgd_res)) > 0.5 or np.nanstd(bgd_res) > 1.3) and parameters.PIXWIDTH_BOXSIZE > 5:
         parameters.PIXWIDTH_BOXSIZE = max(5, parameters.PIXWIDTH_BOXSIZE // 2)
         my_logger.warning(f"\n\tPull distribution of background residuals differs too much from mean=0 and std=1. "
-                          f"\n\t\tmean={np.nanmean(bgd_res)}   std={np.nanstd(bgd_res)}."
-                          f"These value should be smaller in absolute value than 0.5 and 1.3. "
-                          f"To do so, parameters.PIXWIDTH_BOXSIZE is divided "
+                          f"\n\t\tmean={np.nanmean(bgd_res):.3g}; std={np.nanstd(bgd_res):.3g}"
+                          f"\n\tThese value should be smaller in absolute value than 0.5 and 1.3. "
+                          f"\n\tTo do so, parameters.PIXWIDTH_BOXSIZE is divided "
                           f"by 2 from {parameters.PIXWIDTH_BOXSIZE * 2} -> {parameters.PIXWIDTH_BOXSIZE}.")
         bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
 
@@ -1047,7 +1050,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         plot_spectrum_simple(ax[0], np.arange(spectrum.data.size), spectrum.data, data_err=spectrum.err,
                              units=image.units, label='Fitted spectrum', xlim=[0, spectrum.data.size])
         ax[0].plot(xx, s.table['flux_sum'], 'k-', label='Cross spectrum')
-        print(s.table['flux_sum'])
         ax[0].set_xlim(0, xx.size)
         ax[0].legend(loc='best')
         ax[1].plot(xx, (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
