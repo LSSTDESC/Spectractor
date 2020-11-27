@@ -62,8 +62,11 @@ def test_extractor():
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
 
 
-def extractor_auxtel():
-    file_names = ['tests/data/calexp_2020031500162-EMPTY_ronchi90lpmm-det000.fits']
+def test_extractor_auxtel():
+    file_names = ['tests/data/calexp_2020031500162-EMPTY_ronchi90lpmm-det000.fits']  # image 1
+    #file_names = ['tests/data/calexp_2020031200313-EMPTY_ronchi90lpmm-det000.fits']  # image 2
+    #file_names = ['tests/data/calexp_2020022100767-EMPTY_ronchi90lpmm-det000.fits']  # image 3
+    #file_names = ['tests/data//calexp_2020021800154-EMPTY_ronchi90lpmm-det000.fits']  # image 4
     #tests/data/auxtel_first_light-1.fits']
 
     # logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')

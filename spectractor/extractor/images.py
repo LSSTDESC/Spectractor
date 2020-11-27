@@ -137,8 +137,6 @@ class Image(object):
         self.header["AIRMASS"] = self.airmass
         self.header["DATE-OBS"] = self.date_obs
         self.header["EXPTIME"] = self.expo
-        self.header['DEC'] = self.dec
-        self.header['HA'] = self.hour_angle
         self.header['OUTTEMP'] = self.temperature
         self.header['OUTPRESS'] = self.pressure
         self.header['OUTHUM'] = self.humidity
@@ -359,10 +357,10 @@ class Image(object):
 
         Script from A. Guyonnet.
         """
-        latitude = Latitude(parameters.OBS_LATITUDE, unit=units.deg)
-        ha = Angle(self.header['HA'], unit='hourangle').radian
-        dec = Angle(self.header['DEC'], unit=units.deg).radian
-        parallactic_angle = Angle(np.arctan(np.sin(ha) / (np.cos(dec) * np.tan(latitude) - np.sin(dec) * np.cos(ha))))
+        latitude = Latitude(parameters.OBS_LATITUDE, unit=units.deg) #.radian
+        ha = self.hour_angle
+        dec = self.dec
+        parallactic_angle = Angle(np.arctan2(np.sin(ha), (np.cos(dec) * np.tan(latitude) - np.sin(dec) * np.cos(ha))))
         self.parallactic_angle = parallactic_angle.degree
         self.header['PARANGLE'] = self.parallactic_angle
         self.header.comments['PARANGLE'] = 'parallactic angle in degree'
@@ -440,9 +438,9 @@ def load_CTIO_image(image):
     image.filters = image.header['FILTERS']
     image.filter = image.header['FILTER1']
     image.disperser_label = image.header['FILTER2']
-    image.ra = image.header['RA']
-    image.dec = image.header['DEC']
-    image.hour_angle = image.header['HA']
+    image.ra = Angle(image.header['RA'], unit="hourangle")
+    image.dec = Angle(image.header['DEC'], unit="deg")
+    image.hour_angle = Angle(image.header['HA'], unit="hourangle")
     image.temperature = image.header['OUTTEMP']
     image.pressure = image.header['OUTPRESS']
     image.humidity = image.header['OUTHUM']
@@ -569,10 +567,11 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.header = hdu_list[0].header
     image.data = hdu_list[1].data.astype(np.float64)
     hdu_list.close()  # need to free allocation for file descripto
-    # image.data = np.concatenate((data[10:-10, 10:-10], data2[10:-10, 10:-10]))
     image.date_obs = image.header['DATE']
     image.expo = float(image.header['EXPTIME'])
-    image.data = image.data.T[:, ::-1]
+    # transformations so that stars are like in Stellarium up to a rotation
+    # with spectrogram nearly horizontal and on the right of central star
+    image.data = image.data.T[::-1, ::-1]
     if image.header["AMSTART"] is not None:
         image.airmass = 0.5 * (float(image.header["AMSTART"]) + float(image.header["AMEND"]))
     else:
@@ -582,22 +581,34 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
     parameters.CCD_IMSIZE = image.data.shape[1]
     image.disperser_label = image.header['GRATING']
-    image.ra = image.header['RA']
-    image.dec = image.header['DEC']
-    image.hour_angle = image.header['HA']
-    image.temperature = 5  # image.header['OUTTEMP']
+    image.ra = Angle(image.header['RA'], unit="deg")
+    image.dec = Angle(image.header['DEC'], unit="deg")
+    image.hour_angle = Angle(image.header['HA'], unit="deg")
+    image.temperature = 10  # image.header['OUTTEMP']
     image.pressure = 730  # image.header['OUTPRESS']
     image.humidity = 25  # image.header['OUTHUM']
     if 'adu' in image.header['BUNIT']:
         image.units = 'ADU'
     image.my_logger.warning("\n\tNeed to set the camera rotation angle ? Angle must be counted positive from "
                             "north to east direction. Need to flip the signs ?")
-    parameters.OBS_CAMERA_ROTATION = float(image.header["ROTPA"])
+    parameters.OBS_CAMERA_ROTATION = 90 - float(image.header["ROTPA"])
+    # parameters.OBS_CAMERA_ROTATION = -270 + 180/np.pi * np.arctan2(hdu_list[1].header["CD2_1"],
+    # hdu_list[1].header["CD1_1"])
+    if parameters.OBS_CAMERA_ROTATION > 360:
+        parameters.OBS_CAMERA_ROTATION -= 360
+    if parameters.OBS_CAMERA_ROTATION < -360:
+        parameters.OBS_CAMERA_ROTATION += 360
+    rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[1].header["CD2_1"], hdu_list[1].header["CD1_1"])
+    if not np.isclose(rotation_wcs, -parameters.OBS_CAMERA_ROTATION % 360, atol=1):
+        image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
+                                f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degree. "
+                                f"\nBoth differs by more than 1 degree... bug ?")
     parameters.OBS_ALTITUDE = float(image.header['OBS-ELEV']) / 1000
     parameters.OBS_LATITUDE = image.header['OBS-LAT']
     image.read_out_noise = 8.5 * np.ones_like(image.data)
     image.target_label = image.header["OBJECT"].replace(" ", "")
-    image.target_guess = [float(image.header["OBJECTY"]), float(image.header["OBJECTX"])]
+    image.target_guess = [parameters.CCD_IMSIZE - float(image.header["OBJECTY"]),
+                          parameters.CCD_IMSIZE - float(image.header["OBJECTX"])]
     image.disperser_label = image.header["GRATING"]
     image.disperser_label = image.header["GRATING"]
     parameters.DISTANCE2CCD = 116 + float(image.header["LINSPOS"])  # mm
