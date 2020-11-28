@@ -1262,6 +1262,7 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
 
     def eq(xx):
         return interp(xx) - 0.5 * maximum
+
     res = dichotomie(eq, a, b, 1e-3)
     if center is None:
         center = np.average(x, weights=y)
@@ -1269,7 +1270,7 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
     if not full_output:
         return fwhm
     else:
-        return fwhm, 0.5*maximum, center, res, center - abs(res-center)
+        return fwhm, 0.5 * maximum, center, res, center - abs(res - center)
 
 
 def compute_integral(x, y, bounds=None):
@@ -1706,8 +1707,8 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         >>> from spectractor import parameters
         >>> from spectractor.tools import plot_image_simple
         >>> f, ax = plt.subplots(1,1)
-        >>> im = Image('tests/data/reduc_20170605_028.fits')
-        >>> plot_image_simple(ax, im.data, scale="log10", units="ADU", target_pixcoords=(815,580),
+        >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
+        >>> plot_image_simple(ax, im.data, scale="symlog", units="ADU", target_pixcoords=(815,580),
         ...                     title="tests/data/reduc_20170605_028.fits")
         >>> if parameters.DISPLAY: plt.show()
     """
@@ -1812,6 +1813,68 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         ax.set_ylabel(f'Flux')
     if title != '':
         ax.set_title(title)
+
+
+def plot_compass_simple(ax, parallactic_angle=None, arrow_size=0.1, origin=[0.15, 0.15]):
+    """Plot small (N,W) compass, and optionally zenith direction.
+
+    Parameters
+    ----------
+    ax: Axes
+        Axes instance to make the plot.
+    parallactic_angle: float, optional
+        Value is the parallactic angle with respect to North eastward and plot the zenith direction (default: None).
+    arrow_size: float, optional
+        Length of the arrow as a fraction of axe sizes (default: 0.1)
+    origin: array_like, optional
+        (x0, y0) position of the compass as axes fraction (default: [0.15, 0.15]).
+
+    Examples
+    --------
+
+    >>> from spectractor.extractor.images import Image
+    >>> from spectractor import parameters
+    >>> from spectractor.tools import plot_image_simple, plot_compass_simple
+    >>> f, ax = plt.subplots(1,1)
+    >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
+    >>> plot_image_simple(ax, im.data, scale="symlog", units="ADU", target_pixcoords=(750,700),
+    ...                   title='tests/data/reduc_20170530_134.fits')
+    >>> plot_compass_simple(ax, im.parallactic_angle)
+    >>> if parameters.DISPLAY: plt.show()
+
+    """
+    # North arrow
+    N_arrow = [0, arrow_size]
+    N_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(N_arrow[0], N_arrow[1],
+                                                                    camera_angle=parameters.OBS_CAMERA_ROTATION,
+                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+    ax.annotate("N", xy=origin, xycoords='axes fraction', xytext=N_xy + origin, textcoords='axes fraction',
+                arrowprops=dict(arrowstyle="<|-", fc="yellow", ec="yellow"), color="yellow",
+                horizontalalignment='center', verticalalignment='center')
+    # West arrow
+    W_arrow = [arrow_size, 0]
+    W_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(W_arrow[0], W_arrow[1],
+                                                                    camera_angle=parameters.OBS_CAMERA_ROTATION,
+                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+    ax.annotate("W", xy=origin, xycoords='axes fraction', xytext=W_xy + origin, textcoords='axes fraction',
+                arrowprops=dict(arrowstyle="<|-", fc="yellow", ec="yellow"), color="yellow",
+                horizontalalignment='center', verticalalignment='center')
+    # Central dot
+    xmin, xmax = ax.get_xlim()
+    ax.scatter(origin[0] * xmax, origin[1] * xmax, color="yellow", s=20)
+    # Zenith direction
+    if parallactic_angle is not None:
+        p_arrow = [0, arrow_size]  # angle with respect to North in RADEC counterclockwise
+        angle = parameters.OBS_CAMERA_ROTATION + parameters.OBS_CAMERA_RA_FLIP_SIGN * parallactic_angle
+        p_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(p_arrow[0], p_arrow[1],
+                                                                        camera_angle=angle,
+                                                                        flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                        flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+        ax.annotate("Z", xy=origin, xycoords='axes fraction', xytext=p_xy + origin, textcoords='axes fraction',
+                    arrowprops=dict(arrowstyle="<|-", fc="lightgreen", ec="lightgreen"), color="lightgreen",
+                    horizontalalignment='center', verticalalignment='center')
 
 
 def load_fits(file_name, hdu_index=0):

@@ -13,7 +13,7 @@ from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.psf import Moffat
-from spectractor.tools import (plot_image_simple, save_fits, load_fits, fit_poly1d,
+from spectractor.tools import (plot_image_simple, save_fits, load_fits, fit_poly1d, plot_compass_simple,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
                                set_wcs_file_name, load_wcs_from_file, imgslice)
@@ -400,8 +400,8 @@ class Image(object):
 
         Examples
         --------
-        >>> im = Image('tests/data/reduc_20170605_028.fits')
-        >>> im.plot_image(target_pixcoords=[820, 580])
+        >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
+        >>> im.plot_image(target_pixcoords=[820, 580], scale="symlog")
         >>> if parameters.DISPLAY: plt.show()
         """
         if ax is None:
@@ -414,6 +414,7 @@ class Image(object):
             units = self.units
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
+        plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
         plt.legend()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'))
