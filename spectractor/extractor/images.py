@@ -1189,6 +1189,7 @@ def turn_image(image):
                                     margin:-margin],
                           scale="symlog", title='Raw image (log10 scale)', units=image.units,
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
+        plot_compass_simple(ax1, image.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
         ax2.axhline(parameters.YWINDOW, color='k')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),

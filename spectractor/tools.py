@@ -1863,7 +1863,8 @@ def plot_compass_simple(ax, parallactic_angle=None, arrow_size=0.1, origin=[0.15
                 horizontalalignment='center', verticalalignment='center')
     # Central dot
     xmin, xmax = ax.get_xlim()
-    ax.scatter(origin[0] * xmax, origin[1] * xmax, color="yellow", s=20)
+    ymin, ymax = ax.get_ylim()
+    ax.scatter(origin[0] * xmax, origin[1] * ymax, color="yellow", s=20)
     # Zenith direction
     if parallactic_angle is not None:
         p_arrow = [0, arrow_size]  # angle with respect to North in RADEC counterclockwise

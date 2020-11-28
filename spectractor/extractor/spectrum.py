@@ -82,6 +82,7 @@ class Spectrum:
         self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
         self.chromatic_psf = ChromaticPSF(self.psf, Nx=1, Ny=1, deg=1, saturation=1)
         self.rotation_angle = 0
+        self.parallactic_angle = None
         self.spectrogram = None
         self.spectrogram_bgd = None
         self.spectrogram_bgd_rms = None
@@ -127,6 +128,7 @@ class Spectrum:
             self.temperature = image.temperature
             self.pressure = image.pressure
             self.humidity = image.humidity
+            self.parallactic_angle = image.parallactic_angle
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
                                self.humidity, self.airmass]
 
@@ -254,17 +256,18 @@ class Spectrum:
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
-        plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
-                             title=title, units=self.units)
         if self.lambdas_order2 is not None:
             distance = self.disperser.grating_lambda_to_pixel(self.lambdas_order2, self.x0, order=2)
             lambdas_order2_contamination = self.disperser.grating_pixel_to_lambda(distance, self.x0, order=1)
             data_order2_contamination = self.data_order2 * (self.lambdas_order2 * np.gradient(self.lambdas_order2))\
                                         / (lambdas_order2_contamination * np.gradient(lambdas_order2_contamination))
-            data_interp = interp1d(self.lambdas, self.data, kind="linear", fill_value="0", bounds_error=False)
-            plot_spectrum_simple(ax, lambdas_order2_contamination,
-                                 data_interp(lambdas_order2_contamination) + data_order2_contamination, data_err=None,
-                                 xlim=xlim, label='Order 2 contamination', linestyle="--", lw=1)
+            if np.sum(data_order2_contamination) / np.sum(self.data) > 0.01:
+                data_interp = interp1d(self.lambdas, self.data, kind="linear", fill_value="0", bounds_error=False)
+                plot_spectrum_simple(ax, lambdas_order2_contamination,
+                                     data_interp(lambdas_order2_contamination) + data_order2_contamination, data_err=None,
+                                     xlim=xlim, label='Order 2 contamination', linestyle="--", lw=1)
+        plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
+                             title=title, units=self.units)
         if len(self.target.spectra) > 0:
             for k in range(len(self.target.spectra)):
                 s = self.target.spectra[k] / np.max(self.target.spectra[k]) * np.max(self.data)
@@ -497,6 +500,8 @@ class Spectrum:
                 self.humidity = self.header['OUTHUM']
             if self.header['LBDA_REF'] != "":
                 self.lambda_ref = self.header['LBDA_REF']
+            if self.header['PARANGLE'] != "":
+                self.parallactic_angle = self.header['PARANGLE']
 
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
