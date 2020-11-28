@@ -13,6 +13,7 @@ from spectractor.config import set_logger, load_config
 from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.psf import Moffat
+from spectractor.simulation.adr import hadec2zdpar
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, fit_poly1d, plot_compass_simple,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
@@ -360,8 +361,9 @@ class Image(object):
         latitude = Latitude(parameters.OBS_LATITUDE, unit=units.deg)
         ha = self.hour_angle
         dec = self.dec
-        parallactic_angle = Angle(np.arctan2(np.sin(ha), (np.cos(dec) * np.tan(latitude) - np.sin(dec) * np.cos(ha))))
-        self.parallactic_angle = parallactic_angle.degree
+        # parallactic_angle = Angle(np.arctan2(np.sin(ha), (np.cos(dec) * np.tan(latitude) - np.sin(dec) * np.cos(ha))))
+        zenithal_distance, parallactic_angle = hadec2zdpar(ha, dec, latitude, deg=False)
+        self.parallactic_angle = parallactic_angle.value * 180 / np.pi
         self.header['PARANGLE'] = self.parallactic_angle
         self.header.comments['PARANGLE'] = 'parallactic angle in degree'
         return self.parallactic_angle
