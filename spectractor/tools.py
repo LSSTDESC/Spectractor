@@ -2280,6 +2280,70 @@ def resolution_operator(cov, Q, reg):
     return np.eye(N) - reg * cov @ Q
 
 
+def flip_and_rotate_radec_to_image_xy_coordinates(ra, dec, camera_angle=0, flip_ra_sign=1, flip_dec_sign=1):
+    """Flip and rotate the vectors in pixels along (RA,DEC) directions to (x, y) image coordinates.
+    The parity transformations are applied first, then rotation.
+
+    Parameters
+    ----------
+    ra: array_like
+        Vector coordinates along RA direction.
+    dec: array_like
+        Vector coordinates along DEC direction.
+    camera_angle: float
+        Angle of the camera between y axis and the North Celestial Pole counterclockwise, or equivalently between
+        the x axis and the West direction counterclokwise. Units are degrees. (default: 0).
+    flip_ra_sign: -1, 1, optional
+        Flip RA axis is value is -1 (default: 1).
+    flip_dec_sign: -1, 1, optional
+        Flip DEC axis is value is -1 (default: 1).
+
+    Returns
+    -------
+    x: array_like
+       Vector coordinates along the x direction.
+    y: array_like
+       Vector coordinates along the y direction.
+
+    Examples
+    --------
+
+    >>> from spectractor import parameters
+    >>> parameters.OBS_CAMERA_ROTATION = 180
+    >>> parameters.OBS_CAMERA_DEC_FLIP_SIGN = 1
+    >>> parameters.OBS_CAMERA_RA_FLIP_SIGN = 1
+
+    North vector
+
+    >>> N_ra, N_dec = [0, 1]
+
+    Compute North direction in (x, y) frame
+
+    >>> flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=1)
+    (0.0, 1.0)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 180, flip_ra_sign=1, flip_dec_sign=1)
+    '-0.0, -1.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=1)
+    '-1.0, 0.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=-1)
+    '1.0, -0.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=-1, flip_dec_sign=-1)
+    '1.0, -0.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=-1)
+    '0.0, -1.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=-1, flip_dec_sign=1)
+    '0.0, 1.0'
+
+    """
+    flip = np.array([[flip_ra_sign, 0], [0, flip_dec_sign]], dtype=float)
+    a = - camera_angle * np.pi / 180
+    # minus sign as rotation matrix is apply on the right on the adr vector
+    rotation = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]], dtype=float)
+    transformation = flip @ rotation
+    x, y = (np.asarray([ra, dec]).T @ transformation).T
+    return x, y
+
+
 if __name__ == "__main__":
     import doctest
 
