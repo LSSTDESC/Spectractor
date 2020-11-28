@@ -357,7 +357,7 @@ class Image(object):
 
         Script from A. Guyonnet.
         """
-        latitude = Latitude(parameters.OBS_LATITUDE, unit=units.deg) #.radian
+        latitude = Latitude(parameters.OBS_LATITUDE, unit=units.deg)
         ha = self.hour_angle
         dec = self.dec
         parallactic_angle = Angle(np.arctan2(np.sin(ha), (np.cos(dec) * np.tan(latitude) - np.sin(dec) * np.cos(ha))))
