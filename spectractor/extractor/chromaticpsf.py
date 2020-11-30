@@ -958,7 +958,7 @@ class ChromaticPSF:
         self.from_profile_params_to_shape_params(self.profile_params)
 
     def fit_chromatic_psf(self, data, bgd_model_func=None, data_errors=None, mode="1D",
-                          amplitude_priors_method="noprior", verbose=False):
+                          amplitude_priors_method="noprior", verbose=False, live_fit=False):
         """
         Fit a chromatic PSF model on 2D data.
 
@@ -1071,11 +1071,13 @@ class ChromaticPSF:
         """
         if mode == "1D":
             w = ChromaticPSF1DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
-                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose)
+                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose,
+                                           live_fit=live_fit)
             run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
         elif mode == "2D":
             w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
-                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose)
+                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose,
+                                           live_fit=live_fit)
             # run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
                                             fix=w.fixed, sigma_clip=10, niter_clip=3, verbose=verbose)

@@ -973,7 +973,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                        f'mode={mode} and amplitude_priors_method={method}...')
         my_logger.debug(f"\n\tTransverse fit table before PSF_2D fit:"
                         f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
-        w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
+        w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False,
                                 amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
         # save results
         spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
@@ -1056,6 +1056,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                       label='(model_integral-cross_sum)/cross_sum')
         ax[1, 0].legend()
         ax[1, 0].grid(True)
+        ax[1, 0].set_xlim(ax[0, 0].get_xlim())
         ax[1, 0].set_ylim(-1, 1)
         ax[1, 0].set_ylabel('Relative difference')
         fig.tight_layout()
