@@ -575,6 +575,7 @@ class ChromaticPSF:
         pixel_x = np.arange(self.Nx).astype(int)
         # oversampling for precise computation of the PSF
         # pixels.shape = (2, Nx, Ny): self.pixels[1<-y, 0<-first pixel value column, :]
+        # TODO: account for rotation ad projection effects is PSF is not round
         pixel_eval = np.arange(self.pixels[1, 0, 0], self.pixels[1, 0, -1], 0.1)
         for x in pixel_x:
             p = profile_params[x, :]
@@ -583,7 +584,6 @@ class ChromaticPSF:
             fwhm = compute_fwhm(pixel_eval, out, center=p[2], minimum=0)
             self.table['flux_integral'][x] = p[0]  # if MoffatGauss1D normalized
             self.table['fwhm'][x] = fwhm
-            self.table['Dy_disp_axis'][x] = 0
 
     def set_bounds(self):
         """
