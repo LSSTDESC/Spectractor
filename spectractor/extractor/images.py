@@ -1143,7 +1143,7 @@ def turn_image(image):
         :hide:
 
         >>> assert im.data_rotated is not None
-        >>> assert np.isclose(im.rotation_angle, np.arctan(slope)*180/np.pi, rtol=1e-2)
+        >>> assert np.isclose(im.rotation_angle, np.arctan(slope)*180/np.pi, rtol=5e-2)
 
     .. plot::
 
