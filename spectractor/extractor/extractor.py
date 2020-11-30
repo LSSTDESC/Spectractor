@@ -512,10 +512,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, 1000], title='Zoom $H_2 O$', dispersion=True)
         for i in range(3):  # clear middle colorbars
             for j in range(2):
-                plt.delaxes(ax[i, 2*j+1])
+                plt.delaxes(ax[i, 2 * j + 1])
         for i in range(4):  # clear middle y axis labels
             for j in range(1, 3):
-                ax[i, 2*j].set_ylabel("")
+                ax[i, 2 * j].set_ylabel("")
         fig.tight_layout()
         if self.live_fit:
             plt.draw()
@@ -1034,41 +1034,43 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Summary plot
     if parameters.DEBUG or parameters.LSST_SAVEFIGPATH:
-        fig, ax = plt.subplots(3, 1, sharex='all', figsize=(12, 6))
+        gs_kw = dict(width_ratios=[3, 0.08], height_ratios=[1, 1, 1])
+        fig, ax = plt.subplots(3, 2, sharex='none', figsize=(12, 6), gridspec_kw=gs_kw)
         xx = np.arange(s.table['Dx'].size)
-        plot_image_simple(ax[2], data=data, scale="symlog", title='', units=image.units, aspect='auto')
-        ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_disp_axis'], label='Dispersion axis')
-        ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_disp_axis'], label='Dispersion axis')
-        ax[2].scatter(xx, target_pixcoords_spectrogram[1] + s.table['Dy'],
-                      c=s.table['lambdas'], edgecolors='None', cmap=from_lambda_to_colormap(s.table['lambdas']),
-                      label='Fitted spectrum centers', marker='o', s=10)
-        ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
-        ax[2].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-', label='')
-        ax[2].set_ylim(0.5 * Ny - signal_width, 0.5 * Ny + signal_width)
-        ax[2].set_xlim(0, xx.size)
-        ax[2].legend(loc='best')
-        plot_spectrum_simple(ax[0], np.arange(spectrum.data.size), spectrum.data, data_err=spectrum.err,
-                             units=image.units, label='Fitted spectrum', xlim=[0, spectrum.data.size])
-        ax[0].plot(xx, s.table['flux_sum'], 'k-', label='Cross spectrum')
-        ax[0].set_xlim(0, xx.size)
-        ax[0].legend(loc='best')
-        ax[1].plot(xx, (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
-                   label='(model_integral-cross_sum)/cross_sum')
-        ax[1].legend()
-        ax[1].grid(True)
-        ax[1].set_ylim(-1, 1)
-        ax[1].set_ylabel('Relative difference')
+        plot_image_simple(ax[2, 0], data=data, scale="symlog", title='', units=image.units, aspect='auto', cax=ax[2, 1])
+        ax[2, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_disp_axis'], label='Dispersion axis', color="r")
+        ax[2, 0].scatter(xx, target_pixcoords_spectrogram[1] + s.table['Dy'],
+                         c=s.table['lambdas'], edgecolors='None', cmap=from_lambda_to_colormap(s.table['lambdas']),
+                         label='Fitted spectrum centers', marker='o', s=10)
+        ax[2, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
+        ax[2, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-', label='')
+        ax[2, 0].set_ylim(0.5 * Ny - signal_width, 0.5 * Ny + signal_width)
+        ax[2, 0].set_xlim(0, xx.size)
+        ax[2, 0].legend(loc='best')
+        plot_spectrum_simple(ax[0, 0], spectrum.lambdas, spectrum.data, data_err=spectrum.err,
+                             units=image.units, label='Fitted spectrum')
+        ax[0, 0].plot(spectrum.lambdas, s.table['flux_sum'], 'k-', label='Cross spectrum')
+        ax[1, 0].set_xlabel(r"$\lambda$ [nm]")
+        ax[0, 0].legend(loc='best')
+        ax[1, 0].plot(spectrum.lambdas, (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
+                      label='(model_integral-cross_sum)/cross_sum')
+        ax[1, 0].legend()
+        ax[1, 0].grid(True)
+        ax[1, 0].set_ylim(-1, 1)
+        ax[1, 0].set_ylabel('Relative difference')
         fig.tight_layout()
         fig.subplots_adjust(hspace=0)
-        pos0 = ax[0].get_position()
-        pos1 = ax[1].get_position()
-        pos2 = ax[2].get_position()
-        ax[0].set_position([pos2.x0, pos0.y0, pos2.width, pos0.height])
-        ax[1].set_position([pos2.x0, pos1.y0, pos2.width, pos1.height])
+        pos0 = ax[0, 0].get_position()
+        pos1 = ax[1, 0].get_position()
+        pos2 = ax[2, 0].get_position()
+        ax[0, 0].set_position([pos2.x0, pos0.y0, pos2.width, pos0.height])
+        ax[1, 0].set_position([pos2.x0, pos1.y0, pos2.width, pos1.height])
+        ax[0, 1].remove()
+        ax[1, 1].remove()
         if parameters.DISPLAY:
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
-            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'spectrum.pdf'))
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'intermediate_spectrum.pdf'))
 
     return w
 
@@ -1152,7 +1154,7 @@ def set_fast_mode(image):
     """
     new_shape = np.asarray(image.data.shape) // parameters.CCD_REBIN
     image.data = rebin(image.data, new_shape)
-    image.stat_errors = np.sqrt(rebin(image.stat_errors**2, new_shape))
+    image.stat_errors = np.sqrt(rebin(image.stat_errors ** 2, new_shape))
     image.target_guess = np.asarray(image.target_guess) / parameters.CCD_REBIN
     parameters.PIXDIST_BACKGROUND //= parameters.CCD_REBIN
     parameters.PIXWIDTH_BOXSIZE = max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN)
