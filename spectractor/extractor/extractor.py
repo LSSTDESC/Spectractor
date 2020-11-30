@@ -517,14 +517,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             for j in range(1, 3):
                 ax[i, 2 * j].set_ylabel("")
         fig.tight_layout()
-        if self.live_fit:
+        if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
             plt.close()
         else:
             if parameters.DISPLAY and self.verbose:
                 plt.show()
-        if parameters.SAVE:
+        if parameters.SAVE:  # pragma: no cover
             figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
@@ -595,7 +595,7 @@ def run_ffm_minimisation(w, method="newton"):
             parameters.SAVE = False
 
     # Optimize the regularisation parameter only if it was not done before
-    if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:
+    if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
         w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=1)
         run_minimisation(w_reg, method="minimize", ftol=1e-4, xtol=1e-2, verbose=1, epsilon=[1e-1],
                          minimizer_method="Nelder-Mead")
@@ -757,6 +757,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     calibrate_spectrum(spectrum)
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
+    w = None
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
         w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
@@ -1076,7 +1077,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     return w
 
 
-def plot_comparison_truth(spectrum, w):
+def plot_comparison_truth(spectrum, w):  # pragma: no cover
     s = spectrum.chromatic_psf
     lambdas_truth = np.fromstring(spectrum.header['LBDAS_T'][1:-1], sep=' ')
     psf_poly_truth = np.fromstring(spectrum.header['PSF_P_T'][1:-1], sep=' ', dtype=float)
