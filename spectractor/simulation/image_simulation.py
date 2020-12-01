@@ -185,7 +185,7 @@ class StarFieldModel:
                 right = min(parameters.CCD_IMSIZE, int(self.pixcoords[0][k]) + window)
                 low = max(0, int(self.pixcoords[1][k]) - window)
                 up = min(parameters.CCD_IMSIZE, int(self.pixcoords[1][k]) + window)
-                xx, yy = np.mgrid[left:right, low:up]
+                yy, xx = np.mgrid[low:up, left:right]
                 self.field[low:up, left:right] += self.stars[k].psf.evaluate(np.array([xx, yy]))
         return self.field
 
@@ -310,7 +310,7 @@ class ImageModel(Image):
         self.true_spectrum = None
 
     def compute(self, star, background, spectrogram, starfield=None):
-        xx, yy = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
+        yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
         self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
                   spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
@@ -444,7 +444,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.compute(star, background, spectrogram, starfield=starfield)
 
     # Recover true spectrum
-    true_lambdas = np.copy(spectrogram.lambdas)
+    spectrogram.set_true_spectrum(spectrogram.lambdas, ozone, pwv, aerosols, shift_t=0)
+    true_lambdas = np.copy(spectrogram.true_lambdas)
     true_spectrum = np.copy(spectrogram.true_spectrum)
 
     # Saturation effects

@@ -12,7 +12,7 @@ import numpy as np
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
-                                                ISM_LINES)
+                                                ISM_LINES, STELLAR_LINES)
 
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
@@ -59,8 +59,7 @@ def load_target(label, verbose=False):
     elif parameters.OBS_OBJECT_TYPE == 'MONOCHROMATOR':
         return Monochromator(label, verbose)
     else:
-        t = Target(label, verbose)
-        t.my_logger.error(f'\n\tUnknown parameters.OBS_OBJECT_TYPE: {parameters.OBS_OBJECT_TYPE}')
+        raise ValueError(f'Unknown parameters.OBS_OBJECT_TYPE: {parameters.OBS_OBJECT_TYPE}')
 
 
 class Target:
@@ -256,8 +255,8 @@ class Star(Target):
         if len(file_names) > 0:
             is_calspec = True
             self.emission_spectrum = False
-            self.hydrogen_only = True
-            self.lines = Lines(HYDROGEN_LINES+ATMOSPHERIC_LINES,
+            self.hydrogen_only = False
+            self.lines = Lines(HYDROGEN_LINES + ATMOSPHERIC_LINES + STELLAR_LINES,
                                redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
             for k, f in enumerate(file_names):
@@ -274,8 +273,8 @@ class Star(Target):
                     self.spectra.append(data.flux)
         elif 'HD' in self.label:  # it is a star
             self.emission_spectrum = False
-            self.hydrogen_only = True
-            self.lines = Lines(ATMOSPHERIC_LINES + HYDROGEN_LINES,
+            self.hydrogen_only = False
+            self.lines = Lines(ATMOSPHERIC_LINES + HYDROGEN_LINES + STELLAR_LINES,
                                redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
         else:

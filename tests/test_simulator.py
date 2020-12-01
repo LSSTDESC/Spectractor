@@ -49,6 +49,8 @@ def test_simulator():
     parameters.DEBUG = True
     load_config('config/ctio.ini')
 
+    output_directory = './tests/data/'
+
     for file_name in file_names:
         tag = file_name.split('/')[-1]
         # spectrum_simulation = SpectrumSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
@@ -56,17 +58,17 @@ def test_simulator():
         # spectrogram_simulation = SpectrogramSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
         #                                               A1=1.1, A2=0.9, D=56, shift_x=-3, shift_y=1, angle=-1)
         # psf_poly_params = spectrogram_simulation.chromatic_psf.from_table_to_poly_params()
-        image_simulation = ImageSim(file_name.replace('_spectrum.fits', '.fits'), file_name, './tests/data/', A2=1,
+        image_simulation = ImageSim(file_name.replace('_spectrum.fits', '.fits'), file_name, output_directory, A2=1,
                                     psf_poly_params=None, with_stars=True)
-        SpectrumSimulatorSimGrid(file_name, './tests/data/', pwv_grid=[0, 10, 2], ozone_grid=[200, 400, 2],
+        SpectrumSimulatorSimGrid(file_name, output_directory, pwv_grid=[0, 10, 2], ozone_grid=[200, 400, 2],
                                  aerosol_grid=[0, 0.1, 2])
         atmgrid = AtmosphereGrid(file_name, file_name.replace('spectrum', 'atmsim'))
         atm = Atmosphere(atmgrid.airmass, atmgrid.pressure, atmgrid.temperature)
-        assert os.path.isfile('./tests/data/' + tag.replace('_spectrum.fits', '_atmsim.fits')) is True
+        assert os.path.isfile(output_directory + tag.replace('_spectrum.fits', '_atmsim.fits')) is True
         assert image_simulation.data is not None
         # assert spectrum_simulation.data is not None
         # assert spectrogram_simulation.data is not None
-        assert os.path.isfile('./tests/data/' + tag.replace('_spectrum.fits', '_sim.fits')) is True
+        assert os.path.isfile(output_directory + tag.replace('reduc', 'sim').replace('_spectrum.fits', '.fits'))
         assert atm.transmission is not None
 
 

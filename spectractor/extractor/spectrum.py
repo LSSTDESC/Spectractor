@@ -16,12 +16,12 @@ from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
-from spectractor.simulation.adr import adr_calib
+from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 
 
 class Spectrum:
 
-    def __init__(self, file_name="", image=None, order=1, target=None, config=""):
+    def __init__(self, file_name="", image=None, order=1, target=None, config="", fast_load=False):
         """ Spectrum class used to store information and methods
         relative to spectra nd their extraction.
 
@@ -38,6 +38,8 @@ class Spectrum:
             Target object if provided (default: None)
         config: str, optional
             A config file name to load some parameter values for a given instrument (default: "").
+        fast_load: bool, optional
+            If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
 
         Examples
         --------
@@ -57,6 +59,7 @@ class Spectrum:
         >>> print(s.target.label)
         PNG321.0+3.9
         """
+        self.fast_load = fast_load
         self.my_logger = set_logger(self.__class__.__name__)
         if config != "":
             load_config(config)
@@ -79,8 +82,10 @@ class Spectrum:
         self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
         self.chromatic_psf = ChromaticPSF(self.psf, Nx=1, Ny=1, deg=1, saturation=1)
         self.rotation_angle = 0
+        self.parallactic_angle = None
         self.spectrogram = None
         self.spectrogram_bgd = None
+        self.spectrogram_bgd_rms = None
         self.spectrogram_err = None
         self.spectrogram_residuals = None
         self.spectrogram_fit = None
@@ -94,8 +99,11 @@ class Spectrum:
         self.spectrogram_saturation = None
         self.spectrogram_Nx = None
         self.spectrogram_Ny = None
+        self.lambdas_order2 = None
+        self.data_order2 = None
+        self.err_order2 = None
+        self.filename = file_name
         if file_name != "":
-            self.filename = file_name
             self.load_spectrum(file_name)
         if image is not None:
             self.header = image.header
@@ -120,10 +128,9 @@ class Spectrum:
             self.temperature = image.temperature
             self.pressure = image.pressure
             self.humidity = image.humidity
-            self.xpixsize = image.xpixsize
-            self.ypixsize = image.ypixsize
+            self.parallactic_angle = image.parallactic_angle
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
-                               self.humidity, self.airmass, self.rotation_angle, self.xpixsize, self.ypixsize]
+                               self.humidity, self.airmass]
 
         self.load_filter()
 
@@ -154,6 +161,10 @@ class Spectrum:
         if self.cov_matrix is not None:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix /= ldl_mat
+        if self.data_order2 is not None:
+            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.gradient(self.lambdas_order2)
+            self.data_order2 /= ldl_2
+            self.err_order2 /= ldl_2
         self.units = 'erg/s/cm$^2$/nm'
 
     def convert_from_flam_to_ADUrate(self):
@@ -183,6 +194,10 @@ class Spectrum:
         if self.cov_matrix is not None:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix *= ldl_mat
+        if self.data_order2 is not None:
+            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.gradient(self.lambdas_order2)
+            self.data_order2 *= ldl_2
+            self.err_order2 *= ldl_2
         self.units = 'ADU/s'
 
     def load_filter(self):
@@ -241,6 +256,16 @@ class Spectrum:
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
+        if self.lambdas_order2 is not None:
+            distance = self.disperser.grating_lambda_to_pixel(self.lambdas_order2, self.x0, order=2)
+            lambdas_order2_contamination = self.disperser.grating_pixel_to_lambda(distance, self.x0, order=1)
+            data_order2_contamination = self.data_order2 * (self.lambdas_order2 * np.gradient(self.lambdas_order2))\
+                                        / (lambdas_order2_contamination * np.gradient(lambdas_order2_contamination))
+            if np.sum(data_order2_contamination) / np.sum(self.data) > 0.01:
+                data_interp = interp1d(self.lambdas, self.data, kind="linear", fill_value="0", bounds_error=False)
+                plot_spectrum_simple(ax, lambdas_order2_contamination,
+                                     data_interp(lambdas_order2_contamination) + data_order2_contamination, data_err=None,
+                                     xlim=xlim, label='Order 2 contamination', linestyle="--", lw=1)
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title=title, units=self.units)
         if len(self.target.spectra) > 0:
@@ -355,25 +380,21 @@ class Spectrum:
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
                                   'second column gives the spectrum in unit UNIT2, ' \
                                   'third column the corresponding errors.'
-        self.header['LBDA_REF'] = self.lambda_ref
         hdu1 = fits.PrimaryHDU()
         hdu1.header = self.header
         hdu1.header["EXTNAME"] = "SPECTRUM"
         hdu2 = fits.ImageHDU()
-        hdu2.header["EXTNAME"] = "S_FIT"
+        hdu2.header["EXTNAME"] = "SPEC_COV"
         hdu3 = fits.ImageHDU()
-        hdu3.header["EXTNAME"] = "S_RES"
-        hdu4 = fits.ImageHDU()
-        hdu4.header["EXTNAME"] = "SPEC_COV"
+        hdu3.header["EXTNAME"] = "ORDER2"
         hdu1.data = [self.lambdas, self.data, self.err]
-        hdu2.data = self.spectrogram_fit
-        hdu3.data = self.spectrogram_residuals
-        hdu4.data = self.cov_matrix
-        hdu = fits.HDUList([hdu1, hdu2, hdu3, hdu4])
+        if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
+            hdu2.data = self.cov_matrix
+            hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
+        hdu = fits.HDUList([hdu1, hdu2, hdu3])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
-        # OLD: save_fits(output_file_name, self.header, [self.lambdas, self.data, self.err], overwrite=overwrite)
         self.my_logger.info(f'\n\tSpectrum saved in {output_file_name}')
 
     def save_spectrogram(self, output_file_name, overwrite=False):
@@ -402,13 +423,25 @@ class Spectrum:
         self.header['S_DEG'] = self.spectrogram_deg
         self.header['S_SAT'] = self.spectrogram_saturation
         hdu1 = fits.PrimaryHDU()
+        hdu1.header["EXTNAME"] = "S_DATA"
         hdu2 = fits.ImageHDU()
+        hdu2.header["EXTNAME"] = "S_ERR"
         hdu3 = fits.ImageHDU()
+        hdu3.header["EXTNAME"] = "S_BGD"
+        hdu4 = fits.ImageHDU()
+        hdu4.header["EXTNAME"] = "S_BGD_ER"
+        hdu5 = fits.ImageHDU()
+        hdu5.header["EXTNAME"] = "S_FIT"
+        hdu6 = fits.ImageHDU()
+        hdu6.header["EXTNAME"] = "S_RES"
         hdu1.header = self.header
         hdu1.data = self.spectrogram
         hdu2.data = self.spectrogram_err
         hdu3.data = self.spectrogram_bgd
-        hdu = fits.HDUList([hdu1, hdu2, hdu3])
+        hdu4.data = self.spectrogram_bgd_rms
+        hdu5.data = self.spectrogram_fit
+        hdu6.data = self.spectrogram_residuals
+        hdu = fits.HDUList([hdu1, hdu2, hdu3, hdu4, hdu5, hdu6])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
@@ -465,12 +498,10 @@ class Spectrum:
                 self.pressure = self.header['OUTPRESS']
             if self.header['OUTHUM'] != "":
                 self.humidity = self.header['OUTHUM']
-            if self.header['XPIXSIZE'] != "":
-                self.xpixsize = self.header['XPIXSIZE']
-            if self.header['YPIXSIZE'] != "":
-                self.ypixsize = self.header['YPIXSIZE']
             if self.header['LBDA_REF'] != "":
                 self.lambda_ref = self.header['LBDA_REF']
+            if self.header['PARANGLE'] != "":
+                self.parallactic_angle = self.header['PARANGLE']
 
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
@@ -480,29 +511,27 @@ class Spectrum:
             self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
 
             self.adr_params = [self.dec, self.hour_angle, self.temperature,
-                               self.pressure, self.humidity, self.airmass, self.rotation_angle, self.xpixsize,
-                               self.ypixsize]
+                               self.pressure, self.humidity, self.airmass]
 
-            if os.path.isfile(spectrogram_file_name):
-                self.load_spectrogram(spectrogram_file_name)
-            else:
-                raise FileNotFoundError(f"Spectrogram file {spectrogram_file_name} does not exist.")
-            psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
-            self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
-            if os.path.isfile(psf_file_name):
-                self.load_chromatic_psf(psf_file_name)
-            else:
-                raise FileNotFoundError(f"PSF file {psf_file_name} does not exist.")
+            if not self.fast_load:
+                if os.path.isfile(spectrogram_file_name):
+                    self.load_spectrogram(spectrogram_file_name)
+                else:
+                    raise FileNotFoundError(f"Spectrogram file {spectrogram_file_name} does not exist.")
+                psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
+                self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
+                if os.path.isfile(psf_file_name):
+                    self.load_chromatic_psf(psf_file_name)
+                else:
+                    raise FileNotFoundError(f"PSF file {psf_file_name} does not exist.")
             hdu_list = fits.open(input_file_name)
             if len(hdu_list) > 1:
-                self.spectrogram_fit = hdu_list[0].data
-                self.spectrogram_residuals = hdu_list[1].data
-            if len(hdu_list) > 3:
                 self.cov_matrix = hdu_list["SPEC_COV"].data
+                if len(hdu_list) > 2:
+                    self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
             else:
                 self.cov_matrix = np.diag(self.err ** 2)
         else:
-            self.my_logger.warning(f'\n\tSpectrum file {input_file_name} not found')
             raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
 
     def load_spectrogram(self, input_file_name):
@@ -524,6 +553,10 @@ class Spectrum:
             self.spectrogram = hdu_list[0].data
             self.spectrogram_err = hdu_list[1].data
             self.spectrogram_bgd = hdu_list[2].data
+            if len(hdu_list) > 3:
+                self.spectrogram_bgd_rms = hdu_list[3].data
+                self.spectrogram_fit = hdu_list[4].data
+                self.spectrogram_residuals = hdu_list[5].data
             self.spectrogram_x0 = float(header['S_X0'])
             self.spectrogram_y0 = float(header['S_Y0'])
             self.spectrogram_xmin = int(header['S_XMIN'])
@@ -561,6 +594,8 @@ class Spectrum:
                                               x0=self.spectrogram_x0, y0=self.spectrogram_y0,
                                               deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,
                                               file_name=input_file_name)
+            if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
+                self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
             self.my_logger.info(f'\n\tSpectrogram loaded from {input_file_name}')
         else:
             self.my_logger.warning(f'\n\tSpectrogram file {input_file_name} not found')
@@ -1020,8 +1055,13 @@ def calibrate_spectrum(spectrum):
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
     lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
     spectrum.lambda_ref = lambda_ref
-    adr_pixel_shift = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-
+    spectrum.header['LBDA_REF'] = lambda_ref
+    # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
+    # Must project ADR along dispersion axis
+    adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
+                                lambda_ref=lambda_ref)
+    adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                           dispersion_axis_angle=spectrum.rotation_angle)
     x0 = spectrum.x0
     if x0 is None:
         x0 = spectrum.target_pixcoords
@@ -1034,19 +1074,20 @@ def calibrate_spectrum(spectrum):
 
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
-        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - shift - adr_pixel_shift,
+        dist = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift)
+        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(dist - adr_u,
                                                                       x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
         spectrum.convert_from_ADUrate_to_flam()
         chisq = detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None, calibration_lines_only=True)
-        spectrum.convert_from_flam_to_ADUrate()
         chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             if parameters.LIVE_FIT:
-                spectrum.plot_spectrum(live_fit=True, label=rf'Order {spectrum.order:d} spectrum'
-                                                            r'\n$D_\mathrm{CCD}'
+                spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum\n'
+                                                            r'$D_\mathrm{CCD}'
                                                             rf'={D:.2f}\,$mm, $\delta u_0={shift:.2f}\,$pix')
+        spectrum.convert_from_flam_to_ADUrate()
         return chisq
 
     # grid exploration of the parameters
@@ -1108,12 +1149,14 @@ def calibrate_spectrum(spectrum):
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - pixel_shift - adr_pixel_shift,
-                                                         x0=x0, order=spectrum.order)
+    distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=pixel_shift)
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - adr_u, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.lambdas_binwidths = np.gradient(lambdas)
     spectrum.convert_from_ADUrate_to_flam()
-    spectrum.pixels = distance - pixel_shift
+    spectrum.chromatic_psf.table['Dx'] -= pixel_shift
+    spectrum.chromatic_psf.table['Dy_disp_axis'] = distance * np.sin(spectrum.rotation_angle * np.pi / 180)
+    spectrum.pixels = np.copy(spectrum.chromatic_psf.table['Dx'])
     detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
                  fwhm_func=fwhm_func, ax=None, calibration_lines_only=False)
     # Convert back to flam units

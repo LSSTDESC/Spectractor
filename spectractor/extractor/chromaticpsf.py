@@ -7,13 +7,12 @@ from scipy.interpolate import interp1d
 
 from astropy.table import Table
 
-from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm,
-                               plot_correlation_matrix_simple, compute_correlation_matrix)
+from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm)
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss, Moffat
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping
+from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping, RegFitWorkspace
 
 
 class ChromaticPSF:
@@ -246,7 +245,6 @@ class ChromaticPSF:
             plt.show()
 
         """
-        pixels = self.pixels
         if mode == "2D":
             yy, xx = np.mgrid[:self.Ny, :self.Nx]
             pixels = np.asarray([xx, yy])
@@ -577,6 +575,7 @@ class ChromaticPSF:
         pixel_x = np.arange(self.Nx).astype(int)
         # oversampling for precise computation of the PSF
         # pixels.shape = (2, Nx, Ny): self.pixels[1<-y, 0<-first pixel value column, :]
+        # TODO: account for rotation ad projection effects is PSF is not round
         pixel_eval = np.arange(self.pixels[1, 0, 0], self.pixels[1, 0, -1], 0.1)
         for x in pixel_x:
             p = profile_params[x, :]
@@ -585,7 +584,6 @@ class ChromaticPSF:
             fwhm = compute_fwhm(pixel_eval, out, center=p[2], minimum=0)
             self.table['flux_integral'][x] = p[0]  # if MoffatGauss1D normalized
             self.table['fwhm'][x] = fwhm
-            self.table['Dy_disp_axis'][x] = 0
 
     def set_bounds(self):
         """
@@ -960,7 +958,7 @@ class ChromaticPSF:
         self.from_profile_params_to_shape_params(self.profile_params)
 
     def fit_chromatic_psf(self, data, bgd_model_func=None, data_errors=None, mode="1D",
-                          amplitude_priors_method="noprior", verbose=False):
+                          amplitude_priors_method="noprior", verbose=False, live_fit=False):
         """
         Fit a chromatic PSF model on 2D data.
 
@@ -1071,14 +1069,15 @@ class ChromaticPSF:
             >>> assert np.abs(np.mean((w.amplitude_params - s0.poly_params[:s0.Nx])/w.amplitude_params_err)) < 0.1
 
         """
-        w = None
         if mode == "1D":
             w = ChromaticPSF1DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
-                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose)
+                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose,
+                                           live_fit=live_fit)
             run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
         elif mode == "2D":
             w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
-                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose)
+                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose,
+                                           live_fit=live_fit)
             # run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
                                             fix=w.fixed, sigma_clip=10, niter_clip=3, verbose=verbose)
@@ -1171,7 +1170,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             # xx, yy = np.meshgrid(np.arange(Nx), pixels)
             self.bgd = self.bgd_model_func(np.arange(self.Nx), self.pixels)
         self.data = self.data - self.bgd
-        self.bgd_std = float(np.std(np.random.poisson(self.bgd)))
+        self.bgd_std = float(np.std(np.random.poisson(np.abs(self.bgd))))
 
         # crop spectrogram to fit faster
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
@@ -1204,6 +1203,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # priors on amplitude parameters
         self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed']
         self.amplitude_priors_method = amplitude_priors_method
+        self.fwhm_priors = np.copy(self.chromatic_psf.table['fwhm'])
         self.reg = parameters.PSF_FIT_REG_PARAM
         self.Q = np.zeros((self.Nx, self.Nx))
         self.Q_dot_A0 = np.zeros(self.Nx)
@@ -1698,108 +1698,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
-
-
-class RegFitWorkspace(FitWorkspace):
-
-    def __init__(self, w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=False, live_fit=False):
-        """
-
-        Parameters
-        ----------
-        w: ChromaticPSFFitWorkspace
-        """
-        FitWorkspace.__init__(self, verbose=verbose, live_fit=live_fit)
-        self.x = np.array([0])
-        self.data = np.array([0])
-        self.err = np.array([1])
-        self.w = w
-        self.p = np.asarray([np.log10(opt_reg)])
-        self.bounds = [(-20, np.log10(self.w.amplitude_priors.size) + 2)]
-        self.input_labels = ["log10_reg"]
-        self.axis_names = [r"$\log_{10} r$"]
-        self.fixed = [False] * self.p.size
-        self.opt_reg = opt_reg
-        self.resolution = np.zeros_like((self.w.amplitude_params.size, self.w.amplitude_params.size))
-        self.G = 0
-        self.chisquare = -1
-
-    def simulate(self, log10_r):
-        reg = 10 ** log10_r
-        M_dot_W_dot_M_plus_Q = self.w.M_dot_W_dot_M + reg * self.w.Q
-        try:
-            L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-            cov = L.T @ L
-        except np.linalg.LinAlgError:
-            cov = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-        A = cov @ (self.w.M.T @ self.w.W_dot_data + reg * self.w.Q_dot_A0)
-        self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
-        diff = self.w.data_flat - self.w.M @ A
-        self.chisquare = diff[self.w.not_outliers] @ (self.w.W * diff)[self.w.not_outliers]
-        self.w.amplitude_params = A
-        self.w.amplitude_cov_matrix = cov
-        self.w.amplitude_params_err = np.array([np.sqrt(cov[x, x]) for x in range(cov.shape[0])])
-        self.G = self.chisquare / (self.w.data_flat.size - np.trace(self.resolution)) ** 2
-        return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
-
-    def plot_fit(self):
-        log10_opt_reg = self.p[0]
-        opt_reg = 10 ** log10_opt_reg
-        regs = 10 ** np.linspace(min(-10, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
-        Gs = []
-        chisqs = []
-        resolutions = []
-        x = np.arange(len(self.w.amplitude_priors))
-        for r in regs:
-            self.simulate(np.log10(r))
-            if parameters.DISPLAY and False:
-                fig = plt.figure()
-                plt.errorbar(x, self.w.amplitude_params, yerr=[np.sqrt(self.w.amplitude_cov_matrix[i, i]) for i in x],
-                             label=f"fit r={r:.2g}")
-                plt.plot(x, self.w.amplitude_priors, label="prior")
-                plt.grid()
-                plt.legend()
-                plt.draw()
-                plt.pause(1e-8)
-                plt.close(fig)
-            Gs.append(self.G)
-            chisqs.append(self.chisquare)
-            resolutions.append(np.trace(self.resolution))
-        fig, ax = plt.subplots(3, 1, figsize=(7, 5), sharex="all")
-        ax[0].plot(regs, Gs)
-        ax[0].axvline(opt_reg, color="k")
-        ax[1].axvline(opt_reg, color="k")
-        ax[2].axvline(opt_reg, color="k")
-        ax[0].set_ylabel(r"$G(r)$")
-        ax[0].set_xlabel("Regularisation hyper-parameter $r$")
-        ax[0].grid()
-        ax[0].set_title(f"Optimal regularisation parameter: {opt_reg:.3g}")
-        ax[1].plot(regs, chisqs)
-        ax[1].set_ylabel(r"$\chi^2(\mathbf{A}(r) \vert \mathbf{\theta})$")
-        ax[1].set_xlabel("Regularisation hyper-parameter $r$")
-        ax[1].grid()
-        ax[1].set_xscale("log")
-        ax[2].set_xscale("log")
-        ax[2].plot(regs, resolutions)
-        ax[2].set_ylabel(r"$\mathrm{Tr}\,\mathbf{R}$")
-        ax[2].set_xlabel("Regularisation hyper-parameter $r$")
-        ax[2].grid()
-        fig.tight_layout()
-        plt.subplots_adjust(hspace=0)
-        if parameters.DISPLAY:
-            plt.show()
-        if parameters.LSST_SAVEFIGPATH:
-            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'regularisation.pdf'))
-
-        fig = plt.figure(figsize=(7, 5))
-        rho = compute_correlation_matrix(self.w.amplitude_cov_matrix)
-        plot_correlation_matrix_simple(plt.gca(), rho, axis_names=[''] * self.w.chromatic_psf.Nx)
-        # ipar=np.arange(10, 20))
-        plt.gca().set_title(r"Correlation matrix $\mathbf{\rho}$")
-        if parameters.LSST_SAVEFIGPATH:
-            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'amplitude_correlation_matrix.pdf'))
-        if parameters.DISPLAY:
-            plt.show()
 
 
 if __name__ == "__main__":

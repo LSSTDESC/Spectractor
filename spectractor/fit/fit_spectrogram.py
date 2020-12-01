@@ -2,9 +2,10 @@ import time
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import copy
 
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.simulation.simulator import SimulatorInit, SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
@@ -101,6 +102,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.saturation = self.spectrum.spectrogram_saturation
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols,
                            self.D, self.shift_x, self.shift_y, self.angle, self.B])
+        self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 9])
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params])
         self.input_labels = ["A1", "A2", "ozone [db]", "PWV [mm]", "VAOD", r"D_CCD [mm]",
@@ -113,12 +115,12 @@ class SpectrogramFitWorkspace(FitWorkspace):
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
-            if "x_c" in par or "saturation" in par:
+            if "x_c" in par or "saturation" in par or "y_c" in par:
                 self.fixed[k] = True
         # self.fixed[1] = True  # A2
         # self.fixed[5:7] = [True, True]  # DCCD, x0
-        self.fixed[7] = True  # Delta y
-        self.fixed[8] = True  # angle
+        # self.fixed[7] = True  # Delta y
+        # self.fixed[8] = True  # angle
         self.fixed[9] = True  # B
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
@@ -192,8 +194,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
-            norm = np.max(self.spectrum.spectrogram[:, sub])
-            plot_image_simple(ax[0, 0], data=self.spectrum.spectrogram[:, sub] / norm, title='Data', aspect='auto',
+            norm = np.max(self.data[:, sub])
+            plot_image_simple(ax[0, 0], data=self.data[:, sub] / norm, title='Data', aspect='auto',
                               cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)')
             ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
             plot_image_simple(ax[1, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
@@ -208,9 +210,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
                 ax[1, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
-            residuals = (self.spectrum.spectrogram - self.model)
+            residuals = (self.data - self.model)
             # residuals_err = self.spectrum.spectrogram_err / self.model
-            norm = self.spectrum.spectrogram_err
+            norm = self.err
             residuals /= norm
             std = float(np.std(residuals[:, sub]))
             plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
@@ -224,7 +226,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[3, 1].remove()
-            ax[3, 0].plot(self.lambdas[sub], self.spectrum.spectrogram.sum(axis=0)[sub], label='Data')
+            ax[3, 0].plot(self.lambdas[sub], self.data.sum(axis=0)[sub], label='Data')
             ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
             ax[3, 0].set_ylabel('Cross spectrum')
             ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
@@ -280,9 +282,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         """
         global plot_counter
-        self.simulation.fix_psf_cube = False
-        if np.all(np.isclose(psf_poly_params, self.p[self.psf_params_start_index:], rtol=1e-6)):
-            self.simulation.fix_psf_cube = True
         lambdas, model, model_err = \
             self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, psf_poly_params)
         self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B] + list(psf_poly_params))
@@ -297,12 +296,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
     def jacobian(self, params, epsilon, fixed_params=None):
         start = time.time()
         lambdas, model, model_err = self.simulate(*params)
-        model = model.flatten()
+        model = model.flatten()[self.not_outliers]
         J = np.zeros((params.size, model.size))
+        strategy = copy.copy(self.simulation.fix_psf_cube)
         for ip, p in enumerate(params):
             if fixed_params[ip]:
                 continue
-            if ip < self.psf_params_start_index:
+            if ip in self.fixed_psf_params:
                 self.simulation.fix_psf_cube = True
             else:
                 self.simulation.fix_psf_cube = False
@@ -311,7 +311,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+            J[ip] = (tmp_model.flatten()[self.not_outliers] - model) / epsilon[ip]
+        self.simulation.fix_psf_cube = strategy
         self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
@@ -425,7 +426,6 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
-        fit_workspace.simulation.fast_sim = True
         costs = np.array([fit_workspace.chisq(guess)])
         if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
             fit_workspace.plot_fit()
@@ -436,19 +436,19 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         epsilon[epsilon == 0] = 1e-4
         fixed = np.copy(fit_workspace.fixed)
 
-        fit_workspace.simulation.fast_sim = True
-        fit_workspace.simulation.fix_psf_cube = False
-        fit_workspace.fixed = np.copy(fixed)
-        fit_workspace.fixed[:fit_workspace.psf_params_start_index] = True
-        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fit_workspace.fixed, xtol=1e-3, ftol=1e-2, niter=10)
+        # fit_workspace.simulation.fast_sim = True
+        # fit_workspace.simulation.fix_psf_cube = False
+        # fit_workspace.fixed = np.copy(fixed)
+        # fit_workspace.fixed[:fit_workspace.psf_params_start_index] = True
+        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+        #                                            fix=fit_workspace.fixed, xtol=1e-3, ftol=1e-2, niter=10)
 
-        fit_workspace.simulation.fast_sim = True
-        fit_workspace.simulation.fix_psf_cube = False
-        fit_workspace.fixed = np.copy(fixed)
-        guess = fit_workspace.p
-        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fit_workspace.fixed, xtol=1e-5, ftol=1e-3, niter=10)
+        # fit_workspace.simulation.fast_sim = True
+        # fit_workspace.simulation.fix_psf_cube = False
+        # fit_workspace.fixed = np.copy(fixed)
+        # guess = fit_workspace.p
+        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+        #                                            fix=fit_workspace.fixed, xtol=1e-5, ftol=1e-3, niter=10)
 
         fit_workspace.simulation.fast_sim = False
         fit_workspace.simulation.fix_psf_cube = False
@@ -527,7 +527,7 @@ if __name__ == "__main__":
                  'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
     params = []
     chisqs = []
-    filenames = ['outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits']
+    filenames = ['outputs/sim_20170530_134_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 

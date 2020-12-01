@@ -382,8 +382,8 @@ class Grating:
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             l, t = a.T
-            self.ratio_order_2over1 = interpolate.interp1d(l, t, bounds_error=False,
-                                                           fill_value="extrapolate", kind="linear")
+            self.ratio_order_2over1 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
+                                                           fill_value=(t[0], t[-1]))
         else:
             self.ratio_order_2over1 = lambda x: parameters.GRATING_ORDER_2OVER1 * np.ones_like(x).astype(float)
         filename = self.data_dir + self.label + "/hologram_center.txt"
@@ -667,6 +667,9 @@ class Hologram(Grating):
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             self.N_x, self.N_y, self.N_data = a.T
+            if parameters.CCD_REBIN > 1:
+                self.N_x /= parameters.CCD_REBIN
+                self.N_y /= parameters.CCD_REBIN
             N_interp = interpolate.interp2d(self.N_x, self.N_y, self.N_data, kind='cubic')
             self.N_fit = fit_poly2d(self.N_x, self.N_y, self.N_data, order=2)
             self.N_interp = lambda x: float(N_interp(x[0], x[1]))
@@ -694,6 +697,9 @@ class Hologram(Grating):
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             self.theta_x, self.theta_y, self.theta_data = a.T
+            if parameters.CCD_REBIN > 1:
+                self.theta_x /= parameters.CCD_REBIN
+                self.theta_y /= parameters.CCD_REBIN
             theta_interp = interpolate.interp2d(self.theta_x, self.theta_y, self.theta_data, kind='cubic')
             self.theta = lambda x: float(theta_interp(x[0], x[1]))
         else:

@@ -1262,6 +1262,7 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
 
     def eq(xx):
         return interp(xx) - 0.5 * maximum
+
     res = dichotomie(eq, a, b, 1e-3)
     if center is None:
         center = np.average(x, weights=y)
@@ -1269,7 +1270,7 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
     if not full_output:
         return fwhm
     else:
-        return fwhm, 0.5*maximum, center, res, center - abs(res-center)
+        return fwhm, 0.5 * maximum, center, res, center - abs(res - center)
 
 
 def compute_integral(x, y, bounds=None):
@@ -1396,10 +1397,10 @@ def weighted_avg_and_std(values, weights):
 
 def hessian_and_theta(data, margin_cut=1):
     # compute hessian matrices on the image
-    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order='xy')
+    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order='rc')
     lambda_plus = 0.5 * ((Hxx + Hyy) + np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     lambda_minus = 0.5 * ((Hxx + Hyy) - np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
-    theta = 0.5 * np.arctan2(2 * Hxy, Hyy - Hxx) * 180 / np.pi
+    theta = 0.5 * np.arctan2(2 * Hxy, Hxx - Hyy) * 180 / np.pi
     # remove the margins
     lambda_minus = lambda_minus[margin_cut:-margin_cut, margin_cut:-margin_cut]
     lambda_plus = lambda_plus[margin_cut:-margin_cut, margin_cut:-margin_cut]
@@ -1706,8 +1707,8 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         >>> from spectractor import parameters
         >>> from spectractor.tools import plot_image_simple
         >>> f, ax = plt.subplots(1,1)
-        >>> im = Image('tests/data/reduc_20170605_028.fits')
-        >>> plot_image_simple(ax, im.data, scale="log10", units="ADU", target_pixcoords=(815,580),
+        >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
+        >>> plot_image_simple(ax, im.data, scale="symlog", units="ADU", target_pixcoords=(815,580),
         ...                     title="tests/data/reduc_20170605_028.fits")
         >>> if parameters.DISPLAY: plt.show()
     """
@@ -1742,21 +1743,35 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
                    label='Target', linewidth=2)
 
 
-def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', label='', title='', units=''):
+def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', linestyle='none', lw=2, label='',
+                         title='', units=''):
     """Simple function to plot a spectrum with error bars and labels.
 
     Parameters
     ----------
     ax: Axes
-        Axes instance to make the plot
+        Axes instance to make the plot.
+    lambdas: array
+        The wavelengths array.
+    data: array
+        The spectrum data array.
+    data_err: array, optional
+        The spectrum uncertainty array (default: None).
     xlim: list, optional
-        List of minimum and maximum abscisses
-    color: str
-        String for the color of the spectrum (default: 'r')
-    label: str
-        String label for the plot legend
-    lambdas: array, optional
-        The wavelengths array if it has been given externally (default: None)
+        List of minimum and maximum abscisses (default: None).
+    color: str, optional
+        String for the color of the spectrum (default: 'r').
+    linestyle: str, optional
+        String for the linestyle of the spectrum (default: 'none').
+    lw: int, optional
+        Integer for line width (default: 2).
+    label: str, optional
+        String label for the plot legend (default: '').
+    title: str, optional
+        String label for the plot title (default: '').
+    units: str, optional
+        String label for the plot units (default: '').
+
 
     Examples
     --------
@@ -1769,17 +1784,20 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         >>> from spectractor import parameters
         >>> from spectractor.tools import plot_spectrum_simple
         >>> f, ax = plt.subplots(1,1)
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
-        >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=[500,700], color='r', label='test')
+        # >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
+        # >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=[500,700], color='r', label='test')
+        >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=None, color='r', label='test')
         >>> if parameters.DISPLAY: plt.show()
     """
     xs = lambdas
     if xs is None:
         xs = np.arange(data.size)
     if data_err is not None:
-        ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=1, label=label, zorder=0, markersize=2)
+        ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=lw, label=label,
+                    zorder=0, markersize=2, linestyle=linestyle)
     else:
-        ax.plot(xs, data, f'{color}-', lw=2, label=label)
+        ax.plot(xs, data, f'{color}-', lw=lw, label=label, linestyle=linestyle)
     ax.grid(True)
     if xlim is None and lambdas is not None:
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
@@ -1795,6 +1813,69 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         ax.set_ylabel(f'Flux')
     if title != '':
         ax.set_title(title)
+
+
+def plot_compass_simple(ax, parallactic_angle=None, arrow_size=0.1, origin=[0.15, 0.15]):
+    """Plot small (N,W) compass, and optionally zenith direction.
+
+    Parameters
+    ----------
+    ax: Axes
+        Axes instance to make the plot.
+    parallactic_angle: float, optional
+        Value is the parallactic angle with respect to North eastward and plot the zenith direction (default: None).
+    arrow_size: float, optional
+        Length of the arrow as a fraction of axe sizes (default: 0.1)
+    origin: array_like, optional
+        (x0, y0) position of the compass as axes fraction (default: [0.15, 0.15]).
+
+    Examples
+    --------
+
+    >>> from spectractor.extractor.images import Image
+    >>> from spectractor import parameters
+    >>> from spectractor.tools import plot_image_simple, plot_compass_simple
+    >>> f, ax = plt.subplots(1,1)
+    >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
+    >>> plot_image_simple(ax, im.data, scale="symlog", units="ADU", target_pixcoords=(750,700),
+    ...                   title='tests/data/reduc_20170530_134.fits')
+    >>> plot_compass_simple(ax, im.parallactic_angle)
+    >>> if parameters.DISPLAY: plt.show()
+
+    """
+    # North arrow
+    N_arrow = [0, arrow_size]
+    N_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(N_arrow[0], N_arrow[1],
+                                                                    camera_angle=parameters.OBS_CAMERA_ROTATION,
+                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+    ax.annotate("N", xy=origin, xycoords='axes fraction', xytext=N_xy + origin, textcoords='axes fraction',
+                arrowprops=dict(arrowstyle="<|-", fc="yellow", ec="yellow"), color="yellow",
+                horizontalalignment='center', verticalalignment='center')
+    # West arrow
+    W_arrow = [arrow_size, 0]
+    W_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(W_arrow[0], W_arrow[1],
+                                                                    camera_angle=parameters.OBS_CAMERA_ROTATION,
+                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+    ax.annotate("W", xy=origin, xycoords='axes fraction', xytext=W_xy + origin, textcoords='axes fraction',
+                arrowprops=dict(arrowstyle="<|-", fc="yellow", ec="yellow"), color="yellow",
+                horizontalalignment='center', verticalalignment='center')
+    # Central dot
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    ax.scatter(origin[0] * xmax, origin[1] * ymax, color="yellow", s=20)
+    # Zenith direction
+    if parallactic_angle is not None:
+        p_arrow = [0, arrow_size]  # angle with respect to North in RADEC counterclockwise
+        angle = parameters.OBS_CAMERA_ROTATION + parameters.OBS_CAMERA_RA_FLIP_SIGN * parallactic_angle
+        p_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(p_arrow[0], p_arrow[1],
+                                                                        camera_angle=angle,
+                                                                        flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                        flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+        ax.annotate("Z", xy=origin, xycoords='axes fraction', xytext=p_xy + origin, textcoords='axes fraction',
+                    arrowprops=dict(arrowstyle="<|-", fc="lightgreen", ec="lightgreen"), color="lightgreen",
+                    horizontalalignment='center', verticalalignment='center')
 
 
 def load_fits(file_name, hdu_index=0):
@@ -2031,9 +2112,13 @@ def rebin(arr, new_shape):
            [4., 4., 4., 4., 4.],
            [4., 4., 4., 4., 4.]])
     """
+    if np.any(new_shape * parameters.CCD_REBIN != arr.shape):
+        shape_cropped = new_shape * parameters.CCD_REBIN
+        margins = arr.shape - shape_cropped
+        arr = arr[:-margins[0], :-margins[1]]
     shape = (new_shape[0], arr.shape[0] // new_shape[0],
              new_shape[1], arr.shape[1] // new_shape[1])
-    return arr.reshape(shape).sum(-1).sum(1)
+    return arr.reshape(shape).mean(-1).mean(1)
 
 
 def set_wcs_output_directory(file_name, output_directory=""):
@@ -2257,6 +2342,70 @@ def plot_correlation_matrix_simple(ax, rho, axis_names, ipar=None):
 def resolution_operator(cov, Q, reg):
     N = cov.shape[0]
     return np.eye(N) - reg * cov @ Q
+
+
+def flip_and_rotate_radec_to_image_xy_coordinates(ra, dec, camera_angle=0, flip_ra_sign=1, flip_dec_sign=1):
+    """Flip and rotate the vectors in pixels along (RA,DEC) directions to (x, y) image coordinates.
+    The parity transformations are applied first, then rotation.
+
+    Parameters
+    ----------
+    ra: array_like
+        Vector coordinates along RA direction.
+    dec: array_like
+        Vector coordinates along DEC direction.
+    camera_angle: float
+        Angle of the camera between y axis and the North Celestial Pole counterclockwise, or equivalently between
+        the x axis and the West direction counterclokwise. Units are degrees. (default: 0).
+    flip_ra_sign: -1, 1, optional
+        Flip RA axis is value is -1 (default: 1).
+    flip_dec_sign: -1, 1, optional
+        Flip DEC axis is value is -1 (default: 1).
+
+    Returns
+    -------
+    x: array_like
+       Vector coordinates along the x direction.
+    y: array_like
+       Vector coordinates along the y direction.
+
+    Examples
+    --------
+
+    >>> from spectractor import parameters
+    >>> parameters.OBS_CAMERA_ROTATION = 180
+    >>> parameters.OBS_CAMERA_DEC_FLIP_SIGN = 1
+    >>> parameters.OBS_CAMERA_RA_FLIP_SIGN = 1
+
+    North vector
+
+    >>> N_ra, N_dec = [0, 1]
+
+    Compute North direction in (x, y) frame
+
+    >>> flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=1)
+    (0.0, 1.0)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 180, flip_ra_sign=1, flip_dec_sign=1)
+    '-0.0, -1.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=1)
+    '-1.0, 0.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=-1)
+    '1.0, -0.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=-1, flip_dec_sign=-1)
+    '1.0, -0.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=-1)
+    '0.0, -1.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=-1, flip_dec_sign=1)
+    '0.0, 1.0'
+
+    """
+    flip = np.array([[flip_ra_sign, 0], [0, flip_dec_sign]], dtype=float)
+    a = - camera_angle * np.pi / 180
+    # minus sign as rotation matrix is apply on the right on the adr vector
+    rotation = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]], dtype=float)
+    transformation = flip @ rotation
+    x, y = (np.asarray([ra, dec]).T @ transformation).T
+    return x, y
 
 
 if __name__ == "__main__":
