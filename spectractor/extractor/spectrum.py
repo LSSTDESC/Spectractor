@@ -508,12 +508,11 @@ class Spectrum:
                                       data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
-            self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
-
             self.adr_params = [self.dec, self.hour_angle, self.temperature,
                                self.pressure, self.humidity, self.airmass]
 
             if not self.fast_load:
+                self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
                 if os.path.isfile(spectrogram_file_name):
                     self.load_spectrogram(spectrogram_file_name)
                 else:
