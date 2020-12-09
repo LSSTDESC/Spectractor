@@ -4,11 +4,11 @@ import copy
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 from scipy.interpolate import interp1d
-from scipy.integrate import simps, quad
+from scipy.integrate import quad
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation
+from spectractor.simulation.simulator import SimulatorInit
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping
 from spectractor.tools import plot_image_simple
@@ -120,6 +120,13 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
         self.amplitude_truth = None
         self.lambdas_truth = None
+        self.atmosphere = Atmosphere(airmass=1,
+                                     pressure=float(np.mean([self.spectra[k].header["OUTPRESS"]
+                                                             for k in range(self.nspectra)])),
+                                     temperature=float(np.mean([self.spectra[k].header["OUTTEMP"]
+                                                                for k in range(self.nspectra)])))
+        self.true_instrumental_transmission = None
+        self.true_atmospheric_transmission = None
         self.get_truth()
         # XXXX TEST XXXX
         # self.simulate(300, 5, 0.03)
@@ -136,30 +143,49 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             self.lambdas.append(0.5 * (lambdas_bin_edges[i] + lambdas_bin_edges[i - 1]))
         self.lambdas = np.asarray(self.lambdas)
         # mask
-        lambdas_to_mask = np.asarray([])  # 510, 515, 520, 525, 530])
+        lambdas_to_mask = np.asarray(
+            [350, 355, 360, 365, 370, 375, 400, 405, 410, 415, 430, 435, 440, 510, 515, 520, 525, 530,
+             560, 565, 570, 575, 650, 655, 660, 680, 685, 690, 695, 755, 760, 765, 770,
+             980, 985, 990, 995, 1000, 1080, 1085, 1090, 1095, 1100, 1105, 1110, 1115])
         lambdas_to_mask_indices = np.asarray(
             [np.argmin(np.abs(self.lambdas - lambdas_to_mask[i])) for i in range(lambdas_to_mask.size)])
+        # rebin atmosphere
+        self.atmosphere_lambda_bins = []
+        for i in range(0, lambdas_bin_edges.size):
+            self.atmosphere_lambda_bins.append([])
+            for j in range(0, self.atmospheres[0].lambdas.size):
+                if self.atmospheres[0].lambdas[j] >= lambdas_bin_edges[i]:
+                    self.atmosphere_lambda_bins[-1].append(j)
+                if i < lambdas_bin_edges.size - 1 and self.atmospheres[0].lambdas[j] >= lambdas_bin_edges[i + 1]:
+                    self.atmosphere_lambda_bins[-1] = np.array(self.atmosphere_lambda_bins[-1])
+                    break
+        self.atmosphere_lambda_bins = np.array(self.atmosphere_lambda_bins)
+        self.atmosphere_lambda_step = np.gradient(self.atmospheres[0].lambdas)[0]
         # rebin data
         self.data_cube = []
         for k in range(self.nspectra):
             data_func = interp1d(self.spectra[k].lambdas, self.spectra[k].data,
                                  kind="cubic", fill_value="extrapolate", bounds_error=None)
+            # lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
+            # amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+            # data_func = interp1d(lambdas_truth, amplitude_truth,
+            #                      kind="cubic", fill_value="extrapolate", bounds_error=None)
             data = []
             for i in range(1, lambdas_bin_edges.size):
                 data.append(quad(data_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0] / self.bin_widths)
             self.data_cube.append(np.copy(data))
-            if parameters.DEBUG:
-                if "LBDAS_T" in self.spectra[k].header:
-                    lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
-                    amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
-                    plt.plot(lambdas_truth, amplitude_truth, label="truth")  # -amplitude_truth)
-                plt.plot(self.lambdas, self.data_cube[-1], label="binned data")  # -amplitude_truth)
-                plt.plot(self.spectra[k].lambdas, self.spectra[k].data, label="raw data")  # -amplitude_truth)
-                # plt.title(self.spectra[k].filename)
-                # plt.xlim(480,700)
-                plt.grid()
-                plt.legend()
-                plt.show()
+            # if parameters.DEBUG:
+            #     if "LBDAS_T" in self.spectra[k].header:
+            #         lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
+            #         amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+            #         plt.plot(lambdas_truth, amplitude_truth, label="truth")  # -amplitude_truth)
+            #     plt.plot(self.lambdas, self.data_cube[-1], label="binned data")  # -amplitude_truth)
+            #     plt.plot(self.spectra[k].lambdas, self.spectra[k].data, label="raw data")  # -amplitude_truth)
+            #     # plt.title(self.spectra[k].filename)
+            #     # plt.xlim(480,700)
+            #     plt.grid()
+            #     plt.legend()
+            #     plt.show()
         self.data_cube = np.asarray(self.data_cube)
         self.data = np.hstack(self.data_cube)
         # rebin reference star
@@ -169,8 +195,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                                  kind="cubic", fill_value="extrapolate", bounds_error=None)
             data = []
             for i in range(1, lambdas_bin_edges.size):
-                self.ref_spectrum_cube.append(quad(data_func, lambdas_bin_edges[i - 1],
-                                                   lambdas_bin_edges[i])[0] / self.bin_widths)
+                data.append(quad(data_func, lambdas_bin_edges[i - 1],
+                                 lambdas_bin_edges[i])[0] / self.bin_widths)
             self.ref_spectrum_cube.append(np.copy(data))
         self.ref_spectrum_cube = np.asarray(self.ref_spectrum_cube)
         # rebin errors
@@ -180,15 +206,18 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                                 kind="cubic", fill_value="extrapolate", bounds_error=False)
             err = []
             for i in range(1, lambdas_bin_edges.size):
-                err.append(np.sqrt(np.abs(quad(err_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0])
-                                   / self.bin_widths))
+                if i in lambdas_to_mask_indices:
+                    err.append(np.nan)
+                else:
+                    err.append(np.sqrt(np.abs(quad(err_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0])
+                                       / self.bin_widths))
             self.err_cube.append(np.copy(err))
         self.err_cube = np.asarray(self.err_cube)
         self.err = np.hstack(self.err_cube)
         if parameters.DEBUG:
             for k in range(self.nspectra):
                 plt.errorbar(self.lambdas, self.data_cube[k], self.err_cube[k], label=f"spectrum {k}")
-                plt.plot(self.lambdas, self.ref_spectrum_cube[k] * np.max(self.data) / np.max(self.ref_spectrum_cube[k]), "k-")
+                # plt.plot(self.lambdas, self.ref_spectrum_cube[k] * np.max(self.data_cube[k]) / np.max(self.ref_spectrum_cube[k]), "k-")
             plt.ylim(0, 1.1 * np.max(self.data))
             plt.grid()
             plt.legend()
@@ -249,8 +278,20 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             pwv_truth = self.spectrum.header['PWV_T']
             aerosols_truth = self.spectrum.header['VAOD_T']
             self.truth = (ozone_truth, pwv_truth, aerosols_truth)
+            self.true_atmospheric_transmission = []
+            tatm = self.atmosphere.simulate(ozone=ozone_truth, pwv=pwv_truth, aerosols=aerosols_truth)
+            for i in range(1, self.lambdas_bin_edges.size):
+                self.true_atmospheric_transmission.append(quad(tatm, self.lambdas_bin_edges[i - 1],
+                                                               self.lambdas_bin_edges[i])[0] / self.bin_widths)
+            self.true_atmospheric_transmission = np.array(self.true_atmospheric_transmission)
         else:
             self.truth = None
+        self.true_instrumental_transmission = []
+        tinst = lambda lbda: self.disperser.transmission(lbda) * self.telescope.transmission(lbda)
+        for i in range(1, self.lambdas_bin_edges.size):
+            self.true_instrumental_transmission.append(quad(tinst, self.lambdas_bin_edges[i - 1],
+                                                            self.lambdas_bin_edges[i])[0] / self.bin_widths)
+        self.true_instrumental_transmission = np.array(self.true_instrumental_transmission)
 
     def simulate(self, ozone, pwv, aerosols):
         """Interface method to simulate multiple spectra with a single atmosphere.
@@ -285,18 +326,22 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         """
         # linear regression for the instrumental transmission parameters T
-        # Matrix M filling
-        M = []
+        # Matrix M filling: hereafter a fast integration is used
+        # M = []
         # for k in range(self.nspectra):
         #     atm = []
         #     a = self.atmospheres[k].simulate(ozone, pwv, aerosols)
+        #     lbdas = self.atmospheres[k].lambdas
         #     for i in range(1, self.lambdas_bin_edges.size):
-        #         atm.append(quad(a, self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i], epsrel=1e-2)[0] / self.bin_widths)
-        #     M.append(np.diag(self.spectrum_ref * np.array(atm)))
-        M = np.array([np.diag(self.spectrum_ref * self.atmospheres[k].simulate(ozone, pwv, aerosols)(self.lambdas))
+        #         atm.append(
+        #             np.trapz(a(lbdas[self.atmosphere_lambda_bins[i]]), dx=self.atmosphere_lambda_step)
+        #             / self.bin_widths)
+        #     M.append(np.diag(self.ref_spectrum_cube[k] * np.array(atm)))
+        # hereafter: no binning but gives unbiased result on extracted spectra from simulations and truth spectra
+        M = np.array([np.diag(self.ref_spectrum_cube[k] *
+                              self.atmospheres[k].simulate(ozone, pwv, aerosols)(self.lambdas))
                       for k in range(self.nspectra)])
-        # Matrix W filling
-        # if spectra are not independent, use these lines with einstein summations:
+        # Matrix W filling: if spectra are not independent, use these lines with einstein summations:
         # W = np.zeros((self.nspectra, self.nspectra, self.lambdas.size, self.lambdas.size))
         # for k in range(self.nspectra):
         #     W[k, k, ...] = self.data_invcov[k]
@@ -308,8 +353,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         for i in range(self.lambdas.size):
             if np.sum(M_dot_W_dot_M[i]) == 0:
                 M_dot_W_dot_M[i, i] = 1e-10 * np.mean(M_dot_W_dot_M)
-        # plt.imshow(M_dot_W_dot_M, origin="lower")
-        # plt.show()
         try:
             L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
             cov_matrix = L.T @ L
@@ -328,16 +371,12 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                                               if cov_matrix[i, i] > 0 else 0 for i in range(self.lambdas.size)])
         self.amplitude_cov_matrix = np.copy(cov_matrix)
         self.model_err = np.zeros_like(self.model)
-        # for k in range(self.nspectra):
-        #     plt.errorbar(self.lambdas, model_cube[k])
-        # plt.grid()
-        # plt.show()
-        # plt.errorbar(self.lambdas, self.amplitude_params, yerr=self.amplitude_params_err)
-        # plt.grid()
-        # plt.show()
         return self.lambdas, self.model, self.model_err
 
     def plot_fit(self):
+        """Plot the fit result.
+
+        """
         cmap_bwr = copy.copy(cm.get_cmap('bwr'))
         cmap_bwr.set_bad(color='lightgrey')
         cmap_viridis = copy.copy(cm.get_cmap('viridis'))
@@ -348,8 +387,10 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         data = data_good.reshape(self.nspectra, self.lambdas.size)
         model = self.model.reshape(self.nspectra, self.lambdas.size)
         err = self.err.reshape(self.nspectra, self.lambdas.size)
-        gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
-        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), gridspec_kw=gs_kw)
+        gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1, 1])
+        fig, ax = plt.subplots(nrows=5, ncols=2, figsize=(7, 8), gridspec_kw=gs_kw)
+        ozone, pwv, aerosols = self.p
+        plt.suptitle(f'VAOD={aerosols:.3f}, ozone={ozone:.0f}db, PWV={pwv:.2f}mm')
         norm = np.nanmax(self.data)
         plot_image_simple(ax[1, 0], data=model / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
                           units='1/max(data)', cmap=cmap_viridis)
@@ -377,12 +418,33 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         ax[3, 1].remove()
         ax[3, 0].errorbar(self.lambdas, self.amplitude_params, yerr=self.amplitude_params_err,
                           label=r'$T_{\mathrm{inst}}$', fmt='k.')  # , markersize=0.1)
-        # ax[3, 0].plot(self.lambdas, self., label='Model')
+        if self.true_instrumental_transmission is not None:
+            ax[3, 0].plot(self.lambdas, self.true_instrumental_transmission, "g-", label=r'true $T_{\mathrm{inst}}$')
         ax[3, 0].set_ylabel(r'Transmissions')
         ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
         ax[3, 0].legend(fontsize=7)
+        ax[3, 0].set_xlim(self.lambdas[0], self.lambdas[-1])
+        ax[3, 0].set_ylim(0, 1.1 * np.max(self.amplitude_params))
         # ax[3, 0].set_xlim((0, self.data.shape[1]))
         ax[3, 0].grid(True)
+        ax[4, 1].remove()
+        tatm = self.atmosphere.simulate(ozone=ozone, pwv=pwv, aerosols=aerosols)
+        tatm_binned = []
+        for i in range(1, self.lambdas_bin_edges.size):
+            tatm_binned.append(quad(tatm, self.lambdas_bin_edges[i - 1],
+                                    self.lambdas_bin_edges[i])[0] / self.bin_widths)
+
+        ax[4, 0].errorbar(self.lambdas, tatm_binned,
+                          label=r'$T_{\mathrm{atm}}$', fmt='k.')  # , markersize=0.1)
+        if self.truth is not None:
+            ax[4, 0].plot(self.lambdas, self.true_atmospheric_transmission, "b-", label=r'true $T_{\mathrm{atm}}$')
+        ax[4, 0].set_ylabel(r'Transmissions')
+        ax[4, 0].set_xlabel(r'$\lambda$ [nm]')
+        ax[4, 0].legend(fontsize=7)
+        ax[4, 0].set_xlim(self.lambdas[0], self.lambdas[-1])
+        # ax[4, 0].set_ylim(0, 1.1)
+        ax[4, 0].grid(True)
+        fig.tight_layout()
         if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
@@ -478,7 +540,6 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
                             np.gradient(fit_workspace.atmospheres[0].PWV_Points)[0],
                             np.gradient(fit_workspace.atmospheres[0].AER_Points)[0]]) / 2
         # epsilon = np.array([100, 1e-2, 0.5])
-        print(epsilon)
         # epsilon[-1] = 0.001 * np.max(fit_workspace.data)
 
         # fit_workspace.simulation.fast_sim = True
