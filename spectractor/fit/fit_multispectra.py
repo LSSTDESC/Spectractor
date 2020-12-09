@@ -94,8 +94,13 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         self.spectrum_err = [self.spectra[k].err for k in range(self.nspectra)]
         self.spectrum_data_cov = [self.spectra[k].cov_matrix for k in range(self.nspectra)]
         self.lambdas = None
+        self.lambdas_bin_edges = None
         self.data_invcov = None
-        self.spectrum_ref = None
+        self.data_cube = []
+        self.err_cube = []
+        self.data_cov_cube = []
+        self.data_invcov_cube = []
+        self.ref_spectrum_cube = []
         self.prepare_data()
         self.ozone = 400.
         self.pwv = 3
@@ -142,30 +147,32 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             data = []
             for i in range(1, lambdas_bin_edges.size):
                 data.append(quad(data_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0] / self.bin_widths)
-            if "LBDAS_T" in self.spectra[k].header:
-                lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
-                # psf_poly_truth = np.fromstring(self.spectra[k].header['PSF_P_T'][1:-1], sep=' ', dtype=float)
-                amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
-                # data_func = interp1d(lambdas_truth, amplitude_truth,
-                #                      kind="cubic", fill_value="extrapolate", bounds_error=None)
-                plt.plot(lambdas_truth, amplitude_truth)  # -amplitude_truth)
             self.data_cube.append(np.copy(data))
-            plt.plot(self.lambdas, self.data_cube[-1])  # -amplitude_truth)
-            plt.plot(self.spectra[k].lambdas, self.spectra[k].data)  # -amplitude_truth)
-            # plt.title(self.spectra[k].filename)
-            # plt.xlim(480,700)
-            plt.grid()
-            plt.show()
+            if parameters.DEBUG:
+                if "LBDAS_T" in self.spectra[k].header:
+                    lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
+                    amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+                    plt.plot(lambdas_truth, amplitude_truth, label="truth")  # -amplitude_truth)
+                plt.plot(self.lambdas, self.data_cube[-1], label="binned data")  # -amplitude_truth)
+                plt.plot(self.spectra[k].lambdas, self.spectra[k].data, label="raw data")  # -amplitude_truth)
+                # plt.title(self.spectra[k].filename)
+                # plt.xlim(480,700)
+                plt.grid()
+                plt.legend()
+                plt.show()
         self.data_cube = np.asarray(self.data_cube)
         self.data = np.hstack(self.data_cube)
         # rebin reference star
-        self.spectrum_ref = []
-        for i in range(1, lambdas_bin_edges.size):
-            data_func = interp1d(self.spectra[0].target.wavelengths[0], self.spectra[0].target.spectra[0],
+        self.ref_spectrum_cube = []
+        for k in range(self.nspectra):
+            data_func = interp1d(self.spectra[k].target.wavelengths[0], self.spectra[k].target.spectra[0],
                                  kind="cubic", fill_value="extrapolate", bounds_error=None)
-            self.spectrum_ref.append(
-                quad(data_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0] / self.bin_widths)
-        self.spectrum_ref = np.asarray(self.spectrum_ref)
+            data = []
+            for i in range(1, lambdas_bin_edges.size):
+                self.ref_spectrum_cube.append(quad(data_func, lambdas_bin_edges[i - 1],
+                                                   lambdas_bin_edges[i])[0] / self.bin_widths)
+            self.ref_spectrum_cube.append(np.copy(data))
+        self.ref_spectrum_cube = np.asarray(self.ref_spectrum_cube)
         # rebin errors
         self.err_cube = []
         for k in range(self.nspectra):
@@ -178,13 +185,14 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             self.err_cube.append(np.copy(err))
         self.err_cube = np.asarray(self.err_cube)
         self.err = np.hstack(self.err_cube)
-
-        for k in range(self.nspectra):
-            plt.errorbar(self.lambdas, self.data_cube[k], self.err_cube[k])
-        plt.plot(self.lambdas, self.spectrum_ref * np.max(self.data) / np.max(self.spectrum_ref), "k-")
-        plt.ylim(0, 1.1 * np.max(self.data))
-        plt.grid()
-        plt.show()
+        if parameters.DEBUG:
+            for k in range(self.nspectra):
+                plt.errorbar(self.lambdas, self.data_cube[k], self.err_cube[k], label=f"spectrum {k}")
+                plt.plot(self.lambdas, self.ref_spectrum_cube[k] * np.max(self.data) / np.max(self.ref_spectrum_cube[k]), "k-")
+            plt.ylim(0, 1.1 * np.max(self.data))
+            plt.grid()
+            plt.legend()
+            plt.show()
         # rebin covariance matrices
         self.data_cov_cube = []
         for k in range(self.nspectra):
@@ -197,8 +205,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                     jmin = max(0, int(np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[j]))))
                     jmax = min(self.spectrum_data_cov[k].shape[0] - 1,
                                np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[j + 1])))
-                    # if k==13:
-                    #    print(i,j,imin,imax,jmin,jmax)
                     if imin == imax:
                         cov[i, i] = (i + 1) * 1e10
                     elif jmin == jmax:
@@ -219,24 +225,14 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             self.data_cov[k * self.lambdas.size:(k + 1) * self.lambdas.size,
             k * self.lambdas.size:(k + 1) * self.lambdas.size] = \
                 self.data_cov_cube[k]
-        # for k in range(self.nspectra):
-        #     if not np.any(np.isinf(self.data_cov[k])):
-        #         plt.imshow(self.data_cov[13])
-        #         plt.show()
-        #         plt.imshow(self.spectrum_data_cov[13])
-        #         plt.show()
-        #         break
         self.data_invcov_cube = np.zeros_like(self.data_cov_cube)
         for k in range(self.nspectra):
-            # vals = np.linalg.eigvals(self.data_cov[k])
-            # print(k, np.sum(self.data_cov[k]), np.linalg.det(self.data_cov[k]), vals[vals <= 0])
             mean = np.mean(self.data_cov_cube[k])
             try:
                 L = np.linalg.inv(np.linalg.cholesky(self.data_cov_cube[k] / mean))
                 invcov_matrix = mean * L.T @ L
             except np.linalg.LinAlgError:
                 invcov_matrix = mean * np.linalg.inv(self.data_cov_cube[k] / mean)
-            # print(k, np.sum(self.data_cov[k]), np.sum(invcov_matrix))
             self.data_invcov_cube[k] = invcov_matrix
         self.data_invcov = np.zeros(self.nspectra * np.array(self.data_cov_cube[0].shape))
         for k in range(self.nspectra):
@@ -253,8 +249,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             pwv_truth = self.spectrum.header['PWV_T']
             aerosols_truth = self.spectrum.header['VAOD_T']
             self.truth = (ozone_truth, pwv_truth, aerosols_truth)
-            # self.lambdas_truth = np.fromstring(self.spectrum.header['LBDAS_T'][1:-1], sep=' ', dtype=float)
-            # self.amplitude_truth = np.fromstring(self.spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
         else:
             self.truth = None
 
@@ -508,7 +502,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
             parameters.SAVE = False
 
 
-def filter(file_names):
+def filter_data(file_names):
     from scipy.stats import median_absolute_deviation
     new_file_names = []
     D = []
@@ -516,15 +510,15 @@ def filter(file_names):
     dx = []
     amplitude = []
     for name in file_names:
-        #try:
-        spectrum = Spectrum(name, fast_load=True)
-        D.append(spectrum.header["D2CCD"])
-        dx.append(spectrum.header["PIXSHIFT"])
-        amplitude.append(np.sum(spectrum.data[300:]))
-        if "CHI2_FIT" in spectrum.header:
-            chi2.append(spectrum.header["A2_FIT"])
-        #except:
-        #    print(f"fail to open {name}")
+        try:
+            spectrum = Spectrum(name, fast_load=True)
+            D.append(spectrum.header["D2CCD"])
+            dx.append(spectrum.header["PIXSHIFT"])
+            amplitude.append(np.sum(spectrum.data[300:]))
+            if "CHI2_FIT" in spectrum.header:
+                chi2.append(spectrum.header["A2_FIT"])
+        except:
+            print(f"fail to open {name}")
     D = np.array(D)
     dx = np.array(dx)
     chi2 = np.array(chi2)
@@ -700,7 +694,7 @@ if __name__ == "__main__":
 
     print(file_names)
 
-    file_names = filter(file_names)
+    file_names = filter_data(file_names)
 
     parameters.VERBOSE = True
     parameters.DEBUG = True
