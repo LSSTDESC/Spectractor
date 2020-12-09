@@ -375,6 +375,8 @@ class Spectrum:
             >>> assert os.path.isfile('./tests/test.fits')
             >>> os.remove('./tests/test.fits')
         """
+        self.header["REBIN"] = parameters.CCD_REBIN
+        self.header.comments['REBIN'] = 'original image rebinning factor to get spectrum.'
         self.header['UNIT1'] = "nanometer"
         self.header['UNIT2'] = self.units
         self.header['COMMENTS'] = 'First column gives the wavelength in unit UNIT1, ' \
@@ -1052,13 +1054,14 @@ def calibrate_spectrum(spectrum):
     """
     distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
-    lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
-    spectrum.lambda_ref = lambda_ref
-    spectrum.header['LBDA_REF'] = lambda_ref
+    if spectrum.lambda_ref is None:
+        lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
+        spectrum.lambda_ref = lambda_ref
+        spectrum.header['LBDA_REF'] = lambda_ref
     # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
     # Must project ADR along dispersion axis
     adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
-                                lambda_ref=lambda_ref)
+                                lambda_ref=spectrum.lambda_ref)
     adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
                                                            dispersion_axis_angle=spectrum.rotation_angle)
     x0 = spectrum.x0
@@ -1080,7 +1083,7 @@ def calibrate_spectrum(spectrum):
         spectrum.convert_from_ADUrate_to_flam()
         chisq = detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None, calibration_lines_only=True)
-        chisq += (shift * shift) / (parameters.PIXSHIFT_PRIOR / 2) ** 2
+        chisq += ((shift) / parameters.PIXSHIFT_PRIOR) ** 2
         if parameters.DEBUG and parameters.DISPLAY:
             if parameters.LIVE_FIT:
                 spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum\n'
@@ -1095,8 +1098,8 @@ def calibrate_spectrum(spectrum):
     if spectrum.header['D2CCD'] != '':
         D = spectrum.header['D2CCD']
     D_err = parameters.DISTANCE2CCD_ERR
-    D_step = D_err / 2
-    pixel_shift_step = parameters.PIXSHIFT_PRIOR / 5
+    D_step = D_err / 4
+    pixel_shift_step = parameters.PIXSHIFT_PRIOR / 10
     pixel_shift_prior = parameters.PIXSHIFT_PRIOR
     Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
     pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
@@ -1161,8 +1164,8 @@ def calibrate_spectrum(spectrum):
     # Convert back to flam units
     # spectrum.convert_from_ADUrate_to_flam()
     spectrum.my_logger.info(
-        f"\n\tOrder0 total shift: {pixel_shift:.2f}pix"
-        f"\n\tD = {D:.2f} mm (default: DISTANCE2CCD = {parameters.DISTANCE2CCD:.2f} "
+        f"\n\tOrder0 total shift: {pixel_shift:.3f}pix"
+        f"\n\tD = {D:.3f} mm (default: DISTANCE2CCD = {parameters.DISTANCE2CCD:.2f} "
         f"+/- {parameters.DISTANCE2CCD_ERR:.2f} mm, "
         f"{(D - parameters.DISTANCE2CCD) / parameters.DISTANCE2CCD_ERR:.1f} sigma shift)")
     spectrum.header['PIXSHIFT'] = pixel_shift
