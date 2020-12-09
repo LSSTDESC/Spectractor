@@ -89,11 +89,12 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D,
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
+        # self.fixed[0] = True
         # self.fixed[1] = True
         self.fixed[5] = True
-        # self.fixed[6:8] = [True, True]
+        self.fixed[6:8] = [True, True]
         # self.fixed[7] = False
-        # self.fixed[1] = True
+        self.fixed[8] = True
         # self.fixed[-1] = True
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]", "B"]
@@ -163,7 +164,7 @@ class SpectrumFitWorkspace(FitWorkspace):
             ax.set_title(title, fontsize=10)
         ax.legend()
         divider = make_axes_locatable(ax)
-        ax2 = divider.append_axes("bottom", size=size, pad=0)
+        ax2 = divider.append_axes("bottom", size=size, pad=0, sharex=ax)
         ax.figure.add_axes(ax2)
         min_positive = np.min(self.model[self.model > 0])
         idx = np.logical_not(np.isclose(self.model[sub], 0, atol=0.01 * min_positive))
@@ -374,7 +375,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
 
         fit_workspace.simulation.fast_sim = False
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-4, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3,
+                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3,
                                         verbose=False)
         if fit_workspace.filename != "":
             parameters.SAVE = True
