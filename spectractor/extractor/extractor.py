@@ -93,17 +93,19 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
                            r"$\theta$ [deg]", "$B$", "R"] + list(self.psf_poly_params_names)
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D, (-2, 2), (-3, 3),
+        self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
+                                                (-parameters.CCD_PIXEL2ARCSEC, parameters.PIXSHIFT_PRIOR),
+                                                (-parameters.CCD_PIXEL2ARCSEC, parameters.PIXSHIFT_PRIOR),
                                                 (-90, 90), (0.2, 5), (-360, 360)]), psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
             if "x_c" in par or "saturation" in par or "y_c" in par:
                 self.fixed[k] = True
-        # This set of fixed parameters was determined so that the reconstructed spectrum has the minimum bias
+        # This set of fixed parameters was determined so that the reconstructed spectrum has a ZERO bias
         # with respect to the true spectrum injected in the simulation
-        self.fixed[1] = True  # D2CCD
-        self.fixed[2] = True  # delta x
-        self.fixed[5] = True  # B
+        self.fixed[1] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_pectrum
+        self.fixed[2] = True  # delta x: if False, extracted spectrum is biaised compared with truth
+        self.fixed[5] = True  # B: not needed in simulations, to check with data
         self.fixed[6] = True  # camera rot
         self.fixed[-1] = True  # saturation
         self.nwalkers = max(2 * self.ndim, nwalkers)
@@ -279,6 +281,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
         distance = np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)
         self.spectrum.chromatic_psf.table["Dy_disp_axis"] = Dy_disp_axis
+        self.spectrum.chromatic_psf.table["Dx"] = Dx
 
         # First guess of wavelengths
         self.spectrum.disperser.D = np.copy(D2CCD)
@@ -351,7 +354,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             for x in range(self.Nx):
                 M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
                                                                          p=profile_params_order2[x, :]).flatten()
-                if profile_params_order2[x, 1] > 1.1 * self.Nx:
+                if profile_params_order2[x, 1] > 1.2 * self.Nx:
                     break
 
         # Algebra to compute amplitude parameters
@@ -400,6 +403,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Save results
         self.M = M
+        self.psf_profile_params = np.copy(profile_params)
         self.psf_poly_params = np.copy(poly_params)
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
@@ -582,7 +586,7 @@ def run_ffm_minimisation(w, method="newton"):
 
         w.fixed = np.copy(fixed)
         run_minimisation_sigma_clipping(w, "newton", epsilon, fixed, xtol=1e-5,
-                                        ftol=100 / w.data.size, sigma_clip=10, niter_clip=3)
+                                        ftol=1 / w.data.size, sigma_clip=10, niter_clip=3)
 
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if w.filename != "":
@@ -761,10 +765,17 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
         w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
-        spectrum = run_ffm_minimisation(w, method="newton")
+        for i in range(2):
+            spectrum.convert_from_flam_to_ADUrate()
+            spectrum = run_ffm_minimisation(w, method="newton")
 
-    # Calibrate the spectrum
-    calibrate_spectrum(spectrum)
+            # Calibrate the spectrum
+            calibrate_spectrum(spectrum)
+            w.p[1] = spectrum.disperser.D
+            w.p[2] = spectrum.header['PIXSHIFT']
+            # Compare with truth if available
+            if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and 'LBDAS_T' in spectrum.header and parameters.DEBUG:
+                plot_comparison_truth(spectrum, w)
 
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
@@ -777,10 +788,6 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         spectrum.plot_spectrum(xlim=None)
     spectrum.chromatic_psf.table['lambdas'] = spectrum.lambdas
     spectrum.chromatic_psf.table.write(output_filename_psf, overwrite=True)
-
-    # Compare with truth if available
-    if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and 'LBDAS_T' in spectrum.header and parameters.DEBUG:
-        plot_comparison_truth(spectrum, w)
 
     return spectrum
 
@@ -1119,7 +1126,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     # fwhm_2d = np.interp(np.arange(len(s.table)), np.arange(s.Nx), fwhm_1d)
     ax[0, 1].plot(lambdas_truth, s0.table["fwhm"], label="truth")
     ax[0, 1].plot(spectrum.lambdas, w.fwhm_priors, label="prior")
-    ax[0, 1].plot(spectrum.lambdas, s.table["fwhm"], label="2D")
+    ax[0, 1].plot(spectrum.lambdas, s.table["fwhm"], label="fit")
     ax[0, 1].grid()
     ax[0, 1].set_ylim(0, 10)
     ax[0, 1].legend()
