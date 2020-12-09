@@ -111,7 +111,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 self.bounds[1] = (min(self.atmospheres[0].PWV_Points), max(self.atmospheres[0].PWV_Points))
                 self.bounds[2] = (min(self.atmospheres[0].AER_Points), max(self.atmospheres[0].AER_Points))
                 break
-        print(self.bounds)
         self.nwalkers = max(2 * self.ndim, nwalkers)
         # self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
         self.amplitude_truth = None
@@ -126,10 +125,15 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         lambdas_bin_edges = np.arange(int(np.min(np.concatenate(list(self.spectrum_lambdas)))),
                                       int(np.max(np.concatenate(list(self.spectrum_lambdas)))) + 1,
                                       self.bin_widths)
+        self.lambdas_bin_edges = lambdas_bin_edges
         self.lambdas = []
         for i in range(1, lambdas_bin_edges.size):
             self.lambdas.append(0.5 * (lambdas_bin_edges[i] + lambdas_bin_edges[i - 1]))
         self.lambdas = np.asarray(self.lambdas)
+        # mask
+        lambdas_to_mask = np.asarray([])  # 510, 515, 520, 525, 530])
+        lambdas_to_mask_indices = np.asarray(
+            [np.argmin(np.abs(self.lambdas - lambdas_to_mask[i])) for i in range(lambdas_to_mask.size)])
         # rebin data
         self.data_cube = []
         for k in range(self.nspectra):
@@ -138,7 +142,20 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             data = []
             for i in range(1, lambdas_bin_edges.size):
                 data.append(quad(data_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0] / self.bin_widths)
+            if "LBDAS_T" in self.spectra[k].header:
+                lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
+                # psf_poly_truth = np.fromstring(self.spectra[k].header['PSF_P_T'][1:-1], sep=' ', dtype=float)
+                amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+                # data_func = interp1d(lambdas_truth, amplitude_truth,
+                #                      kind="cubic", fill_value="extrapolate", bounds_error=None)
+                plt.plot(lambdas_truth, amplitude_truth)  # -amplitude_truth)
             self.data_cube.append(np.copy(data))
+            plt.plot(self.lambdas, self.data_cube[-1])  # -amplitude_truth)
+            plt.plot(self.spectra[k].lambdas, self.spectra[k].data)  # -amplitude_truth)
+            # plt.title(self.spectra[k].filename)
+            # plt.xlim(480,700)
+            plt.grid()
+            plt.show()
         self.data_cube = np.asarray(self.data_cube)
         self.data = np.hstack(self.data_cube)
         # rebin reference star
@@ -162,12 +179,12 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         self.err_cube = np.asarray(self.err_cube)
         self.err = np.hstack(self.err_cube)
 
-        # for k in range(self.nspectra):
-        #     plt.errorbar(self.lambdas, self.data[k], self.err[k])
-        # plt.plot(self.lambdas, self.spectrum_ref * np.max(self.data) / np.max(self.spectrum_ref), "k-")
-        # plt.ylim(0, 1.1 * np.max(self.data))
-        # plt.grid()
-        # plt.show()
+        for k in range(self.nspectra):
+            plt.errorbar(self.lambdas, self.data_cube[k], self.err_cube[k])
+        plt.plot(self.lambdas, self.spectrum_ref * np.max(self.data) / np.max(self.spectrum_ref), "k-")
+        plt.ylim(0, 1.1 * np.max(self.data))
+        plt.grid()
+        plt.show()
         # rebin covariance matrices
         self.data_cov_cube = []
         for k in range(self.nspectra):
@@ -187,9 +204,14 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                     elif jmin == jmax:
                         cov[j, j] = (j + 1) * 1e10
                     else:
-                        mean = np.mean(self.spectrum_data_cov[k][imin:imax, jmin:jmax])
-                        cov[i, j] = mean
-                        cov[j, i] = mean
+                        if i in lambdas_to_mask_indices:
+                            cov[i, i] = (i + 1000)
+                        elif j in lambdas_to_mask_indices:
+                            cov[j, j] = (j + 1000)
+                        else:
+                            mean = np.mean(self.spectrum_data_cov[k][imin:imax, jmin:jmax])
+                            cov[i, j] = mean
+                            cov[j, i] = mean
             self.data_cov_cube.append(np.copy(cov))
         self.data_cov_cube = np.asarray(self.data_cov_cube)
         self.data_cov = np.zeros(self.nspectra * np.array(self.data_cov_cube[0].shape))
@@ -270,6 +292,13 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         """
         # linear regression for the instrumental transmission parameters T
         # Matrix M filling
+        M = []
+        # for k in range(self.nspectra):
+        #     atm = []
+        #     a = self.atmospheres[k].simulate(ozone, pwv, aerosols)
+        #     for i in range(1, self.lambdas_bin_edges.size):
+        #         atm.append(quad(a, self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i], epsrel=1e-2)[0] / self.bin_widths)
+        #     M.append(np.diag(self.spectrum_ref * np.array(atm)))
         M = np.array([np.diag(self.spectrum_ref * self.atmospheres[k].simulate(ozone, pwv, aerosols)(self.lambdas))
                       for k in range(self.nspectra)])
         # Matrix W filling
@@ -422,7 +451,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
 
     Parameters
     ----------
-    fit_workspace: SpectrumFitWorkspace
+    fit_workspace: MultiSpectraFitWorkspace
         An instance of the SpectrogramFitWorkspace class.
     method: str, optional
         Fitting method (default: 'newton').
@@ -449,9 +478,14 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
         #     fit_workspace.plot_fit()
         # params_table = np.array([guess])
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
-        epsilon = 1e-1 * guess
-        epsilon[epsilon == 0] = 1e-1
-        epsilon[-1] = 0.001 * np.max(fit_workspace.data)
+        epsilon = 1e-2 * guess
+        epsilon[epsilon == 0] = 1e-2
+        epsilon = np.array([np.gradient(fit_workspace.atmospheres[0].OZ_Points)[0],
+                            np.gradient(fit_workspace.atmospheres[0].PWV_Points)[0],
+                            np.gradient(fit_workspace.atmospheres[0].AER_Points)[0]]) / 2
+        # epsilon = np.array([100, 1e-2, 0.5])
+        print(epsilon)
+        # epsilon[-1] = 0.001 * np.max(fit_workspace.data)
 
         # fit_workspace.simulation.fast_sim = True
         # fit_workspace.simulation.fix_psf_cube = False
@@ -461,7 +495,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
 
         # fit_workspace.simulation.fast_sim = False
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-3, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3,
+                                        xtol=1e-3, ftol=1 / fit_workspace.data.size, sigma_clip=300, niter_clip=3,
                                         verbose=False)
         if fit_workspace.filename != "":
             parameters.SAVE = True
@@ -472,6 +506,57 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
             # save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
+
+
+def filter(file_names):
+    from scipy.stats import median_absolute_deviation
+    new_file_names = []
+    D = []
+    chi2 = []
+    dx = []
+    amplitude = []
+    for name in file_names:
+        #try:
+        spectrum = Spectrum(name, fast_load=True)
+        D.append(spectrum.header["D2CCD"])
+        dx.append(spectrum.header["PIXSHIFT"])
+        amplitude.append(np.sum(spectrum.data[300:]))
+        if "CHI2_FIT" in spectrum.header:
+            chi2.append(spectrum.header["A2_FIT"])
+        #except:
+        #    print(f"fail to open {name}")
+    D = np.array(D)
+    dx = np.array(dx)
+    chi2 = np.array(chi2)
+    k = np.arange(len(D))
+    plt.plot(k, amplitude)
+    plt.show()
+    plt.plot(k, D)
+    # plt.plot(k, np.polyval(np.polyfit(k, reg, deg=1), k))
+    plt.axhline(np.median(D))
+    plt.axhline(np.median(D) + 3 * median_absolute_deviation(D))
+    plt.axhline(np.median(D) - 3 * median_absolute_deviation(D))
+    plt.grid()
+    plt.show()
+    filter_indices = np.logical_and(D > np.median(D) - 3 * median_absolute_deviation(D),
+                                    D < np.median(D) + 3 * median_absolute_deviation(D))
+    if len(chi2) > 0:
+        filter_indices *= np.logical_and(chi2 > np.median(chi2) - 3 * median_absolute_deviation(chi2),
+                                         chi2 < np.median(chi2) + 3 * median_absolute_deviation(chi2))
+    filter_indices *= np.logical_and(dx > np.median(dx) - 3 * median_absolute_deviation(dx),
+                                     dx < np.median(dx) + 3 * median_absolute_deviation(dx))
+    plt.plot(k, D)
+    plt.plot(k[filter_indices], D[filter_indices], "ko")
+    plt.show()
+    plt.plot(k, dx)
+    plt.plot(k[filter_indices], dx[filter_indices], "ko")
+    plt.show()
+    if len(chi2) > 0:
+        plt.title("chi2")
+        plt.plot(k, chi2)
+        plt.plot(k[filter_indices], chi2[filter_indices], "ko")
+        plt.show()
+    return np.array(file_names)[filter_indices]
 
 
 if __name__ == "__main__":
@@ -508,8 +593,8 @@ if __name__ == "__main__":
     file_names = []
     disperser_label = "Thor300"
     target_label = "HD111980"
-    input_directory = "../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/"
-    tag = "sim"
+    input_directory = "../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/"
+    tag = "reduc"
     extension = ".fits"
 
     all_files = os.listdir(input_directory)
@@ -525,62 +610,97 @@ if __name__ == "__main__":
     #     except:
     #         print(f"File {file_name} buggy.")
     # HoloAmAg
-    # file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_064_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_069_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_074_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_079_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_084_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_089_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_094_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_099_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_104_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_109_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_114_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_119_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_124_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_129_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_134_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_139_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_144_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_149_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_154_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_159_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_164_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_169_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_174_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_179_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_184_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_189_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_194_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_199_spectrum.fits']
+    file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_064_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_069_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_074_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_079_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_084_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_089_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_094_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_099_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_104_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_109_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_114_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_119_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_124_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_129_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_134_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_139_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_144_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_149_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_154_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_159_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_164_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_169_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_174_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_179_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_184_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_189_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_194_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_199_spectrum.fits']
     # Thor300
-    file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_066_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_071_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_076_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_081_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_086_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_091_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_096_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_101_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_106_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_111_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_116_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_121_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_126_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_131_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_136_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_141_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_146_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_151_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_156_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_161_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_166_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_171_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_176_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_186_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=1/sim_20170530_196_spectrum.fits']
+    file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_058_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_061_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_066_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_071_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_076_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_081_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_086_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_091_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_096_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_101_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_106_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_111_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_116_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_121_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_126_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_131_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_136_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_141_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_146_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_151_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_156_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_161_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_166_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_171_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_176_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_181_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_186_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_191_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_196_spectrum.fits']
+    # file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_058_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_061_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_066_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_071_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_076_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_081_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_086_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_091_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_096_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_101_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_106_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_111_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_116_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_121_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_126_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_131_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_136_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_141_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_146_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_151_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_156_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_161_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_166_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_171_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_176_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_181_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_186_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_191_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_196_spectrum.fits']
 
     print(file_names)
+
+    file_names = filter(file_names)
 
     parameters.VERBOSE = True
     parameters.DEBUG = True
