@@ -5,7 +5,6 @@ from spectractor.simulation.image_simulation import ImageSim
 from spectractor.logbook import LogBook
 from spectractor.extractor.extractor import Spectractor
 
-
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
@@ -40,11 +39,11 @@ if __name__ == "__main__":
         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None:
             continue
-        spectrum_file_name = args.output_directory+'/'+tag.replace('.fits', '_spectrum.fits')
+        spectrum_file_name = args.output_directory + '/' + tag.replace('.fits', '_spectrum.fits')
         atmgrid = AtmosphereGrid(file_name)
         SpectrumSimulatorSimGrid(spectrum_file_name, args.output_directory)
         image = ImageSim(file_name, spectrum_file_name, args.output_directory, A1=1, A2=1,
                          pwv=5, ozone=300, aerosols=0.03,
                          psf_poly_params=None, with_stars=True)
-        sim_file_name = args.output_directory+tag.replace('reduc_', 'sim_')
+        sim_file_name = args.output_directory + tag.replace('reduc_', 'sim_')
         Spectractor(sim_file_name, args.output_directory, target, [xpos, ypos], disperser_label, args.config)
