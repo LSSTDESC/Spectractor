@@ -113,14 +113,14 @@ class Libradtran:
         """
 
         self.my_logger.debug(
-            '\n\t--------------------------------------------'
-            '\n\tevaluate'
-            '\n\t 1) airmass = {airmass}'
-            '\n\t 2) pwv = {pwv}'
-            '\n\t 3) ozone = {ozone}'
-            '\n\t 4) aer = {aerosol}'
-            '\n\t 5) pressure =  {pressure}'
-            '\n\t--------------------------------------------')
+            f'\n\t--------------------------------------------'
+            f'\n\tevaluate'
+            f'\n\t 1) airmass = {airmass}'
+            f'\n\t 2) pwv = {pwv}'
+            f'\n\t 3) ozone = {ozone}'
+            f'\n\t 4) aer = {aerosol}'
+            f'\n\t 5) pressure =  {pressure}'
+            f'\n\t--------------------------------------------')
 
         # build the part 1 of file_name
         base_filename_part1 = self.Prog + '_' + parameters.OBS_NAME + '_' + self.equation_solver + '_'
