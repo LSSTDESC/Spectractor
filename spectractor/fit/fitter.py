@@ -61,6 +61,7 @@ class FitWorkspace:
         self.data = None
         self.err = None
         self.data_cov = None
+        self.data_invcov = None
         self.x = None
         self.outliers = []
         self.sigma_clip = 5
@@ -588,7 +589,7 @@ class FitWorkspace:
         else:
             if self.data_cov.ndim > 2:
                 K = self.data_cov.shape[0]
-                cov = [self.data_cov[k] + np.diag(model_err[k]**2) for k in range(K)]
+                cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
                 L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
                 res = np.asarray([L[k] @ (model[k] - self.data[k]) for k in range(K)])
                 res = res.flatten()
@@ -718,7 +719,7 @@ class FitWorkspace:
         H = np.zeros((params.size, params.size, model.size))
         tmp_p = np.copy(params)
         for ip, p1 in enumerate(params):
-            print(ip, p1, params[ip],  tmp_p[ip], self.bounds[ip], epsilon[ip], tmp_p[ip] + epsilon[ip])
+            print(ip, p1, params[ip], tmp_p[ip], self.bounds[ip], epsilon[ip], tmp_p[ip] + epsilon[ip])
             if fixed_params[ip]:
                 continue
             if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
@@ -734,14 +735,14 @@ class FitWorkspace:
             for jp, p2 in enumerate(params):
                 if fixed_params[jp]:
                     continue
-                x, modelplus, model_err = self.simulate(params+epsilon)
-                x, modelmoins, model_err = self.simulate(params-epsilon)
+                x, modelplus, model_err = self.simulate(params + epsilon)
+                x, modelmoins, model_err = self.simulate(params - epsilon)
                 model = model.flatten()[self.not_outliers]
 
-                print("hh", ip, jp, tmp_J[ip], J[jp], tmp_p[ip], params,  (tmp_J[ip] - J[jp])/epsilon)
-                print((modelplus+modelmoins-2*model)/(np.asarray(epsilon)**2))
-                H[ip, jp] = (tmp_J[ip] - J[jp])/epsilon
-                H[ip, jp] = (modelplus+modelmoins-2*model)/(np.asarray(epsilon)**2)
+                print("hh", ip, jp, tmp_J[ip], J[jp], tmp_p[ip], params, (tmp_J[ip] - J[jp]) / epsilon)
+                print((modelplus + modelmoins - 2 * model) / (np.asarray(epsilon) ** 2))
+                H[ip, jp] = (tmp_J[ip] - J[jp]) / epsilon
+                H[ip, jp] = (modelplus + modelmoins - 2 * model) / (np.asarray(epsilon) ** 2)
         return H
 
 
@@ -773,11 +774,42 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     """
     my_logger = set_logger(__name__)
     tmp_params = np.copy(params)
+    # Prepare covariance matrix for data
     if fit_workspace.data_cov is None:
         cov_data = np.asarray(fit_workspace.err.flatten()[fit_workspace.not_outliers] ** 2)
     else:
         good_indices = np.asarray(fit_workspace.not_outliers, dtype=int)
-        cov_data = fit_workspace.data_cov[good_indices[:, None], good_indices]
+        cov_data = np.copy(fit_workspace.data_cov)
+        if cov_data.ndim == 2:
+            cov_data = cov_data[good_indices[:, None], good_indices]
+        elif cov_data.ndim == 3:
+            cov_data = [cov_data[k][good_indices[:, None], good_indices] for k in range(cov_data.shape[0])]
+        else:
+            raise ValueError(f"Data covariance matrix must be of dimension 1, 2 or 3. "
+                             f"Here cov_data.ndim=={cov_data.ndim}.")
+    # Prepare inverse covariance matrix for data
+    W = np.zeros_like(cov_data)
+    if fit_workspace.data_invcov is None:
+        if cov_data.ndim == 1:
+            W = 1 / cov_data
+        elif cov_data.ndim == 2:
+            L = np.linalg.inv(np.linalg.cholesky(cov_data))
+            W = L.T @ L
+        elif cov_data.ndim == 3:
+            for k in range(cov_data.shape[0]):
+                L = np.linalg.inv(np.linalg.cholesky(cov_data[k]))
+                W[k] = L.T @ L
+    else:
+        good_indices = np.asarray(fit_workspace.not_outliers, dtype=int)
+        W = np.copy(fit_workspace.data_invcov)
+        if W.ndim == 1:
+            W = W[good_indices]
+        elif W.ndim == 2:
+            W = W[good_indices[:, None], good_indices]
+        elif W.ndim == 3:
+            W = [W[k][good_indices[:, None], good_indices] for k in range(W.shape[0])]
+        else:
+            raise ValueError(f"Data inverse covariance matrix must be of dimension 1, 2 or 3. Here W.ndim=={W.ndim}.")
     ipar = np.arange(params.size)
     if fixed_params is not None:
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
@@ -793,18 +825,23 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         if cov_data.ndim == 1:
             if np.any(tmp_model_err > 0):
                 cov = cov_data + np.asarray(tmp_model_err.flatten()[fit_workspace.not_outliers] ** 2)
-            else:
-                cov = cov_data
-            W = 1 / cov
+                W = 1 / cov
             cost = residuals @ (W * residuals)
-        else:
+        elif cov_data.ndim == 2:
             if np.any(tmp_model_err > 0):
                 cov = cov_data + np.diag(tmp_model_err.flatten()[fit_workspace.not_outliers] ** 2)
-            else:
-                cov = cov_data
-            L = np.linalg.inv(np.linalg.cholesky(cov))
-            W = L.T @ L
+                L = np.linalg.inv(np.linalg.cholesky(cov))
+                W = L.T @ L
             cost = residuals @ W @ residuals
+        elif cov_data.ndim == 3:
+            if np.any(tmp_model_err > 0):
+                cov = np.asarray([cov_data[k] + np.diag(tmp_model_err.flatten()[fit_workspace.not_outliers] ** 2)
+                                  for k in range(cov_data.shape[0])])
+                W = np.zeros_like(cov)
+                for k in range(cov.shape[0]):
+                    L = np.linalg.inv(np.linalg.cholesky(cov[k]))
+                    W[k] = L.T @ L
+        # Jacobian
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):
@@ -822,8 +859,10 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # algebra
         if W.ndim == 1:
             JT_W = J.T * W
-        else:
+        elif W.ndim == 2:
             JT_W = J.T @ W
+        else:
+            JT_W = np.array([J.T[k] @ W[k] for k in range(W.shape[0])])
         JT_W_J = JT_W @ J
         try:
             L = np.linalg.inv(np.linalg.cholesky(JT_W_J))  # cholesky is too sensible to the numerical precision
@@ -894,7 +933,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
 
 
 def simple_newton_minimisation(fit_workspace, params, epsilon, niter=10, fixed_params=None,
-                               xtol=1e-3, ftol=1e-3):   # pragma: no cover
+                               xtol=1e-3, ftol=1e-3):  # pragma: no cover
     """Experimental function to minimize a function.
 
     Parameters
@@ -970,7 +1009,7 @@ def simple_newton_minimisation(fit_workspace, params, epsilon, niter=10, fixed_p
         if parameters.DISPLAY:
             fig = plt.figure()
             plt.plot(r, js, label="prior")
-            mod = tmp_model + J[0] * (r - (tmp_params-dparams)[0])
+            mod = tmp_model + J[0] * (r - (tmp_params - dparams)[0])
             plt.plot(r, mod)
             plt.axvline(tmp_params)
             plt.axhline(tmp_model)
@@ -1099,9 +1138,9 @@ def run_simple_newton_minimisation(fit_workspace, guess, epsilon, fix=None, xtol
     if fix is None:
         fix = [False] * guess.size
     fit_workspace.p, fit_workspace.cov, funcs, params_table = simple_newton_minimisation(fit_workspace, guess,
-                                                                                       epsilon, niter=niter,
-                                                                                       fixed_params=fix,
-                                                                                       xtol=xtol, ftol=ftol)
+                                                                                         epsilon, niter=niter,
+                                                                                         fixed_params=fix,
+                                                                                         xtol=xtol, ftol=ftol)
     ipar = np.array(np.where(np.array(fix).astype(int) == 0)[0])
     if verbose or fit_workspace.verbose:
         print_parameter_summary(fit_workspace.p[ipar], fit_workspace.cov,
