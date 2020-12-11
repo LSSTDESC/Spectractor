@@ -1004,8 +1004,6 @@ class ChromaticPSF:
         >>> bgd = 10*np.ones_like(data)
         >>> data += bgd
         >>> data = np.random.poisson(data)
-        # >>> np.save("test_data.npy", data)
-        >>> data = np.load("test_data.npy")
         >>> data_errors = np.sqrt(data)
 
         Extract the background:
@@ -1066,7 +1064,7 @@ class ChromaticPSF:
             >>> assert w.costs[-1] /(w.Nx*w.Ny) < 1.2
             >>> assert np.abs(np.mean(residuals)) < 0.15
             >>> assert np.std(residuals) < 1.2
-            >>> assert np.abs(np.mean((w.amplitude_params - s0.poly_params[:s0.Nx])/w.amplitude_params_err)) < 0.1
+            >>> assert np.abs(np.mean((w.amplitude_params - s0.poly_params[:s0.Nx])/w.amplitude_params_err)) < 0.5
 
         """
         if mode == "1D":
