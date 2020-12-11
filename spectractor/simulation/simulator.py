@@ -579,7 +579,7 @@ class SpectrumSimGrid:
                 self.my_logger.info(f'\n\tSPECTRA.save atm-file={self.filename}')
 
 
-def SimulatorInit(filename):
+def SimulatorInit(filename, fast_load=False):
     """ SimulatorInit
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
@@ -587,7 +587,7 @@ def SimulatorInit(filename):
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SIMULATOR initialisation')
     # Load data spectrum
-    spectrum = Spectrum(filename)
+    spectrum = Spectrum(filename, fast_load=fast_load)
 
     # TELESCOPE TRANSMISSION
     # ------------------------

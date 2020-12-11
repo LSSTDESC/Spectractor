@@ -586,16 +586,22 @@ class FitWorkspace:
             else:
                 res = ((model - self.data) / np.sqrt(model_err * model_err + self.err * self.err)).flatten()
         else:
-            if len(self.outliers) > 0:
-                good_indices = np.asarray(self.not_outliers, dtype=int)
-                cov = self.data_cov + np.diag(model_err * model_err)
-                cov = cov[good_indices[:, None], good_indices]
-                L = np.linalg.inv(np.linalg.cholesky(cov))
-                res = L @ (model[good_indices] - self.data[good_indices])
+            if self.data_cov.ndim > 2:
+                K = self.data_cov.shape[0]
+                cov = [self.data_cov[k] + np.diag(model_err[k]**2) for k in range(K)]
+                L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
+                res = np.asarray([L[k] @ (model[k] - self.data[k]) for k in range(K)])
+                res = res.flatten()
             else:
                 cov = self.data_cov + np.diag(model_err * model_err)
-                L = np.linalg.inv(np.linalg.cholesky(cov))
-                res = L @ (model - self.data)
+                if len(self.outliers) > 0:
+                    good_indices = np.asarray(self.not_outliers, dtype=int)
+                    cov = cov[good_indices[:, None], good_indices]
+                    L = np.linalg.inv(np.linalg.cholesky(cov))
+                    res = L @ (model[good_indices] - self.data[good_indices])
+                else:
+                    L = np.linalg.inv(np.linalg.cholesky(cov))
+                    res = L @ (model - self.data)
         return res
 
     def chisq(self, p):
@@ -1124,7 +1130,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
     if method == "minimize":
         start = time.time()
         result = optimize.minimize(nll, fit_workspace.p, method=minimizer_method,
-                                   options={'ftol': ftol, 'gtol': 1e-20, 'disp': True,
+                                   options={'ftol': ftol, 'gtol': 1e-20,
                                             'maxiter': 100000, 'maxls': 50, 'maxcor': 30},
                                    bounds=bounds)
         fit_workspace.p = result['x']
