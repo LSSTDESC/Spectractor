@@ -680,7 +680,8 @@ class FitWorkspace:
                     W = [1 / (self.data_cov[k] + model_err * model_err) for k in range(K)]
                 else:
                     W = self.W
-                res = [model[k] - self.data[k].astype(float) for k in range(K)]
+                res = [model[k].astype(float) - self.data[k].astype(float) for k in range(K)]
+                self.my_logger.warning(f"{W.dtype} {res[0].dtype} {model[0].dtype} {self.data[0].dtype}")
                 chisq = np.sum([res[k] @ (W[k].astype(float) * res[k]) for k in range(K)])
             elif self.W[0].ndim == 2:
                 K = len(self.W)
@@ -690,7 +691,7 @@ class FitWorkspace:
                     W = [L[k].T @ L[k] for k in range(K)]
                 else:
                     W = self.W
-                res = [model[k] - self.data[k].astype(float) for k in range(K)]
+                res = [model[k].astype(float) - self.data[k].astype(float) for k in range(K)]
                 chisq = np.sum([res[k] @ W[k].astype(float) @ res[k] for k in range(K)])
             else:
                 raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
@@ -983,7 +984,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         if fit_workspace.W.dtype != np.object:
             JT_W_R0 = JT_W @ residuals
         else:
-            JT_W_R0 = JT_W @ np.concatenate(residuals).ravel()
+            JT_W_R0 = JT_W @ np.concatenate(residuals).ravel().astype(float)
         dparams = - inv_JT_W_J @ JT_W_R0
 
         if with_line_search:

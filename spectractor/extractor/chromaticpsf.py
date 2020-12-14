@@ -1223,9 +1223,9 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         model = np.copy(self.model)
         err = np.copy(self.err)
         if isinstance(self, ChromaticPSF1DFitWorkspace):
-            data = data.T
-            model = model.T
-            err = err.T
+            data = data.T.astype(float)
+            model = model.T.astype(float)
+            err = err.T.astype(float)
         if isinstance(self, ChromaticPSF2DFitWorkspace):
             data = data.reshape((self.Ny, self.Nx))
             model = model.reshape((self.Ny, self.Nx))
@@ -1288,19 +1288,19 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.my_logger = set_logger(self.__class__.__name__)
         self.pixels = np.arange(self.Ny)
 
-        # data: ordered by pixel columns
-        self.data = self.data.T
-        self.err = self.err.T
-        self.pixels = self.pixels.T
-
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
         # (which is not exactly true in rotated images)
         self.data_cov = self.err * self.err
         self.W = 1. / (self.err * self.err)
         # self.W = np.array([self.W[x, :] for x in range(self.Nx)])  # [np.diag(self.W[:, x]) for x in range(self.Nx)]
-        self.W_dot_data = [self.W[x] * self.data[x, :] for x in range(self.Nx)]
-        self.W = self.W.astype(np.object)  # this line makes the code think that W is block diagonal
+        self.W_dot_data = [self.W[:, x] * self.data[:, x] for x in range(self.Nx)]
+        self.W = self.W.T.astype(np.object)  # this line makes the code think that W is block diagonal
+
+        # data: ordered by pixel columns
+        self.data = self.data.T.astype(np.object)
+        self.err = self.err.T.astype(np.object)
+        self.pixels = self.pixels.T
 
     def simulate(self, *shape_params):
         """
@@ -1484,6 +1484,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W = self.W.flatten()
         self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
         self.data = self.data.flatten()
+        self.err = self.err.flatten()
 
         # regularisation matrices
         self.reg = parameters.PSF_FIT_REG_PARAM
