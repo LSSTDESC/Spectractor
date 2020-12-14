@@ -430,9 +430,9 @@ class PSF:
 
         Fit the data in 1D:
 
-        >>> data1d = data[:,int(p[1])]
-        >>> data1d_err = data_errors[:,int(p[1])]
-        >>> p = np.array([10000, 20, 32, 3, 3, -0.2, 1, 400000])
+        >>> data1d = data[:,int(p0[1])]
+        >>> data1d_err = data_errors[:,int(p0[1])]
+        >>> p = np.array([10000, 20, 32, 4, 3, -0.1, 2, 400000])
         >>> psf1d = MoffatGauss(p)
         >>> w = psf1d.fit_psf(data1d, data_errors=data1d_err, bgd_model_func=None)
         >>> w.plot_fit()
@@ -706,6 +706,9 @@ class PSFFitWorkspace(FitWorkspace):
             self.psf.apply_max_width_to_bounds(self.Ny)
             yy, xx = np.mgrid[:self.Ny, :self.Nx]
             self.pixels = np.asarray([xx, yy])
+            # flat data for fitworkspace
+            self.data = self.data.flatten()
+            self.err = self.err.flatten()
         elif data.ndim == 1:
             self.Ny = self.data.size
             self.Nx = 1
@@ -724,8 +727,7 @@ class PSFFitWorkspace(FitWorkspace):
         # here image uncertainties are assumed to be uncorrelated
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
-        self.W = self.W.flatten()  # np.diag(self.W.flatten())
-        self.W_dot_data = self.W * self.data.flatten()
+        self.W_dot_data = self.W * self.data
 
     def simulate(self, *psf_params):
         """
@@ -804,12 +806,12 @@ class PSFFitWorkspace(FitWorkspace):
         #     amplitude = M.T @ self.W_dot_data / M_dot_W_dot_M
         #     self.p[0] = amplitude
         # Save results
-        self.model = self.psf.evaluate(self.pixels, p=self.p)
+        self.model = self.psf.evaluate(self.pixels, p=self.p).flatten()
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
     def plot_fit(self):
-        if self.data.ndim == 1:
+        if self.Nx == 1:
             fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex='all', gridspec_kw={'height_ratios': [5, 1]})
             data = np.copy(self.data)
             if self.bgd_model_func is not None:
@@ -861,19 +863,22 @@ class PSFFitWorkspace(FitWorkspace):
             ax[1].get_yaxis().set_label_coords(-0.1, 0.5)
             # fig.tight_layout()
             # fig.subplots_adjust(wspace=0, hspace=0)
-        elif self.data.ndim == 2:
+        else:
+            data = np.copy(self.data).reshape((self.Ny, self.Nx))
+            model = np.copy(self.model).reshape((self.Ny, self.Nx))
+            err = np.copy(self.err).reshape((self.Ny, self.Nx))
             gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
             fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(5, 7), gridspec_kw=gs_kw)
             norm = np.nanmax(self.data)
-            plot_image_simple(ax[0, 0], data=self.model / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
+            plot_image_simple(ax[0, 0], data=model / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
                               units='1/max(data)')
             ax[0, 0].set_title("Model", fontsize=10, loc='center', color='white', y=0.8)
-            plot_image_simple(ax[1, 0], data=self.data / norm, title='Data', aspect='auto',
+            plot_image_simple(ax[1, 0], data=data / norm, title='Data', aspect='auto',
                               cax=ax[1, 1], vmin=0, vmax=1, units='1/max(data)')
             ax[1, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
-            residuals = (self.data - self.model)
+            residuals = (data - model)
             # residuals_err = self.spectrum.spectrogram_err / self.model
-            norm = self.err
+            norm = err
             residuals /= norm
             std = float(np.std(residuals))
             plot_image_simple(ax[2, 0], data=residuals, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
@@ -887,14 +892,12 @@ class PSFFitWorkspace(FitWorkspace):
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[3, 1].remove()
-            ax[3, 0].plot(np.arange(self.Nx), self.data.sum(axis=0), label='Data')
-            ax[3, 0].plot(np.arange(self.Nx), self.model.sum(axis=0), label='Model')
+            ax[3, 0].plot(np.arange(self.Nx), data.sum(axis=0), label='Data')
+            ax[3, 0].plot(np.arange(self.Nx), model.sum(axis=0), label='Model')
             ax[3, 0].set_ylabel('Transverse sum')
             ax[3, 0].set_xlabel(r'X [pixels]')
             ax[3, 0].legend(fontsize=7)
             ax[3, 0].grid(True)
-        else:
-            raise ValueError(f"Data array must have dimension 1 or 2. Here data.ndim={self.data.ndim}.")
         if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)

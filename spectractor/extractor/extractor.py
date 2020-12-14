@@ -120,6 +120,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.W = self.W.flatten()
         self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
 
+        # flat data for fitworkspace
+        self.data = self.data.flatten()
+        self.err = self.err.flatten()
+
         # design matrix
         self.M = np.zeros((self.Nx, self.data.size))
         self.M_dot_W_dot_M = np.zeros((self.Nx, self.Nx))
@@ -410,8 +414,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.amplitude_cov_matrix = np.copy(cov_matrix)
 
         # Compute the model
-        self.model = (M @ amplitude_params).reshape((self.Ny, self.Nx))
-        self.model += B * self.bgd
+        self.model = (M @ amplitude_params)  # .reshape((self.Ny, self.Nx))
+        self.model += B * self.bgd.flatten()
         self.model_err = np.zeros_like(self.model)
 
         return self.pixels, self.model, self.model_err
@@ -433,14 +437,17 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
         sub = np.where(sub < self.spectrum.spectrogram.shape[1])[0]
+        data = self.data.reshape((self.Ny, self.Nx))
+        err = self.err.reshape((self.Ny, self.Nx))
+        model = self.model.reshape((self.Ny, self.Nx))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
-            norm = np.max(self.data[:, sub])
-            plot_image_simple(ax[0, 0], data=self.data[:, sub] / norm, title='Data', aspect='auto',
+            norm = np.max(data[:, sub])
+            plot_image_simple(ax[0, 0], data=data[:, sub] / norm, title='Data', aspect='auto',
                               cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)')
             ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
-            plot_image_simple(ax[1, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
+            plot_image_simple(ax[1, 0], data=model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
                               units='1/max(data)')
             if dispersion:
                 x = self.spectrum.chromatic_psf.table['Dx'][sub[5:-5]] + self.spectrum.spectrogram_x0 - sub[0]
@@ -452,9 +459,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
                 ax[1, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
-            residuals = (self.data - self.model)
+            residuals = (data - model)
             # residuals_err = self.spectrum.spectrogram_err / self.model
-            norm = self.err
+            norm = err
             residuals /= norm
             std = float(np.std(residuals[:, sub]))
             plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
@@ -468,8 +475,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[3, 1].remove()
-            ax[3, 0].plot(self.lambdas[sub], self.data.sum(axis=0)[sub], label='Data')
-            ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
+            ax[3, 0].plot(self.lambdas[sub], data.sum(axis=0)[sub], label='Data')
+            ax[3, 0].plot(self.lambdas[sub], model.sum(axis=0)[sub], label='Model')
             ax[3, 0].set_ylabel('Cross spectrum')
             ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
             ax[3, 0].legend(fontsize=7)

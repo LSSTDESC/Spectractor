@@ -79,8 +79,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
         self.crop_spectrogram()
         self.lambdas = self.spectrum.lambdas
-        self.data = self.spectrum.spectrogram
-        self.err = self.spectrum.spectrogram_err
+        self.Ny, self.Nx = self.spectrum.spectrogram.shape
+        self.data = self.spectrum.spectrogram.flatten()
+        self.err = self.spectrum.spectrogram_err.flatten()
         self.A1 = 1.0
         self.A2 = 1.0
         self.ozone = 400.
@@ -191,14 +192,17 @@ class SpectrogramFitWorkspace(FitWorkspace):
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
         sub = np.where(sub < self.spectrum.spectrogram_Nx)[0]
+        data = self.data.reshape((self.Ny, self.Nx))
+        model = self.model.reshape((self.Ny, self.Nx))
+        err = self.err.reshape((self.Ny, self.Nx))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
-            norm = np.max(self.data[:, sub])
-            plot_image_simple(ax[0, 0], data=self.data[:, sub] / norm, title='Data', aspect='auto',
+            norm = np.max(data[:, sub])
+            plot_image_simple(ax[0, 0], data=data[:, sub] / norm, title='Data', aspect='auto',
                               cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)')
             ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
-            plot_image_simple(ax[1, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
+            plot_image_simple(ax[1, 0], data=model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
                               units='1/max(data)')
             if dispersion:
                 x = self.spectrum.chromatic_psf.table['Dx'][sub[5:-5]] + self.spectrum.spectrogram_x0 - sub[0]
@@ -210,9 +214,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
                 ax[1, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
-            residuals = (self.data - self.model)
+            residuals = (data - model)
             # residuals_err = self.spectrum.spectrogram_err / self.model
-            norm = self.err
+            norm = err
             residuals /= norm
             std = float(np.std(residuals[:, sub]))
             plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
@@ -226,8 +230,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[3, 1].remove()
-            ax[3, 0].plot(self.lambdas[sub], self.data.sum(axis=0)[sub], label='Data')
-            ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
+            ax[3, 0].plot(self.lambdas[sub], data.sum(axis=0)[sub], label='Data')
+            ax[3, 0].plot(self.lambdas[sub], model.sum(axis=0)[sub], label='Model')
             ax[3, 0].set_ylabel('Cross spectrum')
             ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
             ax[3, 0].legend(fontsize=7)
@@ -266,9 +270,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         lambdas: array_like
             Array of wavelengths (1D).
         model: array_like
-            2D array of the spectrogram simulation.
+            Flat 1D array of the spectrogram simulation.
         model_err: array_like
-            2D array of the spectrogram simulation uncertainty.
+            Flat 1D array of the spectrogram simulation uncertainty.
 
         Examples
         --------
@@ -286,16 +290,19 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, psf_poly_params)
         self.p = np.array([A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B] + list(psf_poly_params))
         self.lambdas = lambdas
-        self.model = model
-        self.model_err = model_err
+        self.model = model.flatten()
+        self.model_err = model_err.flatten()
         if self.live_fit and (plot_counter % 30) == 0:
             self.plot_fit()
         plot_counter += 1
-        return lambdas, model, model_err
+        return self.lambdas, self.model, self.model_err
 
-    def jacobian(self, params, epsilon, fixed_params=None):
+    def jacobian(self, params, epsilon, fixed_params=None, model_input=None):
         start = time.time()
-        lambdas, model, model_err = self.simulate(*params)
+        if model_input is not None:
+            lambdas, model, model_err = model_input
+        else:
+            lambdas, model, model_err = self.simulate(*params)
         model = model.flatten()[self.not_outliers]
         J = np.zeros((params.size, model.size))
         strategy = copy.copy(self.simulation.fix_psf_cube)
@@ -426,10 +433,10 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
-        costs = np.array([fit_workspace.chisq(guess)])
-        if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
-            fit_workspace.plot_fit()
-        params_table = np.array([guess])
+        # costs = np.array([fit_workspace.chisq(guess)])
+        # if parameters.DISPLAY and (parameters.DEBUG or fit_workspace.live_fit):
+        #     fit_workspace.plot_fit()
+        # params_table = np.array([guess])
         start = time.time()
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
         epsilon = 1e-4 * guess
@@ -453,20 +460,21 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         fit_workspace.simulation.fast_sim = False
         fit_workspace.simulation.fix_psf_cube = False
         fit_workspace.fixed = np.copy(fixed)
-        guess = fit_workspace.p
-        params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-                                                   fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
-                                                   niter=40)
-        # run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-        #                                 xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
-        #                                 verbose=False)
+        # guess = fit_workspace.p
+        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
+        #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
+        #                                            niter=40)
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
+                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
+                                        verbose=False)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             parameters.SAVE = True
             ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
             fit_workspace.plot_correlation_matrix(ipar)
             fit_workspace.save_parameters_summary(ipar, header=f"{fit_workspace.spectrum.date_obs}\n"
-                                                               f"chi2: {costs[-1] / fit_workspace.data.size}")
+                                                               f"chi2: "
+                                                               f"{fit_workspace.costs[-1] / fit_workspace.data.size}")
             # save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
