@@ -61,7 +61,7 @@ class FitWorkspace:
         self.data = None
         self.err = None
         self.data_cov = None
-        self.data_invcov = None
+        self.W = None
         self.x = None
         self.outliers = []
         self.sigma_clip = 5
@@ -123,15 +123,16 @@ class FitWorkspace:
         else:
             return list(np.arange(self.data.size))
 
-    def get_good_indices(self):
-        good_indices = np.asarray(self.not_outliers, dtype=int)
+    def get_bad_indices(self):
+        bad_indices = np.asarray(self.outliers, dtype=int)
         if self.data.ndim > 1:
-            mask = np.zeros(self.data.shape, dtype=bool)
-            mask[np.unravel_index(self.not_outliers, self.data.shape)] = True
-            good_indices = []
-            for k in range(self.data.shape[0]):
-                good_indices.append(np.arange(self.data[k].size)[mask[k]])
-        return good_indices
+            if len(self.outliers) > 0:
+                mask = np.zeros(self.data.shape, dtype=bool)
+                mask[np.unravel_index(self.outliers, self.data.shape)] = True
+                bad_indices = [np.arange(self.data[k].size)[mask[k]] for k in range(self.data.shape[0])]
+            else:
+                bad_indices = [[] for _ in range(self.data.shape[0])]
+        return bad_indices
 
     def set_start(self, percent=0.02, a_random=1e-5):
         """Set the random starting points for MCMC exploration.
@@ -573,8 +574,6 @@ class FitWorkspace:
     def weighted_residuals(self, p):
         """Compute the weighted residuals array for a set of model parameters p.
 
-        The uncertainties are assumed to be uncorrelated.
-
         Parameters
         ----------
         p: array_like
@@ -587,13 +586,11 @@ class FitWorkspace:
 
         """
         x, model, model_err = self.simulate(*p)
-        good_indices = self.get_good_indices()
         if self.data_cov is None:
             if len(self.outliers) > 0:
-                model_err = model_err.flatten()[good_indices]
-                err = self.err.flatten()[good_indices]
-                res = (model.flatten()[good_indices] - self.data.flatten()[good_indices]) / np.sqrt(
-                    model_err * model_err + err * err)
+                model_err = model_err.flatten()
+                err = self.err.flatten()
+                res = (model.flatten() - self.data.flatten()) / np.sqrt(model_err * model_err + err * err)
             else:
                 res = ((model - self.data) / np.sqrt(model_err * model_err + self.err * self.err)).flatten()
         else:
@@ -601,25 +598,47 @@ class FitWorkspace:
                 K = self.data_cov.shape[0]
                 if np.any(model_err > 0):
                     cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
-                    cov = [cov[k][good_indices[k][:, None], good_indices[k]] for k in range(K)]
                     L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
-                else:
-                    invcov = [self.data_invcov[k][good_indices[k][:, None], good_indices[k]] for k in range(K)]
-                    L = [np.linalg.cholesky(invcov[k]) for k in range(K)]
-                res = [L[k] @ (model[k, good_indices[k]] - self.data[k, good_indices[k]]) for k in range(K)]
+                res = [L[k] @ (model[k] - self.data[k]) for k in range(K)]
                 res = np.concatenate(res).ravel()
             else:
-                cov = self.data_cov + np.diag(model_err * model_err)
-                if len(self.outliers) > 0:
-                    cov = cov[good_indices[:, None], good_indices]
+                if np.any(model_err > 0):
+                    cov = self.data_cov + np.diag(model_err * model_err)
                     L = np.linalg.inv(np.linalg.cholesky(cov))
-                    res = L @ (model[good_indices] - self.data[good_indices])
                 else:
-                    L = np.linalg.inv(np.linalg.cholesky(cov))
-                    res = L @ (model - self.data)
+                    if self.W.ndim == 1 and self.W.dtype != np.object:
+                        L = np.sqrt(self.W)
+                    elif self.W.ndim == 2 and self.W.dtype != np.object:
+                        L = np.linalg.cholesky(self.W)
+                    else:
+                        raise ValueError(f"Case not implemented with self.W.ndim={self.W.ndim} "
+                                         f"and self.W.dtype={self.W.dtype}")
+                res = L @ (model - self.data)
         return res
 
-    def chisq(self, p):
+    # def chisq(self, p):
+    #     """Compute the chi square for a set of model parameters p.
+    #
+    #     Parameters
+    #     ----------
+    #     p: array_like
+    #         The array of model parameters.
+    #
+    #     Returns
+    #     -------
+    #     chisq: float
+    #         The chi square value.
+    #
+    #     """
+    #     res = self.weighted_residuals(p)
+    #     print(res.shape, type(res), res.ndim)
+    #     if len(res) == self.data_cov.shape[0]:
+    #         chisq = np.sum([np.sum(res[k] ** 2) for k in range(self.data_cov.shape[0])])
+    #     else:
+    #         chisq = np.sum(res * res)
+    #     return chisq
+
+    def chisq(self, p, model_output=False):
         """Compute the chi square for a set of model parameters p.
 
         Parameters
@@ -633,13 +652,101 @@ class FitWorkspace:
             The chi square value.
 
         """
-        res = self.weighted_residuals(p)
-        print(res.shape, type(res), res.ndim)
-        if len(res) == self.data_cov.shape[0]:
-            chisq = np.sum([np.sum(res[k] ** 2) for k in range(self.data_cov.shape[0])])
+        # check data format
+        if (self.data.dtype != np.object and self.data.ndim > 1) or (self.err.dtype != np.object and self.err.ndim > 1):
+            raise ValueError("Fitworkspace.data and Fitworkspace.err must be a flat 1D array,"
+                             " or an array of flat arrays of unequal lengths.")
+        # prepare weight matrices in case they have not been built before
+        self.prepare_weight_matrices()
+        x, model, model_err = self.simulate(*p)
+        if self.W.ndim == 1 and self.W.dtype != np.object:
+            if np.any(model_err > 0):
+                W = 1 / (self.data_cov + model_err * model_err)
+            else:
+                W = self.W
+            res = (model - self.data)
+            chisq = res @ (W * res)
+        elif self.W.dtype == np.object:
+            K = len(self.W)
+            if self.W[0].ndim == 1:
+                if np.any(model_err > 0):
+                    W = [1 / (self.data_cov[k] + model_err * model_err) for k in range(K)]
+                else:
+                    W = self.W
+                res = [model[k] - self.data[k] for k in range(K)]
+                chisq = np.sum([res[k] @ (W[k].astype(float) * res[k]) for k in range(K)])
+            elif self.W[0].ndim == 2:
+                K = len(self.W)
+                if np.any(model_err > 0):
+                    cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
+                    L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
+                    W = [L[k].T @ L[k] for k in range(K)]
+                else:
+                    W = self.W
+                res = [model[k] - self.data[k] for k in range(K)]
+                chisq = np.sum([res[k] @ W[k] @ res[k] for k in range(K)])
+            else:
+                raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
+                                 f"I get W[0]={self.W[0]}")
+        elif self.W.ndim == 2 and self.W.dtype != np.object:
+            if np.any(model_err > 0):
+                cov = self.data_cov + np.diag(model_err * model_err)
+                L = np.linalg.inv(np.linalg.cholesky(cov))
+                W = L.T @ L
+            else:
+                W = self.W
+            res = (model - self.data)
+            chisq = res @ W @ res
         else:
-            chisq = np.sum(res * res)
-        return chisq
+            raise ValueError(
+                f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
+                f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
+                f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
+        if model_output:
+            return chisq, x, model, model_err
+        else:
+            return chisq
+
+    def prepare_weight_matrices(self):
+        # Prepare covariance matrix for data
+        if self.data_cov is None:
+            self.data_cov = np.asarray(self.err.flatten() ** 2)
+        # Prepare inverse covariance matrix for data
+        if self.W is None:
+            if self.data_cov.ndim == 1 and self.data_cov.dtype != np.object:
+                self.W = 1 / self.data_cov
+            elif self.data_cov.ndim == 2 and self.data_cov.dtype != np.object:
+                L = np.linalg.inv(np.linalg.cholesky(self.data_cov))
+                self.W = L.T @ L
+            elif self.data_cov.dtype is np.object:
+                if self.data_cov[0].ndim == 1:
+                    self.W = np.array([1 / self.data_cov[k] for k in range(self.data_cov.shape[0])])
+                else:
+                    self.W = []
+                    for k in range(len(self.data_cov)):
+                        L = np.linalg.inv(np.linalg.cholesky(self.data_cov[k]))
+                        self.W[k] = L.T @ L
+                    self.W = np.asarray(self.W)
+        if len(self.outliers) > 0:
+            bad_indices = self.get_bad_indices()
+            if self.W.ndim == 1 and self.W.dtype != np.object:
+                self.W[bad_indices] = 0
+            elif self.W.ndim == 2 and self.W.dtype != np.object:
+                self.W[:, bad_indices] = 0
+                self.W[bad_indices, :] = 0
+            elif self.W.dtype == np.object:
+                if self.data_cov[0].ndim == 1:
+                    for k in range(len(self.W)):
+                        self.W[k][bad_indices[k]] = 0
+                else:
+                    for k in range(len(self.W)):
+                        self.W[k][:, bad_indices[k]] = 0
+                        self.W[k][bad_indices[k], :] = 0
+            else:
+                raise ValueError(
+                    f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
+                    f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
+                    f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
 
     def lnlike(self, p):
         """Compute the logarithmic likelihood for a set of model parameters p as -0.5*chisq.
@@ -683,7 +790,7 @@ class FitWorkspace:
         else:
             return -np.inf
 
-    def jacobian(self, params, epsilon, fixed_params=None):
+    def jacobian(self, params, epsilon, fixed_params=None, model_input=None):
         """Generic function to compute the Jacobian matrix of a model, with numerical derivatives.
 
         Parameters
@@ -701,12 +808,15 @@ class FitWorkspace:
             The Jacobian matrix.
 
         """
-        x, model, model_err = self.simulate(*params)
-        if self.data_cov.ndim < 3:
-            model = model.flatten()[self.not_outliers]
-            J = np.zeros((params.size, model.size))
+        if model_input:
+            x, model, model_err = model_input
         else:
+            x, model, model_err = self.simulate(*params)
+        if self.W.dtype == np.object and self.W[0].ndim == 2:
             J = [[] for _ in range(params.size)]
+        else:
+            model = model.flatten()
+            J = np.zeros((params.size, model.size))
         for ip, p in enumerate(params):
             if fixed_params[ip]:
                 continue
@@ -715,12 +825,11 @@ class FitWorkspace:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            good_indices = self.get_good_indices()
-            if self.data_cov.ndim < 3:
-                J[ip] = (tmp_model.flatten()[good_indices] - model) / epsilon[ip]
-            else:
+            if self.W.dtype == np.object and self.W[0].ndim == 2:
                 for k in range(model.shape[0]):
-                    J[ip].append((tmp_model[k][good_indices[k]] - model[k][good_indices[k]]) / epsilon[ip])
+                    J[ip].append((tmp_model[k] - model[k]) / epsilon[ip])
+            else:
+                J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
         return np.asarray(J)
 
     def hessian(self, params, epsilon, fixed_params=None):
@@ -740,7 +849,7 @@ class FitWorkspace:
 
         """
         x, model, model_err = self.simulate(*params)
-        model = model.flatten()[self.not_outliers]
+        model = model.flatten()
         J = self.jacobian(params, epsilon, fixed_params=fixed_params)
         H = np.zeros((params.size, params.size, model.size))
         tmp_p = np.copy(params)
@@ -753,7 +862,7 @@ class FitWorkspace:
             tmp_p[ip] += epsilon[ip]
             print(tmp_p)
             # tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            # J[ip] = (tmp_model.flatten()[self.not_outliers] - model) / epsilon[ip]
+            # J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
         tmp_J = self.jacobian(tmp_p, epsilon, fixed_params=fixed_params)
         for ip, p1 in enumerate(params):
             if fixed_params[ip]:
@@ -763,7 +872,7 @@ class FitWorkspace:
                     continue
                 x, modelplus, model_err = self.simulate(params + epsilon)
                 x, modelmoins, model_err = self.simulate(params - epsilon)
-                model = model.flatten()[self.not_outliers]
+                model = model.flatten()
 
                 print("hh", ip, jp, tmp_J[ip], J[jp], tmp_p[ip], params, (tmp_J[ip] - J[jp]) / epsilon)
                 print((modelplus + modelmoins - 2 * model) / (np.asarray(epsilon) ** 2))
@@ -800,44 +909,8 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     """
     my_logger = set_logger(__name__)
     tmp_params = np.copy(params)
-    # Prepare covariance matrix for data
-    if fit_workspace.data_cov is None:
-        cov_data = np.asarray(fit_workspace.err.flatten()[fit_workspace.not_outliers] ** 2)
-        fit_workspace.data_cov = cov_data
-    else:
-        good_indices = fit_workspace.get_good_indices()
-        cov_data = np.copy(fit_workspace.data_cov)
-        if cov_data.ndim == 2:
-            cov_data = cov_data[good_indices[:, None], good_indices]
-        elif cov_data.ndim == 3:
-            cov_data = [cov_data[k][good_indices[k][:, None], good_indices[k]] for k in range(cov_data.shape[0])]
-        else:
-            raise ValueError(f"Data covariance matrix must be of dimension 1, 2 or 3. "
-                             f"Here cov_data.ndim=={cov_data.ndim}.")
-    # Prepare inverse covariance matrix for data
-    W = np.zeros_like(cov_data)
-    if fit_workspace.data_invcov is None:
-        if fit_workspace.data_cov.ndim == 1:
-            W = 1 / cov_data
-        elif fit_workspace.data_cov.ndim == 2:
-            L = np.linalg.inv(np.linalg.cholesky(cov_data))
-            W = L.T @ L
-        elif fit_workspace.data_cov.ndim == 3:
-            for k in range(cov_data.shape[0]):
-                L = np.linalg.inv(np.linalg.cholesky(cov_data[k]))
-                W[k] = L.T @ L
-        fit_workspace.data_invcov = W
-    else:
-        good_indices = fit_workspace.get_good_indices()
-        W = np.copy(fit_workspace.data_invcov)
-        if fit_workspace.data_cov.ndim == 1:
-            W = W[good_indices]
-        elif fit_workspace.data_cov.ndim == 2:
-            W = W[good_indices[:, None], good_indices]
-        elif fit_workspace.data_cov.ndim == 3:
-            W = [W[k][good_indices[k][:, None], good_indices[k]] for k in range(W.shape[0])]
-        else:
-            raise ValueError(f"Data inverse covariance matrix must be of dimension 1, 2 or 3. Here W.ndim=={W.ndim}.")
+    fit_workspace.prepare_weight_matrices()
+    W = fit_workspace.W
     ipar = np.arange(params.size)
     if fixed_params is not None:
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
@@ -846,39 +919,54 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     inv_JT_W_J = np.zeros((len(ipar), len(ipar)))
     for i in range(niter):
         start = time.time()
-        good_indices = fit_workspace.get_good_indices()
-        tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
-        # if fit_workspace.live_fit:
-        #    fit_workspace.plot_fit()
-        if fit_workspace.data_cov.ndim == 1:
-            if np.any(tmp_model_err > 0):
-                cov = cov_data + np.asarray(tmp_model_err.flatten()[fit_workspace.not_outliers] ** 2)
-                W = 1 / cov
-            residuals = (tmp_model - fit_workspace.data).flatten()[fit_workspace.not_outliers]
-            cost = residuals @ (W * residuals)
-        elif fit_workspace.data_cov.ndim == 2:
-            if np.any(tmp_model_err > 0):
-                cov = cov_data + np.diag(tmp_model_err.flatten()[fit_workspace.not_outliers] ** 2)
-                L = np.linalg.inv(np.linalg.cholesky(cov))
-                W = L.T @ L
-            residuals = (tmp_model - fit_workspace.data).flatten()[fit_workspace.not_outliers]
-            cost = residuals @ W @ residuals
-        elif fit_workspace.data_cov.ndim == 3:
-            if np.any(tmp_model_err > 0):
-                cov = np.asarray([cov_data[k] + np.diag(tmp_model_err[k][good_indices[k]] ** 2)
-                                  for k in range(cov_data.shape[0])])
-                W = np.zeros_like(cov)
-                for k in range(cov.shape[0]):
-                    L = np.linalg.inv(np.linalg.cholesky(cov[k]))
-                    W[k] = L.T @ L
-            residuals = [(tmp_model[k] - fit_workspace.data[k])[good_indices[k]]
-                         for k in range(fit_workspace.data_cov.shape[0])]
-            cost = np.sum([residuals[k] @ W[k] @ residuals[k] for k in range(fit_workspace.data_cov.shape[0])])
+        # # the following lines are similar to fitworkspace.chisq() but as residuals are also needed,
+        # # fitworkspace.simulate() is called only one time
+        # tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
+        # # if fit_workspace.live_fit:
+        # #    fit_workspace.plot_fit()
+        # if fit_workspace.data_cov.ndim == 1:
+        #     if np.any(tmp_model_err > 0):
+        #         bad_indices = fit_workspace.get_bad_indices()
+        #         cov = data_cov + np.asarray(tmp_model_err.flatten() ** 2)
+        #         W = 1 / cov
+        #         W[bad_indices] = 0
+        #     residuals = (tmp_model - fit_workspace.data).flatten()
+        #     cost = residuals @ (W * residuals)
+        # elif fit_workspace.data_cov.ndim == 2:
+        #     if np.any(tmp_model_err > 0):
+        #         bad_indices = fit_workspace.get_bad_indices()
+        #         cov = data_cov + np.diag(tmp_model_err.flatten() ** 2)
+        #         L = np.linalg.inv(np.linalg.cholesky(cov))
+        #         W = L.T @ L
+        #         W[bad_indices, :] = 0
+        #         W[:, bad_indices] = 0
+        #     residuals = (tmp_model - fit_workspace.data).flatten()
+        #     cost = residuals @ W @ residuals
+        # elif fit_workspace.data_cov.ndim == 3:
+        #     if np.any(tmp_model_err > 0):
+        #         bad_indices = fit_workspace.get_bad_indices()
+        #         cov = np.asarray([data_cov[k] + np.diag(tmp_model_err[k] ** 2) for k in range(data_cov.shape[0])])
+        #         W = np.zeros_like(cov)
+        #         for k in range(cov.shape[0]):
+        #             L = np.linalg.inv(np.linalg.cholesky(cov[k]))
+        #             W[k] = L.T @ L
+        #             W[k][bad_indices[k], :] = 0
+        #             W[k][:, bad_indices[k]] = 0
+        #     residuals = [(tmp_model[k] - fit_workspace.data[k]) for k in range(fit_workspace.data_cov.shape[0])]
+        #     cost = np.sum([residuals[k] @ W[k] @ residuals[k] for k in range(fit_workspace.data_cov.shape[0])])
+        # else:
+        #     raise ValueError(f"Data covariance matrix must be of dimension 1, 2 or 3. "
+        #                      f"Here fit_workspace.data_cov.ndim=={fit_workspace.data_cov.ndim}.")
+        cost, tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.chisq(tmp_params, model_output=True)
+        if isinstance(fit_workspace.W, np.ndarray) and fit_workspace.W.dtype != np.object:
+            residuals = (tmp_model - fit_workspace.data).flatten()
+        elif isinstance(fit_workspace.W, np.ndarray) and fit_workspace.W.dtype == np.object:
+            residuals = [(tmp_model[k] - fit_workspace.data[k]) for k in range(len(fit_workspace.W))]
         else:
-            raise ValueError(f"Data covariance matrix must be of dimension 1, 2 or 3. "
-                             f"Here fit_workspace.data_cov.ndim=={fit_workspace.data_cov.ndim}.")
+            raise TypeError(f"Type of fit_workspace.W is {type(fit_workspace.W)}. It must be a np.ndarray.")
         # Jacobian
-        J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params)
+        J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params,
+                                   model_input=[tmp_lambdas, tmp_model, tmp_model_err])
         # remove parameters with unexpected null Jacobian vectors
         for ip in range(J.shape[0]):
             if ip not in ipar:
@@ -893,25 +981,31 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # remove fixed parameters
         J = J[ipar].T
         # algebra
-        if fit_workspace.data_cov.ndim == 1:
+        if fit_workspace.W.ndim == 1 and fit_workspace.W.dtype != np.object:
             JT_W = J.T * W
             JT_W_J = JT_W @ J
-        elif fit_workspace.data_cov.ndim == 2:
+        elif fit_workspace.W.ndim == 2 and fit_workspace.W.dtype != np.object:
             JT_W = J.T @ W
             JT_W_J = JT_W @ J
         else:
-            # warning ! here the data arrays indexed by k have different lengths because outliers are removed.
-            # the philosophy is to temporarily flatten the data arrays
-            JT_W = [np.concatenate([J[ip][k].T @ W[k] for k in range(fit_workspace.data_cov.shape[0])]).ravel()
-                    for ip in range(len(J))]
-            JT_W_J = np.array([[JT_W[ip2] @ np.concatenate(J[ip1][:]).ravel() for ip1 in range(len(J))]
-                               for ip2 in range(len(J))])
+            fit_workspace.my_logger.warning(f"tototootot {fit_workspace.W.dtype} {fit_workspace.W[0].dtype} {fit_workspace.W[0].shape} {fit_workspace.W[0].ndim}")
+            if fit_workspace.W[0].ndim == 1:
+                JT_W = J.T * np.concatenate(W).ravel().astype(float)
+                JT_W_J = JT_W @ J
+            else:
+                # warning ! here the data arrays indexed by k can have different lengths because outliers
+                # because W inverse covariance is block diagonal and blocks can have different sizes
+                # the philosophy is to temporarily flatten the data arrays
+                JT_W = [np.concatenate([J[ip][k].T @ W[k] for k in range(fit_workspace.W.shape[0])]).ravel()
+                        for ip in range(len(J))]
+                JT_W_J = np.array([[JT_W[ip2] @ np.concatenate(J[ip1][:]).ravel() for ip1 in range(len(J))]
+                                   for ip2 in range(len(J))])
         try:
             L = np.linalg.inv(np.linalg.cholesky(JT_W_J))  # cholesky is too sensible to the numerical precision
             inv_JT_W_J = L.T @ L
         except np.linalg.LinAlgError:
             inv_JT_W_J = np.linalg.inv(JT_W_J)
-        if fit_workspace.data_cov.ndim < 3:
+        if fit_workspace.W.dtype != np.object:
             JT_W_R0 = JT_W @ residuals
         else:
             # JT_W_R0 = np.sum([JT_W[k] @ residuals[k] for k in range(fit_workspace.data_cov.shape[0])], axis=0)
@@ -921,8 +1015,6 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         if with_line_search:
             def line_search(alpha):
                 tmp_params_2 = np.copy(tmp_params)
-                print(tmp_params_2, tmp_params)
-                print(dparams.shape)
                 tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
                 for ipp, pp in enumerate(tmp_params_2):
                     if pp < fit_workspace.bounds[ipp][0]:
@@ -931,8 +1023,9 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                         tmp_params_2[ipp] = fit_workspace.bounds[ipp][1]
                 # lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
                 # res = mod.flatten()[fit_workspace.not_outliers] - fit_workspace.data.flatten()[fit_workspace.not_outliers]
-                w_res = fit_workspace.weighted_residuals(tmp_params_2)
-                return w_res @ w_res  # res @ (W * res)
+                # w_res = fit_workspace.weighted_residuals(tmp_params_2)
+                #return w_res @ w_res  # res @ (W * res)
+                return fit_workspace.chisq(tmp_params_2)
 
             # tol parameter acts on alpha (not func)
             alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=5e-1, brack=(0, 1))
@@ -1389,7 +1482,7 @@ class RegFitWorkspace(FitWorkspace):
         A = cov @ (self.w.M.T @ self.w.W_dot_data + reg * self.w.Q_dot_A0)
         self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
         diff = self.w.data_flat - self.w.M @ A
-        self.chisquare = diff[self.w.not_outliers] @ (self.w.W * diff)[self.w.not_outliers]
+        self.chisquare = diff @ (self.w.W * diff)
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
         self.w.amplitude_params_err = np.array([np.sqrt(cov[x, x]) for x in range(cov.shape[0])])
