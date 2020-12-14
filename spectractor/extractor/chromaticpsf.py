@@ -1034,7 +1034,7 @@ class ChromaticPSF:
         ..  doctest::
             :hide:
 
-            >>> residuals = (w.data-w.model)/w.err
+            >>> residuals = [(w.data[x]-w.model[x])/w.err[x] for x in range(w.Nx)]
             >>> assert w.costs[-1] /(w.Nx*w.Ny) < 1.5
             >>> assert np.abs(np.mean(residuals)) < 0.15
             >>> assert np.std(residuals) < 1.2
@@ -1223,9 +1223,9 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         model = np.copy(self.model)
         err = np.copy(self.err)
         if isinstance(self, ChromaticPSF1DFitWorkspace):
-            data = data.T.astype(float)
-            model = model.T.astype(float)
-            err = err.T.astype(float)
+            data = np.array([data[x] for x in range(self.Nx)], dtype=float).T
+            model = np.array([model[x] for x in range(self.Nx)], dtype=float).T
+            err = np.array([err[x] for x in range(self.Nx)], dtype=float).T
         if isinstance(self, ChromaticPSF2DFitWorkspace):
             data = data.reshape((self.Ny, self.Nx))
             model = model.reshape((self.Ny, self.Nx))
@@ -1292,14 +1292,21 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         # here image uncertainties are assumed to be uncorrelated
         # (which is not exactly true in rotated images)
         self.data_cov = self.err * self.err
-        self.W = 1. / (self.err * self.err)
-        # self.W = np.array([self.W[x, :] for x in range(self.Nx)])  # [np.diag(self.W[:, x]) for x in range(self.Nx)]
-        self.W_dot_data = [self.W[:, x] * self.data[:, x] for x in range(self.Nx)]
-        self.W = self.W.T.astype(np.object)  # this line makes the code think that W is block diagonal
+        W = 1. / (self.err * self.err)
+        # these lines make the code thinks that W is block diagonal
+        self.W = np.empty(self.Nx, dtype=np.object)
+        for x in range(self.Nx):
+            self.W[x] = W[:, x]
+        self.W_dot_data = [self.W[x] * self.data[:, x] for x in range(self.Nx)]
 
         # data: ordered by pixel columns
-        self.data = self.data.T.astype(np.object)
-        self.err = self.err.T.astype(np.object)
+        data = np.empty(self.Nx, dtype=np.object)
+        err = np.empty(self.Nx, dtype=np.object)
+        for x in range(self.Nx):
+            data[x] = self.data[:, x]
+            err[x] = self.err[:, x]
+        self.data = data
+        self.err = err
         self.pixels = self.pixels.T
 
     def simulate(self, *shape_params):
@@ -1410,7 +1417,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
             M = np.array([self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]) for x in range(self.Nx)])
-            M_dot_W_dot_M = np.array([M[x].T @ (self.W[x].astype(float) * M[x]) for x in range(self.Nx)])
+            M_dot_W_dot_M = np.array([M[x].T @ (self.W[x] * M[x]) for x in range(self.Nx)])
             if self.amplitude_priors_method != "psf1d":
                 cov_matrix = np.diag([1 / M_dot_W_dot_M[x] if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
                                       for x in range(self.Nx)])
@@ -1443,9 +1450,10 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                                     for x in range(self.Nx)]
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
-            self.model = np.zeros_like(self.data)
+            self.model = np.zeros((self.Nx, self.Ny), dtype=float)
             for x in range(self.Nx):
-                self.model[x, :] = M[x] * amplitude_params[x]
+                self.model[x] = M[x] * amplitude_params[x]
+
         else:
             amplitude_params = np.copy(self.amplitude_priors)
             err2 = np.copy(amplitude_params)

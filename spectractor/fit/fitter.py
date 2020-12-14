@@ -680,9 +680,9 @@ class FitWorkspace:
                     W = [1 / (self.data_cov[k] + model_err * model_err) for k in range(K)]
                 else:
                     W = self.W
-                res = [model[k].astype(float) - self.data[k].astype(float) for k in range(K)]
+                res = [model[k] - self.data[k] for k in range(K)]
                 self.my_logger.warning(f"{W.dtype} {res[0].dtype} {model[0].dtype} {self.data[0].dtype}")
-                chisq = np.sum([res[k] @ (W[k].astype(float) * res[k]) for k in range(K)])
+                chisq = np.sum([res[k] @ (W[k] * res[k]) for k in range(K)])
             elif self.W[0].ndim == 2:
                 K = len(self.W)
                 if np.any(model_err > 0):
@@ -691,8 +691,8 @@ class FitWorkspace:
                     W = [L[k].T @ L[k] for k in range(K)]
                 else:
                     W = self.W
-                res = [model[k].astype(float) - self.data[k].astype(float) for k in range(K)]
-                chisq = np.sum([res[k] @ W[k].astype(float) @ res[k] for k in range(K)])
+                res = [model[k] - self.data[k] for k in range(K)]
+                chisq = np.sum([res[k] @ W[k] @ res[k] for k in range(K)])
             else:
                 raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
                                  f"I get W[0]={self.W[0]}")
@@ -937,7 +937,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         if isinstance(fit_workspace.W, np.ndarray) and fit_workspace.W.dtype != np.object:
             residuals = (tmp_model - fit_workspace.data).flatten()
         elif isinstance(fit_workspace.W, np.ndarray) and fit_workspace.W.dtype == np.object:
-            residuals = [(tmp_model[k] - fit_workspace.data[k].astype(float)) for k in range(len(fit_workspace.W))]
+            residuals = [(tmp_model[k] - fit_workspace.data[k]) for k in range(len(fit_workspace.W))]
         else:
             raise TypeError(f"Type of fit_workspace.W is {type(fit_workspace.W)}. It must be a np.ndarray.")
         # Jacobian
@@ -965,13 +965,13 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             JT_W_J = JT_W @ J
         else:
             if fit_workspace.W[0].ndim == 1:
-                JT_W = J.T * np.concatenate(W).ravel().astype(float)
+                JT_W = J.T * np.concatenate(W).ravel()
                 JT_W_J = JT_W @ J
             else:
                 # warning ! here the data arrays indexed by k can have different lengths because outliers
                 # because W inverse covariance is block diagonal and blocks can have different sizes
                 # the philosophy is to temporarily flatten the data arrays
-                JT_W = [np.concatenate([J[ip][k].T @ W[k].astype(float)
+                JT_W = [np.concatenate([J[ip][k].T @ W[k]
                                         for k in range(fit_workspace.W.shape[0])]).ravel()
                         for ip in range(len(J))]
                 JT_W_J = np.array([[JT_W[ip2] @ np.concatenate(J[ip1][:]).ravel() for ip1 in range(len(J))]
@@ -984,7 +984,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         if fit_workspace.W.dtype != np.object:
             JT_W_R0 = JT_W @ residuals
         else:
-            JT_W_R0 = JT_W @ np.concatenate(residuals).ravel().astype(float)
+            JT_W_R0 = JT_W @ np.concatenate(residuals).ravel()
         dparams = - inv_JT_W_J @ JT_W_R0
 
         if with_line_search:
