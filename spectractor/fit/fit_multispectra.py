@@ -22,7 +22,7 @@ from spectractor.extractor.spectrum import Spectrum
 
 class MultiSpectraFitWorkspace(FitWorkspace):
 
-    def __init__(self, output_file_name, file_names, fixed_A1s=True, bin_width=10,
+    def __init__(self, output_file_name, file_names, fixed_A1s=True, bin_width=-1,
                  nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         """Class to fit jointly multiple spectra extracted with Spectractor.
@@ -41,7 +41,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         file_names: list
             List of spectrum file names.
         bin_width: float
-            Size of the wavelength bins in nm.
+            Size of the wavelength bins in nm. If negative, no binning.
         nwalkers: int, optional
             Number of walkers for MCMC fitting.
         nsteps: int, optional
@@ -101,7 +101,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         self.spectrum_data_cov = [self.spectra[k].cov_matrix for k in range(self.nspectra)]
         self.lambdas = np.empty(1)
         self.lambdas_bin_edges = None
-        self.data_invcov = None
         self.data_cube = []
         self.err_cube = []
         self.data_cov_cube = []
@@ -170,8 +169,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             [350, 355, 360, 365, 370, 375, 400, 405, 410, 415, 430, 435, 440, 510, 515, 520, 525, 530,
              560, 565, 570, 575, 650, 655, 660, 680, 685, 690, 695, 755, 760, 765, 770,
              980, 985, 990, 995, 1000, 1080, 1085, 1090, 1095, 1100, 1105, 1110, 1115])
-        # lambdas_to_mask = np.asarray([350, 355, 360, 365, 370, 375, 380])
-        lambdas_to_mask = np.asarray([])
+        lambdas_to_mask = np.asarray([350, 355, 360, 365, 370, 375, 380])
+        # lambdas_to_mask = np.asarray([])
         lambdas_to_mask_indices = np.asarray(
             [np.argmin(np.abs(self.lambdas - lambdas_to_mask[i])) for i in range(lambdas_to_mask.size)])
         # rebin atmosphere
@@ -192,10 +191,10 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         for k in range(self.nspectra):
             data_func = interp1d(self.spectra[k].lambdas, self.spectra[k].data,
                                  kind="cubic", fill_value="extrapolate", bounds_error=None)
-            lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
-            amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
-            data_func = interp1d(lambdas_truth, amplitude_truth,
-                                 kind="cubic", fill_value="extrapolate", bounds_error=None)
+            # lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
+            # amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+            # data_func = interp1d(lambdas_truth, amplitude_truth,
+            #                      kind="cubic", fill_value="extrapolate", bounds_error=None)
             data = []
             for i in range(1, lambdas_bin_edges.size):
                 data.append(quad(data_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0] / self.bin_widths)
@@ -213,7 +212,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             #     plt.legend()
             #     plt.show()
         self.data_cube = np.asarray(self.data_cube)
-        self.data = self.data_cube  # np.hstack(self.data_cube)
+        self.data = self.data_cube.astype(np.object)  # np.hstack(self.data_cube)
         # rebin reference star
         self.ref_spectrum_cube = []
         for k in range(self.nspectra):
@@ -321,6 +320,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             k * self.lambdas.size:(k + 1) * self.lambdas.size] = \
                 self.data_invcov_cube[k]
         self.data_invcov = self.data_invcov_cube
+        self.W = self.data_invcov.astype(np.object)
         print("inv data_cov_cube", time.time()-start)
         start = time.time()
 
@@ -405,8 +405,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                                        self.atmospheres[k].simulate(ozone, pwv, aerosols)(self.lambdas))
                       for k in range(self.nspectra)])
         print("compute M", time.time()-start)
-        print(M)
-        print(M.shape)
         # for k in range(self.nspectra):
         #     plt.plot(self.lambdas, [M[k][i,i] for i in range(self.lambdas.size)])
         #     plt.plot(self.lambdas, self.ref_spectrum_cube[k], linestyle="--")
@@ -421,21 +419,21 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # M_dot_W_dot_M = np.einsum('lkj,lki->ij', M, W_dot_M)
         # M_dot_W_dot_M = np.zeros_like(M_dot_W_dot_M)
         # otherwise, this is much faster:
-        M_dot_W_dot_M = np.sum([M[k].T @ self.data_invcov_cube[k] @ M[k] for k in range(self.nspectra)], axis=0)
+        M_dot_W_dot_M = np.sum([M[k].T @ self.data_invcov_cube[k].astype(float) @ M[k] for k in range(self.nspectra)], axis=0)
         for i in range(self.lambdas.size):
             if np.sum(M_dot_W_dot_M[i]) == 0:
-                M_dot_W_dot_M[i, i] = 1e-10 * np.mean(M_dot_W_dot_M)
-        #try:
-        L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-        cov_matrix = L.T @ L
-        #cov_matrix = pinvh(M_dot_W_dot_M, check_finite=False)
-        #L = np.linalg.cholesky(M_dot_W_dot_M)
-        #inv_L = solve_triangular(L, np.eye(L.shape[0]), check_finite=False, overwrite_b=True)
-        #cov_matrix = inv_L.T @ inv_L
-        print("inv", time.time()-start)
-        start = time.time()
-        #except np.linalg.LinAlgError:
-        #   cov_matrix = np.linalg.inv(M_dot_W_dot_M)
+                M_dot_W_dot_M[i, i] = 1e-10 * np.mean(M_dot_W_dot_M) * np.random.random()
+        try:
+            L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
+            cov_matrix = L.T @ L
+            #cov_matrix = pinvh(M_dot_W_dot_M, check_finite=False)
+            #L = np.linalg.cholesky(M_dot_W_dot_M)
+            #inv_L = solve_triangular(L, np.eye(L.shape[0]), check_finite=False, overwrite_b=True)
+            #cov_matrix = inv_L.T @ inv_L
+            print("inv", time.time()-start)
+            start = time.time()
+        except np.linalg.LinAlgError:
+            cov_matrix = np.linalg.inv(M_dot_W_dot_M)
         amplitude_params = cov_matrix @ (np.sum([M[k].T @ self.data_invcov_cube[k] @ self.data_cube[k]
                                                  for k in range(self.nspectra)], axis=0))
         self.M = M
@@ -464,9 +462,9 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         data_good = np.copy(self.data)
         # data_good[self.outliers] = np.nan
-        data = data_good.reshape(self.nspectra, self.lambdas.size)
-        model = self.model.reshape(self.nspectra, self.lambdas.size)
-        err = self.err.reshape(self.nspectra, self.lambdas.size)
+        data = data_good.reshape(self.nspectra, self.lambdas.size).astype(float)
+        model = self.model.reshape(self.nspectra, self.lambdas.size).astype(float)
+        err = self.err.reshape(self.nspectra, self.lambdas.size).astype(float)
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1])
         fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(7, 6), gridspec_kw=gs_kw)
         ozone, pwv, aerosols, *A1s = self.p
@@ -610,7 +608,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         plt.axhline(1, color="k", linestyle="--")
         plt.axhline(np.mean(A1s), color="b", linestyle="--",
-                    label=rf"$\left\langle A_1\right\rangle = {np.mean(A1s)} (std={np.std(A1s)})$")
+                    label=rf"$\left\langle A_1\right\rangle = {np.mean(A1s):.3f} (std={np.std(A1s):.3f})$")
         plt.grid()
         plt.ylabel("Grey transmission relative to first spectrum")
         plt.xlabel("Spectrum index")
@@ -924,6 +922,6 @@ if __name__ == "__main__":
     parameters.VERBOSE = True
     parameters.DEBUG = True
     output_filename = f"sim_20170530_{disperser_label}"
-    w = MultiSpectraFitWorkspace(output_filename, file_names, bin_width=5, nsteps=1000, fixed_A1s=False,
+    w = MultiSpectraFitWorkspace(output_filename, file_names, bin_width=1, nsteps=1000, fixed_A1s=False,
                                  burnin=200, nbins=10, verbose=1, plot=True, live_fit=True)
     run_multispectra_minimisation(w, method="newton")
