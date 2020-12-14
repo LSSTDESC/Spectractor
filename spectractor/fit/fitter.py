@@ -1367,9 +1367,11 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
             my_logger.info(f"\n\tSigma-clipping step {step}/{niter_clip} (sigma={sigma_clip})")
         run_minimisation(fit_workspace, method=method, epsilon=epsilon, fix=fix, xtol=xtol, ftol=ftol, niter=niter)
         # remove outliers
-        indices_no_nan = ~np.isnan(fit_workspace.data.flatten().astype(float))
-        residuals = np.abs(fit_workspace.model.flatten()[indices_no_nan]
-                           - fit_workspace.data.flatten()[indices_no_nan]) / fit_workspace.err.flatten()[indices_no_nan]
+        indices_no_nan = ~np.isnan(np.concatenate(fit_workspace.data).ravel())
+        data = np.concatenate(fit_workspace.model).ravel()[indices_no_nan]
+        model = np.concatenate(fit_workspace.data).ravel()[indices_no_nan]
+        err = np.concatenate(fit_workspace.err).ravel()[indices_no_nan]
+        residuals = np.abs(data - model) / err
         outliers = residuals > sigma_clip
         outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
         outliers.sort()
