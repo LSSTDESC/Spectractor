@@ -1298,6 +1298,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
             fit_workspace.plot_fit()
     elif method == "least_squares":
+        fit_workspace.my_logger.warning("least_squares might not work, use with caution... "
+                                        "or repair carefully the function weighted_residuals()")
         start = time.time()
         x_scale = np.abs(guess)
         x_scale[x_scale == 0] = 0.1
