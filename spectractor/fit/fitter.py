@@ -599,6 +599,8 @@ class FitWorkspace:
                 if np.any(model_err > 0):
                     cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
                     L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
+                else:
+                    L = [np.linalg.cholesky(self.W[k]) for k in range(K)]
                 res = [L[k] @ (model[k] - self.data[k]) for k in range(K)]
                 res = np.concatenate(res).ravel()
             else:
@@ -641,10 +643,15 @@ class FitWorkspace:
     def chisq(self, p, model_output=False):
         """Compute the chi square for a set of model parameters p.
 
+        Four cases are implemented: diagonal W, 2D W, array of diagonal Ws, array of 2D Ws. The two latter cases
+        are for multiple independent data vectors with W being block diagonal.
+
         Parameters
         ----------
         p: array_like
             The array of model parameters.
+        model_output: bool, optional
+            If true, the simulated model is output.
 
         Returns
         -------
@@ -801,6 +808,8 @@ class FitWorkspace:
             The array of small steps to compute the partial derivatives of the model.
         fixed_params: array_like
             List of boolean values. If True, the parameter is considered fixed and no derivative are computed.
+        model_input: array_like, optional
+            A model input as a list with (x, model, model_err) to avoid an additional call to simulate().
 
         Returns
         -------
@@ -893,6 +902,9 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                      with_line_search=True):  # pragma: no cover
     """
 
+    Four cases are implemented: diagonal W, 2D W, array of diagonal Ws, array of 2D Ws. The two latter cases
+    are for multiple independent data vectors with W being block diagonal.
+
     Parameters
     ----------
     fit_workspace: FitWorkspace
@@ -902,6 +914,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     fixed_params
     xtol
     ftol
+    with_line_search
 
     Returns
     -------
@@ -919,44 +932,6 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     inv_JT_W_J = np.zeros((len(ipar), len(ipar)))
     for i in range(niter):
         start = time.time()
-        # # the following lines are similar to fitworkspace.chisq() but as residuals are also needed,
-        # # fitworkspace.simulate() is called only one time
-        # tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.simulate(*tmp_params)
-        # # if fit_workspace.live_fit:
-        # #    fit_workspace.plot_fit()
-        # if fit_workspace.data_cov.ndim == 1:
-        #     if np.any(tmp_model_err > 0):
-        #         bad_indices = fit_workspace.get_bad_indices()
-        #         cov = data_cov + np.asarray(tmp_model_err.flatten() ** 2)
-        #         W = 1 / cov
-        #         W[bad_indices] = 0
-        #     residuals = (tmp_model - fit_workspace.data).flatten()
-        #     cost = residuals @ (W * residuals)
-        # elif fit_workspace.data_cov.ndim == 2:
-        #     if np.any(tmp_model_err > 0):
-        #         bad_indices = fit_workspace.get_bad_indices()
-        #         cov = data_cov + np.diag(tmp_model_err.flatten() ** 2)
-        #         L = np.linalg.inv(np.linalg.cholesky(cov))
-        #         W = L.T @ L
-        #         W[bad_indices, :] = 0
-        #         W[:, bad_indices] = 0
-        #     residuals = (tmp_model - fit_workspace.data).flatten()
-        #     cost = residuals @ W @ residuals
-        # elif fit_workspace.data_cov.ndim == 3:
-        #     if np.any(tmp_model_err > 0):
-        #         bad_indices = fit_workspace.get_bad_indices()
-        #         cov = np.asarray([data_cov[k] + np.diag(tmp_model_err[k] ** 2) for k in range(data_cov.shape[0])])
-        #         W = np.zeros_like(cov)
-        #         for k in range(cov.shape[0]):
-        #             L = np.linalg.inv(np.linalg.cholesky(cov[k]))
-        #             W[k] = L.T @ L
-        #             W[k][bad_indices[k], :] = 0
-        #             W[k][:, bad_indices[k]] = 0
-        #     residuals = [(tmp_model[k] - fit_workspace.data[k]) for k in range(fit_workspace.data_cov.shape[0])]
-        #     cost = np.sum([residuals[k] @ W[k] @ residuals[k] for k in range(fit_workspace.data_cov.shape[0])])
-        # else:
-        #     raise ValueError(f"Data covariance matrix must be of dimension 1, 2 or 3. "
-        #                      f"Here fit_workspace.data_cov.ndim=={fit_workspace.data_cov.ndim}.")
         cost, tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.chisq(tmp_params, model_output=True)
         if isinstance(fit_workspace.W, np.ndarray) and fit_workspace.W.dtype != np.object:
             residuals = (tmp_model - fit_workspace.data).flatten()
@@ -988,7 +963,6 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             JT_W = J.T @ W
             JT_W_J = JT_W @ J
         else:
-            fit_workspace.my_logger.warning(f"tototootot {fit_workspace.W.dtype} {fit_workspace.W[0].dtype} {fit_workspace.W[0].shape} {fit_workspace.W[0].ndim}")
             if fit_workspace.W[0].ndim == 1:
                 JT_W = J.T * np.concatenate(W).ravel().astype(float)
                 JT_W_J = JT_W @ J
@@ -1021,10 +995,6 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                         tmp_params_2[ipp] = fit_workspace.bounds[ipp][0]
                     if pp > fit_workspace.bounds[ipp][1]:
                         tmp_params_2[ipp] = fit_workspace.bounds[ipp][1]
-                # lbd, mod, err = fit_workspace.simulate(*tmp_params_2)
-                # res = mod.flatten()[fit_workspace.not_outliers] - fit_workspace.data.flatten()[fit_workspace.not_outliers]
-                # w_res = fit_workspace.weighted_residuals(tmp_params_2)
-                #return w_res @ w_res  # res @ (W * res)
                 return fit_workspace.chisq(tmp_params_2)
 
             # tol parameter acts on alpha (not func)
