@@ -153,28 +153,33 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
     def prepare_data(self):
         # rebin wavelengths
-        self.lambdas = []
         if self.bin_widths > 0:
             lambdas_bin_edges = np.arange(int(np.min(np.concatenate(list(self.spectrum_lambdas)))),
                                           int(np.max(np.concatenate(list(self.spectrum_lambdas)))) + 1,
                                           self.bin_widths)
             self.lambdas_bin_edges = lambdas_bin_edges
+            lbdas = []
             for i in range(1, lambdas_bin_edges.size):
-                self.lambdas.append(0.5 * (lambdas_bin_edges[i] + lambdas_bin_edges[i - 1]))
+                lbdas.append(0.5 * (lambdas_bin_edges[i] + lambdas_bin_edges[i - 1]))
+            self.lambdas = []
+            for k in range(self.nspectra):
+                self.lambdas.append(np.asarray(lbdas))
             self.lambdas = np.asarray(self.lambdas)
         else:
             self.lambdas = np.copy(self.spectrum_lambdas)
         # mask
         lambdas_to_mask = np.asarray(
-            [350, 355, 360, 365, 370, 375, 400, 405, 410, 415, 430, 435, 440, 510, 515, 520, 525, 530,
+            [345, 350, 355, 360, 365, 370, 375, 400, 405, 410, 415, 430, 435, 440, 510, 515, 520, 525, 530,
              560, 565, 570, 575, 650, 655, 660, 680, 685, 690, 695, 755, 760, 765, 770,
              980, 985, 990, 995, 1000, 1080, 1085, 1090, 1095, 1100, 1105, 1110, 1115])
-        lambdas_to_mask = np.asarray([350, 355, 360, 365, 370, 375, 380])
-        # lambdas_to_mask = np.asarray([])
-        lambdas_to_mask_indices = np.asarray(
-            [np.argmin(np.abs(self.lambdas - lambdas_to_mask[i])) for i in range(lambdas_to_mask.size)])
+        # lambdas_to_mask = np.asarray([350, 355, 360, 365, 370, 375, 380])
+        lambdas_to_mask = np.asarray([])
+        lambdas_to_mask_indices = []
+        for k in range(self.nspectra):
+            lambdas_to_mask_indices.append(np.asarray([np.argmin(np.abs(self.lambdas[k] - lambdas_to_mask[i]))
+                                                       for i in range(lambdas_to_mask.size)]))
         # rebin atmosphere
-        if isinstance(self.atmospheres[0], AtmosphereGrid):
+        if self.bin_widths > 0 and isinstance(self.atmospheres[0], AtmosphereGrid):
             self.atmosphere_lambda_bins = []
             for i in range(0, lambdas_bin_edges.size):
                 self.atmosphere_lambda_bins.append([])
@@ -187,142 +192,165 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             self.atmosphere_lambda_bins = np.array(self.atmosphere_lambda_bins)
             self.atmosphere_lambda_step = np.gradient(self.atmospheres[0].lambdas)[0]
         # rebin data
-        self.data_cube = []
-        for k in range(self.nspectra):
-            data_func = interp1d(self.spectra[k].lambdas, self.spectra[k].data,
-                                 kind="cubic", fill_value="extrapolate", bounds_error=None)
-            # lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
-            # amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
-            # data_func = interp1d(lambdas_truth, amplitude_truth,
-            #                      kind="cubic", fill_value="extrapolate", bounds_error=None)
-            data = []
-            for i in range(1, lambdas_bin_edges.size):
-                data.append(quad(data_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0] / self.bin_widths)
-            self.data_cube.append(np.copy(data))
-            # if parameters.DEBUG:
-            #     if "LBDAS_T" in self.spectra[k].header:
-            #         lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
-            #         amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
-            #         plt.plot(lambdas_truth, amplitude_truth, label="truth")  # -amplitude_truth)
-            #     plt.plot(self.lambdas, self.data_cube[-1], label="binned data")  # -amplitude_truth)
-            #     plt.plot(self.spectra[k].lambdas, self.spectra[k].data, label="raw data")  # -amplitude_truth)
-            #     # plt.title(self.spectra[k].filename)
-            #     # plt.xlim(480,700)
-            #     plt.grid()
-            #     plt.legend()
-            #     plt.show()
-        self.data_cube = np.asarray(self.data_cube)
-        self.data = self.data_cube.astype(np.object)  # np.hstack(self.data_cube)
+        if self.bin_widths > 0:
+            data_cube = []
+            for k in range(self.nspectra):
+                data_func = interp1d(self.spectra[k].lambdas, self.spectra[k].data,
+                                     kind="cubic", fill_value="extrapolate", bounds_error=None)
+                # lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
+                # amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+                # data_func = interp1d(lambdas_truth, amplitude_truth,
+                #                      kind="cubic", fill_value="extrapolate", bounds_error=None)
+                data = []
+                for i in range(1, lambdas_bin_edges.size):
+                    data.append(quad(data_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0] / self.bin_widths)
+                data_cube.append(np.copy(data))
+                # if parameters.DEBUG:
+                #     if "LBDAS_T" in self.spectra[k].header:
+                #         lambdas_truth = np.fromstring(self.spectra[k].header['LBDAS_T'][1:-1], sep=' ')
+                #         amplitude_truth = np.fromstring(self.spectra[k].header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
+                #         plt.plot(lambdas_truth, amplitude_truth, label="truth")  # -amplitude_truth)
+                #     plt.plot(self.lambdas, self.data_cube[-1], label="binned data")  # -amplitude_truth)
+                #     plt.plot(self.spectra[k].lambdas, self.spectra[k].data, label="raw data")  # -amplitude_truth)
+                #     # plt.title(self.spectra[k].filename)
+                #     # plt.xlim(480,700)
+                #     plt.grid()
+                #     plt.legend()
+                #     plt.show()
+            self.data = np.asarray(data_cube).astype(np.object)  # np.hstack(self.data_cube)
+        else:
+            self.data = np.copy(self.spectrum_data).astype(object)
         # rebin reference star
         self.ref_spectrum_cube = []
-        for k in range(self.nspectra):
-            data_func = interp1d(self.spectra[k].target.wavelengths[0], self.spectra[k].target.spectra[0],
-                                 kind="cubic", fill_value="extrapolate", bounds_error=None)
-            data = []
-            for i in range(1, lambdas_bin_edges.size):
-                data.append(quad(data_func, lambdas_bin_edges[i - 1],
-                                 lambdas_bin_edges[i])[0] / self.bin_widths)
-            self.ref_spectrum_cube.append(np.copy(data))
+        if self.bin_widths > 0:
+            for k in range(self.nspectra):
+                data_func = interp1d(self.spectra[k].target.wavelengths[0], self.spectra[k].target.spectra[0],
+                                     kind="cubic", fill_value="extrapolate", bounds_error=None)
+                data = []
+                for i in range(1, lambdas_bin_edges.size):
+                    data.append(quad(data_func, lambdas_bin_edges[i - 1],
+                                     lambdas_bin_edges[i])[0] / self.bin_widths)
+                self.ref_spectrum_cube.append(np.copy(data))
+        else:
+            for k in range(self.nspectra):
+                ref = interp1d(self.spectra[k].target.wavelengths[0], self.spectra[k].target.spectra[0],
+                               kind="cubic", fill_value="extrapolate", bounds_error=None)(self.lambdas[k])
+                self.ref_spectrum_cube.append(np.copy(ref))
         self.ref_spectrum_cube = np.asarray(self.ref_spectrum_cube)
         # rebin errors
-        self.err_cube = []
-        for k in range(self.nspectra):
-            err_func = interp1d(self.spectra[k].lambdas, self.spectra[k].err ** 2,
-                                kind="cubic", fill_value="extrapolate", bounds_error=False)
-            err = []
-            for i in range(1, lambdas_bin_edges.size):
-                if i in lambdas_to_mask_indices:
-                    err.append(np.nan)
-                else:
-                    err.append(np.sqrt(np.abs(quad(err_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0])
-                                       / self.bin_widths))
-            self.err_cube.append(np.copy(err))
-        self.err_cube = np.asarray(self.err_cube)
-        self.err = np.hstack(self.err_cube)
+        if self.bin_widths > 0:
+            self.err_cube = []
+            for k in range(self.nspectra):
+                err_func = interp1d(self.spectra[k].lambdas, self.spectra[k].err ** 2,
+                                    kind="cubic", fill_value="extrapolate", bounds_error=False)
+                err = []
+                for i in range(1, lambdas_bin_edges.size):
+                    if i in lambdas_to_mask_indices[k]:
+                        err.append(np.nan)
+                    else:
+                        err.append(np.sqrt(np.abs(quad(err_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0])
+                                           / self.bin_widths))
+                self.err_cube.append(np.copy(err))
+            self.err_cube = np.asarray(self.err_cube)
+            self.err = np.hstack(self.err_cube)
+        else:
+            self.err = np.copy(self.spectrum_err).astype(object)
         if parameters.DEBUG:
             for k in range(self.nspectra):
-                plt.errorbar(self.lambdas, self.data_cube[k], self.err_cube[k], label=f"spectrum {k}")
-                # plt.plot(self.lambdas, self.ref_spectrum_cube[k] * np.max(self.data_cube[k]) / np.max(self.ref_spectrum_cube[k]), "k-")
-            plt.ylim(0, 1.1 * np.max(self.data))
+                plt.errorbar(self.lambdas[k], self.data[k], self.err[k], label=f"spectrum {k}")
+                plt.ylim(0, 1.2 * np.max(self.data[k]))
             plt.grid()
             plt.legend()
             plt.show()
-        # rebin covariance matrices
+        # rebin W matrices
         import time
         start = time.time()
-        self.data_cov_cube = []
-        lmins = []
-        lmaxs = []
-        for k in range(self.nspectra):
-            lmins.append([])
-            lmaxs.append([])
-            for i in range(self.lambdas.size):
-                lmins[-1].append(max(0, int(np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[i])))))
-                lmaxs[-1].append(min(self.spectrum_data_cov[k].shape[0] - 1,
-                           np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[i + 1]))))
-        for k in range(self.nspectra):
-            cov = np.zeros((self.lambdas.size, self.lambdas.size))
-            for i in range(cov.shape[0]):
-                #imin = max(0, int(np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[i]))))
-                #imax = min(self.spectrum_data_cov[k].shape[0] - 1,
-                #           np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[i + 1])))
-                imin = lmins[k][i]
-                imax = lmaxs[k][i]
-                if imin == imax:
-                    cov[i, i] = (i + 1) * 1e10
-                    continue
-                if i in lambdas_to_mask_indices:
-                    cov[i, i] = (i + 1e10)
-                    continue
-                for j in range(i, cov.shape[1]):
-                    #jmin = max(0, int(np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[j]))))
-                    #jmax = min(self.spectrum_data_cov[k].shape[0] - 1,
-                    #           np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[j + 1])))
-                    jmin = lmins[k][j]
-                    jmax = lmaxs[k][j]
-                    # if imin == imax:
-                    #     cov[i, i] = (i + 1) * 1e10
-                    # elif jmin == jmax:
-                    #     cov[j, j] = (j + 1) * 1e10
-                    # else:
-                    if jmin == jmax:
-                        cov[j, j] = (j + 1) * 1e10
-                    else:
-                        if j in lambdas_to_mask_indices:
-                            cov[j, j] = (j + 1e10)
+        if self.bin_widths > 0:
+            self.data_cov_cube = []
+            lmins = []
+            lmaxs = []
+            for k in range(self.nspectra):
+                lmins.append([])
+                lmaxs.append([])
+                for i in range(self.lambdas[k].size):
+                    lmins[-1].append(max(0, int(np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[i])))))
+                    lmaxs[-1].append(min(self.spectrum_data_cov[k].shape[0] - 1,
+                               np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[i + 1]))))
+            for k in range(self.nspectra):
+                cov = np.zeros((self.lambdas[k].size, self.lambdas[k].size))
+                for i in range(cov.shape[0]):
+                    #imin = max(0, int(np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[i]))))
+                    #imax = min(self.spectrum_data_cov[k].shape[0] - 1,
+                    #           np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[i + 1])))
+                    imin = lmins[k][i]
+                    imax = lmaxs[k][i]
+                    if imin == imax:
+                        cov[i, i] = (i + 1) * 1e10
+                        continue
+                    if i in lambdas_to_mask_indices[k]:
+                        cov[i, i] = (i + 1e10)
+                        continue
+                    for j in range(i, cov.shape[1]):
+                        #jmin = max(0, int(np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[j]))))
+                        #jmax = min(self.spectrum_data_cov[k].shape[0] - 1,
+                        #           np.argmin(np.abs(self.spectrum_lambdas[k] - lambdas_bin_edges[j + 1])))
+                        jmin = lmins[k][j]
+                        jmax = lmaxs[k][j]
+                        # if imin == imax:
+                        #     cov[i, i] = (i + 1) * 1e10
+                        # elif jmin == jmax:
+                        #     cov[j, j] = (j + 1) * 1e10
+                        # else:
+                        if jmin == jmax:
+                            cov[j, j] = (j + 1) * 1e10
                         else:
-                            mean = np.mean(self.spectrum_data_cov[k][imin:imax, jmin:jmax])
-                            cov[i, j] = mean
-                            cov[j, i] = mean
-            self.data_cov_cube.append(np.copy(cov))
-        self.data_cov_cube = np.asarray(self.data_cov_cube)
-        self.data_cov = np.zeros(self.nspectra * np.array(self.data_cov_cube[0].shape))
-        for k in range(self.nspectra):
-            self.data_cov[k * self.lambdas.size:(k + 1) * self.lambdas.size,
-            k * self.lambdas.size:(k + 1) * self.lambdas.size] = \
-                self.data_cov_cube[k]
-        self.data_cov = self.data_cov_cube
-        print("fill data_cov_cube", time.time()-start)
-        plt.imshow(self.data_cov[0])
-        plt.show()
-        start = time.time()
-        self.data_invcov_cube = np.zeros_like(self.data_cov_cube)
-        for k in range(self.nspectra):
-            try:
-                L = np.linalg.inv(np.linalg.cholesky(self.data_cov_cube[k]))
-                invcov_matrix = L.T @ L
-            except np.linalg.LinAlgError:
-                invcov_matrix = np.linalg.inv(self.data_cov_cube[k])
-            self.data_invcov_cube[k] = invcov_matrix
-        self.data_invcov = np.zeros(self.nspectra * np.array(self.data_cov_cube[0].shape))
-        for k in range(self.nspectra):
-            self.data_invcov[k * self.lambdas.size:(k + 1) * self.lambdas.size,
-            k * self.lambdas.size:(k + 1) * self.lambdas.size] = \
-                self.data_invcov_cube[k]
-        self.data_invcov = self.data_invcov_cube
-        self.W = self.data_invcov.astype(np.object)
-        print("inv data_cov_cube", time.time()-start)
-        start = time.time()
+                            if j in lambdas_to_mask_indices[k]:
+                                cov[j, j] = (j + 1e10)
+                            else:
+                                mean = np.mean(self.spectrum_data_cov[k][imin:imax, jmin:jmax])
+                                cov[i, j] = mean
+                                cov[j, i] = mean
+                self.data_cov_cube.append(np.copy(cov))
+            self.data_cov_cube = np.asarray(self.data_cov_cube)
+            self.data_cov = np.zeros(self.nspectra * np.array(self.data_cov_cube[0].shape))
+            for k in range(self.nspectra):
+                self.data_cov[k * self.lambdas[k].size:(k + 1) * self.lambdas[k].size,
+                k * self.lambdas[k].size:(k + 1) * self.lambdas[k].size] = \
+                    self.data_cov_cube[k]
+            self.data_cov = self.data_cov_cube
+            print("fill data_cov_cube", time.time()-start)
+            plt.imshow(self.data_cov[0])
+            plt.show()
+            start = time.time()
+            self.data_invcov_cube = np.zeros_like(self.data_cov_cube)
+            for k in range(self.nspectra):
+                try:
+                    L = np.linalg.inv(np.linalg.cholesky(self.data_cov_cube[k]))
+                    invcov_matrix = L.T @ L
+                except np.linalg.LinAlgError:
+                    invcov_matrix = np.linalg.inv(self.data_cov_cube[k])
+                self.data_invcov_cube[k] = invcov_matrix
+            self.data_invcov = np.zeros(self.nspectra * np.array(self.data_cov_cube[0].shape))
+            for k in range(self.nspectra):
+                self.data_invcov[k * self.lambdas[k].size:(k + 1) * self.lambdas[k].size,
+                k * self.lambdas[k].size:(k + 1) * self.lambdas[k].size] = \
+                    self.data_invcov_cube[k]
+            self.data_invcov = self.data_invcov_cube
+            self.W = self.data_invcov.astype(np.object)
+            print("inv data_cov_cube", time.time()-start)
+            start = time.time()
+        else:
+            self.W = []
+            for k in range(self.nspectra):
+                try:
+                    L = np.linalg.inv(np.linalg.cholesky(self.spectrum_data_cov[k]))
+                    invcov_matrix = L.T @ L
+                except np.linalg.LinAlgError:
+                    invcov_matrix = np.linalg.inv(self.data_cov_cube[k])
+                invcov_matrix[lambdas_to_mask_indices[k], :] = 0
+                invcov_matrix[:, lambdas_to_mask_indices[k]] = 0
+                self.W.append(invcov_matrix)
+            self.W = np.asarray(self.W).astype(object)
 
     def get_truth(self):
         """Load the truth parameters (if provided) from the file header.
@@ -335,17 +363,23 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             self.truth = (ozone_truth, pwv_truth, aerosols_truth)
             self.true_atmospheric_transmission = []
             tatm = self.atmosphere.simulate(ozone=ozone_truth, pwv=pwv_truth, aerosols=aerosols_truth)
-            for i in range(1, self.lambdas_bin_edges.size):
-                self.true_atmospheric_transmission.append(quad(tatm, self.lambdas_bin_edges[i - 1],
-                                                               self.lambdas_bin_edges[i])[0] / self.bin_widths)
+            if self.bin_widths > 0:
+                for i in range(1, self.lambdas_bin_edges.size):
+                    self.true_atmospheric_transmission.append(quad(tatm, self.lambdas_bin_edges[i - 1],
+                                                                   self.lambdas_bin_edges[i])[0] / self.bin_widths)
+            else:
+                self.true_atmospheric_transmission = tatm(self.lambdas[0])
             self.true_atmospheric_transmission = np.array(self.true_atmospheric_transmission)
         else:
             self.truth = None
         self.true_instrumental_transmission = []
         tinst = lambda lbda: self.disperser.transmission(lbda) * self.telescope.transmission(lbda)
-        for i in range(1, self.lambdas_bin_edges.size):
-            self.true_instrumental_transmission.append(quad(tinst, self.lambdas_bin_edges[i - 1],
-                                                            self.lambdas_bin_edges[i])[0] / self.bin_widths)
+        if self.bin_widths > 0:
+            for i in range(1, self.lambdas_bin_edges.size):
+                self.true_instrumental_transmission.append(quad(tinst, self.lambdas_bin_edges[i - 1],
+                                                                self.lambdas_bin_edges[i])[0] / self.bin_widths)
+        else:
+            self.true_instrumental_transmission = tinst(self.lambdas[0])
         self.true_instrumental_transmission = np.array(self.true_instrumental_transmission)
 
     def simulate(self, ozone, pwv, aerosols, *A1s):
@@ -402,15 +436,15 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         import time
         start = time.time()
         M = np.array([A1s[k] * np.diag(self.ref_spectrum_cube[k] *
-                                       self.atmospheres[k].simulate(ozone, pwv, aerosols)(self.lambdas))
+                                       self.atmospheres[k].simulate(ozone, pwv, aerosols)(self.lambdas[k]))
                       for k in range(self.nspectra)])
         print("compute M", time.time()-start)
+        start = time.time()
         # for k in range(self.nspectra):
         #     plt.plot(self.lambdas, [M[k][i,i] for i in range(self.lambdas.size)])
         #     plt.plot(self.lambdas, self.ref_spectrum_cube[k], linestyle="--")
         # plt.grid()
         # plt.show()
-        start = time.time()
         # Matrix W filling: if spectra are not independent, use these lines with einstein summations:
         # W = np.zeros((self.nspectra, self.nspectra, self.lambdas.size, self.lambdas.size))
         # for k in range(self.nspectra):
@@ -419,8 +453,10 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # M_dot_W_dot_M = np.einsum('lkj,lki->ij', M, W_dot_M)
         # M_dot_W_dot_M = np.zeros_like(M_dot_W_dot_M)
         # otherwise, this is much faster:
-        M_dot_W_dot_M = np.sum([M[k].T @ self.data_invcov_cube[k].astype(float) @ M[k] for k in range(self.nspectra)], axis=0)
-        for i in range(self.lambdas.size):
+        M_dot_W_dot_M = np.sum([M[k].T @ self.W[k].astype(float) @ M[k] for k in range(self.nspectra)], axis=0)
+        print("compute MWM", time.time()-start)
+        start = time.time()
+        for i in range(self.lambdas[0].size):
             if np.sum(M_dot_W_dot_M[i]) == 0:
                 M_dot_W_dot_M[i, i] = 1e-10 * np.mean(M_dot_W_dot_M) * np.random.random()
         try:
@@ -434,19 +470,21 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             start = time.time()
         except np.linalg.LinAlgError:
             cov_matrix = np.linalg.inv(M_dot_W_dot_M)
-        amplitude_params = cov_matrix @ (np.sum([M[k].T @ self.data_invcov_cube[k] @ self.data_cube[k]
+        amplitude_params = cov_matrix @ (np.sum([M[k].T @ self.W[k].astype(float) @ self.data.astype(float)[k]
                                                  for k in range(self.nspectra)], axis=0))
         self.M = M
         self.M_dot_W_dot_M = M_dot_W_dot_M
-        model_cube = np.zeros_like(self.data_cube)
+        model_cube = []
+        model_err_cube = []
         for k in range(self.nspectra):
-            model_cube[k, :] = M[k] @ amplitude_params
-        self.model = model_cube  # np.hstack(model_cube)
+            model_cube.append(M[k] @ amplitude_params)
+            model_err_cube.append(np.zeros_like(model_cube[-1]))
+        self.model = np.asarray(model_cube)  # np.hstack(model_cube)
+        self.model_err = np.asarray(model_err_cube)  # np.hstack(model_cube)
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[i, i])
-                                              if cov_matrix[i, i] > 0 else 0 for i in range(self.lambdas.size)])
+                                              if cov_matrix[i, i] > 0 else 0 for i in range(self.lambdas[0].size)])
         self.amplitude_cov_matrix = np.copy(cov_matrix)
-        self.model_err = np.zeros_like(self.model)
         print("algebra", time.time()-start)
         start = time.time()
         return self.lambdas, self.model, self.model_err
@@ -462,9 +500,9 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         data_good = np.copy(self.data)
         # data_good[self.outliers] = np.nan
-        data = data_good.reshape(self.nspectra, self.lambdas.size).astype(float)
-        model = self.model.reshape(self.nspectra, self.lambdas.size).astype(float)
-        err = self.err.reshape(self.nspectra, self.lambdas.size).astype(float)
+        data = data_good.reshape(self.nspectra, self.lambdas[0].size).astype(float)
+        model = self.model.reshape(self.nspectra, self.lambdas[0].size).astype(float)
+        err = self.err.reshape(self.nspectra, self.lambdas[0].size).astype(float)
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1])
         fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(7, 6), gridspec_kw=gs_kw)
         ozone, pwv, aerosols, *A1s = self.p
@@ -524,21 +562,21 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         transmission_err = np.copy(self.amplitude_params_err)
         transmission[masked] = np.nan
         transmission_err[masked] = np.nan
-        ax[0, 0].errorbar(self.lambdas, transmission, yerr=transmission_err,
+        ax[0, 0].errorbar(self.lambdas[0], transmission, yerr=transmission_err,
                           label=r'$T_{\mathrm{inst}}$', fmt='k.')  # , markersize=0.1)
         ax[0, 0].set_ylabel(r'Instrumental transmission')
-        ax[0, 0].set_xlim(self.lambdas[0], self.lambdas[-1])
+        ax[0, 0].set_xlim(self.lambdas[0][0], self.lambdas[0][-1])
         ax[0, 0].set_ylim(0, 1.1 * np.nanmax(transmission))
         ax[0, 0].grid(True)
         ax[0, 0].set_xlabel(r'$\lambda$ [nm]')
         if self.true_instrumental_transmission is not None:
-            ax[0, 0].plot(self.lambdas, self.true_instrumental_transmission, "g-", label=r'true $T_{\mathrm{inst}}$')
+            ax[0, 0].plot(self.lambdas[0], self.true_instrumental_transmission, "g-", label=r'true $T_{\mathrm{inst}}$')
             ax[1, 0].set_xlabel(r'$\lambda$ [nm]')
             ax[1, 0].grid(True)
             ax[1, 0].set_ylabel(r'Data-Truth')
             residuals = self.amplitude_params - self.true_instrumental_transmission
             residuals[masked] = np.nan
-            ax[1, 0].errorbar(self.lambdas, residuals, yerr=transmission_err,
+            ax[1, 0].errorbar(self.lambdas[0], residuals, yerr=transmission_err,
                               label=r'$T_{\mathrm{inst}}$', fmt='k.')  # , markersize=0.1)
             ax[1, 0].set_ylim(-1.1 * np.nanmax(np.abs(residuals)), 1.1 * np.nanmax(np.abs(residuals)))
         else:
@@ -551,19 +589,19 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             tatm_binned.append(quad(tatm, self.lambdas_bin_edges[i - 1],
                                     self.lambdas_bin_edges[i])[0] / self.bin_widths)
 
-        ax[0, 1].errorbar(self.lambdas, tatm_binned,
+        ax[0, 1].errorbar(self.lambdas[0], tatm_binned,
                           label=r'$T_{\mathrm{atm}}$', fmt='k.')  # , markersize=0.1)
         ax[0, 1].set_ylabel(r'Atmospheric transmission')
         ax[0, 1].set_xlabel(r'$\lambda$ [nm]')
-        ax[0, 1].set_xlim(self.lambdas[0], self.lambdas[-1])
+        ax[0, 1].set_xlim(self.lambdas[0][0], self.lambdas[0][-1])
         ax[0, 1].grid(True)
         if self.truth is not None:
-            ax[0, 1].plot(self.lambdas, self.true_atmospheric_transmission, "b-", label=r'true $T_{\mathrm{atm}}$')
+            ax[0, 1].plot(self.lambdas[0], self.true_atmospheric_transmission, "b-", label=r'true $T_{\mathrm{atm}}$')
             ax[1, 1].set_xlabel(r'$\lambda$ [nm]')
             ax[1, 1].set_ylabel(r'Data-Truth')
             ax[1, 1].grid(True)
             residuals = np.asarray(tatm_binned) - self.true_atmospheric_transmission
-            ax[1, 1].errorbar(self.lambdas, residuals, label=r'$T_{\mathrm{inst}}$', fmt='k.')  # , markersize=0.1)
+            ax[1, 1].errorbar(self.lambdas[0], residuals, label=r'$T_{\mathrm{inst}}$', fmt='k.')  # , markersize=0.1)
             ax[1, 1].set_ylim(-1.1 * np.max(np.abs(residuals)), 1.1 * np.max(np.abs(residuals)))
         else:
             ax[1, 1].remove()
@@ -885,35 +923,35 @@ if __name__ == "__main__":
                   '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_186_spectrum.fits',
                   '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_191_spectrum.fits',
                   '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_196_spectrum.fits']
-    # file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_058_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_061_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_066_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_071_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_076_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_081_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_086_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_091_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_096_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_101_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_106_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_111_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_116_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_121_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_126_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_131_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_136_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_141_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_146_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_151_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_156_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_161_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_166_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_171_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_176_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_181_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_186_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_191_spectrum.fits',
-    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_196_spectrum.fits']
+    file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_058_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_061_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_066_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_071_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_076_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_081_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_086_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_091_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_096_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_101_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_106_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_111_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_116_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_121_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_126_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_131_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_136_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_141_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_146_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_151_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_156_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_161_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_166_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_171_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_176_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_181_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_186_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_191_spectrum.fits',
+                  '../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_196_spectrum.fits']
 
     print(file_names)
 
