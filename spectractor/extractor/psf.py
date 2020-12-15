@@ -727,7 +727,6 @@ class PSFFitWorkspace(FitWorkspace):
         # here image uncertainties are assumed to be uncorrelated
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
-        self.W_dot_data = self.W * self.data
 
     def simulate(self, *psf_params):
         """
@@ -803,7 +802,7 @@ class PSFFitWorkspace(FitWorkspace):
         #     M = self.psf.evaluate(self.pixels, p=np.array([1] + list(self.p))).flatten()
         #     M_dot_W_dot_M = M.T @ self.W @ M
         #     # Regression
-        #     amplitude = M.T @ self.W_dot_data / M_dot_W_dot_M
+        #     amplitude = M.T @ (self.W * self.data) / M_dot_W_dot_M
         #     self.p[0] = amplitude
         # Save results
         self.model = self.psf.evaluate(self.pixels, p=self.p).flatten()
