@@ -119,7 +119,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.W = self.W.flatten()
 
         # flat data for fitworkspace
-        self.data = self.data.flatten()
+        self.data = self.data.flatten() - self.bgd_flat
         self.err = self.err.flatten()
 
         # design matrix
@@ -272,7 +272,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         A2, D2CCD, dx0, dy0, angle, B, rot, *poly_params = params
         parameters.OBS_CAMERA_ROTATION = rot
         self.p = np.asarray(params)
-        W_dot_data = self.W * (self.data - B * self.bgd_flat)
+        W_dot_data = self.W * (self.data + (1 - B) * self.bgd_flat)
         profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:, 0] = 1
         profile_params[:, 1] = np.arange(self.Nx)
@@ -413,7 +413,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Compute the model
         self.model = (M @ amplitude_params)  # .reshape((self.Ny, self.Nx))
-        self.model += B * self.bgd.flatten()
         self.model_err = np.zeros_like(self.model)
 
         return self.pixels, self.model, self.model_err
@@ -435,9 +434,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
         sub = np.where(sub < self.spectrum.spectrogram.shape[1])[0]
-        data = self.data.reshape((self.Ny, self.Nx))
+        data = (self.data + self.bgd_flat).reshape((self.Ny, self.Nx))
         err = self.err.reshape((self.Ny, self.Nx))
-        model = self.model.reshape((self.Ny, self.Nx))
+        model = (self.model + self.p[5] * self.bgd_flat).reshape((self.Ny, self.Nx))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
@@ -558,6 +557,7 @@ def run_ffm_minimisation(w, method="newton"):
     --------
 
     >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
+    >>> spec = Spectrum("../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_176_spectrum.fits")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
