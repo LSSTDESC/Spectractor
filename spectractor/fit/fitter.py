@@ -681,7 +681,6 @@ class FitWorkspace:
                 else:
                     W = self.W
                 res = [model[k] - self.data[k] for k in range(K)]
-                self.my_logger.warning(f"{W.dtype} {res[0].dtype} {model[0].dtype} {self.data[0].dtype}")
                 chisq = np.sum([res[k] @ (W[k] * res[k]) for k in range(K)])
             elif self.W[0].ndim == 2:
                 K = len(self.W)
@@ -1367,10 +1366,13 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
             my_logger.info(f"\n\tSigma-clipping step {step}/{niter_clip} (sigma={sigma_clip})")
         run_minimisation(fit_workspace, method=method, epsilon=epsilon, fix=fix, xtol=xtol, ftol=ftol, niter=niter)
         # remove outliers
-        indices_no_nan = ~np.isnan(np.concatenate(fit_workspace.data).ravel())
-        data = np.concatenate(fit_workspace.model).ravel()[indices_no_nan]
-        model = np.concatenate(fit_workspace.data).ravel()[indices_no_nan]
-        err = np.concatenate(fit_workspace.err).ravel()[indices_no_nan]
+        if fit_workspace.data.dtype == np.object:
+            indices_no_nan = ~np.isnan(np.concatenate(fit_workspace.data).ravel())
+        else:
+            indices_no_nan = ~np.isnan(fit_workspace.data.flatten())
+        data = fit_workspace.data.flatten()[indices_no_nan]
+        model = fit_workspace.model.flatten()[indices_no_nan]
+        err = fit_workspace.err.flatten()[indices_no_nan]
         residuals = np.abs(data - model) / err
         outliers = residuals > sigma_clip
         outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
