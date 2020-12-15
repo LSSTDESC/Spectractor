@@ -59,7 +59,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.lambdas_order2 = self.spectrum.lambdas_order2
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         self.data = spectrum.spectrogram[self.bgd_width:-self.bgd_width, :]
-        self.data_flat = self.data.flatten()
         self.err = spectrum.spectrogram_err[self.bgd_width:-self.bgd_width, :]
         self.bgd = spectrum.spectrogram_bgd[self.bgd_width:-self.bgd_width, :]
         self.bgd_flat = self.bgd.flatten()
@@ -118,7 +117,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
-        self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
 
         # flat data for fitworkspace
         self.data = self.data.flatten()
@@ -274,7 +272,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         A2, D2CCD, dx0, dy0, angle, B, rot, *poly_params = params
         parameters.OBS_CAMERA_ROTATION = rot
         self.p = np.asarray(params)
-        self.W_dot_data = self.W * (self.data_flat - B * self.bgd_flat)
+        W_dot_data = self.W * (self.data - B * self.bgd_flat)
         profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:, 0] = 1
         profile_params[:, 1] = np.arange(self.Nx)
@@ -321,15 +319,15 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Prepare order 2 profile params indexed by the pixel column x
         profile_params_order2 = np.copy(profile_params)
-        profile_params_order2[:, 0] = self.spectrum.disperser.ratio_order_2over1(lambdas)
+        profile_params_order2[:, 0] = self.spectrum.disperser.ratio_order_2over1(self.lambdas)
         profile_params_order2[:, 1] = np.arange(self.Nx) + adr_x_2 + dx0
         profile_params_order2[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y_2 + dy0) - self.bgd_width
 
         # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
         # same PSF as for the order 1 but at the same position
         for k in range(1, profile_params.shape[1]):
-            profile_params_order2[:, k] = interp1d(lambdas_order2, profile_params_order2[:, k],
-                                                   kind="cubic", fill_value="extrapolate")(lambdas)
+            profile_params_order2[:, k] = interp1d(self.lambdas_order2, profile_params_order2[:, k],
+                                                   kind="cubic", fill_value="extrapolate")(self.lambdas)
 
         # if parameters.DEBUG:
         #     plt.imshow(self.data, origin="lower")
@@ -371,7 +369,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                     cov_matrix = L.T @ L
                 except np.linalg.LinAlgError:
                     cov_matrix = np.linalg.inv(M_dot_W_dot_M)
-                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data)
+                amplitude_params = cov_matrix @ (M.T @ W_dot_data)
                 if self.amplitude_priors_method == "positive":
                     amplitude_params[amplitude_params < 0] = 0
                 elif self.amplitude_priors_method == "smooth":
@@ -397,7 +395,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                     cov_matrix = L.T @ L
                 except np.linalg.LinAlgError:
                     cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + self.reg * self.Q_dot_A0)
+                amplitude_params = cov_matrix @ (M.T @ W_dot_data + self.reg * self.Q_dot_A0)
             self.M_dot_W_dot_M = M_dot_W_dot_M
         else:
             amplitude_params = np.copy(self.amplitude_priors)
