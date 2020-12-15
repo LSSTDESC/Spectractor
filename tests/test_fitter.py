@@ -109,11 +109,11 @@ def test_minimisation_sigma_clipping():
     run_minimisation_sigma_clipping(w, method="basinhopping", sigma_clip=sigma, niter_clip=clip_niter)
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     assert np.all(outliers == w.outliers)
-    w.p = np.array([1, 1])
-    w.outliers = []
-    run_minimisation_sigma_clipping(w, method="least_squares", sigma_clip=sigma, niter_clip=clip_niter)
-    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
-    assert np.all(outliers == w.outliers)
+    # w.p = np.array([1, 1])
+    # w.outliers = []
+    # run_minimisation_sigma_clipping(w, method="least_squares", sigma_clip=sigma, niter_clip=clip_niter)
+    # assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    # assert np.all(outliers == w.outliers)
     w.p = np.array([1, 1])
     w.outliers = []
     run_minimisation_sigma_clipping(w, method="minuit", sigma_clip=sigma, niter_clip=clip_niter)
