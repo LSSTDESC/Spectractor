@@ -1469,13 +1469,18 @@ class RegFitWorkspace(FitWorkspace):
             A = cov @ (self.w.M.T @ (self.w.W * self.data) + reg * self.w.Q_dot_A0)
         else:
             A = cov @ (self.w.M.T @ self.w.W @ self.data + reg * self.w.Q_dot_A0)
+        # self.my_logger.warning(f"{amplitude_params.size} {np.sum(amplitude_params)} {np.trace(cov_matrix)}")
+        self.my_logger.warning(f"{A.size} {np.sum(A)} {np.trace(cov)}")
         self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
         diff = self.w.data - self.w.M @ A
-        self.chisquare = diff @ (self.w.W * diff)
+        if self.w.W.ndim == 1:
+            self.chisquare = diff @ (self.w.W * diff)
+        else:
+            self.chisquare = diff @ self.w.W @ diff
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
         self.w.amplitude_params_err = np.array([np.sqrt(cov[x, x]) for x in range(cov.shape[0])])
-        self.G = self.chisquare / (self.w.data_flat.size - np.trace(self.resolution)) ** 2
+        self.G = self.chisquare / (self.w.data.size - np.trace(self.resolution)) ** 2
         return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
     def plot_fit(self):

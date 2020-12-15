@@ -1173,7 +1173,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # crop spectrogram to fit faster
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         self.data = self.data[self.bgd_width:-self.bgd_width, :]
-        self.data_flat = self.data.flatten()
         self.pixels = np.arange(self.data.shape[0])
         self.err = np.copy(self.err[self.bgd_width:-self.bgd_width, :])
         self.Ny, self.Nx = self.data.shape
@@ -1188,7 +1187,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.data_cov = (self.err * self.err).flatten()
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
-        # self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
 
         # design matrix
         self.M = np.zeros((self.Nx, self.data.size))
@@ -1297,7 +1295,6 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W = np.empty(self.Nx, dtype=np.object)
         for x in range(self.Nx):
             self.W[x] = W[:, x]
-        # self.W_dot_data = [self.W[x] * self.data[:, x] for x in range(self.Nx)]
 
         # data: ordered by pixel columns
         data = np.empty(self.Nx, dtype=np.object)
@@ -1490,7 +1487,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
-        # self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
         self.data = self.data.flatten()
         self.err = self.err.flatten()
 
@@ -1720,6 +1716,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # TODO: propagate and marginalize over the shape parameter uncertainties ?
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
         self.amplitude_cov_matrix = np.copy(cov_matrix)
+        self.my_logger.warning(f"{amplitude_params.size} {np.sum(amplitude_params)} {np.trace(cov_matrix)}")
+        # self.my_logger.warning(f"{A.size} {np.sum(A)} {np.trace(cov)}")
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         if self.amplitude_priors_method == "fixed":
             self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
