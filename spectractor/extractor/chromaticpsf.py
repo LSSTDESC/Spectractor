@@ -1188,7 +1188,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.data_cov = (self.err * self.err).flatten()
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
-        self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
+        # self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
 
         # design matrix
         self.M = np.zeros((self.Nx, self.data.size))
@@ -1297,7 +1297,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W = np.empty(self.Nx, dtype=np.object)
         for x in range(self.Nx):
             self.W[x] = W[:, x]
-        self.W_dot_data = [self.W[x] * self.data[:, x] for x in range(self.Nx)]
+        # self.W_dot_data = [self.W[x] * self.data[:, x] for x in range(self.Nx)]
 
         # data: ordered by pixel columns
         data = np.empty(self.Nx, dtype=np.object)
@@ -1422,7 +1422,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                 cov_matrix = np.diag([1 / M_dot_W_dot_M[x] if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
                                       for x in range(self.Nx)])
                 amplitude_params = np.array([
-                    M[x].T @ self.W_dot_data[x] / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
+                    M[x].T @ (self.W[x] * self.data[x]) / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
                     for x in range(self.Nx)])
                 if self.amplitude_priors_method == "positive":
                     amplitude_params[amplitude_params < 0] = 0
@@ -1446,7 +1446,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                 M_dot_W_dot_M_plus_Q = [M_dot_W_dot_M[x] + self.reg * self.Q[x, x] for x in range(self.Nx)]
                 cov_matrix = np.diag([1 / M_dot_W_dot_M_plus_Q[x] if M_dot_W_dot_M_plus_Q[x] > 0 else 0.1 * self.bgd_std
                                       for x in range(self.Nx)])
-                amplitude_params = [cov_matrix[x, x] * (M[x].T @ self.W_dot_data[x] + self.reg * self.Q_dot_A0[x])
+                amplitude_params = [cov_matrix[x, x] * (M[x].T @ (self.W[x] * self.data[x]) + self.reg * self.Q_dot_A0[x])
                                     for x in range(self.Nx)]
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
@@ -1490,7 +1490,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
-        self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
+        # self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
         self.data = self.data.flatten()
         self.err = self.err.flatten()
 
@@ -1678,7 +1678,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                     cov_matrix = L.T @ L
                 except np.linalg.LinAlgError:
                     cov_matrix = np.linalg.inv(M_dot_W_dot_M)
-                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data)
+                amplitude_params = cov_matrix @ (M.T @ (self.W * self.data))
                 if self.amplitude_priors_method == "positive":
                     amplitude_params[amplitude_params < 0] = 0
                 elif self.amplitude_priors_method == "smooth":
@@ -1704,7 +1704,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                     cov_matrix = L.T @ L
                 except np.linalg.LinAlgError:
                     cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + self.reg * self.Q_dot_A0)
+                amplitude_params = cov_matrix @ (M.T @ (self.W * self.data) + self.reg * self.Q_dot_A0)
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
             self.model = (M @ amplitude_params)  #.reshape((self.Ny, self.Nx))

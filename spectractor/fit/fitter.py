@@ -673,6 +673,14 @@ class FitWorkspace:
                 W = self.W
             res = (model - self.data)
             chisq = res @ (W * res)
+            # fit_workspace.my_logger.warning(f"ll {tmp_params}")
+            # fit_workspace.my_logger.warning(f"yyyy {np.sum(residuals)} {np.sum(W)} {np.sum(W*residuals)}")
+            # fit_workspace.my_logger.warning(f"yoooo {np.sum(residuals)} {np.sum(W*residuals)} ")
+            # fit_workspace.my_logger.warning(f"yiiii {np.sum(tmp_model.flatten()[fit_workspace.not_outliers])} {np.sum(fit_workspace.data.flatten()[fit_workspace.not_outliers])} ")
+            # self.my_logger.warning(f"ll {p}")
+            # self.my_logger.warning(f"yyyy {np.sum(res)} {np.sum(W)} {np.sum(W*res)}")
+            # self.my_logger.warning(f"yoooo {np.sum(res[self.not_outliers])} {np.sum(W[self.not_outliers]*res[self.not_outliers])} ")
+            # self.my_logger.warning(f"yiiii {np.sum(model[self.not_outliers])} {np.sum(self.data[self.not_outliers])} ")
         elif self.W.dtype == np.object:
             K = len(self.W)
             if self.W[0].ndim == 1:
@@ -1457,9 +1465,12 @@ class RegFitWorkspace(FitWorkspace):
             cov = L.T @ L
         except np.linalg.LinAlgError:
             cov = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-        A = cov @ (self.w.M.T @ self.w.W_dot_data + reg * self.w.Q_dot_A0)
+        if self.w.W.ndim == 1:
+            A = cov @ (self.w.M.T @ (self.w.W * self.data) + reg * self.w.Q_dot_A0)
+        else:
+            A = cov @ (self.w.M.T @ self.w.W @ self.data + reg * self.w.Q_dot_A0)
         self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
-        diff = self.w.data_flat - self.w.M @ A
+        diff = self.w.data - self.w.M @ A
         self.chisquare = diff @ (self.w.W * diff)
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
