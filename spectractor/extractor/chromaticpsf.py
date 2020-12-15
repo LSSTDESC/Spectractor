@@ -1165,7 +1165,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # prepare the background, data and errors
         self.bgd = np.zeros_like(self.data)
         if self.bgd_model_func is not None:
-            # xx, yy = np.meshgrid(np.arange(Nx), pixels)
             self.bgd = self.bgd_model_func(np.arange(self.Nx), self.pixels)
         self.data = self.data - self.bgd
         self.bgd_std = float(np.std(np.random.poisson(np.abs(self.bgd))))
@@ -1716,8 +1715,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # TODO: propagate and marginalize over the shape parameter uncertainties ?
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
         self.amplitude_cov_matrix = np.copy(cov_matrix)
-        self.my_logger.warning(f"{amplitude_params.size} {np.sum(amplitude_params)} {np.trace(cov_matrix)}")
-        # self.my_logger.warning(f"{A.size} {np.sum(A)} {np.trace(cov)}")
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         if self.amplitude_priors_method == "fixed":
             self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]

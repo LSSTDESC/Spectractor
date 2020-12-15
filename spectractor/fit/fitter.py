@@ -1466,11 +1466,9 @@ class RegFitWorkspace(FitWorkspace):
         except np.linalg.LinAlgError:
             cov = np.linalg.inv(M_dot_W_dot_M_plus_Q)
         if self.w.W.ndim == 1:
-            A = cov @ (self.w.M.T @ (self.w.W * self.data) + reg * self.w.Q_dot_A0)
+            A = cov @ (self.w.M.T @ (self.w.W * self.w.data) + reg * self.w.Q_dot_A0)
         else:
-            A = cov @ (self.w.M.T @ self.w.W @ self.data + reg * self.w.Q_dot_A0)
-        # self.my_logger.warning(f"{amplitude_params.size} {np.sum(amplitude_params)} {np.trace(cov_matrix)}")
-        self.my_logger.warning(f"{A.size} {np.sum(A)} {np.trace(cov)}")
+            A = cov @ (self.w.M.T @ (self.w.W @ self.w.data) + reg * self.w.Q_dot_A0)
         self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
         diff = self.w.data - self.w.M @ A
         if self.w.W.ndim == 1:
