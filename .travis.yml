@@ -68,7 +68,7 @@ before_script:
   - "tar -xf libRadtran-2.0.3.tar"
   - "cd libRadtran-2.0.3"
   - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN --with-libnetcdf=$TRAVIS_BUILD_DIR/NETCDF/"
-  - "make uvspec"
+  - "make"
   - "cd ../"
   - "export LIBRADTRAN_DIR=libRadtran-2.0.3/"
   - export NETPBM_LIB="-L/usr/lib -lnetpbm"
