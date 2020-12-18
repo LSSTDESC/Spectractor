@@ -1,6 +1,8 @@
 import os
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from scipy.interpolate import interp1d
 import time
 
@@ -433,21 +435,31 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         dispersion: bool, optional
             If True, plot a colored bar to see the associated wavelength color along the x axis (default: False).
         """
+        cmap_bwr = copy.copy(cm.get_cmap('bwr'))
+        cmap_bwr.set_bad(color='lightgrey')
+        cmap_viridis = copy.copy(cm.get_cmap('viridis'))
+        cmap_viridis.set_bad(color='lightgrey')
+
+        data = np.copy(self.data)
+        if len(self.outliers) > 0:
+            bad_indices = self.get_bad_indices()
+            data[bad_indices] = np.nan
+
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
         sub = np.where(sub < self.spectrum.spectrogram.shape[1])[0]
-        data = (self.data + self.bgd_flat).reshape((self.Ny, self.Nx))
+        data = (data + self.bgd_flat).reshape((self.Ny, self.Nx))
         err = self.err.reshape((self.Ny, self.Nx))
         model = (self.model + self.p[5] * self.bgd_flat).reshape((self.Ny, self.Nx))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
-            norm = np.max(data[:, sub])
+            norm = np.nanmax(data[:, sub])
             plot_image_simple(ax[0, 0], data=data[:, sub] / norm, title='Data', aspect='auto',
-                              cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)')
+                              cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)', cmap=cmap_viridis)
             ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
             plot_image_simple(ax[1, 0], data=model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
-                              units='1/max(data)')
+                              units='1/max(data)', cmap=cmap_viridis)
             if dispersion:
                 x = self.spectrum.chromatic_psf.table['Dx'][sub[5:-5]] + self.spectrum.spectrogram_x0 - sub[0]
                 y = np.ones_like(x)
@@ -462,9 +474,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             # residuals_err = self.spectrum.spectrogram_err / self.model
             norm = err
             residuals /= norm
-            std = float(np.std(residuals[:, sub]))
+            std = float(np.nanstd(residuals[:, sub]))
             plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
-                              aspect='auto', cax=ax[2, 1], units='', cmap="bwr")
+                              aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
             ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
             ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals[:, sub]):.3f}\nstd={np.std(residuals[:, sub]):.3f}',
                           horizontalalignment='left', verticalalignment='bottom',

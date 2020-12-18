@@ -1,6 +1,7 @@
 import time
 import os
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import numpy as np
 import copy
 
@@ -118,7 +119,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         for k, par in enumerate(self.input_labels):
             if "x_c" in par or "saturation" in par or "y_c" in par:
                 self.fixed[k] = True
-        # self.fixed[1] = True  # A2
+        # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
+        self.fixed[1] = "A2_T" not in self.spectrum.header and not self.spectrum.disperser.flat_ratio_order_2over1
         # self.fixed[5:7] = [True, True]  # DCCD, x0
         # self.fixed[7] = True  # Delta y
         # self.fixed[8] = True  # angle
@@ -189,21 +191,31 @@ class SpectrogramFitWorkspace(FitWorkspace):
         dispersion: bool, optional
             If True, plot a colored bar to see the associated wavelength color along the x axis (default: False).
         """
+        cmap_bwr = copy.copy(cm.get_cmap('bwr'))
+        cmap_bwr.set_bad(color='lightgrey')
+        cmap_viridis = copy.copy(cm.get_cmap('viridis'))
+        cmap_viridis.set_bad(color='lightgrey')
+
+        data = np.copy(self.data)
+        if len(self.outliers) > 0:
+            bad_indices = self.get_bad_indices()
+            data[bad_indices] = np.nan
+
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
         sub = np.where(sub < self.spectrum.spectrogram_Nx)[0]
-        data = self.data.reshape((self.Ny, self.Nx))
+        data = data.reshape((self.Ny, self.Nx))
         model = self.model.reshape((self.Ny, self.Nx))
         err = self.err.reshape((self.Ny, self.Nx))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
-            norm = np.max(data[:, sub])
+            norm = np.nanmax(data[:, sub])
             plot_image_simple(ax[0, 0], data=data[:, sub] / norm, title='Data', aspect='auto',
-                              cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)')
+                              cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)', cmap=cmap_viridis)
             ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
             plot_image_simple(ax[1, 0], data=model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
-                              units='1/max(data)')
+                              units='1/max(data)', cmap=cmap_viridis)
             if dispersion:
                 x = self.spectrum.chromatic_psf.table['Dx'][sub[5:-5]] + self.spectrum.spectrogram_x0 - sub[0]
                 y = np.ones_like(x)
@@ -218,9 +230,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
             # residuals_err = self.spectrum.spectrogram_err / self.model
             norm = err
             residuals /= norm
-            std = float(np.std(residuals[:, sub]))
+            std = float(np.nanstd(residuals[:, sub]))
             plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
-                              aspect='auto', cax=ax[2, 1], units='', cmap="bwr")
+                              aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
             ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
             ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals[:, sub]):.3f}\nstd={np.std(residuals[:, sub]):.3f}',
                           horizontalalignment='left', verticalalignment='bottom',
@@ -303,7 +315,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             lambdas, model, model_err = model_input
         else:
             lambdas, model, model_err = self.simulate(*params)
-        model = model.flatten()[self.not_outliers]
+        model = model.flatten()
         J = np.zeros((params.size, model.size))
         strategy = copy.copy(self.simulation.fix_psf_cube)
         for ip, p in enumerate(params):
@@ -318,7 +330,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            J[ip] = (tmp_model.flatten()[self.not_outliers] - model) / epsilon[ip]
+            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
         self.simulation.fix_psf_cube = strategy
         self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
@@ -510,29 +522,29 @@ if __name__ == "__main__":
     load_config(args.config)
 
     # filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    filename = 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits'
+    filename = 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_134_spectrum.fits'
     # filename = 'outputs/sim_20170530_134_spectrum.fits'
     filenames = [
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_104_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_109_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_114_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_119_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_124_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_129_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_134_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_139_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_144_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_149_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_154_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_159_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_164_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_169_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_174_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_179_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_184_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_189_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_194_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_104_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_109_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_114_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_119_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_124_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_129_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_134_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_139_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_144_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_149_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_154_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_159_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_164_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_169_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_174_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_179_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_184_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_189_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_194_spectrum.fits',
+                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_199_spectrum.fits']
     params = []
     chisqs = []
     filenames = ['outputs/sim_20170530_134_spectrum.fits']
