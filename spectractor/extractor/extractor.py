@@ -94,7 +94,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
                                                 (-parameters.CCD_PIXEL2ARCSEC, parameters.PIXSHIFT_PRIOR),
-                                                (-parameters.CCD_PIXEL2ARCSEC, parameters.PIXSHIFT_PRIOR),
+                                                (-10 * parameters.CCD_PIXEL2ARCSEC, 10 * parameters.PIXSHIFT_PRIOR),
                                                 (-90, 90), (0.2, 5), (-360, 360)]), psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
@@ -102,6 +102,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 self.fixed[k] = True
         # This set of fixed parameters was determined so that the reconstructed spectrum has a ZERO bias
         # with respect to the true spectrum injected in the simulation
+        # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
+        self.fixed[0] = "A2_T" not in self.spectrum.header and not self.spectrum.disperser.flat_ratio_order_2over1
         self.fixed[1] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_pectrum
         self.fixed[2] = True  # delta x: if False, extracted spectrum is biaised compared with truth
         self.fixed[5] = True  # B: not needed in simulations, to check with data
@@ -557,7 +559,6 @@ def run_ffm_minimisation(w, method="newton"):
     --------
 
     >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
-    >>> spec = Spectrum("../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/sim_20170530_176_spectrum.fits")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
