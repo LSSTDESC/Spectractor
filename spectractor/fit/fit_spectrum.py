@@ -82,7 +82,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.ozone = 400.
         self.pwv = 3
         self.aerosols = 0.05
-        self.reso = -1
+        self.reso = 1
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.B = 0
@@ -90,8 +90,8 @@ class SpectrumFitWorkspace(FitWorkspace):
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
         # self.fixed[0] = True
-        # self.fixed[1] = True
-        self.fixed[5] = True
+        self.fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
+        # self.fixed[5] = True
         self.fixed[6:8] = [True, True]
         # self.fixed[7] = False
         self.fixed[8] = True
@@ -173,10 +173,11 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax2.errorbar(lambdas[sub][idx], residuals, yerr=residuals_err, fmt='ro', markersize=2, label='(Data-Model)/Err')
         ax2.axhline(0, color=p0[0].get_color())
         ax2.grid(True)
+        ylim = ax2.get_ylim()
         residuals_model = self.model_err[sub][idx] / self.err[sub][idx]
         ax2.fill_between(lambdas[sub][idx], -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
         # std = np.std(residuals)
-        # ax2.set_ylim([-2. * std, 2. * std])
+        ax2.set_ylim(ylim)
         ax2.set_xlabel(ax.get_xlabel())
         # ax2.set_ylabel('(Data-Model)/Err', fontsize=10)
         ax2.legend()
