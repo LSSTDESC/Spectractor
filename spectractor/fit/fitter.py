@@ -125,11 +125,18 @@ class FitWorkspace:
 
     def get_bad_indices(self):
         bad_indices = np.asarray(self.outliers, dtype=int)
-        if self.data.ndim > 1:
+        if self.data.dtype == np.object:
             if len(self.outliers) > 0:
-                mask = np.zeros(self.data.shape, dtype=bool)
-                mask[np.unravel_index(self.outliers, self.data.shape)] = True
-                bad_indices = [np.arange(self.data[k].size)[mask[k]] for k in range(self.data.shape[0])]
+                bad_indices = []
+                start_index = 0
+                for k in range(self.data.shape[0]):
+                    mask = np.zeros(self.data[k].size, dtype=bool)
+                    outliers = np.asarray(self.outliers)[np.logical_and(np.asarray(self.outliers) > start_index,
+                                                                        np.asarray(self.outliers) < start_index +
+                                                                        self.data[k].size)]
+                    mask[outliers - start_index] = True
+                    bad_indices.append(np.arange(self.data[k].size)[mask])
+                    start_index += self.data[k].size
             else:
                 bad_indices = [[] for _ in range(self.data.shape[0])]
         return bad_indices
@@ -1004,6 +1011,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                     if pp > fit_workspace.bounds[ipp][1]:
                         tmp_params_2[ipp] = fit_workspace.bounds[ipp][1]
                 return fit_workspace.chisq(tmp_params_2)
+
             # tol parameter acts on alpha (not func)
             alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=5e-1, brack=(0, 1))
         else:
@@ -1023,6 +1031,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         # prepare outputs
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
+        fit_workspace.p = tmp_params
         if fit_workspace.verbose:
             my_logger.info(f"\n\tIteration={i}: initial cost={cost:.5g} initial chisq_red={cost / tmp_model.size:.5g}"
                            f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
@@ -1375,23 +1384,23 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         run_minimisation(fit_workspace, method=method, epsilon=epsilon, fix=fix, xtol=xtol, ftol=ftol, niter=niter)
         # remove outliers
         if fit_workspace.data.dtype == np.object:
-            indices_no_nan = ~np.isnan(np.concatenate(fit_workspace.data).ravel())
-            data = np.concatenate(fit_workspace.data).ravel()[indices_no_nan]
-            model = np.concatenate(fit_workspace.model).ravel()[indices_no_nan]
-            err = np.concatenate(fit_workspace.err).ravel()[indices_no_nan]
+            # indices_no_nan = ~np.isnan(np.concatenate(fit_workspace.data).ravel())
+            data = np.concatenate(fit_workspace.data).ravel()  # [indices_no_nan]
+            model = np.concatenate(fit_workspace.model).ravel()  # [indices_no_nan]
+            err = np.concatenate(fit_workspace.err).ravel()  # [indices_no_nan]
         else:
-            indices_no_nan = ~np.isnan(fit_workspace.data.flatten())
-            data = fit_workspace.data.flatten()[indices_no_nan]
-            model = fit_workspace.model.flatten()[indices_no_nan]
-            err = fit_workspace.err.flatten()[indices_no_nan]
+            # indices_no_nan = ~np.isnan(fit_workspace.data.flatten())
+            data = fit_workspace.data.flatten()  # [indices_no_nan]
+            model = fit_workspace.model.flatten()  # [indices_no_nan]
+            err = fit_workspace.err.flatten()  # [indices_no_nan]
         residuals = np.abs(data - model) / err
         outliers = residuals > sigma_clip
-        outliers = [i for i in range(fit_workspace.data.size) if outliers[i]]
+        outliers = [i for i in range(data.size) if outliers[i]]
         outliers.sort()
         if len(outliers) > 0:
             my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
-            my_logger.info(f'\n\tOutliers: {len(outliers)} / {fit_workspace.data.size} data points '
-                           f'({100 * len(outliers) / fit_workspace.data.size:.2f}%) '
+            my_logger.info(f'\n\tOutliers: {len(outliers)} / {data.size} data points '
+                           f'({100 * len(outliers) / data.size:.2f}%) '
                            f'at more than {sigma_clip}-sigma from best-fit model.')
             if np.all(fit_workspace.outliers == outliers):
                 my_logger.info(f'\n\tOutliers flat index list unchanged since last iteration: '
