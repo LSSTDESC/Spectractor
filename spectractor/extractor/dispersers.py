@@ -307,6 +307,7 @@ class Grating:
         self.transmission = None
         self.transmission_err = None
         self.ratio_order_2over1 = None
+        self.flat_ratio_order_2over1 = True
         self.load_files(verbose=verbose)
 
     def N(self, x):
@@ -384,8 +385,10 @@ class Grating:
             l, t = a.T
             self.ratio_order_2over1 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
                                                            fill_value=(t[0], t[-1]))
+            self.flat_ratio_order_2over1 = False
         else:
             self.ratio_order_2over1 = lambda x: parameters.GRATING_ORDER_2OVER1 * np.ones_like(x).astype(float)
+            self.flat_ratio_order_2over1 = True
         filename = self.data_dir + self.label + "/hologram_center.txt"
         if os.path.isfile(filename):
             lines = [ll.rstrip('\n') for ll in open(filename)]
