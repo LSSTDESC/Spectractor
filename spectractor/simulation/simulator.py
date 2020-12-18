@@ -161,9 +161,9 @@ class SpectrumSimulation(Spectrum):
             self.data[-1] = self.data[-2]
             # self.data /= np.gradient(lambdas)
             telescope_transmission = self.telescope.transmission(lambdas)
-            idx = np.where(telescope_transmission > 0)[0]
+            idx = telescope_transmission > 0
             self.err[idx] = self.data[idx] * self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx]
-            idx = np.where(telescope_transmission <= 0)[0]
+            idx = telescope_transmission <= 0
             self.err[idx] = 1e6 * np.max(self.err)
         # Now add the systematics
         if reso > 0.1:
@@ -284,6 +284,8 @@ class SpectrogramModel(Spectrum):
         spectrum_err = np.zeros_like(spectrum)
         idx = telescope_transmission > 0
         spectrum_err[idx] = self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[idx]
+        # idx = telescope_transmission <= 0: not ready yet to be implemented
+        # spectrum_err[idx] = 1e6 * np.max(spectrum_err)
         return spectrum, spectrum_err
 
     def simulate_psf(self, psf_poly_params):
