@@ -83,6 +83,8 @@ class SpectrumSimulation(Spectrum):
         idx = np.where(self.telescope.transmission(lambdas) > 0)[0]
         self.err[idx] = self.telescope.transmission_err(lambdas)[idx] / self.telescope.transmission(lambdas)[idx]
         self.err[idx] *= self.data[idx]
+        idx = np.where(self.telescope.transmission(lambdas) <= 0)[0]
+        self.err[idx] = 1e6 * np.max(self.err)
         return self.data, self.err
 
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, reso=0.,
@@ -138,6 +140,7 @@ class SpectrumSimulation(Spectrum):
         distance_order2 = distance - adr_u
         lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
+        self.lambdas = lambdas
         self.lambdas_order2 = lambdas_order2
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
         if self.fast_sim:
@@ -160,6 +163,8 @@ class SpectrumSimulation(Spectrum):
             telescope_transmission = self.telescope.transmission(lambdas)
             idx = np.where(telescope_transmission > 0)[0]
             self.err[idx] = self.data[idx] * self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx]
+            idx = np.where(telescope_transmission <= 0)[0]
+            self.err[idx] = 1e6 * np.max(self.err)
         # Now add the systematics
         if reso > 0.1:
             self.data = fftconvolve_gaussian(self.data, reso)
@@ -175,7 +180,7 @@ class SpectrumSimulation(Spectrum):
             self.err = (err_conv(lambdas) + A2 * err_order2) / lambdas
         if B != 0:
             self.data += B / (lambdas * np.gradient(lambdas))
-        if np.any(self.err > 0):
+        if np.any(self.err <= 0):
             min_positive = np.min(self.err[self.err > 0])
             self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
         return self.lambdas, self.data, self.err
