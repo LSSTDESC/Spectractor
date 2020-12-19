@@ -105,7 +105,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # This set of fixed parameters was determined so that the reconstructed spectrum has a ZERO bias
         # with respect to the true spectrum injected in the simulation
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        self.fixed[0] = "A2_T" not in self.spectrum.header and not self.spectrum.disperser.flat_ratio_order_2over1
+        self.fixed[0] = not self.spectrum.disperser.flat_ratio_order_2over1
         self.fixed[1] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_pectrum
         self.fixed[2] = True  # delta x: if False, extracted spectrum is biaised compared with truth
         self.fixed[5] = True  # B: not needed in simulations, to check with data

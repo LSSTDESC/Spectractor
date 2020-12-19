@@ -120,7 +120,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             if "x_c" in par or "saturation" in par or "y_c" in par:
                 self.fixed[k] = True
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        self.fixed[1] = "A2_T" not in self.spectrum.header and not self.spectrum.disperser.flat_ratio_order_2over1
+        self.fixed[1] = not self.spectrum.disperser.flat_ratio_order_2over1
         # self.fixed[5:7] = [True, True]  # DCCD, x0
         # self.fixed[7] = True  # Delta y
         # self.fixed[8] = True  # angle
