@@ -122,6 +122,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
         self.fixed[1] = not self.spectrum.disperser.flat_ratio_order_2over1
         # self.fixed[5:7] = [True, True]  # DCCD, x0
+        self.fixed[6] = True  # Delta x
         # self.fixed[7] = True  # Delta y
         # self.fixed[8] = True  # angle
         self.fixed[9] = True  # B
@@ -548,6 +549,7 @@ if __name__ == "__main__":
     params = []
     chisqs = []
     filenames = ['outputs/sim_20170530_134_spectrum.fits']
+    filenames = ['../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_176_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 

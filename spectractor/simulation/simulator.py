@@ -168,7 +168,7 @@ class SpectrumSimulation(Spectrum):
         # Now add the systematics
         if reso > 0.1:
             self.data = fftconvolve_gaussian(self.data, reso)
-            self.err = np.sqrt(np.abs(fftconvolve_gaussian(self.err ** 2, reso)))
+            # self.err = np.sqrt(np.abs(fftconvolve_gaussian(self.err ** 2, reso)))
         if A2 > 0:
             lambdas_binwidths_order2 = np.gradient(lambdas_order2)
             sim_conv = interp1d(lambdas, self.data * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))

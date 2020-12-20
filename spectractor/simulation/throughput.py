@@ -432,7 +432,7 @@ class TelescopeTransmission:
         wl,trm=ctio.load_mirror_reflectivity(datapath)
         self.tm=interp1d(wl,trm,kind='linear',bounds_error=False,fill_value=0.)
         '''
-        throughput = Throughput()
+        throughput = Throughput(input_directory=parameters.THROUGHPUT_DIR)
         wl, trm, err = throughput.load_total_throughput()
         to = interp1d(wl, trm, kind='linear', bounds_error=False, fill_value=0.)
         err = np.sqrt(err ** 2 + parameters.OBS_TRANSMISSION_SYSTEMATICS ** 2)
