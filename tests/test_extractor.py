@@ -22,16 +22,17 @@ def test_logbook():
 
 def test_extractor_ctio():
     file_names = ['tests/data/reduc_20170530_134.fits']
+    file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.0/data_30may17_A2=0.1/reduc_20170530_076.fits']
     output_directory = "./outputs"
 
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    parameters.CCD_REBIN = 2
+    parameters.CCD_REBIN = 1
 
     for file_name in file_names:
-        tag = file_name.split('/')[-1]
+        tag = file_name.split('/')[-1].replace("sim","reduc")
         disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         if target_label is None or xpos is None or ypos is None:
             continue
