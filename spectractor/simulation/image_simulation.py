@@ -374,7 +374,9 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Load reduced image
     spectrum, telescope, disperser, target = SimulatorInit(spectrum_filename)
     image = ImageModel(image_filename, target_label=target.label)
-    guess = [spectrum.header['TARGETX'], spectrum.header['TARGETY']]
+    guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
+    if "CCDREBIN" in spectrum.header:
+        guess *= spectrum.header["CCDREBIN"]
     if parameters.DEBUG:
         image.plot_image(scale='symlog', target_pixcoords=guess)
     # Fit the star 2D profile
@@ -425,6 +427,11 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     if psf_poly_params is None:
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
+    else:
+        spectrum.chromatic_psf.deg = (len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.param_names) - 2) - 1
+        spectrum.chromatic_psf.set_polynomial_degrees(spectrum.chromatic_psf.deg)
+        my_logger.info(f'\n\tUse PSF parameters {psf_poly_params} as polynoms of '
+                       f'degree {spectrum.chromatic_psf.degrees}')
 
     # Simulate spectrogram
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,

@@ -141,6 +141,7 @@ class Image(object):
         self.header['OUTTEMP'] = self.temperature
         self.header['OUTPRESS'] = self.pressure
         self.header['OUTHUM'] = self.humidity
+        self.header['CCDREBIN'] = parameters.CCD_REBIN
 
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)

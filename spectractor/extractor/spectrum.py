@@ -504,6 +504,8 @@ class Spectrum:
                 self.lambda_ref = self.header['LBDA_REF']
             if self.header['PARANGLE'] != "":
                 self.parallactic_angle = self.header['PARANGLE']
+            if 'CCDREBIN' in self.header and self.header['CCDREBIN'] != "":
+                parameters.CCD_REBIN = self.header['CCDREBIN']
 
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
