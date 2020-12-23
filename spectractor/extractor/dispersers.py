@@ -384,7 +384,7 @@ class Grating:
             a = np.loadtxt(filename)
             l, t = a.T
             self.ratio_order_2over1 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
-                                                           fill_value=(t[0], t[-1]))
+                                                           fill_value="extrapolate") #"(0, t[-1]))
             self.flat_ratio_order_2over1 = False
         else:
             self.ratio_order_2over1 = lambda x: parameters.GRATING_ORDER_2OVER1 * np.ones_like(x).astype(float)
@@ -540,6 +540,7 @@ class Grating:
         if xlim is not None:
             wavelengths = np.linspace(xlim[0], xlim[1], 100)
         plt.plot(wavelengths, self.transmission(wavelengths), 'b-', label=self.label)
+        plt.plot(wavelengths, self.ratio_order_2over1(wavelengths), 'r-', label="Ratio 2/1")
         plt.xlabel(r"$\lambda$ [nm]")
         plt.ylabel(r"Transmission")
         plt.grid()
