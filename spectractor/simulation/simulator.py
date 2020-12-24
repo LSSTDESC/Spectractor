@@ -712,7 +712,7 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
     # SPECTRA-GRID
     # -------------
     # in any case we re-calculate the spectra in case of change of spectrum function
-    spectra = SpectrumSimGrid(spectrum, atm, telescope, disperser, target, atm.header)
+    spectra = SpectrumSimGrid(spectrum, atm, telescope, disperser, target)
     spectra.compute()
     spectra.save_spectra(output_filename)
     if parameters.DEBUG:
