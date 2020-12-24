@@ -105,7 +105,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # This set of fixed parameters was determined so that the reconstructed spectrum has a ZERO bias
         # with respect to the true spectrum injected in the simulation
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        self.fixed[0] = True  # not self.spectrum.disperser.flat_ratio_order_2over1
+        self.fixed[0] = not self.spectrum.disperser.flat_ratio_order_2over1
         self.fixed[1] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_pectrum
         self.fixed[2] = True  # delta x: if False, extracted spectrum is biased compared with truth
         # self.fixed[3] = True  # delta y
@@ -575,7 +575,6 @@ def run_ffm_minimisation(w, method="newton"):
     --------
 
     >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
-    >>> spec = Spectrum('../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/reduc_20170530_076_spectrum.fits', config="./config/ctio.ini")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
