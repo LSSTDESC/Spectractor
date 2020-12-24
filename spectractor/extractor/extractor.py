@@ -775,7 +775,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Calibrate the spectrum
     my_logger.info(f'\n\tCalibrating order {spectrum.order:d} spectrum...')
-    calibrate_spectrum(spectrum)
+    calibrate_spectrum(spectrum, with_adr=True)
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
     w = None
@@ -787,7 +787,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
             spectrum = run_ffm_minimisation(w, method="newton")
 
             # Calibrate the spectrum
-            calibrate_spectrum(spectrum)
+            calibrate_spectrum(spectrum, with_adr=False)
             w.p[1] = spectrum.disperser.D
             w.p[2] = spectrum.header['PIXSHIFT']
 

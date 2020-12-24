@@ -651,12 +651,12 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
     Creation of a mock spectrum with emission and absorption lines:
 
     >>> import numpy as np
-    >>> from spectractor.extractor.spectroscopy import Lines, HALPHA, HBETA, O2
+    >>> from spectractor.extractor.spectroscopy import Lines, HALPHA, HBETA, O2_1
     >>> lambdas = np.arange(300,1000,1)
     >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
     >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
     >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
-    >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
+    >>> spectrum += O2_1.gaussian_model(lambdas, A=-3000, sigma=7)
     >>> spectrum_err = np.sqrt(spectrum)
     >>> cov = np.diag(spectrum_err)
     >>> spectrum = np.random.poisson(spectrum)
@@ -668,7 +668,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
 
     Detect the lines:
 
-    >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
+    >>> lines = Lines([HALPHA, HBETA, O2_1], hydrogen_only=True,
     ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
     >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, cov, fwhm_func=fwhm_func)
 
@@ -1027,7 +1027,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
     return global_chisq
 
 
-def calibrate_spectrum(spectrum):
+def calibrate_spectrum(spectrum, with_adr=False):
     """Convert pixels into wavelengths given the position of the order 0,
     the data for the spectrum, the properties of the disperser. Fit the absorption
     (and eventually the emission) lines to perform a second calibration of the
@@ -1040,6 +1040,9 @@ def calibrate_spectrum(spectrum):
     ----------
     spectrum: Spectrum
         Spectrum object to calibrate
+    with_adr: bool, optional
+        If True, the ADR longitudinal shift is subtracted to distances.
+        Must be False if the spectrum has already been decontaminated from ADR (default: False).
 
     Returns
     -------
@@ -1051,9 +1054,10 @@ def calibrate_spectrum(spectrum):
     >>> spectrum = Spectrum('tests/data/reduc_20170605_028_spectrum.fits')
     >>> parameters.LAMBDA_MIN = 550
     >>> parameters.LAMBDA_MAX = 800
-    >>> lambdas = calibrate_spectrum(spectrum)
+    >>> lambdas = calibrate_spectrum(spectrum, with_adr=True)
     >>> spectrum.plot_spectrum()
     """
+    with_adr = int(with_adr)
     distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
     if spectrum.lambda_ref is None:
@@ -1079,7 +1083,7 @@ def calibrate_spectrum(spectrum):
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
         dist = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift)
-        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(dist - adr_u,
+        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(dist - with_adr*adr_u,
                                                                       x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
         spectrum.convert_from_ADUrate_to_flam()
@@ -1154,7 +1158,7 @@ def calibrate_spectrum(spectrum):
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
     distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=pixel_shift)
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - adr_u, x0=x0, order=spectrum.order)
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr*adr_u, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.lambdas_binwidths = np.gradient(lambdas)
     spectrum.convert_from_ADUrate_to_flam()
