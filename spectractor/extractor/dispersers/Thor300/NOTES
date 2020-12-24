@@ -1,0 +1,5 @@
+- ratio_order_2over1.txt: fit of a model to Arthur's data from the LPNHE optical test bench
+- transmission.txt: mix of measurements coming from the Thorlabs data sheet (300-420nm), Laurent's measurement
+at DCCD=200mm (420-920nm) and Arthur's measurement at DCCD=58mm (>920nm)
+(see jupyter notebook Disperser_efficiencies.ipynb)
+- N.txt: estimation with CTIO data

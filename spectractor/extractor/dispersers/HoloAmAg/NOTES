@@ -1,0 +1,5 @@
+- ratio_order_2over1.txt: fit of a model to Laurent's data from the LPNHE optical test bench of 2020/07/09
+- transmission.txt: fit on CTIO data 2017/30/05 by Vincent assuming no order 2 contamination
+(see jupyter notebook Disperser_efficiencies.ipynb)
+- N.txt: interpolation of Neff estimated with CTIO scan of the hologram
+- hologram_*.txt: same
