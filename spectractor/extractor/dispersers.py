@@ -384,7 +384,7 @@ class Grating:
             a = np.loadtxt(filename)
             l, t = a.T
             self.ratio_order_2over1 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
-                                                           fill_value="extrapolate") #"(0, t[-1]))
+                                                           fill_value="extrapolate")  # "(0, t[-1]))
             self.flat_ratio_order_2over1 = False
         else:
             self.ratio_order_2over1 = lambda x: parameters.GRATING_ORDER_2OVER1 * np.ones_like(x).astype(float)
