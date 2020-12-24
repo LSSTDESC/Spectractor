@@ -118,16 +118,16 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
                                f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100])}, "
                                f"std={np.std(residuals[100:-100])}")
     assert np.isclose(float(spectrum.header['X0_T']), spectrum.x0[0], atol=0.05)
-    assert np.isclose(float(spectrum.header['Y0_T']), spectrum.x0[1], atol=0.05)
+    assert np.isclose(float(spectrum.header['Y0_T']), spectrum.x0[1], atol=0.5)
     assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle,
                       atol=180 / np.pi * 1 / parameters.CCD_IMSIZE)
     assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), atol=5e-3)
-    assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.08)
+    assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
     assert float(spectrum.header['CHI2_FIT']) < 0.65
     assert np.all(np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+6:],
-                             np.array(PSF_POLY_PARAMS_TRUTH)[6:], atol=0.15))
+                             np.array(PSF_POLY_PARAMS_TRUTH)[6:], rtol=0.05, atol=0.05))
     assert np.abs(np.mean(residuals[100:-100])) < 0.1
-    assert np.std(residuals[100:-100]) < 1
+    assert np.std(residuals[100:-100]) < 2
     spectrum_file_name = "./tests/data/sim_20170530_134_spectrum.fits"
     assert os.path.isfile(spectrum_file_name)
     spectrum = Spectrum(spectrum_file_name)
@@ -140,9 +140,9 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     nsigma = 5
     labels = ["A1_T", "OZONE_T", "PWV_T", "VAOD_T"]
     indices = [0, 2, 3, 4]
-    assert w.costs[-1] < 0.58
+    assert w.costs[-1]/w.data.size < 0.58
     for i, l in zip(indices, labels):
-        spectrum.my_logger.info(f"\n\tTest {l} best-fit {w.p[i]}+/-{np.sqrt(w.cov[i, i])} vs {spectrum.header[l]}"
+        spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]}+/-{np.sqrt(w.cov[i, i])} vs {spectrum.header[l]}"
                                 f" at {nsigma}sigma level: "
                                 f"{np.abs(w.p[i]-spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma}")
         assert np.abs(w.p[i]-spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma
@@ -158,15 +158,15 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     nsigma = 5
     labels = ["A1_T", "A2_T", "OZONE_T", "PWV_T", "VAOD_T", "D2CCD_T"]
     indices = [0, 1, 2, 3, 4, 5]
-    assert w.costs[-1] < 0.68
+    assert w.costs[-1]/w.data.size < 0.68
     for i, l in zip(indices, labels):
-        spectrum.my_logger.info(f"\n\tTest {l} best-fit {w.p[i]}+/-{np.sqrt(w.cov[i, i])} vs {spectrum.header[l]}"
+        spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]}+/-{np.sqrt(w.cov[i, i])} vs {spectrum.header[l]}"
                                 f" at {nsigma}sigma level: "
                                 f"{np.abs(w.p[i]-spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma}")
         assert np.abs(w.p[i]-spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma
-    assert np.isclose(np.abs(w.p[8]), 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
-    assert np.isclose(np.abs(w.p[9]), spectrum.header["ROT_T"], atol=2e-2)  # angle
-    assert np.isclose(np.abs(w.p[10]), 1, atol=1e-3)  # B
+    assert np.isclose(w.p[7], 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
+    assert np.isclose(w.p[8], spectrum.header["ROT_T"], atol=2e-2)  # angle
+    assert np.isclose(w.p[9], 1, atol=1e-3)  # B
 
 
 def test_fullchain():
