@@ -1784,9 +1784,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         >>> from spectractor import parameters
         >>> from spectractor.tools import plot_spectrum_simple
         >>> f, ax = plt.subplots(1,1)
-        # >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
-        # >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=[500,700], color='r', label='test')
         >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=None, color='r', label='test')
         >>> if parameters.DISPLAY: plt.show()
     """
@@ -2106,7 +2104,7 @@ def rebin(arr, new_shape):
 
     Examples
     --------
-    >>> a = np.ones((10, 10))
+    >>> a = 4 * np.ones((10, 10))
     >>> b = rebin(a, (5, 5))
     >>> b
     array([[4., 4., 4., 4., 4.],
@@ -2117,7 +2115,7 @@ def rebin(arr, new_shape):
     """
     if np.any(new_shape * parameters.CCD_REBIN != arr.shape):
         shape_cropped = new_shape * parameters.CCD_REBIN
-        margins = arr.shape - shape_cropped
+        margins = np.asarray(arr.shape) - shape_cropped
         arr = arr[:-margins[0], :-margins[1]]
     shape = (new_shape[0], arr.shape[0] // new_shape[0],
              new_shape[1], arr.shape[1] // new_shape[1])
