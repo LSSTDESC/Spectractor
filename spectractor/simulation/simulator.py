@@ -130,16 +130,16 @@ class SpectrumSimulation(Spectrum):
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         lambda_ref = self.lambda_ref
-        adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                               dispersion_axis_angle=self.rotation_angle)
-        distance_order1 = distance - adr_u
-        adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                               dispersion_axis_angle=self.rotation_angle)
-        distance_order2 = distance - adr_u
-        lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
-        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
+        # adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        # adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+        #                                                        dispersion_axis_angle=self.rotation_angle)
+        # distance_order1 = distance - adr_u
+        # adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
+        # adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+        #                                                        dispersion_axis_angle=self.rotation_angle)
+        # distance_order2 = distance - adr_u
+        # lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
+        # lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
         self.lambdas = lambdas
         self.lambdas_order2 = lambdas_order2
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
@@ -291,8 +291,8 @@ class SpectrogramModel(Spectrum):
     def simulate_psf(self, psf_poly_params):
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params, apply_bounds=True)
         self.chromatic_psf.fill_table_with_profile_params(profile_params)
-        self.chromatic_psf.table['Dy_disp_axis'] = np.tan(self.rotation_angle * np.pi / 180) * self.chromatic_psf.table[
-            'Dx']
+        self.chromatic_psf.table['Dy_disp_axis'] = \
+            np.tan(self.rotation_angle * np.pi / 180) * self.chromatic_psf.table['Dx']
         self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['y_c']) - self.spectrogram_y0
         self.chromatic_psf.profile_params = self.chromatic_psf.from_table_to_profile_params()
         if parameters.DEBUG:
@@ -308,26 +308,30 @@ class SpectrogramModel(Spectrum):
         # Wavelengths using the order 0 shifts (ADR has no impact as it shifts order 0 and order p equally)
         new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
         self.disperser.D = D
-        lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
+        self.lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
+        self.lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
+        self.lambdas_binwidths = np.gradient(self.lambdas)
 
         # ADR for order 1
-        adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=self.lambda_ref)
+        adr_ra, adr_dec = adr_calib(self.lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=self.lambda_ref)
         adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                                   dispersion_axis_angle=self.rotation_angle)
+        # adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+        #                                                            dispersion_axis_angle=self.rotation_angle)
+
         # Compute lambdas at pixel column x
-        lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=1)
+        # lambdas = self.disperser.grating_pixel_to_lambda(distance - 0*adr_u, new_x0, order=1)
         # Position (not distance) in pixel of wavelength lambda order 1 centroid in the (x,y) spectrogram frame
         dispersion_law = r0 + (Dx + shift_x + adr_x) + 1j * (Dy_disp_axis + adr_y + shift_y)
 
         # ADR for order 2
-        adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=self.lambda_ref)
+        adr_ra, adr_dec = adr_calib(self.lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
+                                    lambda_ref=self.lambda_ref)
         adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                                   dispersion_axis_angle=self.rotation_angle)
+        # adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+        #                                                            dispersion_axis_angle=self.rotation_angle)
+
         # Compute lambdas at pixel column x
-        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=2)
+        # lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - 0*adr_u, new_x0, order=2)
         # Position (not distance) in pixel of wavelength lambda order 2 centroid in the (x,y) spectrogram frame
         dispersion_law_order2 = r0 + (Dx + shift_x + adr_x) + 1j * (Dy_disp_axis + adr_y + shift_y)
 
@@ -350,20 +354,19 @@ class SpectrogramModel(Spectrum):
         # dispersion_law_order2 = dispersion_law + 1j * (dy_func(lambdas_order2) - self.chromatic_psf.table['Dy']
         #                                                + self.chromatic_psf.table['Dy_disp_axis'])
 
-        self.lambdas = lambdas
-        self.lambdas_binwidths = np.gradient(lambdas)
         if parameters.DEBUG:
             from spectractor.tools import from_lambda_to_colormap
             plt.plot(self.chromatic_psf.table['Dx'], self.chromatic_psf.table['Dy_disp_axis'], 'k-', label="mean")
             plt.scatter(-r0.real + dispersion_law.real, -r0.imag + dispersion_law.imag, label="dispersion_law",
-                        cmap=from_lambda_to_colormap(lambdas), c=lambdas)
+                        cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
             plt.scatter(-r0.real + dispersion_law_order2.real, -r0.imag + dispersion_law_order2.imag,
-                        label="dispersion_law_order2", cmap=from_lambda_to_colormap(lambdas_order2), c=lambdas_order2)
+                        label="dispersion_law_order2",
+                        cmap=from_lambda_to_colormap(self.lambdas_order2), c=self.lambdas_order2)
             plt.title(f"x0={new_x0}")
             plt.legend()
             plt.show()
 
-        return lambdas, lambdas_order2, dispersion_law, dispersion_law_order2
+        return self.lambdas, self.lambdas_order2, dispersion_law, dispersion_law_order2
 
     # @profile
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
@@ -506,7 +509,7 @@ class SpectrumSimGrid:
     """
 
     # ---------------------------------------------------------------------------
-    def __init__(self, spectrum, atmgrid, telescope, disperser, target, header, filename=""):
+    def __init__(self, spectrum, atmgrid, telescope, disperser, target, filename=""):
         """
         Args:
             filename (:obj:`str`): path to the image
