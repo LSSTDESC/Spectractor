@@ -73,7 +73,7 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
 
 def make_test_image():
     spectrum_filename = "outputs/reduc_20170530_134_spectrum.fits"
-    image_filename = spectrum_filename.replace("_spectrum.fits", ".fits")
+    image_filename = "./tests/data/reduc_20170530_134.fits"
     ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T,
              psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=True, with_rotation=True)
 
