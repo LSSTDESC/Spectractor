@@ -413,7 +413,7 @@ class PSF:
 
         Fit the data in 2D:
 
-        >>> p = np.array([150000, 19, 31, 4, 3, -0.1, 3, 400000])
+        >>> p = np.array([150000, 19, 31, 4.5, 2.5, -0.1, 3, 400000])
         >>> psf = MoffatGauss(p)
         >>> w = psf.fit_psf(data, data_errors=data_errors, bgd_model_func=None)
         >>> w.plot_fit()
@@ -760,7 +760,7 @@ class PSFFitWorkspace(FitWorkspace):
             :hide:
 
             >>> assert mod is not None
-            >>> assert np.mean(np.abs(mod-data)/data_errors) < 1
+            >>> assert np.mean(np.abs(mod.reshape(data.shape)-data)/data_errors) < 1
 
         Fit the data in 1D:
 
@@ -932,8 +932,6 @@ def load_PSF(psf_type=parameters.PSF_TYPE):
     <....Moffat object at ...>
     >>> load_PSF(psf_type="MoffatGauss")  # doctest: +ELLIPSIS
     <....MoffatGauss object at ...>
-    >>> load_PSF(psf_type="unknown")  # doctest: +ELLIPSIS
-    <....PSF object at ...>
 
     """
     if psf_type == "Moffat":
