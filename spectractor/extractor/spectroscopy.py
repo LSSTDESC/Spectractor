@@ -166,13 +166,13 @@ class Lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(7)])
-        [686.719, 762.2, 794.0, 820.4, 822.696, 868.0, 898.765]
+        [687.472, 760.6, 763.2, 794.0, 820.4, 822.696, 868.0]
 
         Redshift all the spectral lines, except the atmospheric lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
-        [686.719, 706.2, 762.2, 777.6, 794.0]
+        [687.472, 706.2, 760.6, 763.2, 777.6]
 
         Hydrogen lines at order 1 and 2:
         >>> lines = Lines(HYDROGEN_LINES, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True, orders=[1, 2])
@@ -332,7 +332,7 @@ class Lines:
         >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
         >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
         >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
-        >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
+        >>> spectrum += O2_1.gaussian_model(lambdas, A=-3000, sigma=7)
         >>> spectrum_err = np.sqrt(spectrum)
         >>> spec = Spectrum()
         >>> spec.lambdas = lambdas
@@ -342,7 +342,7 @@ class Lines:
 
         Detect the lines:
 
-        >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
+        >>> lines = Lines([HALPHA, HBETA, O2_1], hydrogen_only=True,
         ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
         >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
 
@@ -429,7 +429,7 @@ class Lines:
         >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
         >>> spectrum += HALPHA.gaussian_model(lambdas, A=5000, sigma=3)
         >>> spectrum += HBETA.gaussian_model(lambdas, A=3000, sigma=2)
-        >>> spectrum += O2.gaussian_model(lambdas, A=-3000, sigma=7)
+        >>> spectrum += O2_1.gaussian_model(lambdas, A=-3000, sigma=7)
         >>> spectrum_err = np.sqrt(spectrum)
         >>> spec = Spectrum()
         >>> spec.lambdas = lambdas
@@ -438,7 +438,7 @@ class Lines:
         >>> fwhm_func = interp1d(lambdas, 0.01 * lambdas)
 
         Detect the lines
-        >>> lines = Lines([HALPHA, HBETA, O2], hydrogen_only=True,
+        >>> lines = Lines([HALPHA, HBETA, O2_1], hydrogen_only=True,
         ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
         >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
         >>> assert(global_chisq < 1)
