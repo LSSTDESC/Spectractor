@@ -55,7 +55,8 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
     # ax[0].plot(spectrum.lambdas, transverse_sum, label="Transverse sum")
     ax[0].set_ylabel(f"Spectrum [{spectrum.units}]")
     ax[0].legend()
-    amplitude_truth_interp = interp1d(lambdas_truth, amplitude_truth, kind='cubic', fill_value=0, bounds_error=False)(spectrum.lambdas)
+    amplitude_truth_interp = interp1d(lambdas_truth, amplitude_truth, kind='cubic',
+                                      fill_value=0, bounds_error=False)(spectrum.lambdas)
     residuals = (spectrum.data - amplitude_truth_interp)/spectrum.err
     ax[1].errorbar(spectrum.lambdas, residuals, yerr=np.ones_like(spectrum.data), label="Fit", fmt="r.")
     ax[1].set_ylabel(f"Residuals")
@@ -71,7 +72,7 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
     return residuals
 
 
-def make_test_image():
+def make_image():
     spectrum_filename = "outputs/reduc_20170530_134_spectrum.fits"
     image_filename = "./tests/data/reduc_20170530_134.fits"
     ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T,
@@ -81,7 +82,7 @@ def make_test_image():
 def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     # load test and make image simulation
     if not os.path.isfile(sim_image):
-        make_test_image()
+        make_image()
     image = Image(sim_image)
     lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
     amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
@@ -95,32 +96,38 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     parameters.CCD_REBIN = 1
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
-    # spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
-    #                        disperser_label=disperser_label)
-    #
-    # # tests
-    # residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
-    #
-    # spectrum.my_logger.warning(f"\n\tQuantities to test:"
-    #                            f"\n\t\tspectrum.header['X0_T']={spectrum.header['X0_T']} vs {spectrum.x0[0]}"
-    #                            f"\n\t\tspectrum.header['Y0_T']={spectrum.header['Y0_T']} vs {spectrum.x0[1]}"
-    #                            f"\n\t\tspectrum.header['ROT_T']={spectrum.header['ROT_T']} vs {spectrum.rotation_angle}"
-    #                            f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV']} vs {np.mean(spectrum.spectrogram_bgd)}"
-    #                            f"\n\t\tspectrum.header['D2CCD_T']={spectrum.header['D2CCD_T']} vs {spectrum.disperser.D}"
-    #                            f"\n\t\tspectrum.header['A2_FIT']={spectrum.header['A2_FIT']} vs {A2_T}"
-    #                            f"\n\t\tspectrum.header['CHI2_FIT']={spectrum.header['CHI2_FIT']}"
-    #                            f"\n\t\tspectrum.chromatic_psf.poly_params={spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx:]} vs {PSF_POLY_PARAMS_TRUTH}"
-    #                            f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100])}, std={np.std(residuals[100:-100])}")
-    # assert np.isclose(float(spectrum.header['X0_T']), spectrum.x0[0], atol=0.05)
-    # assert np.isclose(float(spectrum.header['Y0_T']), spectrum.x0[1], atol=0.05)
-    # assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle,
-    #                   atol=180 / np.pi * 1 / parameters.CCD_IMSIZE)
-    # assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), atol=5e-3)
-    # assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.08)
-    # assert float(spectrum.header['CHI2_FIT']) < 0.65
-    # assert np.all(np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+6:], np.array(PSF_POLY_PARAMS_TRUTH)[6:], atol=0.15))
-    # assert np.abs(np.mean(residuals[100:-100])) < 0.1
-    # assert np.std(residuals[100:-100]) < 1
+    spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
+                           disperser_label=disperser_label)
+
+    # tests
+    residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
+
+    spectrum.my_logger.warning(f"\n\tQuantities to test:"
+                               f"\n\t\tspectrum.header['X0_T']={spectrum.header['X0_T']} vs {spectrum.x0[0]}"
+                               f"\n\t\tspectrum.header['Y0_T']={spectrum.header['Y0_T']} vs {spectrum.x0[1]}"
+                               f"\n\t\tspectrum.header['ROT_T']={spectrum.header['ROT_T']} vs {spectrum.rotation_angle}"
+                               f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV']} "
+                               f"vs {np.mean(spectrum.spectrogram_bgd)}"
+                               f"\n\t\tspectrum.header['D2CCD_T']={spectrum.header['D2CCD_T']} "
+                               f"vs {spectrum.disperser.D}"
+                               f"\n\t\tspectrum.header['A2_FIT']={spectrum.header['A2_FIT']} vs {A2_T}"
+                               f"\n\t\tspectrum.header['CHI2_FIT']={spectrum.header['CHI2_FIT']}"
+                               f"\n\t\tspectrum.chromatic_psf."
+                               f"poly_params={spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx:]}"
+                               f" vs {PSF_POLY_PARAMS_TRUTH}"
+                               f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100])}, "
+                               f"std={np.std(residuals[100:-100])}")
+    assert np.isclose(float(spectrum.header['X0_T']), spectrum.x0[0], atol=0.05)
+    assert np.isclose(float(spectrum.header['Y0_T']), spectrum.x0[1], atol=0.05)
+    assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle,
+                      atol=180 / np.pi * 1 / parameters.CCD_IMSIZE)
+    assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), atol=5e-3)
+    assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.08)
+    assert float(spectrum.header['CHI2_FIT']) < 0.65
+    assert np.all(np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+6:],
+                             np.array(PSF_POLY_PARAMS_TRUTH)[6:], atol=0.15))
+    assert np.abs(np.mean(residuals[100:-100])) < 0.1
+    assert np.std(residuals[100:-100]) < 1
     spectrum_file_name = "./tests/data/sim_20170530_134_spectrum.fits"
     assert os.path.isfile(spectrum_file_name)
     spectrum = Spectrum(spectrum_file_name)
