@@ -452,6 +452,34 @@ class Grating:
         theta0 = get_theta0(x0)
         return np.arcsin(order * lambdas * 1e-6 * self.N(x0) + np.sin(theta0))
 
+    def grating_refraction_angle_to_lambda(self, thetas, x0, order=1):
+        """ Convert refraction angles into wavelengths (in nm) with.
+
+        Parameters
+        ----------
+        thetas: array, float
+            Refraction angles in radian.
+        x0: float or [float, float]
+            Order 0 position detected in the non-rotated image.
+        order: int
+            Order of the spectrum (default: 1)
+
+        Examples
+        --------
+        >>> disperser = Grating(N=300, D=55)
+        >>> x0 = [800,800]
+        >>> lambdas = np.arange(300, 900, 100)
+        >>> thetas = disperser.refraction_angle_lambda(lambdas, x0, order=1)
+        >>> print(thetas)
+        [0.0896847  0.11985125 0.15012783 0.18054376 0.21112957 0.24191729]
+        >>> lambdas = disperser.grating_refraction_angle_to_lambda(thetas, x0, order=1)
+        >>> print(lambdas)
+        [300. 400. 500. 600. 700. 800.]
+        """
+        theta0 = get_theta0(x0)
+        lambdas = (np.sin(thetas) - np.sin(theta0)) / (order * self.N(x0))
+        return lambdas * 1e6
+
     def grating_pixel_to_lambda(self, deltaX, x0, order=1):
         """ Convert pixels into wavelengths (in nm) with.
 
