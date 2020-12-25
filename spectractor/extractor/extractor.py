@@ -293,31 +293,33 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # First guess of wavelengths
         self.spectrum.disperser.D = np.copy(D2CCD)
-        lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
-                                                                  self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                  order=1)
-        lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
-                                                                         self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                         order=2)
-
-        # Evaluate ADR
-        adr_ra, adr_dec = adr_calib(lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
-                                    lambda_ref=self.spectrum.lambda_ref)
-        adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
-        # Compute lambdas at pixel column x
-        self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u,
+        self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
                                                                        self.spectrum.x0 + np.asarray([dx0, dy0]),
                                                                        order=1)
-        # Evaluate ADR for order 2
-        adr_ra, adr_dec = adr_calib(lambdas_order2, self.spectrum.adr_params, parameters.OBS_LATITUDE,
-                                    lambda_ref=self.spectrum.lambda_ref)
-        adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-        adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
-        # Compute lambdas at pixel column x for order 2
-        self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u_2,
+        self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
                                                                               self.spectrum.x0 + np.asarray([dx0, dy0]),
                                                                               order=2)
+
+        # Evaluate ADR
+        adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
+                                    lambda_ref=self.spectrum.lambda_ref)
+        adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+        # adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+        # Compute lambdas at pixel column x
+        # self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u,
+        #                                                                self.spectrum.x0 + np.asarray([dx0, dy0]),
+        #                                                                order=1)
+
+        # Evaluate ADR for order 2
+        adr_ra, adr_dec = adr_calib(self.lambdas_order2, self.spectrum.adr_params, parameters.OBS_LATITUDE,
+                                    lambda_ref=self.spectrum.lambda_ref)
+        adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+        # adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+        # Compute lambdas at pixel column x for order 2
+        # self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u_2,
+        #                                                                    self.spectrum.x0 + np.asarray([dx0, dy0]),
+        #                                                                    order=2)
+
         # Fill spectrogram trace as a function of the pixel column x
         profile_params[:, 1] += adr_x + dx0
         profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y + dy0) - self.bgd_width
@@ -344,7 +346,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         #     plt.scatter(profile_params_order2[:, 1], profile_params_order2[:, 2], label="order 2",
         #                 cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
         #     plt.plot(profile_params[:, 1], profile_params[:, 2], label="profile")
-        #     plt.plot(profile_params[:, 1], Dy_disp_axis + 0*(self.spectrum.spectrogram_y0 + dy0 - self.bgd_width), 'k-',
+        #     plt.plot(profile_params[:, 1], Dy_disp_axis + self.spectrum.spectrogram_y0 + dy0 - self.bgd_width, 'k-',
         #              label="disp_axis")
         #     plt.plot(self.spectrum.chromatic_psf.table['Dx'] + self.spectrum.spectrogram_x0 + dx0,
         #              self.spectrum.chromatic_psf.table['Dy'] + self.spectrum.spectrogram_y0 + dy0 - self.bgd_width,
@@ -482,7 +484,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
                               aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
             ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
-            ax[2, 0].text(0.05, 0.05, f'mean={np.nanmean(residuals[:, sub]):.3f}\nstd={np.nanstd(residuals[:, sub]):.3f}',
+            ax[2, 0].text(0.05, 0.05,
+                          f'mean={np.nanmean(residuals[:, sub]):.3f}\nstd={np.nanstd(residuals[:, sub]):.3f}',
                           horizontalalignment='left', verticalalignment='bottom',
                           color='black', transform=ax[2, 0].transAxes)
             ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
@@ -575,18 +578,11 @@ def run_ffm_minimisation(w, method="newton"):
     --------
 
     >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
+    >>> spec = Spectrum('../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_176_spectrum.fits')
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
     >>> if 'LBDAS_T' in spec.header: plot_comparison_truth(spec, w)
-    >>> import matplotlib.pyplot as plt
-    >>> fig = plt.figure()
-    >>> spec.convert_from_ADUrate_to_flam()
-    >>> plt.plot(spec.lambdas, spec.data)
-    >>> spec2 = Spectrum("./outputs/reduc_20170530_176_spectrum.fits",  config="./config/ctio.ini")
-    >>> plt.plot(spec2.lambdas, spec2.data)
-    >>> plt.show()
-
        Line   Tabulated  Detected ...
 
     .. doctest:
@@ -778,7 +774,6 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     calibrate_spectrum(spectrum, with_adr=True)
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
-    w = None
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
         w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
