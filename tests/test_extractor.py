@@ -28,7 +28,7 @@ def test_extractor_ctio():
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    parameters.CCD_REBIN = 1
+    parameters.CCD_REBIN = 2
 
     for file_name in file_names:
         tag = file_name.split('/')[-1].replace("sim","reduc")
