@@ -518,9 +518,9 @@ STELLAR_LINES = [FE1, FE2, FE3, FE4, CAII1, CAII2, MG1, MG2]
 # O2 = Line(762.2, atmospheric=True, label=r'$O_2$',  # 762.2 is a weighted average of the O2 line simulated by Libradtran
 #           label_pos=[0.007, 0.02],
 #           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
-O2_1 = Line(760.6, atmospheric=True, label='',
+O2_1 = Line(760.3, atmospheric=True, label='',
             label_pos=[0.007, 0.02], use_for_calibration=True)  # libradtran paper fig.3
-O2_2 = Line(763.2, atmospheric=True, label='$O_2$',
+O2_2 = Line(763.1, atmospheric=True, label='$O_2$',
             label_pos=[0.007, 0.02], use_for_calibration=True)  # libradtran paper fig.3
 O2B = Line(687.472, atmospheric=True, label=r'$O_2(B)$',  # 687.472 is a weighted average of the O2B line simulated by Libradtran
            label_pos=[0.007, 0.02], use_for_calibration=True)  # https://en.wikipedia.org/wiki/Fraunhofer_lines

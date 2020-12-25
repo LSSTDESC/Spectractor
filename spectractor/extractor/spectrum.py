@@ -1054,7 +1054,7 @@ def calibrate_spectrum(spectrum, with_adr=False):
     >>> spectrum = Spectrum('tests/data/reduc_20170605_028_spectrum.fits')
     >>> parameters.LAMBDA_MIN = 550
     >>> parameters.LAMBDA_MAX = 800
-    >>> lambdas = calibrate_spectrum(spectrum, with_adr=True)
+    >>> lambdas = calibrate_spectrum(spectrum, with_adr=False)
     >>> spectrum.plot_spectrum()
     """
     with_adr = int(with_adr)
