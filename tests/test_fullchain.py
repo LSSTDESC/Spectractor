@@ -123,7 +123,7 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
                       atol=180 / np.pi * 1 / parameters.CCD_IMSIZE)
     assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), atol=5e-3)
     assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
-    assert float(spectrum.header['CHI2_FIT']) < 0.57
+    assert float(spectrum.header['CHI2_FIT']) < 0.62
     assert np.all(np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+6:],
                              np.array(PSF_POLY_PARAMS_TRUTH)[6:], rtol=0.05, atol=0.05))
     assert np.abs(np.mean(residuals[100:-100])) < 0.1
@@ -140,7 +140,7 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     nsigma = 2
     labels = ["A1_T", "OZONE_T", "PWV_T", "VAOD_T"]
     indices = [0, 2, 3, 4]
-    assert w.costs[-1]/w.data.size < 0.52
+    assert w.costs[-1]/w.data.size < 0.55
     for i, l in zip(indices, labels):
         spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]}+/-{np.sqrt(w.cov[i, i])} vs {spectrum.header[l]}"
                                 f" at {nsigma}sigma level: "
@@ -158,7 +158,7 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     nsigma = 5
     labels = ["A1_T", "A2_T", "OZONE_T", "PWV_T", "VAOD_T", "D2CCD_T"]
     indices = [0, 1, 2, 3, 4, 5]
-    assert w.costs[-1]/w.data.size < 0.61
+    assert w.costs[-1]/w.data.size < 0.65
     for i, l in zip(indices, labels):
         spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]}+/-{np.sqrt(w.cov[i, i])} vs {spectrum.header[l]}"
                                 f" at {nsigma}sigma level: "
