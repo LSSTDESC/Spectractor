@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
 from matplotlib.ticker import MaxNLocator
+from astropy.io import ascii
 
 import copy
 import os
@@ -16,7 +17,7 @@ from spectractor.config import set_logger
 from spectractor.simulation.simulator import SimulatorInit
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping
-from spectractor.tools import plot_image_simple, plot_spectrum_simple
+from spectractor.tools import from_lambda_to_colormap
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.spectroscopy import *
 
@@ -182,7 +183,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         lambdas_to_mask = [np.arange(300, 350, self.bin_widths)]
         for line in [HALPHA, HBETA, HGAMMA, HDELTA, O2_1, O2_2, O2B]:
             width = line.width_bounds[1]
-            lambdas_to_mask += [np.arange(line.wavelength-width, line.wavelength+width, self.bin_widths)]
+            lambdas_to_mask += [np.arange(line.wavelength - width, line.wavelength + width, self.bin_widths)]
         lambdas_to_mask = np.concatenate(lambdas_to_mask).ravel()
         lambdas_to_mask_indices = []
         for k in range(self.nspectra):
@@ -448,7 +449,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             for i in range(1, self.lambdas_bin_edges.size):
                 delta = self.atmosphere_lambda_bins[i][-1] - self.atmosphere_lambda_bins[i][0]
                 if delta > 0:
-                    atm.append(np.trapz(a(lbdas[self.atmosphere_lambda_bins[i]]), dx=self.atmosphere_lambda_step) / delta)
+                    atm.append(
+                        np.trapz(a(lbdas[self.atmosphere_lambda_bins[i]]), dx=self.atmosphere_lambda_step) / delta)
                 else:
                     atm.append(1)
             if reso > 0:
@@ -520,6 +522,13 @@ class MultiSpectraFitWorkspace(FitWorkspace):
     def plot_fit(self):
         """Plot the fit result.
 
+        Examples
+        --------
+        >>> file_names = ["./tests/data/reduc_20170530_134_spectrum.fits", "./tests/data/sim_20170530_134_spectrum.fits"]
+        >>> w = MultiSpectraFitWorkspace("./outputs/test", file_names, bin_width=5, verbose=True)
+        >>> w.simulate(*w.p)   #doctest: +ELLIPSIS
+        (array(...
+        >>> w.plot_fit()
         """
         cmap_bwr = copy.copy(cm.get_cmap('bwr'))
         cmap_bwr.set_bad(color='lightgrey')
@@ -527,41 +536,60 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         cmap_viridis.set_bad(color='lightgrey')
 
         data = copy.deepcopy(self.data)
+        for k in range(self.nspectra):
+            data[k][np.isnan(data[k]/self.err[k])] = np.nan
         if len(self.outliers) > 0:
             bad_indices = self.get_bad_indices()
             for k in range(self.nspectra):
                 data[k][bad_indices[k]] = np.nan
+            data[k] = np.ma.masked_invalid(data[k])
         data = np.array([data[k] for k in range(self.nspectra)], dtype=float)
         model = np.array([self.model[k] for k in range(self.nspectra)], dtype=float)
         err = np.array([self.err[k] for k in range(self.nspectra)], dtype=float)
-        gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1])
+        gs_kw = dict(width_ratios=[3, 0.13], height_ratios=[1, 1, 1])
         fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(7, 6), gridspec_kw=gs_kw)
         ozone, pwv, aerosols, reso, *A1s = self.p
-        plt.suptitle(f'VAOD={aerosols:.3f}, ozone={ozone:.0f}db, PWV={pwv:.2f}mm, reso={reso:.2f}')
+        plt.suptitle(f'VAOD={aerosols:.3f}, ozone={ozone:.0f}db, PWV={pwv:.2f}mm, reso={reso:.2f}', y=0.995)
         norm = np.nanmax(data)
-        plot_image_simple(ax[1, 0], data=model / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
-                          units='1/max(data)', cmap=cmap_viridis)
-        ax[1, 0].set_title("Model", fontsize=10, loc='center', color='white', y=0.8)
-        plot_image_simple(ax[0, 0], data=data / norm, title='Data', aspect='auto',
-                          cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)', cmap=cmap_viridis)
-        ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+        y = np.arange(0, self.nspectra+1).astype(int) - 0.5
+        xx, yy = np.meshgrid(self.lambdas[0], y)
+        ylbda = -0.45 * np.ones_like(self.lambdas[0][1:-1])
+        # model
+        im = ax[1, 0].pcolormesh(xx, yy, model / norm, vmin=0, vmax=1, cmap=cmap_viridis)
+        plt.colorbar(im, cax=ax[1, 1], label='1/max(data)', format="%.1f")
+        ax[1, 0].set_title("Model", fontsize=12, color='white', x=0.91, y=0.76)
+        ax[1, 0].grid(color='silver', ls='solid')
+        ax[1, 0].scatter(self.lambdas[0][1:-1], ylbda, cmap=from_lambda_to_colormap(self.lambdas[0][1:-1]),
+                         edgecolors='None', c=self.lambdas[0][1:-1], label='', marker='o', s=20)
+        # data
+        im = ax[0, 0].pcolormesh(xx, yy, data / norm, vmin=0, vmax=1, cmap=cmap_viridis)
+        plt.colorbar(im, cax=ax[0, 1], label='1/max(data)', format="%.1f")
+        ax[0, 0].set_title("Data", fontsize=12, color='white', x=0.91, y=0.76)
+        ax[0, 0].grid(color='silver', ls='solid')
+        ax[0, 0].scatter(self.lambdas[0][1:-1], ylbda, cmap=from_lambda_to_colormap(self.lambdas[0][1:-1]),
+                         edgecolors='None', c=self.lambdas[0][1:-1], label='', marker='o', s=20)
+        # residuals
         residuals = (data - model)
-        # residuals_err = self.spectrum.spectrogram_err / self.model
         norm = err
         residuals /= norm
         std = float(np.nanstd(residuals))
-        plot_image_simple(ax[2, 0], data=residuals, vmin=-3 * std, vmax=3 * std, title='(Data-Model)/Err',
-                          aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
-        ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
-        ax[2, 0].text(0.05, 0.05, f'mean={np.nanmean(residuals):.3f}\nstd={np.nanstd(residuals):.3f}',
+        im = ax[2, 0].pcolormesh(xx, yy, residuals, vmin=-3 * std, vmax=3 * std, cmap=cmap_bwr)
+        plt.colorbar(im, cax=ax[2, 1], label='(Data-Model)/Err', format="%.0f")
+        # ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, color='black', x=0.84, y=0.76)
+        ax[2, 0].grid(color='silver', ls='solid')
+        ax[2, 0].scatter(self.lambdas[0][1:-1], ylbda, cmap=from_lambda_to_colormap(self.lambdas[0][1:-1]),
+                         edgecolors='None', c=self.lambdas[0][1:-1], label='', marker='o', s=10*self.nspectra)
+        ax[2, 0].text(0.05, 0.8, f'mean={np.nanmean(residuals):.3f}\nstd={np.nanstd(residuals):.3f}',
                       horizontalalignment='left', verticalalignment='bottom',
                       color='black', transform=ax[2, 0].transAxes)
-        ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
-        ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
+        ax[2, 0].set_xlabel(r"$\lambda$ [nm]")
         for i in range(3):
+            ax[i, 0].set_xlim(self.lambdas[0, 0], self.lambdas[0, -1])
+            ax[i, 0].set_ylim(-0.5, self.nspectra-0.5)
+            ax[i, 0].yaxis.set_major_locator(MaxNLocator(integer=True))
             ax[i, 0].set_ylabel("Spectrum index")
+            ax[i, 1].get_yaxis().set_label_coords(2.6, 0.5)
+            ax[i, 0].get_yaxis().set_label_coords(-0.06, 0.5)
         fig.tight_layout()
         if self.live_fit:  # pragma: no cover
             plt.draw()
@@ -570,11 +598,11 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         else:  # pragma: no cover
             if parameters.DISPLAY and self.verbose:
                 plt.show()
-        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, f'T_inst_best_fit.pdf'), dpi=100, bbox_inches='tight')
+        if parameters.SAVE:
+            fig.savefig(self.output_file_name + '_bestfit.pdf', dpi=100, bbox_inches='tight')
 
     def plot_transmissions(self):
-        """Plot the fit result.
+        """Plot the fit result for transmissions.
 
         Examples
         --------
@@ -644,8 +672,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         else:  # pragma: no cover
             if parameters.DISPLAY and self.verbose:
                 plt.show()
-        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, f'T_inst_best_fit.pdf'), dpi=100, bbox_inches='tight')
+        if parameters.SAVE:
+            fig.savefig(self.output_file_name + '_Tinst_best_fit.pdf', dpi=100, bbox_inches='tight')
 
     def plot_A1s(self):
         """
@@ -685,19 +713,30 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         plt.xlabel("Spectrum index")
         plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
         plt.legend()
+        if parameters.SAVE:
+            plt.gcf().savefig(self.output_file_name + '_A1s.pdf', dpi=100, bbox_inches='tight')
         plt.show()
 
-    def save_telescope_throughput(self):
-        from scipy.signal import savgol_filter
+    def save_transmissions(self):
+        ozone, pwv, aerosols, reso, *A1s = self.p
+        tatm = self.atmosphere.simulate(ozone=ozone, pwv=pwv, aerosols=aerosols)
+        tatm_binned = []
+        for i in range(1, self.lambdas_bin_edges.size):
+            tatm_binned.append(quad(tatm, self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i])[0] /
+                               (self.lambdas_bin_edges[i] - self.lambdas_bin_edges[i - 1]))
+
         throughput = self.amplitude_params / self.disperser.transmission(self.lambdas[0])
         throughput_err = self.amplitude_params_err / self.disperser.transmission(self.lambdas[0])
-        mask_good = throughput_err < 10 * np.nanmedian(throughput_err)
-        throughput_err[~mask_good] = np.interp(self.lambdas[0][~mask_good],
-                                               self.lambdas[0][mask_good], throughput_err[mask_good])
-        throughput = savgol_filter(throughput, 17, 3)
-        throughput_err = savgol_filter(throughput_err, 17, 3)
-        file_name = "ctio_throughput_20173005_basethor300_prod7.3.txt"
-        np.savetxt(file_name, np.array([self.lambdas[0], throughput, throughput_err]).T)
+        # mask_good = throughput_err < 10 * np.nanmedian(throughput_err)
+        # throughput_err[~mask_good] = np.interp(self.lambdas[0][~mask_good],
+        #                                        self.lambdas[0][mask_good], throughput_err[mask_good])
+        # from scipy.signal import savgol_filter
+        # throughput = savgol_filter(throughput, 17, 3)
+        # throughput_err = savgol_filter(throughput_err, 17, 3)
+        file_name = self.output_file_name + f"_transmissions.txt"
+        ascii.write([self.lambdas[0], self.amplitude_params, self.amplitude_params_err,
+                     throughput, throughput_err, tatm_binned], file_name,
+                    names=["wl", "Tinst", "Tinst_err", "Ttel", "Ttel_err", "Tatm"], overwrite=True)
 
     def jacobian(self, params, epsilon, fixed_params=None, model_input=None):
         """Generic function to compute the Jacobian matrix of a model, with numerical derivatives.
@@ -842,7 +881,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
 
         tinst = np.array(fit_workspace.amplitude_params)
         for k in range(w.nspectra):
-            plt.plot(w.lambdas[k], tinst*np.array([w.M[k][i,i] for i in range(w.lambdas[k].size)]))
+            plt.plot(w.lambdas[k], tinst * np.array([w.M[k][i, i] for i in range(w.lambdas[k].size)]))
             # plt.plot(self.lambdas, self.ref_spectrum_cube[k], linestyle="--")
             plt.ylim(0, 1.2 * np.max(fit_workspace.data[k]))
         plt.grid()
@@ -858,7 +897,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
             fit_workspace.plot_fit()
             fit_workspace.plot_transmissions()
             fit_workspace.plot_A1s()
-            fit_workspace.save_telescope_throughput()
+            fit_workspace.save_transmissions()
             parameters.SAVE = False
 
 
@@ -1033,33 +1072,33 @@ if __name__ == "__main__":
     #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/reduc_20170530_194_spectrum.fits',
     #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/reduc_20170530_199_spectrum.fits']
     # Thor300
-    file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_066_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_071_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_076_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_081_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_086_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_091_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_096_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_101_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_106_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_111_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_116_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_121_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_126_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_131_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_136_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_141_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_146_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_151_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_156_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_161_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_166_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_171_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_176_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_181_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_186_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_191_spectrum.fits',
-                  '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_196_spectrum.fits']
+    # file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_066_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_071_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_076_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_081_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_086_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_091_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_096_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_101_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_106_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_111_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_116_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_121_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_126_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_131_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_136_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_141_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_146_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_151_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_156_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_161_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_166_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_171_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_176_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_181_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_186_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_191_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_196_spectrum.fits']
     file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/reduc_20170530_061_spectrum.fits',
                   '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/reduc_20170530_066_spectrum.fits',
                   '../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/reduc_20170530_071_spectrum.fits',
@@ -1095,7 +1134,7 @@ if __name__ == "__main__":
 
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    output_filename = f"sim_20170530_{disperser_label}"
+    output_filename = os.path.join(input_directory, f"multispectra_{disperser_label}_{target_label}")
     w = MultiSpectraFitWorkspace(output_filename, file_names, bin_width=3, nsteps=1000, fixed_A1s=False,
                                  burnin=200, nbins=10, verbose=1, plot=True, live_fit=True, inject_random_A1s=False)
     run_multispectra_minimisation(w, method="newton")
