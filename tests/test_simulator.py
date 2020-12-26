@@ -49,7 +49,7 @@ def test_simulator():
     parameters.DEBUG = True
     load_config('config/ctio.ini')
 
-    output_directory = './tests/data/'
+    output_directory = './outputs/'
 
     for file_name in file_names:
         tag = file_name.split('/')[-1]
