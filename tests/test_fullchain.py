@@ -98,25 +98,27 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
                            disperser_label=disperser_label)
+    # spectrum = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
 
     # tests
     residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
 
     spectrum.my_logger.warning(f"\n\tQuantities to test:"
-                               f"\n\t\tspectrum.header['X0_T']={spectrum.header['X0_T']} vs {spectrum.x0[0]}"
-                               f"\n\t\tspectrum.header['Y0_T']={spectrum.header['Y0_T']} vs {spectrum.x0[1]}"
-                               f"\n\t\tspectrum.header['ROT_T']={spectrum.header['ROT_T']} vs {spectrum.rotation_angle}"
-                               f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV']} "
-                               f"vs {np.mean(spectrum.spectrogram_bgd)}"
-                               f"\n\t\tspectrum.header['D2CCD_T']={spectrum.header['D2CCD_T']} "
-                               f"vs {spectrum.disperser.D}"
-                               f"\n\t\tspectrum.header['A2_FIT']={spectrum.header['A2_FIT']} vs {A2_T}"
-                               f"\n\t\tspectrum.header['CHI2_FIT']={spectrum.header['CHI2_FIT']}"
-                               f"\n\t\tspectrum.chromatic_psf."
-                               f"poly_params={spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx:]}"
-                               f" vs {PSF_POLY_PARAMS_TRUTH}"
-                               f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100])}, "
-                               f"std={np.std(residuals[100:-100])}")
+                               f"\n\t\tspectrum.header['X0_T']={spectrum.header['X0_T']:.5g} vs {spectrum.x0[0]:.5g}"
+                               f"\n\t\tspectrum.header['Y0_T']={spectrum.header['Y0_T']:.5g} vs {spectrum.x0[1]:.5g}"
+                               f"\n\t\tspectrum.header['ROT_T']={spectrum.header['ROT_T']:.5g} "
+                               f"vs {spectrum.rotation_angle:.5g}"
+                               f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV']:.4g} "
+                               f"vs {np.mean(spectrum.spectrogram_bgd):.4g}"
+                               f"\n\t\tspectrum.header['D2CCD_T']={spectrum.header['D2CCD_T']:.5g} "
+                               f"vs {spectrum.disperser.D:.5g}"
+                               f"\n\t\tspectrum.header['A2_FIT']={spectrum.header['A2_FIT']:.5g} vs {A2_T:.5g}"
+                               f"\n\t\tspectrum.header['CHI2_FIT']={spectrum.header['CHI2_FIT']:.4g}"
+                               f"\n\t\tspectrum.chromatic_psf.poly_params="
+                               f"{spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+2*(PSF_POLY_ORDER+1):]}"
+                               f" vs {PSF_POLY_PARAMS_TRUTH[2*(PSF_POLY_ORDER+1):]}"
+                               f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100]):.5g}, "
+                               f"std={np.std(residuals[100:-100]):.5g}")
     assert np.isclose(float(spectrum.header['X0_T']), spectrum.x0[0], atol=0.05)
     assert np.isclose(float(spectrum.header['Y0_T']), spectrum.x0[1], atol=0.5)
     assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle,
@@ -124,8 +126,8 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), atol=5e-3)
     assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
     assert float(spectrum.header['CHI2_FIT']) < 0.62
-    assert np.all(np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+6:],
-                             np.array(PSF_POLY_PARAMS_TRUTH)[6:], rtol=0.05, atol=0.05))
+    assert np.all(np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+2*(PSF_POLY_ORDER+1):],
+                             np.array(PSF_POLY_PARAMS_TRUTH)[2*(PSF_POLY_ORDER+1):], rtol=0.05, atol=0.05))
     assert np.abs(np.mean(residuals[100:-100])) < 0.1
     assert np.std(residuals[100:-100]) < 2
     spectrum_file_name = "./tests/data/sim_20170530_134_spectrum.fits"
@@ -137,13 +139,13 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     w = SpectrumFitWorkspace(spectrum_file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                              burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
     run_spectrum_minimisation(w, method="newton")
-    nsigma = 2
+    nsigma = 5
     labels = ["A1_T", "OZONE_T", "PWV_T", "VAOD_T"]
     indices = [0, 2, 3, 4]
     assert w.costs[-1]/w.data.size < 0.55
     for i, l in zip(indices, labels):
-        spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]}+/-{np.sqrt(w.cov[i, i])} vs {spectrum.header[l]}"
-                                f" at {nsigma}sigma level: "
+        spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.cov[i, i]):.3f} "
+                                f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
                                 f"{np.abs(w.p[i]-spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma}")
         assert np.abs(w.p[i]-spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma
     assert np.abs(w.p[1]) / np.sqrt(w.cov[1, 1]) < nsigma  # A2
@@ -158,15 +160,17 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     nsigma = 5
     labels = ["A1_T", "A2_T", "OZONE_T", "PWV_T", "VAOD_T", "D2CCD_T"]
     indices = [0, 1, 2, 3, 4, 5]
+    A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, B, *psf_poly_params = w.p
     assert w.costs[-1]/w.data.size < 0.65
     for i, l in zip(indices, labels):
-        spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]}+/-{np.sqrt(w.cov[i, i])} vs {spectrum.header[l]}"
-                                f" at {nsigma}sigma level: "
+        spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.cov[i, i]):.3f} "
+                                f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
                                 f"{np.abs(w.p[i]-spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma}")
         assert np.abs(w.p[i]-spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma
-    assert np.isclose(w.p[7], 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
-    assert np.isclose(w.p[8], spectrum.header["ROT_T"], atol=2e-2)  # angle
-    assert np.isclose(w.p[9], 1, atol=1e-3)  # B
+    assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
+    assert np.isclose(B, 1, atol=1e-3)  # B
+    assert np.all(np.isclose(psf_poly_params[2*(PSF_POLY_ORDER+1):],
+                             np.array(PSF_POLY_PARAMS_TRUTH)[2*(PSF_POLY_ORDER+1):], rtol=0.05, atol=0.05))
 
 
 def test_fullchain():

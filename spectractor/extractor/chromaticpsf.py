@@ -110,6 +110,8 @@ class ChromaticPSF:
                                                   + "^{(" + str(k) + ")}$")
         self.opt_reg = parameters.PSF_FIT_REG_PARAM
         self.cov_matrix = np.zeros((Nx, Nx))
+        if file_name != "":
+            self.poly_params = self.from_table_to_poly_params()
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg

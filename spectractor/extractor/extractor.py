@@ -795,6 +795,8 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         w.spectrum.spectrogram_y0 += dy0
         w.spectrum.x0[0] += dx0
         w.spectrum.x0[1] += dy0
+        w.spectrum.header["TARGETX"] = w.spectrum.x0[0]
+        w.spectrum.header["TARGETY"] = w.spectrum.x0[1]
 
         # Compute order 2 contamination
         w.spectrum.lambdas_order2 = w.lambdas
