@@ -44,7 +44,7 @@ def test_fitworkspace():
     parameters.VERBOSE = True
 
     # Do the fits
-    file_name = "test_linefitworkspace.txt"
+    file_name = "./outputs/test_linefitworkspace.txt"
     w = LineFitWorkspace(x, y, yerr, file_name, truth=truth, nwalkers=20, nsteps=5000, burnin=1000, nbins=20)
     run_minimisation(w, method="minimize")
     assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
