@@ -1386,7 +1386,7 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         outliers = [i for i in range(data.size) if outliers[i]]
         outliers.sort()
         if len(outliers) > 0:
-            my_logger.debug(f'\n\tOutliers flat index list:\n{outliers}')
+            my_logger.debug(f'\n\tOutliers flat index list: {outliers}')
             my_logger.info(f'\n\tOutliers: {len(outliers)} / {data.size} data points '
                            f'({100 * len(outliers) / data.size:.2f}%) '
                            f'at more than {sigma_clip}-sigma from best-fit model.')

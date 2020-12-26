@@ -648,33 +648,26 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
     3.00
 
     """
-    my_logger = set_logger(__name__)
     gg_init = models.Polynomial1D(order)
-    gg_init.c0.min = np.min(y)
-    gg_init.c0.max = 2 * np.max(y)
     gg_init.c1 = 0
     gg_init.c2 = 0
-    with warnings.catch_warnings():
-        # Ignore model linearity warning from the fitter
-        warnings.simplefilter('ignore')
-        fit = fitting.LevMarLSQFitter()
-        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
-        # get fitted model and filtered data
-        or_fitted_model, filtered_data = or_fit(gg_init, x, y)
-        outliers = []  # not working
-        '''
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(8,5))
-        plt.plot(x, y, 'gx', label="original data")
-        plt.plot(x, filtered_data, 'r+', label="filtered data")
-        plt.plot(x, or_fitted_model(x), 'r--',
-                 label="model fitted w/ filtered data")
-        plt.legend(loc=2, numpoints=1)
-        if parameters.DISPLAY: plt.show()
-        '''
-        # my_logger.info(f'\n\t{or_fitted_model}')
-        # my_logger.debug(f'\n\t{fit.fit_info}')
-        return or_fitted_model, outliers
+    fit = fitting.LinearLSQFitter()
+    or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+    # get fitted model and filtered data
+    or_fitted_model, filtered_data = or_fit(gg_init, x, y)
+    outliers = []  # not working
+    """
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(8,5))
+    plt.plot(x, y, 'gx', label="original data")
+    plt.plot(x, gg_init(x), 'k.', label="guess")
+    plt.plot(x, filtered_data, 'r+', label="filtered data")
+    plt.plot(x, or_fitted_model(x), 'r--',
+             label="model fitted w/ filtered data")
+    plt.legend(loc=2, numpoints=1)
+    if parameters.DISPLAY: plt.show()
+    """
+    return or_fitted_model, outliers
 
 
 def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
@@ -721,18 +714,13 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
     """
     my_logger = set_logger(__name__)
     gg_init = models.Polynomial2D(order)
-    gg_init.c0_0.min = np.min(z)
-    gg_init.c0_0.max = 2 * np.max(z)
-    with warnings.catch_warnings():
-        # Ignore model linearity warning from the fitter
-        warnings.simplefilter('ignore')
-        fit = fitting.LevMarLSQFitter()
-        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
-        # get fitted model and filtered data
-        or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
-        my_logger.info(f'\n\t{or_fitted_model}')
-        # my_logger.debug(f'\n\t{fit.fit_info}')
-        return or_fitted_model
+    fit = fitting.LinearLSQFitter()
+    or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+    # get fitted model and filtered data
+    or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
+    my_logger.info(f'\n\t{or_fitted_model}')
+    # my_logger.debug(f'\n\t{fit.fit_info}')
+    return or_fitted_model
 
 
 def tied_circular_gauss2d(g1):
@@ -1456,7 +1444,7 @@ def fftconvolve_gaussian(array, reso):
         kernel /= np.sum(kernel)
         array = fftconvolve(array, kernel, mode='same')
     else:
-        my_logger.error('\n\tArray dimension must be 1 or 2.')
+        my_logger.error(f'\n\tArray dimension must be 1 or 2. Here I have array.ndim={array.ndim}.')
     return array
 
 
