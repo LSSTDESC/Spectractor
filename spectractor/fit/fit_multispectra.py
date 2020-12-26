@@ -1102,7 +1102,7 @@ if __name__ == "__main__":
 
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    output_filename = os.path.join(input_directory, f"multispectra_{disperser_label}_{target_label}")
+    output_filename = os.path.join(input_directory, f"outputs/test_multispectra_{disperser_label}_{target_label}")
     w = MultiSpectraFitWorkspace(output_filename, file_names, bin_width=3, nsteps=1000, fixed_A1s=False,
                                  burnin=200, nbins=10, verbose=1, plot=True, live_fit=True, inject_random_A1s=False)
     run_multispectra_minimisation(w, method="newton")
