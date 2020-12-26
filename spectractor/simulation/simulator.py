@@ -36,6 +36,12 @@ class SpectrumSimulation(Spectrum):
         fast_sim: bool, optional
             If True, do a fast simulation without integrating within the wavelength bins (default: True).
 
+        Examples
+        --------
+        >>> spectrum, telescope, disperser, target = SimulatorInit("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
+        >>> sim = SpectrumSimulation(spectrum, atmosphere, telescope, disperser, fast_sim=True)
+
         """
         Spectrum.__init__(self)
         for k, v in list(spectrum.__dict__.items()):
@@ -122,6 +128,24 @@ class SpectrumSimulation(Spectrum):
         spectrum_err: array_like
             The spectrum uncertainties interpolated function in Target units.
 
+        Examples
+        --------
+        >>> spectrum, telescope, disperser, target = SimulatorInit("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
+        >>> sim = SpectrumSimulation(spectrum, atmosphere, telescope, disperser, fast_sim=True)
+        >>> lambdas, model, model_err = sim.simulate(A1=1, A2=1, ozone=300, pwv=5, aerosols=0.05, reso=0.,
+        ... D=parameters.DISTANCE2CCD, shift_x=0., B=0.)
+        >>> sim.plot_spectrum()
+
+        .. doctest::
+            :hide:
+
+            >>> assert np.sum(lambdas) > 0
+            >>> assert np.sum(model) > 0
+            >>> assert np.sum(model) < 1e-10
+            >>> assert np.sum(sim.data_order2) > 0
+            >>> assert np.sum(sim.data_order2) < 1e-11
+
         """
         # find lambdas including ADR effect
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
@@ -129,7 +153,7 @@ class SpectrumSimulation(Spectrum):
         distance = self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
-        lambda_ref = self.lambda_ref
+        # lambda_ref = self.lambda_ref
         # adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
         # adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
         #                                                        dispersion_axis_angle=self.rotation_angle)
@@ -177,6 +201,7 @@ class SpectrumSimulation(Spectrum):
                               * lambdas_binwidths_order2 / self.lambdas_binwidths
             err_order2 = err_conv(lambdas_order2) * lambdas_binwidths_order2 / self.lambdas_binwidths
             self.data = (sim_conv(lambdas) + A2 * spectrum_order2) / lambdas
+            self.data_order2 = A2 * spectrum_order2 / lambdas
             self.err = (err_conv(lambdas) + A2 * err_order2) / lambdas
         if B != 0:
             self.data += B / (lambdas * np.gradient(lambdas))
@@ -202,6 +227,11 @@ class SpectrogramModel(Spectrum):
         disperser: Grating
             Disperser instance.
 
+        Examples
+        --------
+        >>> spectrum, telescope, disperser, target = SimulatorInit("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
+        >>> sim = SpectrogramModel(spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True)
         """
         Spectrum.__init__(self)
         for k, v in list(spectrum.__dict__.items()):
@@ -375,33 +405,53 @@ class SpectrogramModel(Spectrum):
 
         Parameters
         ----------
-        A1
-        A2
-        ozone
-        pwv
-        aerosols
-        psf_poly_params
-        D
-        shift_x
-        shift_y
-        angle
-        B
+        A1: float
+            Global amplitude of the spectrum (default: 1).
+        A2: float
+            Relative amplitude of the order 2 spectrum contamination (default: 0).
+        ozone: float
+            Ozone quantity in Dobson.
+        pwv: float
+            Precipitable Water Vapor quantity in mm.
+        aerosols: float
+            VAOD Vertical Aerosols Optical Depth.
+        D: float
+            Distance between the CCD and the disperser in mm (default: parameters.DISTANCE2CCD)
+        shift_x: float
+            Shift in pixels along x axis of the order 0 position estimate (default: 0).
+        shift_y: float
+            Shift in pixels along y axis of the order 0 position estimate (default: 0).
+        angle: float
+            Angle of the dispersion axis in degree (default: 0).
+        B: float
+            Amplitude level for the background (default: 0).
+        psf_poly_params: array_like
+            Polynomial parameters describing the PSF dependence in wavelength (default: None).
 
         Returns
         -------
+        lambdas: array_like
+            The wavelength array in nm used for the interpolation.
+        spectrogram: array_like
+            The spectrogram array in ADU/s units.
+        spectrogram_err: array_like
+            The spectrogram uncertainty array in ADU/s units.
 
         Example
         -------
-        >>> from spectractor import parameters
-        >>> parameters.DEBUG = True
-        >>> spectrum, telescope, disperser, target = SimulatorInit('outputs/reduc_20170530_134_spectrum.fits')
-        >>> airmass = spectrum.header['AIRMASS']
-        >>> pressure = spectrum.header['OUTPRESS']
-        >>> temperature = spectrum.header['OUTTEMP']
-        >>> atmosphere = Atmosphere(airmass, pressure, temperature)
+
+        >>> spectrum, telescope, disperser, target = SimulatorInit('./tests/data/reduc_20170530_134_spectrum.fits')
+        >>> atmosphere = Atmosphere(airmass=1, pressure=800, temperature=10)
         >>> psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
-        >>> spec = SpectrogramModel(spectrum, atmosphere, telescope, disperser, with_background=True)
-        >>> lambdas, data, err = spec.simulate(A2=0, angle=spectrum.rotation_angle, psf_poly_params=psf_poly_params)
+        >>> sim = SpectrogramModel(spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True)
+        >>> lambdas, model, model_err = sim.simulate(A2=1, angle=-1.5, psf_poly_params=psf_poly_params)
+        >>> sim.plot_spectrogram()
+
+        .. doctest::
+            :hide:
+
+            >>> assert np.sum(lambdas) > 0
+            >>> assert np.sum(model) > 20
         """
         import time
         start = time.time()
@@ -637,7 +687,7 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
     spectrum_simulation = SpectrumSimulation(spectrum, atmosphere, telescope, disperser)
     spectrum_simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift)
     if parameters.DEBUG:
-        spectrum_simulation.plot_spectrum()
+        spectrum_simulation.plot_spectrum(force_lines=True)
     return spectrum_simulation
 
 

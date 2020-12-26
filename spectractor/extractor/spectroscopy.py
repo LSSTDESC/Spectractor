@@ -475,21 +475,22 @@ class Lines:
                                  FWHM, signal_level, line.fit_snr, line.fit_chisq, line.fit_eqwidth_mod,
                                  line.fit_eqwidth_data))
                 j += 1
-
-        t = Table(rows=rows, names=(
-            'Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq', 'Eqwidth_mod',
-            'Eqwidth_data'),
-                  dtype=('a12', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
-        for col in t.colnames[1:5]:
-            t[col].unit = 'nm'
-        t[t.colnames[5]].unit = amplitude_units
-        for col in t.colnames[-2:]:
-            t[col].unit = 'nm'
-        t[t.colnames[-3]].unit = 'reduced'
-        if output_file_name != "":
-            t.write(output_file_name, overwrite=overwrite)
-        if print_table:
-            print(t)
+        t = None
+        if len(rows) > 0:
+            t = Table(rows=rows, names=(
+                'Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq', 'Eqwidth_mod',
+                'Eqwidth_data'),
+                      dtype=('a12', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
+            for col in t.colnames[1:5]:
+                t[col].unit = 'nm'
+            t[t.colnames[5]].unit = amplitude_units
+            for col in t.colnames[-2:]:
+                t[col].unit = 'nm'
+            t[t.colnames[-3]].unit = 'reduced'
+            if output_file_name != "":
+                t.write(output_file_name, overwrite=overwrite)
+            if print_table:
+                print(t)
         return t
 
 

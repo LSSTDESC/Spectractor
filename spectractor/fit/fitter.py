@@ -1491,7 +1491,7 @@ class RegFitWorkspace(FitWorkspace):
         x = np.arange(len(self.w.amplitude_priors))
         for r in regs:
             self.simulate(np.log10(r))
-            if parameters.DISPLAY and False:
+            if parameters.DISPLAY and False:  # pragma: no cover
                 fig = plt.figure()
                 plt.errorbar(x, self.w.amplitude_params, yerr=[np.sqrt(self.w.amplitude_cov_matrix[i, i]) for i in x],
                              label=f"fit r={r:.2g}")

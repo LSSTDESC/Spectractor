@@ -305,7 +305,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.lambdas = lambdas
         self.model = model.flatten()
         self.model_err = model_err.flatten()
-        if self.live_fit and (plot_counter % 30) == 0:
+        if self.live_fit and (plot_counter % 30) == 0:  # pragma: no cover
             self.plot_fit()
         plot_counter += 1
         return self.lambdas, self.model, self.model_err
@@ -384,7 +384,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             for j in range(1, 3):
                 ax[i, 2*j].set_ylabel("")
         fig.tight_layout()
-        if self.live_fit:
+        if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
             plt.close()
@@ -397,7 +397,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             fig.savefig(figname, dpi=100, bbox_inches='tight')
 
 
-def lnprob_spectrogram(p):
+def lnprob_spectrogram(p):  # pragma: no cover
     """Logarithmic likelihood function to maximize in MCMC exploration.
 
     Parameters
@@ -549,7 +549,6 @@ if __name__ == "__main__":
     params = []
     chisqs = []
     filenames = ['outputs/sim_20170530_134_spectrum.fits']
-    filenames = ['../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_176_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
@@ -562,12 +561,12 @@ if __name__ == "__main__":
         # w.analyze_chains()
         params.append(w.p)
         chisqs.append(w.costs[-1])
-    params = np.asarray(params).T
-
-    fig, ax = plt.subplots(1, len(params))
-    for ip, p in enumerate(params):
-        print(f"{w.input_labels[ip]}:", np.mean(p), np.std(p))
-        ax[ip].plot(p, label=f"{w.input_labels[ip]}")
-        ax[ip].grid()
-        ax[ip].legend()
-    plt.show()
+    # params = np.asarray(params).T
+    #
+    # fig, ax = plt.subplots(1, len(params))
+    # for ip, p in enumerate(params):
+    #     print(f"{w.input_labels[ip]}:", np.mean(p), np.std(p))
+    #     ax[ip].plot(p, label=f"{w.input_labels[ip]}")
+    #     ax[ip].grid()
+    #     ax[ip].legend()
+    # plt.show()

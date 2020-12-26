@@ -279,7 +279,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         # zoom H2O
         self.plot_spectrum_comparison_simple(ax1, extent=[870, 1000], title='Zoom $H_2 O$', size=0.8)
         fig.tight_layout()
-        if self.live_fit:
+        if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
             plt.close()
@@ -291,7 +291,7 @@ class SpectrumFitWorkspace(FitWorkspace):
                 self.my_logger.info(f'Save figure {figname}.')
                 fig.savefig(figname, dpi=100, bbox_inches='tight')
 
-    def decontaminate_order2(self):
+    def decontaminate_order2(self):  # pragma: no cover
         lambdas = self.spectrum.lambdas
         lambdas_order2 = self.simulation.lambdas_order2
         A1, A2, ozone, pwv, aerosols, reso, D, shift, B = self.p
@@ -304,14 +304,14 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.model = (sim_conv(lambdas) - A2 * spectrum_order2) / lambdas
         self.model_err = (err_conv(lambdas) - A2 * err_order2) / lambdas
 
-    def get_truth_without_order2(self):
+    def get_truth_without_order2(self):  # pragma: no cover
         lambdas, model, model_err = self.simulation.simulate(1., 0., self.ozone, self.pwv, self.aerosols, self.reso,
                                                              self.D, self.shift_x)
         self.lambdas_truth = lambdas
         self.amplitude_truth = model
 
 
-def lnprob_spectrum(p):
+def lnprob_spectrum(p):  # pragma: no cover
     """Logarithmic likelihood function to maximize in MCMC exploration.
 
     Parameters
