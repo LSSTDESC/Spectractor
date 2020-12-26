@@ -870,7 +870,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
             parameters.SAVE = False
 
 
-def filter_data(file_names):
+def filter_data(file_names):  # pragma: no cover
     from scipy.stats import median_absolute_deviation
     D = []
     chi2 = []
