@@ -127,8 +127,8 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
     assert float(spectrum.header['CHI2_FIT']) < 0.65
     assert np.all(np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+2*(PSF_POLY_ORDER+1):],
-                             np.array(PSF_POLY_PARAMS_TRUTH)[2*(PSF_POLY_ORDER+1):], rtol=0.05, atol=0.05))
-    assert np.abs(np.mean(residuals[100:-100])) < 0.1
+                             np.array(PSF_POLY_PARAMS_TRUTH)[2*(PSF_POLY_ORDER+1):], rtol=0.1, atol=0.05))
+    assert np.abs(np.mean(residuals[100:-100])) < 0.15
     assert np.std(residuals[100:-100]) < 2
     spectrum_file_name = "./tests/data/sim_20170530_134_spectrum.fits"
     assert os.path.isfile(spectrum_file_name)
