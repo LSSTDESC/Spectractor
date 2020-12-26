@@ -76,7 +76,7 @@ def test_fitworkspace():
     assert os.path.exists(file_name.replace(".txt", "_emcee.h5"))
     assert os.path.exists(file_name.replace(".txt", "_emcee_convergence.pdf"))
     assert os.path.exists(file_name.replace(".txt", "_emcee_triangle.pdf"))
-    assert np.all([np.abs(w.p[i] - truth[i]) / np.sqrt(w.cov[i,i]) < 2 for i in range(w.ndim)])
+    assert np.all([np.abs(w.p[i] - truth[i]) / np.sqrt(w.cov[i, i]) < 3 for i in range(w.ndim)])
 
 
 def test_minimisation_sigma_clipping():
