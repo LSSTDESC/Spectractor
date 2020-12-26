@@ -166,13 +166,13 @@ class Lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=True, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(7)])
-        [687.472, 760.6, 763.2, 794.0, 820.4, 822.696, 868.0]
+        [687.472, 760.3, 763.1, 794.0, 820.4, 822.696, 868.0]
 
         Redshift all the spectral lines, except the atmospheric lines:
 
         >>> lines = Lines(ISM_LINES+HYDROGEN_LINES+ATMOSPHERIC_LINES, redshift=1, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True)
         >>> print([lines.lines[i].wavelength for i in range(5)])
-        [687.472, 706.2, 760.6, 763.2, 777.6]
+        [687.472, 706.2, 760.3, 763.1, 777.6]
 
         Hydrogen lines at order 1 and 2:
         >>> lines = Lines(HYDROGEN_LINES, redshift=0, atmospheric_lines=True, hydrogen_only=False, emission_spectrum=True, orders=[1, 2])

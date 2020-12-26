@@ -42,7 +42,8 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
     >>> spectrum = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
     >>> lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
     >>> amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)[:lambdas_truth.size]
-    >>> plot_residuals(spectrum, lambdas_truth, amplitude_truth)
+    >>> plot_residuals(spectrum, lambdas_truth, amplitude_truth)  #doctest: +ELLIPSIS
+    array([...
     """
     fig, ax = plt.subplots(2, 1, figsize=(8, 6), sharex="all", gridspec_kw={'height_ratios': [3, 1]})
     plot_spectrum_simple(ax[0], spectrum.lambdas, spectrum.data, data_err=spectrum.err, label="Fit",

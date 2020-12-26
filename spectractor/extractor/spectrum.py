@@ -264,8 +264,8 @@ class Spectrum:
             if np.sum(data_order2_contamination) / np.sum(self.data) > 0.01:
                 data_interp = interp1d(self.lambdas, self.data, kind="linear", fill_value="0", bounds_error=False)
                 plot_spectrum_simple(ax, lambdas_order2_contamination,
-                                     data_interp(lambdas_order2_contamination) + data_order2_contamination, data_err=None,
-                                     xlim=xlim, label='Order 2 contamination', linestyle="--", lw=1)
+                                     data_interp(lambdas_order2_contamination) + data_order2_contamination,
+                                     data_err=None, xlim=xlim, label='Order 2 contamination', linestyle="--", lw=1)
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title=title, units=self.units)
         if len(self.target.spectra) > 0:
@@ -588,8 +588,8 @@ class Spectrum:
         >>> parameters.PSF_TYPE = "MoffatGauss"
         >>> s = Spectrum()
         >>> s.load_spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
-        >>> print(s.chromatic_psf.table)  # doctest: +ELLIPSIS
-             lambdas               Dx         ...
+        >>> print(s.chromatic_psf.table)  #doctest: +ELLIPSIS
+             lambdas               Dx        ...
         """
         if os.path.isfile(input_file_name):
             self.psf = load_PSF(psf_type=parameters.PSF_TYPE)

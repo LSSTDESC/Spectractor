@@ -137,8 +137,7 @@ class ChromaticPSF:
 
         ..  doctest::
             :hide:
-
-            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 2, 0, 5, 0, 2, 0, -0.4, -0.4,1,0,20000])))
+            >>> assert(np.all(np.isclose(params,[10, 50, 100, 150, 200, 0, 0, 0, 0, 5, 0, 2, 0, -0.4, -0.4,1,0,20000])))
 
         """
         if not isinstance(self.psf, MoffatGauss) and not isinstance(self.psf, Moffat):
@@ -1361,7 +1360,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
             :hide:
 
             >>> assert mod is not None
-            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+            >>> assert np.mean(np.abs(mod.flatten()-np.concatenate(w.data).ravel())/np.concatenate(w.err).ravel()) < 1
 
         Fit the amplitude of data smoothing the result with a window of size 10 pixels:
 
@@ -1374,7 +1373,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
             :hide:
 
             >>> assert mod is not None
-            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+            >>> assert np.mean(np.abs(mod.flatten()-np.concatenate(w.data).ravel())/np.concatenate(w.err).ravel()) < 1
 
         Fit the amplitude of data using the transverse PSF1D fit as a prior and with a
         Tikhonov regularisation parameter set by parameters.PSF_FIT_REG_PARAM:
@@ -1388,7 +1387,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
             :hide:
 
             >>> assert mod is not None
-            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+            >>> assert np.mean(np.abs(mod.flatten()-np.concatenate(w.data).ravel())/np.concatenate(w.err).ravel()) < 1
 
         Set the amplitude parameters fixing the transverse PSF1D fit amplitudes:
 
@@ -1401,7 +1400,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
             :hide:
 
             >>> assert mod is not None
-            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+            >>> assert np.mean(np.abs(mod.flatten()-np.concatenate(w.data).ravel())/np.concatenate(w.err).ravel()) < 1
 
         """
         # linear regression for the amplitude parameters
@@ -1465,7 +1464,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.poly_params = np.copy(poly_params)
         poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
         if self.amplitude_priors_method == "fixed":
-            self.model = self.chromatic_psf.evaluate(poly_params, mode="1D")[self.bgd_width:-self.bgd_width, :]
+            self.model = self.chromatic_psf.evaluate(poly_params, mode="1D")[self.bgd_width:-self.bgd_width, :].T
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
