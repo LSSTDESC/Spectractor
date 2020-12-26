@@ -106,24 +106,34 @@ class FitWorkspace:
         -------
         ndim: int
 
+        Examples
+        --------
+        >>> from spectractor.fit.fitter import FitWorkspace
+        >>> import numpy as np
+        >>> w = FitWorkspace()
+        >>> w.p = np.ones(5)
+        >>> w.ndim
+        5
         """
         return len(self.p)
 
-    @property
-    def not_outliers(self):
-        """List of points that are not outliers rejected by a sigma-clipping method or other masking method.
+    def get_bad_indices(self):
+        """List of indices that are outliers rejected by a sigma-clipping method or other masking method.
 
         Returns
         -------
         not_outliers: list
 
+        Examples
+        --------
+        >>> from spectractor.fit.fitter import FitWorkspace
+        >>> import numpy as np
+        >>> w = FitWorkspace()
+        >>> w.data = np.array([np.array([1,2,3]), np.array([1,2,3,4])])
+        >>> w.outliers = [2, 6]
+        >>> w.get_bad_indices()
+        [array([2]), array([3])]
         """
-        if len(self.outliers) > 0:
-            return [i for i in range(self.data.size) if i not in self.outliers]
-        else:
-            return list(np.arange(self.data.size))
-
-    def get_bad_indices(self):
         bad_indices = np.asarray(self.outliers, dtype=int)
         if self.data.dtype == np.object:
             if len(self.outliers) > 0:
@@ -578,7 +588,7 @@ class FitWorkspace:
             else:
                 plt.show()
 
-    def weighted_residuals(self, p):
+    def weighted_residuals(self, p):  # pragma: nocover
         """Compute the weighted residuals array for a set of model parameters p.
 
         Parameters
@@ -624,28 +634,6 @@ class FitWorkspace:
                                          f"and self.W.dtype={self.W.dtype}")
                 res = L @ (model - self.data)
         return res
-
-    # def chisq(self, p):
-    #     """Compute the chi square for a set of model parameters p.
-    #
-    #     Parameters
-    #     ----------
-    #     p: array_like
-    #         The array of model parameters.
-    #
-    #     Returns
-    #     -------
-    #     chisq: float
-    #         The chi square value.
-    #
-    #     """
-    #     res = self.weighted_residuals(p)
-    #     print(res.shape, type(res), res.ndim)
-    #     if len(res) == self.data_cov.shape[0]:
-    #         chisq = np.sum([np.sum(res[k] ** 2) for k in range(self.data_cov.shape[0])])
-    #     else:
-    #         chisq = np.sum(res * res)
-    #     return chisq
 
     def chisq(self, p, model_output=False):
         """Compute the chi square for a set of model parameters p.
@@ -856,7 +844,7 @@ class FitWorkspace:
                 J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
         return np.asarray(J)
 
-    def hessian(self, params, epsilon, fixed_params=None):
+    def hessian(self, params, epsilon, fixed_params=None):  # pragma: nocover
         """Experimental function to compute the hessian of a model.
 
         Parameters
@@ -914,7 +902,7 @@ def lnprob(p):  # pragma: no cover
 
 
 def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None, xtol=1e-3, ftol=1e-3,
-                     with_line_search=True):  # pragma: no cover
+                     with_line_search=True):
     """
 
     Four cases are implemented: diagonal W, 2D W, array of diagonal Ws, array of 2D Ws. The two latter cases
@@ -1315,7 +1303,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
             fit_workspace.plot_fit()
-    elif method == "least_squares":
+    elif method == "least_squares":  # pragma: no cover
         fit_workspace.my_logger.warning("least_squares might not work, use with caution... "
                                         "or repair carefully the function weighted_residuals()")
         start = time.time()
