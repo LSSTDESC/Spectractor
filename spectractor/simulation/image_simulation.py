@@ -253,6 +253,8 @@ class BackgroundModel:
         self.level = level
         if self.level <= 0:
             self.my_logger.warning('\n\tBackground level must be strictly positive.')
+        else:
+            self.my_logger.info(f'\n\tBackground set to {level:.3f} ADU/s.')
         self.frame = frame
 
     def model(self):
