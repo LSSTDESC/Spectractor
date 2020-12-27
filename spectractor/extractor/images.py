@@ -676,7 +676,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
             if parameters.DEBUG:
                 plt.figure(figsize=(5, 5))
                 sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
-                                                                         rotated=rotated, widths=(20, 20))
+                                                                         rotated=rotated, widths=widths)
                 plot_image_simple(plt.gca(), data=sub_image, scale="lin", title="", units=image.units,
                                   target_pixcoords=[theX - x0 + Dx, theY - y0 + Dy])
                 plt.show()
