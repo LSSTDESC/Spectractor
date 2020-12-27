@@ -2,7 +2,6 @@ from numpy.testing import run_module_suite
 import sys
 
 from test_astrometry import *
-from test_simulator import *
 from test_extractor import *
 from test_fitter import *
 

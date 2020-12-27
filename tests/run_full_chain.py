@@ -1,6 +1,7 @@
 from numpy.testing import run_module_suite
 import sys
 
+from test_simulator import *
 from test_fullchain import *
 
 if __name__ == "__main__":
