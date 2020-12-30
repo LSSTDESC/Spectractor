@@ -40,7 +40,7 @@ class Libradtran:
         # -------------------------------------
 
         # LibRadTran installation directory
-        self.simulation_directory = 'simulations'
+        self.simulation_directory = 'libradtran'
         ensure_dir(self.simulation_directory)
         self.libradtran_path = parameters.LIBRADTRAN_DIR
 
@@ -108,7 +108,7 @@ class Libradtran:
         >>> lib = Libradtran()
         >>> output = lib.simulate(1.2, 2, 400, 0.07, 800)
         >>> print(output)
-        simulations/pp/us/as/rt/in/RT_CTIO_pp_us_as_rt_z12_pwv20_oz40_aer7.OUT
+        libradtran/pp/us/as/rt/in/RT_CTIO_pp_us_as_rt_z12_pwv20_oz40_aer7.OUT
         """
 
         self.my_logger.debug(
@@ -271,15 +271,15 @@ class Libradtran:
 
 
 def clean_simulation_directory():
-    """Remove the simulations directory.
+    """Remove the libradtran directory.
 
     Examples
     --------
-    >>> ensure_dir('simulations')
+    >>> ensure_dir('libradtran')
     >>> clean_simulation_directory()
-    >>> assert not os.path.isfile('simulations')
+    >>> assert not os.path.isfile('libradtran')
     """
-    os.system("rm -rf simulations")
+    os.system("rm -rf libradtran")
 
 
 if __name__ == "__main__":

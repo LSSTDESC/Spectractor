@@ -58,9 +58,9 @@ def test_simulator():
         assert np.sum(spectrum_simulation.data) > 0
         assert np.sum(spectrum_simulation.data) < 1e-10
         assert np.sum(spectrum_simulation.data_order2) < 1e-10
-        spectrogram_simulation = SpectrogramSimulator(file_name, output_directory, pwv=5, ozone=300, aerosols=0.03,
-                                                      A1=1, A2=1, D=56, shift_x=-1, shift_y=1, angle=-1)
-        assert np.sum(spectrogram_simulation.data) > 20
+        # spectrogram_simulation = SpectrogramSimulator(file_name, output_directory, pwv=5, ozone=300, aerosols=0.03,
+        #                                               A1=1, A2=1, D=56, shift_x=-1, shift_y=1, angle=-1)
+        # assert np.sum(spectrogram_simulation.data) > 20
         # psf_poly_params = spectrogram_simulation.chromatic_psf.from_table_to_poly_params()
         image_simulation = ImageSim(file_name.replace('_spectrum.fits', '.fits'), file_name, output_directory, A2=1,
                                     psf_poly_params=None, with_stars=True)
