@@ -79,8 +79,7 @@ class Libradtran:
             cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
         else:
             cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
-        p = subprocess.run(cmd, shell=True, check=True)
-        p.wait()
+        subprocess.run(cmd, shell=True, check=True)
 
     def simulate(self, airmass, pwv, ozone, aerosol, pressure):
         """Simulate the atmosphere transmission with Libratran.
