@@ -98,9 +98,9 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     parameters.CCD_REBIN = 1
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
-    # spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
-    #                        disperser_label=disperser_label)
-    spectrum = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
+    spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
+                           disperser_label=disperser_label)
+    # spectrum = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
 
     # tests
     residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
