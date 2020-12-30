@@ -12,7 +12,7 @@ import re
 import sys
 import numpy as np
 
-from subprocess import Popen, PIPE
+import subprocess
 
 from spectractor.tools import ensure_dir
 import spectractor.parameters as parameters
@@ -79,7 +79,7 @@ class Libradtran:
             cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
         else:
             cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
-        p = Popen(cmd, shell=True, stdout=PIPE)
+        p = subprocess.run(cmd, shell=True, check=True)
         p.wait()
 
     def simulate(self, airmass, pwv, ozone, aerosol, pressure):
