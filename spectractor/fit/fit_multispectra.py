@@ -14,7 +14,7 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.simulation.simulator import SimulatorInit
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping
+from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping, run_minimisation
 from spectractor.tools import from_lambda_to_colormap, fftconvolve_gaussian
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.spectroscopy import HALPHA, HBETA, HGAMMA, HDELTA, O2_1, O2_2, O2B
@@ -781,27 +781,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             #         J[ip].append((M[k] @ Tinst + 0*M[k] @ dTinst_dA1k) / p)
             #     print("JA1", time.time()-start)
         return np.asarray(J)
-
-
-def lnprob_spectrum(p):
-    """Logarithmic likelihood function to maximize in MCMC exploration.
-
-    Parameters
-    ----------
-    p: array_like
-        Array of SpectrumFitWorkspace parameters.
-
-    Returns
-    -------
-    lp: float
-        Log of the likelihood function.
-
-    """
-    global w
-    lp = w.lnprior(p)
-    if not np.isfinite(lp):
-        return -1e20
-    return lp + w.lnlike(p)
 
 
 def run_multispectra_minimisation(fit_workspace, method="newton"):
