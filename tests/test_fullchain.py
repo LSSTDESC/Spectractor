@@ -125,7 +125,7 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     assert np.isclose(float(spectrum.header['Y0_T']), spectrum.x0[1], atol=0.5)
     assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle,
                       atol=180 / np.pi * 1 / parameters.CCD_IMSIZE)
-    assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), rtol=5e-3)
+    assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), rtol=1e-2)
     assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
     assert float(spectrum.header['CHI2_FIT']) < 0.65
     assert np.all(np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+2*(PSF_POLY_ORDER+1):],
