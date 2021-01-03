@@ -75,10 +75,14 @@ before_script:
   - export NETPBM_INC="-I/usr/include"
   - conda create -n py37 python=3.7 pip
   - source activate py37
+  - conda remove --name py27 --all
+  - conda info --envs
   - python --version
   - pip install pyutil numpy
   - wget http://astrometry.net/downloads/astrometry.net-0.78.tar.gz
   - tar xvzf astrometry.net-0.78.tar.gz
+  - ls *.tar
+  - rm -f *.tar
   - cd astrometry.net-*
   - make
   - make py
