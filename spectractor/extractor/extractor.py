@@ -980,6 +980,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Extract the non rotated background
     bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
+    my_logger.info(f"\n\tBackground statistics: mean={np.nanmean(bgd):.3f} {image.units}, "
+                   f"RMS={np.nanmean(bgd_rms):.3f} {image.units}.")
 
     # Propagate background uncertainties
     err = np.sqrt(err * err + bgd_rms * bgd_rms)

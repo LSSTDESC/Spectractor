@@ -390,8 +390,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         target_pixcoords = find_target(image, guess, use_wcs=True)
     # Background model
     my_logger.info('\n\tBackground model...')
-    yy, xx = np.mgrid[:parameters.XWINDOW, :parameters.YWINDOW]
-    bgd_level = float(np.mean(image.target_bkgd2D(xx, yy)))
+    bgd_level = float(np.mean(spectrum.spectrogram_bgd))
     background = BackgroundModel(level=bgd_level, frame=None)  # (1600, 1650, 100))
     if parameters.DEBUG:
         background.plot_model()
@@ -472,7 +471,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.add_poisson_and_read_out_noise()
 
     # Round float ADU into closest integers
-    image.data = np.around(image.data)
+    # image.data = np.around(image.data)
 
     # Plot
     if parameters.VERBOSE and parameters.DISPLAY:  # pragma: no cover
