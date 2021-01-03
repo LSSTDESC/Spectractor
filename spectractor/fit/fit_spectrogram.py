@@ -112,8 +112,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.axis_names = ["$A_1$", "$A_2$", "ozone [db]", "PWV [mm]", "VAOD", r"$D_{CCD}$ [mm]",
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
                            r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names)
+        bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 800), (1, 10),
-                                                (0, 1), (50, 60), (-2, 2), (-3, 3), (-90, 90), (0.8, 1.2)]),
+                                                (0, 1), bounds_D, (-2, 2), (-3, 3), (-90, 90), (0.8, 1.2)]),
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
