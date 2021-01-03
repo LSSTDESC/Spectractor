@@ -1083,6 +1083,10 @@ class ChromaticPSF:
         else:
             raise ValueError(f"Unknown fitting mode={mode}. Must be '1D' or '2D'.")
 
+        # recompute and save params in class attributes
+        w.simulate(*w.p)
+
+        # regularisation
         if w.amplitude_priors_method == "psf1d" and mode == "2D":
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
             run_minimisation(w_reg, method="minimize", ftol=1e-4, xtol=1e-2, verbose=verbose, epsilon=[1e-1],

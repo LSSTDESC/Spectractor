@@ -786,6 +786,9 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
             w.p[1] = spectrum.disperser.D
             w.p[2] = spectrum.header['PIXSHIFT']
 
+        # Recompute and save params in class attributes
+        w.simulate(*w.p)
+
         # Propagate parameters
         A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.p
         w.spectrum.rotation_angle = angle
