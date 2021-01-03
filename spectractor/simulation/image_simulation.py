@@ -314,8 +314,11 @@ class ImageModel(Image):
     def compute(self, star, background, spectrogram, starfield=None):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
-        self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
-                  spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
+        if spectrogram.full_image:
+            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.data
+        else:
+            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
+                      spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
         # - spectrogram.spectrogram_bgd)
         if starfield is not None:
             self.data += starfield.model(xx, yy)
@@ -439,7 +442,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0., B=1.,
                                            psf_poly_params=psf_poly_params, angle=rotation_angle, with_background=False,
-                                           fast_sim=False)
+                                           fast_sim=False, full_image=True)
 
     # now we include effects related to the wrong extraction of the spectrum:
     # wrong estimation of the order 0 position and wrong DISTANCE2CCD
