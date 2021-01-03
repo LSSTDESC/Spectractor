@@ -79,6 +79,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_names[0], fast_load=True)
         self.spectra = []
         self.atmospheres = []
+        self.file_names = file_names
         for name in file_names:
             spectrum = Spectrum(name, fast_load=True)
             self.spectra.append(spectrum)
@@ -617,10 +618,11 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                           label=r'true $T_{\mathrm{inst}}* \left\langle A_1 \right\rangle$')
             ax[1, 0].set_xlabel(r'$\lambda$ [nm]')
             ax[1, 0].grid(True)
-            ax[1, 0].set_ylabel(r'Data-Truth')
-            residuals = self.amplitude_params - self.true_instrumental_transmission
+            ax[1, 0].set_ylabel(r'(Data-Truth)/Err')
+            norm = transmission_err
+            residuals = (self.amplitude_params - self.true_instrumental_transmission) / norm
             residuals[masked] = np.nan
-            ax[1, 0].errorbar(self.lambdas[0], residuals, yerr=transmission_err,
+            ax[1, 0].errorbar(self.lambdas[0], residuals, yerr=transmission_err / norm,
                               label=r'$T_{\mathrm{inst}}$', fmt='k.')  # , markersize=0.1)
             ax[1, 0].set_ylim(-1.1 * np.nanmax(np.abs(residuals)), 1.1 * np.nanmax(np.abs(residuals)))
         else:
@@ -672,8 +674,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         """
         ozone, pwv, aerosols, reso, *A1s = self.p
-        zs = [self.spectra[k].header["PARANGLE"] for k in range(self.nspectra)]
-        err = np.sqrt([0] + [self.cov[ip, ip] for ip in range(3, self.cov.shape[0])])
+        zs = [self.spectra[k].header["AIRMASS"] for k in range(self.nspectra)]
+        err = np.sqrt([0] + [self.cov[ip, ip] for ip in range(self.A1_first_index, self.cov.shape[0])])
         spectra_index = np.arange(self.nspectra)
         sc = plt.scatter(spectra_index, A1s, c=zs, s=0)
         plt.colorbar(sc, label="Airmass")
@@ -719,7 +721,10 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # from scipy.signal import savgol_filter
         # throughput = savgol_filter(throughput, 17, 3)
         # throughput_err = savgol_filter(throughput_err, 17, 3)
-        file_name = self.output_file_name + f"_transmissions.txt"
+        if "sim" in self.file_names[0]:
+            file_name = self.output_file_name + f"_sim_transmissions.txt"
+        else:
+            file_name = self.output_file_name + f"_transmissions.txt"
         ascii.write([self.lambdas[0], self.amplitude_params, self.amplitude_params_err,
                      throughput, throughput_err, tatm_binned], file_name,
                     names=["wl", "Tinst", "Tinst_err", "Ttel", "Ttel_err", "Tatm"], overwrite=True)
@@ -819,11 +824,14 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
                                         xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=5, niter_clip=3,
                                         verbose=False)
 
+        # Recompute and save params in class attributes
+        fit_workspace.simulate(*fit_workspace.p)
+
+        # Renormalize A1s and instrumental transmission
         ozone, pwv, aerosols, reso, *A1s = fit_workspace.p
         mean_A1 = np.mean(A1s)
         fit_workspace.amplitude_params /= mean_A1
         fit_workspace.amplitude_params_err /= mean_A1
-        # fit_workspace.p[3:] /= mean_A1
         if fit_workspace.true_A1s is not None:
             fit_workspace.true_instrumental_transmission *= np.mean(fit_workspace.true_A1s)
             fit_workspace.true_A1s /= np.mean(fit_workspace.true_A1s)
