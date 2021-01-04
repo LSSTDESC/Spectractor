@@ -14,7 +14,7 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.simulation.simulator import SimulatorInit
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping, run_minimisation
+from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping, run_minimisation, RegFitWorkspace
 from spectractor.tools import from_lambda_to_colormap, fftconvolve_gaussian
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.spectroscopy import HALPHA, HBETA, HGAMMA, HDELTA, O2_1, O2_2, O2B
@@ -102,13 +102,13 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         self.ozone = 260.
         self.pwv = 3
         self.aerosols = 0.015
-        self.reso = 2
+        self.reso = -1
         self.A1s = np.ones(self.nspectra)
         self.p = np.array([self.ozone, self.pwv, self.aerosols, self.reso, *self.A1s])
         self.A1_first_index = 4
         self.fixed = [False] * self.p.size
         # self.fixed[0] = True
-        # self.fixed[3] = True
+        self.fixed[3] = True
         self.fixed[self.A1_first_index] = True
         if fixed_A1s:
             for ip in range(self.A1_first_index, len(self.fixed)):
@@ -146,6 +146,21 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         self.amplitude_params_err = np.zeros(self.lambdas.size)
         self.amplitude_cov_matrix = np.zeros((self.lambdas.size, self.lambdas.size))
 
+        # regularisation
+        self.amplitude_priors_method = "noprior"
+        self.reg = parameters.PSF_FIT_REG_PARAM * self.bin_widths
+        if self.amplitude_priors_method == "spectrum":
+            self.amplitude_priors = np.copy(self.true_instrumental_transmission)
+            self.amplitude_priors_cov_matrix = np.eye(self.lambdas[0].size)  # np.diag(np.ones_like(self.lambdas))
+            self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[i, i]) for i in range(self.lambdas[0].size)])
+            L = np.diag(-2 * np.ones(self.lambdas[0].size)) + np.diag(np.ones(self.lambdas[0].size), -1)[:-1, :-1] \
+                + np.diag(np.ones(self.lambdas[0].size), 1)[:-1, :-1]
+            L[0, 0] = -1
+            L[-1, -1] = -1
+            self.L = L.astype(float)
+            self.Q = L.T @ np.linalg.inv(self.amplitude_priors_cov_matrix) @ L
+            self.Q_dot_A0 = self.Q @ self.amplitude_priors
+
     def _prepare_data(self):
         # rebin wavelengths
         if self.bin_widths > 0:
@@ -155,7 +170,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             self.lambdas_bin_edges = lambdas_bin_edges
             lbdas = []
             for i in range(1, lambdas_bin_edges.size):
-                lbdas.append(0.5 * (lambdas_bin_edges[i] + lambdas_bin_edges[i - 1]))
+                lbdas.append(0.5 * (0*lambdas_bin_edges[i] + 2*lambdas_bin_edges[i - 1]))  # lambda bin value on left
             self.lambdas = []
             for k in range(self.nspectra):
                 self.lambdas.append(np.asarray(lbdas))
@@ -170,7 +185,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             dlbda = self.lambdas[0, -1] - self.lambdas[0, -2]
             lambdas_bin_edges = list(self.lambdas[0]) + [self.lambdas[0, -1] + dlbda]
         # mask
-        lambdas_to_mask = [np.arange(300, 350, self.bin_widths)]
+        lambdas_to_mask = [np.arange(300, 355, self.bin_widths)]
         for line in [HALPHA, HBETA, HGAMMA, HDELTA, O2_1, O2_2, O2B]:
             width = line.width_bounds[1]
             lambdas_to_mask += [np.arange(line.wavelength - width, line.wavelength + width, self.bin_widths)]
@@ -229,8 +244,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                                      kind="cubic", fill_value="extrapolate", bounds_error=None)
                 data = []
                 for i in range(1, lambdas_bin_edges.size):
-                    data.append(quad(data_func, lambdas_bin_edges[i - 1],
-                                     lambdas_bin_edges[i])[0] / self.bin_widths)
+                    data.append(quad(data_func, lambdas_bin_edges[i - 1], lambdas_bin_edges[i])[0] / self.bin_widths)
                 self.ref_spectrum_cube.append(np.copy(data))
         else:
             for k in range(self.nspectra):
@@ -471,26 +485,29 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # M_dot_W_dot_M = np.zeros_like(M_dot_W_dot_M)
         # otherwise, this is much faster:
         M_dot_W_dot_M = np.sum([M[k].T @ self.W[k] @ M[k] for k in range(self.nspectra)], axis=0)
-        # print("compute MWM", time.time() - start)
-        # start = time.time()
-        for i in range(self.lambdas[0].size):
-            if np.sum(M_dot_W_dot_M[i]) == 0:
-                M_dot_W_dot_M[i, i] = 1e-10 * np.mean(M_dot_W_dot_M) * np.random.random()
-        try:
-            L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-            cov_matrix = L.T @ L
-            # cov_matrix = pinvh(M_dot_W_dot_M, check_finite=False)
-            # L = np.linalg.cholesky(M_dot_W_dot_M)
-            # inv_L = solve_triangular(L, np.eye(L.shape[0]), check_finite=False, overwrite_b=True)
-            # cov_matrix = inv_L.T @ inv_L
-            # print("inv", time.time() - start)
-            # start = time.time()
-        except np.linalg.LinAlgError:
-            cov_matrix = np.linalg.inv(M_dot_W_dot_M)
         M_dot_W_dot_D = np.sum([M[k].T @ self.W[k] @ self.data[k] for k in range(self.nspectra)], axis=0)
-        amplitude_params = cov_matrix @ M_dot_W_dot_D
+        if self.amplitude_priors_method != "spectrum":
+            for i in range(self.lambdas[0].size):
+                if np.sum(M_dot_W_dot_M[i]) == 0:
+                    M_dot_W_dot_M[i, i] = 1e-10 * np.mean(M_dot_W_dot_M) * np.random.random()
+            try:
+                L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
+                cov_matrix = L.T @ L
+            except np.linalg.LinAlgError:
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M)
+            amplitude_params = cov_matrix @ M_dot_W_dot_D
+        else:
+            M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
+            try:
+                L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
+                cov_matrix = L.T @ L
+            except np.linalg.LinAlgError:
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
+            amplitude_params = cov_matrix @ (M_dot_W_dot_D + self.reg * self.Q_dot_A0)
+
         self.M = M
         self.M_dot_W_dot_M = M_dot_W_dot_M
+        self.M_dot_W_dot_D = M_dot_W_dot_D
         model_cube = []
         model_err_cube = []
         for k in range(self.nspectra):
@@ -824,6 +841,13 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
                                         xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=5, niter_clip=3,
                                         verbose=False)
 
+        # w_reg = RegFitWorkspace(fit_workspace, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=parameters.VERBOSE)
+        # run_minimisation(w_reg, method="minimize", ftol=1e-4, xtol=1e-2, verbose=parameters.VERBOSE, epsilon=[1e-1],
+        #                  minimizer_method="Nelder-Mead")
+        # w_reg.opt_reg = 10 ** w_reg.p[0]
+        # w_reg.my_logger.info(f"\n\tOptimal regularisation parameter: {w_reg.opt_reg}")
+        # fit_workspace.reg = np.copy(w_reg.opt_reg)
+        # fit_workspace.opt_reg = w_reg.opt_reg
         # Recompute and save params in class attributes
         fit_workspace.simulate(*fit_workspace.p)
 
