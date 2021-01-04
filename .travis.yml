@@ -26,6 +26,14 @@ addons: # for libradtran and astrometry.net library
 python:
   - "3.7"
 
+before_install:
+- sudo fallocate -l 4G /swapfile
+- sudo chmod 600 /swapfile
+- sudo mkswap /swapfile
+- sudo swapon /swapfile
+- sudo sysctl vm.swappiness=10
+- sudo sysctl -w vm.max_map_count=1966080
+
 install:
   - sudo apt-get update
   - sudo apt-get install gfortran
