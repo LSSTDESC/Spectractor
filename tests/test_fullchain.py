@@ -20,7 +20,7 @@ PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
                          0, 0, 0,
                          3, 2, 0,
                          2, 0, 0,
-                         500]
+                         1e6]
 A1_T = 1
 A2_T = 1
 
@@ -76,7 +76,9 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
 def make_image():
     spectrum_filename = "./tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = "./tests/data/reduc_20170530_134.fits"
-    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=0*A2_T,
+    # spectrum_filename = "../CTIODataJune2017_reduced_RG715_v2_prod7.4/data_30may17_A2=0.1/reduc_20170530_176_spectrum.fits"
+    # image_filename = "../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/reduc_20170530_176.fits"
+    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T,
              psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=True, with_rotation=True)
 
 
@@ -101,6 +103,7 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
                            disperser_label=disperser_label)
     # spectrum = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
+    # spectrum = Spectrum("./tests/data/sim_20170530_176_spectrum.fits")
 
     # tests
     residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
@@ -110,15 +113,15 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
                                f"\n\t\tspectrum.header['Y0_T']={spectrum.header['Y0_T']:.5g} vs {spectrum.x0[1]:.5g}"
                                f"\n\t\tspectrum.header['ROT_T']={spectrum.header['ROT_T']:.5g} "
                                f"vs {spectrum.rotation_angle:.5g}"
-                               f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV']:.4g} "
-                               f"vs {np.mean(spectrum.spectrogram_bgd):.4g}"
+                               f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV']:.5g} "
+                               f"vs {np.mean(spectrum.spectrogram_bgd):.5g}"
                                f"\n\t\tspectrum.header['D2CCD_T']={spectrum.header['D2CCD_T']:.5g} "
                                f"vs {spectrum.disperser.D:.5g}"
                                f"\n\t\tspectrum.header['A2_FIT']={spectrum.header['A2_FIT']:.5g} vs {A2_T:.5g}"
                                f"\n\t\tspectrum.header['CHI2_FIT']={spectrum.header['CHI2_FIT']:.4g}"
                                f"\n\t\tspectrum.chromatic_psf.poly_params="
-                               f"{spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+2*(PSF_POLY_ORDER+1):]}"
-                               f" vs {PSF_POLY_PARAMS_TRUTH[2*(PSF_POLY_ORDER+1):]}"
+                               f"{spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+2*(PSF_POLY_ORDER+1):-1]}"
+                               f" vs {PSF_POLY_PARAMS_TRUTH[2*(PSF_POLY_ORDER+1):-1]}"
                                f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100]):.5g}, "
                                f"std={np.std(residuals[100:-100]):.5g}")
     assert np.isclose(float(spectrum.header['X0_T']), spectrum.x0[0], atol=0.05)
@@ -128,11 +131,12 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), rtol=1e-2)
     assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
     assert float(spectrum.header['CHI2_FIT']) < 0.65
-    assert np.all(np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+2*(PSF_POLY_ORDER+1):],
-                             np.array(PSF_POLY_PARAMS_TRUTH)[2*(PSF_POLY_ORDER+1):], rtol=0.1, atol=0.1))
+    assert np.all(np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx+2*(PSF_POLY_ORDER+1):-1],
+                             np.array(PSF_POLY_PARAMS_TRUTH)[2*(PSF_POLY_ORDER+1):-1], rtol=0.1, atol=0.1))
     assert np.abs(np.mean(residuals[100:-100])) < 0.25
     assert np.std(residuals[100:-100]) < 2
     spectrum_file_name = "./tests/data/sim_20170530_134_spectrum.fits"
+    # spectrum_file_name = "./tests/data/sim_20170530_176_spectrum.fits"
     assert os.path.isfile(spectrum_file_name)
     spectrum = Spectrum(spectrum_file_name)
     atmgrid_filename = sim_image.replace('sim', 'reduc').replace('.fits', '_atmsim.fits')
@@ -171,8 +175,8 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
         assert np.abs(w.p[i]-spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma
     assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
     assert np.isclose(B, 1, atol=1e-3)  # B
-    assert np.all(np.isclose(psf_poly_params[2*(PSF_POLY_ORDER+1):],
-                             np.array(PSF_POLY_PARAMS_TRUTH)[2*(PSF_POLY_ORDER+1):], rtol=0.05, atol=0.05))
+    assert np.all(np.isclose(psf_poly_params[2*(PSF_POLY_ORDER+1):-1],
+                             np.array(PSF_POLY_PARAMS_TRUTH)[2*(PSF_POLY_ORDER+1):-1], rtol=0.1, atol=0.1))
 
 
 def test_fullchain():

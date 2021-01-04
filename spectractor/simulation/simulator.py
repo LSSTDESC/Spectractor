@@ -483,6 +483,8 @@ class SpectrogramModel(Spectrum):
         self.my_logger.debug(f'\n\tAfter psf params: {time.time() - start}')
         start = time.time()
         lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y)
+        self.chromatic_psf.table["Dx"] = dispersion_law.real - self.r0.real
+        self.chromatic_psf.table["Dy"] = dispersion_law.imag - self.r0.imag
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
         spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
@@ -524,8 +526,8 @@ class SpectrogramModel(Spectrum):
                 distance = np.abs(dispersion_law)
                 distance_order2 = np.abs(dispersion_law_order2)
                 for k in range(3, self.profile_params.shape[1]):
-                    profile_params_order2[:nlbda2, k] = interp1d(distance, profile_params_order2[:, k],
-                                                           kind="linear", fill_value="extrapolate")(distance_order2)
+                    profile_params_order2[:nlbda2, k] = interp1d(distance, profile_params_order2[:, k], kind="cubic",
+                                                                 fill_value="extrapolate")(distance_order2)
                 for i in range(0, nlbda2, 1):
                     self.psf_cube_order2[i] = self.psf.evaluate(self.pixels, p=profile_params_order2[i, :])
                 self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')
