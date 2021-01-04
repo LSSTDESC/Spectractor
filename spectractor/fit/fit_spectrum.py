@@ -82,7 +82,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.ozone = 400.
         self.pwv = 3
         self.aerosols = 0.05
-        self.reso = 1
+        self.reso = -1
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.B = 0
@@ -91,7 +91,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.fixed = [False] * self.p.size
         # self.fixed[0] = True
         self.fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
-        # self.fixed[5] = True
+        self.fixed[5] = True
         # self.fixed[6:8] = [True, True]
         self.fixed[7] = True
         self.fixed[8] = True
@@ -376,18 +376,24 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         #                                 verbose=False)
 
         fit_workspace.simulation.fast_sim = False
+        fit_workspace.fixed[0] = True
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3,
+                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
                                         verbose=False)
+        fit_workspace.fixed[0] = False
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
+                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
+                                        verbose=False)
+
+        parameters.SAVE = True
+        ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
+        fit_workspace.plot_correlation_matrix(ipar)
+        fit_workspace.plot_fit()
         if fit_workspace.filename != "":
-            parameters.SAVE = True
-            ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
-            fit_workspace.plot_correlation_matrix(ipar)
             header = f"{fit_workspace.spectrum.date_obs}\nchi2: {fit_workspace.costs[-1] / fit_workspace.data.size}"
             fit_workspace.save_parameters_summary(ipar, header=header)
             # save_gradient_descent(fit_workspace, costs, params_table)
-            fit_workspace.plot_fit()
-            parameters.SAVE = False
+        parameters.SAVE = False
 
 
 if __name__ == "__main__":
