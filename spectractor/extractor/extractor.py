@@ -95,7 +95,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                            r"$\theta$ [deg]", "$B$", "R"] + list(self.psf_poly_params_names)
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
-                                                (-parameters.CCD_PIXEL2ARCSEC, parameters.PIXSHIFT_PRIOR),
+                                                (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
                                                 (-10 * parameters.CCD_PIXEL2ARCSEC, 10 * parameters.PIXSHIFT_PRIOR),
                                                 (-90, 90), (0.2, 5), (-360, 360)]), psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
@@ -304,7 +304,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
                                     lambda_ref=self.spectrum.lambda_ref)
         adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-        # adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
         # Compute lambdas at pixel column x
         # self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u,
         #                                                                self.spectrum.x0 + np.asarray([dx0, dy0]),
@@ -321,7 +321,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         #                                                                    order=2)
 
         # Fill spectrogram trace as a function of the pixel column x
-        profile_params[:, 1] += adr_x + dx0
+        profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + adr_x + dx0
         profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y + dy0) - self.bgd_width
         # Dy_disp_axis = np.copy(profile_params[:, 2])
         # profile_params[:, 2] += adr_y + dy0 - self.bgd_width
@@ -335,9 +335,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
         # same PSF as for the order 1 but at the same position
+        distance_order2 = self.spectrum.disperser.grating_lambda_to_pixel(self.lambdas-adr_u,
+                                                                          self.spectrum.x0 + np.asarray([dx0, dy0]),
+                                                                          order=2)
         for k in range(1, profile_params.shape[1]):
-            profile_params_order2[:, k] = interp1d(self.lambdas_order2, profile_params_order2[:, k],
-                                                   kind="cubic", fill_value="extrapolate")(self.lambdas)
+            # profile_params_order2[:, k] = interp1d(self.lambdas_order2, profile_params_order2[:, k],
+            #                                       kind="cubic", fill_value="extrapolate")(self.lambdas)
+            profile_params_order2[:, k] = interp1d(distance, profile_params_order2[:, k],
+                                                   kind="cubic", fill_value="extrapolate")(distance_order2)
 
         # if parameters.DEBUG:
         #     plt.imshow(self.data.reshape((self.Ny, self.Nx)), origin="lower")
@@ -578,7 +583,6 @@ def run_ffm_minimisation(w, method="newton"):
     --------
 
     >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
-    >>> spec = Spectrum('../CTIODataJune2017_reduced_RG715_v2_prod7.3/data_30may17_A2=0.1/sim_20170530_176_spectrum.fits')
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
@@ -1123,17 +1127,18 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     s = spectrum.chromatic_psf
     lambdas_truth = np.fromstring(spectrum.header['LBDAS_T'][1:-1], sep=' ')
     psf_poly_truth = np.fromstring(spectrum.header['PSF_P_T'][1:-1], sep=' ', dtype=float)
+    deg_truth = int(spectrum.header["PSF_DEG"])
+    psf_poly_truth[-1] = spectrum.spectrogram_saturation
     amplitude_truth = np.fromstring(spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
     amplitude_truth *= parameters.FLAM_TO_ADURATE * lambdas_truth * np.gradient(lambdas_truth)
-
-    s0 = ChromaticPSF(s.psf, lambdas_truth.size, s.Ny, deg=int(spectrum.header["PSF_DEG"]),
-                      saturation=parameters.CCD_MAXADU)
+    s0 = ChromaticPSF(s.psf, lambdas_truth.size, s.Ny, deg=deg_truth,
+                      saturation=spectrum.spectrogram_saturation)
     s0.poly_params = np.asarray(list(amplitude_truth) + list(psf_poly_truth))
     s0.deg = (len(s0.poly_params[s0.Nx:]) - 1) // (len(s0.psf.param_names) - 2) - 1
     s0.set_polynomial_degrees(s0.deg)
     s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
     s0.from_profile_params_to_shape_params(s0.profile_params)
-    gs_kw = dict(width_ratios=[2, 1], height_ratios=[3, 1])
+    gs_kw = dict(width_ratios=[2, 1], height_ratios=[2, 1])
     fig, ax = plt.subplots(2, 2, figsize=(9, 5), sharex="all", gridspec_kw=gs_kw)
     ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth")
     amplitude_priors_err = [np.sqrt(w.amplitude_priors_cov_matrix[x, x]) for x in range(w.Nx)]
