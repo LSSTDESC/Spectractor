@@ -651,7 +651,23 @@ def run_ffm_minimisation(w, method="newton"):
                 [np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
 
     # Save results
-    w.simulate(*w.p)
+    x, model, model_err = w.simulate(*w.p)
+
+    # Propagate uncertainties
+    # from spectractor.tools import plot_correlation_matrix_simple, compute_correlation_matrix
+    # J = np.array([w.jacobian(w.p, epsilon=w.epsilon, fixed_params=w.fixed, model_input=[x, model, model_err]), w.M])
+    # w.amplitude_cov_matrix = J.T @ (w.W * J)
+    # w.my_logger.warning(f"{w.amplitude_cov_matrix.shape}")
+    # w.amplitude_params_err = np.array([np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
+    # plt.errorbar(w.lambdas, w.amplitude_params, w.amplitude_params_err)
+    # plt.grid()
+    # plt.show()
+    # plt.figure()
+    # plot_correlation_matrix_simple(ax=plt.gca(), rho=compute_correlation_matrix(w.amplitude_cov_matrix),
+    #                                axis_names=[f"$A_{x}$" for x in range(w.Nx)])
+    # plt.show()
+
+
     if parameters.DEBUG:
         w.plot_fit()
     w.spectrum.lambdas = np.copy(w.lambdas)
