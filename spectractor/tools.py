@@ -2315,14 +2315,15 @@ def compute_correlation_matrix(cov):
     return rho
 
 
-def plot_correlation_matrix_simple(ax, rho, axis_names, ipar=None):
+def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):
     if ipar is None:
         ipar = np.arange(rho.shape[0]).astype(int)
     im = plt.imshow(rho[ipar[:, None], ipar], interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
     ax.set_title("Correlation matrix")
-    names = [axis_names[ip] for ip in ipar]
-    plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=11)
-    plt.yticks(np.arange(ipar.size), names, fontsize=11)
+    if axis_names is not None:
+        names = [axis_names[ip] for ip in ipar]
+        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=11)
+        plt.yticks(np.arange(ipar.size), names, fontsize=11)
     cbar = plt.colorbar(im)
     cbar.ax.tick_params(labelsize=9)
     plt.gcf().tight_layout()
