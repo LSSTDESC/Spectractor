@@ -207,6 +207,13 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                         break
             self.atmosphere_lambda_bins = np.array(self.atmosphere_lambda_bins, dtype=object)
             self.atmosphere_lambda_step = np.gradient(self.atmospheres[0].lambdas)[0]
+        # rescale data lambdas
+        # D2CCD = np.median([self.spectra[k].header["D2CCD"] for k in range(self.nspectra)])
+        # for k in range(self.nspectra):
+        #     self.spectra[k].disperser.D = self.spectra[k].header["D2CCD"]
+        #     dist = self.spectra[k].disperser.grating_lambda_to_pixel(self.spectra[k].lambdas, x0=self.spectra[k].x0)
+        #     self.spectra[k].disperser.D = D2CCD
+        #     self.spectra[k].lambdas = self.spectra[k].disperser.grating_pixel_to_lambda(dist, x0=self.spectra[k].x0)
         # rebin data
         self.data = np.empty(self.nspectra, dtype=np.object)
         if self.bin_widths > 0:
