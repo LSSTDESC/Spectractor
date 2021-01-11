@@ -4,6 +4,8 @@ import sys
 from test_simulator import *
 from test_fullchain import *
 
+import subprocess
+
 if __name__ == "__main__":
     # Run tests
     args = sys.argv
@@ -13,4 +15,6 @@ if __name__ == "__main__":
         print("Running tests that are not tagged as 'slow'. "
               "Use '--all' to run all tests.")
         args.append("-a!slow")
+
+    subprocess.run("ls -la", shell=True, check=True)
     run_module_suite(argv=args)
