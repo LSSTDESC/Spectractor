@@ -79,10 +79,11 @@ class Libradtran:
             cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
         else:
             cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
-        print(path + 'bin/uvspec -h')
         self.my_logger.warning(path + 'bin/uvspec -h')
         self.my_logger.warning(os.getenv("LIBRADTRAN_DIR"))
         self.my_logger.warning(cmd)
+        self.my_logger.warning(os.getcwd())
+        self.my_logger.warning(os.listdir())
         subprocess.run(path + 'bin/uvspec -h', shell=True)
         subprocess.run(cmd, shell=True)
         subprocess.run(cmd, shell=True, check=True)
