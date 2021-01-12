@@ -80,7 +80,11 @@ class Libradtran:
         else:
             cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
         print(path + 'bin/uvspec -h')
+        self.my_logger.warning(path + 'bin/uvspec -h')
+        self.my_logger.warning(os.getenv("LIBRADTRAN_DIR"))
+        self.my_logger.warning(cmd)
         subprocess.run(path + 'bin/uvspec -h', shell=True, check=True)
+        subprocess.run(cmd, shell=True)
         subprocess.run(cmd, shell=True, check=True)
 
     def simulate(self, airmass, pwv, ozone, aerosol, pressure):

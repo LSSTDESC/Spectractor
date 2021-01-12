@@ -16,5 +16,4 @@ if __name__ == "__main__":
               "Use '--all' to run all tests.")
         args.append("-a!slow")
 
-    subprocess.run("uvspec -h", shell=True, check=True)
     run_module_suite(argv=args)
