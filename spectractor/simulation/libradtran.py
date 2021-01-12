@@ -83,7 +83,7 @@ class Libradtran:
         self.my_logger.warning(path + 'bin/uvspec -h')
         self.my_logger.warning(os.getenv("LIBRADTRAN_DIR"))
         self.my_logger.warning(cmd)
-        subprocess.run(path + 'bin/uvspec -h', shell=True, check=True)
+        subprocess.run(path + 'bin/uvspec -h', shell=True)
         subprocess.run(cmd, shell=True)
         subprocess.run(cmd, shell=True, check=True)
 
