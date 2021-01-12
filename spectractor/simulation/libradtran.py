@@ -76,9 +76,9 @@ class Libradtran:
             Path to bin/uvpsec if necessary, otherwise use  self.home (default: "")
         """
         if path != '':
-            cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
+            cmd = os.path.join(path, 'bin/uvspec') + ' < ' + inp + ' > ' + out
         else:
-            cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
+            cmd = os.path.join(self.home, '/libRadtran/bin/uvspec') + ' < ' + inp + ' > ' + out
         self.my_logger.warning(f"{path}, {self.home}")
         self.my_logger.warning(path + 'bin/uvspec -h')
         self.my_logger.warning(os.getenv("LIBRADTRAN_DIR"))
@@ -86,7 +86,7 @@ class Libradtran:
         self.my_logger.warning(os.getcwd())
         self.my_logger.warning(os.listdir())
         # self.my_logger.warning(subprocess.run("du -sh ."))
-        subprocess.run(path + 'bin/uvspec -h', shell=True)
+        subprocess.run(os.path.join(path, 'bin/uvspec') + ' -h')
         subprocess.run(cmd, shell=True)
         subprocess.run(cmd, shell=True, check=True)
 
