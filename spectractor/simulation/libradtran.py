@@ -86,7 +86,8 @@ class Libradtran:
         self.my_logger.warning(os.getcwd())
         self.my_logger.warning(os.listdir())
         # self.my_logger.warning(subprocess.run("du -sh ."))
-        subprocess.run(os.path.join(path, 'bin/uvspec') + ' -h')
+        subprocess.run('./libRadtran-2.0.3/bin/uvspec -h', shell=True)
+        subprocess.run(os.path.join(path, 'bin/uvspec') + ' -h', shell=True)
         subprocess.run(cmd, shell=True)
         subprocess.run(cmd, shell=True, check=True)
 
