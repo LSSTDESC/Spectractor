@@ -121,6 +121,8 @@ class Atmosphere:
         wl = data[:, 0]
         atm = data[:, 1]
         self.transmission = interp1d(wl, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
+        self.my_logger.warning(f"remove {path}")
+        os.remove(path)
         return self.transmission
 
     def plot_transmission(self):
