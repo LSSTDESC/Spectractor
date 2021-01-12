@@ -79,6 +79,7 @@ class Libradtran:
             cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
         else:
             cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
+        self.my_logger.warning(f"{path}, {self.home}")
         self.my_logger.warning(path + 'bin/uvspec -h')
         self.my_logger.warning(os.getenv("LIBRADTRAN_DIR"))
         self.my_logger.warning(cmd)
