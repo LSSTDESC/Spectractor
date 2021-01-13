@@ -27,7 +27,7 @@ python:
   - "3.7"
 
 before_install:
-- sudo fallocate -l 4G /swapfile
+- sudo fallocate -l 12G /swapfile
 - sudo chmod 600 /swapfile
 - sudo mkswap /swapfile
 - sudo swapon /swapfile
@@ -55,7 +55,7 @@ install:
 before_script:
   # use personal github token to clone slitless github private repo
   - echo -e "machine github.com\n  login $CI_USER_TOKEN" > ~/.netrc
-  - export TRAVIS_WORKER_DOCKER_MEMORY=6G
+  - export TRAVIS_WORKER_DOCKER_MEMORY=12G
   # necessary for libradtran make uvspec command
   - conda create -n py27 python=2.7 pip
   - source activate py27
