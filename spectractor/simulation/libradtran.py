@@ -79,16 +79,6 @@ class Libradtran:
             cmd = os.path.join(path, 'bin/uvspec') + ' < ' + inp + ' > ' + out
         else:
             cmd = os.path.join(self.home, '/libRadtran/bin/uvspec') + ' < ' + inp + ' > ' + out
-        self.my_logger.warning(f"{path}, {self.home}")
-        self.my_logger.warning(path + 'bin/uvspec -h')
-        self.my_logger.warning(os.getenv("LIBRADTRAN_DIR"))
-        self.my_logger.warning(cmd)
-        self.my_logger.warning(os.getcwd())
-        self.my_logger.warning(os.listdir())
-        # self.my_logger.warning(subprocess.run("du -sh ."))
-        subprocess.run('./libRadtran-2.0.3/bin/uvspec -h', shell=True)
-        subprocess.run(os.path.join(path, 'bin/uvspec') + ' -h', shell=True)
-        subprocess.run(cmd, shell=True)
         subprocess.run(cmd, shell=True, check=True)
 
     def simulate(self, airmass, pwv, ozone, aerosol, pressure):

@@ -88,20 +88,20 @@ before_script:
   - conda info --envs
   - python --version
   - pip install pyutil numpy
-#  - wget http://astrometry.net/downloads/astrometry.net-0.78.tar.gz
-#  - tar xvzf astrometry.net-0.78.tar.gz
-#  - ls *.tar
-#  - rm -f *.tar
-#  - cd astrometry.net-*
-#  - make
-#  - make py
-#  - make extra
-#  - make install INSTALL_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET
-#  - wget -r -nc http://data.astrometry.net/5000/index-5002-24.fits
-#  - wget -r -nc http://data.astrometry.net/5000/index-5000-40.fits
-#  - mv data.astrometry.net/5000/index-*.fits $TRAVIS_BUILD_DIR/ASTROMETRYNET/data/
-#  # - make install-indexes
-#  - cd ../
+  - wget http://astrometry.net/downloads/astrometry.net-0.78.tar.gz
+  - tar xvzf astrometry.net-0.78.tar.gz
+  - ls *.tar
+  - rm -f *.tar
+  - cd astrometry.net-*
+  - make
+  - make py
+  - make extra
+  - make install INSTALL_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET
+  - wget -r -nc http://data.astrometry.net/5000/index-5002-24.fits
+  - wget -r -nc http://data.astrometry.net/5000/index-5000-40.fits
+  - mv data.astrometry.net/5000/index-*.fits $TRAVIS_BUILD_DIR/ASTROMETRYNET/data/
+  # - make install-indexes
+  - cd ../
   - "export ASTROMETRYNET_DIR=$TRAVIS_BUILD_DIR/ASTROMETRYNET"
   - "echo 'disable_jit: 1' > .numba_config.yaml"
 
