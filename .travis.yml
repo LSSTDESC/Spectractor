@@ -26,6 +26,9 @@ addons: # for libradtran and astrometry.net library
 python:
   - "3.7"
 
+notifications:
+  webhooks: https://coveralls.io/webhook?repo_token=COVERALLS_REPO_TOKEN
+
 before_install:
 - sudo fallocate -l 12G /swapfile
 - sudo chmod 600 /swapfile
@@ -52,10 +55,10 @@ install:
   # Useful for debugging any issues with conda
   - conda info -a
 
-before_script:
   # use personal github token to clone slitless github private repo
   - echo -e "machine github.com\n  login $CI_USER_TOKEN" > ~/.netrc
   - export TRAVIS_WORKER_DOCKER_MEMORY=12G
+  - "COVERALLS_PARALLEL=true coveralls"
   # necessary for libradtran make uvspec command
   - conda create -n py27 python=2.7 pip
   - source activate py27
@@ -129,4 +132,4 @@ jobs:
 #- coverage run -a --source=spectractor extractor simulator fit
 
 after_success:
-  - coveralls
+  - coveralls --finish
