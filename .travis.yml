@@ -127,9 +127,7 @@ jobs:
   - stage: "nosetests"
     script: nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
   - stage: "doctests and coverage"
-    script:
-      - ./coverage_and_test.sh
-      - coveralls --finish
+    script: ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py
 #- coverage run -a --source=spectractor extractor simulator fit
 
