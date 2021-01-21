@@ -131,5 +131,5 @@ jobs:
 #- coverage run -a --source=spectractor spectractor/*.py
 #- coverage run -a --source=spectractor extractor simulator fit
 
-after_success:
-  - coveralls --finish
+#after_success:
+#  - coveralls --finish
