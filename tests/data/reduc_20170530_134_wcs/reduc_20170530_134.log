@@ -36,7 +36,7 @@ Field size: 13.6934 x 13.6679 arcminutes
 Field rotation angle: up is 179.739 degrees E of N
 Field parity: neg
 solve-field.c:326:plot_source_overlay Plotting command was cancelled
- solve-field.c:132:run_command Command was: "/usr/local/astrometry//bin/plotxy -I /tmp/tmp.ppm.k1MMcX -i ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.axy -X X -Y Y -C red -w 2 -N 50 -x 1 -y 1 -P | /usr/local/astrometry//bin/plotxy -i ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.axy -X X -Y Y -I - -w 2 -r 3 -C red -n 50 -N 200 -x 1 -y 1 > ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134-objs.png"
+ solve-field.c:132:run_command Command was: "/usr/local/astrometry//bin/plotxy -I /tmp/tmp.ppm.mDVyZH -i ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.axy -X X -Y Y -C red -w 2 -N 50 -x 1 -y 1 -P | /usr/local/astrometry//bin/plotxy -i ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.axy -X X -Y Y -I - -w 2 -r 3 -C red -n 50 -N 200 -x 1 -y 1 > ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134-objs.png"
 
  solve-field.c:131:run_command Command exited with exit status 1
 

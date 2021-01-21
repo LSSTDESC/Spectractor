@@ -585,7 +585,6 @@ class Spectrum:
 
         Examples
         --------
-        >>> parameters.PSF_TYPE = "MoffatGauss"
         >>> s = Spectrum()
         >>> s.load_spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
         >>> print(s.chromatic_psf.table)  #doctest: +ELLIPSIS
