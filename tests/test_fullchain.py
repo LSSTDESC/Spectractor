@@ -124,7 +124,7 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
                                f" vs {PSF_POLY_PARAMS_TRUTH[2*(PSF_POLY_ORDER+1):-1]}"
                                f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100]):.5g}, "
                                f"std={np.std(residuals[100:-100]):.5g}")
-    assert np.isclose(float(spectrum.header['X0_T']), spectrum.x0[0], atol=0.05)
+    assert np.isclose(float(spectrum.header['X0_T']), spectrum.x0[0], atol=0.2)
     assert np.isclose(float(spectrum.header['Y0_T']), spectrum.x0[1], atol=0.5)
     assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle,
                       atol=180 / np.pi * 1 / parameters.CCD_IMSIZE)
