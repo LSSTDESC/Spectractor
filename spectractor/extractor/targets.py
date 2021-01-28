@@ -275,7 +275,7 @@ class Star(Target):
                 else:
                     self.wavelengths.append(data.wave)
                     self.spectra.append(data.flux)
-        elif 'HD' in self.label:  # it is a star
+        elif 'HD' in self.label or self.label in parameters.STAR_NAMES:  # it is a star
             self.emission_spectrum = False
             self.hydrogen_only = False
             self.lines = Lines(ATMOSPHERIC_LINES + HYDROGEN_LINES + STELLAR_LINES,
