@@ -896,14 +896,23 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
         bounds[1] = [np.inf] * bgd_npar + bounds[1]
         if len(bgd_index) > 0:
             try:
-                fit, cov, model = fit_poly1d_legendre(lambdas[bgd_index], spec[bgd_index],
-                                                      order=bgd_npar - 1, w=1. / spec_err[bgd_index])
+                if spec_err is not None:
+                    w = 1. / spec_err[bgd_index]
+                else:
+                    w = np.ones_like(lambdas[bgd_index])
+                fit, cov, model = fit_poly1d_legendre(lambdas[bgd_index], spec[bgd_index], order=bgd_npar - 1, w=w)
             except:
-                fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index],
-                                                      order=bgd_npar - 1, w=1. / spec_err[index])
+                if spec_err is not None:
+                    w = 1. / spec_err[index]
+                else:
+                    w = np.ones_like(lambdas[index])
+                fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index], order=bgd_npar - 1, w=w)
         else:
-            fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index],
-                                                  order=bgd_npar - 1, w=1. / spec_err[index])
+            if spec_err is not None:
+                w = 1. / spec_err[index]
+            else:
+                w = np.ones_like(lambdas[index])
+            fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index], order=bgd_npar - 1, w=w)
         # lines.my_logger.warning(f'{bgd_npar} {fit}')
         # fig = plt.figure()
         # plt.plot(lambdas[index], spec[index])
