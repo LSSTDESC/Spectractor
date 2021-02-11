@@ -3,11 +3,12 @@ import os
 import sys
 import re
 import numpy as np
-import coloredlogs
 import logging
 import astropy.units as units
 
 from spectractor import parameters
+if not parameters.CALLING_CODE:
+    import coloredlogs
 
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
 logging.getLogger("numba").setLevel(logging.ERROR)
@@ -190,17 +191,21 @@ def set_logger(logger):
     
     """
     my_logger = logging.getLogger(logger)
-    coloredlogs.DEFAULT_LEVEL_STYLES['warn'] = {'color': 'yellow'}
-    coloredlogs.DEFAULT_FIELD_STYLES['levelname'] = {'color': 'white', 'bold': True}
+    if not parameters.CALLING_CODE:
+        coloredlogs.DEFAULT_LEVEL_STYLES['warn'] = {'color': 'yellow'}
+        coloredlogs.DEFAULT_FIELD_STYLES['levelname'] = {'color': 'white', 'bold': True}
     if parameters.VERBOSE > 0:
         my_logger.setLevel(logging.INFO)
-        coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.INFO)
+        if not parameters.CALLING_CODE:
+            coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.INFO)
     else:
         my_logger.setLevel(logging.WARNING)
-        coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.WARNING)
+        if not parameters.CALLING_CODE:
+            coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.WARNING)
     if parameters.DEBUG_LOGGING:
         my_logger.setLevel(logging.DEBUG)
-        coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.DEBUG)
+        if not parameters.CALLING_CODE:
+            coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.DEBUG)
     return my_logger
 
 
