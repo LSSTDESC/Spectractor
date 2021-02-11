@@ -198,7 +198,7 @@ def set_logger(logger):
     else:
         my_logger.setLevel(logging.WARNING)
         coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.WARNING)
-    if parameters.DEBUG:
+    if parameters.DEBUG_LOGGING:
         my_logger.setLevel(logging.DEBUG)
         coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.DEBUG)
     return my_logger
