@@ -377,7 +377,7 @@ class ChromaticPSF:
         poly_params = np.array([])
         amplitude = None
         for k, name in enumerate(self.psf.param_names):
-            if name is 'amplitude':
+            if name == 'amplitude':
                 amplitude = profile_params[:, k]
                 poly_params = np.concatenate([poly_params, amplitude])
         if amplitude is None:
@@ -385,11 +385,11 @@ class ChromaticPSF:
                                    'Polynomial fit for shape parameters will be unweighted.')
         for k, name in enumerate(self.psf.param_names):
             delta = 0
-            if name is not 'amplitude':
+            if name != 'amplitude':
                 weights = np.copy(amplitude)
-                if name is 'x_c':
+                if name == 'x_c':
                     delta = self.x0
-                if name is 'y_c':
+                if name == 'y_c':
                     delta = self.y0
                 fit = np.polynomial.legendre.legfit(pixels, profile_params[:, k] - delta,
                                                     deg=self.degrees[name], w=weights)
