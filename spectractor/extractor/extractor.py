@@ -335,7 +335,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
         # same PSF as for the order 1 but at the same position
-        distance_order2 = self.spectrum.disperser.grating_lambda_to_pixel(self.lambdas-adr_u,
+        distance_order2 = self.spectrum.disperser.grating_lambda_to_pixel(self.lambdas - adr_u,
                                                                           self.spectrum.x0 + np.asarray([dx0, dy0]),
                                                                           order=2)
         for k in range(1, profile_params.shape[1]):
@@ -926,11 +926,11 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # while np.nanmean(bgd_res)/np.nanstd(bgd_res) < -0.2 and parameters.PIXWIDTH_BOXSIZE >= 5:
     while (np.abs(np.nanmean(bgd_res)) > 0.5 or np.nanstd(bgd_res) > 1.3) and parameters.PIXWIDTH_BOXSIZE > 5:
         parameters.PIXWIDTH_BOXSIZE = max(5, parameters.PIXWIDTH_BOXSIZE // 2)
-        my_logger.warning(f"\n\tPull distribution of background residuals differs too much from mean=0 and std=1. "
-                          f"\n\t\tmean={np.nanmean(bgd_res):.3g}; std={np.nanstd(bgd_res):.3g}"
-                          f"\n\tThese value should be smaller in absolute value than 0.5 and 1.3. "
-                          f"\n\tTo do so, parameters.PIXWIDTH_BOXSIZE is divided "
-                          f"by 2 from {parameters.PIXWIDTH_BOXSIZE * 2} -> {parameters.PIXWIDTH_BOXSIZE}.")
+        my_logger.debug(f"\n\tPull distribution of background residuals differs too much from mean=0 and std=1. "
+                        f"\n\t\tmean={np.nanmean(bgd_res):.3g}; std={np.nanstd(bgd_res):.3g}"
+                        f"\n\tThese value should be smaller in absolute value than 0.5 and 1.3. "
+                        f"\n\tTo do so, parameters.PIXWIDTH_BOXSIZE is divided "
+                        f"by 2 from {parameters.PIXWIDTH_BOXSIZE * 2} -> {parameters.PIXWIDTH_BOXSIZE}.")
         bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
 
     # Propagate background uncertainties
