@@ -2,7 +2,7 @@ from numpy.testing import run_module_suite
 import numpy as np
 
 from spectractor import parameters
-from spectractor.simulation.simulator import (SpectrumSimulatorSimGrid,
+from spectractor.simulation.simulator import (SpectrumSimulatorSimGrid, SpectrumSimulator,
                                               Atmosphere, AtmosphereGrid, SpectrogramSimulator)
 from spectractor.simulation.image_simulation import ImageSim
 from spectractor.config import load_config
@@ -49,14 +49,18 @@ def test_simulator():
     parameters.DEBUG = True
     load_config('config/ctio.ini')
 
-    output_directory = './tests/data/'
+    output_directory = './outputs/'
 
     for file_name in file_names:
         tag = file_name.split('/')[-1]
-        # spectrum_simulation = SpectrumSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
-        #                                        A1=1.1, A2=0.1, reso=2, D=56, shift=-3)
-        # spectrogram_simulation = SpectrogramSimulator(file_name, pwv=3, ozone=350, aerosols=0.02,
-        #                                               A1=1.1, A2=0.9, D=56, shift_x=-3, shift_y=1, angle=-1)
+        spectrum_simulation = SpectrumSimulator(file_name, output_directory, pwv=5, ozone=300, aerosols=0.03,
+                                                A1=1, A2=10, reso=2, D=56, shift=-1)
+        assert np.sum(spectrum_simulation.data) > 0
+        assert np.sum(spectrum_simulation.data) < 1e-10
+        assert np.sum(spectrum_simulation.data_order2) < 1e-10
+        # spectrogram_simulation = SpectrogramSimulator(file_name, output_directory, pwv=5, ozone=300, aerosols=0.03,
+        #                                               A1=1, A2=1, D=56, shift_x=-1, shift_y=1, angle=-1)
+        # assert np.sum(spectrogram_simulation.data) > 20
         # psf_poly_params = spectrogram_simulation.chromatic_psf.from_table_to_poly_params()
         image_simulation = ImageSim(file_name.replace('_spectrum.fits', '.fits'), file_name, output_directory, A2=1,
                                     psf_poly_params=None, with_stars=True)

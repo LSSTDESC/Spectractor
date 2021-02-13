@@ -253,6 +253,8 @@ class BackgroundModel:
         self.level = level
         if self.level <= 0:
             self.my_logger.warning('\n\tBackground level must be strictly positive.')
+        else:
+            self.my_logger.info(f'\n\tBackground set to {level:.3f} ADU/s.')
         self.frame = frame
 
     def model(self):
@@ -312,8 +314,11 @@ class ImageModel(Image):
     def compute(self, star, background, spectrogram, starfield=None):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
-        self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
-                  spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
+        if spectrogram.full_image:
+            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.data
+        else:
+            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
+                      spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
         # - spectrogram.spectrogram_bgd)
         if starfield is not None:
             self.data += starfield.model(xx, yy)
@@ -374,7 +379,9 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Load reduced image
     spectrum, telescope, disperser, target = SimulatorInit(spectrum_filename)
     image = ImageModel(image_filename, target_label=target.label)
-    guess = [spectrum.header['TARGETX'], spectrum.header['TARGETY']]
+    guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
+    if "CCDREBIN" in spectrum.header:
+        guess *= spectrum.header["CCDREBIN"]
     if parameters.DEBUG:
         image.plot_image(scale='symlog', target_pixcoords=guess)
     # Fit the star 2D profile
@@ -386,8 +393,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         target_pixcoords = find_target(image, guess, use_wcs=True)
     # Background model
     my_logger.info('\n\tBackground model...')
-    yy, xx = np.mgrid[:parameters.XWINDOW, :parameters.YWINDOW]
-    bgd_level = float(np.mean(image.target_bkgd2D(xx, yy)))
+    bgd_level = float(np.mean(spectrum.spectrogram_bgd))
     background = BackgroundModel(level=bgd_level, frame=None)  # (1600, 1650, 100))
     if parameters.DEBUG:
         background.plot_model()
@@ -425,13 +431,18 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     if psf_poly_params is None:
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
+    else:
+        spectrum.chromatic_psf.deg = (len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.param_names) - 2) - 1
+        spectrum.chromatic_psf.set_polynomial_degrees(spectrum.chromatic_psf.deg)
+        my_logger.info(f'\n\tUse PSF parameters {psf_poly_params} as polynoms of '
+                       f'degree {spectrum.chromatic_psf.degrees}')
 
     # Simulate spectrogram
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0., B=1.,
                                            psf_poly_params=psf_poly_params, angle=rotation_angle, with_background=False,
-                                           fast_sim=False)
+                                           fast_sim=False, full_image=True)
 
     # now we include effects related to the wrong extraction of the spectrum:
     # wrong estimation of the order 0 position and wrong DISTANCE2CCD
@@ -463,7 +474,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.add_poisson_and_read_out_noise()
 
     # Round float ADU into closest integers
-    image.data = np.around(image.data)
+    # image.data = np.around(image.data)
 
     # Plot
     if parameters.VERBOSE and parameters.DISPLAY:  # pragma: no cover

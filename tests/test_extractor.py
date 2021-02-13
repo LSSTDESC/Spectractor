@@ -31,7 +31,7 @@ def test_extractor_ctio():
     parameters.CCD_REBIN = 2
 
     for file_name in file_names:
-        tag = file_name.split('/')[-1]
+        tag = file_name.split('/')[-1].replace("sim","reduc")
         disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         if target_label is None or xpos is None or ypos is None:
             continue

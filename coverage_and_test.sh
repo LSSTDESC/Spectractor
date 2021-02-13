@@ -29,4 +29,3 @@ do
     coverage run -a --source=spectractor $i
 done
 
-

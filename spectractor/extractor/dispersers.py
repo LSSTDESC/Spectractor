@@ -307,6 +307,7 @@ class Grating:
         self.transmission = None
         self.transmission_err = None
         self.ratio_order_2over1 = None
+        self.flat_ratio_order_2over1 = True
         self.load_files(verbose=verbose)
 
     def N(self, x):
@@ -383,9 +384,11 @@ class Grating:
             a = np.loadtxt(filename)
             l, t = a.T
             self.ratio_order_2over1 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
-                                                           fill_value=(t[0], t[-1]))
+                                                           fill_value="extrapolate")  # "(0, t[-1]))
+            self.flat_ratio_order_2over1 = False
         else:
             self.ratio_order_2over1 = lambda x: parameters.GRATING_ORDER_2OVER1 * np.ones_like(x).astype(float)
+            self.flat_ratio_order_2over1 = True
         filename = self.data_dir + self.label + "/hologram_center.txt"
         if os.path.isfile(filename):
             lines = [ll.rstrip('\n') for ll in open(filename)]
@@ -448,6 +451,34 @@ class Grating:
         """
         theta0 = get_theta0(x0)
         return np.arcsin(order * lambdas * 1e-6 * self.N(x0) + np.sin(theta0))
+
+    def grating_refraction_angle_to_lambda(self, thetas, x0, order=1):
+        """ Convert refraction angles into wavelengths (in nm) with.
+
+        Parameters
+        ----------
+        thetas: array, float
+            Refraction angles in radian.
+        x0: float or [float, float]
+            Order 0 position detected in the non-rotated image.
+        order: int
+            Order of the spectrum (default: 1)
+
+        Examples
+        --------
+        >>> disperser = Grating(N=300, D=55)
+        >>> x0 = [800,800]
+        >>> lambdas = np.arange(300, 900, 100)
+        >>> thetas = disperser.refraction_angle_lambda(lambdas, x0, order=1)
+        >>> print(thetas)
+        [0.0896847  0.11985125 0.15012783 0.18054376 0.21112957 0.24191729]
+        >>> lambdas = disperser.grating_refraction_angle_to_lambda(thetas, x0, order=1)
+        >>> print(lambdas)
+        [300. 400. 500. 600. 700. 800.]
+        """
+        theta0 = get_theta0(x0)
+        lambdas = (np.sin(thetas) - np.sin(theta0)) / (order * self.N(x0))
+        return lambdas * 1e6
 
     def grating_pixel_to_lambda(self, deltaX, x0, order=1):
         """ Convert pixels into wavelengths (in nm) with.
@@ -537,6 +568,7 @@ class Grating:
         if xlim is not None:
             wavelengths = np.linspace(xlim[0], xlim[1], 100)
         plt.plot(wavelengths, self.transmission(wavelengths), 'b-', label=self.label)
+        plt.plot(wavelengths, self.ratio_order_2over1(wavelengths), 'r-', label="Ratio 2/1")
         plt.xlabel(r"$\lambda$ [nm]")
         plt.ylabel(r"Transmission")
         plt.grid()

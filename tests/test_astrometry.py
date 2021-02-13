@@ -12,7 +12,7 @@ import numpy as np
 
 
 def test_astrometry():
-    file_names = ['tests/data/reduc_20170530_134.fits']  #, 'tests/data/reduc_20170605_028.fits']
+    file_names = ['tests/data/reduc_20170530_134.fits']  # 'tests/data/reduc_20170605_028.fits']
 
     load_config('./config/ctio.ini')
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')

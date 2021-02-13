@@ -26,6 +26,17 @@ addons: # for libradtran and astrometry.net library
 python:
   - "3.7"
 
+notifications:
+  webhooks: https://coveralls.io/webhook?repo_token=COVERALLS_REPO_TOKEN
+
+before_install:
+- sudo fallocate -l 12G /swapfile
+- sudo chmod 600 /swapfile
+- sudo mkswap /swapfile
+- sudo swapon /swapfile
+- sudo sysctl vm.swappiness=10
+- sudo sysctl -w vm.max_map_count=1966080
+
 install:
   - sudo apt-get update
   - sudo apt-get install gfortran
@@ -47,6 +58,8 @@ install:
 before_script:
   # use personal github token to clone slitless github private repo
   - echo -e "machine github.com\n  login $CI_USER_TOKEN" > ~/.netrc
+  - export TRAVIS_WORKER_DOCKER_MEMORY=12G
+  - export COVERALLS_PARALLEL=true
   # necessary for libradtran make uvspec command
   - conda create -n py27 python=2.7 pip
   - source activate py27
@@ -63,22 +76,26 @@ before_script:
   - "cd ../"
   - "echo $LD_LIBRARY_PATH"
   - "export LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/NETCDF/lib/"
-  - "wget -L http://www.libradtran.org/download/history/libRadtran-2.0.2.tar.gz"
-  - "gzip -d libRadtran-2.0.2.tar.gz"
-  - "tar -xf libRadtran-2.0.2.tar"
-  - "cd libRadtran-2.0.2"
+  - "wget -L http://www.libradtran.org/download/history/libRadtran-2.0.3.tar.gz"
+  - "gzip -d libRadtran-2.0.3.tar.gz"
+  - "tar -xf libRadtran-2.0.3.tar"
+  - "cd libRadtran-2.0.3"
   - "./configure  --prefix=$TRAVIS_BUILD_DIR/LIBRADTRAN --with-libnetcdf=$TRAVIS_BUILD_DIR/NETCDF/"
-  - "make uvspec"
+  - "make"
   - "cd ../"
-  - "export LIBRADTRAN_DIR=libRadtran-2.0.2/"
+  - "export LIBRADTRAN_DIR=libRadtran-2.0.3/"
   - export NETPBM_LIB="-L/usr/lib -lnetpbm"
   - export NETPBM_INC="-I/usr/include"
   - conda create -n py37 python=3.7 pip
   - source activate py37
+  - conda remove --name py27 --all
+  - conda info --envs
   - python --version
   - pip install pyutil numpy
   - wget http://astrometry.net/downloads/astrometry.net-0.78.tar.gz
   - tar xvzf astrometry.net-0.78.tar.gz
+  - ls *.tar
+  - rm -f *.tar
   - cd astrometry.net-*
   - make
   - make py
@@ -106,9 +123,11 @@ before_script:
 
 jobs:
   include:
-  - stage: nosetests
+  - stage: "full chain nosetest"
+    script: nosetests tests/run_full_chain.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
+  - stage: "nosetests"
     script: nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
-  - stage: doctests and coverage
+  - stage: "doctests and coverage"
     script: ./coverage_and_test.sh
 #- coverage run -a --source=spectractor spectractor/*.py
 #- coverage run -a --source=spectractor extractor simulator fit

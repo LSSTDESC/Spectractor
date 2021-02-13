@@ -12,7 +12,7 @@ import re
 import sys
 import numpy as np
 
-from subprocess import Popen, PIPE
+import subprocess
 
 from spectractor.tools import ensure_dir
 import spectractor.parameters as parameters
@@ -40,7 +40,7 @@ class Libradtran:
         # -------------------------------------
 
         # LibRadTran installation directory
-        self.simulation_directory = 'simulations'
+        self.simulation_directory = 'libradtran'
         ensure_dir(self.simulation_directory)
         self.libradtran_path = parameters.LIBRADTRAN_DIR
 
@@ -76,11 +76,10 @@ class Libradtran:
             Path to bin/uvpsec if necessary, otherwise use  self.home (default: "")
         """
         if path != '':
-            cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
+            cmd = os.path.join(path, 'bin/uvspec') + ' < ' + inp + ' > ' + out
         else:
-            cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
-        p = Popen(cmd, shell=True, stdout=PIPE)
-        p.wait()
+            cmd = os.path.join(self.home, '/libRadtran/bin/uvspec') + ' < ' + inp + ' > ' + out
+        subprocess.run(cmd, shell=True, check=True)
 
     def simulate(self, airmass, pwv, ozone, aerosol, pressure):
         """Simulate the atmosphere transmission with Libratran.
@@ -109,7 +108,7 @@ class Libradtran:
         >>> lib = Libradtran()
         >>> output = lib.simulate(1.2, 2, 400, 0.07, 800)
         >>> print(output)
-        simulations/pp/us/as/rt/in/RT_CTIO_pp_us_as_rt_z12_pwv20_oz40_aer7.OUT
+        libradtran/pp/us/as/rt/in/RT_CTIO_pp_us_as_rt_z12_pwv20_oz40_aer7.OUT
         """
 
         self.my_logger.debug(
@@ -272,15 +271,15 @@ class Libradtran:
 
 
 def clean_simulation_directory():
-    """Remove the simulations directory.
+    """Remove the libradtran directory.
 
     Examples
     --------
-    >>> ensure_dir('simulations')
+    >>> ensure_dir('libradtran')
     >>> clean_simulation_directory()
-    >>> assert not os.path.isfile('simulations')
+    >>> assert not os.path.isfile('libradtran')
     """
-    os.system("rm -rf simulations")
+    os.system("rm -rf libradtran")
 
 
 if __name__ == "__main__":
