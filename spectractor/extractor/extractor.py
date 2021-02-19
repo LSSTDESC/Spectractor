@@ -477,6 +477,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 ax[1, 0].scatter(x, y, cmap=from_lambda_to_colormap(self.lambdas[sub[5:-5]]), edgecolors='None',
                                  c=self.lambdas[sub[5:-5]],
                                  label='', marker='o', s=10)
+                ax[1, 0].set_xlim(0, model[:, sub].shape[1])
+                ax[1, 0].set_ylim(0, model[:, sub].shape[0])
             # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
