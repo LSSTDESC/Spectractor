@@ -592,8 +592,6 @@ def load_AUXTEL_image(image):  # pragma: no cover
     if 'adu' in image.header['BUNIT']:
         image.units = 'ADU'
     parameters.OBS_CAMERA_ROTATION = 90 - float(image.header["ROTPA"])
-    # parameters.OBS_CAMERA_ROTATION = -270 + 180/np.pi * np.arctan2(hdu_list[1].header["CD2_1"],
-    # hdu_list[1].header["CD1_1"])
     if parameters.OBS_CAMERA_ROTATION > 360:
         parameters.OBS_CAMERA_ROTATION -= 360
     if parameters.OBS_CAMERA_ROTATION < -360:
