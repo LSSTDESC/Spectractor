@@ -390,9 +390,8 @@ class Spectrum:
         hdu3 = fits.ImageHDU()
         hdu3.header["EXTNAME"] = "ORDER2"
         hdu1.data = [self.lambdas, self.data, self.err]
-        if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
-            hdu2.data = self.cov_matrix
-            hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
+        hdu2.data = self.cov_matrix
+        hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
         hdu = fits.HDUList([hdu1, hdu2, hdu3])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
@@ -1168,6 +1167,8 @@ def calibrate_spectrum(spectrum, with_adr=False):
     distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=pixel_shift)
     lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr*adr_u, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
+    spectrum.lambdas_order2 = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr*adr_u, x0=x0,
+                                                                         order=spectrum.order+1)
     spectrum.lambdas_binwidths = np.gradient(lambdas)
     spectrum.convert_from_ADUrate_to_flam()
     spectrum.chromatic_psf.table['Dx'] -= pixel_shift

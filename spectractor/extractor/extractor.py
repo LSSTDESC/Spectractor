@@ -801,6 +801,8 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     # Calibrate the spectrum
     my_logger.info(f'\n\tCalibrating order {spectrum.order:d} spectrum...')
     calibrate_spectrum(spectrum, with_adr=True)
+    spectrum.data_order2 = np.zeros_like(spectrum.lambdas_order2)
+    spectrum.err_order2 = np.zeros_like(spectrum.lambdas_order2)
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
