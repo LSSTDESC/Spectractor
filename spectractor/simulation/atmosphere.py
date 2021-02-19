@@ -112,8 +112,7 @@ class Atmosphere:
         self.aerosols = aerosols
         self.set_title()
         self.set_label()
-        if parameters.VERBOSE:
-            self.my_logger.info(f'\n\t{self.title}\n\t\t{self.label}')
+        self.my_logger.debug(f'\n\t{self.title}\n\t\t{self.label}')
 
         lib = libradtran.Libradtran()
         path = lib.simulate(self.airmass, pwv, ozone, aerosols, self.pressure)
@@ -294,9 +293,8 @@ class AtmosphereGrid(Atmosphere):
             >>> assert a.atmgrid.shape == (3, a.index_atm_data+len(parameters.LAMBDAS))
         """
         # first determine the length
-        if parameters.VERBOSE or parameters.DEBUG:
-            self.my_logger.info(f'\n\tAtmosphere simulations for z={self.airmass:4.2f}, P={self.pressure:4.2f}hPa, '
-                                rf'T={self.temperature:4.2f}$\degree$C, for data-file={self.image_filename} ')
+        self.my_logger.debug(f'\n\tAtmosphere simulations for z={self.airmass:4.2f}, P={self.pressure:4.2f}hPa, '
+                             rf'T={self.temperature:4.2f}$\degree$C, for data-file={self.image_filename} ')
         count = 0
         for aer in self.AER_Points:
             for pwv in self.PWV_Points:
@@ -439,8 +437,7 @@ class AtmosphereGrid(Atmosphere):
 
             hdu = fits.PrimaryHDU(self.atmgrid, header=hdr)
             hdu.writeto(self.filename, overwrite=True)
-            if parameters.VERBOSE:
-                self.my_logger.info(f'\n\tAtmosphere.save atm-file={self.filename}')
+            self.my_logger.info(f'\n\tAtmosphere.save atm-file={self.filename}')
 
     def load_file(self, filename):
         """Load the atmospheric grid from a fits file and interpolate across the points
@@ -520,8 +517,7 @@ class AtmosphereGrid(Atmosphere):
 
             self.atmgrid[:, :] = hdu[0].data[:, :]
 
-            if parameters.VERBOSE or parameters.DEBUG:
-                self.my_logger.info(f'\n\tAtmosphere.load_image atm-file={self.filename}')
+            self.my_logger.debug(f'\n\tAtmosphere.load_image atm-file={self.filename}')
 
             # interpolate the grid
             self.lambdas = self.atmgrid[0, self.index_atm_data:]
