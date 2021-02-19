@@ -107,7 +107,7 @@ def test_extractor_ctio_planetary_nebula():
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
 
 
-def test_extractor_auxtel():
+def extractor_auxtel():
     file_names = ['tests/data/calexp_2020031500162-EMPTY_ronchi90lpmm-det000.fits']  # image 1
     #file_names = ['tests/data/calexp_2020031200313-EMPTY_ronchi90lpmm-det000.fits']  # image 2
     #file_names = ['tests/data/calexp_2020022100767-EMPTY_ronchi90lpmm-det000.fits']  # image 3
