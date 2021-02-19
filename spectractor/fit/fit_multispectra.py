@@ -23,7 +23,7 @@ from spectractor.extractor.spectroscopy import HALPHA, HBETA, HGAMMA, HDELTA, O2
 class MultiSpectraFitWorkspace(FitWorkspace):
 
     def __init__(self, output_file_name, file_names, fixed_A1s=True, inject_random_A1s=False, bin_width=-1,
-                 nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 nwalkers=18, nsteps=1000, burnin=100, nbins=10, extra_mask=None,
                  verbose=0, plot=False, live_fit=False):
         """Class to fit jointly multiple spectra extracted with Spectractor.
 
@@ -90,6 +90,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 self.my_logger.warning(f"\n\tNo atmosphere grid {atmgrid_file_name}, the fit will be slower...")
                 self.atmospheres.append(Atmosphere(spectrum.airmass, spectrum.pressure, spectrum.temperature))
         self.nspectra = len(self.spectra)
+        self.extra_mask = extra_mask
         self.spectrum_lambdas = [self.spectra[k].lambdas for k in range(self.nspectra)]
         self.spectrum_data = [self.spectra[k].data for k in range(self.nspectra)]
         self.spectrum_err = [self.spectra[k].err for k in range(self.nspectra)]
@@ -186,10 +187,13 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             lambdas_bin_edges = list(self.lambdas[0]) + [self.lambdas[0, -1] + dlbda]
         # mask
         lambdas_to_mask = [np.arange(300, 355, self.bin_widths)]
+        if self.extra_mask is not None:
+            lambdas_to_mask += [self.extra_mask]
         for line in [HALPHA, HBETA, HGAMMA, HDELTA, O2_1, O2_2, O2B]:
             width = line.width_bounds[1]
             lambdas_to_mask += [np.arange(line.wavelength - width, line.wavelength + width, self.bin_widths)]
         lambdas_to_mask = np.concatenate(lambdas_to_mask).ravel()
+        lambdas_to_mask = np.sort(lambdas_to_mask)
         lambdas_to_mask_indices = []
         for k in range(self.nspectra):
             lambdas_to_mask_indices.append(np.asarray([np.argmin(np.abs(self.lambdas[k] - lambdas_to_mask[i]))
@@ -401,12 +405,12 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             self.truth = None
         self.true_instrumental_transmission = []
         tinst = lambda lbda: self.disperser.transmission(lbda) * self.telescope.transmission(lbda)
-        if self.bin_widths > 0:
-            for i in range(1, self.lambdas_bin_edges.size):
-                self.true_instrumental_transmission.append(quad(tinst, self.lambdas_bin_edges[i - 1],
-                                                                self.lambdas_bin_edges[i])[0] / self.bin_widths)
-        else:
-            self.true_instrumental_transmission = tinst(self.lambdas[0])
+        # if self.bin_widths > 0:
+        #     for i in range(1, self.lambdas_bin_edges.size):
+        #         self.true_instrumental_transmission.append(quad(tinst, self.lambdas_bin_edges[i - 1],
+        #                                                         self.lambdas_bin_edges[i])[0] / self.bin_widths)
+        # else:
+        self.true_instrumental_transmission = tinst(self.lambdas[0])
         self.true_instrumental_transmission = np.array(self.true_instrumental_transmission)
 
     def simulate(self, ozone, pwv, aerosols, reso, *A1s):
@@ -585,7 +589,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         residuals /= norm
         std = float(np.nanstd(residuals))
         im = ax[2, 0].pcolormesh(xx, yy, residuals, vmin=-3 * std, vmax=3 * std, cmap=cmap_bwr)
-        plt.colorbar(im, cax=ax[2, 1], label='(Data-Model)/Err', format="%.0f")
+        plt.colorbar(im, cax=ax[2, 1], label='(Data-Model)/Err', format="%.1f")
         # ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, color='black', x=0.84, y=0.76)
         ax[2, 0].grid(color='silver', ls='solid')
         ax[2, 0].scatter(self.lambdas[0][1:-1], ylbda, cmap=from_lambda_to_colormap(self.lambdas[0][1:-1]),
