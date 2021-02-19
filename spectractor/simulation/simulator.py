@@ -258,6 +258,8 @@ class SpectrogramModel(Spectrum):
         self.psf_cube = None
         self.psf_cube_order2 = None
         self.fix_psf_cube = False
+        self.fix_atm_sim = False
+        self.atmosphere_sim = None
         self.fast_sim = fast_sim
         self.with_background = with_background
         self.full_image = full_image
@@ -311,7 +313,9 @@ class SpectrogramModel(Spectrum):
 
         """
         spectrum = np.zeros_like(lambdas)
-        atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
+        if self.atmosphere_sim is None or not self.fix_atm_sim:
+            self.atmosphere_sim = self.atmosphere.simulate(ozone, pwv, aerosols)
+        atmosphere = self.atmosphere_sim
         telescope_transmission = self.telescope.transmission(lambdas - shift_t)
         if self.fast_sim:
             spectrum = self.target.sed(lambdas)
@@ -343,7 +347,7 @@ class SpectrogramModel(Spectrum):
             np.tan(self.rotation_angle * np.pi / 180) * self.chromatic_psf.table['Dx']
         self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['y_c']) - self.r0.imag
         self.chromatic_psf.profile_params = self.chromatic_psf.from_table_to_profile_params()
-        if parameters.DEBUG:
+        if False:
             self.chromatic_psf.plot_summary()
         return self.chromatic_psf.profile_params
 
@@ -406,7 +410,7 @@ class SpectrogramModel(Spectrum):
         # dispersion_law_order2 = dispersion_law + 1j * (dy_func(lambdas_order2) - self.chromatic_psf.table['Dy']
         #                                                + self.chromatic_psf.table['Dy_disp_axis'])
 
-        if parameters.DEBUG:
+        if False:
             from spectractor.tools import from_lambda_to_colormap
             plt.plot(self.chromatic_psf.table['Dx'], self.chromatic_psf.table['Dy_disp_axis'], 'k-', label="mean")
             plt.scatter(dispersion_law.real-self.r0.real, -self.r0.imag + dispersion_law.imag, label="dispersion_law",
@@ -549,7 +553,7 @@ class SpectrogramModel(Spectrum):
         if self.with_background:
             self.data += B * self.spectrogram_bgd
         self.my_logger.debug(f'\n\tAfter bgd: {time.time() - start}')
-        if parameters.DEBUG:
+        if False:
             fig, ax = plt.subplots(2, 1, sharex="all", figsize=(12, 9))
             im = ax[0].imshow(self.data, origin='lower')
             plt.colorbar(im, ax=ax[0], label=self.units)
