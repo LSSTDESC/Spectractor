@@ -941,8 +941,15 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     psf = load_PSF(psf_type=parameters.PSF_TYPE)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
                      deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
-    s.fit_transverse_PSF1D_profile(data, err, signal_width, ws, pixel_step=10, sigma_clip=5,
-                                   bgd_model_func=bgd_model_func, saturation=image.saturation, live_fit=False)
+    verbose = copy.copy(parameters.VERBOSE)
+    debug = copy.copy(parameters.DEBUG)
+    parameters.VERBOSE = False
+    parameters.DEBUG = False
+    s.fit_transverse_PSF1D_profile(data, err, signal_width, ws, pixel_step=parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT,
+                                   sigma_clip=5, bgd_model_func=bgd_model_func, saturation=image.saturation,
+                                   live_fit=False)
+    parameters.VERBOSE = verbose
+    parameters.DEBUG = debug
 
     # Fill spectrum object
     spectrum.pixels = np.arange(xmin, xmax, 1).astype(int)
@@ -1243,4 +1250,5 @@ def set_fast_mode(image):
     parameters.YWINDOW //= parameters.CCD_REBIN
     parameters.XWINDOW_ROT //= parameters.CCD_REBIN
     parameters.YWINDOW_ROT //= parameters.CCD_REBIN
+    parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT //= parameters.CCD_REBIN
     return image
