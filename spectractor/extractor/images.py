@@ -565,7 +565,6 @@ def load_AUXTEL_image(image):  # pragma: no cover
         The Image instance to fill with file data and header.
     """
     image.my_logger.info(f'\n\tLoading AUXTEL image {image.file_name}...')
-    image.my_logger.warning(image.header)
     hdu_list = fits.open(image.file_name)
     image.header = hdu_list[0].header
     image.data = hdu_list[1].data.astype(np.float64)
