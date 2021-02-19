@@ -439,24 +439,22 @@ class TelescopeTransmission:
         to_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
 
         # Filter RG715
-        wl, trg, err = throughput.load_RG715()
-        tfr = interp1d(wl, trg, kind='linear', bounds_error=False, fill_value=0.)
-
+        # wl, trg, err = throughput.load_RG715()
+        # tfr = interp1d(wl, trg, kind='linear', bounds_error=False, fill_value=0.)
+        #
         # Filter FGB37
-        wl, trb, err = throughput.load_FGB37()
-        tfb = interp1d(wl, trb, kind='linear', bounds_error=False, fill_value=0.)
+        # wl, trb, err = throughput.load_FGB37()
+        # tfb = interp1d(wl, trb, kind='linear', bounds_error=False, fill_value=0.)
 
-        if self.filter_name == "RG715":
-            TF = tfr
-        elif self.filter_name == "FGB37":
-            TF = tfb
-        else:
-            TF = lambda x: np.ones_like(x).astype(float)
-
-        tf = TF
+        # if self.filter_name == "RG715":
+        #     TF = tfr
+        # elif self.filter_name == "FGB37":
+        #     TF = tfb
+        # else:
+        TF = lambda x: np.ones_like(x).astype(float)
 
         # self.transmission=lambda x: self.qe(x)*self.to(x)*(self.tm(x)**2)*self.tf(x)
-        self.transmission = lambda x: to(x) * tf(x)
+        self.transmission = lambda x: to(x) * TF(x)
         self.transmission_err = lambda x: to_err(x)
         return self.transmission
 
