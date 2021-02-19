@@ -591,8 +591,6 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.humidity = 25  # image.header['OUTHUM']
     if 'adu' in image.header['BUNIT']:
         image.units = 'ADU'
-    image.my_logger.warning("\n\tNeed to set the camera rotation angle ? Angle must be counted positive from "
-                            "north to east direction. Need to flip the signs ?")
     parameters.OBS_CAMERA_ROTATION = 90 - float(image.header["ROTPA"])
     # parameters.OBS_CAMERA_ROTATION = -270 + 180/np.pi * np.arctan2(hdu_list[1].header["CD2_1"],
     # hdu_list[1].header["CD1_1"])
