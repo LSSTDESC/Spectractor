@@ -287,7 +287,7 @@ class SpectrogramModel(Spectrum):
         self.true_lambdas = lambdas
         return spectrum
 
-    def simulate_spectrum(self, lambdas, ozone, pwv, aerosols, shift_t=0.):
+    def simulate_spectrum(self, lambdas, atmosphere, shift_t=0.):
         """
         Simulate the spectrum of the object and return the result in Target units.
 
@@ -295,12 +295,8 @@ class SpectrogramModel(Spectrum):
         ----------
         lambdas: array_like
             The wavelength array in nm.
-        ozone: float
-            Ozone quantity in Dobson
-        pwv: float
-            Precipitable Water Vapor quantity in mm
-        aerosols: float
-            VAOD Vertical Aerosols Optical Depth
+        atmosphere: callable
+            A callable function of the atmospheric transmission.
         shift_t: float
             Shift of the transmission in nm (default: 0).
 
@@ -313,9 +309,6 @@ class SpectrogramModel(Spectrum):
 
         """
         spectrum = np.zeros_like(lambdas)
-        if self.atmosphere_sim is None or not self.fix_atm_sim:
-            self.atmosphere_sim = self.atmosphere.simulate(ozone, pwv, aerosols)
-        atmosphere = self.atmosphere_sim
         telescope_transmission = self.telescope.transmission(lambdas - shift_t)
         if self.fast_sim:
             spectrum = self.target.sed(lambdas)
@@ -491,7 +484,9 @@ class SpectrogramModel(Spectrum):
         self.chromatic_psf.table["Dy"] = dispersion_law.imag - self.r0.imag
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
-        spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
+        if self.atmosphere_sim is None or not self.fix_atm_sim:
+            self.atmosphere_sim = self.atmosphere.simulate(ozone, pwv, aerosols)
+        spectrum, spectrum_err = self.simulate_spectrum(lambdas, self.atmosphere_sim)
         self.my_logger.debug(f'\n\tAfter spectrum: {time.time() - start}')
         # Fill the order 1 cube
         nlbda = dispersion_law.size
@@ -514,7 +509,7 @@ class SpectrogramModel(Spectrum):
         # Add order 2
         if A2 > 0.:
             spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(lambdas_order2) * \
-                                                   self.simulate_spectrum(lambdas_order2, ozone, pwv, aerosols)
+                                                   self.simulate_spectrum(lambdas_order2, self.atmosphere_sim)
             if np.any(np.isnan(spectrum_order2)):
                 spectrum_order2[np.isnan(spectrum_order2)] = 0.
             nlbda2 = dispersion_law_order2.size

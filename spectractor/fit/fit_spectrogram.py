@@ -323,6 +323,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         model = model.flatten()
         J = np.zeros((params.size, model.size))
         strategy = copy.copy(self.simulation.fix_psf_cube)
+        atmosphere = copy.copy(self.simulation.atmosphere_sim)
         for ip, p in enumerate(params):
             if fixed_params[ip]:
                 continue
@@ -339,6 +340,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
+            if self.simulation.fix_atm_sim is False:
+                self.simulation.atmosphere_sim = atmosphere
             J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
         self.simulation.fix_psf_cube = strategy
         self.simulation.fix_atm_sim = False
