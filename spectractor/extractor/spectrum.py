@@ -975,6 +975,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             snr = np.abs(signal_level / noise_level)
             # save fit results
             line.fitted = True
+            line.fit_index = index
             line.fit_lambdas = lambdas[index]
 
             x_norm = rescale_x_for_legendre(lambdas[index])
