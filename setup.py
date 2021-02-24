@@ -32,7 +32,7 @@ setup(
                   'spectractor.extractor': ['dispersers/HoloPhAg/*.txt', 'dispersers/HoloPhP/*.txt',
                                             'dispersers/HoloAmAg/*.txt', 'dispersers/Thor300/*.txt',
                                             'dispersers/Ron200/*.txt', 'dispersers/Ron400/*.txt'],
-                  'spectractor.simulation': ['CTIOThroughput/*.txt']},
+                  'spectractor.simulation': ['CTIOThroughput/*.txt', 'AuxTelThroughput/*.txt']},
     url='https://github.com/LSSTDESC/Spectractor',
     license='BSD',
     python_requires='>=3.7',
