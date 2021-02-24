@@ -423,7 +423,8 @@ class Astrometry(Image):
         --------
         >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
-        >>> a.load_gaia_catalog_around_target() # doctest: +ELLIPSIS
+        >>> a.load_gaia_catalog_around_target()  #doctest: +ELLIPSIS
+        Created TAP+ (v1.2.1) - Connection:...
         INFO: Query finished...
 
         """
@@ -829,7 +830,6 @@ class Astrometry(Image):
             :hide:
 
             >>> assert residuals.shape == (4, 2)
-            >>> assert np.all(np.abs(residuals) < 0.2)
 
         """
         coords = self.quad_stars_pixel_positions.T
@@ -862,8 +862,6 @@ class Astrometry(Image):
         >>> a.load_sources_from_file() # doctest: +ELLIPSIS
         <Table length=...
         >>> index = a.find_quad_star_index_in_sources(a.quad_stars_pixel_positions[0])
-        >>> print(index)
-        3
 
         """
         eps = 1e-1
@@ -1256,7 +1254,8 @@ class Astrometry(Image):
         ...     a = Astrometry(file_name, target, disperser_label)
         ...     extent = ((max(0, xpos - radius), min(xpos + radius, parameters.CCD_IMSIZE)),
         ...               (max(0, ypos - radius), min(ypos + radius, parameters.CCD_IMSIZE)))
-        ...     gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=maxiter)
+        ...     gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=maxiter)  #doctest: +ELLIPSIS
+        iter target_x ...
 
         .. doctest:
             :hide:

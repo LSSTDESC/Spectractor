@@ -648,33 +648,26 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
     3.00
 
     """
-    my_logger = set_logger(__name__)
     gg_init = models.Polynomial1D(order)
-    gg_init.c0.min = np.min(y)
-    gg_init.c0.max = 2 * np.max(y)
     gg_init.c1 = 0
     gg_init.c2 = 0
-    with warnings.catch_warnings():
-        # Ignore model linearity warning from the fitter
-        warnings.simplefilter('ignore')
-        fit = fitting.LevMarLSQFitter()
-        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
-        # get fitted model and filtered data
-        or_fitted_model, filtered_data = or_fit(gg_init, x, y)
-        outliers = []  # not working
-        '''
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(8,5))
-        plt.plot(x, y, 'gx', label="original data")
-        plt.plot(x, filtered_data, 'r+', label="filtered data")
-        plt.plot(x, or_fitted_model(x), 'r--',
-                 label="model fitted w/ filtered data")
-        plt.legend(loc=2, numpoints=1)
-        if parameters.DISPLAY: plt.show()
-        '''
-        # my_logger.info(f'\n\t{or_fitted_model}')
-        # my_logger.debug(f'\n\t{fit.fit_info}')
-        return or_fitted_model, outliers
+    fit = fitting.LinearLSQFitter()
+    or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+    # get fitted model and filtered data
+    or_fitted_model, filtered_data = or_fit(gg_init, x, y)
+    outliers = []  # not working
+    """
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(8,5))
+    plt.plot(x, y, 'gx', label="original data")
+    plt.plot(x, gg_init(x), 'k.', label="guess")
+    plt.plot(x, filtered_data, 'r+', label="filtered data")
+    plt.plot(x, or_fitted_model(x), 'r--',
+             label="model fitted w/ filtered data")
+    plt.legend(loc=2, numpoints=1)
+    if parameters.DISPLAY: plt.show()
+    """
+    return or_fitted_model, outliers
 
 
 def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
@@ -721,18 +714,13 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
     """
     my_logger = set_logger(__name__)
     gg_init = models.Polynomial2D(order)
-    gg_init.c0_0.min = np.min(z)
-    gg_init.c0_0.max = 2 * np.max(z)
-    with warnings.catch_warnings():
-        # Ignore model linearity warning from the fitter
-        warnings.simplefilter('ignore')
-        fit = fitting.LevMarLSQFitter()
-        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
-        # get fitted model and filtered data
-        or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
-        my_logger.info(f'\n\t{or_fitted_model}')
-        # my_logger.debug(f'\n\t{fit.fit_info}')
-        return or_fitted_model
+    fit = fitting.LinearLSQFitter()
+    or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+    # get fitted model and filtered data
+    or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
+    my_logger.info(f'\n\t{or_fitted_model}')
+    # my_logger.debug(f'\n\t{fit.fit_info}')
+    return or_fitted_model
 
 
 def tied_circular_gauss2d(g1):
@@ -1456,7 +1444,7 @@ def fftconvolve_gaussian(array, reso):
         kernel /= np.sum(kernel)
         array = fftconvolve(array, kernel, mode='same')
     else:
-        my_logger.error('\n\tArray dimension must be 1 or 2.')
+        my_logger.error(f'\n\tArray dimension must be 1 or 2. Here I have array.ndim={array.ndim}.')
     return array
 
 
@@ -1784,9 +1772,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         >>> from spectractor import parameters
         >>> from spectractor.tools import plot_spectrum_simple
         >>> f, ax = plt.subplots(1,1)
-        # >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
         >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
-        # >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=[500,700], color='r', label='test')
         >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=None, color='r', label='test')
         >>> if parameters.DISPLAY: plt.show()
     """
@@ -1802,7 +1788,10 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
     if xlim is None and lambdas is not None:
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
     ax.set_xlim(xlim)
-    ax.set_ylim(0., np.nanmax(data[np.logical_and(xs > xlim[0], xs < xlim[1])]) * 1.2)
+    try:
+        ax.set_ylim(0., np.nanmax(data[np.logical_and(xs > xlim[0], xs < xlim[1])]) * 1.2)
+    except ValueError:
+        pass
     if lambdas is not None:
         ax.set_xlabel(r'$\lambda$ [nm]')
     else:
@@ -2103,7 +2092,7 @@ def rebin(arr, new_shape):
 
     Examples
     --------
-    >>> a = np.ones((10, 10))
+    >>> a = 4 * np.ones((10, 10))
     >>> b = rebin(a, (5, 5))
     >>> b
     array([[4., 4., 4., 4., 4.],
@@ -2114,7 +2103,7 @@ def rebin(arr, new_shape):
     """
     if np.any(new_shape * parameters.CCD_REBIN != arr.shape):
         shape_cropped = new_shape * parameters.CCD_REBIN
-        margins = arr.shape - shape_cropped
+        margins = np.asarray(arr.shape) - shape_cropped
         arr = arr[:-margins[0], :-margins[1]]
     shape = (new_shape[0], arr.shape[0] // new_shape[0],
              new_shape[1], arr.shape[1] // new_shape[1])
@@ -2326,14 +2315,15 @@ def compute_correlation_matrix(cov):
     return rho
 
 
-def plot_correlation_matrix_simple(ax, rho, axis_names, ipar=None):
+def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):
     if ipar is None:
         ipar = np.arange(rho.shape[0]).astype(int)
     im = plt.imshow(rho[ipar[:, None], ipar], interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
     ax.set_title("Correlation matrix")
-    names = [axis_names[ip] for ip in ipar]
-    plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=11)
-    plt.yticks(np.arange(ipar.size), names, fontsize=11)
+    if axis_names is not None:
+        names = [axis_names[ip] for ip in ipar]
+        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=11)
+        plt.yticks(np.arange(ipar.size), names, fontsize=11)
     cbar = plt.colorbar(im)
     cbar.ax.tick_params(labelsize=9)
     plt.gcf().tight_layout()

@@ -1,6 +1,8 @@
 import os
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from scipy.interpolate import interp1d
 import time
 
@@ -59,7 +61,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.lambdas_order2 = self.spectrum.lambdas_order2
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         self.data = spectrum.spectrogram[self.bgd_width:-self.bgd_width, :]
-        self.data_flat = self.data.flatten()
         self.err = spectrum.spectrogram_err[self.bgd_width:-self.bgd_width, :]
         self.bgd = spectrum.spectrogram_bgd[self.bgd_width:-self.bgd_width, :]
         self.bgd_flat = self.bgd.flatten()
@@ -94,8 +95,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                            r"$\theta$ [deg]", "$B$", "R"] + list(self.psf_poly_params_names)
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
-                                                (-parameters.CCD_PIXEL2ARCSEC, parameters.PIXSHIFT_PRIOR),
-                                                (-parameters.CCD_PIXEL2ARCSEC, parameters.PIXSHIFT_PRIOR),
+                                                (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
+                                                (-10 * parameters.CCD_PIXEL2ARCSEC, 10 * parameters.PIXSHIFT_PRIOR),
                                                 (-90, 90), (0.2, 5), (-360, 360)]), psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
@@ -103,8 +104,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 self.fixed[k] = True
         # This set of fixed parameters was determined so that the reconstructed spectrum has a ZERO bias
         # with respect to the true spectrum injected in the simulation
+        # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
+        self.fixed[0] = not self.spectrum.disperser.flat_ratio_order_2over1
         self.fixed[1] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_pectrum
-        self.fixed[2] = True  # delta x: if False, extracted spectrum is biaised compared with truth
+        self.fixed[2] = True  # delta x: if False, extracted spectrum is biased compared with truth
+        # self.fixed[3] = True  # delta y
+        # self.fixed[4] = True  # angle
         self.fixed[5] = True  # B: not needed in simulations, to check with data
         self.fixed[6] = True  # camera rot
         self.fixed[-1] = True  # saturation
@@ -118,7 +123,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
         self.W = self.W.flatten()
-        self.W_dot_data = self.W * self.data_flat  # np.diag(self.W) @ self.data.flatten()
+
+        # flat data for fitworkspace
+        self.data = self.data.flatten() - self.bgd_flat
+        self.err = self.err.flatten()
 
         # design matrix
         self.M = np.zeros((self.Nx, self.data.size))
@@ -270,7 +278,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         A2, D2CCD, dx0, dy0, angle, B, rot, *poly_params = params
         parameters.OBS_CAMERA_ROTATION = rot
         self.p = np.asarray(params)
-        self.W_dot_data = self.W * (self.data_flat - B * self.bgd_flat)
+        W_dot_data = self.W * (self.data + (1 - B) * self.bgd_flat)
         profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:, 0] = 1
         profile_params[:, 1] = np.arange(self.Nx)
@@ -285,50 +293,59 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # First guess of wavelengths
         self.spectrum.disperser.D = np.copy(D2CCD)
-        lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
-                                                                  self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                  order=1)
-        lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
-                                                                         self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                         order=2)
+        self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
+                                                                       self.spectrum.x0 + np.asarray([dx0, dy0]),
+                                                                       order=1)
+        self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
+                                                                              self.spectrum.x0 + np.asarray([dx0, dy0]),
+                                                                              order=2)
 
         # Evaluate ADR
-        adr_ra, adr_dec = adr_calib(lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
+        adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
                                     lambda_ref=self.spectrum.lambda_ref)
         adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
         adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
         # Compute lambdas at pixel column x
-        self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u,
-                                                                       self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                       order=1)
+        # self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u,
+        #                                                                self.spectrum.x0 + np.asarray([dx0, dy0]),
+        #                                                                order=1)
+
         # Evaluate ADR for order 2
-        adr_ra, adr_dec = adr_calib(lambdas_order2, self.spectrum.adr_params, parameters.OBS_LATITUDE,
+        adr_ra, adr_dec = adr_calib(self.lambdas_order2, self.spectrum.adr_params, parameters.OBS_LATITUDE,
                                     lambda_ref=self.spectrum.lambda_ref)
         adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-        adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+        # adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
         # Compute lambdas at pixel column x for order 2
-        self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u_2,
-                                                                              self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                              order=2)
+        # self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u_2,
+        #                                                                    self.spectrum.x0 + np.asarray([dx0, dy0]),
+        #                                                                    order=2)
 
         # Fill spectrogram trace as a function of the pixel column x
-        profile_params[:, 1] += adr_x + dx0
+        profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + adr_x + dx0
         profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y + dy0) - self.bgd_width
+        # Dy_disp_axis = np.copy(profile_params[:, 2])
+        # profile_params[:, 2] += adr_y + dy0 - self.bgd_width
 
         # Prepare order 2 profile params indexed by the pixel column x
         profile_params_order2 = np.copy(profile_params)
-        profile_params_order2[:, 0] = self.spectrum.disperser.ratio_order_2over1(lambdas)
+        profile_params_order2[:, 0] = self.spectrum.disperser.ratio_order_2over1(self.lambdas)
         profile_params_order2[:, 1] = np.arange(self.Nx) + adr_x_2 + dx0
         profile_params_order2[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y_2 + dy0) - self.bgd_width
+        # profile_params_order2[:, 2] = Dy_disp_axis + adr_y_2 + dy0 - self.bgd_width
 
         # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
         # same PSF as for the order 1 but at the same position
+        distance_order2 = self.spectrum.disperser.grating_lambda_to_pixel(self.lambdas - adr_u,
+                                                                          self.spectrum.x0 + np.asarray([dx0, dy0]),
+                                                                          order=2)
         for k in range(1, profile_params.shape[1]):
-            profile_params_order2[:, k] = interp1d(lambdas_order2, profile_params_order2[:, k],
-                                                   kind="cubic", fill_value="extrapolate")(lambdas)
+            # profile_params_order2[:, k] = interp1d(self.lambdas_order2, profile_params_order2[:, k],
+            #                                       kind="cubic", fill_value="extrapolate")(self.lambdas)
+            profile_params_order2[:, k] = interp1d(distance, profile_params_order2[:, k],
+                                                   kind="cubic", fill_value="extrapolate")(distance_order2)
 
         # if parameters.DEBUG:
-        #     plt.imshow(self.data, origin="lower")
+        #     plt.imshow(self.data.reshape((self.Ny, self.Nx)), origin="lower")
         #     plt.scatter(profile_params[:, 1], profile_params[:, 2], label="profile",
         #                 cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
         #     plt.scatter(profile_params_order2[:, 1], profile_params_order2[:, 2], label="order 2",
@@ -367,7 +384,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                     cov_matrix = L.T @ L
                 except np.linalg.LinAlgError:
                     cov_matrix = np.linalg.inv(M_dot_W_dot_M)
-                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data)
+                amplitude_params = cov_matrix @ (M.T @ W_dot_data)
                 if self.amplitude_priors_method == "positive":
                     amplitude_params[amplitude_params < 0] = 0
                 elif self.amplitude_priors_method == "smooth":
@@ -393,7 +410,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                     cov_matrix = L.T @ L
                 except np.linalg.LinAlgError:
                     cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-                amplitude_params = cov_matrix @ (M.T @ self.W_dot_data + self.reg * self.Q_dot_A0)
+                amplitude_params = cov_matrix @ (M.T @ W_dot_data + self.reg * self.Q_dot_A0)
             self.M_dot_W_dot_M = M_dot_W_dot_M
         else:
             amplitude_params = np.copy(self.amplitude_priors)
@@ -410,8 +427,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.amplitude_cov_matrix = np.copy(cov_matrix)
 
         # Compute the model
-        self.model = (M @ amplitude_params).reshape((self.Ny, self.Nx))
-        self.model += B * self.bgd
+        self.model = (M @ amplitude_params)  # .reshape((self.Ny, self.Nx))
         self.model_err = np.zeros_like(self.model)
 
         return self.pixels, self.model, self.model_err
@@ -430,18 +446,31 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         dispersion: bool, optional
             If True, plot a colored bar to see the associated wavelength color along the x axis (default: False).
         """
+        cmap_bwr = copy.copy(cm.get_cmap('bwr'))
+        cmap_bwr.set_bad(color='lightgrey')
+        cmap_viridis = copy.copy(cm.get_cmap('viridis'))
+        cmap_viridis.set_bad(color='lightgrey')
+
+        data = np.copy(self.data)
+        if len(self.outliers) > 0:
+            bad_indices = self.get_bad_indices()
+            data[bad_indices] = np.nan
+
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
         sub = np.where(sub < self.spectrum.spectrogram.shape[1])[0]
+        data = (data + self.bgd_flat).reshape((self.Ny, self.Nx))
+        err = self.err.reshape((self.Ny, self.Nx))
+        model = (self.model + self.p[5] * self.bgd_flat).reshape((self.Ny, self.Nx))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
-            norm = np.max(self.data[:, sub])
-            plot_image_simple(ax[0, 0], data=self.data[:, sub] / norm, title='Data', aspect='auto',
-                              cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)')
+            norm = np.nanmax(data[:, sub])
+            plot_image_simple(ax[0, 0], data=data[:, sub] / norm, title='Data', aspect='auto',
+                              cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)', cmap=cmap_viridis)
             ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
-            plot_image_simple(ax[1, 0], data=self.model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
-                              units='1/max(data)')
+            plot_image_simple(ax[1, 0], data=model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
+                              units='1/max(data)', cmap=cmap_viridis)
             if dispersion:
                 x = self.spectrum.chromatic_psf.table['Dx'][sub[5:-5]] + self.spectrum.spectrogram_x0 - sub[0]
                 y = np.ones_like(x)
@@ -452,15 +481,16 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
                 ax[1, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
-            residuals = (self.data - self.model)
+            residuals = (data - model)
             # residuals_err = self.spectrum.spectrogram_err / self.model
-            norm = self.err
+            norm = err
             residuals /= norm
-            std = float(np.std(residuals[:, sub]))
+            std = float(np.nanstd(residuals[:, sub]))
             plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
-                              aspect='auto', cax=ax[2, 1], units='', cmap="bwr")
+                              aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
             ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
-            ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals[:, sub]):.3f}\nstd={np.std(residuals[:, sub]):.3f}',
+            ax[2, 0].text(0.05, 0.05,
+                          f'mean={np.nanmean(residuals[:, sub]):.3f}\nstd={np.nanstd(residuals[:, sub]):.3f}',
                           horizontalalignment='left', verticalalignment='bottom',
                           color='black', transform=ax[2, 0].transAxes)
             ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
@@ -468,8 +498,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[3, 1].remove()
-            ax[3, 0].plot(self.lambdas[sub], self.data.sum(axis=0)[sub], label='Data')
-            ax[3, 0].plot(self.lambdas[sub], self.model.sum(axis=0)[sub], label='Model')
+            ax[3, 0].plot(self.lambdas[sub], data.sum(axis=0)[sub], label='Data')
+            ax[3, 0].plot(self.lambdas[sub], model.sum(axis=0)[sub], label='Model')
             ax[3, 0].set_ylabel('Cross spectrum')
             ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
             ax[3, 0].legend(fontsize=7)
@@ -552,12 +582,11 @@ def run_ffm_minimisation(w, method="newton"):
     Examples
     --------
 
-    >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
+    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
     >>> if 'LBDAS_T' in spec.header: plot_comparison_truth(spec, w)
-
        Line   Tabulated  Detected ...
 
     .. doctest:
@@ -622,7 +651,32 @@ def run_ffm_minimisation(w, method="newton"):
                 [np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
 
     # Save results
-    w.simulate(*w.p)
+    x, model, model_err = w.simulate(*w.p)
+
+    # Propagate uncertainties
+    # from spectractor.tools import plot_correlation_matrix_simple, compute_correlation_matrix
+    # M = np.copy(w.M)
+    # amplitude_params = np.copy(w.amplitude_params)
+    # ipar = np.array(np.where(np.array(w.fixed).astype(int) == 0)[0])
+    # w.amplitude_priors_method = "fixed"
+    # jac = w.jacobian(w.p, epsilon=epsilon, fixed_params=w.fixed, model_input=[x, model, model_err])
+    # jac = jac[ipar]
+    # start = jac.shape[0]
+    # J = np.hstack([jac.T, M])
+    # H = (J.T * w.W) @ J
+    # H[start:, start:] += w.reg*w.Q
+    # full_cov_matrix = np.linalg.inv(H)
+    # amplitude_params_err = np.array([np.sqrt(full_cov_matrix[start+x, start+x]) for x in range(w.Nx)])
+    # plt.errorbar(w.lambdas, amplitude_params, yerr=amplitude_params_err)
+    # plt.grid()
+    # plt.show()
+    # plt.figure()
+    # plot_correlation_matrix_simple(ax=plt.gca(), rho=compute_correlation_matrix(full_cov_matrix))
+    # plt.show()
+    # w.amplitude_params = amplitude_params
+    # w.amplitude_params_err = amplitude_params_err
+    # w.amplitude_cov_matrix = full_cov_matrix[start:, start:]
+
     if parameters.DEBUG:
         w.plot_fit()
     w.spectrum.lambdas = np.copy(w.lambdas)
@@ -636,20 +690,8 @@ def run_ffm_minimisation(w, method="newton"):
     w.spectrum.header['CHI2_FIT'] = w.costs[-1] / w.data.size
     w.spectrum.header['PIXSHIFT'] = w.p[2]
     w.spectrum.header['D2CCD'] = w.p[1]
-
-    # Propagate parameters
-    A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.p
-    w.spectrum.header['A2_FIT'] = A2
-    w.spectrum.header["ROTANGLE"] = angle
-    w.spectrum.rotation_angle = angle
-    w.spectrum.spectrogram_bgd *= B
-    w.spectrum.spectrogram_bgd_rms *= B
-    w.spectrum.x0[1] += dy0
-
-    # Compute order 2 contamination
-    w.spectrum.lambdas_order2 = w.lambdas
-    w.spectrum.data_order2 = A2 * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
-    w.spectrum.err_order2 = A2 * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+    w.spectrum.header['A2_FIT'] = w.p[0]
+    w.spectrum.header["ROTANGLE"] = w.p[4]
 
     return w.spectrum
 
@@ -758,10 +800,9 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Calibrate the spectrum
     my_logger.info(f'\n\tCalibrating order {spectrum.order:d} spectrum...')
-    calibrate_spectrum(spectrum)
+    calibrate_spectrum(spectrum, with_adr=True)
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
-    w = None
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
         w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
@@ -770,12 +811,33 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
             spectrum = run_ffm_minimisation(w, method="newton")
 
             # Calibrate the spectrum
-            calibrate_spectrum(spectrum)
+            calibrate_spectrum(spectrum, with_adr=False)
             w.p[1] = spectrum.disperser.D
             w.p[2] = spectrum.header['PIXSHIFT']
-            # Compare with truth if available
-            if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and 'LBDAS_T' in spectrum.header and parameters.DEBUG:
-                plot_comparison_truth(spectrum, w)
+
+        # Recompute and save params in class attributes
+        w.simulate(*w.p)
+
+        # Propagate parameters
+        A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.p
+        w.spectrum.rotation_angle = angle
+        w.spectrum.spectrogram_bgd *= B
+        w.spectrum.spectrogram_bgd_rms *= B
+        w.spectrum.spectrogram_x0 += dx0
+        w.spectrum.spectrogram_y0 += dy0
+        w.spectrum.x0[0] += dx0
+        w.spectrum.x0[1] += dy0
+        w.spectrum.header["TARGETX"] = w.spectrum.x0[0]
+        w.spectrum.header["TARGETY"] = w.spectrum.x0[1]
+
+        # Compute order 2 contamination
+        w.spectrum.lambdas_order2 = w.lambdas
+        w.spectrum.data_order2 = A2 * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+        w.spectrum.err_order2 = A2 * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+
+        # Compare with truth if available
+        if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and 'LBDAS_T' in spectrum.header and parameters.DEBUG:
+            plot_comparison_truth(spectrum, w)
 
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
@@ -864,11 +926,11 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # while np.nanmean(bgd_res)/np.nanstd(bgd_res) < -0.2 and parameters.PIXWIDTH_BOXSIZE >= 5:
     while (np.abs(np.nanmean(bgd_res)) > 0.5 or np.nanstd(bgd_res) > 1.3) and parameters.PIXWIDTH_BOXSIZE > 5:
         parameters.PIXWIDTH_BOXSIZE = max(5, parameters.PIXWIDTH_BOXSIZE // 2)
-        my_logger.warning(f"\n\tPull distribution of background residuals differs too much from mean=0 and std=1. "
-                          f"\n\t\tmean={np.nanmean(bgd_res):.3g}; std={np.nanstd(bgd_res):.3g}"
-                          f"\n\tThese value should be smaller in absolute value than 0.5 and 1.3. "
-                          f"\n\tTo do so, parameters.PIXWIDTH_BOXSIZE is divided "
-                          f"by 2 from {parameters.PIXWIDTH_BOXSIZE * 2} -> {parameters.PIXWIDTH_BOXSIZE}.")
+        my_logger.debug(f"\n\tPull distribution of background residuals differs too much from mean=0 and std=1. "
+                        f"\n\t\tmean={np.nanmean(bgd_res):.3g}; std={np.nanstd(bgd_res):.3g}"
+                        f"\n\tThese value should be smaller in absolute value than 0.5 and 1.3. "
+                        f"\n\tTo do so, parameters.PIXWIDTH_BOXSIZE is divided "
+                        f"by 2 from {parameters.PIXWIDTH_BOXSIZE * 2} -> {parameters.PIXWIDTH_BOXSIZE}.")
         bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
 
     # Propagate background uncertainties
@@ -950,6 +1012,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Extract the non rotated background
     bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
+    my_logger.info(f"\n\tBackground statistics: mean={np.nanmean(bgd):.3f} {image.units}, "
+                   f"RMS={np.nanmean(bgd_rms):.3f} {image.units}.")
 
     # Propagate background uncertainties
     err = np.sqrt(err * err + bgd_rms * bgd_rms)
@@ -1088,15 +1152,18 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     s = spectrum.chromatic_psf
     lambdas_truth = np.fromstring(spectrum.header['LBDAS_T'][1:-1], sep=' ')
     psf_poly_truth = np.fromstring(spectrum.header['PSF_P_T'][1:-1], sep=' ', dtype=float)
+    deg_truth = int(spectrum.header["PSF_DEG"])
+    psf_poly_truth[-1] = spectrum.spectrogram_saturation
     amplitude_truth = np.fromstring(spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
     amplitude_truth *= parameters.FLAM_TO_ADURATE * lambdas_truth * np.gradient(lambdas_truth)
-
-    s0 = ChromaticPSF(s.psf, lambdas_truth.size, s.Ny, deg=int(spectrum.header["PSF_DEG"]),
-                      saturation=parameters.CCD_MAXADU)
+    s0 = ChromaticPSF(s.psf, lambdas_truth.size, s.Ny, deg=deg_truth,
+                      saturation=spectrum.spectrogram_saturation)
     s0.poly_params = np.asarray(list(amplitude_truth) + list(psf_poly_truth))
+    s0.deg = (len(s0.poly_params[s0.Nx:]) - 1) // (len(s0.psf.param_names) - 2) - 1
+    s0.set_polynomial_degrees(s0.deg)
     s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
     s0.from_profile_params_to_shape_params(s0.profile_params)
-    gs_kw = dict(width_ratios=[2, 1], height_ratios=[3, 1])
+    gs_kw = dict(width_ratios=[2, 1], height_ratios=[2, 1])
     fig, ax = plt.subplots(2, 2, figsize=(9, 5), sharex="all", gridspec_kw=gs_kw)
     ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth")
     amplitude_priors_err = [np.sqrt(w.amplitude_priors_cov_matrix[x, x]) for x in range(w.Nx)]

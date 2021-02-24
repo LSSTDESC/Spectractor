@@ -90,18 +90,19 @@ class SpectrumFitWorkspace(FitWorkspace):
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
         # self.fixed[0] = True
-        # self.fixed[1] = True
+        self.fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
         self.fixed[5] = True
-        self.fixed[6:8] = [True, True]
-        # self.fixed[7] = False
+        # self.fixed[6:8] = [True, True]
+        self.fixed[7] = True
         self.fixed[8] = True
         # self.fixed[-1] = True
         self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]", "B"]
         self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
+        bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (300, 700), (0, 10), (0, 0.01),
-                       (0, 10), (50, 60), (-2, 2), (-np.inf, np.inf)]
+                       (0.1, 10), bounds_D, (-2, 2), (-np.inf, np.inf)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
@@ -173,10 +174,11 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax2.errorbar(lambdas[sub][idx], residuals, yerr=residuals_err, fmt='ro', markersize=2, label='(Data-Model)/Err')
         ax2.axhline(0, color=p0[0].get_color())
         ax2.grid(True)
+        ylim = ax2.get_ylim()
         residuals_model = self.model_err[sub][idx] / self.err[sub][idx]
         ax2.fill_between(lambdas[sub][idx], -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
         # std = np.std(residuals)
-        # ax2.set_ylim([-2. * std, 2. * std])
+        ax2.set_ylim(ylim)
         ax2.set_xlabel(ax.get_xlabel())
         # ax2.set_ylabel('(Data-Model)/Err', fontsize=10)
         ax2.legend()
@@ -278,7 +280,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         # zoom H2O
         self.plot_spectrum_comparison_simple(ax1, extent=[870, 1000], title='Zoom $H_2 O$', size=0.8)
         fig.tight_layout()
-        if self.live_fit:
+        if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
             plt.close()
@@ -290,7 +292,7 @@ class SpectrumFitWorkspace(FitWorkspace):
                 self.my_logger.info(f'Save figure {figname}.')
                 fig.savefig(figname, dpi=100, bbox_inches='tight')
 
-    def decontaminate_order2(self):
+    def decontaminate_order2(self):  # pragma: no cover
         lambdas = self.spectrum.lambdas
         lambdas_order2 = self.simulation.lambdas_order2
         A1, A2, ozone, pwv, aerosols, reso, D, shift, B = self.p
@@ -303,14 +305,14 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.model = (sim_conv(lambdas) - A2 * spectrum_order2) / lambdas
         self.model_err = (err_conv(lambdas) - A2 * err_order2) / lambdas
 
-    def get_truth_without_order2(self):
+    def get_truth_without_order2(self):  # pragma: no cover
         lambdas, model, model_err = self.simulation.simulate(1., 0., self.ozone, self.pwv, self.aerosols, self.reso,
                                                              self.D, self.shift_x)
         self.lambdas_truth = lambdas
         self.amplitude_truth = model
 
 
-def lnprob_spectrum(p):
+def lnprob_spectrum(p):  # pragma: no cover
     """Logarithmic likelihood function to maximize in MCMC exploration.
 
     Parameters
@@ -374,18 +376,24 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         #                                 verbose=False)
 
         fit_workspace.simulation.fast_sim = False
+        fit_workspace.fixed[0] = True
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=10, niter_clip=3,
+                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
                                         verbose=False)
+        fit_workspace.fixed[0] = False
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
+                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
+                                        verbose=False)
+
+        parameters.SAVE = True
+        ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
+        fit_workspace.plot_correlation_matrix(ipar)
+        fit_workspace.plot_fit()
         if fit_workspace.filename != "":
-            parameters.SAVE = True
-            ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
-            fit_workspace.plot_correlation_matrix(ipar)
             header = f"{fit_workspace.spectrum.date_obs}\nchi2: {fit_workspace.costs[-1] / fit_workspace.data.size}"
             fit_workspace.save_parameters_summary(ipar, header=header)
             # save_gradient_descent(fit_workspace, costs, params_table)
-            fit_workspace.plot_fit()
-            parameters.SAVE = False
+        parameters.SAVE = False
 
 
 if __name__ == "__main__":
@@ -442,7 +450,39 @@ if __name__ == "__main__":
                  'outputs/data_30may17_HoloAmAg_prod6.9/sim_20170530_199_spectrum.fits']
     params = []
     chisqs = []
-    filenames = ['outputs/sim_20170530_134_spectrum.fits']
+    filenames = ['outputs/reduc_20170530_176_spectrum.fits']
+    # filenames = ['../test_176_Moffat4/reduc_20170530_176_spectrum.fits']
+    # filenames = ['../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_176_spectrum.fits']
+    # filenames = ['../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_061_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_066_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_071_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_076_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_081_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_086_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_091_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_096_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_101_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_106_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_111_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_116_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_121_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_126_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_131_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_136_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_141_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_146_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_151_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_156_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_161_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_166_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_171_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_176_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_181_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_186_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_191_spectrum.fits',
+    #               '../CTIODataJune2017_reduced_RG715_v2_prod7.2/data_30may17_A2=0.1/reduc_20170530_196_spectrum.fits']
+
+
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 

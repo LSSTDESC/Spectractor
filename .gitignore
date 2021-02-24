@@ -16,7 +16,7 @@ randomseed
 Spectractor.egg-info/
 build/
 dist/
-*simulations/
+*libradtran/
 outputs/
 docs/_build
 *_wcs/

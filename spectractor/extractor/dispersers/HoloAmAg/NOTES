@@ -1,0 +1,6 @@
+- ratio_order_2over1.txt: fit of a model to Sylvie's data from CTIO spectra observed with a blue filter
+- transmission.txt: fit on CTIO data 2017/30/05 normalized with multispectra_Thor300_HD111980_CTIO_throughput_prod7.5.3.txt
+../CTIODataJune2017_reduced_RG715_v2_prod7.5/data_30may17_A2=0.1/multispectra_HoloAmAg_HD111980_HoloAmAg_throughput.txt
+(see jupyter notebook Multispectra.ipynb)
+- N.txt: interpolation of Neff estimated with CTIO scan of the hologram
+- hologram_*.txt: same

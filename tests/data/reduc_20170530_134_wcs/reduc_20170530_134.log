@@ -1,0 +1,43 @@
+/usr/local/astrometry//bin/solve-field --scale-unit arcsecperpix --scale-low 0.40059900000000004 --scale-high 0.40140099999999995 --ra 193.31271999999998 --dec -18.522224722222223 --radius 0.22812444444444446 --dir ./tests/data/reduc_20170530_134_wcs --out reduc_20170530_134 --overwrite --x-column X --y-column Y ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134_sources.fits
+Reading input file 1 of 1: "./tests/data/reduc_20170530_134_wcs/reduc_20170530_134_sources.fits"...
+Solving...
+Reading file "./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.axy"...
+Only searching for solutions within 0.228124 degrees of RA,Dec (193.313,-18.5222)
+Field 1 did not solve (index index-5005-06.fits, field objects 1-10).
+Field 1 did not solve (index index-5004-24.fits, field objects 1-10).
+Field 1 did not solve (index index-5003-24.fits, field objects 1-10).
+Field 1 did not solve (index index-5002-24.fits, field objects 1-10).
+Field 1 did not solve (index index-5001-24.fits, field objects 1-10).
+Field 1 did not solve (index index-5000-24.fits, field objects 1-10).
+Field 1 did not solve (index index-4206-06.fits, field objects 1-10).
+Field 1 did not solve (index index-4205-06.fits, field objects 1-10).
+Field 1 did not solve (index index-4204-24.fits, field objects 1-10).
+Field 1 did not solve (index index-4203-24.fits, field objects 1-10).
+Field 1 did not solve (index index-4202-24.fits, field objects 1-10).
+Field 1 did not solve (index index-4201-24.fits, field objects 1-10).
+Field 1 did not solve (index index-4200-24.fits, field objects 1-10).
+Field 1 did not solve (index index-5005-06.fits, field objects 11-20).
+Field 1 did not solve (index index-5004-24.fits, field objects 11-20).
+Field 1 did not solve (index index-5003-24.fits, field objects 11-20).
+mo field stars:
+  star 4; field_xy 1279.3,410.6, field_orig 1279.3,410.6
+  star 9; field_xy 465.9,423.1, field_orig 465.9,423.1
+  star 10; field_xy 1104.9,487.2, field_orig 1104.9,487.2
+  star 5; field_xy 781.2,414.2, field_orig 781.2,414.2
+  log-odds ratio 84.6727 (5.92747e+36), 18 match, 0 conflict, 7 distractors, 124 index.
+  RA,Dec = (193.282,-18.5642), pixel scale 0.40102 arcsec/pix.
+  Hit/miss:   Hit/miss: ++++-+++-+-++++++---+++-+(best)-++++
+Field 1: solved with index index-5002-24.fits.
+Field 1 solved: writing to file ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.solved to indicate this.
+Field: ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134_sources.fits
+Field center: (RA,Dec) = (193.281451, -18.564178) deg.
+Field center: (RA H:M:S, Dec D:M:S) = (12:53:07.548, -18:33:51.042).
+Field size: 13.6934 x 13.6679 arcminutes
+Field rotation angle: up is 179.739 degrees E of N
+Field parity: neg
+solve-field.c:326:plot_source_overlay Plotting command was cancelled
+ solve-field.c:132:run_command Command was: "/usr/local/astrometry//bin/plotxy -I /tmp/tmp.ppm.mDVyZH -i ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.axy -X X -Y Y -C red -w 2 -N 50 -x 1 -y 1 -P | /usr/local/astrometry//bin/plotxy -i ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.axy -X X -Y Y -I - -w 2 -r 3 -C red -n 50 -N 200 -x 1 -y 1 > ./tests/data/reduc_20170530_134_wcs/reduc_20170530_134-objs.png"
+
+ solve-field.c:131:run_command Command exited with exit status 1
+
+

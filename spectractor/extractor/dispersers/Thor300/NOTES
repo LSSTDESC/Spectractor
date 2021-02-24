@@ -1,0 +1,5 @@
+- ratio_order_2over1.txt: fit of a model to Sylvie's data from CTIO spectra observed with a blue filter
+- transmission.txt: mix of measurements coming from the Thorlabs data sheet (300-450nm), Laurent's measurement
+at DCCD=200mm (450-920nm), Arthur's measurement at DCCD=58mm (1000>920nm) and Thorlabs data sheet again (>1000nm)
+(see jupyter notebook Disperser_efficiencies.ipynb)
+- N.txt: estimation with CTIO data
