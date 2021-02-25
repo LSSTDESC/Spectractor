@@ -477,6 +477,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 ax[1, 0].scatter(x, y, cmap=from_lambda_to_colormap(self.lambdas[sub[5:-5]]), edgecolors='None',
                                  c=self.lambdas[sub[5:-5]],
                                  label='', marker='o', s=10)
+                ax[1, 0].set_xlim(0, model[:, sub].shape[1])
+                ax[1, 0].set_ylim(0, model[:, sub].shape[0])
             # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
@@ -801,6 +803,8 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     # Calibrate the spectrum
     my_logger.info(f'\n\tCalibrating order {spectrum.order:d} spectrum...')
     calibrate_spectrum(spectrum, with_adr=True)
+    spectrum.data_order2 = np.zeros_like(spectrum.lambdas_order2)
+    spectrum.err_order2 = np.zeros_like(spectrum.lambdas_order2)
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
@@ -941,8 +945,15 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     psf = load_PSF(psf_type=parameters.PSF_TYPE)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
                      deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
-    s.fit_transverse_PSF1D_profile(data, err, signal_width, ws, pixel_step=10, sigma_clip=5,
-                                   bgd_model_func=bgd_model_func, saturation=image.saturation, live_fit=False)
+    verbose = copy.copy(parameters.VERBOSE)
+    debug = copy.copy(parameters.DEBUG)
+    parameters.VERBOSE = False
+    parameters.DEBUG = False
+    s.fit_transverse_PSF1D_profile(data, err, signal_width, ws, pixel_step=parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT,
+                                   sigma_clip=5, bgd_model_func=bgd_model_func, saturation=image.saturation,
+                                   live_fit=False)
+    parameters.VERBOSE = verbose
+    parameters.DEBUG = debug
 
     # Fill spectrum object
     spectrum.pixels = np.arange(xmin, xmax, 1).astype(int)
@@ -1243,4 +1254,5 @@ def set_fast_mode(image):
     parameters.YWINDOW //= parameters.CCD_REBIN
     parameters.XWINDOW_ROT //= parameters.CCD_REBIN
     parameters.YWINDOW_ROT //= parameters.CCD_REBIN
+    parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT //= parameters.CCD_REBIN
     return image

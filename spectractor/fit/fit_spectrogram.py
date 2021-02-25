@@ -105,6 +105,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols,
                            self.D, self.shift_x, self.shift_y, self.angle, self.B])
         self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 9])
+        self.atm_params_indices = np.array([2, 3, 4])
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params])
         self.input_labels = ["A1", "A2", "ozone [db]", "PWV [mm]", "VAOD", r"D_CCD [mm]",
@@ -113,8 +114,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
                            r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names)
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 800), (1, 10),
-                                                (0, 1), bounds_D, (-2, 2), (-3, 3), (-90, 90), (0.8, 1.2)]),
+        self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (100, 700), (0, 10),
+                                                (0, 0.1), bounds_D, (-2, 2), (-10, 10), (-90, 90), (0.8, 1.2)]),
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
@@ -224,6 +225,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 ax[1, 0].scatter(x, y, cmap=from_lambda_to_colormap(self.lambdas[sub[5:-5]]), edgecolors='None',
                                  c=self.lambdas[sub[5:-5]],
                                  label='', marker='o', s=10)
+                ax[1, 0].set_xlim(0, model[:, sub].shape[1])
+                ax[1, 0].set_ylim(0, model[:, sub].shape[0])
             # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
@@ -320,6 +323,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         model = model.flatten()
         J = np.zeros((params.size, model.size))
         strategy = copy.copy(self.simulation.fix_psf_cube)
+        atmosphere = copy.copy(self.simulation.atmosphere_sim)
         for ip, p in enumerate(params):
             if fixed_params[ip]:
                 continue
@@ -327,13 +331,20 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 self.simulation.fix_psf_cube = True
             else:
                 self.simulation.fix_psf_cube = False
+            if ip in self.atm_params_indices:
+                self.simulation.fix_atm_sim = False
+            else:
+                self.simulation.fix_atm_sim = True
             tmp_p = np.copy(params)
             if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
+            if self.simulation.fix_atm_sim is False:
+                self.simulation.atmosphere_sim = atmosphere
             J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
         self.simulation.fix_psf_cube = strategy
+        self.simulation.fix_atm_sim = False
         self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
@@ -371,7 +382,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, B,  *psf = self.p
         plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
-                     f'D={D:.2f}mm, shift_x={shift_x:.2f}pix, B={B:.3f}', y=1)
+                     f'D={D:.2f}mm, shift_y={shift_y:.2f}pix, B={B:.3f}', y=1)
         # main plot
         self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
         # zoom O2

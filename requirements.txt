@@ -2,22 +2,20 @@ numpy>1.15
 scipy
 matplotlib
 pandas
-# pyfftw
-# numexpr
-llvmlite==0.29.0
-numba==0.44.1
+llvmlite #==0.29.0
+numba #==0.44.1
 astropy>=3.2
 photutils
 astroquery
 coloredlogs
 scikit-image
-h5py==2.8.0
-emcee==3.0rc2
+h5py #==2.8.0
+emcee #==3.0rc2
 tqdm
 mpi4py
 schwimmbad
-iminuit<2
-coverage<5.0,>=3.6
+iminuit>=2
+coverage>=3.6 # <5
 configparser
 coveralls
 pysynphot

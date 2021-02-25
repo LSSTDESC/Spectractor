@@ -1326,11 +1326,16 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if fix is None:
             fix = [False] * guess.size
         # noinspection PyArgumentList
-        m = Minuit.from_array_func(fcn=nll, start=guess, error=error, errordef=1,
-                                   fix=fix, print_level=verbose, limit=bounds)
+        # m = Minuit(fcn=nll, values=guess, error=error, errordef=1, fix=fix, print_level=verbose, limit=bounds)
+        m = Minuit(nll, np.copy(guess))
+        m.errors = error
+        m.errordef = 1
+        m.fixed = fix
+        m.print_level = verbose
+        m.limits = bounds
         m.tol = 10
         m.migrad()
-        fit_workspace.p = m.np_values()
+        fit_workspace.p = np.array(m.values[:])
         if verbose:
             my_logger.debug(f"\n\t{m}")
             my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")

@@ -258,6 +258,8 @@ class SpectrogramModel(Spectrum):
         self.psf_cube = None
         self.psf_cube_order2 = None
         self.fix_psf_cube = False
+        self.fix_atm_sim = False
+        self.atmosphere_sim = None
         self.fast_sim = fast_sim
         self.with_background = with_background
         self.full_image = full_image
@@ -285,7 +287,7 @@ class SpectrogramModel(Spectrum):
         self.true_lambdas = lambdas
         return spectrum
 
-    def simulate_spectrum(self, lambdas, ozone, pwv, aerosols, shift_t=0.):
+    def simulate_spectrum(self, lambdas, atmosphere, shift_t=0.):
         """
         Simulate the spectrum of the object and return the result in Target units.
 
@@ -293,12 +295,8 @@ class SpectrogramModel(Spectrum):
         ----------
         lambdas: array_like
             The wavelength array in nm.
-        ozone: float
-            Ozone quantity in Dobson
-        pwv: float
-            Precipitable Water Vapor quantity in mm
-        aerosols: float
-            VAOD Vertical Aerosols Optical Depth
+        atmosphere: callable
+            A callable function of the atmospheric transmission.
         shift_t: float
             Shift of the transmission in nm (default: 0).
 
@@ -311,7 +309,6 @@ class SpectrogramModel(Spectrum):
 
         """
         spectrum = np.zeros_like(lambdas)
-        atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
         telescope_transmission = self.telescope.transmission(lambdas - shift_t)
         if self.fast_sim:
             spectrum = self.target.sed(lambdas)
@@ -343,7 +340,7 @@ class SpectrogramModel(Spectrum):
             np.tan(self.rotation_angle * np.pi / 180) * self.chromatic_psf.table['Dx']
         self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['y_c']) - self.r0.imag
         self.chromatic_psf.profile_params = self.chromatic_psf.from_table_to_profile_params()
-        if parameters.DEBUG:
+        if False:
             self.chromatic_psf.plot_summary()
         return self.chromatic_psf.profile_params
 
@@ -406,7 +403,7 @@ class SpectrogramModel(Spectrum):
         # dispersion_law_order2 = dispersion_law + 1j * (dy_func(lambdas_order2) - self.chromatic_psf.table['Dy']
         #                                                + self.chromatic_psf.table['Dy_disp_axis'])
 
-        if parameters.DEBUG:
+        if False:
             from spectractor.tools import from_lambda_to_colormap
             plt.plot(self.chromatic_psf.table['Dx'], self.chromatic_psf.table['Dy_disp_axis'], 'k-', label="mean")
             plt.scatter(dispersion_law.real-self.r0.real, -self.r0.imag + dispersion_law.imag, label="dispersion_law",
@@ -487,7 +484,9 @@ class SpectrogramModel(Spectrum):
         self.chromatic_psf.table["Dy"] = dispersion_law.imag - self.r0.imag
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
-        spectrum, spectrum_err = self.simulate_spectrum(lambdas, ozone, pwv, aerosols)
+        if self.atmosphere_sim is None or not self.fix_atm_sim:
+            self.atmosphere_sim = self.atmosphere.simulate(ozone, pwv, aerosols)
+        spectrum, spectrum_err = self.simulate_spectrum(lambdas, self.atmosphere_sim)
         self.my_logger.debug(f'\n\tAfter spectrum: {time.time() - start}')
         # Fill the order 1 cube
         nlbda = dispersion_law.size
@@ -510,7 +509,7 @@ class SpectrogramModel(Spectrum):
         # Add order 2
         if A2 > 0.:
             spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(lambdas_order2) * \
-                                                   self.simulate_spectrum(lambdas_order2, ozone, pwv, aerosols)
+                                                   self.simulate_spectrum(lambdas_order2, self.atmosphere_sim)
             if np.any(np.isnan(spectrum_order2)):
                 spectrum_order2[np.isnan(spectrum_order2)] = 0.
             nlbda2 = dispersion_law_order2.size
@@ -549,7 +548,7 @@ class SpectrogramModel(Spectrum):
         if self.with_background:
             self.data += B * self.spectrogram_bgd
         self.my_logger.debug(f'\n\tAfter bgd: {time.time() - start}')
-        if parameters.DEBUG:
+        if False:
             fig, ax = plt.subplots(2, 1, sharex="all", figsize=(12, 9))
             im = ax[0].imshow(self.data, origin='lower')
             plt.colorbar(im, ax=ax[0], label=self.units)

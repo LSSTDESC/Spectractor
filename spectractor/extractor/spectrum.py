@@ -259,7 +259,7 @@ class Spectrum:
         if self.lambdas_order2 is not None:
             distance = self.disperser.grating_lambda_to_pixel(self.lambdas_order2, self.x0, order=2)
             lambdas_order2_contamination = self.disperser.grating_pixel_to_lambda(distance, self.x0, order=1)
-            data_order2_contamination = self.data_order2 * (self.lambdas_order2 * np.gradient(self.lambdas_order2))\
+            data_order2_contamination = self.data_order2 * (self.lambdas_order2 * np.gradient(self.lambdas_order2)) \
                                         / (lambdas_order2_contamination * np.gradient(lambdas_order2_contamination))
             if np.sum(data_order2_contamination) / np.sum(self.data) > 0.01:
                 data_interp = interp1d(self.lambdas, self.data, kind="linear", fill_value="0", bounds_error=False)
@@ -390,9 +390,8 @@ class Spectrum:
         hdu3 = fits.ImageHDU()
         hdu3.header["EXTNAME"] = "ORDER2"
         hdu1.data = [self.lambdas, self.data, self.err]
-        if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
-            hdu2.data = self.cov_matrix
-            hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
+        hdu2.data = self.cov_matrix
+        hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
         hdu = fits.HDUList([hdu1, hdu2, hdu3])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
@@ -1092,7 +1091,7 @@ def calibrate_spectrum(spectrum, with_adr=False):
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
         dist = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift)
-        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(dist - with_adr*adr_u,
+        spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(dist - with_adr * adr_u,
                                                                       x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
         spectrum.convert_from_ADUrate_to_flam()
@@ -1152,23 +1151,28 @@ def calibrate_spectrum(spectrum, with_adr=False):
     #                    bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
     error = [parameters.DISTANCE2CCD_ERR, pixel_shift_step]
     fix = [False, False]
-    m = Minuit.from_array_func(fcn=shift_minimizer, start=start, error=error, errordef=1, fix=fix, print_level=0,
-                               limit=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR),
-                                      (-2, 2)))
+    m = Minuit(shift_minimizer, start)
+    m.errors = error
+    m.errordef = 1
+    m.fixed = fix
+    m.print_level = 0
+    m.limits = ((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2))
     m.migrad()
     # if parameters.DEBUG:
     #     print(m.prin)
     # if not res.success:
     #     spectrum.my_logger.warning('\n\tMinimizer failed.')
     #     print(res)
-    D, pixel_shift = m.np_values()
+    D, pixel_shift = np.array(m.values[:])
     spectrum.disperser.D = D
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
     distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=pixel_shift)
-    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr*adr_u, x0=x0, order=spectrum.order)
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
+    spectrum.lambdas_order2 = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0,
+                                                                         order=spectrum.order + 1)
     spectrum.lambdas_binwidths = np.gradient(lambdas)
     spectrum.convert_from_ADUrate_to_flam()
     spectrum.chromatic_psf.table['Dx'] -= pixel_shift

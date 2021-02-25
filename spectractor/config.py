@@ -10,6 +10,8 @@ import astropy.units as units
 from spectractor import parameters
 
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
+logging.getLogger("numba").setLevel(logging.ERROR)
+logging.getLogger("h5py").setLevel(logging.ERROR)
 
 
 def from_config_to_parameters(config):

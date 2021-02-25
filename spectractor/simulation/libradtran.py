@@ -124,7 +124,7 @@ class Libradtran:
         # build the part 1 of file_name
         base_filename_part1 = self.Prog + '_' + parameters.OBS_NAME + '_' + self.equation_solver + '_'
 
-        aerosol_string = '500 ' + str(aerosol)
+        aerosol_string = f'500 {aerosol:.20f}'
         # aerosol_str=str(wl0_num)+ ' '+str(tau0_num)
         aerosol_index = int(aerosol * 100.)
 
@@ -202,14 +202,14 @@ class Libradtran:
             molecular_resolution = 'coarse'
 
             # water vapor
-            pwv_str = 'H2O ' + str(pwv) + ' MM'
+            pwv_str = f'H2O {pwv:.20f} MM'
             pwv_index = int(10 * pwv)
 
             # airmass
             airmass_index = int(airmass * 10)
 
             # Ozone
-            oz_str = 'O3 ' + str(ozone) + ' DU'
+            oz_str = f'O3 {ozone:.20f} DU'
             ozone_index = int(ozone / 10.)
 
             base_filename = f'{base_filename_part1}{atmkey}_{self.proc}_{self.Mod}_z{airmass_index}' \

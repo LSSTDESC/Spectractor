@@ -565,7 +565,6 @@ def load_AUXTEL_image(image):  # pragma: no cover
         The Image instance to fill with file data and header.
     """
     image.my_logger.info(f'\n\tLoading AUXTEL image {image.file_name}...')
-    image.my_logger.warning(image.header)
     hdu_list = fits.open(image.file_name)
     image.header = hdu_list[0].header
     image.data = hdu_list[1].data.astype(np.float64)
@@ -592,20 +591,16 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.humidity = 25  # image.header['OUTHUM']
     if 'adu' in image.header['BUNIT']:
         image.units = 'ADU'
-    image.my_logger.warning("\n\tNeed to set the camera rotation angle ? Angle must be counted positive from "
-                            "north to east direction. Need to flip the signs ?")
     parameters.OBS_CAMERA_ROTATION = 90 - float(image.header["ROTPA"])
-    # parameters.OBS_CAMERA_ROTATION = -270 + 180/np.pi * np.arctan2(hdu_list[1].header["CD2_1"],
-    # hdu_list[1].header["CD1_1"])
     if parameters.OBS_CAMERA_ROTATION > 360:
         parameters.OBS_CAMERA_ROTATION -= 360
     if parameters.OBS_CAMERA_ROTATION < -360:
         parameters.OBS_CAMERA_ROTATION += 360
-    rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[1].header["CD2_1"], hdu_list[1].header["CD1_1"])
-    if not np.isclose(rotation_wcs, -parameters.OBS_CAMERA_ROTATION % 360, atol=1):
+    rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[1].header["CD2_1"], hdu_list[1].header["CD1_1"]) + 90
+    if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
         image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
                                 f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degree. "
-                                f"\nBoth differs by more than 1 degree... bug ?")
+                                f"\nBoth differs by more than 2 degree... bug ?")
     parameters.OBS_ALTITUDE = float(image.header['OBS-ELEV']) / 1000
     parameters.OBS_LATITUDE = image.header['OBS-LAT']
     image.read_out_noise = 8.5 * np.ones_like(image.data)
