@@ -66,6 +66,7 @@ class Line:
         self.fit_snr = None
         self.fit_fwhm = None
         self.fit_popt = None
+        self.fit_popt_gaussian = None
         self.fit_chisq = None
         self.fit_eqwidth_mod = None
         self.fit_eqwidth_data = None
