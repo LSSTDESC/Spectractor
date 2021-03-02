@@ -802,7 +802,10 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Calibrate the spectrum
     my_logger.info(f'\n\tCalibrating order {spectrum.order:d} spectrum...')
-    calibrate_spectrum(spectrum, with_adr=True)
+    with_adr = True
+    if parameters.OBS_OBJECT_TYPE != "STAR":
+        with_adr = False
+    calibrate_spectrum(spectrum, with_adr=with_adr)
     spectrum.data_order2 = np.zeros_like(spectrum.lambdas_order2)
     spectrum.err_order2 = np.zeros_like(spectrum.lambdas_order2)
 

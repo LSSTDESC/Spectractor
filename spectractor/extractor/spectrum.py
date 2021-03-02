@@ -1074,10 +1074,13 @@ def calibrate_spectrum(spectrum, with_adr=False):
         spectrum.header['LBDA_REF'] = lambda_ref
     # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
     # Must project ADR along dispersion axis
-    adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
-                                lambda_ref=spectrum.lambda_ref)
-    adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                           dispersion_axis_angle=spectrum.rotation_angle)
+    if with_adr > 0:
+        adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
+                                    lambda_ref=spectrum.lambda_ref)
+        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                               dispersion_axis_angle=spectrum.rotation_angle)
+    else:
+        adr_u = np.zeros_like(distance)
     x0 = spectrum.x0
     if x0 is None:
         x0 = spectrum.target_pixcoords
