@@ -669,11 +669,11 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
                 target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra,
                                                               target_coord_after_motion.dec, 0))
                 theX, theY = target_pixcoords / parameters.CCD_REBIN
+            sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
+                                                                                rotated=rotated, widths=widths)
             if parameters.DEBUG:
                 plt.figure(figsize=(5, 5))
-                sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
-                                                                         rotated=rotated, widths=widths)
-                plot_image_simple(plt.gca(), data=sub_image, scale="lin", title="", units=image.units,
+                plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
                                   target_pixcoords=[theX - x0 + Dx, theY - y0 + Dy])
                 plt.show()
         else:
@@ -715,10 +715,15 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
                 Dx = int(avX)
             if int(avY) - Dy < 0:
                 Dy = int(avY)
+    else:
+        Dx, Dy = widths
+        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
+                                                                            rotated=rotated, widths=(Dx, Dy))
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
     else:
+        image.target.data = sub_image_subtracted
         image.target_pixcoords = [theX, theY]
         image.header['TARGETX'] = theX
         image.header.comments['TARGETX'] = 'target position on X axis'
