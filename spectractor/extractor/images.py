@@ -416,7 +416,8 @@ class Image(object):
             units = self.units
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
-        plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
+        if parameters.OBS_OBJECT_TYPE == "STAR":
+            plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
         plt.legend()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'))
@@ -1182,7 +1183,8 @@ def turn_image(image):
                                     margin:-margin],
                           scale="symlog", title='Raw image (log10 scale)', units=image.units,
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
-        plot_compass_simple(ax1, image.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
+        if parameters.OBS_OBJECT_TYPE == "STAR":
+            plot_compass_simple(ax1, image.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
         ax2.axhline(parameters.YWINDOW, color='k')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
