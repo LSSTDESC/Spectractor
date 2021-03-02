@@ -671,10 +671,12 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
                 theX, theY = target_pixcoords / parameters.CCD_REBIN
             sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
                                                                                 rotated=rotated, widths=widths)
+            sub_image_x0 = theX - x0 + Dx
+            sub_image_y0 = theX - y0 + Dy
             if parameters.DEBUG:
                 plt.figure(figsize=(5, 5))
                 plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
-                                  target_pixcoords=[theX - x0 + Dx, theY - y0 + Dy])
+                                  target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
                 plt.show()
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
@@ -683,6 +685,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
             raise ValueError(f"Guess parameter must be set if WCS solution is not found.")
         Dx, Dy = widths
         theX, theY = guess
+        sub_image_x0, sub_image_y0 = x0, y0
         if rotated:
             guess2 = find_target_after_rotation(image)
             x0 = int(guess2[0])
@@ -694,36 +697,40 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
         for i in range(niter):
             # find the target
             # try:
-            avX, avY = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
+            sub_image_x0, sub_image_y0 = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
             # except (Exception, ValueError):
             #     image.target_star2D = None
             #     avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
             # compute target position
-            theX = x0 - Dx + avX
-            theY = y0 - Dy + avY
+            theX = x0 - Dx + sub_image_x0
+            theY = y0 - Dy + sub_image_y0
             # crop for next iteration
             Dx = Dx // (i + 2)
             Dy = Dy // (i + 2)
             x0 = int(theX)
             y0 = int(theY)
             NY, NX = sub_image_subtracted.shape
-            sub_image_subtracted = sub_image_subtracted[max(0, int(avY) - Dy):min(NY, int(avY) + Dy),
-                                   max(0, int(avX) - Dx):min(NX, int(avX) + Dx)]
-            sub_errors = sub_errors[max(0, int(avY) - Dy):min(NY, int(avY) + Dy),
-                         max(0, int(avX) - Dx):min(NX, int(avX) + Dx)]
-            if int(avX) - Dx < 0:
-                Dx = int(avX)
-            if int(avY) - Dy < 0:
-                Dy = int(avY)
+            sub_image_subtracted = sub_image_subtracted[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                                   max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
+            sub_errors = sub_errors[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                         max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
+            if int(sub_image_x0) - Dx < 0:
+                Dx = int(sub_image_x0)
+            if int(sub_image_y0) - Dy < 0:
+                Dy = int(sub_image_y0)
     else:
         Dx, Dy = widths
         sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
                                                                             rotated=rotated, widths=(Dx, Dy))
+        sub_image_x0 = target_pixcoords[0] - x0 + Dx
+        sub_image_y0 = target_pixcoords[1] - y0 + Dy
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
     else:
         image.target.image = sub_image_subtracted
+        image.target.image_x0 = sub_image_x0
+        image.target.image_y0 = sub_image_y0
         image.target_pixcoords = [theX, theY]
         image.header['TARGETX'] = theX
         image.header.comments['TARGETX'] = 'target position on X axis'

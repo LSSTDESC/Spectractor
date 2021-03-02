@@ -87,6 +87,8 @@ class Target:
         self.radec_position_after_pm = None
         self.redshift = 0
         self.image = None
+        self.image_x0 = None
+        self.image_y0 = None
 
 
 class ArcLamp(Target):
