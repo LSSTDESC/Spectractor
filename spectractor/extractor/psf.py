@@ -2,7 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import special
-from scipy.interpolate import interp2d, interp1d
+from scipy.interpolate import interp2d
 
 from spectractor.tools import plot_image_simple
 from spectractor import parameters
