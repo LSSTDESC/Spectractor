@@ -723,7 +723,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
     else:
-        image.target.data = sub_image_subtracted
+        image.target.image = sub_image_subtracted
         image.target_pixcoords = [theX, theY]
         image.header['TARGETX'] = theX
         image.header.comments['TARGETX'] = 'target position on X axis'
