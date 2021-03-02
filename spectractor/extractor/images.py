@@ -685,7 +685,6 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
             raise ValueError(f"Guess parameter must be set if WCS solution is not found.")
         Dx, Dy = widths
         theX, theY = guess
-        sub_image_x0, sub_image_y0 = x0, y0
         if rotated:
             guess2 = find_target_after_rotation(image)
             x0 = int(guess2[0])
@@ -694,6 +693,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
         niter = 2
         sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
                                                                             widths=(Dx, Dy))
+        sub_image_x0, sub_image_y0 = x0, y0
         for i in range(niter):
             # find the target
             # try:
