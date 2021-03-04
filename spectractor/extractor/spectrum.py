@@ -519,6 +519,17 @@ class Spectrum:
                 self.adr_params = [self.dec, self.hour_angle, self.temperature,
                                    self.pressure, self.humidity, self.airmass]
 
+            hdu_list = fits.open(input_file_name)
+            if len(hdu_list) > 1:
+                self.cov_matrix = hdu_list["SPEC_COV"].data
+                if len(hdu_list) > 2:
+                    self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+                    if len(hdu_list) > 3:
+                        self.target.image = hdu_list["ORDER0"].data
+                        self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+                        self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
+            else:
+                self.cov_matrix = np.diag(self.err ** 2)
             if not self.fast_load:
                 self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
                 if os.path.isfile(spectrogram_file_name):
@@ -531,17 +542,6 @@ class Spectrum:
                     self.load_chromatic_psf(psf_file_name)
                 else:
                     raise FileNotFoundError(f"PSF file {psf_file_name} does not exist.")
-            hdu_list = fits.open(input_file_name)
-            if len(hdu_list) > 1:
-                self.cov_matrix = hdu_list["SPEC_COV"].data
-                if len(hdu_list) > 2:
-                    self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
-                    if len(hdu_list) > 3:
-                        self.target.image = hdu_list["ORDER0"].data
-                        self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
-                        self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
-            else:
-                self.cov_matrix = np.diag(self.err ** 2)
         else:
             raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
 

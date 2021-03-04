@@ -723,7 +723,7 @@ class Order0(PSF):
         >>> plt.ylabel("Y [pixels]")
         >>> plt.show()
 
-        >>> out = psf.evaluate(pixels=np.array(np.arange(100)))
+        >>> out = psf.evaluate(pixels=np.arange(100))
 
         >>> fig = plt.figure(figsize=(5,5))
         >>> plt.plot(out)
