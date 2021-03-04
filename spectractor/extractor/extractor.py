@@ -810,7 +810,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     spectrum.err_order2 = np.zeros_like(spectrum.lambdas_order2)
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
-    if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
+    if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and parameters.OBS_OBJECT_TYPE == "STAR":
         w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
         for i in range(2):
@@ -945,7 +945,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    psf = load_PSF(psf_type=parameters.PSF_TYPE)
+    psf = load_PSF(psf_type=parameters.PSF_TYPE, target=image.target)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
                      deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
     verbose = copy.copy(parameters.VERBOSE)
@@ -1055,10 +1055,10 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         # deconvolve and regularize with 1D priors
         method = "psf1d"
         mode = "2D"
-        my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
-                       f'mode={mode} and amplitude_priors_method={method}...')
         my_logger.debug(f"\n\tTransverse fit table before PSF_2D fit:"
                         f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
+        my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
+                       f'mode={mode} and amplitude_priors_method={method}...')
         w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False,
                                 amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
         # save results

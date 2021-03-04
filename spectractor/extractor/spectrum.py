@@ -79,7 +79,7 @@ class Spectrum:
         self.filters = None
         self.units = 'ADU/s'
         self.gain = parameters.CCD_GAIN
-        self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
+        self.psf = load_PSF(psf_type=parameters.PSF_TYPE, target=self.target)
         self.chromatic_psf = ChromaticPSF(self.psf, Nx=1, Ny=1, deg=1, saturation=1)
         self.rotation_angle = 0
         self.parallactic_angle = None
@@ -131,7 +131,6 @@ class Spectrum:
             self.parallactic_angle = image.parallactic_angle
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
                                self.humidity, self.airmass]
-
         self.load_filter()
 
     def convert_from_ADUrate_to_flam(self):
@@ -489,19 +488,19 @@ class Spectrum:
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
             if self.header['D2CCD'] != "":
                 parameters.DISTANCE2CCD = float(self.header["D2CCD"])
-            if self.header['DEC'] != "":
+            if 'DEC' in self.header and self.header['DEC'] != "":
                 self.dec = self.header['DEC']
-            if self.header['HA'] != "":
+            if 'RA' in self.header and self.header['HA'] != "":
                 self.hour_angle = self.header['HA']
-            if self.header['OUTTEMP'] != "":
+            if 'OUTTEMP' in self.header and self.header['OUTTEMP'] != "":
                 self.temperature = self.header['OUTTEMP']
-            if self.header['OUTPRESS'] != "":
+            if 'OUTPRESS' in self.header and self.header['OUTPRESS'] != "":
                 self.pressure = self.header['OUTPRESS']
-            if self.header['OUTHUM'] != "":
+            if 'OUTTHUM' in self.header and self.header['OUTHUM'] != "":
                 self.humidity = self.header['OUTHUM']
             if self.header['LBDA_REF'] != "":
                 self.lambda_ref = self.header['LBDA_REF']
-            if self.header['PARANGLE'] != "":
+            if 'PARANGLE' in self.header and self.header['PARANGLE'] != "":
                 self.parallactic_angle = self.header['PARANGLE']
             if 'CCDREBIN' in self.header and self.header['CCDREBIN'] != "":
                 parameters.CCD_REBIN = self.header['CCDREBIN']
@@ -511,8 +510,9 @@ class Spectrum:
                                       data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
-            self.adr_params = [self.dec, self.hour_angle, self.temperature,
-                               self.pressure, self.humidity, self.airmass]
+            if parameters.OBS_OBJECT_TYPE == "STAR":
+                self.adr_params = [self.dec, self.hour_angle, self.temperature,
+                                   self.pressure, self.humidity, self.airmass]
 
             if not self.fast_load:
                 self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
@@ -590,7 +590,7 @@ class Spectrum:
              lambdas               Dx        ...
         """
         if os.path.isfile(input_file_name):
-            self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
+            self.psf = load_PSF(psf_type=parameters.PSF_TYPE, target=self.target)
             self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
                                               x0=self.spectrogram_x0, y0=self.spectrogram_y0,
                                               deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,

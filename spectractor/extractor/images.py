@@ -705,19 +705,20 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
             theX = x0 - Dx + sub_image_x0
             theY = y0 - Dy + sub_image_y0
             # crop for next iteration
-            Dx = Dx // (i + 2)
-            Dy = Dy // (i + 2)
-            x0 = int(theX)
-            y0 = int(theY)
-            NY, NX = sub_image_subtracted.shape
-            sub_image_subtracted = sub_image_subtracted[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
-                                   max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
-            sub_errors = sub_errors[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
-                         max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
-            if int(sub_image_x0) - Dx < 0:
-                Dx = int(sub_image_x0)
-            if int(sub_image_y0) - Dy < 0:
-                Dy = int(sub_image_y0)
+            if i < niter-1:
+                Dx = Dx // (i + 2)
+                Dy = Dy // (i + 2)
+                x0 = int(theX)
+                y0 = int(theY)
+                NY, NX = sub_image_subtracted.shape
+                sub_image_subtracted = sub_image_subtracted[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                                       max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
+                sub_errors = sub_errors[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                             max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
+                if int(sub_image_x0) - Dx < 0:
+                    Dx = int(sub_image_x0)
+                if int(sub_image_y0) - Dy < 0:
+                    Dy = int(sub_image_y0)
     else:
         Dx, Dy = widths
         sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
