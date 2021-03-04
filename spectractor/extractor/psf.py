@@ -651,9 +651,7 @@ class Order0(PSF):
         self.param_names = ["amplitude", "x_c", "y_c", "gamma", "saturation"]
         self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", "saturation"]
         self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.5, 5), (0, np.inf)])
-        self.psf_func = None
-        if target is not None:
-            self.psf_func = self.build_interpolated_functions(target=target)
+        self.psf_func = self.build_interpolated_functions(target=target)
 
     def build_interpolated_functions(self, target):
         """Interpolate the order 0 image and make 1D and 2D functions centered on its centroid, with varying width
@@ -669,16 +667,15 @@ class Order0(PSF):
         func: Callable
             The 2D interpolated function centered in (target.image_x0, target.image_y0).
         """
-        if target.image is not None:
-            xx = np.arange(0, target.image.shape[1]) - target.image_x0
-            yy = np.arange(0, target.image.shape[0]) - target.image_y0
-            data = target.image / np.sum(target.image)
-            tmp_func = interp2d(xx, yy, data, bounds_error=False, fill_value=None)
+        xx = np.arange(0, target.image.shape[1]) - target.image_x0
+        yy = np.arange(0, target.image.shape[0]) - target.image_y0
+        data = target.image / np.sum(target.image)
+        tmp_func = interp2d(xx, yy, data, bounds_error=False, fill_value=None)
 
-            def func(x, y, amplitude, x_c, y_c, gamma):
-                return amplitude * tmp_func((x - x_c)/gamma, (y - y_c)/gamma)
+        def func(x, y, amplitude, x_c, y_c, gamma):
+            return amplitude * tmp_func((x - x_c)/gamma, (y - y_c)/gamma)
 
-            return func
+        return func
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
@@ -1076,8 +1073,8 @@ def load_PSF(psf_type=parameters.PSF_TYPE, target=None):
     elif psf_type == "MoffatGauss":
         psf = MoffatGauss()
     elif psf_type == "Order0":
-        #if target is None:
-        #    raise ValueError(f"A Target instance must be given when PSF_TYPE='Order0'. I got target={target}.")
+        if target is None:
+            raise ValueError(f"A Target instance must be given when PSF_TYPE='Order0'. I got target={target}.")
         psf = Order0(target=target)
     else:
         raise ValueError(f"Unknown PSF_TYPE={psf_type}. Must be either Moffat or MoffatGauss.")

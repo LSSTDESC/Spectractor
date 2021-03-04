@@ -79,7 +79,7 @@ class Spectrum:
         self.filters = None
         self.units = 'ADU/s'
         self.gain = parameters.CCD_GAIN
-        self.psf = load_PSF(psf_type=parameters.PSF_TYPE, target=self.target)
+        self.psf = load_PSF(psf_type="Moffat", target=self.target)
         self.chromatic_psf = ChromaticPSF(self.psf, Nx=1, Ny=1, deg=1, saturation=1)
         self.rotation_angle = 0
         self.parallactic_angle = None
@@ -388,10 +388,15 @@ class Spectrum:
         hdu2.header["EXTNAME"] = "SPEC_COV"
         hdu3 = fits.ImageHDU()
         hdu3.header["EXTNAME"] = "ORDER2"
+        hdu4 = fits.ImageHDU()
+        hdu4.header["EXTNAME"] = "ORDER0"
         hdu1.data = [self.lambdas, self.data, self.err]
         hdu2.data = self.cov_matrix
         hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
-        hdu = fits.HDUList([hdu1, hdu2, hdu3])
+        hdu4.data = self.target.image
+        hdu4.header["IM_X0"] = self.target.image_x0
+        hdu4.header["IM_Y0"] = self.target.image_y0
+        hdu = fits.HDUList([hdu1, hdu2, hdu3, hdu4])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
@@ -531,6 +536,10 @@ class Spectrum:
                 self.cov_matrix = hdu_list["SPEC_COV"].data
                 if len(hdu_list) > 2:
                     self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+                    if len(hdu_list) > 3:
+                        self.target.image = hdu_list["ORDER0"].data
+                        self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+                        self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
             else:
                 self.cov_matrix = np.diag(self.err ** 2)
         else:
