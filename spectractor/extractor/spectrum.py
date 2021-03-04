@@ -501,7 +501,7 @@ class Spectrum:
                 self.temperature = self.header['OUTTEMP']
             if 'OUTPRESS' in self.header and self.header['OUTPRESS'] != "":
                 self.pressure = self.header['OUTPRESS']
-            if 'OUTTHUM' in self.header and self.header['OUTHUM'] != "":
+            if 'OUTHUM' in self.header and self.header['OUTHUM'] != "":
                 self.humidity = self.header['OUTHUM']
             if self.header['LBDA_REF'] != "":
                 self.lambda_ref = self.header['LBDA_REF']
