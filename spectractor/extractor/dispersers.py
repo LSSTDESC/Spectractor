@@ -382,7 +382,10 @@ class Grating:
         filename = self.data_dir + self.label + "/ratio_order_2over1.txt"
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
-            l, t = a.T
+            if a.T.shape[0] == 2:
+                l, t = a.T
+            else:
+                l, t, e = a.T
             self.ratio_order_2over1 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
                                                            fill_value="extrapolate")  # "(0, t[-1]))
             self.flat_ratio_order_2over1 = False

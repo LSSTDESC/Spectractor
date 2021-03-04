@@ -416,7 +416,8 @@ class Image(object):
             units = self.units
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
-        plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
+        if parameters.OBS_OBJECT_TYPE == "STAR":
+            plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
         plt.legend()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'))
@@ -668,12 +669,14 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
                 target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra,
                                                               target_coord_after_motion.dec, 0))
                 theX, theY = target_pixcoords / parameters.CCD_REBIN
+            sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
+                                                                                rotated=rotated, widths=widths)
+            sub_image_x0 = theX - x0 + Dx
+            sub_image_y0 = theX - y0 + Dy
             if parameters.DEBUG:
                 plt.figure(figsize=(5, 5))
-                sub_image, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
-                                                                         rotated=rotated, widths=widths)
-                plot_image_simple(plt.gca(), data=sub_image, scale="lin", title="", units=image.units,
-                                  target_pixcoords=[theX - x0 + Dx, theY - y0 + Dy])
+                plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
+                                  target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
                 plt.show()
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
@@ -690,34 +693,45 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
         niter = 2
         sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
                                                                             widths=(Dx, Dy))
+        sub_image_x0, sub_image_y0 = x0, y0
         for i in range(niter):
             # find the target
             # try:
-            avX, avY = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
+            sub_image_x0, sub_image_y0 = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
             # except (Exception, ValueError):
             #     image.target_star2D = None
             #     avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
             # compute target position
-            theX = x0 - Dx + avX
-            theY = y0 - Dy + avY
+            theX = x0 - Dx + sub_image_x0
+            theY = y0 - Dy + sub_image_y0
             # crop for next iteration
-            Dx = Dx // (i + 2)
-            Dy = Dy // (i + 2)
-            x0 = int(theX)
-            y0 = int(theY)
-            NY, NX = sub_image_subtracted.shape
-            sub_image_subtracted = sub_image_subtracted[max(0, int(avY) - Dy):min(NY, int(avY) + Dy),
-                                   max(0, int(avX) - Dx):min(NX, int(avX) + Dx)]
-            sub_errors = sub_errors[max(0, int(avY) - Dy):min(NY, int(avY) + Dy),
-                         max(0, int(avX) - Dx):min(NX, int(avX) + Dx)]
-            if int(avX) - Dx < 0:
-                Dx = int(avX)
-            if int(avY) - Dy < 0:
-                Dy = int(avY)
+            if i < niter-1:
+                Dx = Dx // (i + 2)
+                Dy = Dy // (i + 2)
+                x0 = int(theX)
+                y0 = int(theY)
+                NY, NX = sub_image_subtracted.shape
+                sub_image_subtracted = sub_image_subtracted[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                                       max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
+                sub_errors = sub_errors[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                             max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
+                if int(sub_image_x0) - Dx < 0:
+                    Dx = int(sub_image_x0)
+                if int(sub_image_y0) - Dy < 0:
+                    Dy = int(sub_image_y0)
+    else:
+        Dx, Dy = widths
+        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
+                                                                            rotated=rotated, widths=(Dx, Dy))
+        sub_image_x0 = target_pixcoords[0] - x0 + Dx
+        sub_image_y0 = target_pixcoords[1] - y0 + Dy
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
     else:
+        image.target.image = sub_image_subtracted
+        image.target.image_x0 = sub_image_x0
+        image.target.image_y0 = sub_image_y0
         image.target_pixcoords = [theX, theY]
         image.header['TARGETX'] = theX
         image.header.comments['TARGETX'] = 'target position on X axis'
@@ -1182,7 +1196,8 @@ def turn_image(image):
                                     margin:-margin],
                           scale="symlog", title='Raw image (log10 scale)', units=image.units,
                           target_pixcoords=(image.target_pixcoords[0] - margin, 2 * parameters.YWINDOW), aspect='auto')
-        plot_compass_simple(ax1, image.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
+        if parameters.OBS_OBJECT_TYPE == "STAR":
+            plot_compass_simple(ax1, image.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
         ax2.axhline(parameters.YWINDOW, color='k')
         plot_image_simple(ax2, data=image.data_rotated[max(0, y0 - 2 * parameters.YWINDOW):
                                                        min(y0 + 2 * parameters.YWINDOW, image.data.shape[0]),
