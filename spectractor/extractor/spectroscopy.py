@@ -197,7 +197,7 @@ class Lines:
                 if order > 1:
                     if line.label[-1] == "$":
                         tmp_line.label = tmp_line.label[:-1]
-                    tmp_line.label += "^(2)"
+                    tmp_line.label += "^{(2)}"
                     if line.label[-1] == "$":
                         tmp_line.label += "$"
                 self.lines.append(tmp_line)
