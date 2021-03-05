@@ -478,7 +478,7 @@ class Spectrum:
                 self.date_obs = self.header['DATE-OBS']
             if self.header['EXPTIME'] != "":
                 self.expo = self.header['EXPTIME']
-            if self.header['AIRMASS'] != "":
+            if 'AIRMASS' in self.header and self.header['AIRMASS'] != "":
                 self.airmass = self.header['AIRMASS']
             if self.header['GRATING'] != "":
                 self.disperser_label = self.header['GRATING']
@@ -503,7 +503,7 @@ class Spectrum:
                 self.pressure = self.header['OUTPRESS']
             if 'OUTHUM' in self.header and self.header['OUTHUM'] != "":
                 self.humidity = self.header['OUTHUM']
-            if self.header['LBDA_REF'] != "":
+            if 'LBDA_REF' in self.header and self.header['LBDA_REF'] != "":
                 self.lambda_ref = self.header['LBDA_REF']
             if 'PARANGLE' in self.header and self.header['PARANGLE'] != "":
                 self.parallactic_angle = self.header['PARANGLE']
@@ -1110,6 +1110,10 @@ def calibrate_spectrum(spectrum, with_adr=False):
         chisq = detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None, calibration_lines_only=True)
         chisq += ((shift) / parameters.PIXSHIFT_PRIOR) ** 2
+
+        if spectrum.target.image is not None:
+            spectrum.psf.fit_psf(spectrum.target.image, data_errors=np.sqrt(np.abs(spectrum.target.image)),
+                                 bgd_model_func=None)
         if parameters.DEBUG and parameters.DISPLAY:
             if parameters.LIVE_FIT:
                 spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum\n'
