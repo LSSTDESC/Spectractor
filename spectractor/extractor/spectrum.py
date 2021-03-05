@@ -1111,9 +1111,9 @@ def calibrate_spectrum(spectrum, with_adr=False):
                              fwhm_func=fwhm_func, ax=None, calibration_lines_only=True)
         chisq += ((shift) / parameters.PIXSHIFT_PRIOR) ** 2
 
-        if spectrum.target.image is not None:
-            spectrum.psf.fit_psf(spectrum.target.image, data_errors=np.sqrt(np.abs(spectrum.target.image)),
-                                 bgd_model_func=None)
+        #if spectrum.target.image is not None:
+        #    spectrum.psf.fit_psf(spectrum.target.image, data_errors=np.sqrt(np.abs(spectrum.target.image)),
+        #                         bgd_model_func=None)
         if parameters.DEBUG and parameters.DISPLAY:
             if parameters.LIVE_FIT:
                 spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum\n'
