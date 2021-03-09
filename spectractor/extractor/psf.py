@@ -2,6 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import special
+from scipy.interpolate import interp2d
 
 from spectractor.tools import plot_image_simple
 from spectractor import parameters
@@ -638,6 +639,137 @@ class MoffatGauss(PSF):
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
 
+class Order0(PSF):
+
+    def __init__(self, target, p=None):
+        PSF.__init__(self)
+        self.p_default = np.array([1, 0, 0, 1, 1]).astype(float)
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        else:
+            self.p = np.copy(self.p_default)
+        self.param_names = ["amplitude", "x_c", "y_c", "gamma", "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", "saturation"]
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.5, 5), (0, np.inf)])
+        self.psf_func = self.build_interpolated_functions(target=target)
+
+    def build_interpolated_functions(self, target):
+        """Interpolate the order 0 image and make 1D and 2D functions centered on its centroid, with varying width
+        and normalized to get an integral equal to unity.
+
+        Parameters
+        ----------
+        target: Target
+            The target with a target.image attribute to interpolate.
+
+        Returns
+        -------
+        func: Callable
+            The 2D interpolated function centered in (target.image_x0, target.image_y0).
+        """
+        xx = np.arange(0, target.image.shape[1]) - target.image_x0
+        yy = np.arange(0, target.image.shape[0]) - target.image_y0
+        data = target.image / np.sum(target.image)
+        tmp_func = interp2d(xx, yy, data, bounds_error=False, fill_value=None)
+
+        def func(x, y, amplitude, x_c, y_c, gamma):
+            return amplitude * tmp_func((x - x_c)/gamma, (y - y_c)/gamma)
+
+        return func
+
+    def apply_max_width_to_bounds(self, max_half_width=None):
+        if max_half_width is not None:
+            self.max_half_width = max_half_width
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width), (0.5, 5), (0, np.inf)])
+
+    def evaluate(self, pixels, p=None):
+        r"""Evaluate the Order 0 interpolated function.
+
+        The function is normalized to have an integral equal to amplitude parameter.
+
+        Parameters
+        ----------
+        pixels: list
+            List containing the X abscisse 2D array and the Y abscisse 2D array.
+        p: array_like
+            The parameter array. If None, the array used to instanciate the class is taken.
+            If given, the class instance parameter array is updated.
+
+        Returns
+        -------
+        output: array_like
+            The PSF function evaluated.
+
+        Examples
+        --------
+        >>> from spectractor.extractor.images import Image, find_target
+        >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9")
+        >>> im = Image("/Users/jneveu/20200207/10_CCD1_20200207115122.fz", config="config/lpnhe.ini", target_label="HG-AR")
+        >>> im.plot_image()
+        >>> guess = [820, 580]
+        >>> guess = [490,360]
+        >>> parameters.VERBOSE = True
+        >>> parameters.DEBUG = True
+        >>> x0, y0 = find_target(im, guess)
+
+        >>> p = [1,40,50,1,1e20]
+        >>> psf = Order0(target=im.target, p=p)
+        >>> yy, xx = np.mgrid[:80, :100]
+        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+
+        >>> fig = plt.figure(figsize=(5,5))
+        >>> plt.imshow(out, origin="lower")
+        >>> plt.xlabel("X [pixels]")
+        >>> plt.ylabel("Y [pixels]")
+        >>> plt.show()
+
+        >>> out = psf.evaluate(pixels=np.arange(100))
+
+        >>> fig = plt.figure(figsize=(5,5))
+        >>> plt.plot(out)
+        >>> plt.xlabel("X [pixels]")
+        >>> plt.ylabel("Y [pixels]")
+        >>> plt.show()
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.psf import Moffat, Order0
+            from spectractor.extractor.images import Image, find_target
+            im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9")
+            im.plot_image()
+            guess = [820, 580]
+            parameters.VERBOSE = True
+            parameters.DEBUG = True
+            x0, y0 = find_target(im, guess)
+            p = [2,40,30,1,1e20]
+            psf = Order0(target=im.target, p=p)
+            yy, xx = np.mgrid[:80, :100]
+            out = psf.evaluate(pixels=np.array([xx, yy]))
+            fig = plt.figure(figsize=(5,5))
+            plt.imshow(out, origin="lower")
+            plt.xlabel("X [pixels]")
+            plt.ylabel("Y [pixels]")
+            plt.grid()
+            plt.show()
+
+        """
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        amplitude, x_c, y_c, gamma, saturation = self.p
+        if pixels.ndim == 3 and pixels.shape[0] == 2:
+            x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
+            return np.clip(self.psf_func(x[0], y[:, 0], amplitude, x_c, y_c, gamma), 0, saturation)
+        elif pixels.ndim == 1:
+            y = np.array(pixels)
+            out = self.psf_func(x_c, y, amplitude, x_c, y_c, gamma).T[0]
+            out *= amplitude / np.sum(out)
+            return np.clip(out, 0, saturation)
+        else:  # pragma: no cover
+            raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
+
+
 class PSFFitWorkspace(FitWorkspace):
     """Generic PSF fitting workspace.
 
@@ -912,13 +1044,15 @@ class PSFFitWorkspace(FitWorkspace):
             fig.savefig(figname, dpi=100, bbox_inches='tight')
 
 
-def load_PSF(psf_type=parameters.PSF_TYPE):
+def load_PSF(psf_type=parameters.PSF_TYPE, target=None):
     """Load the PSF model with a keyword.
 
     Parameters
     ----------
     psf_type: str
-        PSF model keyword.
+        PSF model keyword (default: parameters.PSF_TYPE).
+    target: Target, optional
+        The Target instance to make Order0 PSF model (default: None).
 
     Returns
     -------
@@ -938,6 +1072,10 @@ def load_PSF(psf_type=parameters.PSF_TYPE):
         psf = Moffat()
     elif psf_type == "MoffatGauss":
         psf = MoffatGauss()
+    elif psf_type == "Order0":
+        if target is None:
+            raise ValueError(f"A Target instance must be given when PSF_TYPE='Order0'. I got target={target}.")
+        psf = Order0(target=target)
     else:
         raise ValueError(f"Unknown PSF_TYPE={psf_type}. Must be either Moffat or MoffatGauss.")
     return psf

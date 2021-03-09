@@ -919,6 +919,7 @@ class ChromaticPSF:
             # if guess[0] * (1 + 0*guess[4]) > 1.2 * maxi:
             #     guess[0] = 0.9 * maxi
             psf.p = guess
+            psf.bounds = bounds
             w = PSFFitWorkspace(psf, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False)
             try:
@@ -936,8 +937,9 @@ class ChromaticPSF:
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
             if live_fit and parameters.DISPLAY:  # pragma: no cover
-                w.live_fit = True
-                w.plot_fit()
+                if not np.any(np.isnan(best_fit[0])):
+                    w.live_fit = True
+                    w.plot_fit()
         # interpolate the skipped pixels with splines
         all_pixels = np.arange(Nx)
         xp = np.array(sorted(set(list(pixel_range))))

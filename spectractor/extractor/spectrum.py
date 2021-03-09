@@ -79,7 +79,7 @@ class Spectrum:
         self.filters = None
         self.units = 'ADU/s'
         self.gain = parameters.CCD_GAIN
-        self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
+        self.psf = load_PSF(psf_type="Moffat", target=self.target)
         self.chromatic_psf = ChromaticPSF(self.psf, Nx=1, Ny=1, deg=1, saturation=1)
         self.rotation_angle = 0
         self.parallactic_angle = None
@@ -131,7 +131,6 @@ class Spectrum:
             self.parallactic_angle = image.parallactic_angle
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
                                self.humidity, self.airmass]
-
         self.load_filter()
 
     def convert_from_ADUrate_to_flam(self):
@@ -389,10 +388,15 @@ class Spectrum:
         hdu2.header["EXTNAME"] = "SPEC_COV"
         hdu3 = fits.ImageHDU()
         hdu3.header["EXTNAME"] = "ORDER2"
+        hdu4 = fits.ImageHDU()
+        hdu4.header["EXTNAME"] = "ORDER0"
         hdu1.data = [self.lambdas, self.data, self.err]
         hdu2.data = self.cov_matrix
         hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
-        hdu = fits.HDUList([hdu1, hdu2, hdu3])
+        hdu4.data = self.target.image
+        hdu4.header["IM_X0"] = self.target.image_x0
+        hdu4.header["IM_Y0"] = self.target.image_y0
+        hdu = fits.HDUList([hdu1, hdu2, hdu3, hdu4])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
@@ -489,19 +493,19 @@ class Spectrum:
                 self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
             if self.header['D2CCD'] != "":
                 parameters.DISTANCE2CCD = float(self.header["D2CCD"])
-            if self.header['DEC'] != "":
+            if 'DEC' in self.header and self.header['DEC'] != "":
                 self.dec = self.header['DEC']
-            if self.header['HA'] != "":
+            if 'RA' in self.header and self.header['HA'] != "":
                 self.hour_angle = self.header['HA']
-            if self.header['OUTTEMP'] != "":
+            if 'OUTTEMP' in self.header and self.header['OUTTEMP'] != "":
                 self.temperature = self.header['OUTTEMP']
-            if self.header['OUTPRESS'] != "":
+            if 'OUTPRESS' in self.header and self.header['OUTPRESS'] != "":
                 self.pressure = self.header['OUTPRESS']
-            if self.header['OUTHUM'] != "":
+            if 'OUTHUM' in self.header and self.header['OUTHUM'] != "":
                 self.humidity = self.header['OUTHUM']
             if self.header['LBDA_REF'] != "":
                 self.lambda_ref = self.header['LBDA_REF']
-            if self.header['PARANGLE'] != "":
+            if 'PARANGLE' in self.header and self.header['PARANGLE'] != "":
                 self.parallactic_angle = self.header['PARANGLE']
             if 'CCDREBIN' in self.header and self.header['CCDREBIN'] != "":
                 parameters.CCD_REBIN = self.header['CCDREBIN']
@@ -511,9 +515,21 @@ class Spectrum:
                                       data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
             spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
-            self.adr_params = [self.dec, self.hour_angle, self.temperature,
-                               self.pressure, self.humidity, self.airmass]
+            if parameters.OBS_OBJECT_TYPE == "STAR":
+                self.adr_params = [self.dec, self.hour_angle, self.temperature,
+                                   self.pressure, self.humidity, self.airmass]
 
+            hdu_list = fits.open(input_file_name)
+            if len(hdu_list) > 1:
+                self.cov_matrix = hdu_list["SPEC_COV"].data
+                if len(hdu_list) > 2:
+                    self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+                    if len(hdu_list) > 3:
+                        self.target.image = hdu_list["ORDER0"].data
+                        self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+                        self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
+            else:
+                self.cov_matrix = np.diag(self.err ** 2)
             if not self.fast_load:
                 self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
                 if os.path.isfile(spectrogram_file_name):
@@ -526,13 +542,6 @@ class Spectrum:
                     self.load_chromatic_psf(psf_file_name)
                 else:
                     raise FileNotFoundError(f"PSF file {psf_file_name} does not exist.")
-            hdu_list = fits.open(input_file_name)
-            if len(hdu_list) > 1:
-                self.cov_matrix = hdu_list["SPEC_COV"].data
-                if len(hdu_list) > 2:
-                    self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
-            else:
-                self.cov_matrix = np.diag(self.err ** 2)
         else:
             raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
 
@@ -590,7 +599,7 @@ class Spectrum:
              lambdas               Dx        ...
         """
         if os.path.isfile(input_file_name):
-            self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
+            self.psf = load_PSF(psf_type=parameters.PSF_TYPE, target=self.target)
             self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
                                               x0=self.spectrogram_x0, y0=self.spectrogram_y0,
                                               deg=self.spectrogram_deg, saturation=self.spectrogram_saturation,
@@ -1005,6 +1014,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             line.fit_eqwidth_data = integrate.simps(Ydata, x_int)  # sol2
 
             line.fit_popt = popt
+            line.fit_popt_gaussian = popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3]
             line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
 
             line.fit_bgd = np.polynomial.legendre.legval(x_norm, popt[:bgd_npar])
@@ -1074,10 +1084,13 @@ def calibrate_spectrum(spectrum, with_adr=False):
         spectrum.header['LBDA_REF'] = lambda_ref
     # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
     # Must project ADR along dispersion axis
-    adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
-                                lambda_ref=spectrum.lambda_ref)
-    adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                           dispersion_axis_angle=spectrum.rotation_angle)
+    if with_adr > 0:
+        adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
+                                    lambda_ref=spectrum.lambda_ref)
+        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                               dispersion_axis_angle=spectrum.rotation_angle)
+    else:
+        adr_u = np.zeros_like(distance)
     x0 = spectrum.x0
     if x0 is None:
         x0 = spectrum.target_pixcoords
