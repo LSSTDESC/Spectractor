@@ -587,9 +587,18 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.ra = Angle(image.header['RA'], unit="deg")
     image.dec = Angle(image.header['DEC'], unit="deg")
     image.hour_angle = Angle(image.header['HA'], unit="deg")
-    image.temperature = 10  # image.header['OUTTEMP']
-    image.pressure = 730  # image.header['OUTPRESS']
-    image.humidity = 25  # image.header['OUTHUM']
+    if 'AIRTEMP' in image.header:
+        image.temperature = image.header['AIRTEMP']
+    else:
+        image.temperature = 10
+    if 'PRESSURE' in image.header:
+        image.pressure = image.header['PRESSURE']
+    else:
+        image.pressure = 743
+    if 'HUMIDITY' in image.header:
+        image.humidity = image.header['HUMIDITY']
+    else:
+        image.humidity = 40
     if 'adu' in image.header['BUNIT']:
         image.units = 'ADU'
     parameters.OBS_CAMERA_ROTATION = 90 - float(image.header["ROTPA"])
@@ -597,20 +606,21 @@ def load_AUXTEL_image(image):  # pragma: no cover
         parameters.OBS_CAMERA_ROTATION -= 360
     if parameters.OBS_CAMERA_ROTATION < -360:
         parameters.OBS_CAMERA_ROTATION += 360
-    rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[1].header["CD2_1"], hdu_list[1].header["CD1_1"]) + 90
-    if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
-        image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
-                                f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degree. "
-                                f"\nBoth differs by more than 2 degree... bug ?")
+    if "CD2_1" in hdu_list[1].header:
+        rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[1].header["CD2_1"], hdu_list[1].header["CD1_1"]) + 90
+        if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
+            image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
+                                    f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degree. "
+                                    f"\nBoth differs by more than 2 degree... bug ?")
     parameters.OBS_ALTITUDE = float(image.header['OBS-ELEV']) / 1000
     parameters.OBS_LATITUDE = image.header['OBS-LAT']
     image.read_out_noise = 8.5 * np.ones_like(image.data)
     image.target_label = image.header["OBJECT"].replace(" ", "")
-    image.target_guess = [parameters.CCD_IMSIZE - float(image.header["OBJECTY"]),
-                          parameters.CCD_IMSIZE - float(image.header["OBJECTX"])]
+    if "OBJECTX" in image.header:
+        image.target_guess = [parameters.CCD_IMSIZE - float(image.header["OBJECTY"]),
+                              parameters.CCD_IMSIZE - float(image.header["OBJECTX"])]
     image.disperser_label = image.header["GRATING"]
-    image.disperser_label = image.header["GRATING"]
-    parameters.DISTANCE2CCD = 116 + float(image.header["LINSPOS"])  # mm
+    parameters.DISTANCE2CCD = 115 + float(image.header["LINSPOS"])  # mm
     image.compute_parallactic_angle()
 
 
