@@ -586,7 +586,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.disperser_label = image.header['GRATING']
     image.ra = Angle(image.header['RA'], unit="deg")
     image.dec = Angle(image.header['DEC'], unit="deg")
-    image.hour_angle = Angle(image.header['HA'], unit="deg")
+    image.hour_angle = Angle(image.header['HASTART'], unit="hourangle")
     if 'AIRTEMP' in image.header:
         image.temperature = image.header['AIRTEMP']
     else:
