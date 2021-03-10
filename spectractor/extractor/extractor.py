@@ -765,6 +765,12 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
     if guess is not None and image.target_guess is None:
         image.target_guess = np.asarray(guess)
+    if image.target_guess is None:
+        from scipy.signal import medfilt2d
+        data = medfilt2d(image.data.T, kernel_size=3)
+        image.target_guess = np.unravel_index(np.argmax(data), data.shape)
+        my_logger.info(f"\n\tNo guess position of order 0 has been given. Assuming the spectrum to extract comes "
+                       f"from the brightest object, guess position is set as {image.target_guess}.")
     if parameters.DEBUG:
         image.plot_image(scale='symlog', target_pixcoords=image.target_guess)
 
