@@ -269,7 +269,9 @@ class Spectrum:
                              title=title, units=self.units)
         if len(self.target.spectra) > 0:
             for k in range(len(self.target.spectra)):
-                s = self.target.spectra[k] / np.max(self.target.spectra[k]) * np.max(self.data)
+                plot_indices = np.logical_and(self.target.wavelengths[k] > np.min(self.lambdas),
+                                              self.target.wavelengths[k] < np.max(self.lambdas))
+                s = self.target.spectra[k] / np.max(self.target.spectra[k][plot_indices]) * np.max(self.data)
                 ax.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
         if self.lambdas is not None:
             self.lines.plot_detected_lines(ax, print_table=parameters.VERBOSE)
