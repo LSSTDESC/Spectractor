@@ -164,7 +164,7 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")
     nsigma = 5
-    labels = ["A1_T", "A2_T", "OZONE_T", "PWV_T", "VAOD_T", "D2CCD_T"]
+    labels = ["A1_T", "A2_T", "OZONE_T", "PWV_T", "VAOD_T"]
     indices = [0, 1, 2, 3, 4, 5]
     A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, B, *psf_poly_params = w.p
     assert w.costs[-1]/w.data.size < 0.65
