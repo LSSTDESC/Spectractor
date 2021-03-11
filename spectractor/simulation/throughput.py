@@ -76,46 +76,18 @@ class Throughput:
         lambdas, transmissions, errors = load_transmission(self.filename_quantum_efficiency)
         return lambdas, transmissions, errors
 
-    def load_RG715(self):
-        """Load the quantum efficiency file and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.
+    def load_filter(self, filter_name):
+        """Load the filter transmission and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.
 
         The input file must have two or three columns:
             1. wavelengths in nm
             2. transmissions between 0 and 1.
             3. uncertainties on the transmissions (optional)
 
-        Returns
-        -------
-        lambdas: array_like
-            The wavelengths array in nm.
-        transmissions: array_like
-            The transmission array, values are between 0 and 1.
-        uncertainties: array_like
-            The uncertainty on the transmission array (0 if file does not contain the info).
-
-        Examples
-        --------
-        >>> t = Throughput()
-        >>> parameters.LAMBDA_MIN = 700
-        >>> lambdas, transmissions, errors = t.load_RG715()
-        >>> print(lambdas[:3])
-        [701.899 704.054 705.491]
-        >>> print(transmissions[:3])
-        [0.09726 0.13538 0.16826]
-        >>> print(errors[:3])
-        [0. 0. 0.]
-
-        """
-        lambdas, transmissions, errors = load_transmission(self.filename_RG715)
-        return lambdas, transmissions, errors
-
-    def load_FGB37(self):
-        """Load the quantum efficiency file and crop in wavelength using LAMBDA_MIN and LAMBDA_MAX.
-
-        The input file must have two or three columns:
-            1. wavelengths in nm
-            2. transmissions between 0 and 1.
-            3. uncertainties on the transmissions (optional)
+        Parameters
+        ----------
+        filter_name: str
+            The filter name, with same label as its corresponding .txt file.
 
         Returns
         -------
@@ -130,7 +102,7 @@ class Throughput:
         --------
         >>> t = Throughput()
         >>> parameters.LAMBDA_MIN = 500
-        >>> lambdas, transmissions, errors = t.load_FGB37()
+        >>> lambdas, transmissions, errors = t.load_filter("FGB37")
         >>> print(lambdas[:3])
         [515.171 534.679 545.315]
         >>> print(transmissions[:3])
@@ -138,8 +110,21 @@ class Throughput:
         >>> print(errors[:3])
         [0. 0. 0.]
 
+        >>> parameters.LAMBDA_MIN = 700
+        >>> lambdas, transmissions, errors = t.load_filter("RG715")
+        >>> print(lambdas[:3])
+        [701.899 704.054 705.491]
+        >>> print(transmissions[:3])
+        [0.09726 0.13538 0.16826]
+        >>> print(errors[:3])
+        [0. 0. 0.]
+
         """
-        lambdas, transmissions, errors = load_transmission(self.filename_FGB37)
+        if ".txt" not in filter_name:
+            filename = os.path.join(parameters.THROUGHPUT_DIR, filter_name+".txt")
+        else:
+            filename = os.path.join(parameters.THROUGHPUT_DIR, filter_name)
+        lambdas, transmissions, errors = load_transmission(filename)
         return lambdas, transmissions, errors
 
     def load_telescope_throughput(self):
@@ -272,13 +257,15 @@ def load_transmission(file_name):
 
     """
     data = np.loadtxt(file_name).T
-    x = data[0]
-    y = data[1]
+    lambdas = data[0]
+    sorted_indices = lambdas.argsort()
+    lambdas = lambdas[sorted_indices]
+    y = data[1][sorted_indices]
     err = np.zeros_like(y)
     if data.shape[0] == 3:
-        err = data[2]
-    indexes = np.where(np.logical_and(x > parameters.LAMBDA_MIN, x < parameters.LAMBDA_MAX))
-    return x[indexes], y[indexes], err[indexes]
+        err = data[2][sorted_indices]
+    indexes = np.logical_and(lambdas > parameters.LAMBDA_MIN, lambdas < parameters.LAMBDA_MAX)
+    return lambdas[indexes], y[indexes], err[indexes]
 
 
 def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, label="", title="", lw=2):
@@ -318,9 +305,9 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Quantum efficiency")
         >>> lambdas, transmissions, errors = t.load_mirror_reflectivity()
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Mirror 1")
-        >>> lambdas, transmissions, errors = t.load_FGB37()
+        >>> lambdas, transmissions, errors = t.load_filter("FGB37")
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="FGB37")
-        >>> lambdas, transmissions, errors = t.load_RG715()
+        >>> lambdas, transmissions, errors = t.load_filter("RG715")
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="RG715")
         >>> lambdas, transmissions, errors = t.load_telescope_throughput()
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Telescope")
@@ -332,7 +319,7 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
         ax.errorbar(lambdas, transmissions, yerr=uncertainties, label=label, lw=lw)
     if title != "":
         ax.set_title(title)
-    ax.set_xlabel("$\lambda$ [nm]")
+    ax.set_xlabel(r"$\lambda$ [nm]")
     ax.set_ylabel("Transmission")
     ax.set_xlim(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)
     ax.grid()
@@ -361,9 +348,9 @@ def plot_all_transmissions(title="Telescope transmissions"):
     plot_transmission_simple(ax, lambdas, transmissions, errors, label="Quantum efficiency")
     lambdas, transmissions, errors = t.load_mirror_reflectivity()
     plot_transmission_simple(ax, lambdas, transmissions, errors, label="Mirror")
-    lambdas, transmissions, errors = t.load_FGB37()
+    lambdas, transmissions, errors = t.load_filter("FGB37")
     plot_transmission_simple(ax, lambdas, transmissions, errors, label="FGB37")
-    lambdas, transmissions, errors = t.load_RG715()
+    lambdas, transmissions, errors = t.load_filter("RG715")
     plot_transmission_simple(ax, lambdas, transmissions, errors, label="RG715")
     lambdas, transmissions, errors = t.load_telescope_throughput()
     plot_transmission_simple(ax, lambdas, transmissions, errors, label="Telescope")
@@ -414,9 +401,19 @@ class TelescopeTransmission:
         Examples
         --------
         >>> t = TelescopeTransmission()
-        >>> assert t.transmission is not None
-        >>> assert t.transmission_err is not None
         >>> t.plot_transmission()
+
+        >>> t2 = TelescopeTransmission("RG715")
+        >>> t2.plot_transmission()
+
+        .. doctest:
+            :hide:
+
+            >>> assert t.transmission is not None
+            >>> assert t.transmission_err is not None
+            >>> assert t2.transmission is not None
+            >>> assert t2.transmission_err is not None
+            >>> assert np.sum(t.transmission(parameters.LAMBDAS)) > np.sum(t2.transmission(parameters.LAMBDAS))
         """
 
         '''
@@ -438,24 +435,16 @@ class TelescopeTransmission:
         err = np.sqrt(err ** 2 + parameters.OBS_TRANSMISSION_SYSTEMATICS ** 2)
         to_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
 
-        # Filter RG715
-        # wl, trg, err = throughput.load_RG715()
-        # tfr = interp1d(wl, trg, kind='linear', bounds_error=False, fill_value=0.)
-        #
-        # Filter FGB37
-        # wl, trb, err = throughput.load_FGB37()
-        # tfb = interp1d(wl, trb, kind='linear', bounds_error=False, fill_value=0.)
-
-        # if self.filter_name == "RG715":
-        #     TF = tfr
-        # elif self.filter_name == "FGB37":
-        #     TF = tfb
-        # else:
-        TF = lambda x: np.ones_like(x).astype(float)
+        TF = lambda x: 1
+        TF_err = lambda x: 0
+        if self.filter_name != "" and "empty" not in self.filter_name.lower():
+            wl, trb, err = throughput.load_filter(self.filter_name)
+            TF = interp1d(wl, trb, kind='linear', bounds_error=False, fill_value=0.)
+            TF_err = interp1d(wl, err, kind='linear', bounds_error=False, fill_value=0.)
 
         # self.transmission=lambda x: self.qe(x)*self.to(x)*(self.tm(x)**2)*self.tf(x)
         self.transmission = lambda x: to(x) * TF(x)
-        self.transmission_err = lambda x: to_err(x)
+        self.transmission_err = lambda x: np.sqrt(to_err(x)**2 + TF_err(x)**2)
         return self.transmission
 
     def plot_transmission(self):

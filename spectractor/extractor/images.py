@@ -572,6 +572,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     hdu_list.close()  # need to free allocation for file descripto
     image.date_obs = image.header['DATE']
     image.expo = float(image.header['EXPTIME'])
+    image.filter = image.header['FILTER']
     # transformations so that stars are like in Stellarium up to a rotation
     # with spectrogram nearly horizontal and on the right of central star
     image.data = image.data.T[::-1, ::-1]
