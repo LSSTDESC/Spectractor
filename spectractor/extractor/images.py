@@ -14,6 +14,7 @@ from spectractor.extractor.targets import load_target
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.psf import Moffat
 from spectractor.simulation.adr import hadec2zdpar
+from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, fit_poly1d, plot_compass_simple,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
@@ -110,6 +111,18 @@ class Image(object):
         self.header.comments["ROTANGLE"] = "[deg] angle of the dispersion axis"
         self.header['D2CCD'] = parameters.DISTANCE2CCD
         self.header.comments["D2CCD"] = "[mm] distance between disperser and CCD"
+
+        if self.filter is not None and "empty" not in self.filter.lower():
+            t = TelescopeTransmission(filter_name=self.filter)
+            integral = np.cumsum(t.transmission(parameters.LAMBDAS))
+            threshold = 1e-4
+            parameters.LAMBDA_MIN = max(parameters.LAMBDAS[np.argmin(np.abs(integral - threshold))],
+                                        parameters.LAMBDA_MIN)
+            parameters.LAMBDA_MAX = min(parameters.LAMBDAS[np.argmin(np.abs(integral - (integral[-1] - threshold)))],
+                                        parameters.LAMBDA_MAX)
+            parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, parameters.LAMBDA_STEP)
+            self.my_logger.info(f"\n\tWith filter {self.filter}, set parameters.LAMBDA_MIN={parameters.LAMBDA_MIN} "
+                                f"and parameters.LAMBDA_MAX={parameters.LAMBDA_MAX}.")
 
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
@@ -440,7 +453,8 @@ def load_CTIO_image(image):
     image.airmass = float(image.header['AIRMASS'])
     image.expo = float(image.header['EXPTIME'])
     image.filters = image.header['FILTERS']
-    image.filter = image.header['FILTER1']
+    if "dia" not in image.header['FILTER1'].lower():
+        image.filter = image.header['FILTER1']
     image.disperser_label = image.header['FILTER2']
     image.ra = Angle(image.header['RA'], unit="hourangle")
     image.dec = Angle(image.header['DEC'], unit="deg")
@@ -572,7 +586,8 @@ def load_AUXTEL_image(image):  # pragma: no cover
     hdu_list.close()  # need to free allocation for file descripto
     image.date_obs = image.header['DATE']
     image.expo = float(image.header['EXPTIME'])
-    image.filter = image.header['FILTER']
+    if "empty" not in image.header['FILTER'].lower():
+        image.filter = image.header['FILTER']
     # transformations so that stars are like in Stellarium up to a rotation
     # with spectrogram nearly horizontal and on the right of central star
     image.data = image.data.T[::-1, ::-1]
@@ -716,13 +731,14 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
             theX = x0 - Dx + sub_image_x0
             theY = y0 - Dy + sub_image_y0
             # crop for next iteration
-            if i < niter-1:
+            if i < niter - 1:
                 Dx = Dx // (i + 2)
                 Dy = Dy // (i + 2)
                 x0 = int(theX)
                 y0 = int(theY)
                 NY, NX = sub_image_subtracted.shape
-                sub_image_subtracted = sub_image_subtracted[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                sub_image_subtracted = sub_image_subtracted[
+                                       max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
                                        max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
                 sub_errors = sub_errors[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
                              max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
