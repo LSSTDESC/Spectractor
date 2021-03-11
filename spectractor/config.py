@@ -82,7 +82,10 @@ def load_config(config_filename):
     from_config_to_parameters(config)
 
     if not os.path.isfile(config_filename):
-        raise FileNotFoundError(f'Config file {config_filename} does not exist.')
+        if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, config_filename)):
+            raise FileNotFoundError(f'Config file {config_filename} does not exist.')
+        else:
+            config_filename = os.path.join(parameters.CONFIG_DIR, config_filename)
     # Load the configuration file
     config = configparser.ConfigParser()
     config.read(config_filename)
