@@ -75,7 +75,7 @@ class Spectrum:
         self.lambda_ref = None
         self.order = order
         self.chromatic_psf = None
-        self.filter = None
+        self.filter = ""
         self.filters = None
         self.units = 'ADU/s'
         self.gain = parameters.CCD_GAIN
