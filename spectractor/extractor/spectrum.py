@@ -17,6 +17,7 @@ from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
+from spectractor.simulation.throughput import TelescopeTransmission
 
 
 class Spectrum:
@@ -75,7 +76,7 @@ class Spectrum:
         self.lambda_ref = None
         self.order = order
         self.chromatic_psf = None
-        self.filter = ""
+        self.filter_label = ""
         self.filters = None
         self.units = 'ADU/s'
         self.gain = parameters.CCD_GAIN
@@ -111,7 +112,7 @@ class Spectrum:
             self.airmass = image.airmass
             self.expo = image.expo
             self.filters = image.filters
-            self.filter = image.filter
+            self.filter_label = image.filter_label
             self.disperser_label = image.disperser_label
             self.disperser = image.disperser
             self.target = image.target
@@ -205,23 +206,19 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum()
-        >>> s.filter = 'FGB37'
+        >>> s.filter_label = 'FGB37'
         >>> s.load_filter()
 
         .. doctest::
             :hide:
 
-            >>> assert parameters.LAMBDA_MIN == parameters.FGB37['min']
-            >>> assert parameters.LAMBDA_MAX == parameters.FGB37['max']
+            >>> assert np.isclose(parameters.LAMBDA_MIN, 300)
+            >>> assert np.isclose(parameters.LAMBDA_MAX, 760)
 
         """
-        for f in parameters.FILTERS:
-            if f['label'] == self.filter:
-                parameters.LAMBDA_MIN = f['min']
-                parameters.LAMBDA_MAX = f['max']
-                self.my_logger.info('\n\tLoad filter %s: lambda between %.1f and %.1f' % (
-                    f['label'], parameters.LAMBDA_MIN, parameters.LAMBDA_MAX))
-                break
+        if self.filter_label != "" and "empty" not in self.filter_label.lower():
+            t = TelescopeTransmission(filter_label=self.filter_label)
+            t.reset_lambda_range(transmission_threshold=1e-4)
 
     def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False):
         """Plot spectrum with emission and absorption lines.

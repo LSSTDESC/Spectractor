@@ -69,7 +69,7 @@ class Image(object):
         self.disperser_label = disperser_label
         self.target_label = target_label
         self.target_guess = None
-        self.filter = ""
+        self.filter_label = ""
         self.filters = None
         self.header = None
         self.data = None
@@ -112,17 +112,9 @@ class Image(object):
         self.header['D2CCD'] = parameters.DISTANCE2CCD
         self.header.comments["D2CCD"] = "[mm] distance between disperser and CCD"
 
-        if self.filter != "" and "empty" not in self.filter.lower():
-            t = TelescopeTransmission(filter_name=self.filter)
-            integral = np.cumsum(t.transmission(parameters.LAMBDAS))
-            threshold = 1e-4
-            parameters.LAMBDA_MIN = max(parameters.LAMBDAS[np.argmin(np.abs(integral - threshold))],
-                                        parameters.LAMBDA_MIN)
-            parameters.LAMBDA_MAX = min(parameters.LAMBDAS[np.argmin(np.abs(integral - (integral[-1] - threshold)))],
-                                        parameters.LAMBDA_MAX)
-            parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, parameters.LAMBDA_STEP)
-            self.my_logger.info(f"\n\tWith filter {self.filter}, set parameters.LAMBDA_MIN={parameters.LAMBDA_MIN} "
-                                f"and parameters.LAMBDA_MAX={parameters.LAMBDA_MAX}.")
+        if self.filter_label != "" and "empty" not in self.filter_label.lower():
+            t = TelescopeTransmission(filter_label=self.filter_label)
+            t.reset_lambda_range(transmission_threshold=1e-4)
 
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
@@ -454,7 +446,7 @@ def load_CTIO_image(image):
     image.expo = float(image.header['EXPTIME'])
     image.filters = image.header['FILTERS']
     if "dia" not in image.header['FILTER1'].lower():
-        image.filter = image.header['FILTER1']
+        image.filter_label = image.header['FILTER1']
     image.disperser_label = image.header['FILTER2']
     image.ra = Angle(image.header['RA'], unit="hourangle")
     image.dec = Angle(image.header['DEC'], unit="deg")
@@ -587,7 +579,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.date_obs = image.header['DATE']
     image.expo = float(image.header['EXPTIME'])
     if "empty" not in image.header['FILTER'].lower():
-        image.filter = image.header['FILTER']
+        image.filter_label = image.header['FILTER']
     # transformations so that stars are like in Stellarium up to a rotation
     # with spectrogram nearly horizontal and on the right of central star
     image.data = image.data.T[::-1, ::-1]
