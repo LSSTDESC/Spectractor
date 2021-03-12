@@ -69,7 +69,7 @@ class Image(object):
         self.disperser_label = disperser_label
         self.target_label = target_label
         self.target_guess = None
-        self.filter = None
+        self.filter = ""
         self.filters = None
         self.header = None
         self.data = None
@@ -112,7 +112,7 @@ class Image(object):
         self.header['D2CCD'] = parameters.DISTANCE2CCD
         self.header.comments["D2CCD"] = "[mm] distance between disperser and CCD"
 
-        if self.filter is not None and "empty" not in self.filter.lower():
+        if self.filter != "" and "empty" not in self.filter.lower():
             t = TelescopeTransmission(filter_name=self.filter)
             integral = np.cumsum(t.transmission(parameters.LAMBDAS))
             threshold = 1e-4
