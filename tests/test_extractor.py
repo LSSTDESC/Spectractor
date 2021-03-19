@@ -31,7 +31,7 @@ def test_extractor_ctio():
     parameters.CCD_REBIN = 2
 
     for file_name in file_names:
-        tag = file_name.split('/')[-1].replace("sim","reduc")
+        tag = file_name.split('/')[-1].replace("sim", "reduc")
         disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         if target_label is None or xpos is None or ypos is None:
             continue
@@ -109,10 +109,10 @@ def test_extractor_ctio_planetary_nebula():
 
 def extractor_auxtel():
     file_names = ['tests/data/calexp_2020031500162-EMPTY_ronchi90lpmm-det000.fits']  # image 1
-    #file_names = ['tests/data/calexp_2020031200313-EMPTY_ronchi90lpmm-det000.fits']  # image 2
-    #file_names = ['tests/data/calexp_2020022100767-EMPTY_ronchi90lpmm-det000.fits']  # image 3
-    #file_names = ['tests/data//calexp_2020021800154-EMPTY_ronchi90lpmm-det000.fits']  # image 4
-    #tests/data/auxtel_first_light-1.fits']
+    # file_names = ['tests/data/calexp_2020031200313-EMPTY_ronchi90lpmm-det000.fits']  # image 2
+    # file_names = ['tests/data/calexp_2020022100767-EMPTY_ronchi90lpmm-det000.fits']  # image 3
+    # file_names = ['tests/data//calexp_2020021800154-EMPTY_ronchi90lpmm-det000.fits']  # image 4
+    # tests/data/auxtel_first_light-1.fits']
 
     # logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
     parameters.VERBOSE = True

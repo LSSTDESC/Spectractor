@@ -704,32 +704,23 @@ class Order0(PSF):
         --------
         >>> from spectractor.extractor.images import Image, find_target
         >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9")
-        >>> im = Image("/Users/jneveu/20200207/10_CCD1_20200207115122.fz", config="config/lpnhe.ini", target_label="HG-AR")
         >>> im.plot_image()
         >>> guess = [820, 580]
-        >>> guess = [490,360]
         >>> parameters.VERBOSE = True
         >>> parameters.DEBUG = True
         >>> x0, y0 = find_target(im, guess)
 
         >>> p = [1,40,50,1,1e20]
         >>> psf = Order0(target=im.target, p=p)
+
+        2D evaluation:
+
         >>> yy, xx = np.mgrid[:80, :100]
         >>> out = psf.evaluate(pixels=np.array([xx, yy]))
 
-        >>> fig = plt.figure(figsize=(5,5))
-        >>> plt.imshow(out, origin="lower")
-        >>> plt.xlabel("X [pixels]")
-        >>> plt.ylabel("Y [pixels]")
-        >>> plt.show()
+        1D evaluation:
 
         >>> out = psf.evaluate(pixels=np.arange(100))
-
-        >>> fig = plt.figure(figsize=(5,5))
-        >>> plt.plot(out)
-        >>> plt.xlabel("X [pixels]")
-        >>> plt.ylabel("Y [pixels]")
-        >>> plt.show()
 
         .. plot::
 
@@ -743,7 +734,7 @@ class Order0(PSF):
             parameters.VERBOSE = True
             parameters.DEBUG = True
             x0, y0 = find_target(im, guess)
-            p = [2,40,30,1,1e20]
+            p = [1,40,50,1,1e20]
             psf = Order0(target=im.target, p=p)
             yy, xx = np.mgrid[:80, :100]
             out = psf.evaluate(pixels=np.array([xx, yy]))

@@ -1,6 +1,7 @@
 from spectractor import parameters
 from spectractor.extractor.extractor import Spectractor
 from spectractor.logbook import LogBook
+from spectractor.config import load_config
 import sys
 
 if __name__ == "__main__":
@@ -35,21 +36,27 @@ if __name__ == "__main__":
 
     file_names = args.input
 
+    load_config(args.config)
+
     logbook = LogBook(logbook=args.logbook)
     for file_name in file_names:
         disperser_label = args.disperser_label
-        if args.target_xy == "0,0" and args.target_label == "":
+        if parameters.OBS_NAME == "CTIO":
             tag = file_name.split('/')[-1]
             tag = tag.replace('sim_', 'reduc_')
             disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+            guess = [xpos, ypos]
             if target_label is None or xpos is None or ypos is None:
                 continue
         else:
-            xpos, ypos = args.target_xy.split(",")
+            guess = None
+            if args.target_xy != "0,0":
+                xpos, ypos = args.target_xy.split(",")
+                xpos = float(xpos)
+                ypos = float(ypos)
+                guess = [xpos, ypos]
             target_label = args.target_label
-            xpos = float(xpos)
-            ypos = float(ypos)
-            if target_label == "" or (xpos == 0 and ypos == 0):
-                sys.exit("Options --xy and --target must be used together, one of these seems not set.")
-        Spectractor(file_name, args.output_directory, target_label=target_label, guess=[xpos, ypos],
+            # if target_label == "" or (xpos == 0 and ypos == 0):
+            #     sys.exit("Options --xy and --target must be used together, one of these seems not set.")
+        Spectractor(file_name, args.output_directory, target_label=target_label, guess=guess,
                     disperser_label=disperser_label, config=args.config)
