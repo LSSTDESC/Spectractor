@@ -7,11 +7,12 @@ from astroquery.simbad import Simbad
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 import os
+import re
 import numpy as np
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
+from spectractor.extractor.spectroscopy import (Lines, Line, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
                                                 ISM_LINES, STELLAR_LINES)
 
 if os.getenv("PYSYN_CDBS"):
@@ -56,6 +57,8 @@ def load_target(label, verbose=False):
         return ArcLamp(label, verbose)
     elif parameters.OBS_OBJECT_TYPE == 'MONOCHROMATOR':
         return Monochromator(label, verbose)
+    elif parameters.OBS_OBJECT_TYPE == 'LASER':
+        return Laser(label, verbose)
     else:
         raise ValueError(f'Unknown parameters.OBS_OBJECT_TYPE: {parameters.OBS_OBJECT_TYPE}')
 
@@ -149,7 +152,9 @@ class Monochromator(Target):
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
         self.emission_spectrum = True
-        self.lines = Lines([], emission_spectrum=True, orders=[1, 2])
+        wl = re.findall(r"[-+]?\d*\.\d+|\d+", label)[0]
+        line = Line(wl, label, atmospheric=False, emission=True, use_for_calibration=True)
+        self.lines = Lines([line], emission_spectrum=True, orders=[1, 2])
 
     def load(self):  # pragma: no cover
         pass
