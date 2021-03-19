@@ -158,7 +158,7 @@ class Monochromator(Target):
         wl = float(re.findall(r"[-+]?\d*\.\d+|\d+", label)[0])
         line = Line(wl, label, atmospheric=False, emission=True, use_for_calibration=True)
         self.lines = Lines([line], emission_spectrum=True, orders=[1, 2])
-        reset_lambda_range(wl-10, wl+10)
+        reset_lambda_range(wl-20, wl+20)
         self.my_logger.info(f"\n\tWith object {self.label}, set parameters.LAMBDA_MIN={parameters.LAMBDA_MIN} "
                             f"and parameters.LAMBDA_MAX={parameters.LAMBDA_MAX}.")
 

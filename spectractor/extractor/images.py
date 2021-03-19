@@ -134,7 +134,7 @@ class Image(object):
         if parameters.OBS_NAME == 'CTIO':
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
-            load_LPNHE_image(self, self.target_label)
+            load_LPNHE_image(self)
         if parameters.OBS_NAME == "AUXTEL":
             load_AUXTEL_image(self)
         # Load the disperser
@@ -509,15 +509,13 @@ def build_CTIO_read_out_noise_map(image):
     image.read_out_noise[size // 2:size, size // 2:size] = image.header['GTRON22']
 
 
-def load_LPNHE_image(image, target_label):  # pragma: no cover
+def load_LPNHE_image(image):  # pragma: no cover
     """Specific routine to load LPNHE fits files and load their data and properties for Spectractor.
 
     Parameters
     ----------
     image: Image
         The Image instance to fill with file data and header.
-    target_label: str:
-        The target label to set the correct object type.
     """
     image.my_logger.info(f'\n\tLoading LPNHE image {image.file_name}...')
     hdus = fits.open(image.file_name)
@@ -564,15 +562,17 @@ def load_LPNHE_image(image, target_label):  # pragma: no cover
     image.header.comments["ZPOS"] = hdus["XYZ"].header.comments["ZPOS"]
     image.my_logger.info('\n\tImage loaded')
 
-    if target_label == "HG-AR":
+    if image.target_label == "HG-AR":
         parameters.OBS_OBJECT_TYPE = "HG-AR"
-    elif "QTH" in target_label:
+    elif "QTH" in image.target_label:
         parameters.OBS_OBJECT_TYPE = "MONOCHROMATOR"
-        target_label += str(hdus["CORNERSTONE"].header["WVLGTH"])
-    elif "LASER" in target_label:
+        parameters.PIXWIDTH_SIGNAL = 30
+        image.target_label += str(hdus["CORNERSTONE"].header["WVLGTH"])
+    elif "LASER" in image.target_label:
         parameters.OBS_OBJECT_TYPE = "LASER"
+        parameters.PIXWIDTH_SIGNAL = 30
     else:
-        raise ValueError(f"\nTarget label {target_label} unknown for LPNHE optical bench.")
+        raise ValueError(f"\nTarget label {image.target_label} unknown for LPNHE optical bench.")
 
 
 def load_AUXTEL_image(image):  # pragma: no cover
