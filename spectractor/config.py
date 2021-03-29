@@ -67,11 +67,12 @@ def load_config(config_filename):
     .. doctest:
         :hide:
 
-        >>> load_config("./config/unknown_file.ini")
+        >>> load_config("./config/ctio.ini")
+        >>> load_config("ctio.ini")
+        >>> load_config("./config/unknown_file.ini")  #doctest: +ELLIPSIS
         Traceback (most recent call last):
         ...
-        SystemExit: Config file ./config/unknown_file.ini does not exist.
-        >>> load_config("./config/ctio.ini")
+        FileNotFoundError: Config file ./config/unknown_file.ini does not exist.
 
     """
     if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, "default.ini")):
@@ -82,7 +83,10 @@ def load_config(config_filename):
     from_config_to_parameters(config)
 
     if not os.path.isfile(config_filename):
-        raise FileNotFoundError(f'Config file {config_filename} does not exist.')
+        if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, config_filename)):
+            raise FileNotFoundError(f'Config file {config_filename} does not exist.')
+        else:
+            config_filename = os.path.join(parameters.CONFIG_DIR, config_filename)
     # Load the configuration file
     config = configparser.ConfigParser()
     config.read(config_filename)
@@ -164,4 +168,3 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod()
-

@@ -419,7 +419,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     airmass = image.header['AIRMASS']
     pressure = image.header['OUTPRESS']
     temperature = image.header['OUTTEMP']
-    telescope = TelescopeTransmission(image.filter)
+    telescope = TelescopeTransmission(image.filter_label)
 
     # Rotation: useful only to fill the Dy_disp_axis column in PSF table
     if not with_rotation:

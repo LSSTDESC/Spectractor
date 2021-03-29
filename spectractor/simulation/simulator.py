@@ -672,7 +672,7 @@ def SimulatorInit(filename, fast_load=False):
 
     # TELESCOPE TRANSMISSION
     # ------------------------
-    telescope = TelescopeTransmission(spectrum.filter)
+    telescope = TelescopeTransmission(spectrum.filter_label)
 
     # DISPERSER TRANSMISSION
     # ------------------------
