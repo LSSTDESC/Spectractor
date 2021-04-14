@@ -78,11 +78,11 @@ class Spectrum:
     disperser: Disperser
         Disperser instance that describes the disperser.
     target: Target
-        Target instance that describes the current target.
+        Target instance that describes the current exposure.
     dec: float
-        Declination coordinate of the current target.
+        Declination coordinate of the current exposure.
     hour_angle float
-        Hour angle coordinate of the current target.
+        Hour angle coordinate of the current exposure.
     temperature: float
         Outside temperature in Celsius degrees.
     pressure: float
