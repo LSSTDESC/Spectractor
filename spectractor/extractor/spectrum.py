@@ -21,10 +21,110 @@ from spectractor.simulation.throughput import TelescopeTransmission
 
 
 class Spectrum:
+    """ Class used to store information and methods relative to spectra and their extraction.
+
+    Attributes
+    ----------
+    my_logger: logging
+        Logging object
+    fast_load: bool
+        If True, only load the spectrum but not the spectrogram.
+    units: str
+        Units of the spectrum.
+    lambdas: array
+        Spectrum wavelengths in nm.
+    data: array
+        Spectrum amplitude array in self.units units.
+    err: array
+        Spectrum amplitude uncertainties in self.units units.
+    cov_matrix: array
+        Spectrum amplitude covariance matrix between wavelengths in self.units units.
+    lambdas_binwidths: array
+        Bin widths of the wavelength array in nm.
+    lambdas_order2: array
+        Spectrum wavelengths for order 2 contamination in nm.
+    data_order2: array
+        Spectrum amplitude array  for order 2 contamination in self.units units.
+    err_order2: array
+        Spectrum amplitude uncertainties  for order 2 contamination in self.units units.
+    lambda_ref: float
+        Reference wavelength for ADR computations in nm.
+    order: int
+        Index of the diffraction order.
+    x0: array
+        Target position [x,y] in the image in pixels.
+    psf: PSF
+        PSF instance to model the spectrum PSF.
+    chromatic_psf: ChromaticPSF
+        ChromaticPSF object that contains data on the PSF shape and evolution in wavelength.
+    date_obs: str
+        Date of the observation.
+    airmass: float
+        Airmass of the current target.
+    expo: float
+        Exposure time in seconds.
+    disperser_label: str
+        Label of the disperser.
+    filter_label: str:
+        Label of the filter.
+    rotation_angle: float
+        Dispersion axis angle in the image in degrees, positive if anticlockwise.
+    parallactic_angle: float
+        Parallactic angle in degrees.
+    lines: Lines
+        Lines instance that contains data on the emission or absorption lines to be searched and fitted in the spectrum.
+    header: Fits.Header
+        FITS file header.
+    disperser: Disperser
+        Disperser instance that describes the disperser.
+    target: Target
+        Target instance that describes the current target.
+    dec: float
+        Declination coordinate of the current target.
+    hour_angle float
+        Hour angle coordinate of the current target.
+    temperature: float
+        Outside temperature in Celsius degrees.
+    pressure: float
+        Outside pressure in hPa.
+    humidity: float
+        Outside relative humidity in fraction of one.
+    spectrogram: array
+        Spectrogram 2D image in image units.
+    spectrogram_bgd: array
+        Estimated 2D background fitted below the spectrogram in image units.
+    spectrogram_bgd_rms: array
+        Estimated 2D background RMS fitted below the spectrogram in image units.
+    spectrogram_err: array
+        Estimated 2D background uncertainty fitted below the spectrogram in image units.
+    spectrogram_fit: array
+        Best fitting model of the spectrogram in image units.
+    spectrogram_residuals: array
+        Residuals between the spectrogram data and the best fitting model of the spectrogram in image units.
+    spectrogram_x0: float
+        Relative position of the target in the spectrogram array along the x axis.
+    spectrogram_y0: float
+        Relative position of the target in the spectrogram array along the y axis.
+    spectrogram_xmin: int
+        Left index of the spectrogram crop in the image.
+    spectrogram_xmax: int
+        Right index of the spectrogram crop in the image.
+    spectrogram_ymin: int
+        Bottom index of the spectrogram crop in the image.
+    spectrogram_ymax: int
+        Top index of the spectrogram crop in the image.
+    spectrogram_deg: int
+        Degree of the polynomial functions to model wavelength evolutions of the PSF parameters.
+    spectrogram_saturation: float
+        Level of saturation in the spectrogram in image units.
+    spectrogram_Nx: int
+        Size of the spectrogram along the x axis.
+    spectrogram_Ny: int
+        Size of the spectrogram along the y axis.
+    """
 
     def __init__(self, file_name="", image=None, order=1, target=None, config="", fast_load=False):
-        """ Spectrum class used to store information and methods
-        relative to spectra nd their extraction.
+        """ Class used to store information and methods relative to spectra and their extraction.
 
         Parameters
         ----------
