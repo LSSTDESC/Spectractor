@@ -913,7 +913,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Lateral bands to remove sky background
     Ny, Nx = data.shape
-    x0 = int(image.target_pixcoords_rotated[0])
     y0 = int(image.target_pixcoords_rotated[1])
     ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
@@ -921,14 +920,14 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Roughly estimates the wavelengths and set start 0 nm before parameters.LAMBDA_MIN
     # and end 0 nm after parameters.LAMBDA_MAX
     if spectrum.order < 0:
-        distance = np.sign(spectrum.order)*(np.arange(Nx) - x0)
+        distance = np.sign(spectrum.order)*(np.arange(Nx) - image.target_pixcoords_rotated[0])
         lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords, order=spectrum.order)
         lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MIN)))
         lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
         xmin = max(0, int(distance[lambda_min_index]))
         xmax = min(right_edge, int(distance[lambda_max_index]) + 1)  # +1 to  include edges
     else:
-        lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - x0, x0=image.target_pixcoords,
+        lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords,
                                                           order=spectrum.order)
         xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
         xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
@@ -940,7 +939,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     my_logger.info(f'\n\tExtract spectrogram: crop rotated image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Position of the order 0 in the spectrogram coordinates
-    target_pixcoords_spectrogram = [x0 - xmin, y0 - ymin]
+    target_pixcoords_spectrogram = [image.target_pixcoords_rotated[0] - xmin, image.target_pixcoords_rotated[1] - ymin]
 
     # Extract the background on the rotated image
     bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
@@ -1022,7 +1021,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
 
     # Position of the order 0 in the spectrogram coordinates
-    target_pixcoords_spectrogram = [x0 - xmin, y0 - ymin]
+    target_pixcoords_spectrogram = [image.target_pixcoords[0] - xmin, image.target_pixcoords[1] - ymin]
     s.y0 = target_pixcoords_spectrogram[1]
     s.x0 = target_pixcoords_spectrogram[0]
 
