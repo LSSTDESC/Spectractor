@@ -287,7 +287,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Distance in x and y with respect to the true order 0 position at lambda_ref
         Dx = np.arange(self.Nx) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
         Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        distance = np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)
+        distance = np.sign(Dx)*np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
         self.spectrum.chromatic_psf.table["Dy_disp_axis"] = Dy_disp_axis
         self.spectrum.chromatic_psf.table["Dx"] = Dx
 
@@ -295,10 +295,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.spectrum.disperser.D = np.copy(D2CCD)
         self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
                                                                        self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                       order=1)
+                                                                       order=self.spectrum.order)
         self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
                                                                               self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                              order=2)
+                                                                              order=self.spectrum.order+np.sign(self.spectrum.order)*1)
 
         # Evaluate ADR
         adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
@@ -337,7 +337,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # same PSF as for the order 1 but at the same position
         distance_order2 = self.spectrum.disperser.grating_lambda_to_pixel(self.lambdas - adr_u,
                                                                           self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                          order=2)
+                                                                          order=self.spectrum.order+np.sign(self.spectrum.order)*1)
         for k in range(1, profile_params.shape[1]):
             # profile_params_order2[:, k] = interp1d(self.lambdas_order2, profile_params_order2[:, k],
             #                                       kind="cubic", fill_value="extrapolate")(self.lambdas)
@@ -1057,7 +1057,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
                          deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
         # fill a first table with first guess
-        s.table['Dx'] = (np.arange(xmin, xmax, np.sign(spectrum.order)*1) - image.target_pixcoords[0])[:len(s.table['Dx'])]
+        s.table['Dx'] = (np.arange(xmin, xmax, 1) - image.target_pixcoords[0])[:len(s.table['Dx'])]
         s.table["amplitude"] = np.interp(s.table['Dx'], Dx_rot, flux)
         s.table["flux_sum"] = np.interp(s.table['Dx'], Dx_rot, flux)
         s.table["flux_err"] = np.interp(s.table['Dx'], Dx_rot, flux_err)

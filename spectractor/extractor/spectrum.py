@@ -1006,8 +1006,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             # jmin and jmax a bit larger than x_int to avoid extrapolation
             jmin = max(0, int(np.argmin(np.abs(lambdas - (x_int[0] - x_step))) - 2))
             jmax = min(len(lambdas), int(np.argmin(np.abs(lambdas - (x_int[-1] + x_step))) + 2))
-            if jmax < jmin:  # decreasing order
-                jmin, jmax = jmax, jmin
+            if jmax-2 < jmin+2:  # decreasing order
+                jmin, jmax = max(0, jmax-4), min(len(lambdas), jmin+4)
             spectr_data = interp1d(lambdas[jmin:jmax], spec[jmin:jmax],
                                    bounds_error=False, fill_value="extrapolate")(x_int)
 
