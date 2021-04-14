@@ -217,7 +217,10 @@ class Star(Target):
         else:
            self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
         self.get_radec_position_after_pm(date_obs="J2000")
-        self.redshift = float(simbad['Z_VALUE'])
+        if not np.ma.is_masked(simbad['Z_VALUE']):
+            self.redshift = float(simbad['Z_VALUE'])
+        else:
+            self.redshift = 0
         self.load_spectra()
 
     def load_spectra(self):
