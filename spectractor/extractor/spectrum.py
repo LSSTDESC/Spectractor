@@ -154,7 +154,7 @@ class Spectrum:
             self.my_logger.warning(f"You ask to convert spectrum already in {self.units}"
                                    f" in erg/s/cm^2/nm... check your code ! Skip the instruction.")
             return
-        ldl = parameters.FLAM_TO_ADURATE * self.lambdas * self.lambdas_binwidths
+        ldl = parameters.FLAM_TO_ADURATE * self.lambdas * np.abs(self.lambdas_binwidths)
         self.data /= ldl
         if self.err is not None:
             self.err /= ldl
@@ -162,7 +162,7 @@ class Spectrum:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix /= ldl_mat
         if self.data_order2 is not None:
-            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.gradient(self.lambdas_order2)
+            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.abs(np.gradient(self.lambdas_order2))
             self.data_order2 /= ldl_2
             self.err_order2 /= ldl_2
         self.units = 'erg/s/cm$^2$/nm'
@@ -187,7 +187,7 @@ class Spectrum:
             self.my_logger.warning(f"You ask to convert spectrum already in {self.units} in ADU/s... check your code ! "
                                    f"Skip the instruction")
             return
-        ldl = parameters.FLAM_TO_ADURATE * self.lambdas * self.lambdas_binwidths
+        ldl = parameters.FLAM_TO_ADURATE * self.lambdas * np.abs(self.lambdas_binwidths)
         self.data *= ldl
         if self.err is not None:
             self.err *= ldl
@@ -195,7 +195,7 @@ class Spectrum:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix *= ldl_mat
         if self.data_order2 is not None:
-            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.gradient(self.lambdas_order2)
+            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.abs(np.gradient(self.lambdas_order2))
             self.data_order2 *= ldl_2
             self.err_order2 *= ldl_2
         self.units = 'ADU/s'
@@ -829,11 +829,18 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
         idx = merges[-1][-1]
         if idx == len(index_list) - 1:
             break
-        if index_list[idx][-1] > index_list[idx + 1][0]:
-            merges[-1].append(idx + 1)
-        else:
-            merges.append([idx + 1])
-            idx += 1
+        if index_list[idx + 1][0] > index_list[idx][0]:  # increasing order
+            if index_list[idx][-1] > index_list[idx + 1][0]:
+                merges[-1].append(idx + 1)
+            else:
+                merges.append([idx + 1])
+                idx += 1
+        else:  # decreasing order
+            if index_list[idx][0] < index_list[idx + 1][-1]:
+                merges[-1].append(idx + 1)
+            else:
+                merges.append([idx + 1])
+                idx += 1
     # reorder merge list with respect to lambdas in guess list
     new_merges = []
     for merge in merges:
@@ -989,9 +996,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             x_norm = rescale_x_for_legendre(lambdas[index])
 
             x_step = 0.1  # nm
-            x_int = np.arange(max(lambdas[0], peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2])),
-                              min(lambdas[-1], peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2])), x_step)
-
+            x_int = np.arange(max(np.min(lambdas), peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2])),
+                              min(np.max(lambdas), peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2])), x_step)
             middle = 0.5 * (np.max(lambdas[index]) + np.min(lambdas[index]))
             x_int_norm = x_int - middle
             if np.max(lambdas[index] - middle) != 0:
@@ -1000,6 +1006,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             # jmin and jmax a bit larger than x_int to avoid extrapolation
             jmin = max(0, int(np.argmin(np.abs(lambdas - (x_int[0] - x_step))) - 2))
             jmax = min(len(lambdas), int(np.argmin(np.abs(lambdas - (x_int[-1] + x_step))) + 2))
+            if jmax < jmin:  # decreasing order
+                jmin, jmax = jmax, jmin
             spectr_data = interp1d(lambdas[jmin:jmax], spec[jmin:jmax],
                                    bounds_error=False, fill_value="extrapolate")(x_int)
 
@@ -1075,7 +1083,7 @@ def calibrate_spectrum(spectrum, with_adr=False):
     >>> spectrum.plot_spectrum()
     """
     with_adr = int(with_adr)
-    distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
+    distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis()
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
     if spectrum.lambda_ref is None:
         lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
@@ -1102,7 +1110,7 @@ def calibrate_spectrum(spectrum, with_adr=False):
 
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
-        dist = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift)
+        dist = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=shift)
         spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(dist - with_adr * adr_u,
                                                                       x0=[x0[0] + shift, x0[1]], order=spectrum.order)
         spectrum.lambdas_binwidths = np.gradient(spectrum.lambdas)
@@ -1180,7 +1188,7 @@ def calibrate_spectrum(spectrum, with_adr=False):
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
     # check success, xO or D on the edge of their priors
-    distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis(shift_x=pixel_shift)
+    distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=pixel_shift)
     lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
     spectrum.lambdas_order2 = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0,

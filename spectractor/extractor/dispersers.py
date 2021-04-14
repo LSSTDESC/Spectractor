@@ -489,11 +489,11 @@ class Grating:
         Parameters
         ----------
         deltaX: array, float
-            Pixel distances to order 0.
+            *Algebraic* pixel distances to order 0 along the dispersion axis.
         x0: float or [float, float]
             Order 0 position detected in the non-rotated image.
         order: int
-            Order of the spectrum (default: 1)
+            Order of the spectrum (default: 1).
 
         Examples
         --------

@@ -798,7 +798,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     find_target(image, image.target_guess, rotated=True, use_wcs=False,
                 widths=(parameters.XWINDOW_ROT, parameters.YWINDOW_ROT))
     # Create Spectrum object
-    spectrum = Spectrum(image=image)
+    spectrum = Spectrum(image=image, order=parameters.SPEC_ORDER)
     # Subtract background and bad pixels
     extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
                                 ws=(parameters.PIXDIST_BACKGROUND,
@@ -913,26 +913,34 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Lateral bands to remove sky background
     Ny, Nx = data.shape
+    x0 = int(image.target_pixcoords_rotated[0])
     y0 = int(image.target_pixcoords_rotated[1])
     ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
 
     # Roughly estimates the wavelengths and set start 0 nm before parameters.LAMBDA_MIN
     # and end 0 nm after parameters.LAMBDA_MAX
-    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
-                                                      x0=image.target_pixcoords)
-    xmin = max(0, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0)))))
-    xmax = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0)))))
+    if spectrum.order < 0:
+        distance = np.sign(spectrum.order)*(np.arange(Nx) - x0)
+        lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords, order=spectrum.order)
+        lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MIN)))
+        lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
+        xmin = max(0, int(distance[lambda_min_index]))
+        xmax = min(right_edge, int(distance[lambda_max_index]) + 1)  # +1 to  include edges
+    else:
+        lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - x0, x0=image.target_pixcoords,
+                                                          order=spectrum.order)
+        xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
+        xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
 
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
-    my_logger.info(
-        f'\n\tExtract spectrogram: crop rotated image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
+    my_logger.info(f'\n\tExtract spectrogram: crop rotated image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Position of the order 0 in the spectrogram coordinates
-    target_pixcoords_spectrogram = [image.target_pixcoords_rotated[0] - xmin, image.target_pixcoords_rotated[1] - ymin]
+    target_pixcoords_spectrogram = [x0 - xmin, y0 - ymin]
 
     # Extract the background on the rotated image
     bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
@@ -1006,15 +1014,15 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     y0 = int(image.target_pixcoords[1])
     ymax = min(Ny, y0 + int(s.table['Dy_disp_axis'].max()) + ws[1] + 1)  # +1 to  include edges
     ymin = max(0, y0 + int(s.table['Dy_disp_axis'].min()) - ws[1])
-    distance = s.get_distance_along_dispersion_axis()
-    lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords)
-    lambda_min_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
-    lambda_max_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0))))
-    xmin = int(s.table['Dx'][lambda_min_index] + x0)
+    distance = s.get_algebraic_distance_along_dispersion_axis()
+    lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords, order=spectrum.order)
+    lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)*1] - parameters.LAMBDA_MIN)))
+    lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)*1] - parameters.LAMBDA_MAX)))
+    xmin = max(0, int(s.table['Dx'][lambda_min_index] + x0))
     xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
 
     # Position of the order 0 in the spectrogram coordinates
-    target_pixcoords_spectrogram = [image.target_pixcoords[0] - xmin, image.target_pixcoords[1] - ymin]
+    target_pixcoords_spectrogram = [x0 - xmin, y0 - ymin]
     s.y0 = target_pixcoords_spectrogram[1]
     s.x0 = target_pixcoords_spectrogram[0]
 
@@ -1028,6 +1036,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
+    my_logger.info(f'\n\tExtract spectrogram: crop raw image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Extract the non rotated background
     bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
@@ -1048,7 +1057,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
                          deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
         # fill a first table with first guess
-        s.table['Dx'] = (np.arange(xmin, xmax, 1) - image.target_pixcoords[0])[:len(s.table['Dx'])]
+        s.table['Dx'] = (np.arange(xmin, xmax, np.sign(spectrum.order)*1) - image.target_pixcoords[0])[:len(s.table['Dx'])]
         s.table["amplitude"] = np.interp(s.table['Dx'], Dx_rot, flux)
         s.table["flux_sum"] = np.interp(s.table['Dx'], Dx_rot, flux)
         s.table["flux_err"] = np.interp(s.table['Dx'], Dx_rot, flux_err)
@@ -1083,8 +1092,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     spectrum.header['PSF_REG'] = opt_reg
 
     # First guess for lambdas
-    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_distance_along_dispersion_axis(),
-                                                                  x0=image.target_pixcoords)
+    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
+                                                                  x0=image.target_pixcoords, order=spectrum.order)
     s.table['lambdas'] = first_guess_lambdas
     spectrum.lambdas = np.array(first_guess_lambdas)
 
@@ -1152,7 +1161,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         ax[1, 0].set_ylim(-1, 1)
         ax[1, 0].set_ylabel('Relative difference')
         fig.tight_layout()
-        fig.subplots_adjust(hspace=0)
+        # fig.subplots_adjust(hspace=0)
         pos0 = ax[0, 0].get_position()
         pos1 = ax[1, 0].get_position()
         pos2 = ax[2, 0].get_position()

@@ -446,7 +446,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # now we include effects related to the wrong extraction of the spectrum:
     # wrong estimation of the order 0 position and wrong DISTANCE2CCD
-    # distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
+    # distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis()
     # spectrum.disperser.D = parameters.DISTANCE2CCD
     # spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=1)
 

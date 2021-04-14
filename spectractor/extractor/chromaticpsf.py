@@ -723,8 +723,9 @@ class ChromaticPSF:
         penalty *= self.Nx * self.Ny
         return in_bounds, penalty, outbound_parameter_name
 
-    def get_distance_along_dispersion_axis(self, shift_x=0, shift_y=0):
-        return np.asarray(np.sqrt((self.table['Dx'] - shift_x) ** 2 + (self.table['Dy_disp_axis'] - shift_y) ** 2))
+    def get_algebraic_distance_along_dispersion_axis(self, shift_x=0, shift_y=0):
+        return np.asarray(np.sign(self.table['Dx']) *
+                          np.sqrt((self.table['Dx'] - shift_x) ** 2 + (self.table['Dy_disp_axis'] - shift_y) ** 2))
 
     def plot_summary(self, truth=None):
         fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12, 6))

@@ -150,7 +150,7 @@ class SpectrumSimulation(Spectrum):
         # find lambdas including ADR effect
         new_x0 = [self.x0[0] - shift_x, self.x0[1]]
         self.disperser.D = D
-        distance = self.chromatic_psf.get_distance_along_dispersion_axis(shift_x=shift_x)
+        distance = self.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=shift_x)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
         # lambda_ref = self.lambda_ref
