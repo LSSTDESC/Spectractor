@@ -723,8 +723,9 @@ class ChromaticPSF:
         penalty *= self.Nx * self.Ny
         return in_bounds, penalty, outbound_parameter_name
 
-    def get_distance_along_dispersion_axis(self, shift_x=0, shift_y=0):
-        return np.asarray(np.sqrt((self.table['Dx'] - shift_x) ** 2 + (self.table['Dy_disp_axis'] - shift_y) ** 2))
+    def get_algebraic_distance_along_dispersion_axis(self, shift_x=0, shift_y=0):
+        return np.asarray(np.sign(self.table['Dx']) *
+                          np.sqrt((self.table['Dx'] - shift_x) ** 2 + (self.table['Dy_disp_axis'] - shift_y) ** 2))
 
     def plot_summary(self, truth=None):
         fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12, 6))
@@ -750,6 +751,8 @@ class ChromaticPSF:
             params = [PSF_models[p][x] for p in range(len(self.psf.param_names))]
             params[:3] = [1, x, self.Ny // 2]
             out = self.psf.evaluate(np.asarray([xx, yy]), p=params)
+            if np.max(out) <= 0:
+                continue
             out /= np.max(out)
             img += out
         ax[1].imshow(img, origin='lower')  # , extent=[0, self.Nx,
@@ -904,6 +907,8 @@ class ChromaticPSF:
             # in case guess amplitude is too low
             # pdf = np.abs(signal)
             signal_sum = np.nansum(signal[middle - ws[0]:middle + ws[0]])
+            if signal_sum < 3 * np.nanstd(signal[bgd_index]):
+                continue
             # if signal_sum > 0:
             #     pdf /= signal_sum
             # mean = np.nansum(pdf * index)

@@ -287,7 +287,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Distance in x and y with respect to the true order 0 position at lambda_ref
         Dx = np.arange(self.Nx) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
         Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        distance = np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)
+        distance = np.sign(Dx)*np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
         self.spectrum.chromatic_psf.table["Dy_disp_axis"] = Dy_disp_axis
         self.spectrum.chromatic_psf.table["Dx"] = Dx
 
@@ -295,10 +295,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.spectrum.disperser.D = np.copy(D2CCD)
         self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
                                                                        self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                       order=1)
+                                                                       order=self.spectrum.order)
         self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
                                                                               self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                              order=2)
+                                                                              order=self.spectrum.order+np.sign(self.spectrum.order))
 
         # Evaluate ADR
         adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
@@ -337,7 +337,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # same PSF as for the order 1 but at the same position
         distance_order2 = self.spectrum.disperser.grating_lambda_to_pixel(self.lambdas - adr_u,
                                                                           self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                          order=2)
+                                                                          order=self.spectrum.order+np.sign(self.spectrum.order))
         for k in range(1, profile_params.shape[1]):
             # profile_params_order2[:, k] = interp1d(self.lambdas_order2, profile_params_order2[:, k],
             #                                       kind="cubic", fill_value="extrapolate")(self.lambdas)
@@ -798,7 +798,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     find_target(image, image.target_guess, rotated=True, use_wcs=False,
                 widths=(parameters.XWINDOW_ROT, parameters.YWINDOW_ROT))
     # Create Spectrum object
-    spectrum = Spectrum(image=image)
+    spectrum = Spectrum(image=image, order=parameters.SPEC_ORDER)
     # Subtract background and bad pixels
     extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
                                 ws=(parameters.PIXDIST_BACKGROUND,
@@ -919,17 +919,24 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Roughly estimates the wavelengths and set start 0 nm before parameters.LAMBDA_MIN
     # and end 0 nm after parameters.LAMBDA_MAX
-    lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
-                                                      x0=image.target_pixcoords)
-    xmin = max(0, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0)))))
-    xmax = min(right_edge, int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0)))))
+    if spectrum.order < 0:
+        distance = np.sign(spectrum.order)*(np.arange(Nx) - image.target_pixcoords_rotated[0])
+        lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords, order=spectrum.order)
+        lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MIN)))
+        lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
+        xmin = max(0, int(distance[lambda_min_index]))
+        xmax = min(right_edge, int(distance[lambda_max_index]) + 1)  # +1 to  include edges
+    else:
+        lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords,
+                                                          order=spectrum.order)
+        xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
+        xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
 
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
-    my_logger.info(
-        f'\n\tExtract spectrogram: crop rotated image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
+    my_logger.info(f'\n\tExtract spectrogram: crop rotated image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Position of the order 0 in the spectrogram coordinates
     target_pixcoords_spectrogram = [image.target_pixcoords_rotated[0] - xmin, image.target_pixcoords_rotated[1] - ymin]
@@ -1006,11 +1013,11 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     y0 = int(image.target_pixcoords[1])
     ymax = min(Ny, y0 + int(s.table['Dy_disp_axis'].max()) + ws[1] + 1)  # +1 to  include edges
     ymin = max(0, y0 + int(s.table['Dy_disp_axis'].min()) - ws[1])
-    distance = s.get_distance_along_dispersion_axis()
-    lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords)
-    lambda_min_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MIN - 0))))
-    lambda_max_index = int(np.argmin(np.abs(lambdas - (parameters.LAMBDA_MAX + 0))))
-    xmin = int(s.table['Dx'][lambda_min_index] + x0)
+    distance = s.get_algebraic_distance_along_dispersion_axis()
+    lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords, order=spectrum.order)
+    lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MIN)))
+    lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
+    xmin = max(0, int(s.table['Dx'][lambda_min_index] + x0))
     xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
 
     # Position of the order 0 in the spectrogram coordinates
@@ -1028,6 +1035,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
+    my_logger.info(f'\n\tExtract spectrogram: crop raw image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Extract the non rotated background
     bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
@@ -1083,8 +1091,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     spectrum.header['PSF_REG'] = opt_reg
 
     # First guess for lambdas
-    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_distance_along_dispersion_axis(),
-                                                                  x0=image.target_pixcoords)
+    first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
+                                                                  x0=image.target_pixcoords, order=spectrum.order)
     s.table['lambdas'] = first_guess_lambdas
     spectrum.lambdas = np.array(first_guess_lambdas)
 
@@ -1152,7 +1160,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         ax[1, 0].set_ylim(-1, 1)
         ax[1, 0].set_ylabel('Relative difference')
         fig.tight_layout()
-        fig.subplots_adjust(hspace=0)
+        # fig.subplots_adjust(hspace=0)
         pos0 = ax[0, 0].get_position()
         pos1 = ax[1, 0].get_position()
         pos2 = ax[2, 0].get_position()

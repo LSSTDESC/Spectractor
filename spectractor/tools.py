@@ -1710,7 +1710,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     if scale == "log10" or scale == "log":
         norm = matplotlib.colors.LogNorm(vmin=vmin, vmax=vmax)
     elif scale == "symlog":
-        norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=10)
+        norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=10, base=10)
     else:
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
     im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)

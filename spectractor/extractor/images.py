@@ -22,6 +22,70 @@ from spectractor.tools import (plot_image_simple, save_fits, load_fits, fit_poly
 
 
 class Image(object):
+    """ The image class contains all the features necessary to load an image and extract a spectrum.
+
+    Attributes
+    ----------
+    my_logger: logging
+        Logging object
+    file_name: str
+        The file name of the exposure.
+    units: str
+        Units of the image.
+    data: array
+        Image 2D array in self.units units.
+    stat_errors: array
+        Image 2D uncertainty array in self.units units.
+    target_pixcoords: array
+        Target position [x,y] in the image in pixels.
+    data_rotated: array
+        Rotated image 2D array in self.units units.
+    stat_errors_rotated: array
+        Rotated image 2D uncertainty array in self.units units.
+    target_pixcoords_rotated: array
+        Target position [x,y] in the rotated image in pixels.
+    date_obs: str
+        Date of the observation.
+    airmass: float
+        Airmass of the current target.
+    expo: float
+        Exposure time in seconds.
+    disperser_label: str
+        Label of the disperser.
+    filter_label: str:
+        Label of the filter.
+    target_label: str:
+        Label of the current target.
+    rotation_angle: float
+        Dispersion axis angle in the image in degrees, positive if anticlockwise.
+    parallactic_angle: float
+        Parallactic angle in degrees.
+    header: Fits.Header
+        FITS file header.
+    disperser: Disperser
+        Disperser instance that describes the disperser.
+    target: Target
+        Target instance that describes the current target.
+    ra: float
+        Right ascension coordinate of the current exposure.
+    dec: float
+        Declination coordinate of the current exposure.
+    hour_angle float
+        Hour angle coordinate of the current exposure.
+    temperature: float
+        Outside temperature in Celsius degrees.
+    pressure: float
+        Outside pressure in hPa.
+    humidity: float
+        Outside relative humidity in fraction of one.
+    saturation: float
+        Level of saturation in the image in image units.
+    target_star2D: PSF
+        PSF instance fitted on the current target.
+    target_bkgd2D: callable
+        Function that models the background behind the current target.
+
+    """
 
     def __init__(self, file_name, target_label="", disperser_label="", config=""):
         """
@@ -594,7 +658,10 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.disperser_label = image.header['GRATING']
     image.ra = Angle(image.header['RA'], unit="deg")
     image.dec = Angle(image.header['DEC'], unit="deg")
-    image.hour_angle = Angle(image.header['HASTART'], unit="hourangle")
+    if 'HASTART' in image.header and image.header['HASTART'] is not None:
+        image.hour_angle = Angle(image.header['HASTART'], unit="hourangle")
+    else:
+        image.hour_angle = Angle(image.header['HA'], unit="deg")
     if 'AIRTEMP' in image.header:
         image.temperature = image.header['AIRTEMP']
     else:
