@@ -298,7 +298,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                                                                        order=self.spectrum.order)
         self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
                                                                               self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                              order=self.spectrum.order+np.sign(self.spectrum.order)*1)
+                                                                              order=self.spectrum.order+np.sign(self.spectrum.order))
 
         # Evaluate ADR
         adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
@@ -337,7 +337,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # same PSF as for the order 1 but at the same position
         distance_order2 = self.spectrum.disperser.grating_lambda_to_pixel(self.lambdas - adr_u,
                                                                           self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                          order=self.spectrum.order+np.sign(self.spectrum.order)*1)
+                                                                          order=self.spectrum.order+np.sign(self.spectrum.order))
         for k in range(1, profile_params.shape[1]):
             # profile_params_order2[:, k] = interp1d(self.lambdas_order2, profile_params_order2[:, k],
             #                                       kind="cubic", fill_value="extrapolate")(self.lambdas)
@@ -1015,8 +1015,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     ymin = max(0, y0 + int(s.table['Dy_disp_axis'].min()) - ws[1])
     distance = s.get_algebraic_distance_along_dispersion_axis()
     lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords, order=spectrum.order)
-    lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)*1] - parameters.LAMBDA_MIN)))
-    lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)*1] - parameters.LAMBDA_MAX)))
+    lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MIN)))
+    lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
     xmin = max(0, int(s.table['Dx'][lambda_min_index] + x0))
     xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
 
