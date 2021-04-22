@@ -230,7 +230,7 @@ def neutral_lines(x_center, y_center, theta_tilt):
 def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
     """Return the order 0 and order 1 positions of an hologram."""
     # refraction angle between order 0 and order 1 at construction
-    alpha = np.arcsin(N * parameters.LAMBDA_CONSTRUCTOR + np.sin(theta0))
+    alpha = np.arcsin(N * parameters.HOLO_LAMBDA_R + np.sin(theta0))
     # distance between order 0 and order 1 in pixels
     AB = (np.tan(alpha) - np.tan(theta0)) * parameters.DISTANCE2CCD / parameters.CCD_PIXEL2MM
     # position of order 1 in pixels
@@ -739,8 +739,8 @@ class Hologram(Grating):
             self.theta = lambda x: float(theta_interp(x[0], x[1]))
         else:
             self.theta = lambda x: self.theta_tilt
-        self.plate_center = [0.5 * parameters.CCD_IMSIZE + parameters.PLATE_CENTER_SHIFT_X / parameters.CCD_PIXEL2MM,
-                             0.5 * parameters.CCD_IMSIZE + parameters.PLATE_CENTER_SHIFT_Y / parameters.CCD_PIXEL2MM]
+        self.plate_center = [0.5 * parameters.CCD_IMSIZE + parameters.HOLO_PLATE_CENTER_SHIFT_X / parameters.CCD_PIXEL2MM,
+                             0.5 * parameters.CCD_IMSIZE + parameters.HOLO_PLATE_CENTER_SHIFT_Y / parameters.CCD_PIXEL2MM]
         self.x_lines, self.line1, self.line2 = neutral_lines(self.holo_center[0], self.holo_center[1], self.theta_tilt)
         if verbose:
             if self.is_hologram:

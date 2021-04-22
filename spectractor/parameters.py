@@ -61,6 +61,7 @@ OBS_NAME = 'CTIO'
 OBS_ALTITUDE = 2.200  # CTIO altitude in k meters from astropy package (Cerro Pachon)
 OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
 OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
+OBS_FOCAL = 12.3 * units.m  # Focal of the telescope
 OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
 OBS_EPOCH = "J2000.0"
 OBS_TRANSMISSION_SYSTEMATICS = 0.005
@@ -81,16 +82,18 @@ HALPHA_FILTER = {'label': 'Halfa', 'min': HALPHA_CENTER - 2 * HALPHA_WIDTH, 'max
 ZGUNN = {'label': 'Z-Gunn', 'min': 800, 'max': 1100}
 FILTERS = [RG715, FGB37, HALPHA_FILTER, ZGUNN]
 
-# Making of the holograms
+# Spectrograph basic settings
 DISTANCE2CCD = 55.45  # distance between hologram and CCD in mm
 DISTANCE2CCD_ERR = 0.19  # uncertainty on distance between hologram and CCD in mm
-LAMBDA_CONSTRUCTOR = 639e-6  # constructor wavelength to make holograms in mm
 GROOVES_PER_MM = 350  # approximate effective number of lines per millimeter of the hologram
-PLATE_CENTER_SHIFT_X = -6.  # plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_Y = -8.  # plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
 GRATING_ORDER_2OVER1 = 0.1  # default value for order 2 over order 1 transmission ratio
+
+# Hologram specific properties
+HOLO_LAMBDA_R = 639e-6  # constructor wavelength to make holograms in mm
+HOLO_PLATE_CENTER_SHIFT_X = -6.  # plate center shift on x in mm in filter frame
+HOLO_PLATE_CENTER_SHIFT_Y = -8.  # plate center shift on x in mm in filter frame
+HOLO_PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
+HOLO_PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
 
 # Search windows in images
 XWINDOW = 100  # window x size to search for the targeted object
