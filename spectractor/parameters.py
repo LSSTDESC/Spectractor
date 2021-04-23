@@ -90,6 +90,7 @@ GRATING_ORDER_2OVER1 = 0.1  # default value for order 2 over order 1 transmissio
 
 # Hologram specific properties
 HOLO_LAMBDA_R = 639e-6  # constructor wavelength to make holograms in mm
+HOLO_TILT = 0  # tilt angle around dispersion axis to avoid ghosts in deg
 HOLO_PLATE_CENTER_SHIFT_X = -6.  # plate center shift on x in mm in filter frame
 HOLO_PLATE_CENTER_SHIFT_Y = -8.  # plate center shift on x in mm in filter frame
 HOLO_PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame

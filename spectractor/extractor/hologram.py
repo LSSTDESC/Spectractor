@@ -115,8 +115,9 @@ def d2ndl2(w0, l0, wA, wB, lA, lB, zetaA, zetaB, lambda_hologram):
 
 
 def rotate_frames(w, l, zeta, w0, l0, wA, wB, lA, lB, zetaA, zetaB, lambda_hologram):
-    beta = -np.arctan(dndl(w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB, lambda_hologram=lambda_hologram) /
-                      dndw(w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB, lambda_hologram=lambda_hologram))
+    beta = -np.arctan(
+        dndl(w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB, lambda_hologram=lambda_hologram) /
+        dndw(w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB, lambda_hologram=lambda_hologram))
     u = np.cos(beta) * (w - w0) + np.sin(beta) * (l - l0)
     v = -np.sin(beta) * (w - w0) + np.cos(beta) * (l - l0)
     z = DCCD + zeta
@@ -134,8 +135,10 @@ def d2ndu2(w0, l0, wA, wB, lA, lB, zetaA, zetaB, lambda_hologram):
     zetaA, zetaB, lB, lA, wB, wA: float
         Positions of the A and B monochromatic coherent sources with respect to the center of the hologram.
     """
-    uA, vA, zA = rotate_frames(wA, lA, zetaA, w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB, lambda_hologram=lambda_hologram)
-    uB, vB, zB = rotate_frames(wB, lB, zetaB, w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB, lambda_hologram=lambda_hologram)
+    uA, vA, zA = rotate_frames(wA, lA, zetaA, w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB,
+                               lambda_hologram=lambda_hologram)
+    uB, vB, zB = rotate_frames(wB, lB, zetaB, w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB,
+                               lambda_hologram=lambda_hologram)
     rA = np.sqrt(uA * uA + vA * vA + (zetaA - DCCD) * (zetaA - DCCD))
     rB = np.sqrt(uB * uB + vB * vB + (zetaB - DCCD) * (zetaB - DCCD))
     return (((zetaA - DCCD) * (zetaA - DCCD) + vA * vA) / rA ** 3 - (
@@ -153,8 +156,10 @@ def d2ndv2(w0, l0, wA, wB, lA, lB, zetaA, zetaB, lambda_hologram):
     zA, zB, lB, lA, wB, wA: float
         Positions of the A and B monochromatic coherent sources with respect to the center of the hologram.
     """
-    uA, vA, zA = rotate_frames(wA, lA, zetaA, w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB, lambda_hologram=lambda_hologram)
-    uB, vB, zB = rotate_frames(wB, lB, zetaB, w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB, lambda_hologram=lambda_hologram)
+    uA, vA, zA = rotate_frames(wA, lA, zetaA, w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB,
+                               lambda_hologram=lambda_hologram)
+    uB, vB, zB = rotate_frames(wB, lB, zetaB, w0, l0, wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB,
+                               lambda_hologram=lambda_hologram)
     rA = np.sqrt(uA * uA + vA * vA + (zetaA - DCCD) * (zetaA - DCCD))
     rB = np.sqrt(uB * uB + vB * vB + (zetaB - DCCD) * (zetaB - DCCD))
     return (((zetaA - DCCD) * (zetaA - DCCD) + uA * uA) / rA ** 3 - (
@@ -174,7 +179,8 @@ def set_symmetric_lines(wA, wB, lA, lB, zetaA, zetaB, lambda_hologram):
     vline = lambda w: -(wB - wA) / (lB - lA) * w + center[1] + center[0] * (wB - wA) / (lB - lA)
 
     def func(w):
-        return d2ndw2(w, hline(w), wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB, lambda_hologram=lambda_hologram)
+        return d2ndw2(w, hline(w), wA=wA, wB=wB, lA=lA, lB=lB, zetaA=zetaA, zetaB=zetaB,
+                      lambda_hologram=lambda_hologram)
 
     wC2 = newton(func, 0.5 * (wA + wB))
     # center = [0.5 * (wA + wB), hline(0.5 * (wA + wB))]
@@ -185,8 +191,8 @@ def set_symmetric_lines(wA, wB, lA, lB, zetaA, zetaB, lambda_hologram):
 
 class HologramModel:
 
-    def __init__(self, wA, lA, zetaA, wB, lB, zetaB, DCCD=parameters.DISTANCE2CCD, DT=parameters.OBS_DIAMETER,
-                 fT=parameters.OBS_FOCAL, lambda_hologram=parameters.HOLO_LAMBDA_R):
+    def __init__(self, wA, lA, zetaA, wB, lB, zetaB, DCCD, DT=parameters.OBS_DIAMETER,
+                 fT=parameters.OBS_FOCAL, lambda_hologram=parameters.HOLO_LAMBDA_R, tilt=parameters.HOLO_TILT):
         r"""
 
         Parameters
@@ -211,10 +217,13 @@ class HologramModel:
             Focal of the telescope in mm.
         lambda_hologram: float
             Record wavelength of the hologram in mm.
+        tilt: float
+            Tilt angle around dispersion axis to avoid ghosts, in deg.
 
         Examples
         --------
-        >>> holo = HologramModel(wA=-10, lA=0, zetaA=200, wB=10, lB=0, zetaB=200, DCCD=200, DT=1200, fT=21600, lambda_hologram=639e-6)
+        >>> holo = HologramModel(wA=-10, lA=0, zetaA=200, wB=10, lB=0, zetaB=200, DCCD=200, DT=1200, fT=21600,
+        ... lambda_hologram=639e-6, tilt=1)
         >>> fig, ax = holo.plot()
         """
         self.wA, self.lA, self.zetaA = wA, lA, zetaA
@@ -223,6 +232,8 @@ class HologramModel:
         self.DT = DT
         self.fT = fT
         self.lambda_hologram = lambda_hologram
+        self.alpha0 = 0
+        self.beta0 = tilt
 
     @property
     def AB(self):
@@ -234,10 +245,11 @@ class HologramModel:
 
     def __str__(self):
         txt = "Hologram properties:\n"
-        txt += "\tA: "+f"[{self.wA:.2f}, {self.lA:.2f}, {self.zetaA:.2f}]"
-        txt += "\tB: "+f"[{self.wB:.2f}, {self.lB:.2f}, {self.zetaB:.2f}]\n"
-        txt += "\tA'B'="+f"{self.AB:.2f}mm"+"\tDzeta="+f"{self.zetaA-self.zetaB:.2f}mm"
-        txt += "\tDCCD="+f"{self.DCCD:.2f}mm"
+        txt += "\tA: " + f"[{self.wA:.2f}, {self.lA:.2f}, {self.zetaA:.2f}]"
+        txt += "\tB: " + f"[{self.wB:.2f}, {self.lB:.2f}, {self.zetaB:.2f}]\n"
+        txt += "\tA'B'=" + f"{self.AB:.2f}mm" + "\tDzeta=" + f"{self.zetaA - self.zetaB:.2f}mm"
+        txt += "\tDCCD=" + f"{self.DCCD:.2f}mm\n"
+        txt += "\talpha0=" + f"{self.alpha0:.2f}deg" + "\tbeta0=" + f"{self.beta0:.2f}deg"
         return txt
 
     def Neff(self, w, l):
@@ -248,7 +260,8 @@ class HologramModel:
         N = Neff(w, l, wA=self.wA, wB=self.wB, lA=self.lA, lB=self.lB, zetaA=self.zetaA, zetaB=self.zetaB,
                  lambda_hologram=self.lambda_hologram)
         alpha = np.arctan2(dndl(w, l, wA=self.wA, wB=self.wB, lA=self.lA, lB=self.lB,
-                                zetaA=self.zetaA, zetaB=self.zetaB, lambda_hologram=self.lambda_hologram), N) * 180 / np.pi
+                                zetaA=self.zetaA, zetaB=self.zetaB, lambda_hologram=self.lambda_hologram),
+                           N) * 180 / np.pi
         return alpha
 
     def plot(self, doplot=True):
@@ -275,12 +288,14 @@ class HologramModel:
             plt.axvline(0, color="red", linestyle="-.", zorder=40)
         else:
             hline, vline, vline2 = set_symmetric_lines(wA=self.wA, wB=self.wB, lA=self.lA, lB=self.lB,
-                                                       zetaA=self.zetaA, zetaB=self.zetaB, lambda_hologram=self.lambda_hologram)
+                                                       zetaA=self.zetaA, zetaB=self.zetaB,
+                                                       lambda_hologram=self.lambda_hologram)
             plt.plot(ws, hline(ws), color="red", linestyle="-.", label='Symmetric axes', lw=2, zorder=40)
             plt.plot(ws, vline(ws), color="red", linestyle="-.", lw=2, zorder=40)
             plt.plot(ws, vline2(ws), color="red", linestyle="-.", lw=2, zorder=40)
         plt.scatter(self.wA, self.lA, s=200, facecolor='red', label="Optical center (A')", zorder=42)
-        plt.scatter(self.wB, self.lB, s=200, facecolor='black', label=r"Order +1 position at $\lambda_R$ (B')", zorder=42)
+        plt.scatter(self.wB, self.lB, s=200, facecolor='black', label=r"Order +1 position at $\lambda_R$ (B')",
+                    zorder=42)
         plt.scatter(0, 0, s=50, facecolor='blue', label="[A'B'] middle", zorder=42)
         plt.xlabel(r"$w$ [mm]", fontsize=14)
         plt.ylabel(r"$l$ [mm]", fontsize=14)
@@ -294,29 +309,46 @@ class HologramModel:
 
 
 def get_alpha0(xA, xB, yA, yB):
-    return np.arctan((yB - yA) / (xB - xA))
+    return np.arctan((yB - yA) / (xB - xA)) * 180 / np.pi
 
 
-def get_beta0(xA, xB, zA, zB):
-    return np.arctan((zB - zA) / (xB - xA))
+def get_euler_angle_matrix(alpha0, beta0):
+    r"""Return the rotation matrix to go from $(x,y,z)$ frame to $(w,l,\zeta)$ frame.
 
+    See Also
+    --------
+    https://fr.wikipedia.org/wiki/Angles_d%27Euler
 
-def get_euler_angle_matrix(xA, xB, yA, yB, zA, zB):
-    alpha0 = get_alpha0(xA, xB, yA, yB)
-    beta0 = get_beta0(xA, xB, zA, zB)
-    A = np.array([[np.cos(alpha0), -np.sin(alpha0), 0],
-                  [np.sin(alpha0) * np.cos(beta0), np.cos(beta0) * np.cos(alpha0), -np.sin(beta0)],
-                  [np.sin(beta0) * np.sin(alpha0), np.sin(beta0) * np.cos(alpha0), np.cos(beta0)]])
+    Parameters
+    ----------
+    alpha0: float
+        Dispersion axis angle $\alpha_0$ around $z$ to go from $x$ to $w$ axis, in deg.
+    beta0: float
+        Dispersion axis angle $\beta_0$ around $x$ to go from $z$ to $\zeta$ axis, in deg.
+
+    Returns
+    -------
+    A: array
+        Rotation matrix.
+
+    """
+    psi = alpha0 * np.pi / 180
+    theta = np.arctan(np.tan(beta0 * np.pi / 180) / np.cos(alpha0 * np.pi / 180))
+    # phi = 0 as u and w are parallel
+    A = np.array([[np.cos(psi), -np.sin(psi) * np.cos(theta), np.sin(psi) * np.sin(theta)],
+                  [np.sin(psi), np.cos(psi) * np.cos(theta), -np.cos(psi) * np.sin(theta)],
+                  [0, np.sin(theta), np.cos(theta)]])
     return A
 
 
-def from_xyz_to_wlzeta_AB(xA, xB, yA, yB, zA, zB, DCCD):
+def from_xyz_to_wlzeta_AB(xA, xB, yA, yB, zA, zB, DCCD, beta0):
     # rotations
-    A = get_euler_angle_matrix(xA, xB, yA, yB, zA, zB)
+    alpha0 = get_alpha0(xA, xB, yA, yB)
+    A = get_euler_angle_matrix(alpha0, beta0)
     wA, lA, zetaA = A.T @ np.array([xA, yA, zA])
     wB, lB, zetaB = A.T @ np.array([xB, yB, zB])
     # translations
-    xc, yc, zc = (wA + wB) / 2, (lA + lB) / 2, -DCCD + (zetaA + zetaB) / 2
+    xc, yc, zc = (wA + wB) / 2, (lA + lB) / 2, -DCCD + zetaA  # + zetaB) / 2
     wA, wB = xc - wA, xc - wB
     lA, lB = lA - yc, lB - yc
     zetaA, zetaB = zetaA - zc, zetaB - zc
@@ -325,12 +357,13 @@ def from_xyz_to_wlzeta_AB(xA, xB, yA, yB, zA, zB, DCCD):
     return xc, yc, zc, wA, lA, zetaA, wB, lB, zetaB
 
 
-def from_xyz_to_wlzeta(x, y, z, xA, xB, yA, yB, zA, zB, DCCD):
+def from_xyz_to_wlzeta(x, y, z, xA, xB, yA, yB, zA, zB, DCCD, beta0):
     # rotations
-    A = get_euler_angle_matrix(xA, xB, yA, yB, zA, zB)
+    alpha0 = get_alpha0(xA, xB, yA, yB)
+    A = get_euler_angle_matrix(alpha0, beta0)
     w, l, zeta = A.T @ np.array([x, y, z])
     # translations
-    xc, yc, zc, wA, lA, zetaA, wB, lB, zetaB = from_xyz_to_wlzeta_AB(xA, xB, yA, yB, zA, zB, DCCD)
+    xc, yc, zc, wA, lA, zetaA, wB, lB, zetaB = from_xyz_to_wlzeta_AB(xA, xB, yA, yB, zA, zB, DCCD, beta0)
     w = xc - w
     l = l - yc
     zeta = zeta - zc
@@ -396,7 +429,7 @@ class HoloFitWorkspace(FitWorkspace):
         self.p = np.array([self.xA, self.xB, self.yA, self.yB, self.zA, self.zB])
         self.fixed = [False] * len(self.p)
         # self.fixed[-2:] = True, True
-        self.fixed[-1] = True
+        self.fixed[-2] = True  # zA at 0 ie zetaA = DCCD
         if only_theta:
             self.fixed[0] = True
             self.fixed[-2:] = True, True
@@ -410,19 +443,22 @@ class HoloFitWorkspace(FitWorkspace):
         self.nwalkers = max(2 * self.ndim, nwalkers)
 
     def update_hologram(self, xA, xB, yA, yB, zA, zB):
-        xc, yc, zc, wA, lA, zetaA, wB, lB, zetaB = from_xyz_to_wlzeta_AB(xA, xB, yA, yB, zA, zB, self.hologram.DCCD)
+        xc, yc, zc, wA, lA, zetaA, wB, lB, zetaB = from_xyz_to_wlzeta_AB(xA, xB, yA, yB, zA, zB, self.hologram.DCCD,
+                                                                         self.hologram.beta0)
         self.hologram.wA, self.hologram.lA, self.hologram.zetaA = wA, lA, zetaA
         self.hologram.wB, self.hologram.lB, self.hologram.zetaB = wB, lB, zetaB
+        self.hologram.alpha0 = get_alpha0(xA, xB, yA, yB)
 
     def simulate(self, xA, xB, yA, yB, zA, zB):
         npoints = self.xy.shape[0]
         Neffs = np.zeros(npoints)
         thetas = np.zeros(npoints)
         self.update_hologram(xA, xB, yA, yB, zA, zB)
-        alpha0 = get_alpha0(xA, xB, yA, yB) * 180 / np.pi
+        alpha0 = get_alpha0(xA, xB, yA, yB)
         for k in range(npoints):
             xpos, ypos, zpos = self.xyz[k]
-            w, l, zeta = from_xyz_to_wlzeta(xpos, ypos, zpos, xA, xB, yA, yB, zA, zB, self.hologram.DCCD)
+            w, l, zeta = from_xyz_to_wlzeta(xpos, ypos, zpos, xA, xB, yA, yB, zA, zB, self.hologram.DCCD,
+                                            self.hologram.beta0)
             Neffs[k] = self.hologram.Neff(w, l)
             alpha = self.hologram.alpha(w, l)
             thetas[k] = alpha - alpha0
@@ -438,10 +474,10 @@ class HoloFitWorkspace(FitWorkspace):
         self.model_err = np.zeros_like(self.model)
         return xy, self.model, self.model_err
 
-    def plot_fit(self):
+    def plot_fit(self, output=""):
         fit_xA, fit_xB, fit_yA, fit_yB, fit_zA, fit_zB = self.p
         self.update_hologram(*self.p)
-        alpha0 = get_alpha0(fit_xA, fit_xB, fit_yA, fit_yB) * 180 / np.pi
+        alpha0 = get_alpha0(fit_xA, fit_xB, fit_yA, fit_yB)
         ws = np.arange(-self.hologram.AB, self.hologram.AB, 0.5)
         ls = np.arange(-self.hologram.AB, self.hologram.AB, 0.5)
         ww, ll = np.meshgrid(ws, ls)
@@ -449,8 +485,10 @@ class HoloFitWorkspace(FitWorkspace):
 
         fig, ax = self.hologram.plot(doplot=False)
         www, lll, zzz = from_xyz_to_wlzeta(self.theta_xy.T[0], self.theta_xy.T[1], np.zeros(self.theta_xy.shape[0]),
-                                           fit_xA, fit_xB, fit_yA, fit_yB, fit_zA, fit_zB, self.hologram.DCCD)
-        plt.scatter(www, lll, c=self.thetas + alpha0, s=100, cmap="bwr", marker='o', edgecolors='k', vmin=np.min(alpha), vmax=np.max(alpha))  # , vmin=-np.max(np.abs(alpha)), vmax=np.max(np.abs(alpha))) #
+                                           fit_xA, fit_xB, fit_yA, fit_yB, fit_zA, fit_zB, self.hologram.DCCD,
+                                           self.hologram.beta0)
+        plt.scatter(www, lll, c=self.thetas + alpha0, s=100, cmap="bwr", marker='o', edgecolors='k', vmin=np.min(alpha),
+                    vmax=np.max(alpha))  # , vmin=-np.max(np.abs(alpha)), vmax=np.max(np.abs(alpha))) #
         # www, lll, zzz = from_xyz_to_wlzeta(self.xyz.T[0], self.xyz.T[1], self.xyz.T[2], fit_xA, fit_xB, fit_yA,
         #                                    fit_yB, fit_zA, fit_zB, self.hologram.DCCD)
         # sc2 = plt.scatter(www, lll, c=NN, s=100, cmap='rainbow', marker='o', edgecolors='k')
@@ -459,5 +497,7 @@ class HoloFitWorkspace(FitWorkspace):
         # cb2.update_ticks()
         # cb2.set_label('$N_{\mathrm{eff}}$ [lpmm]',fontsize=14)
         fig.tight_layout()
+        if output != "":
+            fig.savefig(output, dpi=200)
         plt.show()
 
