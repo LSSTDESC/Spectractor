@@ -1,6 +1,7 @@
 [![Build Status](https://travis-ci.org/LSSTDESC/Spectractor.svg?branch=master)](https://travis-ci.org/LSSTDESC/Spectractor)
 [![Coverage Status](https://coveralls.io/repos/github/LSSTDESC/Spectractor/badge.svg?branch=master)](https://coveralls.io/github/LSSTDESC/Spectractor?branch=master)
 [![Documentation Status](https://readthedocs.org/projects/spectractor/badge/?version=latest)](https://spectractor.readthedocs.io/en/latest/?badge=latest)
+<a href="https://ascl.net/2104.004"><img src="https://img.shields.io/badge/ascl-2104.004-blue.svg?colorB=262255" alt="ascl:2104.004" /></a>
 
 # Spectractor
 
