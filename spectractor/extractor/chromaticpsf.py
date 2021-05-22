@@ -585,6 +585,11 @@ class ChromaticPSF:
             fwhm = compute_fwhm(pixel_eval, out, center=p[2], minimum=0)
             self.table['flux_integral'][x] = p[0]  # if MoffatGauss1D normalized
             self.table['fwhm'][x] = fwhm
+        # clean fwhm bad points
+        fwhms = self.table['fwhm']
+        mask = np.logical_and(fwhms < 1, fwhms > self.Ny // 2)  # less than 1 pixel or greater than window
+        self.table['fwhm'] = interp1d(pixel_x[~mask], fwhms[~mask], kind="linear",
+                                      bounds_error=False, fill_value="extrapolate")(pixel_x)
 
     def set_bounds(self):
         """
