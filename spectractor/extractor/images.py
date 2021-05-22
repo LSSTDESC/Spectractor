@@ -52,7 +52,7 @@ class Image(object):
         Exposure time in seconds.
     disperser_label: str
         Label of the disperser.
-    filter_label: str:
+    filter_label: str
         Label of the filter.
     target_label: str:
         Label of the current target.
@@ -70,7 +70,7 @@ class Image(object):
         Right ascension coordinate of the current exposure.
     dec: float
         Declination coordinate of the current exposure.
-    hour_angle float
+    hour_angle: float
         Hour angle coordinate of the current exposure.
     temperature: float
         Outside temperature in Celsius degrees.
