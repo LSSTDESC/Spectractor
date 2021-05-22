@@ -1076,7 +1076,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False,
                                 amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
         # save results
-        spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
+        spectrum.spectrogram_fit = s.build_spectrogram_image(s.poly_params, mode=mode)
         spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                            np.arange(Ny))) / err
         spectrum.data = np.copy(w.amplitude_params)

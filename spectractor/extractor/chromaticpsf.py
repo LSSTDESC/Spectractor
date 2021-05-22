@@ -172,7 +172,7 @@ class ChromaticPSF:
                 index = index + shift
         return poly_params
 
-    def evaluate(self, poly_params, mode="1D"):
+    def build_spectrogram_image(self, poly_params, mode="1D"):
         """Simulate a 2D spectrogram of size Nx times Ny.
 
         Given a set of polynomial parameters defining the chromatic PSF model, a 2D spectrogram
@@ -205,7 +205,7 @@ class ChromaticPSF:
 
         .. doctest::
 
-            >>> output = s.evaluate(poly_params, mode="1D")
+            >>> output = s.build_spectrogram_image(poly_params, mode="1D")
             >>> im = plt.imshow(output, origin='lower')  # doctest: +ELLIPSIS
             >>> plt.colorbar(im)  # doctest: +ELLIPSIS
             <matplotlib.colorbar.Colorbar object at 0x...>
@@ -218,7 +218,7 @@ class ChromaticPSF:
             psf = MoffatGauss()
             s = ChromaticPSF(psf, Nx=100, Ny=20, deg=4, saturation=20000)
             poly_params = s.generate_test_poly_params()
-            output = s.evaluate(poly_params, mode="1D")
+            output = s.build_spectrogram_image(poly_params, mode="1D")
             im = plt.imshow(output, origin='lower')
             plt.colorbar(im)
             plt.show()
@@ -227,7 +227,7 @@ class ChromaticPSF:
 
         .. doctest::
 
-            >>> output = s.evaluate(poly_params, mode="2D")
+            >>> output = s.build_spectrogram_image(poly_params, mode="2D")
             >>> im = plt.imshow(output, origin='lower')  # doctest: +ELLIPSIS
             >>> plt.colorbar(im)  # doctest: +ELLIPSIS
             <matplotlib.colorbar.Colorbar object at 0x...>
@@ -240,7 +240,7 @@ class ChromaticPSF:
             psf = MoffatGauss()
             s = ChromaticPSF(psf, Nx=100, Ny=20, deg=4, saturation=20000)
             poly_params = s.generate_test_poly_params()
-            output = s.evaluate(poly_params, mode="2D")
+            output = s.build_spectrogram_image(poly_params, mode="2D")
             im = plt.imshow(output, origin='lower')
             plt.colorbar(im)
             plt.show()
@@ -351,7 +351,7 @@ class ChromaticPSF:
         >>> psf = MoffatGauss()
         >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
-        >>> data = s.evaluate(poly_params_test, mode="1D")
+        >>> data = s.build_spectrogram_image(poly_params_test, mode="1D")
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
@@ -485,7 +485,7 @@ class ChromaticPSF:
         >>> psf = MoffatGauss()
         >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=1, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
-        >>> data = s.evaluate(poly_params_test, mode="1D")
+        >>> data = s.build_spectrogram_image(poly_params_test, mode="1D")
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
@@ -817,7 +817,7 @@ class ChromaticPSF:
         >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
         >>> params = s0.generate_test_poly_params()
         >>> saturation = params[-1]
-        >>> data = s0.evaluate(params, mode="1D")
+        >>> data = s0.build_spectrogram_image(params, mode="1D")
         >>> bgd = 10*np.ones_like(data)
         >>> xx, yy = np.meshgrid(np.arange(s0.Nx), np.arange(s0.Ny))
         >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))
@@ -1013,7 +1013,7 @@ class ChromaticPSF:
         >>> params[:s0.Nx] *= 1
         >>> s0.poly_params = params
         >>> saturation = params[-1]
-        >>> data = s0.evaluate(params, mode="2D")
+        >>> data = s0.build_spectrogram_image(params, mode="2D")
         >>> bgd = 10*np.ones_like(data)
         >>> data += bgd
         >>> data = np.random.poisson(data)
@@ -1348,7 +1348,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         >>> params = s0.generate_test_poly_params()
         >>> s0.poly_params = params
         >>> saturation = params[-1]
-        >>> data = s0.evaluate(params, mode="1D")
+        >>> data = s0.build_spectrogram_image(params, mode="1D")
         >>> bgd = 10*np.ones_like(data)
         >>> data += bgd
         >>> data = np.random.poisson(data)
@@ -1480,7 +1480,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.poly_params = np.copy(poly_params)
         poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
         if self.amplitude_priors_method == "fixed":
-            self.model = self.chromatic_psf.evaluate(poly_params, mode="1D")[self.bgd_width:-self.bgd_width, :].T
+            self.model = self.chromatic_psf.build_spectrogram_image(poly_params, mode="1D")[self.bgd_width:-self.bgd_width, :].T
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
@@ -1611,7 +1611,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             >>> params[:s0.Nx] *= 10
             >>> s0.poly_params = params
             >>> saturation = params[-1]
-            >>> data = s0.evaluate(params, mode="2D")
+            >>> data = s0.build_spectrogram_image(params, mode="2D")
             >>> bgd = 10*np.ones_like(data)
             >>> data += bgd
             >>> data = np.random.poisson(data)
@@ -1734,7 +1734,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.amplitude_cov_matrix = np.copy(cov_matrix)
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         if self.amplitude_priors_method == "fixed":
-            self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
+            self.model = self.chromatic_psf.build_spectrogram_image(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
