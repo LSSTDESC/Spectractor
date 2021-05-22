@@ -1308,13 +1308,13 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.data_cov = self.err * self.err
         W = 1. / (self.err * self.err)
         # these lines make the code thinks that W is block diagonal
-        self.W = np.empty(self.Nx, dtype=np.object)
+        self.W = np.empty(self.Nx, dtype=object)
         for x in range(self.Nx):
             self.W[x] = W[:, x]
 
         # data: ordered by pixel columns
-        data = np.empty(self.Nx, dtype=np.object)
-        err = np.empty(self.Nx, dtype=np.object)
+        data = np.empty(self.Nx, dtype=object)
+        err = np.empty(self.Nx, dtype=object)
         for x in range(self.Nx):
             data[x] = self.data[:, x]
             err[x] = self.err[:, x]
