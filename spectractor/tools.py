@@ -1783,7 +1783,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=lw, label=label,
                     zorder=0, markersize=2, linestyle=linestyle)
     else:
-        ax.plot(xs, data, f'{color}-', lw=lw, label=label, linestyle=linestyle)
+        ax.plot(xs, data, color=color, lw=lw, label=label, linestyle=linestyle)
     ax.grid(True)
     if xlim is None and lambdas is not None:
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
