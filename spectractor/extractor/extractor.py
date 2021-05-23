@@ -128,6 +128,17 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.data = self.data.flatten() - self.bgd_flat
         self.err = self.err.flatten()
 
+        # create mask
+        psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(self.psf_poly_params, apply_bounds=True)
+        self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
+        psf_profile_params[:, 2] -= self.bgd_width
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, psf_profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
+        flat_spectrogram = np.sum(psf_cube.reshape(len(psf_profile_params), self.pixels[0].size), axis=0)
+        mask = flat_spectrogram / np.max(flat_spectrogram) == 0
+        self.data[mask] = 0
+        self.W[mask] = 0
+        self.mask = list(np.where(mask)[0])
+
         # design matrix
         self.M = np.zeros((self.Nx, self.data.size))
         self.M_dot_W_dot_M = np.zeros((self.Nx, self.Nx))
@@ -365,14 +376,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         #     plt.show()
 
         # Matrix filling
-        M = np.array([self.spectrum.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
-                      for x in range(self.Nx)]).T
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
+
+        #M = np.array([self.spectrum.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
+        #              for x in range(self.Nx)]).T
         if A2 > 0:
-            for x in range(self.Nx):
-                M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
-                                                                         p=profile_params_order2[x, :]).flatten()
-                if profile_params_order2[x, 1] > 1.2 * self.Nx:
-                    break
+            #for x in range(self.Nx):
+                # M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
+                #                                                         p=profile_params_order2[x, :]).flatten()
+                #if profile_params_order2[x, 1] > 1.2 * self.Nx:
+                #    break
+            psf_cube += A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2, fwhm_clip=parameters.PSF_FWHM_CLIP)
+        M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
 
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
@@ -452,8 +467,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         cmap_viridis.set_bad(color='lightgrey')
 
         data = np.copy(self.data)
-        if len(self.outliers) > 0:
-            bad_indices = self.get_bad_indices()
+        if len(self.outliers) > 0 or len(self.mask) > 0:
+            bad_indices = np.array(list(self.get_bad_indices()) + list(self.mask)).astype(int)
             data[bad_indices] = np.nan
 
         lambdas = self.spectrum.lambdas
@@ -501,6 +516,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[3, 1].remove()
             ax[3, 0].plot(self.lambdas[sub], np.nansum(data, axis=0)[sub], label='Data')
+            model[np.isnan(data)] = np.nan  # mask background values outside fitted region
             ax[3, 0].plot(self.lambdas[sub], np.nansum(model, axis=0)[sub], label='Model')
             ax[3, 0].set_ylabel('Cross spectrum')
             ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
@@ -689,7 +705,7 @@ def run_ffm_minimisation(w, method="newton"):
     w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params)
     w.spectrum.spectrogram_fit = w.model
     w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
-    w.spectrum.header['CHI2_FIT'] = w.costs[-1] / w.data.size
+    w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
     w.spectrum.header['PIXSHIFT'] = w.p[2]
     w.spectrum.header['D2CCD'] = w.p[1]
     w.spectrum.header['A2_FIT'] = w.p[0]
