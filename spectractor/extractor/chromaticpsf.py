@@ -1,7 +1,9 @@
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from tqdm import tqdm
+import copy
 
 from scipy.interpolate import interp1d
 
@@ -264,6 +266,22 @@ class ChromaticPSF:
             for x in range(self.Nx):
                 output += self.psf.evaluate(pixels, p=profile_params[x, :])
         return np.clip(output, 0, self.saturation)
+
+    def build_psf_cube(self, pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP):
+        Ny_pix, Nx_pix = pixels[0].shape
+        psf_cube = np.zeros((len(profile_params), Ny_pix, Nx_pix))
+        fwhms = self.table["fwhm"]
+        for x in range(len(profile_params)):
+            xc, yc = profile_params[x, 1:3]
+            if xc + fwhm_clip * fwhms[x] > Nx_pix or xc - fwhm_clip * fwhms[x] < 0:
+                continue
+            xmin = max(0, int(xc - max(fwhm_clip * fwhms[x], parameters.PIXWIDTH_SIGNAL)))
+            xmax = min(Nx_pix, int(xc + max(parameters.PIXWIDTH_SIGNAL, fwhm_clip * fwhms[x])))
+            ymin = max(0, int(yc - max(parameters.PIXWIDTH_SIGNAL, fwhm_clip * fwhms[x])))
+            ymax = min(Ny_pix, int(yc + max(parameters.PIXWIDTH_SIGNAL, fwhm_clip * fwhms[x])))
+            # print(x, xc, yc, xmin, xmax, ymin, ymax, fwhms[x])
+            psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], p=profile_params[x, :])
+        return psf_cube
 
     def fill_table_with_profile_params(self, profile_params):
         """
@@ -933,7 +951,7 @@ class ChromaticPSF:
             w = PSFFitWorkspace(psf, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False)
             try:
-                run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=2, verbose=False,
+                run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=1, verbose=False,
                                                 fix=w.fixed)
             except:
                 pass
@@ -1192,6 +1210,10 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.pixels = np.arange(self.data.shape[0])
         self.err = np.copy(self.err[self.bgd_width:-self.bgd_width, :])
         self.Ny, self.Nx = self.data.shape
+        self.poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
+        self.profile_params = self.chromatic_psf.from_poly_params_to_profile_params(self.poly_params, apply_bounds=True)
+        if np.sum(self.chromatic_psf.table["fwhm"]) == 0:
+            self.chromatic_psf.from_profile_params_to_shape_params(self.profile_params)
 
         # update the bounds
         self.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
@@ -1233,6 +1255,11 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
 
     def plot_fit(self):
+        cmap_bwr = copy.copy(cm.get_cmap('bwr'))
+        cmap_bwr.set_bad(color='lightgrey')
+        cmap_viridis = copy.copy(cm.get_cmap('viridis'))
+        cmap_viridis.set_bad(color='lightgrey')
+
         data = np.copy(self.data)
         model = np.copy(self.model)
         err = np.copy(self.err)
@@ -1241,25 +1268,28 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             model = np.array([model[x] for x in range(self.Nx)], dtype=float).T
             err = np.array([err[x] for x in range(self.Nx)], dtype=float).T
         if isinstance(self, ChromaticPSF2DFitWorkspace):
+            if len(self.outliers) > 0 or len(self.mask) > 0:
+                bad_indices = np.array(list(self.get_bad_indices()) + list(self.mask)).astype(int)
+                data[bad_indices] = np.nan
             data = data.reshape((self.Ny, self.Nx))
             model = model.reshape((self.Ny, self.Nx))
             err = err.reshape((self.Ny, self.Nx))
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), gridspec_kw=gs_kw)
-        norm = np.max(data)
+        norm = np.nanmax(data)
         plot_image_simple(ax[1, 0], data=model / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
-                          units='1/max(data)')
+                          units='1/max(data)', cmap=cmap_viridis)
         ax[1, 0].set_title("Model", fontsize=10, loc='center', color='white', y=0.8)
         plot_image_simple(ax[0, 0], data=data / norm, title='Data', aspect='auto',
-                          cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)')
+                          cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)', cmap=cmap_viridis)
         ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
         residuals = (data - model)
         # residuals_err = self.spectrum.spectrogram_err / self.model
         norm = err
         residuals /= norm
-        std = float(np.std(residuals))
+        std = float(np.nanstd(residuals))
         plot_image_simple(ax[2, 0], data=residuals, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
-                          aspect='auto', cax=ax[2, 1], units='', cmap="bwr")
+                          aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
         ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
         ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals):.3f}\nstd={np.std(residuals):.3f}',
                       horizontalalignment='left', verticalalignment='bottom',
@@ -1269,9 +1299,10 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
         ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
         ax[3, 1].remove()
-        ax[3, 0].errorbar(np.arange(self.Nx), data.sum(axis=0), yerr=np.sqrt(np.sum(err ** 2, axis=0)),
+        ax[3, 0].errorbar(np.arange(self.Nx), np.nansum(data, axis=0), yerr=np.sqrt(np.nansum(err ** 2, axis=0)),
                           label='Data', fmt='k.', markersize=0.1)
-        ax[3, 0].plot(np.arange(self.Nx), model.sum(axis=0), label='Model')
+        model[np.isnan(data)] = np.nan  # mask background values outside fitted region
+        ax[3, 0].plot(np.arange(self.Nx), np.nansum(model, axis=0), label='Model')
         ax[3, 0].set_ylabel('Transverse sum')
         ax[3, 0].set_xlabel(parameters.PLOT_XLABEL)
         ax[3, 0].legend(fontsize=7)
@@ -1506,6 +1537,14 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.data = self.data.flatten()
         self.err = self.err.flatten()
 
+        # create a mask
+        psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, self.profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
+        flat_spectrogram = np.sum(psf_cube.reshape(len(self.profile_params), self.pixels[0].size), axis=0)
+        mask = flat_spectrogram / np.max(flat_spectrogram) == 0
+        self.data[mask] = 0
+        self.W[mask] = 0
+        self.mask = list(np.where(mask)[0])
+
         # regularisation matrices
         self.reg = parameters.PSF_FIT_REG_PARAM
         if amplitude_priors_method == "psf1d":
@@ -1679,8 +1718,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # profile_params[:self.Nx, 2] -= self.bgd_width
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
-            M = np.array([self.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
-                          for x in range(self.Nx)]).T
+            psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
+            M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
             W_dot_M = np.array([M[:, x] * self.W for x in range(self.Nx)]).T
             # Compute the minimizing amplitudes
             M_dot_W_dot_M = M.T @ W_dot_M

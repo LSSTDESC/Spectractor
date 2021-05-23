@@ -125,6 +125,7 @@ PSF_TYPE = "Moffat"  # the PSF model: Moffat or MoffatGauss
 PSF_POLY_ORDER = 2  # the order of the polynomials to model wavelength dependence of the PSF shape parameters
 PSF_FIT_REG_PARAM = 0.01  # regularisation parameter for the chisq minimisation to extract the spectrum
 PSF_PIXEL_STEP_TRANSVERSE_FIT = 10  # step size in pixels for the first transverse PSF1D fit
+PSF_FWHM_CLIP = 2  # PSF is not evaluated outside a region larger than PSF_FWHM_CLIP*fwhm pixels
 
 # Detection line algorithm
 CALIB_BGD_ORDER = 3  # order of the background polynome to fit
