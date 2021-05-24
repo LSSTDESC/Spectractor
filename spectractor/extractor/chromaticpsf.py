@@ -1025,7 +1025,7 @@ class ChromaticPSF:
 
         Build a mock spectrogram with random Poisson noise using the full 2D PSF model:
 
-        >>> psf = Moffat()
+        >>> psf = Moffat(clip=False)
         >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=10000000)
         >>> params = s0.generate_test_poly_params()
         >>> params[:s0.Nx] *= 1
@@ -1657,7 +1657,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
         .. doctest::
 
-            >>> psf = Moffat()
+            >>> psf = Moffat(clip=False)
             >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=100000)
             >>> params = s0.generate_test_poly_params()
             >>> params[:s0.Nx] *= 10

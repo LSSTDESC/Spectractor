@@ -1009,7 +1009,7 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     # fit a 2D star profile close to this position
     # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2Ds
     # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
-    psf = Moffat()
+    psf = Moffat(clip=True)
     total_flux = np.sum(sub_image_subtracted)
     psf.p[:3] = [total_flux, avX, avY]
     psf.p[-1] = image.saturation

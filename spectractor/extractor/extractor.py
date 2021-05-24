@@ -974,7 +974,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    psf = load_PSF(psf_type=parameters.PSF_TYPE, target=image.target)
+    psf = load_PSF(psf_type=parameters.PSF_TYPE, target=image.target, clip=False)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
                      deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
     verbose = copy.copy(parameters.VERBOSE)
