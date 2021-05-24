@@ -273,8 +273,8 @@ class ChromaticPSF:
         fwhms = self.table["fwhm"]
         for x in range(len(profile_params)):
             xc, yc = profile_params[x, 1:3]
-            if xc + fwhm_clip * fwhms[x] > Nx_pix or xc - fwhm_clip * fwhms[x] < 0:
-                continue
+            # if xc + fwhm_clip * fwhms[x] > Nx_pix or xc - fwhm_clip * fwhms[x] < 0:
+            #     continue
             xmin = max(0, int(xc - max(fwhm_clip * fwhms[x], parameters.PIXWIDTH_SIGNAL)))
             xmax = min(Nx_pix, int(xc + max(parameters.PIXWIDTH_SIGNAL, fwhm_clip * fwhms[x])))
             ymin = max(0, int(yc - max(parameters.PIXWIDTH_SIGNAL, fwhm_clip * fwhms[x])))
@@ -1104,10 +1104,14 @@ class ChromaticPSF:
                                            live_fit=live_fit)
             run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
         elif mode == "2D":
+            # first shot to set the mask
             w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                            live_fit=live_fit)
-            # run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
+            run_minimisation_sigma_clipping(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50,
+                                            fix=w.fixed, sigma_clip=10, niter_clip=1, verbose=verbose)
+            w.set_mask(poly_params=w.poly_params)
+            # precise fit with sigma clipping
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
                                             fix=w.fixed, sigma_clip=10, niter_clip=3, verbose=verbose)
         else:
@@ -1211,9 +1215,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.err = np.copy(self.err[self.bgd_width:-self.bgd_width, :])
         self.Ny, self.Nx = self.data.shape
         self.poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
-        self.profile_params = self.chromatic_psf.from_poly_params_to_profile_params(self.poly_params, apply_bounds=True)
-        if np.sum(self.chromatic_psf.table["fwhm"]) == 0:
-            self.chromatic_psf.from_profile_params_to_shape_params(self.profile_params)
 
         # update the bounds
         self.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
@@ -1291,7 +1292,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         plot_image_simple(ax[2, 0], data=residuals, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
                           aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
         ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
-        ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals):.3f}\nstd={np.std(residuals):.3f}',
+        ax[2, 0].text(0.05, 0.05, f'mean={np.nanmean(residuals):.3f}\nstd={np.nanstd(residuals):.3f}',
                       horizontalalignment='left', verticalalignment='bottom',
                       color='black', transform=ax[2, 0].transAxes)
         ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
@@ -1538,12 +1539,9 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.err = self.err.flatten()
 
         # create a mask
-        psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, self.profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
-        flat_spectrogram = np.sum(psf_cube.reshape(len(self.profile_params), self.pixels[0].size), axis=0)
-        mask = flat_spectrogram / np.max(flat_spectrogram) == 0
-        self.data[mask] = 0
-        self.W[mask] = 0
-        self.mask = list(np.where(mask)[0])
+        self.data_before_mask = np.copy(self.data)
+        self.W_before_mask = np.copy(self.W)
+        self.set_mask()
 
         # regularisation matrices
         self.reg = parameters.PSF_FIT_REG_PARAM
@@ -1558,6 +1556,21 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             self.L = L
             self.Q = L.T @ self.U.T @ self.U @ L
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
+
+    def set_mask(self, poly_params=None):
+        if poly_params is None:
+            poly_params = self.poly_params
+        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
+        if np.sum(self.chromatic_psf.table["fwhm"]) == 0:
+            self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
+        psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
+        flat_spectrogram = np.sum(psf_cube.reshape(len(profile_params), self.pixels[0].size), axis=0)
+        mask = flat_spectrogram / np.max(flat_spectrogram) == 0
+        self.data = np.copy(self.data_before_mask)
+        self.W = np.copy(self.W_before_mask)
+        self.data[mask] = 0
+        self.W[mask] = 0
+        self.mask = list(np.where(mask)[0])
 
     def simulate(self, *shape_params):
         r"""
