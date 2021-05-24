@@ -1482,7 +1482,7 @@ class RegFitWorkspace(FitWorkspace):
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
         self.w.amplitude_params_err = np.array([np.sqrt(cov[x, x]) for x in range(cov.shape[0])])
-        self.G = self.chisquare / (self.w.data.size - np.trace(self.resolution)) ** 2
+        self.G = self.chisquare / ((self.w.data.size - len(self.w.mask) - len(self.w.outliers)) - np.trace(self.resolution)) ** 2
         return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
     def plot_fit(self):
