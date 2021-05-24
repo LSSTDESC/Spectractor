@@ -273,8 +273,10 @@ class ChromaticPSF:
         fwhms = self.table["fwhm"]
         for x in range(len(profile_params)):
             xc, yc = profile_params[x, 1:3]
-            # if xc + fwhm_clip * fwhms[x] > Nx_pix or xc - fwhm_clip * fwhms[x] < 0:
-            #     continue
+            if xc < - fwhm_clip * fwhms[x]:
+                continue
+            if xc > Nx_pix + fwhm_clip * fwhms[x]:
+                break
             xmin = max(0, int(xc - max(fwhm_clip * fwhms[x], parameters.PIXWIDTH_SIGNAL)))
             xmax = min(Nx_pix, int(xc + max(parameters.PIXWIDTH_SIGNAL, fwhm_clip * fwhms[x])))
             ymin = max(0, int(yc - max(parameters.PIXWIDTH_SIGNAL, fwhm_clip * fwhms[x])))
@@ -1216,6 +1218,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.err = np.copy(self.err[self.bgd_width:-self.bgd_width, :])
         self.Ny, self.Nx = self.data.shape
         self.poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
+        self.data_before_mask = np.copy(self.data)
 
         # update the bounds
         self.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
@@ -1262,7 +1265,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         cmap_viridis = copy.copy(cm.get_cmap('viridis'))
         cmap_viridis.set_bad(color='lightgrey')
 
-        data = np.copy(self.data)
+        data = np.copy(self.data_before_mask)
         model = np.copy(self.model)
         err = np.copy(self.err)
         if isinstance(self, ChromaticPSF1DFitWorkspace):
@@ -1352,6 +1355,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
             data[x] = self.data[:, x]
             err[x] = self.err[:, x]
         self.data = data
+        self.data_before_mask = np.copy(data)
         self.err = err
         self.pixels = self.pixels.T
 
@@ -1729,9 +1733,9 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             # Matrix filling
             psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
             M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
-            W_dot_M = np.array([M[:, x] * self.W for x in range(self.Nx)]).T
+            M_dot_W = M.T * self.W
             # Compute the minimizing amplitudes
-            M_dot_W_dot_M = M.T @ W_dot_M
+            M_dot_W_dot_M = M_dot_W @ M
             if self.amplitude_priors_method != "psf1d":
                 try:
                     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))

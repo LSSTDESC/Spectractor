@@ -127,12 +127,16 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # flat data for fitworkspace
         self.data = self.data.flatten() - self.bgd_flat
         self.err = self.err.flatten()
+        self.data_before_mask = np.copy(self.data)
+        self.W_before_mask = np.copy(self.W)
 
         # create mask
-        psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(self.psf_poly_params, apply_bounds=True)
+        psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(self.psf_poly_params,
+                                                                                            apply_bounds=True)
         self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
         psf_profile_params[:, 2] -= self.bgd_width
-        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, psf_profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, psf_profile_params,
+                                                              fwhm_clip=parameters.PSF_FWHM_CLIP)
         flat_spectrogram = np.sum(psf_cube.reshape(len(psf_profile_params), self.pixels[0].size), axis=0)
         mask = flat_spectrogram / np.max(flat_spectrogram) == 0
         self.data[mask] = 0
@@ -298,7 +302,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Distance in x and y with respect to the true order 0 position at lambda_ref
         Dx = np.arange(self.Nx) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
         Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        distance = np.sign(Dx)*np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
+        distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
         self.spectrum.chromatic_psf.table["Dy_disp_axis"] = Dy_disp_axis
         self.spectrum.chromatic_psf.table["Dx"] = Dx
 
@@ -378,21 +382,24 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Matrix filling
         psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
 
-        #M = np.array([self.spectrum.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
+        # M = np.array([self.spectrum.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
         #              for x in range(self.Nx)]).T
         if A2 > 0:
-            #for x in range(self.Nx):
-                # M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
-                #                                                         p=profile_params_order2[x, :]).flatten()
-                #if profile_params_order2[x, 1] > 1.2 * self.Nx:
-                #    break
-            psf_cube += A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2, fwhm_clip=parameters.PSF_FWHM_CLIP)
+            # for x in range(self.Nx):
+            # M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
+            #                                                         p=profile_params_order2[x, :]).flatten()
+            # if profile_params_order2[x, 1] > 1.2 * self.Nx:
+            #    break
+            #psf_cube += A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
+            #                                                            fwhm_clip=parameters.PSF_FWHM_CLIP)
+            psf_cube2 = A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2, fwhm_clip=parameters.PSF_FWHM_CLIP)
+            psf_cube += psf_cube2
+            #M += psf_cube2.reshape(len(profile_params), self.pixels[0].size).T  # flattening
         M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
-
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
-            W_dot_M = np.array([M[:, x] * self.W for x in range(self.Nx)]).T
-            M_dot_W_dot_M = M.T @ W_dot_M
+            M_dot_W = M.T * self.W
+            M_dot_W_dot_M = M_dot_W @ M
             if self.amplitude_priors_method != "spectrum":
                 try:
                     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
@@ -466,7 +473,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         cmap_viridis = copy.copy(cm.get_cmap('viridis'))
         cmap_viridis.set_bad(color='lightgrey')
 
-        data = np.copy(self.data)
+        data = np.copy(self.data_before_mask)
         if len(self.outliers) > 0 or len(self.mask) > 0:
             bad_indices = np.array(list(self.get_bad_indices()) + list(self.mask)).astype(int)
             data[bad_indices] = np.nan
@@ -936,7 +943,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Roughly estimates the wavelengths and set start 0 nm before parameters.LAMBDA_MIN
     # and end 0 nm after parameters.LAMBDA_MAX
     if spectrum.order < 0:
-        distance = np.sign(spectrum.order)*(np.arange(Nx) - image.target_pixcoords_rotated[0])
+        distance = np.sign(spectrum.order) * (np.arange(Nx) - image.target_pixcoords_rotated[0])
         lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords, order=spectrum.order)
         lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MIN)))
         lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
