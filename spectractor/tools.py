@@ -23,7 +23,10 @@ from spectractor.config import set_logger
 from spectractor import parameters
 from math import floor
 
+from numba import njit
 
+
+@njit(fastmath=True, cache=True)
 def gauss(x, A, x0, sigma):
     """Evaluate the Gaussian function.
 
@@ -56,6 +59,7 @@ def gauss(x, A, x0, sigma):
     return A * np.exp(-(x - x0) * (x - x0) / (2 * sigma * sigma))
 
 
+@njit(fastmath=True, cache=True)
 def gauss_jacobian(x, A, x0, sigma):
     """Compute the Jacobian matrix of the Gaussian function.
 
@@ -80,15 +84,17 @@ def gauss_jacobian(x, A, x0, sigma):
 
     >>> x = np.arange(50)
     >>> jac = gauss_jacobian(x, 10, 25, 3)
-    >>> print(jac.shape)
+    >>> print(np.array(jac).T.shape)
     (50, 3)
     """
     dA = gauss(x, A, x0, sigma) / A
     dx0 = A * (x - x0) / (sigma * sigma) * dA
     dsigma = A * (x - x0) * (x - x0) / (sigma ** 3) * dA
-    return np.array([dA, dx0, dsigma]).T
+    # return np.array([dA, dx0, dsigma]).T
+    return dA, dx0, dsigma
 
 
+@njit(fastmath=True, cache=True)
 def line(x, a, b):
     return a * x + b
 
@@ -137,7 +143,9 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
 
         >>> assert np.all(np.isclose(p,popt))
     """
-    popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds, tr_solver='exact', jac=gauss_jacobian,
+    def gauss_jacobian_wrapper(*params):
+        return np.array(gauss_jacobian(*params)).T
+    popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds, tr_solver='exact', jac=gauss_jacobian_wrapper,
                            sigma=sigma, method='dogbox', verbose=0, xtol=1e-20, ftol=1e-20)
     return popt, pcov
 
@@ -317,7 +325,7 @@ def multigauss_and_bgd_jacobian(x, *params):
         c[k] = 1
         out.append(np.polynomial.legendre.legval(x_norm, c))
     for k in range((len(params) - bgd_nparams) // 3):
-        jac = gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]).T
+        jac = np.array(gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]))
         for j in jac:
             out.append(list(j))
     return np.array(out).T
