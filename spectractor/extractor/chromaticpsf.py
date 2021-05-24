@@ -987,6 +987,7 @@ class ChromaticPSF:
             self.table['flux_sum'][x] = np.sum(signal)
         self.poly_params = self.from_profile_params_to_poly_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
+        self.cov_matrix = np.diag(1 / np.array(self.table['flux_err']) ** 2)
 
     def fit_chromatic_psf(self, data, bgd_model_func=None, data_errors=None, mode="1D",
                           amplitude_priors_method="noprior", verbose=False, live_fit=False):
@@ -1713,11 +1714,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             :hide:
 
             >>> assert mod is not None
-            >>> w = ChromaticPSF2DFitWorkspace(s0, data, data_errors, bgd_model_func=bgd_model_func,
-            ... amplitude_priors_method="fixed", verbose=True)
-            >>> y, mod, mod_err = w.simulate(s0.poly_params[s0.Nx:])
-            >>> w.plot_fit()
-            >>> assert np.abs(np.mean((w.amplitude_params-s0.poly_params[:s0.Nx])/w.amplitude_params_err)) < 0.05
 
         """
         # linear regression for the amplitude parameters
@@ -1779,13 +1775,13 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             cov_matrix = np.diag(err2)
         poly_params[:self.Nx] = amplitude_params
         self.poly_params = np.copy(poly_params)
-        poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
         self.amplitude_params = np.copy(amplitude_params)
         # TODO: propagate and marginalize over the shape parameter uncertainties ?
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
         self.amplitude_cov_matrix = np.copy(cov_matrix)
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         if self.amplitude_priors_method == "fixed":
+            poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
             self.model = self.chromatic_psf.build_spectrogram_image(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
