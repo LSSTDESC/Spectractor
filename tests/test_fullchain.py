@@ -86,7 +86,7 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     # load test and make image simulation
     load_config("./config/ctio.ini")
     if not os.path.isfile(sim_image):
-        make_image()
+       make_image()
     image = Image(sim_image)
     lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
     amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
@@ -145,9 +145,9 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
     w = SpectrumFitWorkspace(spectrum_file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                              burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
     run_spectrum_minimisation(w, method="newton")
-    nsigma = 5
-    labels = ["A1_T", "OZONE_T", "PWV_T", "VAOD_T"]
-    indices = [0, 2, 3, 4]
+    nsigma = 3
+    labels = ["OZONE_T", "PWV_T"]
+    indices = [2, 3]
     assert w.costs[-1]/w.data.size < 0.9
     for i, l in zip(indices, labels):
         spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.cov[i, i]):.3f} "
