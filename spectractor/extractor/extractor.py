@@ -398,8 +398,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
-            M_dot_W = M.T * self.W
-            M_dot_W_dot_M = M_dot_W @ M
+            M_dot_W = M.T * np.sqrt(self.W)
+            M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             if self.amplitude_priors_method != "spectrum":
                 try:
                     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
@@ -427,11 +427,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                     pass
             else:
                 M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
-                try:
-                    L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-                    cov_matrix = L.T @ L
-                except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
+                # try:
+                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
+                #     cov_matrix = L.T @ L
+                # except np.linalg.LinAlgError:
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
                 amplitude_params = cov_matrix @ (M.T @ W_dot_data + self.reg * self.Q_dot_A0)
             self.M_dot_W_dot_M = M_dot_W_dot_M
         else:

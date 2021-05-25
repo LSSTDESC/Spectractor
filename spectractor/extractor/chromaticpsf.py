@@ -1733,15 +1733,15 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             # Matrix filling
             psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
             M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
-            M_dot_W = M.T * self.W
+            M_dot_W = M.T * np.sqrt(self.W)
             # Compute the minimizing amplitudes
-            M_dot_W_dot_M = M_dot_W @ M
+            M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             if self.amplitude_priors_method != "psf1d":
-                try:
-                    L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-                    cov_matrix = L.T @ L
-                except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M)
+                # try:
+                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
+                #     cov_matrix = L.T @ L
+                # except np.linalg.LinAlgError:
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M)
                 amplitude_params = cov_matrix @ (M.T @ (self.W * self.data))
                 if self.amplitude_priors_method == "positive":
                     amplitude_params[amplitude_params < 0] = 0
@@ -1763,11 +1763,11 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                     pass
             else:
                 M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
-                try:
-                    L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-                    cov_matrix = L.T @ L
-                except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
+                # try:
+                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
+                #     cov_matrix = L.T @ L
+                # except np.linalg.LinAlgError:
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
                 amplitude_params = cov_matrix @ (M.T @ (self.W * self.data) + self.reg * self.Q_dot_A0)
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
