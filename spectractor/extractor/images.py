@@ -122,7 +122,7 @@ class Image(object):
         self.my_logger = set_logger(self.__class__.__name__)
         if config != "":
             load_config(config)
-        if not os.path.isfile(file_name):
+        if not os.path.isfile(file_name) and parameters.CALLING_CODE != 'LSST_DM':
             raise FileNotFoundError(f"File {file_name} does not exist.")
         self.file_name = file_name
         self.units = 'ADU'
