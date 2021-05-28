@@ -87,7 +87,8 @@ class Image(object):
 
     """
 
-    def __init__(self, file_name, target_label="", disperser_label="", config=""):
+    def __init__(self, file_name, *, target_label="", disperser_label="",
+                 config="", **kwargs):
         """
         The image class contains all the features necessary to load an image and extract a spectrum.
 
@@ -159,6 +160,7 @@ class Image(object):
             # data provided by the LSST shim, just instantiate objects
             # necessary for the following code not to fail
             self.header = fits.header.Header()
+            self.filter_label = kwargs.get('filter_label', '')
         # Load the target if given
         self.target = None
         self.target_pixcoords = None
