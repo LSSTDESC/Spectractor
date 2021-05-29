@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from scipy.interpolate import interp1d
+from scipy import sparse
 import time
 
 from spectractor import parameters
@@ -141,6 +142,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         mask = flat_spectrogram / np.max(flat_spectrogram) == 0
         self.data[mask] = 0
         self.W[mask] = 0
+        self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.sparse_indices = None
         self.mask = list(np.where(mask)[0])
 
         # design matrix
@@ -380,32 +383,30 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         #     plt.show()
 
         # Matrix filling
-        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
-
-        # M = np.array([self.spectrum.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
-        #              for x in range(self.Nx)]).T
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
         if A2 > 0:
             # for x in range(self.Nx):
             # M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
             #                                                         p=profile_params_order2[x, :]).flatten()
             # if profile_params_order2[x, 1] > 1.2 * self.Nx:
             #    break
-            #psf_cube += A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
-            #                                                            fwhm_clip=parameters.PSF_FWHM_CLIP)
-            psf_cube2 = A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2, fwhm_clip=parameters.PSF_FWHM_CLIP)
+            psf_cube2 = A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
+                                                                        fwhm_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
             psf_cube += psf_cube2
-            #M += psf_cube2.reshape(len(profile_params), self.pixels[0].size).T  # flattening
         M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
+        if self.sparse_indices is None:
+            self.sparse_indices = np.where(M > 0)
+        M = sparse.csr_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
-            M_dot_W = M.T * np.sqrt(self.W)
+            M_dot_W = M.T * self.sqrtW
             M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             if self.amplitude_priors_method != "spectrum":
-                try:
-                    L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-                    cov_matrix = L.T @ L
-                except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M)
+                # try:  # slower
+                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
+                #     cov_matrix = L.T @ L
+                # except np.linalg.LinAlgError:
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M)
                 amplitude_params = cov_matrix @ (M.T @ W_dot_data)
                 if self.amplitude_priors_method == "positive":
                     amplitude_params[amplitude_params < 0] = 0
@@ -427,13 +428,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                     pass
             else:
                 M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
-                # try:
+                # try:  # slower
                 #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
                 #     cov_matrix = L.T @ L
                 # except np.linalg.LinAlgError:
                 cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
                 amplitude_params = cov_matrix @ (M.T @ W_dot_data + self.reg * self.Q_dot_A0)
             self.M_dot_W_dot_M = M_dot_W_dot_M
+            amplitude_params = np.asarray(amplitude_params).reshape(-1)
         else:
             amplitude_params = np.copy(self.amplitude_priors)
             err2 = np.copy(amplitude_params)
@@ -449,7 +451,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.amplitude_cov_matrix = np.copy(cov_matrix)
 
         # Compute the model
-        self.model = (M @ amplitude_params)  # .reshape((self.Ny, self.Nx))
+        self.model = M @ amplitude_params
         self.model_err = np.zeros_like(self.model)
 
         return self.pixels, self.model, self.model_err
@@ -636,10 +638,8 @@ def run_ffm_minimisation(w, method="newton"):
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {w.input_labels}")
         epsilon = 1e-4 * guess
         epsilon[epsilon == 0] = 1e-4
-        fixed = np.copy(w.fixed)
 
-        w.fixed = np.copy(fixed)
-        run_minimisation_sigma_clipping(w, "newton", epsilon, fixed, xtol=1e-5,
+        run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
                                         ftol=1 / w.data.size, sigma_clip=10, niter_clip=3)
 
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")

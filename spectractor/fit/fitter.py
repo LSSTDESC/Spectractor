@@ -1473,6 +1473,8 @@ class RegFitWorkspace(FitWorkspace):
             A = cov @ (self.w.M.T @ (self.w.W * self.w.data) + reg * self.w.Q_dot_A0)
         else:
             A = cov @ (self.w.M.T @ (self.w.W @ self.w.data) + reg * self.w.Q_dot_A0)
+        if A.ndim == 2:  # ndim == 2 when A comes from a sparse matrix computation
+            A = np.asarray(A).reshape(-1)
         self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
         diff = self.w.data - self.w.M @ A
         if self.w.W.ndim == 1:

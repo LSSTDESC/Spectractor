@@ -6,6 +6,7 @@ from tqdm import tqdm
 import copy
 
 from scipy.interpolate import interp1d
+from scipy import sparse
 
 from astropy.table import Table
 
@@ -267,9 +268,9 @@ class ChromaticPSF:
                 output += self.psf.evaluate(pixels, p=profile_params[x, :])
         return np.clip(output, 0, self.saturation)
 
-    def build_psf_cube(self, pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP):
+    def build_psf_cube(self, pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP, dtype="float64"):
         Ny_pix, Nx_pix = pixels[0].shape
-        psf_cube = np.zeros((len(profile_params), Ny_pix, Nx_pix))
+        psf_cube = np.zeros((len(profile_params), Ny_pix, Nx_pix), dtype=dtype)
         fwhms = self.table["fwhm"]
         for x in range(len(profile_params)):
             xc, yc = profile_params[x, 1:3]
@@ -1542,10 +1543,12 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W = self.W.flatten()
         self.data = self.data.flatten()
         self.err = self.err.flatten()
+        self.sparse_indices = None
 
         # create a mask
         self.data_before_mask = np.copy(self.data)
         self.W_before_mask = np.copy(self.W)
+        self.sqrtW = np.sqrt(sparse.diags(self.W))
         self.set_mask()
 
         # regularisation matrices
@@ -1575,6 +1578,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W = np.copy(self.W_before_mask)
         self.data[mask] = 0
         self.W[mask] = 0
+        self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.sparse_indices = None
         self.mask = list(np.where(mask)[0])
 
     def simulate(self, *shape_params):
@@ -1733,7 +1738,9 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             # Matrix filling
             psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
             M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
-            M_dot_W = M.T * np.sqrt(self.W)
+            self.sparse_indices = np.where(M > 0)
+            M = sparse.csr_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
+            M_dot_W = M.T * self.sqrtW
             # Compute the minimizing amplitudes
             M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             if self.amplitude_priors_method != "psf1d":
@@ -1769,9 +1776,10 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                 # except np.linalg.LinAlgError:
                 cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
                 amplitude_params = cov_matrix @ (M.T @ (self.W * self.data) + self.reg * self.Q_dot_A0)
+            amplitude_params = np.asarray(amplitude_params).reshape(-1)
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
-            self.model = (M @ amplitude_params)  #.reshape((self.Ny, self.Nx))
+            self.model = M @ amplitude_params
         else:
             amplitude_params = np.copy(self.amplitude_priors)
             err2 = np.copy(amplitude_params)
