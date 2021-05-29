@@ -3,7 +3,7 @@ from numpy.testing import run_module_suite
 from spectractor import parameters
 from spectractor.extractor.extractor import Spectractor
 from spectractor.logbook import LogBook
-from spectractor.config import load_config
+from spectractor.config import load_config, apply_rebinning_to_parameters
 import os
 import numpy as np
 
@@ -29,6 +29,7 @@ def test_extractor_ctio():
     parameters.VERBOSE = True
     parameters.DEBUG = True
     parameters.CCD_REBIN = 2
+    apply_rebinning_to_parameters()
 
     for file_name in file_names:
         tag = file_name.split('/')[-1].replace("sim", "reduc")
@@ -112,20 +113,23 @@ def extractor_auxtel():
     # file_names = ['tests/data/calexp_2020031200313-EMPTY_ronchi90lpmm-det000.fits']  # image 2
     # file_names = ['tests/data/calexp_2020022100767-EMPTY_ronchi90lpmm-det000.fits']  # image 3
     # file_names = ['tests/data//calexp_2020021800154-EMPTY_ronchi90lpmm-det000.fits']  # image 4
+    file_names = ['tests/data/Cor_holo4_003_empty_HD60753_2021-02-18_585.fits']  # ronchi170lpmm
     # tests/data/auxtel_first_light-1.fits']
 
     # logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    xpos = 1600
-    ypos = 2293
-    target_label = "HD107696"
+    #xpos = 1600
+    #ypos = 2293
+    #target_label = "HD107696"
 
-    for config in ['./config/auxtel_quicklook.ini', './config/auxtel.ini']:
+    for config in ['./config/auxtel.ini']:  #'./config/auxtel_quicklook.ini',
         for file_name in file_names:
             # tag = file_name.split('/')[-1]
             # disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-            spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
+            #spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
+            #                       config=config, atmospheric_lines=True)
+            spectrum = Spectractor(file_name, './outputs/', target_label="", guess=None,
                                    config=config, atmospheric_lines=True)
             assert spectrum.data is not None
             assert np.sum(spectrum.data) > 1e-14
