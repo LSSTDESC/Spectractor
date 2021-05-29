@@ -18,7 +18,7 @@ from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, fit_poly1d, plot_compass_simple,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
-                               set_wcs_file_name, load_wcs_from_file, imgslice)
+                               set_wcs_file_name, load_wcs_from_file, imgslice, rebin)
 
 
 class Image(object):
@@ -183,6 +183,15 @@ class Image(object):
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
             self.header['REDSHIFT'] = str(self.target.redshift)
+
+    def rebin(self):
+        """Rebin the image and reset some related parameters.
+
+        """
+        new_shape = np.asarray(self.data.shape) // parameters.CCD_REBIN
+        self.data = rebin(self.data, new_shape)
+        self.stat_errors = np.sqrt(rebin(self.stat_errors ** 2, new_shape))
+        self.target_guess = np.asarray(self.target_guess) / parameters.CCD_REBIN
 
     def load_image(self, file_name):
         """

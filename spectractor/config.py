@@ -106,6 +106,9 @@ def load_config(config_filename):
                                    * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
 
+    if parameters.CCD_REBIN > 1:
+        apply_rebinning_to_parameters()
+
     # check consistency
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
         sys.exit(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
@@ -117,6 +120,22 @@ def load_config(config_filename):
                 value = config.get(section, options)
                 par = getattr(parameters, options.upper())
                 print(f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}")
+
+
+def apply_rebinning_to_parameters():
+    # Apply rebinning
+    parameters.PIXDIST_BACKGROUND //= parameters.CCD_REBIN
+    parameters.PIXWIDTH_BOXSIZE = max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN)
+    parameters.PIXWIDTH_BACKGROUND //= parameters.CCD_REBIN
+    parameters.PIXWIDTH_SIGNAL //= parameters.CCD_REBIN
+    parameters.CCD_IMSIZE //= parameters.CCD_REBIN
+    parameters.CCD_PIXEL2MM *= parameters.CCD_REBIN
+    parameters.CCD_PIXEL2ARCSEC *= parameters.CCD_REBIN
+    parameters.XWINDOW //= parameters.CCD_REBIN
+    parameters.YWINDOW //= parameters.CCD_REBIN
+    parameters.XWINDOW_ROT //= parameters.CCD_REBIN
+    parameters.YWINDOW_ROT //= parameters.CCD_REBIN
+    parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT //= parameters.CCD_REBIN
 
 
 def set_logger(logger):

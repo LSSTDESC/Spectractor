@@ -14,7 +14,7 @@ from spectractor.extractor.spectrum import Spectrum, calibrate_spectrum
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
-from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple, rebin
+from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 from spectractor.fit.fitter import run_minimisation, run_minimisation_sigma_clipping, RegFitWorkspace, FitWorkspace
 
@@ -799,7 +799,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Use fast mode
     if parameters.CCD_REBIN > 1:
-        image = set_fast_mode(image)
+        image.rebin()
         if parameters.DEBUG:
             image.plot_image(scale='symlog', target_pixcoords=image.target_guess)
 
@@ -1267,32 +1267,3 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     plt.show()
 
 
-def set_fast_mode(image):
-    """Set the parameters for a fast mode run of Spectractor.
-
-    Parameters
-    ----------
-    image: Image
-
-    Returns
-    -------
-    image: Image
-
-    """
-    new_shape = np.asarray(image.data.shape) // parameters.CCD_REBIN
-    image.data = rebin(image.data, new_shape)
-    image.stat_errors = np.sqrt(rebin(image.stat_errors ** 2, new_shape))
-    image.target_guess = np.asarray(image.target_guess) / parameters.CCD_REBIN
-    parameters.PIXDIST_BACKGROUND //= parameters.CCD_REBIN
-    parameters.PIXWIDTH_BOXSIZE = max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN)
-    parameters.PIXWIDTH_BACKGROUND //= parameters.CCD_REBIN
-    parameters.PIXWIDTH_SIGNAL //= parameters.CCD_REBIN
-    parameters.CCD_IMSIZE //= parameters.CCD_REBIN
-    parameters.CCD_PIXEL2MM *= parameters.CCD_REBIN
-    parameters.CCD_PIXEL2ARCSEC *= parameters.CCD_REBIN
-    parameters.XWINDOW //= parameters.CCD_REBIN
-    parameters.YWINDOW //= parameters.CCD_REBIN
-    parameters.XWINDOW_ROT //= parameters.CCD_REBIN
-    parameters.YWINDOW_ROT //= parameters.CCD_REBIN
-    parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT //= parameters.CCD_REBIN
-    return image

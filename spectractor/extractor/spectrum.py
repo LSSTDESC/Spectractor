@@ -8,7 +8,7 @@ import numpy as np
 import os
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config
+from spectractor.config import set_logger, load_config, apply_rebinning_to_parameters
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
@@ -608,6 +608,7 @@ class Spectrum:
                 self.parallactic_angle = self.header['PARANGLE']
             if 'CCDREBIN' in self.header and self.header['CCDREBIN'] != "":
                 parameters.CCD_REBIN = self.header['CCDREBIN']
+                apply_rebinning_to_parameters()
 
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
