@@ -590,6 +590,16 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
 
+    def adjust_spectrogram_position_parameters(self):
+        # fit the spectrogram trace
+        epsilon = 1e-4 * self.p
+        epsilon[epsilon == 0] = 1e-4
+        fixed = [True] * len(self.p)
+        fixed[3:5] = [False, False]  # shift_y and angle
+        self.sparse_indices = None
+        run_minimisation(self, "newton", epsilon, fixed, xtol=1e-4, ftol=100 / self.data.size)
+        self.sparse_indices = None
+
 
 def run_ffm_minimisation(w, method="newton"):
     """Interface function to fit spectrogram simulation parameters to data.
@@ -842,6 +852,8 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and parameters.OBS_OBJECT_TYPE == "STAR":
         w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
+        w.adjust_spectrogram_position_parameters()
+
         for i in range(2):
             spectrum.convert_from_flam_to_ADUrate()
             spectrum = run_ffm_minimisation(w, method="newton")

@@ -1269,6 +1269,7 @@ def turn_image(image):
                                                           angle_range=(parameters.ROT_ANGLE_MIN,
                                                                        parameters.ROT_ANGLE_MAX),
                                                           edges=(0, parameters.CCD_IMSIZE))
+    image.rotation_angle = image.disperser.theta_tilt
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
