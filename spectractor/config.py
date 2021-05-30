@@ -123,6 +123,21 @@ def load_config(config_filename):
 
 
 def apply_rebinning_to_parameters():
+    """Divide or multiply original parameters by parameters.CCD_REBIN to set them correctly
+    in the case of an image rebinning.
+
+    Examples
+    --------
+    >>> parameters.PIXWIDTH_SIGNAL = 40
+    >>> parameters.CCD_PIXEL2MM = 10
+    >>> parameters.CCD_REBIN = 2
+    >>> apply_rebinning_to_parameters()
+    >>> parameters.PIXWIDTH_SIGNAL
+    20
+    >>> parameters.CCD_PIXEL2MM
+    20
+
+    """
     # Apply rebinning
     parameters.PIXDIST_BACKGROUND //= parameters.CCD_REBIN
     parameters.PIXWIDTH_BOXSIZE = max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN)

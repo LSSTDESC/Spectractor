@@ -187,11 +187,26 @@ class Image(object):
     def rebin(self):
         """Rebin the image and reset some related parameters.
 
+        Examples
+        --------
+        >>> parameters.CCD_REBIN = 2
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im.target_guess = [810, 590]
+        >>> im.data.shape
+        (2048, 2048)
+        >>> im.rebin()
+        >>> im.data.shape
+        (1024, 1024)
+        >>> im.stat_errors.shape
+        (1024, 1024)
+        >>> im.target_guess
+        array([405., 295.])
         """
         new_shape = np.asarray(self.data.shape) // parameters.CCD_REBIN
         self.data = rebin(self.data, new_shape)
         self.stat_errors = np.sqrt(rebin(self.stat_errors ** 2, new_shape))
-        self.target_guess = np.asarray(self.target_guess) / parameters.CCD_REBIN
+        if self.target_guess is not None:
+            self.target_guess = np.asarray(self.target_guess) / parameters.CCD_REBIN
 
     def load_image(self, file_name):
         """
@@ -1269,7 +1284,7 @@ def turn_image(image):
                                                           angle_range=(parameters.ROT_ANGLE_MIN,
                                                                        parameters.ROT_ANGLE_MAX),
                                                           edges=(0, parameters.CCD_IMSIZE))
-    image.rotation_angle = image.disperser.theta_tilt
+    # image.rotation_angle = image.disperser.theta_tilt
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
