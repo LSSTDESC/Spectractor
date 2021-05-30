@@ -1439,7 +1439,7 @@ def run_emcee(fit_workspace, ln=lnprob):
 
 class RegFitWorkspace(FitWorkspace):
 
-    def __init__(self, w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=False, live_fit=False):
+    def __init__(self, w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=0, live_fit=False):
         """
 
         Parameters
@@ -1460,6 +1460,13 @@ class RegFitWorkspace(FitWorkspace):
         self.resolution = np.zeros_like((self.w.amplitude_params.size, self.w.amplitude_params.size))
         self.G = 0
         self.chisquare = -1
+
+    def print_regularisation_summary(self):
+        self.my_logger.info(f"\n\tOptimal regularisation parameter: {self.opt_reg}"
+                            f"\n\tTr(R) = {np.trace(self.resolution)}"
+                            f"\n\tN_params = {len(self.w.amplitude_params)}"
+                            f"\n\tN_data = {self.w.data.size - len(self.w.mask) - len(self.w.outliers)}"
+                            f" (without mask and outliers)")
 
     def simulate(self, log10_r):
         reg = 10 ** log10_r
@@ -1545,6 +1552,13 @@ class RegFitWorkspace(FitWorkspace):
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'amplitude_correlation_matrix.pdf'))
         if parameters.DISPLAY:
             plt.show()
+
+    def run_regularisation(self):
+        run_minimisation(self, method="minimize", ftol=1e-4, xtol=1e-2, verbose=self.verbose, epsilon=[1e-1],
+                         minimizer_method="Nelder-Mead")
+        self.opt_reg = 10 ** self.p[0]
+        self.simulate(np.log10(self.opt_reg))
+        self.print_regularisation_summary()
 
 
 if __name__ == "__main__":

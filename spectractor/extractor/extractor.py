@@ -664,11 +664,8 @@ def run_ffm_minimisation(w, method="newton"):
 
     # Optimize the regularisation parameter only if it was not done before
     if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
-        w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=1)
-        run_minimisation(w_reg, method="minimize", ftol=1e-4, xtol=1e-2, verbose=1, epsilon=[1e-1],
-                         minimizer_method="Nelder-Mead")
-        w_reg.opt_reg = 10 ** w_reg.p[0]
-        w.my_logger.info(f"\n\tOptimal regularisation parameter: {w_reg.opt_reg}")
+        w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
+        w_reg.run_regularisation()
         w.reg = np.copy(w_reg.opt_reg)
         w.simulate(*w.p)
         w.opt_reg = w_reg.opt_reg
@@ -719,7 +716,9 @@ def run_ffm_minimisation(w, method="newton"):
     w.spectrum.err = np.copy(w.amplitude_params_err)
     w.spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
     w.spectrum.chromatic_psf.fill_table_with_profile_params(w.psf_profile_params)
+    w.spectrum.chromatic_psf.table["amplitude"] = np.copy(w.amplitude_params)
     w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params)
+    w.spectrum.chromatic_psf.poly_params = w.spectrum.chromatic_psf.from_table_to_poly_params()
     w.spectrum.spectrogram_fit = w.model
     w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
     w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
@@ -1100,6 +1099,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         s.cov_matrix = np.copy(w.amplitude_cov_matrix)
         s.profile_params = s.from_poly_params_to_profile_params(s.poly_params, apply_bounds=True)
         s.fill_table_with_profile_params(s.profile_params)
+        s.from_profile_params_to_shape_params(s.profile_params)
         s.table['Dy'] = s.table['y_c'] - target_pixcoords_spectrogram[1]
         # deconvolve and regularize with 1D priors
         method = "psf1d"

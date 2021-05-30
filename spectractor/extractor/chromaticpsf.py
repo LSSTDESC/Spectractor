@@ -608,8 +608,8 @@ class ChromaticPSF:
             self.table['fwhm'][x] = fwhm
         # clean fwhm bad points
         fwhms = self.table['fwhm']
-        mask = np.logical_and(fwhms < 1, fwhms > self.Ny // 2)  # less than 1 pixel or greater than window
-        self.table['fwhm'] = interp1d(pixel_x[~mask], fwhms[~mask], kind="linear",
+        mask = np.logical_and(fwhms > 1, fwhms < self.Ny // 2)  # more than 1 pixel or less than window
+        self.table['fwhm'] = interp1d(pixel_x[mask], fwhms[mask], kind="linear",
                                       bounds_error=False, fill_value="extrapolate")(pixel_x)
 
     def set_bounds(self):
@@ -1127,10 +1127,7 @@ class ChromaticPSF:
         # regularisation
         if w.amplitude_priors_method == "psf1d" and mode == "2D":
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
-            run_minimisation(w_reg, method="minimize", ftol=1e-4, xtol=1e-2, verbose=verbose, epsilon=[1e-1],
-                             minimizer_method="Nelder-Mead")
-            w_reg.opt_reg = 10 ** w_reg.p[0]
-            self.my_logger.info(f"\n\tOptimal regularisation parameter: {w_reg.opt_reg}")
+            w_reg.run_regularisation()
             w.reg = np.copy(w_reg.opt_reg)
             w.simulate(*w.p)
             self.opt_reg = w_reg.opt_reg
@@ -1155,9 +1152,9 @@ class ChromaticPSF:
         self.psf.apply_max_width_to_bounds(max_half_width=w.Ny + 2 * w.bgd_width)
         self.set_bounds()
         self.profile_params = self.from_poly_params_to_profile_params(self.poly_params, apply_bounds=True)
+        self.fill_table_with_profile_params(self.profile_params)
         self.profile_params[:self.Nx, 0] = w.amplitude_params
         self.profile_params[:self.Nx, 1] = np.arange(self.Nx)
-        self.fill_table_with_profile_params(self.profile_params)
         self.from_profile_params_to_shape_params(self.profile_params)
 
         # save plots
