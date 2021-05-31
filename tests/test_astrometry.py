@@ -50,8 +50,10 @@ def test_astrometry():
             assert np.isclose(a.wcs.wcs.crval[1], -54.28912925, atol=0.03)
         if file_name == 'tests/data/sim_20170530_134.fits':
             im = Image(file_name, target_label=target)
-            x0_wcs, y0_wcs = find_target(im, guess=[xpos, ypos], rotated=False, use_wcs=True)
-            x0, y0 = find_target(im, guess=[xpos, ypos], rotated=False, use_wcs=False)
+            parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "WCS"
+            x0_wcs, y0_wcs = find_target(im, guess=[xpos, ypos], rotated=False)
+            parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "fit"
+            x0, y0 = find_target(im, guess=[xpos, ypos], rotated=False)
             im.my_logger.warning(f"\n\tTrue {target} position: "
                                  f"{np.array([float(im.header['X0_T']), float(im.header['Y0_T'])])}"
                                  f"\n\tFound {target} position with WCS: {np.array([x0_wcs, y0_wcs])}"
