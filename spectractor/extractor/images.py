@@ -723,7 +723,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.compute_parallactic_angle()
 
 
-def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[parameters.XWINDOW, parameters.YWINDOW]):
+def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
     """Find the target in the Image instance.
 
     The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
@@ -738,9 +738,6 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
         Two parameter array giving the estimated position of the target in the image, optional if WCS is used.
     rotated: bool
         If True, the target is searched in the rotated image.
-    use_wcs: bool
-        If True, the WCS file (if found) is used to set the target position in pixels,
-        guess parameter is then unnecessary.
     widths: (int, int)
         Two parameter array to define the width of the cropped image (default: [parameters.XWINDOW, parameters.YWINDOW])
 
@@ -764,7 +761,7 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
     target_pixcoords = [-1, -1]
     theX = -1
     theY = -1
-    if use_wcs:
+    if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
         wcs_file_name = set_wcs_file_name(image.file_name)
         if os.path.isfile(wcs_file_name):
             my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
@@ -789,52 +786,66 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
                 plt.show()
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
-    if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
-        if guess is None:
-            raise ValueError(f"Guess parameter must be set if WCS solution is not found.")
-        Dx, Dy = widths
-        theX, theY = guess
-        if rotated:
-            guess2 = find_target_after_rotation(image)
-            x0 = int(guess2[0])
-            y0 = int(guess2[1])
-            guess = [x0, y0]
-        niter = 2
-        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
-                                                                            widths=(Dx, Dy))
-        sub_image_x0, sub_image_y0 = x0, y0
-        for i in range(niter):
-            # find the target
-            # try:
-            sub_image_x0, sub_image_y0 = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
-            # except (Exception, ValueError):
-            #     image.target_star2D = None
-            #     avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
-            # compute target position
-            theX = x0 - Dx + sub_image_x0
-            theY = y0 - Dy + sub_image_y0
-            # crop for next iteration
-            if i < niter - 1:
-                Dx = Dx // (i + 2)
-                Dy = Dy // (i + 2)
-                x0 = int(theX)
-                y0 = int(theY)
-                NY, NX = sub_image_subtracted.shape
-                sub_image_subtracted = sub_image_subtracted[
-                                       max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
-                                       max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
-                sub_errors = sub_errors[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
-                             max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
-                if int(sub_image_x0) - Dx < 0:
-                    Dx = int(sub_image_x0)
-                if int(sub_image_y0) - Dy < 0:
-                    Dy = int(sub_image_y0)
-    else:
+    if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "fit" or rotated:
+        if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
+            if guess is None:
+                raise ValueError(f"Guess parameter must be set if WCS solution is not found.")
+            Dx, Dy = widths
+            theX, theY = guess
+            if rotated:
+                guess2 = find_target_after_rotation(image)
+                x0 = int(guess2[0])
+                y0 = int(guess2[1])
+                guess = [x0, y0]
+            niter = 2
+            sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
+                                                                                widths=(Dx, Dy))
+            sub_image_x0, sub_image_y0 = x0, y0
+            for i in range(niter):
+                # find the target
+                # try:
+                sub_image_x0, sub_image_y0 = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
+                # except (Exception, ValueError):
+                #     image.target_star2D = None
+                #     avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
+                # compute target position
+                theX = x0 - Dx + sub_image_x0
+                theY = y0 - Dy + sub_image_y0
+                # crop for next iteration
+                if i < niter - 1:
+                    Dx = Dx // (i + 2)
+                    Dy = Dy // (i + 2)
+                    x0 = int(theX)
+                    y0 = int(theY)
+                    NY, NX = sub_image_subtracted.shape
+                    sub_image_subtracted = sub_image_subtracted[
+                                           max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                                           max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
+                    sub_errors = sub_errors[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                                 max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
+                    if int(sub_image_x0) - Dx < 0:
+                        Dx = int(sub_image_x0)
+                    if int(sub_image_y0) - Dy < 0:
+                        Dy = int(sub_image_y0)
+        else:
+            Dx, Dy = widths
+            sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
+                                                                                rotated=rotated, widths=(Dx, Dy))
+            theX, theY = target_pixcoords
+            sub_image_x0 = target_pixcoords[0] - x0 + Dx
+            sub_image_y0 = target_pixcoords[1] - y0 + Dy
+    elif parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "guess":
         Dx, Dy = widths
         sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
                                                                             rotated=rotated, widths=(Dx, Dy))
+        theX, theY = target_pixcoords
         sub_image_x0 = target_pixcoords[0] - x0 + Dx
         sub_image_y0 = target_pixcoords[1] - y0 + Dy
+    elif parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
+        pass
+    else:
+        raise ValueError(f"For unrotated images, parameters.SPECTRACTOR_FIT_TARGET_CENTROID muste be either: "
+                         f"guess, fit or WCS. Got {parameters.SPECTRACTOR_FIT_TARGET_CENTROID}.")
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
@@ -1280,11 +1291,18 @@ def turn_image(image):
         plt.imshow(im.data_rotated, origin='lower')
         plt.show()
     """
-    image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
-                                                          angle_range=(parameters.ROT_ANGLE_MIN,
-                                                                       parameters.ROT_ANGLE_MAX),
-                                                          edges=(0, parameters.CCD_IMSIZE))
-    # image.rotation_angle = image.disperser.theta_tilt
+    if parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE == "hessian":
+        image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
+                                                              angle_range=(parameters.ROT_ANGLE_MIN,
+                                                                           parameters.ROT_ANGLE_MAX),
+                                                              edges=(0, parameters.CCD_IMSIZE))
+    elif parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE == "disperser":
+        image.rotation_angle = image.disperser.theta_tilt
+    elif parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE is False:
+        image.rotation_angle = 0
+    else:
+        raise ValueError(f"Unknown method for rotation angle computation: choose among False, disperser, hessian. "
+                         f"Got {parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE}")
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)

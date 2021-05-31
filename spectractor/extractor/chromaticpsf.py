@@ -1114,21 +1114,22 @@ class ChromaticPSF:
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                            live_fit=live_fit)
             run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, fix=w.fixed, verbose=verbose)
-            w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
-            w_reg.run_regularisation()
-            w.reg = np.copy(w_reg.opt_reg)
-            w.simulate(*w.p)
-            self.opt_reg = w_reg.opt_reg
-            if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
-                self.my_logger.warning(f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
-                                       f"below the trace of the prior covariance matrix "
-                                       f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
-                                       f"high regularisation parameter in case of a bad fit. Therefore the final "
-                                       f"covariance matrix is mulitiplied by the ratio of the traces and "
-                                       f"the amplitude parameters are very close the amplitude priors.")
-                r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
-                w.amplitude_cov_matrix *= r
-                w.amplitude_params_err = np.array([np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(self.Nx)])
+            if amplitude_priors_method == "psf1d":
+                w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
+                w_reg.run_regularisation()
+                w.reg = np.copy(w_reg.opt_reg)
+                w.simulate(*w.p)
+                self.opt_reg = w_reg.opt_reg
+                if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
+                    self.my_logger.warning(f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
+                                           f"below the trace of the prior covariance matrix "
+                                           f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
+                                           f"high regularisation parameter in case of a bad fit. Therefore the final "
+                                           f"covariance matrix is mulitiplied by the ratio of the traces and "
+                                           f"the amplitude parameters are very close the amplitude priors.")
+                    r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
+                    w.amplitude_cov_matrix *= r
+                    w.amplitude_params_err = np.array([np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(self.Nx)])
 
             w.set_mask(poly_params=w.poly_params)
             # precise fit with sigma clipping
@@ -1139,25 +1140,6 @@ class ChromaticPSF:
 
         # recompute and save params in class attributes
         w.simulate(*w.p)
-
-        # regularisation
-        if False and (w.amplitude_priors_method == "psf1d" and mode == "2D"):
-            w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
-            w_reg.run_regularisation()
-            w.reg = np.copy(w_reg.opt_reg)
-            w.simulate(*w.p)
-            self.opt_reg = w_reg.opt_reg
-            if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
-                self.my_logger.warning(f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
-                                       f"below the trace of the prior covariance matrix "
-                                       f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
-                                       f"high regularisation parameter in case of a bad fit. Therefore the final "
-                                       f"covariance matrix is mulitiplied by the ratio of the traces and "
-                                       f"the amplitude parameters are very close the amplitude priors.")
-                r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
-                w.amplitude_cov_matrix *= r
-                w.amplitude_params_err = np.array([np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(self.Nx)])
-
         self.poly_params = w.poly_params
         self.cov_matrix = np.copy(w.amplitude_cov_matrix)
 
