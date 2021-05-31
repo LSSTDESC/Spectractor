@@ -132,19 +132,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.W_before_mask = np.copy(self.W)
 
         # create mask
-        psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(self.psf_poly_params,
-                                                                                            apply_bounds=True)
-        self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
-        psf_profile_params[:, 2] -= self.bgd_width
-        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, psf_profile_params,
-                                                              fwhm_clip=parameters.PSF_FWHM_CLIP)
-        flat_spectrogram = np.sum(psf_cube.reshape(len(psf_profile_params), self.pixels[0].size), axis=0)
-        mask = flat_spectrogram / np.max(flat_spectrogram) == 0
-        self.data[mask] = 0
-        self.W[mask] = 0
         self.sqrtW = np.sqrt(sparse.diags(self.W))
         self.sparse_indices = None
-        self.mask = list(np.where(mask)[0])
+        self.set_mask()
 
         # design matrix
         self.M = np.zeros((self.Nx, self.data.size))
@@ -190,6 +180,24 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.Q = L.T @ np.linalg.inv(self.amplitude_priors_cov_matrix) @ L
             # self.Q = L.T @ U.T @ U @ L
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
+
+    def set_mask(self, psf_poly_params=None):
+        if psf_poly_params is None:
+            psf_poly_params = self.psf_poly_params
+        psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params,
+                                                                                            apply_bounds=True)
+        self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
+        psf_profile_params[:, 2] -= self.bgd_width
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, psf_profile_params,
+                                                              fwhmx_clip=3*parameters.PSF_FWHM_CLIP,
+                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+        flat_spectrogram = np.sum(psf_cube.reshape(len(psf_profile_params), self.pixels[0].size), axis=0)
+        mask = flat_spectrogram / np.max(flat_spectrogram) == 0
+        self.data[mask] = 0
+        self.W[mask] = 0
+        self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.sparse_indices = None
+        self.mask = list(np.where(mask)[0])
 
     def simulate(self, *params):
         r"""
@@ -383,7 +391,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         #     plt.show()
 
         # Matrix filling
-        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params,
+                                                              fwhmx_clip=3*parameters.PSF_FWHM_CLIP,
+                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
         if A2 > 0:
             # for x in range(self.Nx):
             # M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
@@ -391,7 +401,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             # if profile_params_order2[x, 1] > 1.2 * self.Nx:
             #    break
             psf_cube2 = A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
-                                                                        fwhm_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+                                                                        fwhmx_clip=3*parameters.PSF_FWHM_CLIP,
+                                                                        fwhmy_clip=parameters.PSF_FWHM_CLIP,
+                                                                        dtype="float32")
             psf_cube += psf_cube2
         M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
         if self.sparse_indices is None:
@@ -601,7 +613,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.sparse_indices = None
 
 
-def run_ffm_minimisation(w, method="newton"):
+def run_ffm_minimisation(w, method="newton", niter=2):
     """Interface function to fit spectrogram simulation parameters to data.
 
     Parameters
@@ -610,6 +622,8 @@ def run_ffm_minimisation(w, method="newton"):
         An instance of the SpectrogramFitWorkspace class.
     method: str, optional
         Fitting method (default: 'newton').
+    niter: int, optional
+        Number of FFM iterations to final result (default: 2).
 
     Returns
     -------
@@ -635,24 +649,70 @@ def run_ffm_minimisation(w, method="newton"):
 
     """
     my_logger = set_logger(__name__)
-    guess = np.asarray(w.p)
-    w.simulate(*guess)
-    w.plot_fit()
+    w.adjust_spectrogram_position_parameters()
+
     if method != "newton":
         run_minimisation(w, method=method)
     else:
-        costs = np.array([w.chisq(guess)])
+        costs = np.array([w.chisq(w.p)])
         if parameters.DISPLAY and (parameters.DEBUG or w.live_fit):
             w.plot_fit()
         start = time.time()
-        my_logger.info(f"\n\tStart guess: {guess}\n\twith {w.input_labels}")
-        epsilon = 1e-4 * guess
+        my_logger.info(f"\n\tStart guess: {w.p}\n\twith {w.input_labels}")
+        epsilon = 1e-4 * w.p
         epsilon[epsilon == 0] = 1e-4
 
-        run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
-                                        ftol=1 / w.data.size, sigma_clip=10, niter_clip=3)
+        run_minimisation(w, method=method, fix=w.fixed, xtol=1e-4, ftol=10 / w.data.size)
+        # Optimize the regularisation parameter only if it was not done before
+        if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
+            w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
+            w_reg.run_regularisation()
+            w.reg = np.copy(w_reg.opt_reg)
+            w.simulate(*w.p)
+            w.opt_reg = w_reg.opt_reg
+            if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
+                w.my_logger.warning(
+                    f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
+                    f"below the trace of the prior covariance matrix "
+                    f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
+                    f"high regularisation parameter in case of a bad fit. Therefore the final "
+                    f"covariance matrix is mulitiplied by the ratio of the traces and "
+                    f"the amplitude parameters are very close the amplitude priors.")
+                r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
+                w.amplitude_cov_matrix *= r
+                w.amplitude_params_err = np.array(
+                    [np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
 
-        my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
+        for i in range(niter):
+            w.set_mask(psf_poly_params=w.p[w.psf_params_start_index:])
+            run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
+                                            ftol=1 / w.data.size, sigma_clip=20, niter_clip=3)
+            my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
+
+            if parameters.DEBUG:
+                w.plot_fit()
+            w.spectrum.lambdas = np.copy(w.lambdas)
+            w.spectrum.data = np.copy(w.amplitude_params)
+            w.spectrum.err = np.copy(w.amplitude_params_err)
+            w.spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
+            w.spectrum.chromatic_psf.fill_table_with_profile_params(w.psf_profile_params)
+            w.spectrum.chromatic_psf.table["amplitude"] = np.copy(w.amplitude_params)
+            w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params)
+            w.spectrum.chromatic_psf.poly_params = w.spectrum.chromatic_psf.from_table_to_poly_params()
+            w.spectrum.spectrogram_fit = w.model
+            w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
+            w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
+            w.spectrum.header['PIXSHIFT'] = w.p[2]
+            w.spectrum.header['D2CCD'] = w.p[1]
+            w.spectrum.header['A2_FIT'] = w.p[0]
+            w.spectrum.header["ROTANGLE"] = w.p[4]
+
+            # Calibrate the spectrum
+            calibrate_spectrum(w.spectrum, with_adr=False)
+            w.p[1] = w.spectrum.disperser.D
+            w.p[2] = w.spectrum.header['PIXSHIFT']
+            w.spectrum.convert_from_flam_to_ADUrate()
+
         if w.filename != "":
             parameters.SAVE = True
             ipar = np.array(np.where(np.array(w.fixed).astype(int) == 0)[0])
@@ -662,27 +722,8 @@ def run_ffm_minimisation(w, method="newton"):
             w.plot_fit()
             parameters.SAVE = False
 
-    # Optimize the regularisation parameter only if it was not done before
-    if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
-        w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
-        w_reg.run_regularisation()
-        w.reg = np.copy(w_reg.opt_reg)
-        w.simulate(*w.p)
-        w.opt_reg = w_reg.opt_reg
-        if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
-            w.my_logger.warning(
-                f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
-                f"below the trace of the prior covariance matrix "
-                f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
-                f"high regularisation parameter in case of a bad fit. Therefore the final "
-                f"covariance matrix is mulitiplied by the ratio of the traces and "
-                f"the amplitude parameters are very close the amplitude priors.")
-            r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
-            w.amplitude_cov_matrix *= r
-            w.amplitude_params_err = np.array(
-                [np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
-
     # Save results
+    w.spectrum.convert_from_ADUrate_to_flam()
     x, model, model_err = w.simulate(*w.p)
 
     # Propagate uncertainties
@@ -709,23 +750,29 @@ def run_ffm_minimisation(w, method="newton"):
     # w.amplitude_params_err = amplitude_params_err
     # w.amplitude_cov_matrix = full_cov_matrix[start:, start:]
 
-    if parameters.DEBUG:
-        w.plot_fit()
-    w.spectrum.lambdas = np.copy(w.lambdas)
-    w.spectrum.data = np.copy(w.amplitude_params)
-    w.spectrum.err = np.copy(w.amplitude_params_err)
-    w.spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
-    w.spectrum.chromatic_psf.fill_table_with_profile_params(w.psf_profile_params)
-    w.spectrum.chromatic_psf.table["amplitude"] = np.copy(w.amplitude_params)
-    w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params)
-    w.spectrum.chromatic_psf.poly_params = w.spectrum.chromatic_psf.from_table_to_poly_params()
-    w.spectrum.spectrogram_fit = w.model
-    w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
-    w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
-    w.spectrum.header['PIXSHIFT'] = w.p[2]
-    w.spectrum.header['D2CCD'] = w.p[1]
-    w.spectrum.header['A2_FIT'] = w.p[0]
-    w.spectrum.header["ROTANGLE"] = w.p[4]
+    # Propagate parameters
+    A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.p
+    w.spectrum.rotation_angle = angle
+    w.spectrum.spectrogram_bgd *= B
+    w.spectrum.spectrogram_bgd_rms *= B
+    w.spectrum.spectrogram_x0 += dx0
+    w.spectrum.spectrogram_y0 += dy0
+    w.spectrum.x0[0] += dx0
+    w.spectrum.x0[1] += dy0
+    w.spectrum.header["TARGETX"] = w.spectrum.x0[0]
+    w.spectrum.header["TARGETY"] = w.spectrum.x0[1]
+
+    # Compute order 2 contamination
+    w.spectrum.lambdas_order2 = w.lambdas
+    w.spectrum.data_order2 = A2 * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+    w.spectrum.err_order2 = A2 * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+
+    # Convert to flam
+    w.spectrum.convert_from_ADUrate_to_flam()
+
+    # Compare with truth if available
+    if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and 'LBDAS_T' in w.spectrum.header and parameters.DEBUG:
+        plot_comparison_truth(w.spectrum, w)
 
     return w.spectrum
 
@@ -851,40 +898,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and parameters.OBS_OBJECT_TYPE == "STAR":
         w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
-        w.adjust_spectrogram_position_parameters()
-
-        for i in range(2):
-            spectrum.convert_from_flam_to_ADUrate()
-            spectrum = run_ffm_minimisation(w, method="newton")
-
-            # Calibrate the spectrum
-            calibrate_spectrum(spectrum, with_adr=False)
-            w.p[1] = spectrum.disperser.D
-            w.p[2] = spectrum.header['PIXSHIFT']
-
-        # Recompute and save params in class attributes
-        w.simulate(*w.p)
-
-        # Propagate parameters
-        A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.p
-        w.spectrum.rotation_angle = angle
-        w.spectrum.spectrogram_bgd *= B
-        w.spectrum.spectrogram_bgd_rms *= B
-        w.spectrum.spectrogram_x0 += dx0
-        w.spectrum.spectrogram_y0 += dy0
-        w.spectrum.x0[0] += dx0
-        w.spectrum.x0[1] += dy0
-        w.spectrum.header["TARGETX"] = w.spectrum.x0[0]
-        w.spectrum.header["TARGETY"] = w.spectrum.x0[1]
-
-        # Compute order 2 contamination
-        w.spectrum.lambdas_order2 = w.lambdas
-        w.spectrum.data_order2 = A2 * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
-        w.spectrum.err_order2 = A2 * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
-
-        # Compare with truth if available
-        if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and 'LBDAS_T' in spectrum.header and parameters.DEBUG:
-            plot_comparison_truth(spectrum, w)
+        spectrum = run_ffm_minimisation(w, method="newton", niter=2)
 
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)

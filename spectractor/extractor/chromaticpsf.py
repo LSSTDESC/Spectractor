@@ -268,20 +268,21 @@ class ChromaticPSF:
                 output += self.psf.evaluate(pixels, p=profile_params[x, :])
         return np.clip(output, 0, self.saturation)
 
-    def build_psf_cube(self, pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP, dtype="float64"):
+    def build_psf_cube(self, pixels, profile_params, fwhmx_clip=parameters.PSF_FWHM_CLIP,
+                       fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float64"):
         Ny_pix, Nx_pix = pixels[0].shape
         psf_cube = np.zeros((len(profile_params), Ny_pix, Nx_pix), dtype=dtype)
         fwhms = self.table["fwhm"]
         for x in range(len(profile_params)):
             xc, yc = profile_params[x, 1:3]
-            if xc < - fwhm_clip * fwhms[x]:
+            if xc < - fwhmx_clip * fwhms[x]:
                 continue
-            if xc > Nx_pix + fwhm_clip * fwhms[x]:
+            if xc > Nx_pix + fwhmx_clip * fwhms[x]:
                 break
-            xmin = max(0, int(xc - max(fwhm_clip * fwhms[x], parameters.PIXWIDTH_SIGNAL)))
-            xmax = min(Nx_pix, int(xc + max(parameters.PIXWIDTH_SIGNAL, fwhm_clip * fwhms[x])))
-            ymin = max(0, int(yc - max(parameters.PIXWIDTH_SIGNAL, fwhm_clip * fwhms[x])))
-            ymax = min(Ny_pix, int(yc + max(parameters.PIXWIDTH_SIGNAL, fwhm_clip * fwhms[x])))
+            xmin = max(0, int(xc - max(fwhmx_clip * fwhms[x], parameters.PIXWIDTH_SIGNAL)))
+            xmax = min(Nx_pix, int(xc + max(parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
+            ymin = max(0, int(yc - max(parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
+            ymax = min(Ny_pix, int(yc + max(parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
             # print(x, xc, yc, xmin, xmax, ymin, ymax, fwhms[x])
             psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], p=profile_params[x, :])
         return psf_cube
@@ -1112,12 +1113,27 @@ class ChromaticPSF:
             w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                            live_fit=live_fit)
-            run_minimisation_sigma_clipping(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50,
-                                            fix=w.fixed, sigma_clip=10, niter_clip=1, verbose=verbose)
+            run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, fix=w.fixed, verbose=verbose)
+            w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
+            w_reg.run_regularisation()
+            w.reg = np.copy(w_reg.opt_reg)
+            w.simulate(*w.p)
+            self.opt_reg = w_reg.opt_reg
+            if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
+                self.my_logger.warning(f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
+                                       f"below the trace of the prior covariance matrix "
+                                       f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
+                                       f"high regularisation parameter in case of a bad fit. Therefore the final "
+                                       f"covariance matrix is mulitiplied by the ratio of the traces and "
+                                       f"the amplitude parameters are very close the amplitude priors.")
+                r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
+                w.amplitude_cov_matrix *= r
+                w.amplitude_params_err = np.array([np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(self.Nx)])
+
             w.set_mask(poly_params=w.poly_params)
             # precise fit with sigma clipping
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
-                                            fix=w.fixed, sigma_clip=10, niter_clip=3, verbose=verbose)
+                                            fix=w.fixed, sigma_clip=20, niter_clip=3, verbose=verbose)
         else:
             raise ValueError(f"Unknown fitting mode={mode}. Must be '1D' or '2D'.")
 
@@ -1125,7 +1141,7 @@ class ChromaticPSF:
         w.simulate(*w.p)
 
         # regularisation
-        if w.amplitude_priors_method == "psf1d" and mode == "2D":
+        if False and (w.amplitude_priors_method == "psf1d" and mode == "2D"):
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
             w_reg.run_regularisation()
             w.reg = np.copy(w_reg.opt_reg)
@@ -1568,7 +1584,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         if np.sum(self.chromatic_psf.table["fwhm"]) == 0:
             self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
-        psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
+        psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhmx_clip=3*parameters.PSF_FWHM_CLIP,
+                                                     fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
         flat_spectrogram = np.sum(psf_cube.reshape(len(profile_params), self.pixels[0].size), axis=0)
         mask = flat_spectrogram / np.max(flat_spectrogram) == 0
         self.data = np.copy(self.data_before_mask)
@@ -1733,7 +1750,9 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # profile_params[:self.Nx, 2] -= self.bgd_width
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
-            psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhm_clip=parameters.PSF_FWHM_CLIP)
+            psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
+                                                         fwhmx_clip=3*parameters.PSF_FWHM_CLIP,
+                                                         fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
             M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
             self.sparse_indices = np.where(M > 0)
             M = sparse.csr_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
