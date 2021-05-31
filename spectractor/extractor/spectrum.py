@@ -1211,6 +1211,10 @@ def calibrate_spectrum(spectrum, with_adr=False):
 
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
+        if np.isnan(spectrum.disperser.D):  # reset the value in case of bad gradient descent
+            spectrum.disperser.D = parameters.DISTANCE2CCD
+        if np.isnan(shift):  # reset the value in case of bad gradient descent
+            shift = 0
         dist = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=shift)
         spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(dist - with_adr * adr_u,
                                                                       x0=[x0[0] + shift, x0[1]], order=spectrum.order)
