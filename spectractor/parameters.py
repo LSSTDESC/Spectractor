@@ -33,6 +33,12 @@ def __getattr__(name):
         return False
 
 
+# Pipeline
+SPECTRACTOR_FIT_TARGET_CENTROID = "fit"  # method to get target centroid, choose among: guess, fit, WCS
+SPECTRACTOR_COMPUTE_ROTATION_ANGLE = "hessian"  # method to get image rotation angle: False, disperser, hessian
+SPECTRACTOR_DECONVOLUTION_PSF2D = True  # deconvolve spectrogram with simple 2D PSF analysis: False, True
+SPECTRACTOR_DECONVOLUTION_FFM = True  # deconvolve spectrogram with full forward model: False, True
+
 # Paths
 mypath = os.path.dirname(__file__)
 DISPERSER_DIR = os.path.join(mypath, "extractor/dispersers/")
@@ -81,15 +87,9 @@ HALPHA_FILTER = {'label': 'Halfa', 'min': HALPHA_CENTER - 2 * HALPHA_WIDTH, 'max
 ZGUNN = {'label': 'Z-Gunn', 'min': 800, 'max': 1100}
 FILTERS = [RG715, FGB37, HALPHA_FILTER, ZGUNN]
 
-# Making of the holograms
+# Spectrograph
 DISTANCE2CCD = 55.45  # distance between hologram and CCD in mm
 DISTANCE2CCD_ERR = 0.19  # uncertainty on distance between hologram and CCD in mm
-LAMBDA_CONSTRUCTOR = 639e-6  # constructor wavelength to make holograms in mm
-GROOVES_PER_MM = 350  # approximate effective number of lines per millimeter of the hologram
-PLATE_CENTER_SHIFT_X = -6.  # plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_Y = -8.  # plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
 GRATING_ORDER_2OVER1 = 0.1  # default value for order 2 over order 1 transmission ratio
 
 # Search windows in images

@@ -227,10 +227,10 @@ def neutral_lines(x_center, y_center, theta_tilt):
     return xs, line1, line2
 
 
-def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
+def order01_positions(holo_center, N, theta_tilt, theta0=0, lambda_constructor=639e-6, verbose=True):
     """Return the order 0 and order 1 positions of an hologram."""
     # refraction angle between order 0 and order 1 at construction
-    alpha = np.arcsin(N * parameters.LAMBDA_CONSTRUCTOR + np.sin(theta0))
+    alpha = np.arcsin(N * lambda_constructor + np.sin(theta0))
     # distance between order 0 and order 1 in pixels
     AB = (np.tan(alpha) - np.tan(theta0)) * parameters.DISTANCE2CCD / parameters.CCD_PIXEL2MM
     # position of order 1 in pixels
@@ -249,19 +249,21 @@ def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
     return order0_position, order1_position, AB
 
 
-def find_order01_positions(holo_center, N_interp, theta_interp, verbose=True):
+def find_order01_positions(holo_center, N_interp, theta_interp, lambda_constructor=639e-6, verbose=True):
     """Find the order 0 and order 1 positions of an hologram."""
     N = N_interp(holo_center)
     theta_tilt = theta_interp(holo_center)
     theta0 = 0
     convergence = 0
     while abs(N - convergence) > 1e-6:
-        order0_position, order1_position, AB = order01_positions(holo_center, N, theta_tilt, theta0, verbose=False)
+        order0_position, order1_position, AB = order01_positions(holo_center, N, theta_tilt, theta0,
+                                                                 lambda_constructor=lambda_constructor, verbose=False)
         convergence = np.copy(N)
         N = N_interp(order0_position)
         theta_tilt = theta_interp(order0_position)
         theta0 = get_theta0(order0_position)
-    order0_position, order1_position, AB = order01_positions(holo_center, N, theta_tilt, theta0, verbose=verbose)
+    order0_position, order1_position, AB = order01_positions(holo_center, N, theta_tilt, theta0,
+                                                             lambda_constructor=lambda_constructor, verbose=verbose)
     return order0_position, order1_position, AB
 
 
@@ -302,7 +304,6 @@ class Grating:
         self.label = label
         self.full_name = label
         self.data_dir = data_dir
-        self.plate_center = [0.5 * parameters.CCD_IMSIZE, 0.5 * parameters.CCD_IMSIZE]
         self.theta_tilt = 0
         self.transmission = None
         self.transmission_err = None
@@ -399,9 +400,7 @@ class Grating:
         else:
             self.theta_tilt = 0
         if verbose:
-            self.my_logger.info(f'\n\tGrating plate center at x0 = {self.plate_center[0]:.1f} '
-                                f'and y0 = {self.plate_center[1]:.1f} '
-                                f'with average tilt of {self.theta_tilt:.1f} degrees')
+            self.my_logger.info(f'\n\tGrating average tilt of {self.theta_tilt:.1f} degrees')
 
     def refraction_angle(self, deltaX, x0):
         """ Return the refraction angle with respect to the disperser normal, using geometrical consideration,
@@ -610,9 +609,8 @@ class Hologram(Grating):
         345.4794168822986
 
         """
-        Grating.__init__(self, parameters.GROOVES_PER_MM, D=D, label=label, data_dir=data_dir, verbose=False)
+        Grating.__init__(self, 350, D=D, label=label, data_dir=data_dir, verbose=False)
         self.holo_center = None  # center of symmetry of the hologram interferences in pixels
-        self.plate_center = None  # center of the hologram plate
         self.theta = None  # interpolated rotation angle map of the hologram from data in degrees
         self.theta_data = None  # rotation angle map data of the hologram from data in degrees
         self.theta_x = None  # x coordinates for the interpolated rotation angle map
@@ -718,8 +716,7 @@ class Hologram(Grating):
                 self.N_interp = lambda x: a[0]
                 self.N_fit = lambda x, y: a[0]
             else:
-                self.N_interp = lambda x: parameters.GROOVES_PER_MM
-                self.N_fit = lambda x, y: parameters.GROOVES_PER_MM
+                raise ValueError("To define an hologram, you must provide hologram_grooves_per_mm.txt or N.txt files.")
         filename = self.data_dir + self.label + "/hologram_center.txt"
         if os.path.isfile(filename):
             lines = [ll.rstrip('\n') for ll in open(filename)]
@@ -739,17 +736,12 @@ class Hologram(Grating):
             self.theta = lambda x: float(theta_interp(x[0], x[1]))
         else:
             self.theta = lambda x: self.theta_tilt
-        self.plate_center = [0.5 * parameters.CCD_IMSIZE + parameters.PLATE_CENTER_SHIFT_X / parameters.CCD_PIXEL2MM,
-                             0.5 * parameters.CCD_IMSIZE + parameters.PLATE_CENTER_SHIFT_Y / parameters.CCD_PIXEL2MM]
         self.x_lines, self.line1, self.line2 = neutral_lines(self.holo_center[0], self.holo_center[1], self.theta_tilt)
         if verbose:
             if self.is_hologram:
                 self.my_logger.info(f'\n\tHologram characteristics:'
-                                    f'\n\tN = {self.N(self.plate_center):.2f} +/- {self.N_err:.2f} '
-                                    f'grooves/mm at plate center'
-                                    f'\n\tPlate center at x0 = {self.plate_center[0]:.1f} and '
-                                    f'y0 = {self.plate_center[1]:.1f} with average tilt of {self.theta_tilt:.1f} '
-                                    f'degrees'
+                                    f'\n\tN = {self.N(self.holo_center):.2f} +/- {self.N_err:.2f} '
+                                    f'grooves/mm at hologram center'
                                     f'\n\tHologram center at x0 = {self.holo_center[0]:.1f} '
                                     f'and y0 = {self.holo_center[1]:.1f} with average tilt of {self.theta_tilt:.1f} '
                                     f'degrees')
@@ -757,10 +749,6 @@ class Hologram(Grating):
                 self.my_logger.info(f'\n\tGrating characteristics:'
                                     f'\n\tN = {self.N([0, 0]):.2f} +/- {self.N_err:.2f} grooves/mm'
                                     f'\n\tAverage tilt of {self.theta_tilt:.1f} degrees')
-        if self.is_hologram:
-            self.order0_position, self.order1_position, self.AB = find_order01_positions(self.holo_center,
-                                                                                         self.N_interp, self.theta,
-                                                                                         verbose=verbose)
 
 
 if __name__ == "__main__":
