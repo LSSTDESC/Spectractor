@@ -94,7 +94,7 @@ def test_extractor_ctio_planetary_nebula():
                                    f"{np.mean(spectrum.chromatic_psf.table['gamma'])}")
         if parameters.SPECTRACTOR_DECONVOLUTION_PSF2D or parameters.SPECTRACTOR_DECONVOLUTION_FFM:
             assert np.isclose(spectrum.lambdas[0], 449, atol=1)
-            assert np.isclose(spectrum.lambdas[-1], 996, atol=1)
+            assert np.isclose(spectrum.lambdas[-1], 996.5, atol=1)
         else:
             assert np.isclose(spectrum.lambdas[0], 443, atol=1)
             assert np.isclose(spectrum.lambdas[-1], 981, atol=1)
