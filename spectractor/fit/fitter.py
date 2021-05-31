@@ -1559,6 +1559,7 @@ class RegFitWorkspace(FitWorkspace):
         self.opt_reg = 10 ** self.p[0]
         self.simulate(np.log10(self.opt_reg))
         self.print_regularisation_summary()
+        self.plot_fit()
 
 
 if __name__ == "__main__":
