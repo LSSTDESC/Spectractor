@@ -755,7 +755,15 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     >>> guess = [820, 580]
     >>> parameters.VERBOSE = True
     >>> parameters.DEBUG = True
-    >>> x1, y1 = find_target(im, guess)
+    >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "fit"
+    >>> find_target(im, guess)  #doctest: +ELLIPSIS
+    [816.8... 587.3...]
+    >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "WCS"
+    >>> find_target(im, guess)  #doctest: +ELLIPSIS
+    [816.9... 587.1...]
+    >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "guess"
+    >>> find_target(im, guess)
+    [820, 580]
     """
     my_logger = set_logger(__name__)
     target_pixcoords = [-1, -1]
@@ -838,9 +846,9 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
         Dx, Dy = widths
         sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
                                                                             rotated=rotated, widths=(Dx, Dy))
-        theX, theY = target_pixcoords
-        sub_image_x0 = target_pixcoords[0] - x0 + Dx
-        sub_image_y0 = target_pixcoords[1] - y0 + Dy
+        theX, theY = guess
+        sub_image_x0 = theX - x0 + Dx
+        sub_image_y0 = theY - y0 + Dy
     elif parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
         pass
     else:
@@ -1234,6 +1242,11 @@ def turn_image(image):
     image: Image
         The Image instance.
 
+    Returns
+    -------
+    rotation_angle: float
+        Rotation angle in degree.
+
     Examples
     --------
 
@@ -1265,7 +1278,15 @@ def turn_image(image):
 
     >>> im.target_pixcoords=(N//2, N//2)
     >>> parameters.DEBUG = True
+    >>> parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE = False
     >>> turn_image(im)
+    0
+    >>> parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE = "disperser"
+    >>> turn_image(im)
+    -1.915
+    >>> parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE = "hessian"
+    >>> turn_image(im)  #doctest: +ELLIPSIS
+    -5.90...
 
     .. doctest::
         :hide:
@@ -1339,6 +1360,7 @@ def turn_image(image):
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotated_image.pdf'))
+    return image.rotation_angle
 
 
 if __name__ == "__main__":

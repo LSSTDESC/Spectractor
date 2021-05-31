@@ -227,7 +227,7 @@ def neutral_lines(x_center, y_center, theta_tilt):
     return xs, line1, line2
 
 
-def order01_positions(holo_center, N, theta_tilt, theta0=0, lambda_constructor=639e-6, verbose=True):
+def order01_positions(holo_center, N, theta_tilt, theta0=0, lambda_constructor=639e-6, verbose=True):  # pragma: no cover
     """Return the order 0 and order 1 positions of an hologram."""
     # refraction angle between order 0 and order 1 at construction
     alpha = np.arcsin(N * lambda_constructor + np.sin(theta0))
@@ -249,7 +249,7 @@ def order01_positions(holo_center, N, theta_tilt, theta0=0, lambda_constructor=6
     return order0_position, order1_position, AB
 
 
-def find_order01_positions(holo_center, N_interp, theta_interp, lambda_constructor=639e-6, verbose=True):
+def find_order01_positions(holo_center, N_interp, theta_interp, lambda_constructor=639e-6, verbose=True):  # pragma: no cover
     """Find the order 0 and order 1 positions of an hologram."""
     N = N_interp(holo_center)
     theta_tilt = theta_interp(holo_center)
