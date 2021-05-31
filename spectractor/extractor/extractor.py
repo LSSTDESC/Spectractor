@@ -50,12 +50,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # check the shapes
         self.Ny, self.Nx = spectrum.spectrogram.shape
-        if self.Ny != self.spectrum.chromatic_psf.Ny:
-            raise AttributeError(f"Data y shape {self.Ny} different from "
-                                 f"ChromaticPSF input Ny {spectrum.chromatic_psf.Ny}.")
-        if self.Nx != self.spectrum.chromatic_psf.Nx:
-            raise AttributeError(f"Data x shape {self.Nx} different from "
-                                 f"ChromaticPSF input Nx {spectrum.chromatic_psf.Nx}.")
+        # if self.Ny != self.spectrum.chromatic_psf.Ny:
+        #     raise AttributeError(f"Data y shape {self.Ny} different from "
+        #                          f"ChromaticPSF input Ny {spectrum.chromatic_psf.Ny}.")
+        # if self.Nx != self.spectrum.chromatic_psf.Nx:
+        #     raise AttributeError(f"Data x shape {self.Nx} different from "
+        #                          f"ChromaticPSF input Nx {spectrum.chromatic_psf.Nx}.")
 
         # crop data to fit faster
         self.lambdas = self.spectrum.lambdas

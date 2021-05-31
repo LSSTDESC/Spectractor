@@ -49,10 +49,10 @@ def test_extractor_ctio():
                                    f"{np.mean(spectrum.chromatic_psf.table['gamma'])}")
         assert np.sum(spectrum.data) * parameters.CCD_REBIN**2 > 2e-11 / parameters.CCD_REBIN
         if parameters.CCD_REBIN == 1:
-            if parameters.PSF_EXTRACTION_MODE == "PSD_2D":
+            if parameters.SPECTRACTOR_DECONVOLUTION_PSF2D or parameters.SPECTRACTOR_DECONVOLUTION_FFM:
                 assert np.isclose(spectrum.lambdas[0], 343, atol=1)
                 assert np.isclose(spectrum.lambdas[-1], 1084.0, atol=1)
-            elif parameters.PSF_EXTRACTION_MODE == "PSF_1D":
+            else:
                 assert np.isclose(spectrum.lambdas[0], 347, atol=1)
                 assert np.isclose(spectrum.lambdas[-1], 1085.0, atol=1)
             assert np.isclose(spectrum.spectrogram_x0, -280, atol=1)
@@ -92,10 +92,10 @@ def test_extractor_ctio_planetary_nebula():
                                    f"\n\t\tspectrum total flux={np.sum(spectrum.data) * parameters.CCD_REBIN ** 2}"
                                    f"\n\t\tnp.mean(spectrum.chromatic_psf.table['gamma']="
                                    f"{np.mean(spectrum.chromatic_psf.table['gamma'])}")
-        if parameters.PSF_EXTRACTION_MODE == "PSD_2D":
+        if parameters.SPECTRACTOR_DECONVOLUTION_PSF2D or parameters.SPECTRACTOR_DECONVOLUTION_FFM:
             assert np.isclose(spectrum.lambdas[0], 449, atol=1)
             assert np.isclose(spectrum.lambdas[-1], 996, atol=1)
-        elif parameters.PSF_EXTRACTION_MODE == "PSF_1D":
+        else:
             assert np.isclose(spectrum.lambdas[0], 443, atol=1)
             assert np.isclose(spectrum.lambdas[-1], 981, atol=1)
         assert np.isclose(spectrum.spectrogram_x0, -368, atol=1)
