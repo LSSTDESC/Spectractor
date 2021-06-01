@@ -607,8 +607,8 @@ class Spectrum:
             if 'PARANGLE' in self.header and self.header['PARANGLE'] != "":
                 self.parallactic_angle = self.header['PARANGLE']
             if 'CCDREBIN' in self.header and self.header['CCDREBIN'] != "":
-                parameters.CCD_REBIN = self.header['CCDREBIN']
-                apply_rebinning_to_parameters()
+                if parameters.CCD_REBIN != self.header['CCDREBIN']:
+                    raise ValueError("Different values of rebinning parameters between config file and header. Choose.")
 
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
