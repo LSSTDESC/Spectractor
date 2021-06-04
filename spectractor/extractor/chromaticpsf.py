@@ -1118,8 +1118,8 @@ class ChromaticPSF:
                 w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
                 w_reg.run_regularisation()
                 w.reg = np.copy(w_reg.opt_reg)
-                w.simulate(*w.p)
                 self.opt_reg = w_reg.opt_reg
+                w.simulate(*w.p)
                 if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
                     self.my_logger.warning(f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
                                            f"below the trace of the prior covariance matrix "

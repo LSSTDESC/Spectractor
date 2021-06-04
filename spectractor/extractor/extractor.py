@@ -667,9 +667,9 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
             w_reg.run_regularisation()
+            w.opt_reg = w_reg.opt_reg
             w.reg = np.copy(w_reg.opt_reg)
             w.simulate(*w.p)
-            w.opt_reg = w_reg.opt_reg
             if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
                 w.my_logger.warning(
                     f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
