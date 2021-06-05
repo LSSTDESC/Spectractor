@@ -900,7 +900,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
     if parameters.SPECTRACTOR_DECONVOLUTION_FFM:
-        w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=False,
+        w = FullForwardModelFitWorkspace(spectrum, verbose=parameters.VERBOSE, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
         spectrum = run_ffm_minimisation(w, method="newton", niter=2)
 

@@ -1037,15 +1037,14 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             my_logger.warning(f"\n\tGradient descent terminated in {i} iterations because all parameters "
                               f"have null Jacobian.")
             break
-        if fit_workspace.verbose or parameters.DEBUG:
-            if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
-                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
-                               f"relative to the sum of the parameters is below xtol={xtol}.")
-                break
-            if len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2])]) < ftol:
-                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
-                               f"relative change of cost is below ftol={ftol}.")
-                break
+        if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
+            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
+                           f"relative to the sum of the parameters is below xtol={xtol}.")
+            break
+        if len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2])]) < ftol:
+            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
+                           f"relative change of cost is below ftol={ftol}.")
+            break
     plt.close()
     return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
 
@@ -1155,15 +1154,14 @@ def simple_newton_minimisation(fit_workspace, params, epsilon, niter=10, fixed_p
             my_logger.warning(f"\n\tGradient descent terminated in {i} iterations because all parameters "
                               f"have null Jacobian.")
             break
-        if fit_workspace.verbose or parameters.DEBUG:
-            if np.sum(np.abs(dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
-                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
-                               f"relative to the sum of the parameters is below xtol={xtol}.")
-                break
-            if len(funcs) > 1 and np.abs(funcs[-2] - new_func) / np.max([np.abs(new_func), np.abs(funcs[-2])]) < ftol:
-                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
-                               f"relative change of cost is below ftol={ftol}.")
-                break
+        if np.sum(np.abs(dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
+            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
+                           f"relative to the sum of the parameters is below xtol={xtol}.")
+            break
+        if len(funcs) > 1 and np.abs(funcs[-2] - new_func) / np.max([np.abs(new_func), np.abs(funcs[-2])]) < ftol:
+            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
+                           f"relative change of cost is below ftol={ftol}.")
+            break
     plt.close()
     return tmp_params, inv_H[:, :, 0], np.array(funcs), np.array(params_table)
 
