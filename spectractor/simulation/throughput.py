@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
 from spectractor.config import set_logger
+from spectractor.tools import reset_lambda_range
 import spectractor.parameters as parameters
 
 
@@ -200,13 +201,27 @@ class TelescopeTransmission:
             plt.close('all')
 
     def reset_lambda_range(self, transmission_threshold=1e-4):
+        """Reset the wavelength range.
+
+        Parameters
+        ----------
+        transmission_threshold: float
+            Threshold to set the wavelength range using the transmission integral (default: 1e-4).
+
+        Examples
+        --------
+        >>> t = TelescopeTransmission(filter_label="FGB37")
+        >>> print(parameters.LAMBDA_MAX, parameters.LAMBDA_MIN)
+        1100 300
+        >>> t.reset_lambda_range()
+        >>> print(f'{parameters.LAMBDA_MAX:.0f}', f'{parameters.LAMBDA_MIN:.0f}')
+        760 300
+
+        """
         integral = np.cumsum(self.transmission(parameters.LAMBDAS))
-        parameters.LAMBDA_MIN = max(parameters.LAMBDAS[np.argmin(np.abs(integral - transmission_threshold))],
-                                    parameters.LAMBDA_MIN)
-        parameters.LAMBDA_MAX = min(parameters.LAMBDAS[np.argmin(np.abs(integral -
-                                                                        (integral[-1] - transmission_threshold)))],
-                                    parameters.LAMBDA_MAX)
-        parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, parameters.LAMBDA_STEP)
+        lambda_min = parameters.LAMBDAS[np.argmin(np.abs(integral - transmission_threshold))]
+        lambda_max = parameters.LAMBDAS[np.argmin(np.abs(integral - (integral[-1] - transmission_threshold)))]
+        reset_lambda_range(lambda_min, lambda_max)
         self.my_logger.info(f"\n\tWith filter {self.filter_label}, set parameters.LAMBDA_MIN={parameters.LAMBDA_MIN} "
                             f"and parameters.LAMBDA_MAX={parameters.LAMBDA_MAX}.")
 

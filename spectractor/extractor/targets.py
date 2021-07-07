@@ -7,11 +7,13 @@ from astroquery.simbad import Simbad
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 import os
+import re
 import numpy as np
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
+from spectractor.tools import reset_lambda_range
+from spectractor.extractor.spectroscopy import (Lines, Line, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
                                                 ISM_LINES, STELLAR_LINES)
 
 if os.getenv("PYSYN_CDBS"):
@@ -56,6 +58,8 @@ def load_target(label, verbose=False):
         return ArcLamp(label, verbose)
     elif parameters.OBS_OBJECT_TYPE == 'MONOCHROMATOR':
         return Monochromator(label, verbose)
+    elif parameters.OBS_OBJECT_TYPE == 'LASER':
+        return Laser(label, verbose)
     else:
         raise ValueError(f'Unknown parameters.OBS_OBJECT_TYPE: {parameters.OBS_OBJECT_TYPE}')
 
@@ -138,18 +142,56 @@ class Monochromator(Target):
 
         Examples
         --------
-
-        >>> t = Monochromator("XX", verbose=False)
+        >>> parameters.VERBOSE = True
+        >>> t = Monochromator("QTH500.50", verbose=False)
         >>> print(t.label)
-        XX
+        QTH500.50
         >>> print(t.emission_spectrum)
         True
+        >>> print(t.lines.lines[0].wavelength)
+        500.5
 
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
         self.emission_spectrum = True
-        self.lines = Lines([], emission_spectrum=True, orders=[1, 2])
+        wl = float(re.findall(r"[-+]?\d*\.\d+|\d+", label)[0])
+        line = Line(wl, label, atmospheric=False, emission=True, use_for_calibration=True)
+        self.lines = Lines([line], emission_spectrum=True, orders=[1, 2])
+        reset_lambda_range(wl-20, wl+20)
+        self.my_logger.info(f"\n\tWith object {self.label}, set parameters.LAMBDA_MIN={parameters.LAMBDA_MIN} "
+                            f"and parameters.LAMBDA_MAX={parameters.LAMBDA_MAX}.")
+
+    def load(self):  # pragma: no cover
+        pass
+
+
+class Laser(Monochromator):
+
+    def __init__(self, label, verbose=False):
+        """Initialize Monochromator class.
+
+        Parameters
+        ----------
+        label: str
+            String label to name the monochromator.
+        verbose: bool, optional
+            Set True to increase verbosity (default: False)
+
+        Examples
+        --------
+        >>> parameters.VERBOSE = True
+        >>> t = Laser("LASER980", verbose=False)
+        >>> print(t.label)
+        LASER980
+        >>> print(t.emission_spectrum)
+        True
+        >>> print(f"{t.lines.lines[0].wavelength:.0f}")
+        980
+
+        """
+        Monochromator.__init__(self, label, verbose=verbose)
+        self.my_logger = set_logger(self.__class__.__name__)
 
     def load(self):  # pragma: no cover
         pass

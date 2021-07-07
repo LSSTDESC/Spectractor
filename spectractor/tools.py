@@ -2398,6 +2398,30 @@ def flip_and_rotate_radec_to_image_xy_coordinates(ra, dec, camera_angle=0, flip_
     return x, y
 
 
+def reset_lambda_range(lambda_min, lambda_max):
+    """Reset the lambda range.
+
+    Parameters
+    ----------
+    lambda_min: float
+        Minimum wavelength.
+    lambda_max: float
+        Maximum wavelength.
+
+    Examples
+    --------
+    >>> print(parameters.LAMBDA_MAX, parameters.LAMBDA_MIN)
+    1100 300
+    >>> reset_lambda_range(500, 550)
+    >>> print(parameters.LAMBDA_MAX, parameters.LAMBDA_MIN)
+    550 500
+
+    """
+    parameters.LAMBDA_MIN = max(lambda_min, parameters.LAMBDA_MIN)
+    parameters.LAMBDA_MAX = min(lambda_max, parameters.LAMBDA_MAX)
+    parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, parameters.LAMBDA_STEP)
+
+
 if __name__ == "__main__":
     import doctest
 

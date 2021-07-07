@@ -198,7 +198,7 @@ class Lines:
                 if order > 1:
                     if line.label[-1] == "$":
                         tmp_line.label = tmp_line.label[:-1]
-                    tmp_line.label += "^(2)"
+                    tmp_line.label += "^{(2)}"
                     if line.label[-1] == "$":
                         tmp_line.label += "$"
                 self.lines.append(tmp_line)
@@ -582,7 +582,7 @@ HG5 = Line(334.148, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
 HG6 = Line(365.015, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HG7 = Line(404.656, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HG8 = Line(407.783, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
-HG9 = Line(435.833, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
+HG9 = Line(435.833, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HG10 = Line(546.074, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HG11 = Line(576.960, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HG12 = Line(579.066, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02], use_for_calibration=True)

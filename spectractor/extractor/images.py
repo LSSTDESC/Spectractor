@@ -626,6 +626,18 @@ def load_LPNHE_image(image):  # pragma: no cover
     image.header.comments["ZPOS"] = hdus["XYZ"].header.comments["ZPOS"]
     image.my_logger.info('\n\tImage loaded')
 
+    if image.target_label == "HG-AR":
+        parameters.OBS_OBJECT_TYPE = "HG-AR"
+    elif "QTH" in image.target_label:
+        parameters.OBS_OBJECT_TYPE = "MONOCHROMATOR"
+        parameters.PIXWIDTH_SIGNAL = 30
+        image.target_label += str(hdus["CORNERSTONE"].header["WVLGTH"])
+    elif "LASER" in image.target_label:
+        parameters.OBS_OBJECT_TYPE = "LASER"
+        parameters.PIXWIDTH_SIGNAL = 30
+    else:
+        raise ValueError(f"\nTarget label {image.target_label} unknown for LPNHE optical bench.")
+
 
 def load_AUXTEL_image(image):  # pragma: no cover
     """Specific routine to load AUXTEL fits files and load their data and properties for Spectractor.
