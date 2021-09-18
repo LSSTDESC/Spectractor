@@ -101,7 +101,7 @@ class StarFieldModel:
 
         >>> from spectractor.extractor.images import Image, find_target
         >>> im = Image('tests/data/reduc_20170530_134.fits', target_label="HD111980")
-        >>> x0, y0 = find_target(im, guess=(740, 680), use_wcs=False)
+        >>> x0, y0 = find_target(im, guess=(740, 680))
         >>> s = StarFieldModel(im)
         >>> s.plot_model()
 
@@ -386,11 +386,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         image.plot_image(scale='symlog', target_pixcoords=guess)
     # Fit the star 2D profile
     my_logger.info('\n\tSearch for the target in the image...')
-    target_pixcoords = find_target(image, guess, use_wcs=False)
-    # Find the exact target position using WCS if available
-    wcs_file_name = set_wcs_file_name(image.file_name)
-    if os.path.isfile(wcs_file_name):
-        target_pixcoords = find_target(image, guess, use_wcs=True)
+    target_pixcoords = find_target(image, guess)
     # Background model
     my_logger.info('\n\tBackground model...')
     bgd_level = float(np.mean(spectrum.spectrogram_bgd))

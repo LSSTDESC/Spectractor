@@ -64,6 +64,7 @@ class FitWorkspace:
         self.W = None
         self.x = None
         self.outliers = []
+        self.mask = []
         self.sigma_clip = 5
         self.model = None
         self.model_err = None
@@ -122,7 +123,7 @@ class FitWorkspace:
 
         Returns
         -------
-        not_outliers: list
+        outliers: list
 
         Examples
         --------
@@ -1021,11 +1022,11 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         params_table.append(np.copy(tmp_params))
         fit_workspace.p = tmp_params
         if fit_workspace.verbose:
-            my_logger.info(f"\n\tIteration={i}: initial cost={cost:.5g} initial chisq_red={cost / tmp_model.size:.5g}"
+            my_logger.info(f"\n\tIteration={i}: initial cost={cost:.5g} initial chisq_red={cost / (tmp_model.size - len(fit_workspace.mask)):.5g}"
                            f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
                            f"\n\tParameter shifts: {alpha_min * dparams}"
                            f"\n\tNew parameters: {tmp_params[ipar]}"
-                           f"\n\tFinal cost={fval:.5g} final chisq_red={fval / tmp_model.size:.5g} "
+                           f"\n\tFinal cost={fval:.5g} final chisq_red={fval / (tmp_model.size - len(fit_workspace.mask)):.5g} "
                            f"computed in {time.time() - start:.2f}s")
         if fit_workspace.live_fit:  # pragma: no cover
             fit_workspace.simulate(*tmp_params)
@@ -1036,15 +1037,14 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             my_logger.warning(f"\n\tGradient descent terminated in {i} iterations because all parameters "
                               f"have null Jacobian.")
             break
-        if fit_workspace.verbose or parameters.DEBUG:
-            if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
-                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
-                               f"relative to the sum of the parameters is below xtol={xtol}.")
-                break
-            if len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2])]) < ftol:
-                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
-                               f"relative change of cost is below ftol={ftol}.")
-                break
+        if np.sum(np.abs(alpha_min * dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
+            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
+                           f"relative to the sum of the parameters is below xtol={xtol}.")
+            break
+        if len(costs) > 1 and np.abs(costs[-2] - fval) / np.max([np.abs(fval), np.abs(costs[-2])]) < ftol:
+            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
+                           f"relative change of cost is below ftol={ftol}.")
+            break
     plt.close()
     return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
 
@@ -1154,15 +1154,14 @@ def simple_newton_minimisation(fit_workspace, params, epsilon, niter=10, fixed_p
             my_logger.warning(f"\n\tGradient descent terminated in {i} iterations because all parameters "
                               f"have null Jacobian.")
             break
-        if fit_workspace.verbose or parameters.DEBUG:
-            if np.sum(np.abs(dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
-                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
-                               f"relative to the sum of the parameters is below xtol={xtol}.")
-                break
-            if len(funcs) > 1 and np.abs(funcs[-2] - new_func) / np.max([np.abs(new_func), np.abs(funcs[-2])]) < ftol:
-                my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
-                               f"relative change of cost is below ftol={ftol}.")
-                break
+        if np.sum(np.abs(dparams)) / np.sum(np.abs(tmp_params[ipar])) < xtol:
+            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the sum of parameter shift "
+                           f"relative to the sum of the parameters is below xtol={xtol}.")
+            break
+        if len(funcs) > 1 and np.abs(funcs[-2] - new_func) / np.max([np.abs(new_func), np.abs(funcs[-2])]) < ftol:
+            my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
+                           f"relative change of cost is below ftol={ftol}.")
+            break
     plt.close()
     return tmp_params, inv_H[:, :, 0], np.array(funcs), np.array(params_table)
 
@@ -1286,9 +1285,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
     if method == "minimize":
         start = time.time()
         result = optimize.minimize(nll, fit_workspace.p, method=minimizer_method,
-                                   options={'ftol': ftol, 'gtol': 1e-20,
-                                            'maxiter': 100000, 'maxls': 50, 'maxcor': 30},
-                                   bounds=bounds)
+                                   options={'ftol': ftol, 'maxiter': 100000}, bounds=bounds)
         fit_workspace.p = result['x']
         if verbose:
             my_logger.debug(f"\n\t{result}")
@@ -1440,7 +1437,7 @@ def run_emcee(fit_workspace, ln=lnprob):
 
 class RegFitWorkspace(FitWorkspace):
 
-    def __init__(self, w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=False, live_fit=False):
+    def __init__(self, w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=0, live_fit=False):
         """
 
         Parameters
@@ -1462,6 +1459,13 @@ class RegFitWorkspace(FitWorkspace):
         self.G = 0
         self.chisquare = -1
 
+    def print_regularisation_summary(self):
+        self.my_logger.info(f"\n\tOptimal regularisation parameter: {self.opt_reg}"
+                            f"\n\tTr(R) = {np.trace(self.resolution)}"
+                            f"\n\tN_params = {len(self.w.amplitude_params)}"
+                            f"\n\tN_data = {self.w.data.size - len(self.w.mask) - len(self.w.outliers)}"
+                            f" (without mask and outliers)")
+
     def simulate(self, log10_r):
         reg = 10 ** log10_r
         M_dot_W_dot_M_plus_Q = self.w.M_dot_W_dot_M + reg * self.w.Q
@@ -1474,6 +1478,8 @@ class RegFitWorkspace(FitWorkspace):
             A = cov @ (self.w.M.T @ (self.w.W * self.w.data) + reg * self.w.Q_dot_A0)
         else:
             A = cov @ (self.w.M.T @ (self.w.W @ self.w.data) + reg * self.w.Q_dot_A0)
+        if A.ndim == 2:  # ndim == 2 when A comes from a sparse matrix computation
+            A = np.asarray(A).reshape(-1)
         self.resolution = np.eye(A.size) - reg * cov @ self.w.Q
         diff = self.w.data - self.w.M @ A
         if self.w.W.ndim == 1:
@@ -1483,7 +1489,7 @@ class RegFitWorkspace(FitWorkspace):
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
         self.w.amplitude_params_err = np.array([np.sqrt(cov[x, x]) for x in range(cov.shape[0])])
-        self.G = self.chisquare / (self.w.data.size - np.trace(self.resolution)) ** 2
+        self.G = self.chisquare / ((self.w.data.size - len(self.w.mask) - len(self.w.outliers)) - np.trace(self.resolution)) ** 2
         return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
     def plot_fit(self):
@@ -1544,6 +1550,13 @@ class RegFitWorkspace(FitWorkspace):
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'amplitude_correlation_matrix.pdf'))
         if parameters.DISPLAY:
             plt.show()
+
+    def run_regularisation(self):
+        run_minimisation(self, method="minimize", ftol=1e-4, xtol=1e-2, verbose=self.verbose, epsilon=[1e-1],
+                         minimizer_method="Nelder-Mead")
+        self.opt_reg = 10 ** self.p[0]
+        self.simulate(np.log10(self.opt_reg))
+        self.print_regularisation_summary()
 
 
 if __name__ == "__main__":

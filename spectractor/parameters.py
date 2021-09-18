@@ -33,6 +33,12 @@ def __getattr__(name):
         return False
 
 
+# Pipeline
+SPECTRACTOR_FIT_TARGET_CENTROID = "fit"  # method to get target centroid, choose among: guess, fit, WCS
+SPECTRACTOR_COMPUTE_ROTATION_ANGLE = "hessian"  # method to get image rotation angle: False, disperser, hessian
+SPECTRACTOR_DECONVOLUTION_PSF2D = True  # deconvolve spectrogram with simple 2D PSF analysis: False, True
+SPECTRACTOR_DECONVOLUTION_FFM = True  # deconvolve spectrogram with full forward model: False, True
+
 # Paths
 mypath = os.path.dirname(__file__)
 DISPERSER_DIR = os.path.join(mypath, "extractor/dispersers/")
@@ -81,15 +87,9 @@ HALPHA_FILTER = {'label': 'Halfa', 'min': HALPHA_CENTER - 2 * HALPHA_WIDTH, 'max
 ZGUNN = {'label': 'Z-Gunn', 'min': 800, 'max': 1100}
 FILTERS = [RG715, FGB37, HALPHA_FILTER, ZGUNN]
 
-# Making of the holograms
+# Spectrograph
 DISTANCE2CCD = 55.45  # distance between hologram and CCD in mm
 DISTANCE2CCD_ERR = 0.19  # uncertainty on distance between hologram and CCD in mm
-LAMBDA_CONSTRUCTOR = 639e-6  # constructor wavelength to make holograms in mm
-GROOVES_PER_MM = 350  # approximate effective number of lines per millimeter of the hologram
-PLATE_CENTER_SHIFT_X = -6.  # plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_Y = -8.  # plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_X_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
-PLATE_CENTER_SHIFT_Y_ERR = 2.  # estimate uncertainty on plate center shift on x in mm in filter frame
 GRATING_ORDER_2OVER1 = 0.1  # default value for order 2 over order 1 transmission ratio
 
 # Search windows in images
@@ -116,15 +116,15 @@ SPEC_ORDER = 1  # spectrum order to extract
 PIXWIDTH_SIGNAL = 10  # half transverse width of the signal rectangular window in pixels
 PIXDIST_BACKGROUND = 20  # distance from dispersion axis to analyse the background in pixels
 PIXWIDTH_BACKGROUND = 10  # transverse width of the background rectangular window in pixels
-PIXWIDTH_BOXSIZE = 20 # box size for sextractor evaluation of the background
+PIXWIDTH_BOXSIZE = 20  # box size for sextractor evaluation of the background
 BGD_ORDER = 1  # the order of the polynomial background to fit in the transverse direction
 
 # PSF
-PSF_EXTRACTION_MODE = "PSF_1D"  # extraction mode: 1D or 2D
 PSF_TYPE = "Moffat"  # the PSF model: Moffat or MoffatGauss
 PSF_POLY_ORDER = 2  # the order of the polynomials to model wavelength dependence of the PSF shape parameters
 PSF_FIT_REG_PARAM = 0.01  # regularisation parameter for the chisq minimisation to extract the spectrum
 PSF_PIXEL_STEP_TRANSVERSE_FIT = 10  # step size in pixels for the first transverse PSF1D fit
+PSF_FWHM_CLIP = 2  # PSF is not evaluated outside a region larger than max(PIXWIDTH_SIGNAL, PSF_FWHM_CLIP*fwhm) pixels
 
 # Detection line algorithm
 CALIB_BGD_ORDER = 3  # order of the background polynome to fit

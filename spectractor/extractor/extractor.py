@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from scipy.interpolate import interp1d
+from scipy import sparse
 import time
 
 from spectractor import parameters
@@ -13,7 +14,7 @@ from spectractor.extractor.spectrum import Spectrum, calibrate_spectrum
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
-from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple, rebin
+from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 from spectractor.fit.fitter import run_minimisation, run_minimisation_sigma_clipping, RegFitWorkspace, FitWorkspace
 
@@ -49,12 +50,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # check the shapes
         self.Ny, self.Nx = spectrum.spectrogram.shape
-        if self.Ny != self.spectrum.chromatic_psf.Ny:
-            raise AttributeError(f"Data y shape {self.Ny} different from "
-                                 f"ChromaticPSF input Ny {spectrum.chromatic_psf.Ny}.")
-        if self.Nx != self.spectrum.chromatic_psf.Nx:
-            raise AttributeError(f"Data x shape {self.Nx} different from "
-                                 f"ChromaticPSF input Nx {spectrum.chromatic_psf.Nx}.")
+        # if self.Ny != self.spectrum.chromatic_psf.Ny:
+        #     raise AttributeError(f"Data y shape {self.Ny} different from "
+        #                          f"ChromaticPSF input Ny {spectrum.chromatic_psf.Ny}.")
+        # if self.Nx != self.spectrum.chromatic_psf.Nx:
+        #     raise AttributeError(f"Data x shape {self.Nx} different from "
+        #                          f"ChromaticPSF input Nx {spectrum.chromatic_psf.Nx}.")
 
         # crop data to fit faster
         self.lambdas = self.spectrum.lambdas
@@ -127,6 +128,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # flat data for fitworkspace
         self.data = self.data.flatten() - self.bgd_flat
         self.err = self.err.flatten()
+        self.data_before_mask = np.copy(self.data)
+        self.W_before_mask = np.copy(self.W)
+
+        # create mask
+        self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.sparse_indices = None
+        self.set_mask()
 
         # design matrix
         self.M = np.zeros((self.Nx, self.data.size))
@@ -172,6 +180,24 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.Q = L.T @ np.linalg.inv(self.amplitude_priors_cov_matrix) @ L
             # self.Q = L.T @ U.T @ U @ L
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
+
+    def set_mask(self, psf_poly_params=None):
+        if psf_poly_params is None:
+            psf_poly_params = self.psf_poly_params
+        psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params,
+                                                                                            apply_bounds=True)
+        self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
+        psf_profile_params[:, 2] -= self.bgd_width
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, psf_profile_params,
+                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+        flat_spectrogram = np.sum(psf_cube.reshape(len(psf_profile_params), self.pixels[0].size), axis=0)
+        mask = flat_spectrogram / np.max(flat_spectrogram) == 0
+        self.data[mask] = 0
+        self.W[mask] = 0
+        self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.sparse_indices = None
+        self.mask = list(np.where(mask)[0])
 
     def simulate(self, *params):
         r"""
@@ -287,7 +313,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Distance in x and y with respect to the true order 0 position at lambda_ref
         Dx = np.arange(self.Nx) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
         Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        distance = np.sign(Dx)*np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
+        distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
         self.spectrum.chromatic_psf.table["Dy_disp_axis"] = Dy_disp_axis
         self.spectrum.chromatic_psf.table["Dx"] = Dx
 
@@ -365,25 +391,34 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         #     plt.show()
 
         # Matrix filling
-        M = np.array([self.spectrum.chromatic_psf.psf.evaluate(self.pixels, p=profile_params[x, :]).flatten()
-                      for x in range(self.Nx)]).T
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params,
+                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
         if A2 > 0:
-            for x in range(self.Nx):
-                M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
-                                                                         p=profile_params_order2[x, :]).flatten()
-                if profile_params_order2[x, 1] > 1.2 * self.Nx:
-                    break
-
+            # for x in range(self.Nx):
+            # M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
+            #                                                         p=profile_params_order2[x, :]).flatten()
+            # if profile_params_order2[x, 1] > 1.2 * self.Nx:
+            #    break
+            psf_cube2 = A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
+                                                                        fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                                        fwhmy_clip=parameters.PSF_FWHM_CLIP,
+                                                                        dtype="float32")
+            psf_cube += psf_cube2
+        M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
+        if self.sparse_indices is None:
+            self.sparse_indices = np.where(M > 0)
+        M = sparse.csr_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
-            W_dot_M = np.array([M[:, x] * self.W for x in range(self.Nx)]).T
-            M_dot_W_dot_M = M.T @ W_dot_M
+            M_dot_W = M.T * self.sqrtW
+            M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             if self.amplitude_priors_method != "spectrum":
-                try:
-                    L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-                    cov_matrix = L.T @ L
-                except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M)
+                # try:  # slower
+                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
+                #     cov_matrix = L.T @ L
+                # except np.linalg.LinAlgError:
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M)
                 amplitude_params = cov_matrix @ (M.T @ W_dot_data)
                 if self.amplitude_priors_method == "positive":
                     amplitude_params[amplitude_params < 0] = 0
@@ -405,13 +440,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                     pass
             else:
                 M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
-                try:
-                    L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-                    cov_matrix = L.T @ L
-                except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
+                # try:  # slower
+                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
+                #     cov_matrix = L.T @ L
+                # except np.linalg.LinAlgError:
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
                 amplitude_params = cov_matrix @ (M.T @ W_dot_data + self.reg * self.Q_dot_A0)
             self.M_dot_W_dot_M = M_dot_W_dot_M
+            amplitude_params = np.asarray(amplitude_params).reshape(-1)
         else:
             amplitude_params = np.copy(self.amplitude_priors)
             err2 = np.copy(amplitude_params)
@@ -427,7 +463,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.amplitude_cov_matrix = np.copy(cov_matrix)
 
         # Compute the model
-        self.model = (M @ amplitude_params)  # .reshape((self.Ny, self.Nx))
+        self.model = M @ amplitude_params
         self.model_err = np.zeros_like(self.model)
 
         return self.pixels, self.model, self.model_err
@@ -451,9 +487,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         cmap_viridis = copy.copy(cm.get_cmap('viridis'))
         cmap_viridis.set_bad(color='lightgrey')
 
-        data = np.copy(self.data)
-        if len(self.outliers) > 0:
-            bad_indices = self.get_bad_indices()
+        data = np.copy(self.data_before_mask)
+        if len(self.outliers) > 0 or len(self.mask) > 0:
+            bad_indices = np.array(list(self.get_bad_indices()) + list(self.mask)).astype(int)
             data[bad_indices] = np.nan
 
         lambdas = self.spectrum.lambdas
@@ -501,6 +537,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[3, 1].remove()
             ax[3, 0].plot(self.lambdas[sub], np.nansum(data, axis=0)[sub], label='Data')
+            model[np.isnan(data)] = np.nan  # mask background values outside fitted region
             ax[3, 0].plot(self.lambdas[sub], np.nansum(model, axis=0)[sub], label='Model')
             ax[3, 0].set_ylabel('Cross spectrum')
             ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
@@ -565,8 +602,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
 
+    def adjust_spectrogram_position_parameters(self):
+        # fit the spectrogram trace
+        epsilon = 1e-4 * self.p
+        epsilon[epsilon == 0] = 1e-4
+        fixed = [True] * len(self.p)
+        fixed[3:5] = [False, False]  # shift_y and angle
+        self.sparse_indices = None
+        run_minimisation(self, "newton", epsilon, fixed, xtol=1e-4, ftol=100 / self.data.size)
+        self.sparse_indices = None
 
-def run_ffm_minimisation(w, method="newton"):
+
+def run_ffm_minimisation(w, method="newton", niter=2):
     """Interface function to fit spectrogram simulation parameters to data.
 
     Parameters
@@ -575,6 +622,8 @@ def run_ffm_minimisation(w, method="newton"):
         An instance of the SpectrogramFitWorkspace class.
     method: str, optional
         Fitting method (default: 'newton').
+    niter: int, optional
+        Number of FFM iterations to final result (default: 2).
 
     Returns
     -------
@@ -600,26 +649,70 @@ def run_ffm_minimisation(w, method="newton"):
 
     """
     my_logger = set_logger(__name__)
-    guess = np.asarray(w.p)
-    w.simulate(*guess)
-    w.plot_fit()
+    w.adjust_spectrogram_position_parameters()
+
     if method != "newton":
         run_minimisation(w, method=method)
     else:
-        costs = np.array([w.chisq(guess)])
+        costs = np.array([w.chisq(w.p)])
         if parameters.DISPLAY and (parameters.DEBUG or w.live_fit):
             w.plot_fit()
         start = time.time()
-        my_logger.info(f"\n\tStart guess: {guess}\n\twith {w.input_labels}")
-        epsilon = 1e-4 * guess
+        my_logger.info(f"\n\tStart guess: {w.p}\n\twith {w.input_labels}")
+        epsilon = 1e-4 * w.p
         epsilon[epsilon == 0] = 1e-4
-        fixed = np.copy(w.fixed)
 
-        w.fixed = np.copy(fixed)
-        run_minimisation_sigma_clipping(w, "newton", epsilon, fixed, xtol=1e-5,
-                                        ftol=1 / w.data.size, sigma_clip=10, niter_clip=3)
+        run_minimisation(w, method=method, fix=w.fixed, xtol=1e-4, ftol=10 / w.data.size)
+        # Optimize the regularisation parameter only if it was not done before
+        if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
+            w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
+            w_reg.run_regularisation()
+            w.opt_reg = w_reg.opt_reg
+            w.reg = np.copy(w_reg.opt_reg)
+            w.simulate(*w.p)
+            if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
+                w.my_logger.warning(
+                    f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
+                    f"below the trace of the prior covariance matrix "
+                    f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
+                    f"high regularisation parameter in case of a bad fit. Therefore the final "
+                    f"covariance matrix is mulitiplied by the ratio of the traces and "
+                    f"the amplitude parameters are very close the amplitude priors.")
+                r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
+                w.amplitude_cov_matrix *= r
+                w.amplitude_params_err = np.array(
+                    [np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
 
-        my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
+        for i in range(niter):
+            w.set_mask(psf_poly_params=w.p[w.psf_params_start_index:])
+            run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
+                                            ftol=1 / w.data.size, sigma_clip=20, niter_clip=3)
+            my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
+
+            if parameters.DEBUG:
+                w.plot_fit()
+            w.spectrum.lambdas = np.copy(w.lambdas)
+            w.spectrum.data = np.copy(w.amplitude_params)
+            w.spectrum.err = np.copy(w.amplitude_params_err)
+            w.spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
+            w.spectrum.chromatic_psf.fill_table_with_profile_params(w.psf_profile_params)
+            w.spectrum.chromatic_psf.table["amplitude"] = np.copy(w.amplitude_params)
+            w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params)
+            w.spectrum.chromatic_psf.poly_params = w.spectrum.chromatic_psf.from_table_to_poly_params()
+            w.spectrum.spectrogram_fit = w.model
+            w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
+            w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
+            w.spectrum.header['PIXSHIFT'] = w.p[2]
+            w.spectrum.header['D2CCD'] = w.p[1]
+            w.spectrum.header['A2_FIT'] = w.p[0]
+            w.spectrum.header["ROTANGLE"] = w.p[4]
+
+            # Calibrate the spectrum
+            calibrate_spectrum(w.spectrum, with_adr=False)
+            w.p[1] = w.spectrum.disperser.D
+            w.p[2] = w.spectrum.header['PIXSHIFT']
+            w.spectrum.convert_from_flam_to_ADUrate()
+
         if w.filename != "":
             parameters.SAVE = True
             ipar = np.array(np.where(np.array(w.fixed).astype(int) == 0)[0])
@@ -629,30 +722,8 @@ def run_ffm_minimisation(w, method="newton"):
             w.plot_fit()
             parameters.SAVE = False
 
-    # Optimize the regularisation parameter only if it was not done before
-    if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
-        w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=1)
-        run_minimisation(w_reg, method="minimize", ftol=1e-4, xtol=1e-2, verbose=1, epsilon=[1e-1],
-                         minimizer_method="Nelder-Mead")
-        w_reg.opt_reg = 10 ** w_reg.p[0]
-        w.my_logger.info(f"\n\tOptimal regularisation parameter: {w_reg.opt_reg}")
-        w.reg = np.copy(w_reg.opt_reg)
-        w.simulate(*w.p)
-        w.opt_reg = w_reg.opt_reg
-        if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
-            w.my_logger.warning(
-                f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
-                f"below the trace of the prior covariance matrix "
-                f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
-                f"high regularisation parameter in case of a bad fit. Therefore the final "
-                f"covariance matrix is mulitiplied by the ratio of the traces and "
-                f"the amplitude parameters are very close the amplitude priors.")
-            r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
-            w.amplitude_cov_matrix *= r
-            w.amplitude_params_err = np.array(
-                [np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
-
     # Save results
+    w.spectrum.convert_from_ADUrate_to_flam()
     x, model, model_err = w.simulate(*w.p)
 
     # Propagate uncertainties
@@ -679,21 +750,29 @@ def run_ffm_minimisation(w, method="newton"):
     # w.amplitude_params_err = amplitude_params_err
     # w.amplitude_cov_matrix = full_cov_matrix[start:, start:]
 
-    if parameters.DEBUG:
-        w.plot_fit()
-    w.spectrum.lambdas = np.copy(w.lambdas)
-    w.spectrum.data = np.copy(w.amplitude_params)
-    w.spectrum.err = np.copy(w.amplitude_params_err)
-    w.spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
-    w.spectrum.chromatic_psf.fill_table_with_profile_params(w.psf_profile_params)
-    w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params)
-    w.spectrum.spectrogram_fit = w.model
-    w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
-    w.spectrum.header['CHI2_FIT'] = w.costs[-1] / w.data.size
-    w.spectrum.header['PIXSHIFT'] = w.p[2]
-    w.spectrum.header['D2CCD'] = w.p[1]
-    w.spectrum.header['A2_FIT'] = w.p[0]
-    w.spectrum.header["ROTANGLE"] = w.p[4]
+    # Propagate parameters
+    A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.p
+    w.spectrum.rotation_angle = angle
+    w.spectrum.spectrogram_bgd *= B
+    w.spectrum.spectrogram_bgd_rms *= B
+    w.spectrum.spectrogram_x0 += dx0
+    w.spectrum.spectrogram_y0 += dy0
+    w.spectrum.x0[0] += dx0
+    w.spectrum.x0[1] += dy0
+    w.spectrum.header["TARGETX"] = w.spectrum.x0[0]
+    w.spectrum.header["TARGETY"] = w.spectrum.x0[1]
+
+    # Compute order 2 contamination
+    w.spectrum.lambdas_order2 = w.lambdas
+    w.spectrum.data_order2 = A2 * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+    w.spectrum.err_order2 = A2 * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+
+    # Convert to flam
+    w.spectrum.convert_from_ADUrate_to_flam()
+
+    # Compare with truth if available
+    if 'LBDAS_T' in w.spectrum.header and parameters.DEBUG:
+        plot_comparison_truth(w.spectrum, w)
 
     return w.spectrum
 
@@ -776,7 +855,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Use fast mode
     if parameters.CCD_REBIN > 1:
-        image = set_fast_mode(image)
+        image.rebin()
         if parameters.DEBUG:
             image.plot_image(scale='symlog', target_pixcoords=image.target_guess)
 
@@ -790,21 +869,25 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
     # Find the exact target position in the raw cut image: several methods
     my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
-    find_target(image, image.target_guess, use_wcs=True, widths=(parameters.XWINDOW, parameters.YWINDOW))
+    find_target(image, image.target_guess, widths=(parameters.XWINDOW, parameters.YWINDOW))
     # Rotate the image
     turn_image(image)
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-    find_target(image, image.target_guess, rotated=True, use_wcs=False,
-                widths=(parameters.XWINDOW_ROT, parameters.YWINDOW_ROT))
+    find_target(image, image.target_guess, rotated=True, widths=(parameters.XWINDOW_ROT, parameters.YWINDOW_ROT))
     # Create Spectrum object
     spectrum = Spectrum(image=image, order=parameters.SPEC_ORDER)
-    # Subtract background and bad pixels
-    extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
-                                ws=(parameters.PIXDIST_BACKGROUND,
-                                    parameters.PIXDIST_BACKGROUND + parameters.PIXWIDTH_BACKGROUND),
-                                right_edge=parameters.CCD_IMSIZE)
+    # First 1D spectrum extraction and background extraction
+    w_psf1d, bgd_model_func = extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
+                                                          ws=(parameters.PIXDIST_BACKGROUND,
+                                                              parameters.PIXDIST_BACKGROUND
+                                                              + parameters.PIXWIDTH_BACKGROUND),
+                                                          right_edge=parameters.CCD_IMSIZE)
     spectrum.atmospheric_lines = atmospheric_lines
+
+    # PSF2D deconvolution
+    if parameters.SPECTRACTOR_DECONVOLUTION_PSF2D:
+        run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func=bgd_model_func)
 
     # Calibrate the spectrum
     my_logger.info(f'\n\tCalibrating order {spectrum.order:d} spectrum...')
@@ -816,41 +899,10 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     spectrum.err_order2 = np.zeros_like(spectrum.lambdas_order2)
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
-    if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and parameters.OBS_OBJECT_TYPE == "STAR":
-        w = FullForwardModelFitWorkspace(spectrum, verbose=1, plot=True, live_fit=False,
+    if parameters.SPECTRACTOR_DECONVOLUTION_FFM:
+        w = FullForwardModelFitWorkspace(spectrum, verbose=parameters.VERBOSE, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
-        for i in range(2):
-            spectrum.convert_from_flam_to_ADUrate()
-            spectrum = run_ffm_minimisation(w, method="newton")
-
-            # Calibrate the spectrum
-            calibrate_spectrum(spectrum, with_adr=False)
-            w.p[1] = spectrum.disperser.D
-            w.p[2] = spectrum.header['PIXSHIFT']
-
-        # Recompute and save params in class attributes
-        w.simulate(*w.p)
-
-        # Propagate parameters
-        A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.p
-        w.spectrum.rotation_angle = angle
-        w.spectrum.spectrogram_bgd *= B
-        w.spectrum.spectrogram_bgd_rms *= B
-        w.spectrum.spectrogram_x0 += dx0
-        w.spectrum.spectrogram_y0 += dy0
-        w.spectrum.x0[0] += dx0
-        w.spectrum.x0[1] += dy0
-        w.spectrum.header["TARGETX"] = w.spectrum.x0[0]
-        w.spectrum.header["TARGETY"] = w.spectrum.x0[1]
-
-        # Compute order 2 contamination
-        w.spectrum.lambdas_order2 = w.lambdas
-        w.spectrum.data_order2 = A2 * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
-        w.spectrum.err_order2 = A2 * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
-
-        # Compare with truth if available
-        if parameters.PSF_EXTRACTION_MODE == "PSF_2D" and 'LBDAS_T' in spectrum.header and parameters.DEBUG:
-            plot_comparison_truth(spectrum, w)
+        spectrum = run_ffm_minimisation(w, method="newton", niter=2)
 
     # Save the spectrum
     spectrum.save_spectrum(output_filename, overwrite=True)
@@ -897,9 +949,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         Right-hand pixel position above which no pixel should be used (default: parameters.CCD_IMSIZE)
     """
 
-    if parameters.PSF_EXTRACTION_MODE != "PSF_1D" and parameters.PSF_EXTRACTION_MODE != "PSF_2D":
-        raise NotImplementedError(f"PSF_EXTRACTION_MODE must PSF_1D or PSF_2D. Found {parameters.PSF_EXTRACTION_MODE}.")
-
     my_logger = set_logger(__name__)
     if ws is None:
         ws = [signal_width + 20, signal_width + 30]
@@ -920,14 +969,15 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Roughly estimates the wavelengths and set start 0 nm before parameters.LAMBDA_MIN
     # and end 0 nm after parameters.LAMBDA_MAX
     if spectrum.order < 0:
-        distance = np.sign(spectrum.order)*(np.arange(Nx) - image.target_pixcoords_rotated[0])
+        distance = np.sign(spectrum.order) * (np.arange(Nx) - image.target_pixcoords_rotated[0])
         lambdas = image.disperser.grating_pixel_to_lambda(distance, x0=image.target_pixcoords, order=spectrum.order)
         lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MIN)))
         lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
         xmin = max(0, int(distance[lambda_min_index]))
         xmax = min(right_edge, int(distance[lambda_max_index]) + 1)  # +1 to  include edges
     else:
-        lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0], x0=image.target_pixcoords,
+        lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
+                                                          x0=image.target_pixcoords,
                                                           order=spectrum.order)
         xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
         xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
@@ -958,7 +1008,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Fit the transverse profile
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
-    psf = load_PSF(psf_type=parameters.PSF_TYPE, target=image.target)
+    psf = load_PSF(psf_type=parameters.PSF_TYPE, target=image.target, clip=False)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
                      deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
     verbose = copy.copy(parameters.VERBOSE)
@@ -1002,8 +1052,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Rotate and save the table
     s.rotate_table(-image.rotation_angle)
-    flux = np.copy(s.table["amplitude"])
-    flux_err = np.copy(s.table["flux_err"])
 
     # Extract the spectrogram edges
     data = np.copy(image.data)[:, 0:right_edge]
@@ -1045,50 +1093,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Propagate background uncertainties
     err = np.sqrt(err * err + bgd_rms * bgd_rms)
-
-    # 2D extraction
-    opt_reg = -1
-    if parameters.PSF_EXTRACTION_MODE == "PSF_2D":
-        # build 1D priors
-        psf_poly_priors = s.from_table_to_poly_params()[s.Nx:]
-        Dy_disp_axis = np.copy(s.table["Dy_disp_axis"])
-        # initialize a new ChromaticPSF
-        s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
-                         deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
-        # fill a first table with first guess
-        s.table['Dx'] = (np.arange(xmin, xmax, 1) - image.target_pixcoords[0])[:len(s.table['Dx'])]
-        s.table["amplitude"] = np.interp(s.table['Dx'], Dx_rot, flux)
-        s.table["flux_sum"] = np.interp(s.table['Dx'], Dx_rot, flux)
-        s.table["flux_err"] = np.interp(s.table['Dx'], Dx_rot, flux_err)
-        s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
-        s.poly_params = np.concatenate((s.table["amplitude"], psf_poly_priors))
-        s.cov_matrix = np.copy(w.amplitude_cov_matrix)
-        s.profile_params = s.from_poly_params_to_profile_params(s.poly_params, apply_bounds=True)
-        s.fill_table_with_profile_params(s.profile_params)
-        s.table['Dy'] = s.table['y_c'] - target_pixcoords_spectrogram[1]
-        # deconvolve and regularize with 1D priors
-        method = "psf1d"
-        mode = "2D"
-        my_logger.debug(f"\n\tTransverse fit table before PSF_2D fit:"
-                        f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
-        my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
-                       f'mode={mode} and amplitude_priors_method={method}...')
-        w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False,
-                                amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
-        # save results
-        spectrum.spectrogram_fit = s.evaluate(s.poly_params, mode=mode)
-        spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
-                                                                                           np.arange(Ny))) / err
-        spectrum.data = np.copy(w.amplitude_params)
-        spectrum.err = np.copy(w.amplitude_params_err)
-        spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
-        spectrum.pixels = np.copy(s.table['Dx'])
-        s.table['Dy'] = s.table['y_c'] - target_pixcoords_spectrogram[1]
-        s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
-        s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
-        spectrum.chromatic_psf = s
-        opt_reg = s.opt_reg
-    spectrum.header['PSF_REG'] = opt_reg
 
     # First guess for lambdas
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
@@ -1173,6 +1177,99 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         if parameters.LSST_SAVEFIGPATH:
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'intermediate_spectrum.pdf'))
 
+    return w, bgd_model_func
+
+
+def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
+    """Get the spectrum from a 2D PSF deconvolution of the spectrogram.
+
+    Parameters
+    ----------
+    spectrum: Spectrum
+    bgd_model_func: callable
+
+    Returns
+    -------
+    w: ChromaticPSFFitWorkspace
+
+    """
+    my_logger = set_logger(__name__)
+    s = spectrum.chromatic_psf
+    Ny, Nx = spectrum.spectrogram.shape
+
+    # build 1D priors
+    Dx_rot = np.copy(s.table['Dx'])
+    amplitude_priors = np.copy(s.table['amplitude'])
+    amplitude_priors_err = np.copy(s.table['flux_err'])
+    psf_poly_priors = s.from_table_to_poly_params()[s.Nx:]
+    Dy_disp_axis = np.copy(s.table["Dy_disp_axis"])
+
+    # initialize a new ChromaticPSF
+    s = ChromaticPSF(s.psf, Nx=Nx, Ny=Ny, x0=spectrum.spectrogram_x0, y0=spectrum.spectrogram_y0,
+                     deg=s.deg, saturation=s.saturation)
+
+    # fill a first table with first guess
+    s.table['Dx'] = (np.arange(spectrum.spectrogram_xmin, spectrum.spectrogram_xmax, 1)
+                     - spectrum.x0[0])[:len(s.table['Dx'])]
+    s.table["amplitude"] = np.interp(s.table['Dx'], Dx_rot, amplitude_priors)
+    s.table["flux_sum"] = np.interp(s.table['Dx'], Dx_rot, amplitude_priors)
+    s.table["flux_err"] = np.interp(s.table['Dx'], Dx_rot, amplitude_priors_err)
+    s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
+    s.poly_params = np.concatenate((s.table["amplitude"], psf_poly_priors))
+    s.cov_matrix = np.copy(spectrum.cov_matrix)
+    s.profile_params = s.from_poly_params_to_profile_params(s.poly_params, apply_bounds=True)
+    s.fill_table_with_profile_params(s.profile_params)
+    s.from_profile_params_to_shape_params(s.profile_params)
+    s.table['Dy'] = s.table['y_c'] - spectrum.spectrogram_y0
+
+    # deconvolve and regularize with 1D priors
+    method = "psf1d"
+    mode = "2D"
+    my_logger.debug(f"\n\tTransverse fit table before PSF_2D fit:"
+                    f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
+    my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
+                   f'mode={mode} and amplitude_priors_method={method}...')
+    data = spectrum.spectrogram
+    err = spectrum.spectrogram_err
+    w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False,
+                            amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
+
+    # save results
+    spectrum.spectrogram_fit = s.build_spectrogram_image(s.poly_params, mode=mode)
+    spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
+                                                                                       np.arange(Ny))) / err
+    lambdas = spectrum.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
+                                                         x0=spectrum.x0, order=spectrum.order)
+    s.table['lambdas'] = lambdas
+    spectrum.lambdas = np.array(lambdas)
+    spectrum.data = np.copy(w.amplitude_params)
+    spectrum.err = np.copy(w.amplitude_params_err)
+    spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
+    spectrum.pixels = np.copy(s.table['Dx'])
+    s.table['Dy'] = s.table['y_c'] - spectrum.spectrogram_y0
+    s.table['Dy_fwhm_inf'] = s.table['Dy'] - 0.5 * s.table['fwhm']
+    s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
+    spectrum.chromatic_psf = s
+    spectrum.header['PSF_REG'] = s.opt_reg
+
+    # Plot FHWM(lambda)
+    if parameters.DEBUG:
+        fig, ax = plt.subplots(2, 1, figsize=(10, 8), sharex="all")
+        ax[0].plot(spectrum.lambdas, np.array(s.table['fwhm']))
+        ax[0].set_xlabel(r"$\lambda$ [nm]")
+        ax[0].set_ylabel("Transverse FWHM [pixels]")
+        ax[0].set_ylim((0.8 * np.min(s.table['fwhm']), 1.2 * np.max(s.table['fwhm'])))  # [-10:])))
+        ax[0].grid()
+        ax[1].plot(spectrum.lambdas, np.array(s.table['y_c']))
+        ax[1].set_xlabel(r"$\lambda$ [nm]")
+        ax[1].set_ylabel("Distance from mean dispersion axis [pixels]")
+        # ax[1].set_ylim((0.8*np.min(s.table['Dy']), 1.2*np.max(s.table['fwhm'][-10:])))
+        ax[1].grid()
+        if parameters.DISPLAY:
+            plt.show()
+        if parameters.LSST_SAVEFIGPATH:
+            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'fwhm_2.pdf'))
+
     return w
 
 
@@ -1242,34 +1339,3 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     if parameters.LSST_SAVEFIGPATH:
         fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'deconvolution_truth.pdf'))
     plt.show()
-
-
-def set_fast_mode(image):
-    """Set the parameters for a fast mode run of Spectractor.
-
-    Parameters
-    ----------
-    image: Image
-
-    Returns
-    -------
-    image: Image
-
-    """
-    new_shape = np.asarray(image.data.shape) // parameters.CCD_REBIN
-    image.data = rebin(image.data, new_shape)
-    image.stat_errors = np.sqrt(rebin(image.stat_errors ** 2, new_shape))
-    image.target_guess = np.asarray(image.target_guess) / parameters.CCD_REBIN
-    parameters.PIXDIST_BACKGROUND //= parameters.CCD_REBIN
-    parameters.PIXWIDTH_BOXSIZE = max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN)
-    parameters.PIXWIDTH_BACKGROUND //= parameters.CCD_REBIN
-    parameters.PIXWIDTH_SIGNAL //= parameters.CCD_REBIN
-    parameters.CCD_IMSIZE //= parameters.CCD_REBIN
-    parameters.CCD_PIXEL2MM *= parameters.CCD_REBIN
-    parameters.CCD_PIXEL2ARCSEC *= parameters.CCD_REBIN
-    parameters.XWINDOW //= parameters.CCD_REBIN
-    parameters.YWINDOW //= parameters.CCD_REBIN
-    parameters.XWINDOW_ROT //= parameters.CCD_REBIN
-    parameters.YWINDOW_ROT //= parameters.CCD_REBIN
-    parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT //= parameters.CCD_REBIN
-    return image

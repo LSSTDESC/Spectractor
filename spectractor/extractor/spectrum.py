@@ -8,7 +8,7 @@ import numpy as np
 import os
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config
+from spectractor.config import set_logger, load_config, apply_rebinning_to_parameters
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
@@ -607,7 +607,8 @@ class Spectrum:
             if 'PARANGLE' in self.header and self.header['PARANGLE'] != "":
                 self.parallactic_angle = self.header['PARANGLE']
             if 'CCDREBIN' in self.header and self.header['CCDREBIN'] != "":
-                parameters.CCD_REBIN = self.header['CCDREBIN']
+                if parameters.CCD_REBIN != self.header['CCDREBIN']:
+                    raise ValueError("Different values of rebinning parameters between config file and header. Choose.")
 
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
@@ -1210,6 +1211,10 @@ def calibrate_spectrum(spectrum, with_adr=False):
 
     def shift_minimizer(params):
         spectrum.disperser.D, shift = params
+        if np.isnan(spectrum.disperser.D):  # reset the value in case of bad gradient descent
+            spectrum.disperser.D = parameters.DISTANCE2CCD
+        if np.isnan(shift):  # reset the value in case of bad gradient descent
+            shift = 0
         dist = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=shift)
         spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(dist - with_adr * adr_u,
                                                                       x0=[x0[0] + shift, x0[1]], order=spectrum.order)
