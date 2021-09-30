@@ -50,13 +50,16 @@ def from_config_to_parameters(config):
             setattr(parameters, options.upper(), value)
 
 
-def load_config(config_filename):
+def load_config(config_filename, rebin=True):
     """Load configuration parameters from a .ini config file.
 
     Parameters
     ----------
     config_filename: str
         The path to the config file.
+    rebin: bool, optional
+        If True, the parameters.REBIN parameter is used and every parameters are changed to comply with the REBIN value.
+        If False, the parameters.REBIN parameter is skipped and set to 1.
 
     Examples
     --------
@@ -106,8 +109,11 @@ def load_config(config_filename):
                                    * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
 
-    if parameters.CCD_REBIN > 1:
+    if parameters.CCD_REBIN > 1 and rebin:
         apply_rebinning_to_parameters()
+    else:
+        parameters.CCD_REBIN = 1
+        print("No rebinning: parameters.REBIN is forced to 1.")
 
     # check consistency
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
