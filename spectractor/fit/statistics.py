@@ -509,7 +509,7 @@ class Likelihood(Grid):
             if verbose:
                 print(('\n'.join([''.join(['\t{0:4.3f}'.format(item) for item in row]) for row in self.rho_matrix])))
             # Output results
-            if output is not '':
+            if output != '':
                 txt = ''
                 for i in self.rangedim:
                     txt += f'{self.pdfs[i].txt_long}\n'

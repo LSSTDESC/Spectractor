@@ -284,7 +284,8 @@ class ChromaticPSF:
             ymin = max(0, int(yc - max(parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
             ymax = min(Ny_pix, int(yc + max(parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
             # print(x, xc, yc, xmin, xmax, ymin, ymax, fwhms[x])
-            psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], p=profile_params[x, :])
+            psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax],
+                                                                  p=profile_params[x, :])
         return psf_cube
 
     def fill_table_with_profile_params(self, profile_params):
@@ -626,9 +627,9 @@ class ChromaticPSF:
         bounds = [[], []]
         for k, name in enumerate(self.psf.param_names):
             tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
-            if name is "saturation":
+            if name == "saturation":
                 tmp_bounds = [[0], [2 * self.saturation]]
-            elif name is "amplitude":
+            elif name == "amplitude":
                 continue
             bounds[0] += tmp_bounds[0]
             bounds[1] += tmp_bounds[1]
@@ -659,12 +660,12 @@ class ChromaticPSF:
             bounds = [[], []]
         for k, name in enumerate(self.psf.param_names):
             tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
-            if name is "saturation":
+            if name == "saturation":
                 if data is not None:
                     tmp_bounds = [[0.1 * np.max(data)], [2 * self.saturation]]
                 else:
                     tmp_bounds = [[0], [2 * self.saturation]]
-            elif name is "amplitude":
+            elif name == "amplitude":
                 continue
             bounds[0] += tmp_bounds[0]
             bounds[1] += tmp_bounds[1]
@@ -725,7 +726,7 @@ class ChromaticPSF:
                     in_bounds = False
                     penalty += np.abs(np.sum(profile_params[p < -noise_level, k]))  # / np.mean(np.abs(p))
                     outbound_parameter_name += name + ' '
-            elif name is "saturation":
+            elif name == "saturation":
                 continue
             else:
                 if np.any(p > self.psf.bounds[k][1]):
@@ -1113,7 +1114,8 @@ class ChromaticPSF:
             w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                            live_fit=live_fit)
-            run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, fix=w.fixed, verbose=verbose)
+            run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, fix=w.fixed,
+                             verbose=verbose)
             if amplitude_priors_method == "psf1d":
                 w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
                 w_reg.run_regularisation()
@@ -1121,12 +1123,13 @@ class ChromaticPSF:
                 self.opt_reg = w_reg.opt_reg
                 w.simulate(*w.p)
                 if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
-                    self.my_logger.warning(f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
-                                           f"below the trace of the prior covariance matrix "
-                                           f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
-                                           f"high regularisation parameter in case of a bad fit. Therefore the final "
-                                           f"covariance matrix is mulitiplied by the ratio of the traces and "
-                                           f"the amplitude parameters are very close the amplitude priors.")
+                    self.my_logger.warning(
+                        f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
+                        f"below the trace of the prior covariance matrix "
+                        f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
+                        f"high regularisation parameter in case of a bad fit. Therefore the final "
+                        f"covariance matrix is mulitiplied by the ratio of the traces and "
+                        f"the amplitude parameters are very close the amplitude priors.")
                     r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
                     w.amplitude_cov_matrix *= r
                     w.amplitude_params_err = np.array([np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(self.Nx)])
@@ -1468,7 +1471,8 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                 cov_matrix = np.diag([1 / M_dot_W_dot_M[x] if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
                                       for x in range(self.Nx)])
                 amplitude_params = np.array([
-                    M[x].T @ (self.W[x] * self.data[x]) / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
+                    M[x].T @ (self.W[x] * self.data[x]) / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[
+                                                                                    x] > 0 else 0.1 * self.bgd_std
                     for x in range(self.Nx)])
                 if self.amplitude_priors_method == "positive":
                     amplitude_params[amplitude_params < 0] = 0
@@ -1492,8 +1496,9 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
                 M_dot_W_dot_M_plus_Q = [M_dot_W_dot_M[x] + self.reg * self.Q[x, x] for x in range(self.Nx)]
                 cov_matrix = np.diag([1 / M_dot_W_dot_M_plus_Q[x] if M_dot_W_dot_M_plus_Q[x] > 0 else 0.1 * self.bgd_std
                                       for x in range(self.Nx)])
-                amplitude_params = [cov_matrix[x, x] * (M[x].T @ (self.W[x] * self.data[x]) + self.reg * self.Q_dot_A0[x])
-                                    for x in range(self.Nx)]
+                amplitude_params = [
+                    cov_matrix[x, x] * (M[x].T @ (self.W[x] * self.data[x]) + self.reg * self.Q_dot_A0[x])
+                    for x in range(self.Nx)]
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
             self.model = np.zeros((self.Nx, self.Ny), dtype=float)
@@ -1513,7 +1518,8 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.poly_params = np.copy(poly_params)
         poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
         if self.amplitude_priors_method == "fixed":
-            self.model = self.chromatic_psf.build_spectrogram_image(poly_params, mode="1D")[self.bgd_width:-self.bgd_width, :].T
+            self.model = self.chromatic_psf.build_spectrogram_image(poly_params, mode="1D")[
+                         self.bgd_width:-self.bgd_width, :].T
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
@@ -1566,7 +1572,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         if np.sum(self.chromatic_psf.table["fwhm"]) == 0:
             self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
-        psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params, fwhmx_clip=3*parameters.PSF_FWHM_CLIP,
+        psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
+                                                     fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
                                                      fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
         flat_spectrogram = np.sum(psf_cube.reshape(len(profile_params), self.pixels[0].size), axis=0)
         mask = flat_spectrogram / np.max(flat_spectrogram) == 0
@@ -1733,7 +1740,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
             psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
-                                                         fwhmx_clip=3*parameters.PSF_FWHM_CLIP,
+                                                         fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
                                                          fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
             M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
             self.sparse_indices = np.where(M > 0)
@@ -1792,7 +1799,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
         if self.amplitude_priors_method == "fixed":
             poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
-            self.model = self.chromatic_psf.build_spectrogram_image(poly_params, mode="2D")[self.bgd_width:-self.bgd_width, :]
+            self.model = self.chromatic_psf.build_spectrogram_image(poly_params, mode="2D")[
+                         self.bgd_width:-self.bgd_width, :]
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
