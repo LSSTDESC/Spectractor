@@ -1251,6 +1251,8 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
     s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
     spectrum.chromatic_psf = s
     spectrum.header['PSF_REG'] = s.opt_reg
+    spectrum.header['TRACE_R'] = w.trace_r
+    spectrum.header['MEANFWHM'] = np.mean(np.array(s.table['fwhm']))
 
     # Plot FHWM(lambda)
     if parameters.DEBUG:
