@@ -1266,6 +1266,7 @@ def calibrate_spectrum(spectrum, with_adr=False):
         plt.xlabel(r'Pixel shift $\delta u_0$ [pix]')
         plt.ylabel(r'$D_\mathrm{CCD}$ [mm]')
         plt.legend()
+        fig.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover

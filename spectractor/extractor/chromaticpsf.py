@@ -1312,6 +1312,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         ax[3, 0].legend(fontsize=7)
         ax[3, 0].set_xlim((0, data.shape[1]))
         ax[3, 0].grid(True)
+        fig.tight_layout()
         if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)

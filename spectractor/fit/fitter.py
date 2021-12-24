@@ -1546,6 +1546,7 @@ class RegFitWorkspace(FitWorkspace):
         plot_correlation_matrix_simple(plt.gca(), rho, axis_names=[''] * len(self.w.amplitude_params))
         # ipar=np.arange(10, 20))
         plt.gca().set_title(r"Correlation matrix $\mathbf{\rho}$")
+        fig.tight_layout()
         if parameters.LSST_SAVEFIGPATH:
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'amplitude_correlation_matrix.pdf'))
         if parameters.DISPLAY:
