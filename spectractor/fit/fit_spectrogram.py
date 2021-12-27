@@ -134,7 +134,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.bounds[4] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
-                                           with_background=True, fast_sim=False)
+                                           with_background=True, fast_sim=False, with_adr=True)
         self.lambdas_truth = None
         self.amplitude_truth = None
         self.get_spectrogram_truth()
