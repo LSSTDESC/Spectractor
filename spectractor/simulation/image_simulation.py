@@ -357,9 +357,7 @@ class ImageModel(Image):
 
 
 def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1,
-             psf_poly_params=None,
-             with_rotation=True,
-             with_stars=True):
+             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -373,6 +371,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     - A2: the relative amplitude of second order compared with first order
     - with_rotation: rotate the spectrum according to the disperser characteristics (True by default)
     - with_stars: include stars in the image field (True by default)
+    - with_adr: include ADR effect (True by default)
     """
     my_logger = set_logger(__name__)
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
@@ -424,6 +423,12 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         rotation_angle = spectrum.rotation_angle
 
     # Load PSF
+    if psf_type is not None:
+        from spectractor.extractor.psf import load_PSF
+        parameters.PSF_TYPE = psf_type
+        psf = load_PSF(psf_type=psf_type)
+        spectrum.psf = psf
+        spectrum.chromatic_psf.psf = psf
     if psf_poly_params is None:
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
@@ -432,13 +437,15 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         spectrum.chromatic_psf.set_polynomial_degrees(spectrum.chromatic_psf.deg)
         my_logger.info(f'\n\tUse PSF parameters {psf_poly_params} as polynoms of '
                        f'degree {spectrum.chromatic_psf.degrees}')
+    if psf_type is not None and psf_poly_params is not None:
+        spectrum.chromatic_psf.init_table()
 
     # Simulate spectrogram
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0., B=1.,
                                            psf_poly_params=psf_poly_params, angle=rotation_angle, with_background=False,
-                                           fast_sim=False, full_image=True)
+                                           fast_sim=False, full_image=True, with_adr=with_adr)
 
     # now we include effects related to the wrong extraction of the spectrum:
     # wrong estimation of the order 0 position and wrong DISTANCE2CCD

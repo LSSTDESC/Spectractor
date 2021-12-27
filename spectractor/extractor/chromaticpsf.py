@@ -80,8 +80,15 @@ class ChromaticPSF:
         self.y0 = y0
         self.profile_params = np.zeros((Nx, len(self.psf.param_names)))
         self.pixels = np.mgrid[:Nx, :Ny]
+        self.init_table(file_name=file_name, saturation=saturation)
+        self.opt_reg = parameters.PSF_FIT_REG_PARAM
+        self.cov_matrix = np.zeros((Nx, Nx))
+        if file_name != "":
+            self.poly_params = self.from_table_to_poly_params()
+
+    def init_table(self, file_name='', saturation=None):
         if file_name == '':
-            arr = np.zeros((Nx, len(self.psf.param_names) + 10))
+            arr = np.zeros((self.Nx, len(self.psf.param_names) + 10))
             self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
                                            'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(
                 self.psf.param_names))
@@ -111,10 +118,6 @@ class ChromaticPSF:
                     self.poly_params_labels.append(f"{p}_{k}")
                     self.poly_params_names.append("$" + self.psf.axis_names[ip].replace("$", "")
                                                   + "^{(" + str(k) + ")}$")
-        self.opt_reg = parameters.PSF_FIT_REG_PARAM
-        self.cov_matrix = np.zeros((Nx, Nx))
-        if file_name != "":
-            self.poly_params = self.from_table_to_poly_params()
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg
