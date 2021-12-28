@@ -1,16 +1,23 @@
 numpy>1.15
 scipy
-matplotlib
+matplotlib>3.1
 pandas
-pyfftw
-numexpr
-astropy>3.1
+llvmlite #==0.29.0
+numba #==0.44.1
+astropy>=3.2
+photutils
 astroquery
 coloredlogs
 scikit-image
-pysynphot
-emcee
-iminuit
-coverage
+h5py #==2.8.0
+emcee #==3.0rc2
+tqdm
+mpi4py
+schwimmbad
+iminuit>=2
+coverage>=3.6 # <5
 configparser
 coveralls
+pysynphot
+deprecated
+pyyaml

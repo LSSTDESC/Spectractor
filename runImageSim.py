@@ -32,10 +32,11 @@ if __name__ == "__main__":
     spectrum_file_name = 'outputs/reduc_20170530_134_spectrum.fits'
     # guess = [720, 670]
     # hologramme HoloAmAg
-    psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
-                       -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
-                       0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
-                       528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
+    # psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
+    #                    -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
+    #                    0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
+    #                    528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
+    psf_poly_params = None
     # file_name="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
     # guess = [840, 530]
     # target = "HD205905"
@@ -47,5 +48,5 @@ if __name__ == "__main__":
         if target is None or xpos is None or ypos is None:
             continue
 
-        image = ImageSim(file_name, spectrum_file_name, args.output_directory, A2=0.01,
+        image = ImageSim(file_name, spectrum_file_name, args.output_directory, A2=1,
                          psf_poly_params=psf_poly_params, with_stars=False)

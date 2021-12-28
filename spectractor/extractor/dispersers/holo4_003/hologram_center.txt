@@ -1,0 +1,2 @@
+#x_star y_star grooves_per_mm grooves_per_mm_err 
+400.0 2750.0 -0.28

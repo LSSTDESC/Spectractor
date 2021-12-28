@@ -11,3 +11,15 @@
 *.DS_Store
 *.xlsx
 .idea
+.coverage
+randomseed
+Spectractor.egg-info/
+build/
+dist/
+*libradtran/
+outputs/
+docs/_build
+*_wcs/
+*.bak
+*.backup
+*.h5

@@ -12,7 +12,7 @@ import re
 import sys
 import numpy as np
 
-from subprocess import Popen, PIPE
+import subprocess
 
 from spectractor.tools import ensure_dir
 import spectractor.parameters as parameters
@@ -40,9 +40,9 @@ class Libradtran:
         # -------------------------------------
 
         # LibRadTran installation directory
-        self.simulation_directory = 'simulations'
+        self.simulation_directory = 'libradtran'
         ensure_dir(self.simulation_directory)
-        self.libradtran_path = os.getenv('LIBRADTRANDIR') + '/'
+        self.libradtran_path = parameters.LIBRADTRAN_DIR
 
         # Filename : RT_LS_pp_us_sa_rt_z15_wv030_oz30.txt
         #          : Prog_Obs_Rte_Atm_proc_Mod_zXX_wv_XX_oz_XX
@@ -76,11 +76,10 @@ class Libradtran:
             Path to bin/uvpsec if necessary, otherwise use  self.home (default: "")
         """
         if path != '':
-            cmd = path + 'bin/uvspec ' + ' < ' + inp + ' > ' + out
+            cmd = os.path.join(path, 'bin/uvspec') + ' < ' + inp + ' > ' + out
         else:
-            cmd = self.home + '/libRadtran/bin/uvspec ' + ' < ' + inp + ' > ' + out
-        p = Popen(cmd, shell=True, stdout=PIPE)
-        p.wait()
+            cmd = os.path.join(self.home, '/libRadtran/bin/uvspec') + ' < ' + inp + ' > ' + out
+        subprocess.run(cmd, shell=True, check=True)
 
     def simulate(self, airmass, pwv, ozone, aerosol, pressure):
         """Simulate the atmosphere transmission with Libratran.
@@ -109,23 +108,23 @@ class Libradtran:
         >>> lib = Libradtran()
         >>> output = lib.simulate(1.2, 2, 400, 0.07, 800)
         >>> print(output)
-        simulations/pp/us/as/rt/in/RT_CTIO_pp_us_as_rt_z12_pwv20_oz40_aer7.OUT
+        libradtran/pp/us/as/rt/in/RT_CTIO_pp_us_as_rt_z12_pwv20_oz40_aer7.OUT
         """
 
         self.my_logger.debug(
-            '\n\t--------------------------------------------'
-            '\n\tevaluate'
-            '\n\t 1) airmass = {airmass}'
-            '\n\t 2) pwv = {pwv}'
-            '\n\t 3) ozone = {ozone}'
-            '\n\t 4) aer = {aerosol}'
-            '\n\t 5) pressure =  {pressure}'
-            '\n\t--------------------------------------------')
+            f'\n\t--------------------------------------------'
+            f'\n\tevaluate'
+            f'\n\t 1) airmass = {airmass}'
+            f'\n\t 2) pwv = {pwv}'
+            f'\n\t 3) ozone = {ozone}'
+            f'\n\t 4) aer = {aerosol}'
+            f'\n\t 5) pressure =  {pressure}'
+            f'\n\t--------------------------------------------')
 
         # build the part 1 of file_name
         base_filename_part1 = self.Prog + '_' + parameters.OBS_NAME + '_' + self.equation_solver + '_'
 
-        aerosol_string = '500 ' + str(aerosol)
+        aerosol_string = f'500 {aerosol:.20f}'
         # aerosol_str=str(wl0_num)+ ' '+str(tau0_num)
         aerosol_index = int(aerosol * 100.)
 
@@ -203,14 +202,14 @@ class Libradtran:
             molecular_resolution = 'coarse'
 
             # water vapor
-            pwv_str = 'H2O ' + str(pwv) + ' MM'
+            pwv_str = f'H2O {pwv:.20f} MM'
             pwv_index = int(10 * pwv)
 
             # airmass
             airmass_index = int(airmass * 10)
 
             # Ozone
-            oz_str = 'O3 ' + str(ozone) + ' DU'
+            oz_str = f'O3 {ozone:.20f} DU'
             ozone_index = int(ozone / 10.)
 
             base_filename = f'{base_filename_part1}{atmkey}_{self.proc}_{self.Mod}_z{airmass_index}' \
@@ -272,15 +271,15 @@ class Libradtran:
 
 
 def clean_simulation_directory():
-    """Remove the simulations directory.
+    """Remove the libradtran directory.
 
     Examples
     --------
-    >>> ensure_dir('simulations')
+    >>> ensure_dir('libradtran')
     >>> clean_simulation_directory()
-    >>> assert not os.path.isfile('simulations')
+    >>> assert not os.path.isfile('libradtran')
     """
-    os.system("rm -rf simulations")
+    os.system("rm -rf libradtran")
 
 
 if __name__ == "__main__":

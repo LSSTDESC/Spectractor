@@ -1,2186 +1,1326 @@
-import warnings
-import sys
+import os
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import special
+from scipy.interpolate import interp2d
 
-from scipy.optimize import basinhopping, minimize
-from scipy.interpolate import interp1d, interp2d
-from scipy.integrate import quad
-from iminuit import Minuit
-
-from astropy.modeling import fitting, Fittable1DModel, Fittable2DModel, Parameter
-from astropy.modeling.models import Moffat1D
-from astropy.stats import sigma_clip
-from astropy.table import Table
-
-from spectractor.tools import LevMarLSQFitterWithNan, dichotomie, fit_poly1d_outlier_removal, \
-    fit_poly1d, fit_moffat1d_outlier_removal, fit_poly2d_outlier_removal
+from spectractor.tools import plot_image_simple
 from spectractor import parameters
 from spectractor.config import set_logger
+from spectractor.fit.fitter import FitWorkspace, run_minimisation
+
+from numba import njit
 
 
-class PSF1D(Fittable1DModel):
-    inputs = ('x',)
-    outputs = ('y',)
+@njit(fastmath=True, cache=True)
+def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):  # pragma: nocover
+    r"""Compute a 1D Moffat function, whose integral is not normalised to unity.
 
-    amplitude_moffat = Parameter('amplitude_moffat', default=0.5)
-    x_mean = Parameter('x_mean', default=0)
-    gamma = Parameter('gamma', default=3)
-    alpha = Parameter('alpha', default=3)
+    .. math ::
 
-    # No gaussian fit at PIC DU MIDI (useless)
-    #if parameters.OBS_NAME == 'PICDUMIDI':
-    #eta_gauss = Parameter('eta_gauss', default=0,fixed=True)
-    #else:
-    eta_gauss = Parameter('eta_gauss', default=1)
-    #if parameters.OBS_NAME == 'PICDUMIDI':
-    #stddev = Parameter('stddev', default=10.,fixed=True)
-    #else:
-    stddev = Parameter('stddev', default=1)
+        f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}
+        \quad\text{with}, \alpha > 1/2
 
-    saturation = Parameter('saturation', default=1)
+    Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor
+    :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}` is not included as special functions
+    are not supported by numba library.
 
-    def fwhm(self, x_array=None):
+    Parameters
+    ----------
+    y: array_like
+        1D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    y_c: float
+        Center  :math:`y_c` of the function.
+    gamma: float
+        Width  :math:`\gamma` of the function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+
+    Returns
+    -------
+    output: array_like
+        1D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Ny = 50
+    >>> y = np.arange(Ny)
+    >>> amplitude = 10
+    >>> alpha = 2
+    >>> gamma = 5
+    >>> a = evaluate_moffat1d_unnormalized(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha)
+    >>> norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
+    >>> a = a / norm
+    >>> print(f"{np.sum(a):.6f}")
+    9.967561
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Ny = 50
+        y = np.arange(Ny)
+        amplitude = 10
+        a = evaluate_moffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma=5, alpha=2)
+        plt.plot(a)
+        plt.grid()
+        plt.xlabel("y")
+        plt.ylabel("Moffat")
+        plt.show()
+
+    """
+    rr = (y - y_c) * (y - y_c)
+    rr_gg = rr / (gamma * gamma)
+    a = (1 + rr_gg) ** -alpha
+    # dx = y[1] - y[0]
+    # integral = np.sum(a) * dx
+    # norm = amplitude
+    # if integral != 0:
+    #     a /= integral
+    # a *= amplitude
+    a *= amplitude
+    return a
+
+
+@njit(fastmath=True, cache=True)
+def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
+    r"""Compute a 1D Moffat-Gaussian function, whose integral is not normalised to unity.
+
+    .. math ::
+
+        f(y) \propto A \left\lbrace
+        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}
+         - \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
+        \quad\text{ and } \quad \eta < 0, \alpha > 1/2
+
+    Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor for the Moffat
+    :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}` is not included as special functions
+    are not supproted by the numba library.
+
+    Parameters
+    ----------
+    y: array_like
+        1D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    y_c: float
+        Center  :math:`y_c` of the function.
+    gamma: float
+        Width  :math:`\gamma` of the Moffat function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+    eta_gauss: float
+        Relative negative amplitude of the Gaussian function.
+    sigma: float
+        Width :math:`\sigma` of the Gaussian function.
+
+    Returns
+    -------
+    output: array_like
+        1D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Ny = 50
+    >>> y = np.arange(Ny)
+    >>> amplitude = 10
+    >>> gamma = 5
+    >>> alpha = 2
+    >>> eta_gauss = -0.1
+    >>> sigma = 1
+    >>> a = evaluate_moffatgauss1d_unnormalized(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
+    ... eta_gauss=eta_gauss, sigma=sigma)
+    >>> norm = gamma*np.sqrt(np.pi)*special.gamma(alpha-0.5)/special.gamma(alpha) + eta_gauss*np.sqrt(2*np.pi)*sigma
+    >>> a = a / norm
+    >>> print(f"{np.sum(a):.6f}")
+    9.966492
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(np.sum(a), amplitude, atol=0.5)
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Ny = 50
+        y = np.arange(Ny)
+        amplitude = 10
+        a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
+        plt.plot(a)
+        plt.grid()
+        plt.xlabel("y")
+        plt.ylabel("Moffat")
+        plt.show()
+    """
+    rr = (y - y_c) * (y - y_c)
+    rr_gg = rr / (gamma * gamma)
+    a = (1 + rr_gg) ** -alpha + eta_gauss * np.exp(-(rr / (2. * sigma * sigma)))
+    # dx = y[1] - y[0]
+    # integral = np.sum(a) * dx
+    # norm = amplitude
+    # if integral != 0:
+    #     norm /= integral
+    # a *= norm
+    a *= amplitude
+    return a
+
+
+@njit(fastmath=True, cache=True)
+def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocover
+    r"""Compute a 2D Moffat function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(x, y) = \frac{A (\alpha - 1)}{\pi \gamma^2} \frac{1}{
+        \left[ 1 +\frac{\left(x-x_c\right)^2+\left(y-y_c\right)^2}{\gamma^2} \right]^\alpha}
+        \quad\text{with}\quad
+        \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
+
+    Note that this function is defined only for :math:`alpha > 1`.
+
+    Note that the normalisation of a 2D Moffat function is analytical so it is not expected that
+    the sum of the output array is equal to :math:`A`, but lower.
+
+    Parameters
+    ----------
+    x: array_like
+        2D array of pixels :math:`x`, regularly spaced.
+    y: array_like
+        2D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    x_c: float
+        X axis center  :math:`x_c` of the function.
+    y_c: float
+        Y axis center  :math:`y_c` of the function.
+    gamma: float
+        Width  :math:`\gamma` of the function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+
+    Returns
+    -------
+    output: array_like
+        2D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Nx = 50
+    >>> Ny = 50
+    >>> yy, xx = np.mgrid[:Ny, :Nx]
+    >>> amplitude = 10
+    >>> a = evaluate_moffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2)
+    >>> print(f"{np.sum(a):.6f}")
+    9.683129
+
+    .. doctest::
+        :hide:
+
+        >>> assert not np.isclose(np.sum(a), amplitude)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Nx = 50
+        Ny = 50
+        yy, xx = np.mgrid[:Nx, :Ny]
+        amplitude = 10
+        a = evaluate_moffat2d(xx, yy, amplitude=amplitude, y_c=Ny/2, x_c=Nx/2, gamma=5, alpha=2)
+        im = plt.pcolor(xx, yy, a)
+        plt.grid()
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.colorbar(im, label="Moffat 2D")
+        plt.show()
+
+    """
+    rr_gg = ((x - x_c) * (x - x_c) / (gamma * gamma) + (y - y_c) * (y - y_c) / (gamma * gamma))
+    a = (1 + rr_gg) ** -alpha
+    norm = (np.pi * gamma * gamma) / (alpha - 1)
+    a *= amplitude / norm
+    return a
+
+
+@njit(fastmath=True, cache=True)
+def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
+    r"""Compute a 2D Moffat-Gaussian function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(x, y) = \frac{A}{\frac{\pi \gamma^2}{\alpha-1} + 2 \pi \eta \sigma^2}\left\lbrace \frac{1}{
+        \left[ 1 +\frac{\left(x-x_c\right)^2+\left(y-y_c\right)^2}{\gamma^2} \right]^\alpha}
+         + \eta e^{-\left[ \left(x-x_c\right)^2+\left(y-y_c\right)^2\right]/(2 \sigma^2)}
+        \right\rbrace
+
+    .. math ::
+        \quad\text{with}\quad
+        \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
+        \quad\text{and} \quad \eta < 0
+
+    Note that this function is defined only for :math:`alpha > 1`.
+
+    Parameters
+    ----------
+    x: array_like
+        2D array of pixels :math:`x`, regularly spaced.
+    y: array_like
+        2D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    x_c: float
+        X axis center  :math:`x_c` of the function.
+    y_c: float
+        Y axis center  :math:`y_c` of the function.
+    gamma: float
+        Width  :math:`\gamma` of the function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+    eta_gauss: float
+        Relative negative amplitude of the Gaussian function.
+    sigma: float
+        Width :math:`\sigma` of the Gaussian function.
+
+    Returns
+    -------
+    output: array_like
+        2D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Nx = 50
+    >>> Ny = 50
+    >>> yy, xx = np.mgrid[:Ny, :Nx]
+    >>> amplitude = 10
+    >>> a = evaluate_moffatgauss2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2,
+    ... eta_gauss=-0.1, sigma=1)
+    >>> print(f"{np.sum(a):.6f}")
+    9.680573
+
+    .. doctest::
+        :hide:
+
+        >>> assert not np.isclose(np.sum(a), amplitude)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Nx = 50
+        Ny = 50
+        yy, xx = np.mgrid[:Nx, :Ny]
+        amplitude = 10
+        a = evaluate_moffatgauss2d(xx, yy, amplitude, Nx/2, Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
+        im = plt.pcolor(xx, yy, a)
+        plt.grid()
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.colorbar(im, label="Moffat 2D")
+        plt.show()
+
+    """
+    rr = ((x - x_c) * (x - x_c) + (y - y_c) * (y - y_c))
+    rr_gg = rr / (gamma * gamma)
+    a = (1 + rr_gg) ** -alpha + eta_gauss * np.exp(-(rr / (2. * sigma * sigma)))
+    norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * sigma * sigma
+    a *= amplitude / norm
+    return a
+
+
+@njit(fastmath=True, cache=True)
+def evaluate_gauss1d(y, amplitude, y_c, sigma):  # pragma: nocover
+    r"""Compute a 2D Gaussian function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(x, y) = \frac{A}{\sigma \sqrt{2 \pi}\left\lbrace e^{-\left[ \left(x-x_c\right)^2\right]/(2 \sigma^2)}
+        \right\rbrace
+
+    .. math ::
+        \quad\text{with}\quad
+        \int_{-\infty}^{\infty}f(y) \mathrm{d}y = A
+
+    Parameters
+    ----------
+    y: array_like
+        2D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    y_c: float
+        X axis center  :math:`y_c` of the function.
+    sigma: float
+        Width :math:`\sigma` of the Gaussian function.
+
+    Returns
+    -------
+    output: array_like
+        1D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Ny = 50
+    >>> y = np.arange(Ny)
+    >>> amplitude = 10
+    >>> sigma = 2
+    >>> a = evaluate_gauss1d(y, amplitude=amplitude, y_c=Ny/2, sigma=sigma)
+    >>> print(f"{np.sum(a):.6f}")
+    10.000000
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Ny = 50
+        y = np.arange(Ny)
+        amplitude = 10
+        a = evaluate_gauss1d(y, amplitude=amplitude, y_c=Ny/2, sigma=2)
+        plt.plot(a)
+        plt.grid()
+        plt.xlabel("y")
+        plt.ylabel("Gauss")
+        plt.show()
+
+    """
+    rr = (y - y_c) * (y - y_c)
+    a = np.exp(-(rr / (2. * sigma * sigma)))
+    norm = np.sqrt(2 * np.pi) * sigma
+    a *= amplitude / norm
+    return a
+
+
+@njit(fastmath=True, cache=True)
+def evaluate_gauss2d(x, y, amplitude, x_c, y_c, sigma):  # pragma: nocover
+    r"""Compute a 2D Gaussian function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(x, y) = \frac{A}{2 \pi \sigma^2}\left\lbrace e^{-\left[ \left(x-x_c\right)^2+\left(y-y_c\right)^2\right]/(2 \sigma^2)}
+        \right\rbrace
+
+    .. math ::
+        \quad\text{with}\quad
+        \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
+
+    Parameters
+    ----------
+    x: array_like
+        2D array of pixels :math:`x`, regularly spaced.
+    y: array_like
+        2D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    x_c: float
+        X axis center  :math:`x_c` of the function.
+    y_c: float
+        Y axis center  :math:`y_c` of the function.
+    sigma: float
+        Width :math:`\sigma` of the Gaussian function.
+
+    Returns
+    -------
+    output: array_like
+        2D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Nx = 50
+    >>> Ny = 50
+    >>> yy, xx = np.mgrid[:Ny, :Nx]
+    >>> amplitude = 10
+    >>> a = evaluate_gauss2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, sigma=1)
+    >>> print(f"{np.sum(a):.6f}")
+    10.000000
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(np.sum(a), amplitude)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Nx = 50
+        Ny = 50
+        yy, xx = np.mgrid[:Nx, :Ny]
+        amplitude = 10
+        a = evaluate_gauss2d(xx, yy, amplitude, Nx/2, Ny/2, sigma=1)
+        im = plt.pcolor(xx, yy, a)
+        plt.grid()
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.colorbar(im, label="Gauss 2D")
+        plt.show()
+
+    """
+    rr = ((x - x_c) * (x - x_c) + (y - y_c) * (y - y_c))
+    a = np.exp(-(rr / (2. * sigma * sigma)))
+    norm = 2 * np.pi * sigma * sigma
+    a *= amplitude / norm
+    return a
+
+
+class PSF:
+    """Generic PSF model class.
+
+    The PSF models must contain at least the "amplitude", "x_c" and "y_c" parameters as the first three parameters
+    (in this order) and "saturation" parameter as the last parameter. "amplitude", "x_c" and "y_c"
+    stands respectively for the general amplitude of the model, the position along the dispersion axis and the
+    transverse position with respect to the dispersion axis (assumed to be the X axis).
+    Last "saturation" parameter must be express in the same units as the signal to model and as the "amplitude"
+    parameter. The PSF models must be normalized to one in total flux divided by the first parameter (amplitude).
+    Then the PSF model integral is equal to the "amplitude" parameter.
+
+    """
+
+    def __init__(self, clip=False):
         """
-        Compute the full width half maximum of the PSF1D model with a dichotomie method.
-
         Parameters
         ----------
-        x_array: array_like, optional
-            An abscisse array is one wants to find FWHM on the interpolated PSF1D model
-            (to smooth the spikes from spurious parameter sets).
-
-        Returns
-        -------
-        FWHM: float
-            The full width half maximum of the PSF1D model.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> p = [2,30,4,2,-0.4,1,10]
-        >>> PSF = PSF1D(*p)
-        >>> a, b =  p[1], p[1]+3*max(p[-2], p[2])
-        >>> fwhm = PSF.fwhm(x_array=None)
-        >>> assert np.isclose(fwhm, 7.25390625)
-        >>> fwhm = PSF.fwhm(x_array=x)
-        >>> assert np.isclose(fwhm, 7.083984375)
-        >>> print(fwhm)
-        7.083984375
-        >>> import matplotlib.pyplot as plt
-        >>> x = np.arange(0, 60, 0.01)
-        >>> plt.plot(x, PSF.evaluate(x, *p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> if parameters.DISPLAY: plt.show()
-        """
-        params = [getattr(self, p).value for p in self.param_names]
-        interp = None
-        if x_array is not None:
-            interp = self.interpolation(x_array)
-            values = self.evaluate(x_array, *params)
-            maximum = np.max(values)
-            imax = np.argmax(values)
-            a = imax + np.argmin(np.abs(values[imax:] - 0.95 * maximum))
-            b = imax + np.argmin(np.abs(values[imax:] - 0.05 * maximum))
-
-            def eq(x):
-                return interp(x) - 0.5 * maximum
-        else:
-            maximum = self.amplitude_moffat.value * (1 + self.eta_gauss.value)
-            a = self.x_mean.value
-            b = self.x_mean.value + 3 * max(self.gamma.value, self.stddev.value)
-
-            def eq(x):
-                return self.evaluate(x, *params) - 0.5 * maximum
-        res = dichotomie(eq, a, b, 1e-2)
-        # res = newton()
-        return abs(2 * (res - self.x_mean.value))
-
-    @staticmethod
-    def evaluate(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = (x - x_mean) * (x - x_mean)
-        rr_gg = rr / (gamma * gamma)
-        # use **(-alpha) instead of **(alpha) to avoid overflow power errors due to high alpha exponents
-        # import warnings
-        # warnings.filterwarnings('error')
-        try:
-            a = amplitude_moffat * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
-        except RuntimeWarning:
-            my_logger = set_logger(__name__)
-            my_logger.warning(f"{[amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation]}")
-            a = amplitude_moffat * eta_gauss * np.exp(-(rr / (2. * stddev * stddev)))
-        return np.clip(a, 0, saturation)
-
-    @staticmethod
-    def fit_deriv(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = (x - x_mean) * (x - x_mean)
-        rr_gg = rr / (gamma * gamma)
-        gauss_norm = np.exp(-(rr / (2. * stddev * stddev)))
-        d_eta_gauss = amplitude_moffat * gauss_norm
-        moffat_norm = (1 + rr_gg) ** (-alpha)
-        d_amplitude_moffat = moffat_norm + eta_gauss * gauss_norm
-        d_x_mean = amplitude_moffat * (eta_gauss * (x - x_mean) / (stddev * stddev) * gauss_norm
-                                       - alpha * moffat_norm * (-2 * x + 2 * x_mean) / (
-                                               gamma * gamma * (1 + rr_gg)))
-        d_stddev = amplitude_moffat * eta_gauss * rr / (stddev ** 3) * gauss_norm
-        d_alpha = - amplitude_moffat * moffat_norm * np.log(1 + rr_gg)
-        d_gamma = 2 * amplitude_moffat * alpha * moffat_norm * (rr_gg / (gamma * (1 + rr_gg)))
-        d_saturation = saturation * np.zeros_like(x)
-        return np.array([d_amplitude_moffat, d_x_mean, d_gamma, d_alpha, d_eta_gauss, d_stddev, d_saturation])
-
-    @staticmethod
-    def deriv(x, amplitude_moffat, x_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = (x - x_mean) * (x - x_mean)
-        rr_gg = rr / (gamma * gamma)
-        d_eta_gauss = np.exp(-(rr / (2. * stddev * stddev)))
-        d_gauss = - eta_gauss * (x - x_mean) / (stddev * stddev) * d_eta_gauss
-        d_moffat = -  alpha * 2 * (x - x_mean) / (gamma * gamma * (1 + rr_gg) ** (alpha + 1))
-        return amplitude_moffat * (d_gauss + d_moffat)
-
-    def interpolation(self, x_array):
-        """
-
-        Parameters
-        ----------
-        x_array: array_like
-            The abscisse array to interpolate the model.
-
-        Returns
-        -------
-        interp: callable
-            Function corresponding to the interpolated model on the x_array array.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> p = [2,0,2,2,1,2,10]
-        >>> PSF = PSF1D(*p)
-        >>> interp = PSF.interpolation(x)
-        >>> assert np.isclose(interp(p[1]), PSF.evaluate(p[1], *p))
+        clip: bool, optional
+            If True, PSF evaluation is clipped between 0 and saturation level (slower) (default: False)
 
         """
-        params = [getattr(self, p).value for p in self.param_names]
-        return interp1d(x_array, self.evaluate(x_array, *params), fill_value=0, bounds_error=False)
-
-    def integrate(self, bounds=(-np.inf, np.inf), x_array=None):
-        """
-        Compute the integral of the PSF1D model. Bounds are -np.inf, np.inf by default, or provided
-        if no x_array is provided. Otherwise the bounds comes from x_array edges.
-
-        Parameters
-        ----------
-        x_array: array_like, optional
-            If not None, the interpoalted PSF1D modelis used for integration (default: None).
-        bounds: array_like, optional
-            The bounds of the integral (default bounds=(-np.inf, np.inf)).
-
-        Returns
-        -------
-        result: float
-            The integral of the PSF1D model.
-
-        Examples
-        --------
-        >>> x = np.arange(0, 60, 1)
-        >>> p = [2,30,4,2,-0.5,1,10]
-        >>> PSF = PSF1D(*p)
-        >>> i = PSF.integrate()
-        >>> assert np.isclose(i, 10.059742339728174)
-        >>> i = PSF.integrate(bounds=(0,60), x_array=x)
-        >>> assert np.isclose(i, 10.046698028728645)
-
-        >>> import matplotlib.pyplot as plt
-        >>> xx = np.arange(0, 60, 0.01)
-        >>> plt.plot(xx, PSF.evaluate(xx, *p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> plt.plot(x, PSF.evaluate(x, *p)) #doctest: +ELLIPSIS
-        [<matplotlib.lines.Line2D object at 0x...>]
-        >>> if parameters.DISPLAY: plt.show()
-
-        """
-        params = [getattr(self, p).value for p in self.param_names]
-        if x_array is None:
-            i = quad(self.evaluate, bounds[0], bounds[1], args=tuple(params), limit=200)
-            return i[0]
-        else:
-            return np.trapz(self.evaluate(x_array, *params), x_array)
-
-
-class PSF2D(Fittable2DModel):
-    inputs = ('x', 'y',)
-    outputs = ('z',)
-
-    amplitude = Parameter('amplitude', default=1)
-    x_mean = Parameter('x_mean', default=0)
-    y_mean = Parameter('y_mean', default=0)
-    gamma = Parameter('gamma', default=3)
-    alpha = Parameter('alpha', default=3)
-    eta_gauss = Parameter('eta_gauss', default=0.5)
-    stddev = Parameter('stddev', default=1)
-    saturation = Parameter('saturation', default=1)
-
-    @staticmethod
-    def evaluate(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
-        rr_gg = rr / (gamma * gamma)
-        a = amplitude * ((1 + rr_gg) ** (-alpha) + eta_gauss * np.exp(-(rr / (2. * stddev * stddev))))
-        return np.clip(a, 0, saturation)
-
-    @staticmethod
-    def fit_deriv(x, y, amplitude, x_mean, y_mean, gamma, alpha, eta_gauss, stddev, saturation):
-        rr = ((x - x_mean) ** 2 + (y - y_mean) ** 2)
-        rr_gg = rr / (gamma * gamma)
-        gauss_norm = np.exp(-(rr / (2. * stddev * stddev)))
-        d_eta_gauss = amplitude * gauss_norm
-        moffat_norm = (1 + rr_gg) ** (-alpha)
-        d_amplitude = moffat_norm + eta_gauss * gauss_norm
-        d_x_mean = amplitude * eta_gauss * (x - x_mean) / (stddev * stddev) * gauss_norm \
-                   - amplitude * alpha * moffat_norm * (-2 * x + 2 * x_mean) / (gamma ** 2 * (1 + rr_gg))
-        d_y_mean = amplitude * eta_gauss * (y - y_mean) / (stddev * stddev) * gauss_norm \
-                   - amplitude * alpha * moffat_norm * (-2 * y + 2 * y_mean) / (gamma ** 2 * (1 + rr_gg))
-        d_stddev = amplitude * eta_gauss * rr / (stddev ** 3) * gauss_norm
-        d_alpha = - amplitude * moffat_norm * np.log(1 + rr_gg)
-        d_gamma = 2 * amplitude * alpha * moffat_norm * (rr_gg / (gamma * (1 + rr_gg)))
-        d_saturation = saturation * np.zeros_like(x)
-        return [d_amplitude, d_x_mean, d_y_mean, d_gamma, d_alpha, d_eta_gauss, d_stddev, d_saturation]
-
-
-class ChromaticPSF1D:
-
-    def __init__(self, Nx, Ny, deg=4, saturation=None):
-        # file_name="", image=None, order=1, target=None):
-        # Spectrum.__init__(self, file_name=file_name, image=image, order=order, target=target)
-        # self.profile_params = profile_params
         self.my_logger = set_logger(self.__class__.__name__)
-        self.PSF1D = PSF1D()
-        self.deg = deg
-        self.degrees = {key: deg for key in self.PSF1D.param_names}
-        self.degrees['saturation'] = 0
-        self.Nx = Nx
-        self.Ny = Ny
-        self.profile_params = np.zeros((Nx, len(self.PSF1D.param_names)))
-        self.pixels = np.arange(Nx).astype(int)
-        # self.flux_sum = np.zeros(Nx)
-        # self.flux_integral = np.zeros(Nx)
-        # self.flux_err = np.zeros(Nx)
-        # self.fwhms = np.zeros(Nx)
-        # self.pixels_fwhm_sup = np.zeros(Nx)
-        # self.pixels_fwhm_inf = np.zeros(Nx)
-        self.n_poly_params = Nx
-        self.fitted_pixels = np.arange(Nx).astype(int)
+        self.p = np.array([])
+        self.param_names = ["amplitude", "x_c", "y_c", "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", "saturation"]
+        self.bounds = [[]]
+        self.p_default = np.array([1, 0, 0, 1])
+        self.max_half_width = np.inf
+        self.clip = clip
 
-        #arr = np.zeros((Nx, len(self.PSF1D.param_names) + 11))
-        #self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_mean', 'flux_sum', 'flux_integral',
-        #                               'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf', 'Dx_rot'] + list(
+    def evaluate(self, pixels, p=None):  # pragma: no cover
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        if pixels.ndim == 3 and pixels.shape[0] == 2:
+            return np.zeros_like(pixels)
+        elif pixels.ndim == 1:
+            return np.zeros_like(pixels)
+        else:
+            raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
-        arr = np.zeros((Nx, len(self.PSF1D.param_names) + 13))
-        self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_mean', 'flux_sum', 'flux_integral',
-                                       'flux_err','chi2_red','ndof' ,'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf', 'Dx_rot'] + list(
-            self.PSF1D.param_names))
-        self.saturation = saturation
-        if saturation is None:
-            self.saturation = 1e20
-            self.my_logger.warning(f"\n\tSaturation level should be given to instanciate the ChromaticPSF1D "
-                                   f"object. self.saturation is set arbitrarily to 1e20. Good luck.")
-        for name in self.PSF1D.param_names:
-            self.n_poly_params += self.degrees[name] + 1
-        self.poly_params = np.zeros(self.n_poly_params)
+    def apply_max_width_to_bounds(self, max_half_width=None):  # pragma: no cover
+        pass
 
-    def fill_table_with_profile_params(self, profile_params):
+    def fit_psf(self, data, data_errors=None, bgd_model_func=None):
         """
-        Fill the table with the profile parameters.
+        Fit a PSF model on 1D or 2D data.
 
         Parameters
         ----------
-        profile_params: array
-           a Nx * len(self.PSF1D.param_names) numpy array containing the PSF1D parameters as a function of pixels.
-
-        Examples
-        --------
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=8000)
-        >>> poly_params_test = s.generate_test_poly_params()
-        >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
-        >>> s.fill_table_with_profile_params(profile_params)
-        >>> assert(np.all(np.isclose(s.table['stddev'], 2*np.ones(100))))
-        """
-        for k, name in enumerate(self.PSF1D.param_names):
-            self.table[name] = profile_params[:, k]
-
-    def rotate_table(self, angle_degree):
-        """
-        In self.table, rotate the columns Dx, Dy, Dy_fwhm_inf and Dy_fwhm_sup by an angle
-        given in degree. The results overwrite the previous columns in self.table.
-
-        Parameters
-        ----------
-        angle_degree: float
-            Rotation angle in degree
-
-        Examples
-        --------
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=8000)
-        >>> s.table['Dx_rot'] = np.arange(100)
-        >>> s.rotate_table(45)
-        >>> assert(np.all(np.isclose(s.table['Dy'], -np.arange(100)/np.sqrt(2))))
-        >>> assert(np.all(np.isclose(s.table['Dx'], np.arange(100)/np.sqrt(2))))
-        >>> assert(np.all(np.isclose(s.table['Dy_fwhm_inf'], -np.arange(100)/np.sqrt(2))))
-        >>> assert(np.all(np.isclose(s.table['Dy_fwhm_sup'], -np.arange(100)/np.sqrt(2))))
-        """
-        angle = angle_degree * np.pi / 180.
-        rotmat = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
-        # finish with Dy_mean to get correct Dx
-        for name in ['Dy', 'Dy_fwhm_inf', 'Dy_fwhm_sup', 'Dy_mean']:
-            vec = list(np.array([self.table['Dx_rot'], self.table[name]]).T)
-            rot_vec = np.array([np.dot(rotmat, v) for v in vec])
-            self.table[name] = rot_vec.T[1]
-        self.table['Dx'] = rot_vec.T[0]
-
-    def from_profile_params_to_poly_params(self, profile_params):
-        """
-        Transform the profile_params array from fit_transverse_PSF1D into a set of parameters
-        for the chromatic PSF parameterisation.
-        Fit polynomial functions across the pixels for each PSF1D
-        parameters. The order of the function is given by self.degrees.
-
-        Parameters
-        ----------
-        profile_params: array
-            a Nx * len(self.PSF1D.param_names) numpy array containing the PSF1D parameters as a function of pixels.
+        data: array_like
+            1D or 2D array containing the data.
+        data_errors: np.array, optional
+            The 1D or 2D array of uncertainties.
+        bgd_model_func: callable, optional
+            A 1D or 2D function to model the extracted background (default: None -> null background).
 
         Returns
         -------
-        profile_params: array_like
-            A set of parameters that can be evaluated by the chromatic PSF class evaluate function.
+        fit_workspace: PSFFitWorkspace
+            The PSFFitWorkspace instance to get info about the fitting.
 
         Examples
         --------
 
-        # Build a mock spectrogram with random Poisson noise:
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=8000)
-        >>> poly_params_test = s.generate_test_poly_params()
-        >>> data = s.evaluate(poly_params_test)
+        Build a mock PSF2D without background and with random Poisson noise:
+
+        >>> p0 = np.array([200000, 20, 30, 5, 2, -0.1, 2, 400000])
+        >>> psf0 = MoffatGauss(p0)
+        >>> yy, xx = np.mgrid[:50, :60]
+        >>> data = psf0.evaluate(np.array([xx, yy]), p0)
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # From the polynomial parameters to the profile parameters:
-        >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
-        >>> assert(np.all(np.isclose(profile_params[0], [0, 50, 5, 2, 0, 2, 8e3])))
+        Fit the data in 2D:
 
-        # From the profile parameters to the polynomial parameters:
-        >>> profile_params = s.from_profile_params_to_poly_params(profile_params)
-        >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
+        >>> p = np.array([150000, 19, 31, 4.5, 2.5, -0.1, 3, 400000])
+        >>> psf = MoffatGauss(p)
+        >>> w = psf.fit_psf(data, data_errors=data_errors, bgd_model_func=None)
+        >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert w.model is not None
+            >>> residuals = (w.data-w.model)/w.err
+            >>> assert w.costs[-1] / w.pixels.size < 1.3
+            >>> assert np.abs(np.mean(residuals)) < 0.4
+            >>> assert np.std(residuals) < 1.2
+            >>> assert np.all(np.isclose(psf.p[1:3], p0[1:3], atol=1e-1))
+
+        Fit the data in 1D:
+
+        >>> data1d = data[:,int(p0[1])]
+        >>> data1d_err = data_errors[:,int(p0[1])]
+        >>> p = np.array([10000, 20, 32, 4, 3, -0.1, 2, 400000])
+        >>> psf1d = MoffatGauss(p)
+        >>> w = psf1d.fit_psf(data1d, data_errors=data1d_err, bgd_model_func=None)
+        >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert w.model is not None
+            >>> residuals = (w.data-w.model)/w.err
+            >>> assert w.costs[-1] / w.pixels.size < 1.2
+            >>> assert np.abs(np.mean(residuals)) < 0.2
+            >>> assert np.std(residuals) < 1.2
+            >>> assert np.all(np.isclose(w.p[2], p0[2], atol=1e-1))
+
+        .. plot::
+
+            import numpy as np
+            import matplotlib.pyplot as plt
+            from spectractor.extractor.psf import *
+            p = np.array([200000, 20, 30, 5, 2, -0.1, 2, 400000])
+            psf = MoffatGauss(p)
+            yy, xx = np.mgrid[:50, :60]
+            data = psf.evaluate(np.array([xx, yy]), p)
+            data = np.random.poisson(data)
+            data_errors = np.sqrt(data+1)
+            data = np.random.poisson(data)
+            data_errors = np.sqrt(data+1)
+            psf = MoffatGauss(p)
+            w = psf.fit_psf(data, data_errors=data_errors, bgd_model_func=None)
+            w.plot_fit()
+
         """
-        pixels = np.linspace(-1, 1, self.Nx)
-        poly_params = np.array([])
-        for k, name in enumerate(self.PSF1D.param_names):
-            if name is 'amplitude_moffat':
-                amplitude = profile_params[:, k]
-                poly_params = np.concatenate([poly_params, amplitude])
+        w = PSFFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func,
+                            verbose=False, live_fit=False)
+        run_minimisation(w, method="newton", ftol=1 / w.pixels.size, xtol=1e-6, niter=50, fix=w.fixed)
+        self.p = np.copy(w.p)
+        return w
+
+
+class Moffat(PSF):
+
+    def __init__(self, p=None, clip=False):
+        PSF.__init__(self, clip=clip)
+        self.p_default = np.array([1, 0, 0, 3, 2, 1]).astype(float)
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        else:
+            self.p = np.copy(self.p_default)
+        self.param_names = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf),
+                                (1.1, 100), (0, np.inf)])
+
+    def apply_max_width_to_bounds(self, max_half_width=None):
+        if max_half_width is not None:
+            self.max_half_width = max_half_width
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
+                                (0.1, self.max_half_width), (1.1, 100), (0, np.inf)])
+
+    def evaluate(self, pixels, p=None):
+        r"""Evaluate the Moffat function.
+
+        The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
+
+        .. math::
+
+            f(y) \propto \frac{A \Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)},
+            \quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
+
+        Parameters
+        ----------
+        pixels: list
+            List containing the X abscisse 2D array and the Y abscisse 2D array.
+        p: array_like
+            The parameter array. If None, the array used to instanciate the class is taken.
+            If given, the class instance parameter array is updated.
+
+        Returns
+        -------
+        output: array_like
+            The PSF function evaluated.
+
+        Examples
+        --------
+        >>> p = [2,20,30,4,2,10]
+        >>> psf = Moffat(p, clip=True)
+        >>> yy, xx = np.mgrid[:50, :60]
+        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.psf import Moffat
+            p = [2,20,30,4,2,10]
+            psf = Moffat(p)
+            yy, xx = np.mgrid[:50, :60]
+            out = psf.evaluate(pixels=np.array([xx, yy]))
+            fig = plt.figure(figsize=(5,5))
+            plt.imshow(out, origin="lower")
+            plt.xlabel("X [pixels]")
+            plt.ylabel("Y [pixels]")
+            plt.show()
+        """
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        amplitude, x_c, y_c, gamma, alpha, saturation = self.p
+        if pixels.ndim == 3 and pixels.shape[0] == 2:
+            x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
+            out = evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
+        elif pixels.ndim == 1:
+            y = np.array(pixels)
+            norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
+            out = evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha) / norm
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
+        else:  # pragma: no cover
+            raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
+
+
+class Gauss(PSF):
+
+    def __init__(self, p=None, clip=False):
+        PSF.__init__(self, clip=clip)
+        self.p_default = np.array([1, 0, 0, 1, 1]).astype(float)
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        else:
+            self.p = np.copy(self.p_default)
+        self.param_names = ["amplitude", "x_c", "y_c", "sigma", "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\sigma$", "saturation"]
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (0, np.inf)])
+
+    def apply_max_width_to_bounds(self, max_half_width=None):
+        if max_half_width is not None:
+            self.max_half_width = max_half_width
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
+                                (1, self.max_half_width), (0, np.inf)])
+
+    def evaluate(self, pixels, p=None):
+        r"""Evaluate the Gauss function.
+
+        The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
+
+        Parameters
+        ----------
+        pixels: list
+            List containing the X abscisse 2D array and the Y abscisse 2D array.
+        p: array_like
+            The parameter array. If None, the array used to instanciate the class is taken.
+            If given, the class instance parameter array is updated.
+
+        Returns
+        -------
+        output: array_like
+            The PSF function evaluated.
+
+        Examples
+        --------
+        >>> p = [2,20,30,2,10]
+        >>> psf = Gauss(p, clip=True)
+        >>> yy, xx = np.mgrid[:50, :60]
+        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.psf import Moffat
+            p = [2,20,30,2,10]
+            psf = Gauss(p)
+            yy, xx = np.mgrid[:50, :60]
+            out = psf.evaluate(pixels=np.array([xx, yy]))
+            fig = plt.figure(figsize=(5,5))
+            plt.imshow(out, origin="lower")
+            plt.xlabel("X [pixels]")
+            plt.ylabel("Y [pixels]")
+            plt.show()
+
+        """
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        amplitude, x_c, y_c, sigma, saturation = self.p
+        if pixels.ndim == 3 and pixels.shape[0] == 2:
+            x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
+            out = evaluate_gauss2d(x, y, amplitude, x_c, y_c, sigma)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
+        elif pixels.ndim == 1:
+            y = np.array(pixels)
+            if amplitude > 0 and sigma > 0:
+                out = evaluate_gauss1d(y, amplitude, y_c, sigma)
             else:
-                # fit, cov, model = fit_poly1d(pixels, profile_params[:, k], order=self.degrees[name])
-                fit = np.polynomial.legendre.legfit(pixels, profile_params[:, k], deg=self.degrees[name])
-                poly_params = np.concatenate([poly_params, fit])
-        return poly_params
+                out = np.zeros_like(y)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
+        else:  # pragma: no cover
+            raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
-    def from_table_to_profile_params(self):
-        """
-        Extract the profile parameters from self.table and fill an array of profile parameters.
 
-        Parameters
-        ----------
+class MoffatGauss(PSF):
 
-        Returns
-        -------
-        profile_params: array
-            Nx * len(self.PSF1D.param_names) numpy array containing the PSF1D parameters as a function of pixels.
+    def __init__(self, p=None, clip=False):
+        PSF.__init__(self, clip=clip)
+        self.p_default = np.array([1, 0, 0, 3, 2, 0, 1, 1]).astype(float)
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        else:
+            self.p = np.copy(self.p_default)
+        self.param_names = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev",
+                            "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 100),
+                                (-1, 0), (0.1, np.inf), (0, np.inf)])
 
-        Examples
-        --------
-        >>> from spectractor.extractor.spectrum import Spectrum
-        >>> s = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
-        >>> profile_params = s.chromatic_psf.from_table_to_profile_params()
-        >>> assert(profile_params.shape == (s.chromatic_psf.Nx, len(s.chromatic_psf.PSF1D.param_names)))
-        >>> assert not np.all(np.isclose(profile_params, np.zeros_like(profile_params)))
-        """
-        profile_params = np.zeros((self.Nx, len(self.PSF1D.param_names)))
-        for k, name in enumerate(self.PSF1D.param_names):
-            profile_params[:, k] = self.table[name]
-        return profile_params
+    def apply_max_width_to_bounds(self, max_half_width=None):
+        if max_half_width is not None:
+            self.max_half_width = max_half_width
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
+                                (0.1, self.max_half_width), (1.1, 100), (-1, 0), (0.1, self.max_half_width),
+                                (0, np.inf)])
 
-    def from_table_to_poly_params(self):
-        """
-        Extract the polynomial parameters from self.table and fill an array with polynomial parameters.
+    def evaluate(self, pixels, p=None):
+        r"""Evaluate the MoffatGauss function.
 
-        Parameters
-        ----------
+        The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
 
-        Returns
-        -------
-        poly_params: array_like
-            A set of polynomial parameters that can be evaluated by the chromatic PSF class evaluate function.
+        .. math::
 
-        Examples
-        --------
-        >>> from spectractor.extractor.spectrum import Spectrum
-        >>> s = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
-        >>> poly_params = s.chromatic_psf.from_table_to_poly_params()
-        >>> assert(poly_params.size > s.chromatic_psf.Nx)
-        >>> assert(len(poly_params.shape)==1)
-        >>> assert not np.all(np.isclose(poly_params, np.zeros_like(poly_params)))
-        """
-        profile_params = self.from_table_to_profile_params()
-        poly_params = self.from_profile_params_to_poly_params(profile_params)
-        return poly_params
-
-    def from_poly_params_to_profile_params(self, poly_params, force_positive=False):
-        """
-        Evaluate the PSF1D profile parameters from the polynomial coefficients. If poly_params length is smaller
-        than self.Nx, it is assumed that the amplitude_moffat parameters are not included and set to arbitrarily to 1.
+            f(y) \propto  \frac{A}{ \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}+\eta\sqrt{2\pi}\sigma},
+            \quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
 
         Parameters
         ----------
-        poly_params: array_like
-            Parameter array of the model, in the form:
-                * Nx first parameters are amplitudes for the Moffat transverse profiles
-                * next parameters are polynomial coefficients for all the PSF1D parameters
-                in the same order as in PSF1D definition, except amplitude_moffat
-        force_positive: bool, optional
-            Force some profile parameters to be positive despite the polynomial coefficients (default: False)
+        pixels: list
+            List containing the X abscisse 2D array and the Y abscisse 2D array.
+        p: array_like
+            The parameter array. If None, the array used to instanciate the class is taken.
+            If given, the class instance parameter array is updated.
 
         Returns
         -------
-        profile_params: array
-            Nx * len(self.PSF1D.param_names) numpy array containing the PSF1D parameters as a function of pixels.
+        output: array_like
+            The PSF function evaluated.
+
+        Examples
+        --------
+        >>> p = [2,20,30,4,2,-0.5,1,10]
+        >>> psf = MoffatGauss(p)
+        >>> yy, xx = np.mgrid[:50, :60]
+        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.psf import MoffatGauss
+            p = [2,20,30,4,2,-0.5,1,10]
+            psf = MoffatGauss(p)
+            yy, xx = np.mgrid[:50, :60]
+            out = psf.evaluate(pixels=np.array([xx, yy]))
+            fig = plt.figure(figsize=(5,5))
+            plt.imshow(out, origin="lower")
+            plt.xlabel("X [pixels]")
+            plt.ylabel("Y [pixels]")
+            plt.show()
+
+        """
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev, saturation = self.p
+        if pixels.ndim == 3 and pixels.shape[0] == 2:
+            x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
+            out = evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
+        elif pixels.ndim == 1:
+            y = np.array(pixels)
+            norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha) + eta_gauss * np.sqrt(
+                2 * np.pi) * stddev
+            out = evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, stddev) / norm
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
+        else:  # pragma: no cover
+            raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
+
+
+class Order0(PSF):
+
+    def __init__(self, target, p=None, clip=False):
+        PSF.__init__(self, clip=clip)
+        self.p_default = np.array([1, 0, 0, 1, 1]).astype(float)
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        else:
+            self.p = np.copy(self.p_default)
+        self.param_names = ["amplitude", "x_c", "y_c", "gamma", "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", "saturation"]
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.5, 5), (0, np.inf)])
+        self.psf_func = self.build_interpolated_functions(target=target)
+
+    def build_interpolated_functions(self, target):
+        """Interpolate the order 0 image and make 1D and 2D functions centered on its centroid, with varying width
+        and normalized to get an integral equal to unity.
+
+        Parameters
+        ----------
+        target: Target
+            The target with a target.image attribute to interpolate.
+
+        Returns
+        -------
+        func: Callable
+            The 2D interpolated function centered in (target.image_x0, target.image_y0).
+        """
+        xx = np.arange(0, target.image.shape[1]) - target.image_x0
+        yy = np.arange(0, target.image.shape[0]) - target.image_y0
+        data = target.image / np.sum(target.image)
+        tmp_func = interp2d(xx, yy, data, bounds_error=False, fill_value=None)
+
+        def func(x, y, amplitude, x_c, y_c, gamma):
+            return amplitude * tmp_func((x - x_c)/gamma, (y - y_c)/gamma)
+
+        return func
+
+    def apply_max_width_to_bounds(self, max_half_width=None):
+        if max_half_width is not None:
+            self.max_half_width = max_half_width
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width), (0.5, 5), (0, np.inf)])
+
+    def evaluate(self, pixels, p=None):
+        r"""Evaluate the Order 0 interpolated function.
+
+        The function is normalized to have an integral equal to amplitude parameter.
+
+        Parameters
+        ----------
+        pixels: list
+            List containing the X abscisse 2D array and the Y abscisse 2D array.
+        p: array_like
+            The parameter array. If None, the array used to instanciate the class is taken.
+            If given, the class instance parameter array is updated.
+
+        Returns
+        -------
+        output: array_like
+            The PSF function evaluated.
+
+        Examples
+        --------
+        >>> from spectractor.extractor.images import Image, find_target
+        >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9")
+        >>> im.plot_image()
+        >>> guess = [820, 580]
+        >>> parameters.VERBOSE = True
+        >>> parameters.DEBUG = True
+        >>> x0, y0 = find_target(im, guess)
+
+        >>> p = [1,40,50,1,1e20]
+        >>> psf = Order0(target=im.target, p=p)
+
+        2D evaluation:
+
+        >>> yy, xx = np.mgrid[:80, :100]
+        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+
+        1D evaluation:
+
+        >>> out = psf.evaluate(pixels=np.arange(100))
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.psf import Moffat, Order0
+            from spectractor.extractor.images import Image, find_target
+            im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9")
+            im.plot_image()
+            guess = [820, 580]
+            parameters.VERBOSE = True
+            parameters.DEBUG = True
+            x0, y0 = find_target(im, guess)
+            p = [1,40,50,1,1e20]
+            psf = Order0(target=im.target, p=p)
+            yy, xx = np.mgrid[:80, :100]
+            out = psf.evaluate(pixels=np.array([xx, yy]))
+            fig = plt.figure(figsize=(5,5))
+            plt.imshow(out, origin="lower")
+            plt.xlabel("X [pixels]")
+            plt.ylabel("Y [pixels]")
+            plt.grid()
+            plt.show()
+
+        """
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        amplitude, x_c, y_c, gamma, saturation = self.p
+        if pixels.ndim == 3 and pixels.shape[0] == 2:
+            x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
+            out = self.psf_func(x[0], y[:, 0], amplitude, x_c, y_c, gamma)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
+        elif pixels.ndim == 1:
+            y = np.array(pixels)
+            out = self.psf_func(x_c, y, amplitude, x_c, y_c, gamma).T[0]
+            out *= amplitude / np.sum(out)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
+        else:  # pragma: no cover
+            raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
+
+
+class PSFFitWorkspace(FitWorkspace):
+    """Generic PSF fitting workspace.
+
+    """
+
+    def __init__(self, psf, data, data_errors, bgd_model_func=None, file_name="",
+                 nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+                 verbose=0, plot=False, live_fit=False, truth=None):
+        """
+
+        Parameters
+        ----------
+        psf
+        data: array_like
+            The data array (background subtracted) of dimension 1 or 2.
+        data_errors
+        bgd_model_func
+        file_name
+        nwalkers
+        nsteps
+        burnin
+        nbins
+        verbose
+        plot
+        live_fit
+        truth
 
         Examples
         --------
 
-        # Build a mock spectrogram with random Poisson noise:
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=1, saturation=8000)
-        >>> poly_params_test = s.generate_test_poly_params()
-        >>> data = s.evaluate(poly_params_test)
+        Build a mock spectrogram with random Poisson noise:
+
+        >>> p = np.array([100, 50, 50, 3, 2, -0.1, 2, 200])
+        >>> psf = MoffatGauss(p)
+        >>> data = psf.evaluate(p)
+        >>> data_errors = np.sqrt(data+1)
+
+        Fit the data:
+
+        >>> w = PSFFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
+
+        """
+        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose=verbose, plot=plot,
+                              live_fit=live_fit, truth=truth)
+        self.my_logger = set_logger(self.__class__.__name__)
+        if data.shape != data_errors.shape:
+            raise ValueError(f"Data and uncertainty arrays must have the same shapes. "
+                             f"Here data.shape={data.shape} and data_errors.shape={data_errors.shape}.")
+        self.psf = psf
+        self.data = data
+        self.err = data_errors
+        self.bgd_model_func = bgd_model_func
+        self.p = np.copy(self.psf.p)  # [1:])
+        self.guess = np.copy(self.psf.p)
+        self.saturation = self.psf.p[-1]
+        self.fixed = [False] * len(self.p)
+        self.fixed[-1] = True  # fix saturation parameter
+        self.input_labels = list(np.copy(self.psf.param_names))  # [1:]))
+        self.axis_names = list(np.copy(self.psf.axis_names))  # [1:]))
+        self.bounds = self.psf.bounds  # [1:]
+        self.nwalkers = max(2 * self.ndim, nwalkers)
+
+        # prepare the fit
+        if data.ndim == 2:
+            self.Ny, self.Nx = self.data.shape
+            self.psf.apply_max_width_to_bounds(self.Ny)
+            yy, xx = np.mgrid[:self.Ny, :self.Nx]
+            self.pixels = np.asarray([xx, yy])
+            # flat data for fitworkspace
+            self.data = self.data.flatten()
+            self.err = self.err.flatten()
+        elif data.ndim == 1:
+            self.Ny = self.data.size
+            self.Nx = 1
+            self.psf.apply_max_width_to_bounds(self.Ny)
+            self.pixels = np.arange(self.Ny)
+            self.fixed[1] = True
+        else:
+            raise ValueError(f"Data array must have dimension 1 or 2. Here pixels.ndim={data.ndim}.")
+
+        # update bounds
+        self.bounds = self.psf.bounds  # [1:]
+        total_flux = np.sum(data)
+        self.bounds[0] = (0.1 * total_flux, 2 * total_flux)
+
+        # error matrix
+        # here image uncertainties are assumed to be uncorrelated
+        # (which is not exactly true in rotated images)
+        self.W = 1. / (self.err * self.err)
+
+    def simulate(self, *psf_params):
+        """
+        Compute a PSF model given PSF parameters and minimizing
+        amplitude parameter given a data array.
+
+        Parameters
+        ----------
+        psf_params: array_like
+            PSF shape parameter array (all parameters except amplitude).
+
+        Examples
+        --------
+
+        Build a mock PSF2D without background and with random Poisson noise:
+
+        >>> p = np.array([200000, 20, 30, 5, 2, -0.1, 2, 400000])
+        >>> psf = MoffatGauss(p)
+        >>> yy, xx = np.mgrid[:50, :60]
+        >>> data = psf.evaluate(np.array([xx, yy]), p)
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
-        # From the polynomial parameters to the profile parameters:
-        >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
-        >>> assert(np.all(np.isclose(profile_params[0], [0, 50, 5, 2, 0, 2, 8e3])))
+        Fit the data in 2D:
 
-        # From the profile parameters to the polynomial parameters:
-        >>> profile_params = s.from_profile_params_to_poly_params(profile_params)
-        >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
+        >>> w = PSFFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
+        >>> x, mod, mod_err = w.simulate(*p)
+        >>> w.plot_fit()
 
-        # From the polynomial parameters to the profile parameters without Moffat amplitudes:
-        >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test[100:])
-        >>> assert(np.all(np.isclose(profile_params[0], [1, 50, 5, 2, 0, 2, 8e3])))
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod.reshape(data.shape)-data)/data_errors) < 1
+
+        Fit the data in 1D:
+
+        >>> data1d = data[:,int(p[1])]
+        >>> data1d_err = data_errors[:,int(p[1])]
+        >>> psf.p[0] = p[0] / 10.5
+        >>> w = PSFFitWorkspace(psf, data1d, data1d_err, bgd_model_func=None, verbose=True)
+        >>> x, mod, mod_err = w.simulate(*psf.p)
+        >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-data1d)/data1d_err) < 1
+
+        .. plot::
+
+            import numpy as np
+            import matplotlib.pyplot as plt
+            from spectractor.extractor.psf import *
+            p = np.array([2000, 20, 30, 5, 2, -0.1, 2, 400])
+            psf = MoffatGauss(p)
+            yy, xx = np.mgrid[:50, :60]
+            data = psf.evaluate(np.array([xx, yy]), p)
+            data = np.random.poisson(data)
+            data_errors = np.sqrt(data+1)
+            data = np.random.poisson(data)
+            data_errors = np.sqrt(data+1)
+            w = PSFFitWorkspace(psf, data, data_errors, bgd_model_func=bgd_model_func, verbose=True)
+            x, mod, mod_err = w.simulate(*p[:-1])
+            w.plot_fit()
 
         """
-        pixels = np.linspace(-1, 1, self.Nx)
-        profile_params = np.zeros((self.Nx, len(self.PSF1D.param_names)))
-        shift = 0
-        for k, name in enumerate(self.PSF1D.param_names):
-            if name == 'amplitude_moffat':
-                if len(poly_params) > self.Nx:
-                    profile_params[:, k] = poly_params[:self.Nx]
+        # Initialization of the regression
+        self.p = np.copy(psf_params)
+        # if not self.fixed_amplitude:
+        #     # Matrix filling
+        #     M = self.psf.evaluate(self.pixels, p=np.array([1] + list(self.p))).flatten()
+        #     M_dot_W_dot_M = M.T @ self.W @ M
+        #     # Regression
+        #     amplitude = M.T @ (self.W * self.data) / M_dot_W_dot_M
+        #     self.p[0] = amplitude
+        # Save results
+        self.model = self.psf.evaluate(self.pixels, p=self.p).flatten()
+        self.model_err = np.zeros_like(self.model)
+        return self.pixels, self.model, self.model_err
+
+    def plot_fit(self):
+        if self.Nx == 1:
+            fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex='all', gridspec_kw={'height_ratios': [5, 1]})
+            data = np.copy(self.data)
+            if self.bgd_model_func is not None:
+                data = data + self.bgd_model_func(self.pixels)
+            ax[0].errorbar(self.pixels, data, yerr=self.err, fmt='ro', label="Data")
+            if len(self.outliers) > 0:
+                ax[0].errorbar(self.outliers, data[self.outliers], yerr=self.err[self.outliers], fmt='go',
+                               label=rf"Outliers ({self.sigma_clip}$\sigma$)")
+            if self.bgd_model_func is not None:
+                ax[0].plot(self.pixels, self.bgd_model_func(self.pixels), 'b--', label="fitted bgd")
+            if self.guess is not None:
+                if self.bgd_model_func is not None:
+                    ax[0].plot(self.pixels, self.psf.evaluate(self.pixels, p=self.guess)
+                               + self.bgd_model_func(self.pixels), 'k--', label="Guess")
                 else:
-                    profile_params[:, k] = np.ones(self.Nx)
-            else:
-                if len(poly_params) > self.Nx:
-                    # profile_params[:, k] = np.polyval(poly_params[Nx + shift:Nx + shift + self.degrees[name] + 1],
-                    #                                  pixels)
-                    profile_params[:, k] = \
-                        np.polynomial.legendre.legval(pixels,
-                                                      poly_params[
-                                                      self.Nx + shift:self.Nx + shift + self.degrees[name] + 1])
-                else:
-                    profile_params[:, k] = \
-                        np.polynomial.legendre.legval(pixels, poly_params[shift:shift + self.degrees[name] + 1])
-                shift = shift + self.degrees[name] + 1
-        if force_positive:
-            for k, name in enumerate(self.PSF1D.param_names):
-                if name == "x_mean":
-                    profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
-                    profile_params[profile_params[:, k] >= self.Ny, k] = self.Ny
-                if name == "alpha":
-                    profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
-                    # profile_params[profile_params[:, k] >= 6, k] = 6
-                if name == "gamma":
-                    profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
-                if name == "stddev":
-                    profile_params[profile_params[:, k] <= 0.1, k] = 1e-1
-        return profile_params
-
-    def from_profile_params_to_shape_params(self, profile_params):
-        """
-        Compute the PSF1D integrals and FWHMS given the profile_params array and fill the table.
-
-        Parameters
-        ----------
-        profile_params: array
-         a Nx * len(self.PSF1D.param_names) numpy array containing the PSF1D parameters as a function of pixels.
-
-        Examples
-        --------
-        >>> s = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=8000)
-        >>> poly_params_test = s.generate_test_poly_params()
-        >>> profile_params = s.from_poly_params_to_profile_params(poly_params_test)
-        >>> s.from_profile_params_to_shape_params(profile_params)
-        >>> assert(np.isclose(s.table['fwhm'][-1], 12.7851))
-        """
-        self.fill_table_with_profile_params(profile_params)
-        pixel_y = np.arange(self.Ny).astype(int)
-        pixel_x = np.arange(self.Nx).astype(int)
-        for x in pixel_x:
-            p = profile_params[x, :]
-            PSF = PSF1D(*p)
-            fwhm = PSF.fwhm(x_array=pixel_y)
-            self.table['flux_integral'][x] = PSF.integrate(bounds=(-10 * fwhm + p[1], 10 * fwhm + p[1]),
-                                                           x_array=pixel_y)
-            self.table['fwhm'][x] = fwhm
-            self.table['Dy_mean'][x] = 0
-
-    def set_bounds(self, data=None):
-        """
-        This function returns an array of bounds for iminuit. It is very touchy, change the values with caution !
-
-        Parameters
-        ----------
-        data: array_like, optional
-            The data array, to set the bounds for the amplitude using its maximum.
-            If None is provided, no bounds are provided for the amplitude parameters.
-
-        Returns
-        -------
-        bounds: array_like
-            2D array containing the pair of bounds for each polynomial parameters.
-
-        """
-        if self.saturation is None:
-            self.saturation = 2 * np.max(data)
-        if data is not None:
-            Ny, Nx = data.shape
-            bounds = [[0.1 * np.max(data[:, x]) for x in range(Nx)], [100.0 * np.max(data[:, x]) for x in range(Nx)]]
-        else:
-            bounds = [[], []]
-        for k, name in enumerate(self.PSF1D.param_names):
-            tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
-            # if name is "x_mean":
-            #      tmp_bounds[0].append(0)
-            #      tmp_bounds[1].append(Ny)
-            # elif name is "gamma":
-            #      tmp_bounds[0].append(0)
-            #      tmp_bounds[1].append(None) # Ny/2
-            # elif name is "alpha":
-            #      tmp_bounds[0].append(1)
-            #      tmp_bounds[1].append(None) # 10
-            # elif name is "eta_gauss":
-            #     tmp_bounds[0].append(-1)
-            #     tmp_bounds[1].append(0)
-            # elif name is "stddev":
-            #     tmp_bounds[0].append(0.1)
-            #     tmp_bounds[1].append(Ny / 2)
-            if name is "saturation":
-                if data is not None:
-                    tmp_bounds = [[0.1 * np.max(data)], [2 * self.saturation]]
-                else:
-                    tmp_bounds = [[0], [2 * self.saturation]]
-            elif name is "amplitude_moffat":
-                continue
-            # else:
-            #     self.my_logger.error(f'Unknown parameter name {name} in set_bounds.')
-            bounds[0] += tmp_bounds[0]
-            bounds[1] += tmp_bounds[1]
-        return np.array(bounds).T
-
-    def check_bounds(self, poly_params, noise_level=0):
-        """
-        Evaluate the PSF1D profile parameters from the polynomial coefficients and check if they are within priors.
-
-        Parameters
-        ----------
-        poly_params: array_like
-            Parameter array of the model, in the form:
-                * Nx first parameters are amplitudes for the Moffat transverse profiles
-                * next parameters are polynomial coefficients for all the PSF1D parameters
-                in the same order as in PSF1D definition, except amplitude_moffat
-        noise_level: float, optional
-            Noise level to set minimal boundary for amplitudes (negatively).
-
-        Returns
-        -------
-        in_bounds: bool
-            Return True if all parameters respect the model parameter priors.
-
-        """
-        in_bounds = True
-        penalty = 0
-        outbound_parameter_name = ""
-        profile_params = self.from_poly_params_to_profile_params(poly_params)
-        for k, name in enumerate(self.PSF1D.param_names):
-            p = profile_params[:, k]
-            if name == 'amplitude_moffat':
-                if np.any(p < -noise_level):
-                    in_bounds = False
-                    penalty += np.abs(np.sum(profile_params[p < -noise_level, k])) / np.abs(np.mean(p))
-                    outbound_parameter_name += name + ' '
-            elif name is "x_mean":
-                if np.any(p < 0):
-                    penalty += np.abs(np.sum(profile_params[p < 0, k])) / np.abs(np.mean(p))
-                    in_bounds = False
-                    outbound_parameter_name += name + ' '
-                if np.any(p > self.Ny):
-                    penalty += np.sum(profile_params[p > self.Ny, k] - self.Ny)
-                    penalty /= np.abs(np.mean(p))
-                    in_bounds = False
-                    outbound_parameter_name += name + ' '
-            # elif name is "gamma":
-            #     if np.any(p < 0) or np.any(p > self.Ny):
-            #         in_bounds = False
-            #         penalty = 1
-            #         break
-            elif name is "alpha":
-                if np.any(p > 10):
-                    penalty += np.sum(profile_params[p > 10, k] - 10)
-                    penalty /= np.abs(np.mean(p))
-                    in_bounds = False
-                    outbound_parameter_name += name + ' '
-                # if np.any(p < 0.1):
-                #     penalty += np.sum(0.1 - profile_params[p < 0.1, k])
-                #     penalty /= np.abs(np.mean(p))
-                #     in_bounds = False
-                #     outbound_parameter_name += name + ' '
-            elif name is "eta_gauss":
-                if np.any(p > 0):
-                    penalty += np.sum(profile_params[p > 0, k])
-                    # penalty /= np.abs(np.mean(p))
-                    in_bounds = False
-                    outbound_parameter_name += name + ' '
-                if np.any(p < -1):
-                    penalty += np.sum(-1 - profile_params[p < -1, k])
-                    penalty /= np.abs(np.mean(p))
-                    in_bounds = False
-                    outbound_parameter_name += name + ' '
-            # elif name is "stddev":
-            #     if np.any(p < 0) or np.any(p > self.Ny):
-            #         in_bounds = False
-            #         penalty = 1
-            #         break
-            elif name is "saturation":
-                continue
-            else:
-                continue
-            # else:
-            #    self.my_logger.error(f'Unknown parameter name {name} in set_bounds.')
-        penalty *= self.Nx * self.Ny
-        return in_bounds, penalty, outbound_parameter_name
-
-    def evaluate(self, poly_params):
-        """
-        Simulate a 2D spectrogram of size Nx times Ny.
-
-        Parameters
-        ----------
-        poly_params: array_like
-            Parameter array of the model, in the form:
-                * Nx first parameters are amplitudes for the Moffat transverse profiles
-                * next parameters are polynomial coefficients for all the PSF1D parameters
-                in the same order as in PSF1D definition, except amplitude_moffat
-
-        Returns
-        -------
-        output: array
-            A 2D array with the model
-
-        Examples
-        --------
-        >>> s = ChromaticPSF1D(Nx=100, Ny=20, deg=4, saturation=8000)
-        >>> poly_params = s.generate_test_poly_params()
-        >>> output = s.evaluate(poly_params)
-
-        >>> import matplotlib.pyplot as plt
-        >>> im = plt.imshow(output, origin='lower')  #doctest: +ELLIPSIS
-        >>> plt.colorbar(im)  #doctest: +ELLIPSIS
-        <matplotlib.colorbar.Colorbar object at 0x...>
-        >>> if parameters.DISPLAY: plt.show()
-
-        """
-        profile_params = self.from_poly_params_to_profile_params(poly_params)
-        y = np.arange(self.Ny)
-        output = np.zeros((self.Ny, self.Nx))
-        for k in range(self.Nx):
-            # self.my_logger.warning(f"{k} {profile_params[k]}")
-            output[:, k] = PSF1D.evaluate(y, *profile_params[k])
-        return output
-
-    def get_distance_along_dispersion_axis(self, shift_x=0, shift_y=0):
-        return np.sqrt((self.table['Dx'] - shift_x) ** 2 + (self.table['Dy_mean'] - shift_y) ** 2)
-
-    def generate_test_poly_params(self):
-        """
-        A set of parameters to define a test spectrogram
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        profile_params: array
-            The list of the test parameters
-
-        Examples
-        --------
-        >>> s = ChromaticPSF1D(Nx=5, Ny=4, deg=1, saturation=8000)
-        >>> params = s.generate_test_poly_params()
-        >>> assert(np.all(np.isclose(params, [ 0, 50, 100, 150, 200, 2, 0, 5, 0, 2, 0, -0.4, -0.4, 2, 0, 8000])))
-        """
-        params = [50 * i for i in range(self.Nx)]
-        params += [0.] * (self.degrees['x_mean'] - 1) + [0, self.Ny / 2]  # y mean
-        params += [0.] * (self.degrees['gamma'] - 1) + [0, 5]  # gamma
-        params += [0.] * (self.degrees['alpha'] - 1) + [0, 2]  # alpha
-        params += [0.] * (self.degrees['eta_gauss'] - 1) + [-0.4, -0.4]  # eta_gauss
-        params += [0.] * (self.degrees['stddev'] - 1) + [0, 2]  # stddev
-        params += [8000.]  # saturation
-        poly_params = np.zeros_like(params)
-        poly_params[:self.Nx] = params[:self.Nx]
-        index = self.Nx - 1
-        self.saturation = 8000.
-        for name in self.PSF1D.param_names:
-            if name == 'amplitude_moffat':
-                continue
-            else:
-                shift = self.degrees[name] + 1
-                c = np.polynomial.legendre.poly2leg(params[index + shift:index:-1])
-                coeffs = np.zeros(shift)
-                coeffs[:c.size] = c
-                poly_params[index + 1:index + shift + 1] = coeffs
-                index = index + shift
-        return poly_params
-
-    def plot_summary(self, truth=None):
-        fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12, 6))
-        test = PSF1D()
-        PSF_models = []
-        PSF_truth = []
-        if truth is not None:
-            PSF_truth = truth.from_poly_params_to_profile_params(truth.poly_params)
-        all_pixels = np.arange(self.Nx)
-        for i, name in enumerate(self.PSF1D.param_names):
-            fit, cov, model = fit_poly1d(self.pixels, self.profile_params[:, i], order=self.degrees[name])
-            PSF_models.append(np.polyval(fit, all_pixels))
-        for i, name in enumerate(self.PSF1D.param_names):
-            p = ax[0].plot(self.pixels, self.profile_params[:, i], marker='+', linestyle='none')
-            ax[0].plot(self.fitted_pixels, self.profile_params[self.fitted_pixels, i], label=test.param_names[i],
-                       marker='o', linestyle='none', color=p[0].get_color())
-            if i > 0:
-                ax[0].plot(all_pixels, PSF_models[i], color=p[0].get_color())
-            if truth is not None:
-                ax[0].plot(all_pixels, PSF_truth[:, i], color=p[0].get_color(), linestyle='--')
-        img = np.zeros((self.Ny, self.Nx)).astype(float)
-        yy, xx = np.mgrid[:self.Ny, :self.Nx]
-        for x in self.pixels[::self.Nx // 10]:
-            params = [PSF_models[p][x] for p in range(len(self.PSF1D.param_names))]
-            psf = PSF2D.evaluate(xx, yy, 1, x, self.Ny // 2, *params[2:])
-            psf /= np.max(psf)
-            img += psf
-        ax[1].imshow(img, origin='lower')
-        ax[1].set_xlabel('X [pixels]')
-        ax[1].set_ylabel('Y [pixels]')
-        ax[0].set_ylabel('PSF1D parameters')
-        ax[0].grid()
-        ax[1].grid(color='white', ls='solid')
-        ax[1].grid(True)
-        ax[0].set_yscale('symlog', linthreshy=10)
-        ax[1].legend(title='PSF(x)')
-        ax[0].legend()
-        fig.tight_layout()
-        # fig.subplots_adjust(hspace=0)
-        if parameters.DISPLAY:
-            plt.show()
-
-
-def extract_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5, live_fit=False):
-    """
-    Fit a polynomial background slice per slice along the x axis,
-    with outlier removal, on lateral bands defined by the ws parameter.
-
-    Parameters
-    ----------
-    data: array
-        The 2D array image. The transverse profile is fitted on the y direction for all pixels along the x direction.
-    err: array
-        The uncertainties related to the data array.
-    deg: int
-        Degree of the polynomial model for the background (default: 1).
-    ws: list
-        up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
-    pixel_step: int, optional
-        The step in pixels between the slices to be fitted (default: 1).
-        The values for the skipped pixels are interpolated with splines from the fitted parameters.
-    live_fit: bool, optional
-        If True, the transverse profile fit is plotted in live across the loop (default: False).
-    sigma: int
-        Sigma for outlier rejection (default: 5).
-
-    Returns
-    -------
-    bgd_model_func: callable
-        A 2D function to model the extracted background
-
-    Examples
-    --------
-
-    # Build a mock spectrogram with random Poisson noise:
-    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, saturation=1000)
-    >>> params = s0.generate_test_poly_params()
-    >>> saturation = params[-1]
-    >>> data = s0.evaluate(params)
-    >>> bgd = 10*np.ones_like(data)
-    >>> data += bgd
-    >>> data = np.random.poisson(data)
-    >>> data_errors = np.sqrt(data+1)
-
-    # Fit the transverse profile:
-    >>> bgd_model = extract_background(data, data_errors, deg=1, ws=[30,50], live_fit=False, sigma=5, pixel_step=1)
-    """
-    my_logger = set_logger(__name__)
-    Ny, Nx = data.shape
-    middle = Ny // 2
-    index = np.arange(Ny)
-    # Prepare the fit
-    bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
-    pixel_range = np.arange(0, Nx, pixel_step)
-    bgd_model = np.zeros_like(data).astype(float)
-    # Fit for pixels in pixel_range array
-    for x in pixel_range:
-        # fit the background with a polynomial function
-        bgd = data[bgd_index, x]
-        bgd_fit, outliers = fit_poly1d_outlier_removal(bgd_index, bgd, order=deg, sigma=sigma, niter=2)
-        bgd_model[:, x] = bgd_fit(index)
-        if live_fit:
-            plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, bgd_fit=bgd_fit,
-                                          sigma=sigma, live_fit=live_fit)
-    # Interpolate the grid on unfitted pixels
-    bgd_fit = bgd_model[:, pixel_range]
-    bgd_model_func = interp2d(pixel_range, index, bgd_fit, kind='linear', bounds_error=False, fill_value=None)
-    # Filter the background model
-    from scipy.signal import medfilt2d
-    # noinspection PyTypeChecker
-    b = bgd_model_func(np.arange(Nx), index)
-    bgd_model = medfilt2d(bgd_model,kernel_size=[9,3])
-    bgd_model_func = interp2d(np.arange(Nx), index, bgd_model, kind='linear', bounds_error=False, fill_value=None)
-    if parameters.DEBUG or True:
-        # fig, ax = plt.subplots(1,3, figsize=(12,4))
-        # noinspection PyTypeChecker
-        b = bgd_model_func(np.arange(Nx), index)
-        im = plt.imshow(b[9:-9,9:-9], origin='auto', aspect="auto")
-        plt.colorbar(im)
-        plt.title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')
-        if parameters.DISPLAY:
-            plt.show()
-
-    return bgd_model_func
-
-
-def extract_background(data, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
-    """
-    Fit a 2D polynomial background with outlier removal, on lateral bands defined by the ws parameter.
-
-    Parameters
-    ----------
-    data: array
-        The 2D array image. The transverse profile is fitted on the y direction for all pixels along the x direction.
-    deg: int
-        Degree of the polynomial model for the background (default: 1).
-    ws: list
-        up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
-    pixel_step: int, optional
-        The step in pixels between the slices to be fitted (default: 1).
-        The values for the skipped pixels are interpolated with splines from the fitted parameters.
-    sigma: int
-        Sigma for outlier rejection (default: 5).
-
-    Returns
-    -------
-    bgd_model_func: callable
-        A 2D function to model the extracted background
-
-    Examples
-    --------
-
-    # Build a mock spectrogram with random Poisson noise:
-    >>> s0 = ChromaticPSF1D(Nx=80, Ny=100, saturation=1000)
-    >>> params = s0.generate_test_poly_params()
-    >>> saturation = params[-1]
-    >>> data = s0.evaluate(params)
-    >>> bgd = 10.*np.ones_like(data)
-    >>> xx, yy = np.meshgrid(np.arange(s0.Nx), np.arange(s0.Ny))
-    >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))
-    >>> data += bgd
-    >>> data = np.random.poisson(data)
-    >>> data_errors = np.sqrt(data+1)
-
-    # Fit the transverse profile:
-    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=5, pixel_step=1)
-    """
-    my_logger = set_logger(__name__)
-    Ny, Nx = data.shape
-    middle = Ny // 2
-    x = np.arange(Nx)
-    y = np.arange(Ny)
-    # Prepare the fit
-    bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
-    pixel_range = np.arange(0, Nx, pixel_step)
-    # Concatenate the background lateral bounds
-    bgd_bands = data[bgd_index, :]
-    bgd_bands = bgd_bands[:, pixel_range]
-    bgd_bands = bgd_bands.astype(float)
-    # Fit a 1 degree 2D polynomial function with outlier removal
-    xx, yy = np.meshgrid(pixel_range, bgd_index)
-    bgd_model_func = fit_poly2d_outlier_removal(xx, yy, bgd_bands, order=deg, sigma=sigma, niter=20)
-    if parameters.DEBUG:
-        fig, ax = plt.subplots(2,1, figsize=(12, 6), sharex='all')
-        bgd_bands = np.copy(data).astype(float)
-        bgd_bands[middle-ws[0]:middle+ws[0], :] = np.nan
-        im = ax[0].imshow(bgd_bands, origin='lower', aspect="auto", vmin=0)
-        c = plt.colorbar(im, ax=ax[0])
-        c.set_label(f'Data units (lin scale)')
-        ax[0].set_title(f'Data background: mean={np.nanmean(bgd_bands):.3f}, std={np.nanstd(bgd_bands):.3f}')
-        ax[0].set_xlabel('X [pixels]')
-        ax[0].set_ylabel('Y [pixels]')
-        xx, yy = np.meshgrid(x, y)
-        b = bgd_model_func(xx, yy)
-        im = ax[1].imshow(b, origin='lower', aspect="auto")
-        ax[1].set_xlabel('X [pixels]')
-        ax[1].set_ylabel('Y [pixels]')
-        c2 = plt.colorbar(im, ax=ax[1])
-        c2.set_label(f'Data units (lin scale)')
-        ax[1].set_title(f'Fitted background: mean={np.mean(b):.3f}, std={np.std(b):.3f}')
-        fig.tight_layout()
-        if parameters.DISPLAY:
-            plt.show()
-    return bgd_model_func
-
-
-def fit_transverse_PSF1D_profile(data, err, w, ws, pixel_step=1, bgd_model_func=None, saturation=None, live_fit=False, sigma=5, deg=4):
-    """
-    Fit the transverse profile of a 2D data image with a PSF1D profile.
-    Loop is done on the x-axis direction.
-    An order 1 polynomial function is fitted to subtract the background for each pixel
-    with a 3*sigma outlier removal procedure to remove background stars.
-    
-    Parameters
-    ----------
-    data: array
-        The 2D array image. The transverse profile is fitted on the y direction
-        for all pixels along the x direction.
-    err: array 
-        The uncertainties related to the data array.
-    w: int
-        Half width of central region where the spectrum is extracted and summed (default: 10)
-    ws: list
-        up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
-    pixel_step: int, optional
-        The step in pixels between the slices to be fitted (default: 1).
-        The values for the skipped pixels are interpolated with splines from the fitted parameters.
-    bgd_model_func: callable, optional
-        A 2D function to model the extracted background (default: None -> null background)
-    saturation: float, optional
-        The saturation level of the image. Default is set to twice the maximum of the data array and has no effect.
-    live_fit: bool, optional
-        If True, the transverse profile fit is plotted in live accross the loop (default: False).
-    sigma: int
-        Sigma for outlier rejection (default: 5).
-
-    Returns
-    -------
-    s: ChromaticPSF1D
-        The chromatic PSF containing all the information on the wavelength dependeces of the parameters adn the flux_sum.
-
-    Examples
-    --------
-
-    # Build a mock spectrogram with random Poisson noise:
-    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, saturation=1000)
-    >>> params = s0.generate_test_poly_params()
-    >>> saturation = params[-1]
-    >>> data = s0.evaluate(params)
-    >>> bgd = 10*np.ones_like(data)
-    >>> xx, yy = np.meshgrid(np.arange(s0.Nx), np.arange(s0.Ny))
-    >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))
-    >>> data += bgd
-    >>> data = np.random.poisson(data)
-    >>> data_errors = np.sqrt(data+1)
-
-    # Extract the background
-    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=3, pixel_step=10)
-
-    # Fit the transverse profile:
-    >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
-    ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False, sigma=5)
-    >>> assert(np.all(np.isclose(s.pixels[:5], np.arange(s.Nx)[:5], rtol=1e-3)))
-    >>> assert(not np.any(np.isclose(s.table['flux_sum'][3:6], np.zeros(s.Nx)[3:6], rtol=1e-3)))
-    >>> assert(np.all(np.isclose(s.table['Dy'][-10:-1], np.zeros(s.Nx)[-10:-1], rtol=1e-2)))
-    >>> s.plot_summary(truth=s0)
-    """
-    my_logger = set_logger(__name__)
-    if saturation is None:
-        saturation = 2 * np.max(data)
-    Ny, Nx = data.shape
-    middle = Ny // 2
-    index = np.arange(Ny)
-    # Prepare the outputs
-    s = ChromaticPSF1D(Nx, Ny, deg=deg, saturation=saturation)
-    # Prepare the fit: start with the maximum of the spectrum
-    ymax_index = int(np.unravel_index(np.argmax(data), data.shape)[1])
-    bgd_index = np.concatenate((np.arange(0, middle - ws[0]), np.arange(middle + ws[0], Ny))).astype(int)
-    y = data[:, ymax_index]
-    guess = [np.nanmax(y) - np.nanmean(y), middle, 5, 2, 0, 2, saturation]
-    maxi = np.abs(np.nanmax(y))
-    bounds = [(0.1 * maxi, 2 * maxi), (middle - w, middle + w), (0.1, Ny // 2), (1, 6), (-1, 0), (0.1, Ny // 2),
-              (0, 2 * saturation)]
-    # first fit with moffat only to initialize the guess
-    # hypothesis that max of spectrum if well describe by a focused PSF
-    bgd = data[bgd_index, ymax_index]
-    if bgd_model_func is not None:
-        signal = y - bgd_model_func([ymax_index]*index.size, index)
-    else:
-        signal = y
-    fit = fit_moffat1d_outlier_removal(index, signal, sigma=sigma, niter=2,
-                                       guess=guess[:4], bounds=np.array(bounds[:4]).T)
-    moffat_guess = [getattr(fit, p).value for p in fit.param_names]
-    guess[:4] = moffat_guess
-    init_guess = np.copy(guess)
-    # Go from max to right, then from max to left
-    # includes the boundaries to avoid Runge phenomenum in chromatic_fit
-    pixel_range = list(np.arange(ymax_index, Nx, pixel_step).astype(int))
-    if Nx - 1 not in pixel_range:
-        pixel_range.append(Nx - 1)
-    pixel_range += list(np.arange(ymax_index, -1, -pixel_step).astype(int))
-    if 0 not in pixel_range:
-        pixel_range.append(0)
-    pixel_range = np.array(pixel_range)
-    for x in pixel_range:
-        guess = np.copy(guess)
-        if x == ymax_index:
-            guess = np.copy(init_guess)
-        # fit the background with a polynomial function
-        y = data[:, x]
-        if bgd_model_func is not None:
-            x_array = [x] * index.size
-            signal = y - bgd_model_func(x_array, index)
-        else:
-            signal = y
-        # in case guess amplitude is too low
-        pdf = np.abs(signal)
-        signal_sum = np.nansum(np.abs(signal))
-        if signal_sum > 0:
-            pdf /= signal_sum
-        mean = np.nansum(pdf * index)
-        std = np.sqrt(np.nansum(pdf * (index - mean) ** 2))
-        maxi = np.abs(np.nanmax(signal))
-        bounds[0] = (0.1 * np.nanstd(bgd), 2 * np.nanmax(y))
-        # if guess[4] > -1:
-        #    guess[0] = np.max(signal) / (1 + guess[4])
-        if guess[0] * (1 + guess[4]) < 3 * np.nanstd(bgd):
-            guess = [0.9 * maxi, mean, std, 2, 0, std, saturation]
-        # if guess[0] * (1 + guess[4]) > 1.2 * maxi:
-        #     guess = [0.9 * maxi, mean, std, 2, 0, std, saturation]
-        PSF_guess = PSF1D(*guess)
-        outliers = []
-        # fit with outlier removal to clean background stars
-        # first a simple moffat to get the general shape
-        # moffat1d = fit_moffat1d_outlier_removal(index, signal, sigma=5, niter=2,
-        #                                        guess=guess[:4], bounds=np.array(bounds[:4]).T)
-        # guess[:4] = [getattr(moffat1d, p).value for p in moffat1d.param_names]
-        # then PSF1D model using the result from the Moffat1D fit
-        # fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
-        #                                            guess=guess, bounds=bounds, sigma=5, niter=2,
-        #                                            niter_basinhopping=5, T_basinhopping=1)
-        # fit = fit_PSF1D_minuit(index[good_indices], signal[good_indices], guess=guess, bounds=bounds,
-        #                       data_errors=err[good_indices, x])
-        fit, outliers ,reduced_chi2,ndof= fit_PSF1D_minuit_outlier_removal(index, signal, guess=guess, bounds=bounds,
-                                                         data_errors=err[:, x], sigma=sigma, niter=2, consecutive=4)
-        # good_indices = [i for i in index if i not in outliers]
-        # outliers = [i for i in index if np.abs((signal[i] - fit(i)) / err[i, x]) > sigma]
-        """
-        This part is relevant if outliers rejection above is activated
-        # test if 3 consecutive pixels are in the outlier list
-        test = 0
-        consecutive_outliers = False
-        for o in range(1, len(outliers)):
-            t = outliers[o] - outliers[o - 1]
-            if t == 1:
-                test += t
-            else:
-                test = 0
-            if test > 1:
-                consecutive_outliers = True
-                break
-        # test if the fit has badly fitted the two highest data points or the middle points
-        test = np.copy(signal)
-        max_badfit = False
-        max_index = signal.argmax()
-        if max_index in outliers:
-            test[max_index] = 0
-            if test.argmax() in outliers:
-                max_badfit = True
-        # if there are consecutive outliers or max is badly fitted, re-estimate the guess and refi
-        if consecutive_outliers:  # or max_badfit:
-            my_logger.warning(f'\n\tRefit because of max_badfit={max_badfit} or '
-                              f'consecutive_outliers={consecutive_outliers}')
-            guess = [1.3 * maxi, middle, guess[2], guess[3], -0.3, std / 2, saturation]
-            fit, outliers = fit_PSF1D_outlier_removal(index, signal, sub_errors=err[:, x], method='basinhopping',
-                                                      guess=guess, bounds=bounds, sigma=5, niter=2,
-                                                      niter_basinhopping=20, T_basinhopping=1)
-        """
-        # compute the flux_sum
-        guess = [getattr(fit, p).value for p in fit.param_names]
-        s.profile_params[x, :] = guess
-        s.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
-        s.table['flux_sum'][x] = np.sum(signal)
-
-        # put fit quality result
-        s.table['chi2_red'][x] = reduced_chi2
-        s.table['ndof'][x] = ndof
-
-
-
-        if live_fit:
-            plot_transverse_PSF1D_profile(x, index, bgd_index, data, err, fit, bgd_model_func, guess,
-                                          PSF_guess,  outliers, sigma, live_fit,reduced_chi2)
-                
-    # interpolate the skipped pixels with splines
-    x = np.arange(Nx)
-    xp = np.array(sorted(set(list(pixel_range))))
-    s.fitted_pixels = xp
-    for i in range(len(s.PSF1D.param_names)):
-        yp = s.profile_params[xp, i]
-        s.profile_params[:, i] = interp1d(xp, yp, kind='cubic')(x)
-    s.table['flux_sum'] = interp1d(xp, s.table['flux_sum'][xp], kind='cubic', bounds_error=False,
-                                   fill_value='extrapolate')(x)
-    s.table['flux_err'] = interp1d(xp, s.table['flux_err'][xp], kind='cubic', bounds_error=False,
-                                   fill_value='extrapolate')(x)
-    s.poly_params = s.from_profile_params_to_poly_params(s.profile_params)
-    s.from_profile_params_to_shape_params(s.profile_params)
-    return s
-
-
-def plot_transverse_PSF1D_profile(x, indices, bgd_indices, data, err, fit=None, bgd_model_func=None,
-                                  params=None, PSF_guess=None, outliers=[], sigma=3, live_fit=False,chi2=-1):
-    """Plot the transverse profile of  the spectrogram.
-
-    This plot function is called in transverse_PSF1D_profile if live_fit option is True.
-
-    Parameters
-    ----------
-    x: int
-        Pixel index along the dispersion axis.
-    indices: array_like
-        Pixel indices across the dispersion axis.
-    bgd_indices: array_like
-        Pixel indices across the dispersion axis for the background estimate.
-    data: array_like
-        The 2D spectrogram data array.
-    err: array_like
-        The 2D spectrogram uncertainty data array.
-    fit: Fittable1DModel, optional
-        Best fitting model function for the profile (default: None).
-    bgd_model_func: callable, optional
-        A 2D function to model the extracted background (default: None -> null background)
-    params: array_like, optional
-        Best fitting model parameter array (default: None).
-    PSF_guess: callable, optional
-        Guessed fitting model function for the profile before the fit (default: None).
-    outliers: array_like, optional
-        Pixel indices of the outliers across the dispersion axis (default: None).
-    sigma: int, optional
-        Value of the sigma-clipping rejection (default: 3).
-        Necessary only if an outlier array is given with the outliers keyword.
-    live_fit: bool
-        If True, plot is shown  in live during the fitting procedure (default: False).
-
-    Examples
-    --------
-
-    # Build a mock spectrogram with random Poisson noise:
-    >>> s0 = ChromaticPSF1D(Nx=80, Ny=100, saturation=1000)
-    >>> params = s0.generate_test_poly_params()
-    >>> saturation = params[-1]
-    >>> data = s0.evaluate(params)
-    >>> bgd = 10*np.ones_like(data)
-    >>> data += bgd
-    >>> data = np.random.poisson(data)
-    >>> data_errors = np.sqrt(data+1)
-
-    # Extract the background
-    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=3, pixel_step=10)
-
-    # Fit the transverse profile:
-    >>> s, bgd_model = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=50,
-    ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=True, sigma=5)
-
-    """
-    Ny = len(indices)
-    y = data[:, x]
-    bgd = data[bgd_indices, x]
-    bgd_err = err[bgd_indices, x]
-    fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex='all', gridspec_kw={'height_ratios': [5, 1]})
-    ax[0].errorbar(np.arange(Ny), y, yerr=err[:, x], fmt='ro', label="original data")
-    ax[0].errorbar(bgd_indices, bgd, yerr=bgd_err, fmt='bo', label="bgd data")
-    if len(outliers) >0:
-        ax[0].errorbar(outliers, data[outliers, x], yerr=err[outliers, x], fmt='go', label=f"outliers ({sigma}$\sigma$)")
-    if bgd_model_func is not None:
-        ax[0].plot(bgd_indices, bgd_model_func([x]*bgd_indices.size, bgd_indices), 'b--', label="fitted bgd")
-    if PSF_guess is not None:
-        if bgd_model_func is not None:
-            ax[0].plot(indices, PSF_guess(indices) + bgd_model_func([x]*indices.size, indices), 'k--', label="guessed profile")
-        else:
-            ax[0].plot(indices, PSF_guess(indices), 'k--', label="guessed profile")
-    if fit is not None and bgd_model_func is not None:
-        model = fit(indices) + bgd_model_func([x]*indices.size, indices)
-        ax[0].plot(indices, model, 'b-', label="fitted profile")
-    ylim = ax[0].get_ylim()
-    if params is not None:
-        PSF_moffat = Moffat1D(*params[:4])
-        ax[0].plot(indices, PSF_moffat(indices) + bgd_model_func([x]*indices.size, indices), 'b+', label="fitted moffat")
-    ax[0].set_ylim(ylim)
-    ax[0].set_ylabel('Transverse profile')
-    ax[0].legend(loc=2, numpoints=1)
-    ax[0].grid(True)
-    if fit is not None:
-        if chi2<0:
+                    ax[0].plot(self.pixels, self.psf.evaluate(self.pixels, p=self.guess),
+                               'k--', label="Guess")
+                self.psf.p = np.copy(self.p)
+            model = np.copy(self.model)
+            # if self.bgd_model_func is not None:
+            #    model = self.model + self.bgd_model_func(self.pixels)
+            ax[0].plot(self.pixels, model, 'b-', label="Model")
+            ylim = list(ax[0].get_ylim())
+            ylim[1] = 1.2 * np.max(self.model)
+            ax[0].set_ylim(ylim)
+            ax[0].set_ylabel('Transverse profile')
+            ax[0].legend(loc=2, numpoints=1)
+            ax[0].grid(True)
             txt = ""
+            for ip, p in enumerate(self.input_labels):
+                txt += f'{p}: {self.p[ip]:.4g}\n'
+            ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
+            # residuals
+            residuals = (data - model) / self.err
+            residuals_err = np.ones_like(self.err)
+            ax[1].errorbar(self.pixels, residuals, yerr=residuals_err, fmt='ro')
+            if len(self.outliers) > 0:
+                residuals_outliers = (data[self.outliers] - model[self.outliers]) / self.err[self.outliers]
+                residuals_outliers_err = np.ones_like(residuals_outliers)
+                ax[1].errorbar(self.outliers, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
+            ax[1].axhline(0, color='b')
+            ax[1].grid(True)
+            std = np.std(residuals)
+            ax[1].set_ylim([-3. * std, 3. * std])
+            ax[1].set_xlabel(ax[0].get_xlabel())
+            ax[1].set_ylabel('(data-fit)/err')
+            ax[0].set_xticks(ax[1].get_xticks()[1:-1])
+            ax[0].get_yaxis().set_label_coords(-0.1, 0.5)
+            ax[1].get_yaxis().set_label_coords(-0.1, 0.5)
+            # fig.tight_layout()
+            # fig.subplots_adjust(wspace=0, hspace=0)
         else:
-            txt=f'chi2/ndof: {chi2:.4g}\n'
-        for ip, p in enumerate(fit.param_names):
-            txt += f'{p}: {getattr(fit, p).value:.4g}\n'
-        ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
-        ax[0].set_title(f'x={x}')
-    model = np.zeros_like(indices).astype(float)
-    model_outliers = np.zeros_like(outliers).astype(float)
-    if fit is not None:
-        model += fit(indices)
-        model_outliers += fit(outliers)
-    if bgd_model_func is not None:
-        model += bgd_model_func([x]*indices.size, indices)
-        model_outliers += bgd_model_func([x]*len(outliers), outliers)
-    if fit is not None or bgd_model_func is not None:
-        residuals = (y - model) / err[:, x]  # / model
-        residuals_err = err[:, x] / err[:, x]  # / model
-        residuals_outliers = (data[outliers, x] - model_outliers) / err[outliers, x]  # / model_outliers
-        residuals_outliers_err = err[outliers, x] / err[outliers, x]  # / model_outliers
-        ax[1].errorbar(indices, residuals, yerr=residuals_err, fmt='ro')
-        ax[1].errorbar(outliers, residuals_outliers, yerr=residuals_outliers_err, fmt='go')
-        ax[1].axhline(0, color='b')
-        ax[1].grid(True)
-        std = np.std(residuals)
-        ax[1].set_ylim([-3. * std, 3. * std])
-
-        ax[1].set_xlabel(ax[0].get_xlabel())
-        ax[1].set_ylabel('(data-fit)/err')
-        ax[0].set_xticks(ax[1].get_xticks()[1:-1])
-        ax[0].get_yaxis().set_label_coords(-0.1, 0.5)
-        ax[1].get_yaxis().set_label_coords(-0.1, 0.5)
-    fig.tight_layout()
-    fig.subplots_adjust(wspace=0, hspace=0)
-    if parameters.DISPLAY:
-        if live_fit:
+            data = np.copy(self.data).reshape((self.Ny, self.Nx))
+            model = np.copy(self.model).reshape((self.Ny, self.Nx))
+            err = np.copy(self.err).reshape((self.Ny, self.Nx))
+            gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
+            fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(5, 7), gridspec_kw=gs_kw)
+            norm = np.nanmax(self.data)
+            plot_image_simple(ax[0, 0], data=model / norm, aspect='auto', cax=ax[0, 1], vmin=0, vmax=1,
+                              units='1/max(data)')
+            ax[0, 0].set_title("Model", fontsize=10, loc='center', color='white', y=0.8)
+            plot_image_simple(ax[1, 0], data=data / norm, title='Data', aspect='auto',
+                              cax=ax[1, 1], vmin=0, vmax=1, units='1/max(data)')
+            ax[1, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+            residuals = (data - model)
+            # residuals_err = self.spectrum.spectrogram_err / self.model
+            norm = err
+            residuals /= norm
+            std = float(np.std(residuals))
+            plot_image_simple(ax[2, 0], data=residuals, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
+                              aspect='auto', cax=ax[2, 1], units='', cmap="bwr")
+            ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
+            ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals):.3f}\nstd={np.std(residuals):.3f}',
+                          horizontalalignment='left', verticalalignment='bottom',
+                          color='black', transform=ax[2, 0].transAxes)
+            ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])
+            ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
+            ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
+            ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
+            ax[3, 1].remove()
+            ax[3, 0].plot(np.arange(self.Nx), data.sum(axis=0), label='Data')
+            ax[3, 0].plot(np.arange(self.Nx), model.sum(axis=0), label='Model')
+            ax[3, 0].set_ylabel('Transverse sum')
+            ax[3, 0].set_xlabel(r'X [pixels]')
+            ax[3, 0].legend(fontsize=7)
+            ax[3, 0].grid(True)
+        if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
             plt.close()
         else:
-            plt.show()
-    plt.close()
+            if parameters.DISPLAY:
+                plt.show()
+            else:
+                plt.close(fig)
+        if parameters.SAVE:  # pragma: no cover
+            figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
+            self.my_logger.info(f"\n\tSave figure {figname}.")
+            fig.savefig(figname, dpi=100, bbox_inches='tight')
 
 
-def fit_chromatic_PSF1D(data, chromatic_psf, bgd_model_func=None, data_errors=None):
-    """
-    Fit a chromatic PSF1D model on 2D data.
+def load_PSF(psf_type=parameters.PSF_TYPE, target=None, clip=False):
+    """Load the PSF model with a keyword.
 
     Parameters
     ----------
-    data: array_like
-        2D array containing the image data.
-    chromatic_psf: ChromaticPSF1D
-        First guess for the chromatic PSF, filled with a first guess of the polynomial shape parameters, mandatory.
-    bgd_model_func: callable, optional
-        A 2D function to model the extracted background (default: None -> null background)
-    data_errors: np.array
-        the 2D array uncertainties.
+    psf_type: str
+        PSF model keyword (default: parameters.PSF_TYPE).
+    target: Target, optional
+        The Target instance to make Order0 PSF model (default: None).
+    clip: bool, optional
+        If True, PSF evaluation is clipped between 0 and saturation level (slower) (default: False)
 
     Returns
     -------
-    s: ChromaticPSF1D
-        The chromatic PSF containing all the information on the wavelength dependences of the parameters adn the flux_sum.
+    psf: PSF
+        An instance of the selected PSF model.
 
     Examples
     --------
+    >>> load_PSF(psf_type="Moffat", clip=True)  # doctest: +ELLIPSIS
+    <....Moffat object at ...>
+    >>> load_PSF(psf_type="MoffatGauss", clip=False)  # doctest: +ELLIPSIS
+    <....MoffatGauss object at ...>
 
-    # Build a mock spectrogram with random Poisson noise:
-    >>> s0 = ChromaticPSF1D(Nx=100, Ny=100, deg=4, saturation=1000)
-    >>> params = s0.generate_test_poly_params()
-    >>> s0.poly_params = params
-    >>> saturation = params[-1]
-    >>> data = s0.evaluate(params)
-    >>> bgd = 10*np.ones_like(data)
-    >>> data += bgd
-    >>> data = np.random.poisson(data)
-    >>> data_errors = np.sqrt(data+1)
-
-    # Extract the background
-    >>> bgd_model_func = extract_background(data, deg=1, ws=[30,50], sigma=3, pixel_step=10)
-
-    # Estimate the first guess values
-    >>> s = fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-    ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False, deg=4)
-    >>> s.plot_summary(truth=s0)
-
-    # Fit the data:
-    >>> s = fit_chromatic_PSF1D(data, s, bgd_model_func=bgd_model_func, data_errors=data_errors)
-    >>> s.plot_summary(truth=s0)
     """
-    my_logger = set_logger(__name__)
-    Ny, Nx = data.shape
-    if Ny != chromatic_psf.Ny:
-        my_logger.error(f"\n\tData y shape {Ny} different from ChromaticPSF1D input self.Ny {chromatic_psf.Ny}.")
-    if Nx != chromatic_psf.Nx:
-        my_logger.error(f"\n\tData x shape {Nx} different from ChromaticPSF1D input self.Nx {chromatic_psf.Nx}.")
-    guess = np.copy(chromatic_psf.poly_params)
-    pixels = np.arange(Ny)
-
-    W = 1. / (data_errors * data_errors)
-    W = [np.diag(W[:, x]) for x in range(Nx)]
-    poly_params = np.copy(guess)
-    bgd = np.zeros_like(data)
-    if bgd_model_func is not None:
-        xx, yy = np.meshgrid(np.arange(Nx), pixels)
-        bgd = bgd_model_func(xx, yy)
-
-    data_subtracted = data - bgd
-    bgd_std = float(np.std(np.random.poisson(bgd)))
-
-    def spectrogram_chisq(shape_params):
-        # linear regression for the amplitude parameters
-        poly_params[Nx:] = np.copy(shape_params)
-        profile_params = chromatic_psf.from_poly_params_to_profile_params(poly_params, force_positive=True)
-        profile_params[:Nx, 0] = 1
-        # try:
-        J = np.array([chromatic_psf.PSF1D.evaluate(pixels, *profile_params[x, :]) for x in range(Nx)])
-        # except:
-        #     for x in range(Nx):
-        #         my_logger.warning(f"{x} {profile_params[x, :]}")
-        J_dot_W_dot_J = np.array([J[x].T.dot(W[x]).dot(J[x]) for x in range(Nx)])
-        amplitude_params = [
-            J[x].T.dot(W[x]).dot(data_subtracted[:, x]) / (J_dot_W_dot_J[x]) if J_dot_W_dot_J[x] > 0 else 0.1 * bgd_std
-            for x in
-            range(Nx)]
-        poly_params[:Nx] = amplitude_params
-        in_bounds, penalty, name = chromatic_psf.check_bounds(poly_params, noise_level=5 * bgd_std)
-        mod = chromatic_psf.evaluate(poly_params)
-        chromatic_psf.poly_params = np.copy(poly_params)
-        if data_errors is None:
-            return np.nansum((mod - data_subtracted) ** 2) + penalty
-        else:
-            return np.nansum(((mod - data_subtracted) / data_errors) ** 2) + penalty
-
-    my_logger.debug(f'\n\tStart chisq: {spectrogram_chisq(guess[Nx:])} with {guess[Nx:]}')
-    error = 0.01 * np.abs(guess) * np.ones_like(guess)
-    fix = [False] * (chromatic_psf.n_poly_params - Nx)
-    fix[-1] = True
-
-    if parameters.OBS_NAME == 'PICDUMIDI':
-        fix[4] = True  # set eta_gauss
-        fix[5] = True  # stddev
-
-
-    bounds = chromatic_psf.set_bounds(data)
-    # fix[:Nx] = [True] * Nx
-    # noinspection PyArgumentList
-    m = Minuit.from_array_func(fcn=spectrogram_chisq, start=guess[Nx:], error=error[Nx:], errordef=1,
-                               fix=fix, print_level=parameters.DEBUG, limit=bounds[Nx:])
-    m.migrad()
-    # m.hesse()
-    # print(m.np_matrix())
-    # print(m.np_matrix(correlation=True))
-    chromatic_psf.poly_params[Nx:] = m.np_values()
-    chromatic_psf.profile_params = chromatic_psf.from_poly_params_to_profile_params(chromatic_psf.poly_params,
-                                                                                    force_positive=True)
-    chromatic_psf.fill_table_with_profile_params(chromatic_psf.profile_params)
-    chromatic_psf.from_profile_params_to_shape_params(chromatic_psf.profile_params)
-    if parameters.DEBUG:
-        # Plot data, best fit model and residuals:
-        chromatic_psf.plot_summary()
-        plot_chromatic_PSF1D_residuals(chromatic_psf, bgd, data, data_errors, guess=guess, title='Best fit')
-    return chromatic_psf
-
-
-def plot_chromatic_PSF1D_residuals(s, bgd, data, data_errors, guess=None, live_fit=False, title=""):
-    """Plot the residuals after fit_chromatic_PSF1D function.
-
-    Parameters
-    ----------
-    s: ChromaticPSF1D
-        The chromatic PSF1D function that has been fitted to data.
-    bgd: array_like
-        The 2D background array.
-    data: array_like
-        The 2D data array.
-    data_errors: array_like
-        The 2D data uncertainty array.
-    guess: array_like, optional
-        The guessed profile before the fit (default: None).
-    live_fit: bool
-        If True, the plot is shown during the fitting procedure (default: False).
-    title: str, optional
-        Title of the plot (default: "").
-    """
-    fig, ax = plt.subplots(5, 1, sharex='all', figsize=(6, 8))
-    plt.title(title)
-    im0 = ax[0].imshow(data, origin='lower', aspect='auto')
-    ax[0].set_title('Data')
-    plt.colorbar(im0, ax=ax[0])
-    im_guess = s.evaluate(guess) + bgd
-    im1 = ax[1].imshow(im_guess, origin='lower', aspect='auto')
-    fit = s.evaluate(s.poly_params) + bgd
-    ax[1].set_title('Guess')
-    plt.colorbar(im1, ax=ax[1])
-    im2 = ax[2].imshow((data - im_guess) / data_errors, origin='lower', aspect='auto')
-    ax[2].set_title('(Data-Guess)/Data_errors')
-    plt.colorbar(im2, ax=ax[2])
-    im3 = ax[3].imshow(fit, origin='lower', aspect='auto')
-    ax[3].set_title(title)
-    plt.colorbar(im3, ax=ax[3])
-    im4 = ax[4].imshow((data - fit) / data_errors, origin='lower', aspect='auto')
-    ax[4].set_title('(Data-Fit)/Data_errors')
-    plt.colorbar(im4, ax=ax[4])
-    fig.tight_layout()
-    if parameters.DISPLAY:
-        if live_fit:
-            plt.draw()
-            plt.pause(1e-8)
-            plt.close()
-        else:
-            plt.show()
-    plt.close()
-
-
-def PSF2D_chisq(params, model, xx, yy, zz, zz_err=None):
-    mod = model.evaluate(xx, yy, *params)
-    if zz_err is None:
-        return np.nansum((mod - zz) ** 2)
+    if psf_type == "Moffat":
+        psf = Moffat(clip=clip)
+    elif psf_type == "MoffatGauss":
+        psf = MoffatGauss(clip=clip)
+    elif psf_type == "Gauss":
+        psf = Gauss(clip=clip)
+    elif psf_type == "Order0":
+        if target is None:
+            raise ValueError(f"A Target instance must be given when PSF_TYPE='Order0'. I got target={target}.")
+        psf = Order0(target=target, clip=clip)
     else:
-        return np.nansum(((mod - zz) / zz_err) ** 2)
-
-
-def PSF2D_chisq_jac(params, model, xx, yy, zz, zz_err=None):
-    diff = model.evaluate(xx, yy, *params) - zz
-    jac = model.fit_deriv(xx, yy, *params)
-    if zz_err is None:
-        return np.array([np.nansum(2 * jac[p] * diff) for p in range(len(params))])
-    else:
-        zz_err2 = zz_err * zz_err
-        return np.array([np.nansum(2 * jac[p] * diff / zz_err2) for p in range(len(params))])
-
-# DO NOT WORK
-# def fit_PSF2D_outlier_removal(x, y, data, sigma=3.0, niter=3, guess=None, bounds=None):
-#     """Fit a PSF 2D model with parameters:
-#         amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
-#     using scipy. Find outliers data point above sigma*data_errors from the fit over niter iterations.
-#
-#     Parameters
-#     ----------
-#     x: np.array
-#         2D array of the x coordinates.
-#     y: np.array
-#         2D array of the y coordinates.
-#     data: np.array
-#         the 1D array profile.
-#     guess: array_like, optional
-#         list containing a first guess for the PSF parameters (default: None).
-#     bounds: list, optional
-#         2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
-#     sigma: int
-#         the sigma limit to exclude data points (default: 3).
-#     niter: int
-#         the number of loop iterations to exclude  outliers and refit the model (default: 2).
-#
-#     Returns
-#     -------
-#     fitted_model: PSF2D
-#         the PSF2D fitted model.
-#
-#     Examples
-#     --------
-#
-#     Create the model:
-#     >>> X, Y = np.mgrid[:50,:50]
-#     >>> PSF = PSF2D()
-#     >>> p = (1000, 25, 25, 5, 1, -0.2, 1, 6000)
-#     >>> Z = PSF.evaluate(X, Y, *p)
-#     >>> Z += 100*np.exp(-((X-10)**2+(Y-10)**2)/4)
-#     >>> Z_err = np.sqrt(1+Z)
-#
-#     Prepare the fit:
-#     >>> guess = (1000, 27, 23, 3.2, 1.2, -0.1, 2,  6000)
-#     >>> bounds = np.array(((0, 6000), (10, 40), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000)))
-#     >>> bounds = bounds.T
-#
-#     Fit without bars:
-#     >>> model = fit_PSF2D_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, sigma=7, niter=5)
-#     >>> res = [getattr(model, p).value for p in model.param_names]
-#     >>> print(res, p)
-#     >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
-#     """
-#     gg_init = PSF2D()
-#     if guess is not None:
-#         for ip, p in enumerate(gg_init.param_names):
-#             getattr(gg_init, p).value = guess[ip]
-#     if bounds is not None:
-#         for ip, p in enumerate(gg_init.param_names):
-#             getattr(gg_init, p).min = bounds[0][ip]
-#             getattr(gg_init, p).max = bounds[1][ip]
-#     gg_init.saturation.fixed = True
-#     with warnings.catch_warnings():
-#         # Ignore model linearity warning from the fitter
-#         warnings.simplefilter('ignore')
-#         fit = LevMarLSQFitterWithNan()
-#         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
-#         # get fitted model and filtered data
-#         or_fitted_model, filtered_data = or_fit(gg_init, x, y, data)
-#         if parameters.VERBOSE:
-#             print(or_fitted_model)
-#         if parameters.DEBUG:
-#             print(fit.fit_info)
-#         print(fit.fit_info)
-#         return or_fitted_model
-
-
-def fit_PSF2D(x, y, data, guess=None, bounds=None, data_errors=None, method='minimize'):
-    """Fit a PSF 2D model with parameters :
-        amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
-    using basin hopping global minimization method.
-
-    Parameters
-    ----------
-    x: np.array
-        2D array of the x coordinates from meshgrid.
-    y: np.array
-        2D array of the y coordinates from meshgrid.
-    data: np.array
-        the 2D array image.
-    guess: array_like, optional
-        List containing a first guess for the PSF parameters (default: None).
-    bounds: list, optional
-        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
-    data_errors: np.array
-        the 2D array uncertainties.
-    method: str, optional
-        the minimisation method: 'minimize' or 'basinhopping' (default: 'minimize').
-
-    Returns
-    -------
-    fitted_model: PSF2D
-        the PSF2D fitted model.
-
-    Examples
-    --------
-
-    Create the model:
-    >>> import numpy as np
-    >>> X, Y = np.mgrid[:50,:50]
-    >>> PSF = PSF2D()
-    >>> p = (50, 25, 25, 5, 1, -0.4, 1, 60)
-    >>> Z = PSF.evaluate(X, Y, *p)
-    >>> Z_err = np.sqrt(Z)/10.
-
-    Prepare the fit:
-    >>> guess = (52, 22, 22, 3.2, 1.2, -0.1, 2, 60)
-    >>> bounds = ((1, 200), (10, 40), (10, 40), (0.5, 10), (0.5, 5), (-100, 200), (0.01, 10), (0, 400))
-
-    Fit with error bars:
-    >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, data_errors=Z_err)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
-
-    Fit without error bars:
-    >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, data_errors=None)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
-
-    Fit with error bars and basin hopping method:
-    >>> model = fit_PSF2D(X, Y, Z, guess=guess, bounds=bounds, data_errors=Z_err, method='basinhopping')
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
-
-    """
-
-    model = PSF2D()
-    my_logger = set_logger(__name__)
-    if method == 'minimize':
-        res = minimize(PSF2D_chisq, guess, method="L-BFGS-B", bounds=bounds,
-                       args=(model, x, y, data, data_errors), jac=PSF2D_chisq_jac)
-    elif method == 'basinhopping':
-        minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, jac=PSF2D_chisq_jac,
-                                args=(model, x, y, data, data_errors))
-        res = basinhopping(PSF2D_chisq, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
-    else:
-        my_logger.error(f'\n\tUnknown method {method}.')
-        sys.exit()
-    my_logger.debug(f'\n{res}')
-    PSF = PSF2D(*res.x)
-    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF
-
-
-def fit_PSF2D_minuit(x, y, data, guess=None, bounds=None, data_errors=None):
-    """Fit a PSF 2D model with parameters :
-        amplitude, x_mean, y_mean, stddev, eta, alpha, gamma, saturation
-    using basin hopping global minimization method.
-
-    Parameters
-    ----------
-    x: np.array
-        2D array of the x coordinates from meshgrid.
-    y: np.array
-        2D array of the y coordinates from meshgrid.
-    data: np.array
-        the 2D array image.
-    guess: array_like, optional
-        List containing a first guess for the PSF parameters (default: None).
-    bounds: list, optional
-        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
-    data_errors: np.array
-        the 2D array uncertainties.
-    method: str, optional
-        the minimisation method: 'minimize' or 'basinhopping' (default: 'minimize').
-
-    Returns
-    -------
-    fitted_model: PSF2D
-        the PSF2D fitted model.
-
-    Examples
-    --------
-
-    Create the model:
-    >>> import numpy as np
-    >>> X, Y = np.mgrid[:50,:50]
-    >>> PSF = PSF2D()
-    >>> p = (50, 25, 25, 5, 1, -0.4, 1, 60)
-    >>> Z = PSF.evaluate(X, Y, *p)
-    >>> Z_err = np.sqrt(Z)/10.
-
-    Prepare the fit:
-    >>> guess = (52, 22, 22, 3.2, 1.2, -0.1, 2, 60)
-    >>> bounds = ((1, 200), (10, 40), (10, 40), (0.5, 10), (0.5, 5), (-100, 200), (0.01, 10), (0, 400))
-
-    Fit with error bars:
-    >>> model = fit_PSF2D_minuit(X, Y, Z, guess=guess, bounds=bounds, data_errors=Z_err)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
-
-    Fit without error bars:
-    >>> model = fit_PSF2D_minuit(X, Y, Z, guess=guess, bounds=bounds, data_errors=None)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
-    """
-
-    model = PSF2D()
-    my_logger = set_logger(__name__)
-
-    error = 0.001 * np.abs(guess) * np.ones_like(guess)
-    z = np.where(np.isclose(error, 0.0, 1e-6))
-    error[z] = 0.001
-    bounds = np.array(bounds)
-    if bounds.shape[0] == 2 and bounds.shape[1] > 2:
-        bounds = bounds.T
-    guess = np.array(guess)
-
-    def chisq_PSF2D(params):
-        return PSF2D_chisq(params, model, x, y, data, data_errors)
-
-    def chisq_PSF2D_jac(params):
-        return PSF2D_chisq_jac(params, model, x, y, data, data_errors)
-
-    fix = [False] * error.size
-    fix[-1] = True
-    # noinspection PyArgumentList
-    m = Minuit.from_array_func(fcn=chisq_PSF2D, start=guess, error=error, errordef=1,
-                               fix=fix, print_level=0, limit=bounds, grad=chisq_PSF2D_jac)
-
-    m.tol = 0.001
-    m.migrad()
-    popt = m.np_values()
-
-    my_logger.debug(f'\n{popt}')
-    PSF = PSF2D(*popt)
-    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF
-
-
-def PSF1D_chisq(params, model, xx, yy, yy_err=None):
-    m = model.evaluate(xx, *params)
-    if len(m) == 0 or len(yy) == 0:
-        return 1e20
-    if np.any(m < 0) or np.any(m > 1.5 * np.max(yy)) or np.max(m) < 0.5 * np.max(yy):
-        return 1e20
-    diff = m - yy
-    if yy_err is None:
-        return np.nansum(diff * diff)
-    else:
-        return np.nansum((diff / yy_err) ** 2)
-
-
-def PSF1D_chisq_jac(params, model, xx, yy, yy_err=None):
-    diff = model.evaluate(xx, *params) - yy
-    jac = model.fit_deriv(xx, *params)
-    if yy_err is None:
-        return np.array([np.nansum(2 * jac[p] * diff) for p in range(len(params))])
-    else:
-        yy_err2 = yy_err * yy_err
-        return np.array([np.nansum(2 * jac[p] * diff / yy_err2) for p in range(len(params))])
-
-
-def fit_PSF1D(x, data, guess=None, bounds=None, data_errors=None, method='minimize'):
-    """Fit a PSF 1D model with parameters :
-        amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
-    using basin hopping global minimization method.
-
-    Parameters
-    ----------
-    x: np.array
-        1D array of the x coordinates.
-    data: np.array
-        the 1D array profile.
-    guess: array_like, optional
-        list containing a first guess for the PSF parameters (default: None).
-    bounds: list, optional
-        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
-    data_errors: np.array
-        the 1D array uncertainties.
-    method: str, optional
-        method to use for the minimisation: choose between minimize and basinhopping.
-
-    Returns
-    -------
-    fitted_model: PSF1D
-        the PSF1D fitted model.
-
-    Examples
-    --------
-
-    Create the model:
-    >>> import numpy as np
-    >>> X = np.arange(0, 50)
-    >>> PSF = PSF1D()
-    >>> p = (50, 25, 5, 1, -0.2, 1, 60)
-    >>> Y = PSF.evaluate(X, *p)
-    >>> Y_err = np.sqrt(Y)/10.
-
-    Prepare the fit:
-    >>> guess = (60, 20, 3.2, 1.2, -0.1, 2,  60)
-    >>> bounds = ((0, 200), (10, 40), (0.5, 10), (0.5, 5), (-10, 200), (0.01, 10), (0, 400))
-
-    Fit with error bars:
-    >>> model = fit_PSF1D(X, Y, guess=guess, bounds=bounds, data_errors=Y_err)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
-
-    Fit without error bars:
-    >>> model = fit_PSF1D(X, Y, guess=guess, bounds=bounds, data_errors=None)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
-
-    Fit with error bars and basin hopping method:
-    >>> model = fit_PSF1D(X, Y, guess=guess, bounds=bounds, data_errors=Y_err, method='basinhopping')
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-3))
-
-    """
-    my_logger = set_logger(__name__)
-    model = PSF1D()
-    if method == 'minimize':
-        res = minimize(PSF1D_chisq, guess, method="L-BFGS-B", bounds=bounds,
-                       args=(model, x, data, data_errors), jac=PSF1D_chisq_jac)
-    elif method == 'basinhopping':
-        minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds,
-                                args=(model, x, data, data_errors), jac=PSF1D_chisq_jac)
-        res = basinhopping(PSF1D_chisq, guess, niter=20, minimizer_kwargs=minimizer_kwargs)
-    else:
-        my_logger.error(f'\n\tUnknown method {method}.')
-        sys.exit()
-    my_logger.debug(f'\n{res}')
-    PSF = PSF1D(*res.x)
-    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF
-
-
-def fit_PSF1D_outlier_removal(x, data, data_errors=None, sigma=3.0, niter=3, guess=None, bounds=None, method='minimize',
-                              niter_basinhopping=5, T_basinhopping=0.2):
-    """Fit a PSF 1D model with parameters:
-        amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
-    using scipy. Find outliers data point above sigma*data_errors from the fit over niter iterations.
-
-    Parameters
-    ----------
-    x: np.array
-        1D array of the x coordinates.
-    data: np.array
-        the 1D array profile.
-    data_errors: np.array
-        the 1D array uncertainties.
-    guess: array_like, optional
-        list containing a first guess for the PSF parameters (default: None).
-    bounds: list, optional
-        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
-    sigma: int
-        the sigma limit to exclude data points (default: 3).
-    niter: int
-        the number of loop iterations to exclude  outliers and refit the model (default: 2).
-    method: str
-        Can be 'minimize' or 'basinhopping' (default: 'minimize').
-    niter_basinhopping: int, optional
-        The number of basin hops (default: 5)
-    T_basinhopping: float, optional
-        The temperature for the basin hops (default: 0.2)
-
-    Returns
-    -------
-    fitted_model: PSF1D
-        the PSF1D fitted model.
-    outliers: list
-        the list of the outlier indices.
-
-    Examples
-    --------
-
-    Create the model:
-    >>> import numpy as np
-    >>> X = np.arange(0, 50)
-    >>> PSF = PSF1D()
-    >>> p = (1000, 25, 5, 1, -0.2, 1, 6000)
-    >>> Y = PSF.evaluate(X, *p)
-    >>> Y += 100*np.exp(-((X-10)/2)**2)
-    >>> Y_err = np.sqrt(1+Y)
-
-    Prepare the fit:
-    >>> guess = (600, 27, 3.2, 1.2, -0.1, 2,  6000)
-    >>> bounds = ((0, 6000), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000))
-
-    Fit without bars:
-    >>> model, outliers = fit_PSF1D_outlier_removal(X, Y, guess=guess, bounds=bounds,
-    ... sigma=3, niter=5, method="minimize")
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
-
-    Fit with error bars:
-    >>> model, outliers = fit_PSF1D_outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err,
-    ... sigma=3, niter=2, method="minimize")
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
-
-    Fit with error bars and basinhopping:
-    >>> model, outliers = fit_PSF1D_outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err,
-    ... sigma=3, niter=5, method="basinhopping", niter_basinhopping=20)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
-    """
-
-    my_logger = set_logger(__name__)
-    indices = np.mgrid[:x.shape[0]]
-    outliers = np.array([])
-    model = PSF1D()
-
-    for step in range(niter):
-        # first fit
-        if data_errors is None:
-            err = None
-        else:
-            err = data_errors[indices]
-        if method == 'minimize':
-            res = minimize(PSF1D_chisq, guess, method="L-BFGS-B", bounds=bounds, jac=PSF1D_chisq_jac,
-                           args=(model, x[indices], data[indices], err))
-        elif method == 'basinhopping':
-            minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds, jac=PSF1D_chisq_jac,
-                                    args=(model, x[indices], data[indices], err))
-            res = basinhopping(PSF1D_chisq, guess, T=T_basinhopping, niter=niter_basinhopping,
-                               minimizer_kwargs=minimizer_kwargs)
-        else:
-            my_logger.error(f'\n\tUnknown method {method}.')
-            sys.exit()
-        if parameters.DEBUG:
-            my_logger.debug(f'\n\tniter={step}\n{res}')
-        # update the model and the guess
-        for ip, p in enumerate(model.param_names):
-            setattr(model, p, res.x[ip])
-        guess = res.x
-        # remove outliers
-        indices_no_nan = ~np.isnan(data)
-        diff = model(x[indices_no_nan]) - data[indices_no_nan]
-        if data_errors is not None:
-            outliers = np.where(np.abs(diff) / data_errors[indices_no_nan] > sigma)[0]
-        else:
-            std = np.std(diff)
-            outliers = np.where(np.abs(diff) / std > sigma)[0]
-        if len(outliers) > 0:
-            indices = [i for i in range(x.shape[0]) if i not in outliers]
-        else:
-            break
-    my_logger.debug(f'\n\tPSF best fitting parameters:\n{model}')
-    return model, outliers
-
-
-def fit_PSF1D_minuit(x, data, guess=None, bounds=None, data_errors=None):
-    """Fit a PSF 1D model with parameters:
-        amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
-    using Minuit.
-
-    Parameters
-    ----------
-    x: np.array
-        1D array of the x coordinates.
-    data: np.array
-        the 1D array profile.
-    guess: array_like, optional
-        list containing a first guess for the PSF parameters (default: None).
-    bounds: list, optional
-        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
-    data_errors: np.array
-        the 1D array uncertainties.
-
-    Returns
-    -------
-    fitted_model: PSF1D
-        the PSF1D fitted model.
-
-    Examples
-    --------
-
-    Create the model:
-    >>> import numpy as np
-    >>> X = np.arange(0, 50)
-    >>> PSF = PSF1D()
-    >>> p = (50, 25, 5, 1, -0.2, 1, 60)
-    >>> Y = PSF.evaluate(X, *p)
-    >>> Y_err = np.sqrt(1+Y)
-
-    Prepare the fit:
-    >>> guess = (60, 20, 3.2, 1.2, -0.1, 2,  60)
-    >>> bounds = ((0, 200), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 400))
-
-    Fit with error bars:
-    >>> model = fit_PSF1D_minuit(X, Y, guess=guess, bounds=bounds, data_errors=Y_err)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-2))
-
-    Fit without error bars:
-    >>> model = fit_PSF1D_minuit(X, Y, guess=guess, bounds=bounds, data_errors=None)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-2))
-
-    """
-
-    my_logger = set_logger(__name__)
-    model = PSF1D()
-
-    def PSF1D_chisq_v2(params):
-        mod = model.evaluate(x, *params)
-        diff = mod - data
-        if data_errors is None:
-            return np.nansum(diff * diff)
-        else:
-            return np.nansum((diff / data_errors) ** 2)
-
-    def PSF1D_chisq_v2_jac(params):
-        diff = model.evaluate(x, *params) - data
-        jac = model.fit_deriv(x, *params)
-        if data_errors is None:
-            return np.array([np.nansum(2 * jac[p] * diff) for p in range(len(params))])
-        else:
-            yy_err2 = data_errors * data_errors
-            return np.array([np.nansum(2 * jac[p] * diff / yy_err2) for p in range(len(params))])
-
-    error = 0.1 * np.abs(guess) * np.ones_like(guess)
-    fix = [False] * len(guess)
-    fix[-1] = True
-    # noinspection PyArgumentList
-    # 3 times faster with gradient
-    m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
-                               print_level=parameters.DEBUG, grad=PSF1D_chisq_v2_jac)
-    m.migrad()
-    PSF = PSF1D(*m.np_values())
-
-    my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF
-
-
-def fit_PSF1D_minuit_outlier_removal(x, data, data_errors, guess=None, bounds=None, sigma=3, niter=2, consecutive=3):
-    """Fit a PSF 1D model with parameters:
-        amplitude_gauss, x_mean, stddev, amplitude_moffat, alpha, gamma, saturation
-    using Minuit. Find outliers data point above sigma*data_errors from the fit over niter iterations.
-    Only at least 3 consecutive outliers are considered.
-
-    Parameters
-    ----------
-    x: np.array
-        1D array of the x coordinates.
-    data: np.array
-        the 1D array profile.
-    data_errors: np.array
-        the 1D array uncertainties.
-    guess: array_like, optional
-        list containing a first guess for the PSF parameters (default: None).
-    bounds: list, optional
-        2D list containing bounds for the PSF parameters with format ((min,...), (max...)) (default: None)
-    sigma: int
-        the sigma limit to exclude data points (default: 3).
-    niter: int
-        the number of loop iterations to exclude  outliers and refit the model (default: 2).
-    consecutive: int
-        the number of outliers that have to be consecutive to be considered (default: 3).
-
-    Returns
-    -------
-    fitted_model: PSF1D
-        the PSF1D fitted model.
-    outliers: list
-        the list of the outlier indices.
-    reduced_chi2
-         the reduced chi2
-    ndof
-        the number of degrees of fredoom ndata-nfittedparam
-
-    Examples
-    --------
-
-    Create the model:
-    >>> import numpy as np
-    >>> X = np.arange(0, 50)
-    >>> PSF = PSF1D()
-    >>> p = (1000, 25, 5, 1, -0.2, 1, 6000)
-    >>> Y = PSF.evaluate(X, *p)
-    >>> Y += 100*np.exp(-((X-10)/2)**2)
-    >>> Y_err = np.sqrt(1+Y)
-
-    Prepare the fit:
-    >>> guess = (600, 20, 3.2, 1.2, -0.1, 2,  6000)
-    >>> bounds = ((0, 6000), (10, 40), (0.5, 10), (0.5, 5), (-1, 0), (0.01, 10), (0, 8000))
-
-    Fit with error bars:
-    >>> model, outliers, reduced_chi2, ndof = fit_PSF1D_minuit_outlier_removal(X, Y, guess=guess, bounds=bounds, data_errors=Y_err,
-    ... sigma=3, niter=2, consecutive=3)
-    >>> res = [getattr(model, p).value for p in model.param_names]
-    >>> assert np.all(np.isclose(p[:-1], res[:-1], rtol=1e-1))
-    """
-
-    my_logger = set_logger(__name__)
-
-    if parameters.OBS_NAME == 'PICDUMIDI':
-        guess[4]=0 # set eta_gauss==0
-        guess[5]=-1.
-
-
-
-    PSF = PSF1D(*guess)
-    model = PSF1D()
-    outliers = np.array([])
-    indices = [i for i in range(x.shape[0]) if i not in outliers]
-
-    def PSF1D_chisq_v2(params):
-        mod = model.evaluate(x, *params)
-        diff = mod[indices] - data[indices]
-        if data_errors is None:
-            return np.nansum(diff * diff)
-        else:
-            return np.nansum((diff / data_errors[indices]) ** 2)
-
-    def PSF1D_chisq_v2_jac(params):
-        diff = model.evaluate(x, *params) - data
-        jac = model.fit_deriv(x, *params)
-        if data_errors is None:
-            return np.array([np.nansum(2 * jac[p] * diff) for p in range(len(params))])
-        else:
-            yy_err2 = data_errors * data_errors
-            return np.array([np.nansum(2 * jac[p] * diff / yy_err2) for p in range(len(params))])
-
-    error = 0.1 * np.abs(guess) * np.ones_like(guess)
-    fix = [False] * len(guess)
-    fix[-1] = True
-
-    if parameters.OBS_NAME == 'PICDUMIDI':
-        fix[4] = True  # set eta_gauss==0
-        fix[5] = True
-
-    consecutive_outliers = []
-    for step in range(niter):
-        # noinspection PyArgumentList
-
-
-        m = Minuit.from_array_func(fcn=PSF1D_chisq_v2, start=guess, error=error, errordef=1, limit=bounds, fix=fix,
-                                   print_level=0, grad=PSF1D_chisq_v2_jac)
-
-        # fmin contains the chi2 value at minimum
-        # fitpar contains the parameters
-        fmin,fitpar=m.migrad()
-
-
-        #%%%%%%
-        #my_logger.warning(f"\n Minuit-Migrad-GET-FMIN :: {m.get_fmin()}")
-        #my_logger.warning(f"\n Minuit-Migrad-GET-PARAM_STATES :: {m.get_param_states()}")
-        #my_logger.warning(f"\n Minuit-Migrad-FMIN :: {fmin}")
-        #my_logger.warning(f"\n Minuit-Migrad-FITPAR :: {fitpar}")
-        fixedpar_flagvec = np.array([fitpar[i].is_fixed for i in np.arange(len(fitpar))])
-        nfreeparam=np.count_nonzero(fixedpar_flagvec == False)
-        ndata=np.count_nonzero(~np.isnan(data))
-        ndof=ndata-nfreeparam
-        if ndof>0:
-            reduced_chi2=fmin["fval"]/ndof
-        else:
-            reduced_chi2=-1.
-        #my_logger.debug(f"\n Minuit-Migrad :: nfreeparam={nfreeparam} , ndata={ndata}, ndof={ndof}, reduced_chi2={reduced_chi2}")
-
-
-        #%%%%%%%
-
-        guess = m.np_values()
-        PSF = PSF1D(*m.np_values())
-        for ip, p in enumerate(model.param_names):
-            setattr(model, p, guess[ip])
-        # remove outliers
-        indices_no_nan = ~np.isnan(data)
-        diff = model(x[indices_no_nan]) - data[indices_no_nan]
-        if data_errors is not None:
-            outliers = np.where(np.abs(diff) / data_errors[indices_no_nan] > sigma)[0]
-        else:
-            std = np.std(diff)
-            outliers = np.where(np.abs(diff) / std > sigma)[0]
-        if len(outliers) > 0:
-            # test if 3 consecutive pixels are in the outlier list
-            test = 0
-            consecutive_outliers = []
-            for o in range(1, len(outliers)):
-                t = outliers[o] - outliers[o - 1]
-                if t == 1:
-                    test += t
-                else:
-                    test = 0
-                if test >= consecutive - 1:
-                    for i in range(consecutive):
-                        consecutive_outliers.append(outliers[o - i])
-            consecutive_outliers = list(set(consecutive_outliers))
-            # my_logger.debug(f"\n\tConsecutive oultlier indices: {consecutive_outliers}")
-            indices = [i for i in range(x.shape[0]) if i not in outliers]
-        else:
-            break
-
-    # my_logger.debug(f'\n\tPSF best fitting parameters:\n{PSF}')
-    return PSF, consecutive_outliers,reduced_chi2,ndof
+        raise ValueError(f"Unknown PSF_TYPE={psf_type}. Must be either Gauss, Moffat or MoffatGauss.")
+    return psf
 
 
 if __name__ == "__main__":
     import doctest
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
-

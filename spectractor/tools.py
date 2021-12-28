@@ -1,9 +1,11 @@
-import os, sys
+import os
+
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting
 from astropy.stats import sigma_clip
 from astropy.io import fits
+from astropy import wcs as WCS
 
 import matplotlib.pyplot as plt
 import matplotlib.colors
@@ -13,13 +15,18 @@ import warnings
 from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
+from scipy.interpolate import interp1d
+from scipy.integrate import quad
 
 from skimage.feature import hessian_matrix
-from spectractor.config import *
+from spectractor.config import set_logger
 from spectractor import parameters
 from math import floor
 
+from numba import njit
 
+
+@njit(fastmath=True, cache=True)
 def gauss(x, A, x0, sigma):
     """Evaluate the Gaussian function.
 
@@ -41,6 +48,7 @@ def gauss(x, A, x0, sigma):
 
     Examples
     --------
+
     >>> x = np.arange(50)
     >>> y = gauss(x, 10, 25, 3)
     >>> print(y.shape)
@@ -48,9 +56,10 @@ def gauss(x, A, x0, sigma):
     >>> y[25]
     10.0
     """
-    return A * np.exp(-(x - x0)*(x - x0) / (2 * sigma * sigma))
+    return A * np.exp(-(x - x0) * (x - x0) / (2 * sigma * sigma))
 
 
+@njit(fastmath=True, cache=True)
 def gauss_jacobian(x, A, x0, sigma):
     """Compute the Jacobian matrix of the Gaussian function.
 
@@ -72,17 +81,20 @@ def gauss_jacobian(x, A, x0, sigma):
 
     Examples
     --------
+
     >>> x = np.arange(50)
     >>> jac = gauss_jacobian(x, 10, 25, 3)
-    >>> print(jac.shape)
+    >>> print(np.array(jac).T.shape)
     (50, 3)
     """
     dA = gauss(x, A, x0, sigma) / A
     dx0 = A * (x - x0) / (sigma * sigma) * dA
-    dsigma = A * (x-x0)*(x-x0) / (sigma ** 3) * dA
-    return np.array([dA, dx0, dsigma]).T
+    dsigma = A * (x - x0) * (x - x0) / (sigma ** 3) * dA
+    # return np.array([dA, dx0, dsigma]).T
+    return dA, dx0, dsigma
 
 
+@njit(fastmath=True, cache=True)
 def line(x, a, b):
     return a * x + b
 
@@ -114,6 +126,7 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> x = np.arange(600.,700.,2)
@@ -124,9 +137,15 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
     10.0
     >>> guess = (2,630,2)
     >>> popt, pcov = fit_gauss(x, y, guess=guess, bounds=((1,600,1),(100,700,100)), sigma=y_err)
-    >>> assert np.all(np.isclose(p,popt))
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p,popt))
     """
-    popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds,  tr_solver='exact', jac=gauss_jacobian,
+    def gauss_jacobian_wrapper(*params):
+        return np.array(gauss_jacobian(*params)).T
+    popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds, tr_solver='exact', jac=gauss_jacobian_wrapper,
                            sigma=sigma, method='dogbox', verbose=0, xtol=1e-20, ftol=1e-20)
     return popt, pcov
 
@@ -150,6 +169,7 @@ def multigauss_and_line(x, *params):
 
     Examples
     --------
+
     >>> x = np.arange(600.,800.,1)
     >>> y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)
     >>> print(y[0])
@@ -189,6 +209,7 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
 
     Examples
     --------
+
     >>> x = np.arange(600.,800.,1)
     >>> y = multigauss_and_line(x, 1, 10, 20, 650, 3, 40, 750, 10)
     >>> print(y[0])
@@ -196,7 +217,7 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
     >>> bounds = ((-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,100,800,100,100,800,100))
     >>> popt, pcov = fit_multigauss_and_line(x, y, guess=(0,1,3,630,3,3,770,3), bounds=bounds)
     >>> print(popt)
-    [   1.   10.   20.  650.    3.   40.  750.   10.]
+    [  1.  10.  20. 650.   3.  40. 750.  10.]
     """
     maxfev = 1000
     popt, pcov = curve_fit(multigauss_and_line, x, y, p0=guess, bounds=bounds, maxfev=maxfev, absolute_sigma=True)
@@ -204,7 +225,7 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
 
 
 def rescale_x_for_legendre(x):
-    middle = 0.5*(np.max(x) + np.min(x))
+    middle = 0.5 * (np.max(x) + np.min(x))
     x_norm = x - middle
     if np.max(x_norm) != 0:
         return x_norm / np.max(x_norm)
@@ -234,16 +255,22 @@ def multigauss_and_bgd(x, *params):
 
     Examples
     --------
-    >>> import spectractor.parameters as parameters
     >>> parameters.CALIB_BGD_NPARAMS = 4
-    >>> x = np.arange(600.,800.,1)
+    >>> x = np.arange(600., 800., 1)
     >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
     >>> print(f'{y[0]:.2f}')
     19.00
 
-    ..plot:
-        import matplotlib.pyplot as plt
+    .. plot::
+
+        from spectractor import parameters
+        from spectractor.tools import multigauss_and_bgd
+        import numpy as np
+        parameters.CALIB_BGD_NPARAMS = 4
+        x = np.arange(600., 800., 1)
+        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
+        y = multigauss_and_bgd(x, *p)
         plt.plot(x,y,'r-')
         plt.show()
 
@@ -278,6 +305,7 @@ def multigauss_and_bgd_jacobian(x, *params):
 
     Examples
     --------
+
     >>> import spectractor.parameters as parameters
     >>> parameters.CALIB_BGD_NPARAMS = 4
     >>> x = np.arange(600.,800.,1)
@@ -297,14 +325,15 @@ def multigauss_and_bgd_jacobian(x, *params):
         c[k] = 1
         out.append(np.polynomial.legendre.legval(x_norm, c))
     for k in range((len(params) - bgd_nparams) // 3):
-        jac = gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]).T
+        jac = np.array(gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]))
         for j in jac:
             out.append(list(j))
     return np.array(out).T
 
 
 # noinspection PyTypeChecker
-def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None, fix_centroids=False):
+def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None,
+                           fix_centroids=False):
     """Fit a multiple Gaussian profile plus a polynomial background to data, using iminuit.
     The mean guess value of the Gaussian must not be far from the truth values.
     Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
@@ -334,6 +363,7 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
 
     Examples
     --------
+
     >>> x = np.arange(600.,800.,1)
     >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
@@ -346,8 +376,20 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     >>> assert np.all(np.isclose(p,popt,rtol=1e-4))
     >>> fit = multigauss_and_bgd(x, *popt)
 
-    ..plot:
+    .. plot::
+
         import matplotlib.pyplot as plt
+        import numpy as np
+        from spectractor.tools import multigauss_and_bgd, fit_multigauss_and_bgd
+        x = np.arange(600.,800.,1)
+        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
+        y = multigauss_and_bgd(x, *p)
+        err = 0.1 * np.sqrt(y)
+        guess = (15,0,0,0,10,640,2,20,750,7)
+        bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
+        popt, pcov = fit_multigauss_and_bgd(x, y, guess=guess, bounds=bounds, sigma=err)
+        fit = multigauss_and_bgd(x, *popt)
+        fig = plt.figure()
         plt.errorbar(x,y,yerr=err,linestyle='None')
         plt.plot(x,fit,'r-')
         plt.plot(x,multigauss_and_bgd(x, *guess),'k--')
@@ -423,16 +465,29 @@ def fit_poly1d(x, y, order, w=None):
 
     Examples
     --------
+
     >>> x = np.arange(500., 1000., 1)
     >>> p = [3, 2, 1, 1]
     >>> y = np.polyval(p, x)
     >>> err = np.ones_like(y)
     >>> fit, cov, model = fit_poly1d(x, y, order=3)
-    >>> assert np.all(np.isclose(p, fit, 1e-5))
-    >>> assert np.all(np.isclose(model, y))
-    >>> assert cov.shape == (4, 4)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p, fit, 1e-5))
+        >>> assert np.all(np.isclose(model, y))
+        >>> assert cov.shape == (4, 4)
+
+    With uncertainties:
+
     >>> fit, cov2, model2 = fit_poly1d(x, y, order=3, w=err)
-    >>> assert np.all(np.isclose(p, fit, 1e-5))
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.all(np.isclose(p, fit, 1e-5))
+
     >>> fit, cov3, model3 = fit_poly1d([0, 1], [1, 1], order=3, w=err)
     >>> print(fit)
     [0 0 0 0]
@@ -476,6 +531,7 @@ def fit_poly1d_legendre(x, y, order, w=None):
 
     Examples
     --------
+
     >>> x = np.arange(500., 1000., 1)
     >>> p = [-1e-6, -1e-4, 1, 1]
     >>> y = np.polyval(p, x)
@@ -488,8 +544,16 @@ def fit_poly1d_legendre(x, y, order, w=None):
     >>> print(fit)
     [0 0 0 0]
 
-    ..plot:
+    .. plot::
+
         import matplotlib.pyplot as plt
+        import numpy as np
+        from spectractor.tools import fit_poly1d_legendre
+        p = [-1e-6, -1e-4, 1, 1]
+        x = np.arange(500., 1000., 1)
+        y = np.polyval(p, x)
+        err = np.ones_like(y)
+        fit, cov2, model2 = fit_poly1d_legendre(x,y,order=3,w=err)
         plt.errorbar(x,y,yerr=err,fmt='ro')
         plt.plot(x,model2)
         plt.show()
@@ -497,10 +561,7 @@ def fit_poly1d_legendre(x, y, order, w=None):
     cov = -1
     x_norm = rescale_x_for_legendre(x)
     if len(x) > order:
-        if w is None:
-            fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True)
-        else:
-            fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True, w=w)
+        fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True, w=w)
         model = np.polynomial.legendre.legval(x_norm, fit)
     else:
         fit = np.array([0] * (order + 1))
@@ -530,15 +591,20 @@ def fit_poly2d(x, y, z, order):
 
     Examples
     --------
+
     >>> x, y = np.mgrid[:50,:50]
     >>> z = x**2 + y**2 - 2*x*y
     >>> fit = fit_poly2d(x, y, z, order=2)
-    >>> assert np.isclose(fit.c0_0.value, 0)
-    >>> assert np.isclose(fit.c1_0.value, 0)
-    >>> assert np.isclose(fit.c2_0.value, 1)
-    >>> assert np.isclose(fit.c0_1.value, 0)
-    >>> assert np.isclose(fit.c0_2.value, 1)
-    >>> assert np.isclose(fit.c1_1.value, -2)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(fit.c0_0.value, 0)
+        >>> assert np.isclose(fit.c1_0.value, 0)
+        >>> assert np.isclose(fit.c2_0.value, 1)
+        >>> assert np.isclose(fit.c0_1.value, 0)
+        >>> assert np.isclose(fit.c0_2.value, 1)
+        >>> assert np.isclose(fit.c1_1.value, -2)
     """
     p_init = models.Polynomial2D(degree=order)
     fit_p = fitting.LevMarLSQFitter()
@@ -574,6 +640,7 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
 
     Examples
     --------
+
     >>> x = np.arange(500., 1000., 1)
     >>> p = [3,2,1,0]
     >>> y = np.polyval(p, x)
@@ -589,33 +656,26 @@ def fit_poly1d_outlier_removal(x, y, order=2, sigma=3.0, niter=3):
     3.00
 
     """
-    my_logger = set_logger(__name__)
     gg_init = models.Polynomial1D(order)
-    gg_init.c0.min = np.min(y)
-    gg_init.c0.max = 2 * np.max(y)
     gg_init.c1 = 0
     gg_init.c2 = 0
-    with warnings.catch_warnings():
-        # Ignore model linearity warning from the fitter
-        warnings.simplefilter('ignore')
-        fit = fitting.LevMarLSQFitter()
-        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
-        # get fitted model and filtered data
-        or_fitted_model, filtered_data = or_fit(gg_init, x, y)
-        outliers = [] # not working
-        '''
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(8,5))
-        plt.plot(x, y, 'gx', label="original data")
-        plt.plot(x, filtered_data, 'r+', label="filtered data")
-        plt.plot(x, or_fitted_model(x), 'r--',
-                 label="model fitted w/ filtered data")
-        plt.legend(loc=2, numpoints=1)
-        if parameters.DISPLAY: plt.show()
-        '''
-        # my_logger.info(f'\n\t{or_fitted_model}')
-        # my_logger.debug(f'\n\t{fit.fit_info}')
-        return or_fitted_model, outliers
+    fit = fitting.LinearLSQFitter()
+    or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+    # get fitted model and filtered data
+    or_fitted_model, filtered_data = or_fit(gg_init, x, y)
+    outliers = []  # not working
+    """
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(8,5))
+    plt.plot(x, y, 'gx', label="original data")
+    plt.plot(x, gg_init(x), 'k.', label="guess")
+    plt.plot(x, filtered_data, 'r+', label="filtered data")
+    plt.plot(x, or_fitted_model(x), 'r--',
+             label="model fitted w/ filtered data")
+    plt.legend(loc=2, numpoints=1)
+    if parameters.DISPLAY: plt.show()
+    """
+    return or_fitted_model, outliers
 
 
 def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
@@ -643,32 +703,32 @@ def fit_poly2d_outlier_removal(x, y, z, order=2, sigma=3.0, niter=30):
 
     Examples
     --------
+
     >>> x, y = np.mgrid[:50,:50]
     >>> z = x**2 + y**2 - 2*x*y
     >>> z[::10,::10] = 0.
     >>> fit = fit_poly2d_outlier_removal(x,y,z,order=2,sigma=3)
-    >>> assert np.isclose(fit.c0_0.value, 0)
-    >>> assert np.isclose(fit.c1_0.value, 0)
-    >>> assert np.isclose(fit.c2_0.value, 1)
-    >>> assert np.isclose(fit.c0_1.value, 0)
-    >>> assert np.isclose(fit.c0_2.value, 1)
-    >>> assert np.isclose(fit.c1_1.value, -2)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(fit.c0_0.value, 0)
+        >>> assert np.isclose(fit.c1_0.value, 0)
+        >>> assert np.isclose(fit.c2_0.value, 1)
+        >>> assert np.isclose(fit.c0_1.value, 0)
+        >>> assert np.isclose(fit.c0_2.value, 1)
+        >>> assert np.isclose(fit.c1_1.value, -2)
 
     """
     my_logger = set_logger(__name__)
     gg_init = models.Polynomial2D(order)
-    gg_init.c0_0.min = np.min(z)
-    gg_init.c0_0.max = 2 * np.max(z)
-    with warnings.catch_warnings():
-        # Ignore model linearity warning from the fitter
-        warnings.simplefilter('ignore')
-        fit = fitting.LevMarLSQFitter()
-        or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
-        # get fitted model and filtered data
-        or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
-        my_logger.info(f'\n\t{or_fitted_model}')
-        # my_logger.debug(f'\n\t{fit.fit_info}')
-        return or_fitted_model
+    fit = fitting.LinearLSQFitter()
+    or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
+    # get fitted model and filtered data
+    or_fitted_model, filtered_data = or_fit(gg_init, x, y, z)
+    my_logger.info(f'\n\t{or_fitted_model}')
+    # my_logger.debug(f'\n\t{fit.fit_info}')
+    return or_fitted_model
 
 
 def tied_circular_gauss2d(g1):
@@ -677,8 +737,8 @@ def tied_circular_gauss2d(g1):
 
 
 def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=None, circular=False):
-    """Fit an astropy Gaussian 2D model with parameters :
-        amplitude, x_mean,y_mean,x_stddev, y_stddev,theta
+    """
+    Fit an astropy Gaussian 2D model with parameters : amplitude, x_mean, y_mean, x_stddev, y_stddev, theta
     using outlier removal methods.
 
     Parameters
@@ -707,6 +767,7 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -715,9 +776,18 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
     >>> p = (50, 25, 25, 5, 5, 0)
     >>> Z = PSF.evaluate(X, Y, *p)
 
-    ..plot:
-        plt.imshow(Z, origin='loxer') #doctest: +ELLIPSIS
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        X, Y = np.mgrid[:50,:50]
+        PSF = models.Gaussian2D()
+        p = (50, 25, 25, 5, 5, 0)
+        Z = PSF.evaluate(X, Y, *p)
+        plt.imshow(Z, origin='lower')
         plt.show()
+
     >>> guess = (45, 20, 20, 7, 7, 0)
     >>> bounds = ((1, 10, 10, 1, 1, -90), (100, 40, 40, 10, 10, 90))
     >>> fit = fit_gauss2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, circular=True)
@@ -725,9 +795,20 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
     >>> print(res)
     [50.0, 25.0, 25.0, 5.0, 5.0, 0.0]
 
-    ..plot:
-        plt.imshow(Z-fit(X, Y), origin='loxer') #doctest: +ELLIPSIS
-        <matplotlib.image.AxesImage object at 0x...>
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        from spectractor.tools import fit_gauss2d_outlier_removal
+        X, Y = np.mgrid[:50,:50]
+        PSF = models.Gaussian2D()
+        p = (50, 25, 25, 5, 5, 0)
+        Z = PSF.evaluate(X, Y, *p)
+        guess = (45, 20, 20, 7, 7, 0)
+        bounds = ((1, 10, 10, 1, 1, -90), (100, 40, 40, 10, 10, 90))
+        fit = fit_gauss2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, circular=True)
+        plt.imshow(Z-fit(X, Y), origin='lower')
         plt.show()
 
     """
@@ -756,8 +837,8 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
 
 
 def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=None):
-    """Fit an astropy Moffat 2D model with parameters :
-        amplitude, x_mean, y_mean, gamma, alpha
+    """
+    Fit an astropy Moffat 2D model with parameters: amplitude, x_mean, y_mean, gamma, alpha
     using outlier removal methods.
 
     Parameters
@@ -784,6 +865,7 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -792,16 +874,41 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
     >>> p = (50, 50, 50, 5, 2)
     >>> Z = PSF.evaluate(X, Y, *p)
 
-    ..plot:
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        X, Y = np.mgrid[:100,:100]
+        PSF = models.Moffat2D()
+        p = (50, 50, 50, 5, 2)
+        Z = PSF.evaluate(X, Y, *p)
         plt.imshow(Z, origin='loxer')
         plt.show()
+
     >>> guess = (45, 48, 52, 4, 2)
     >>> bounds = ((1, 10, 10, 1, 1), (100, 90, 90, 10, 10))
     >>> fit = fit_moffat2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, niter=3)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
-    >>> assert(np.all(np.isclose(p, res, 1e-1)))
 
-    ..plot:
+    .. doctest::
+        :hide:
+
+        >>> assert(np.all(np.isclose(p, res, 1e-1)))
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        from spectractor.tools import fit_moffat2d_outlier_removal
+        X, Y = np.mgrid[:100,:100]
+        PSF = models.Moffat2D()
+        p = (50, 50, 50, 5, 2)
+        Z = PSF.evaluate(X, Y, *p)
+        guess = (45, 48, 52, 4, 2)
+        bounds = ((1, 10, 10, 1, 1), (100, 90, 90, 10, 10))
+        fit = fit_moffat2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, niter=3)
         plt.imshow(Z-fit(X, Y), origin='loxer')
         plt.show()
     """
@@ -827,8 +934,8 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
 
 
 def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=None):
-    """Fit an astropy Moffat 1D model with parameters :
-        amplitude, x_mean, gamma, alpha
+    """
+    Fit an astropy Moffat 1D model with parameters: amplitude, x_mean, gamma, alpha
     using outlier removal methods.
 
     Parameters
@@ -853,6 +960,7 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -861,17 +969,42 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
     >>> p = (50, 50, 5, 2)
     >>> Y = PSF.evaluate(X, *p)
 
-    ..plot:
-        plt.imshow(Z, origin='loxer')
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        X = np.arange(100)
+        PSF = models.Moffat1D()
+        p = (50, 50, 5, 2)
+        Y = PSF.evaluate(X, *p)
+        plt.plot(X, Y)
         plt.show()
+
     >>> guess = (45, 48, 4, 2)
     >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
     >>> fit = fit_moffat1d_outlier_removal(X, Y, guess=guess, bounds=bounds, niter=3)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
-    >>> assert(np.all(np.isclose(p, res, 1e-6)))
 
-    ..plot:
-        plt.imshow(Z-fit(X, Y), origin='loxer')
+    .. doctest::
+        :hide:
+
+        >>> assert(np.all(np.isclose(p, res, 1e-6)))
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        from spectractor.tools import fit_moffat1d_outlier_removal
+        X = np.arange(100)
+        PSF = models.Moffat1D()
+        p = (50, 50, 5, 2)
+        Y = PSF.evaluate(X, *p)
+        guess = (45, 48, 4, 2)
+        bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
+        fit = fit_moffat1d_outlier_removal(X, Y, guess=guess, bounds=bounds, niter=3)
+        plt.plot(X, Y-fit(X))
         plt.show()
     """
     my_logger = set_logger(__name__)
@@ -890,7 +1023,7 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
         or_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip, niter=niter, sigma=sigma)
         # get fitted model and filtered data
         or_fitted_model, filtered_data = or_fit(gg_init, x, y)
-        my_logger.info(f'\n\t{or_fitted_model}')
+        my_logger.debug(f'\n\t{or_fitted_model}')
         # my_logger.debug(f'\n\t{fit.fit_info}')
         return or_fitted_model
 
@@ -917,6 +1050,7 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
 
     Examples
     --------
+
     >>> import numpy as np
     >>> import matplotlib.pyplot as plt
     >>> from astropy.modeling import models
@@ -925,17 +1059,38 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
     >>> p = (50, 50, 5, 2)
     >>> Y = PSF.evaluate(X, *p)
 
-    ..plot:
-        plt.imshow(Z, origin='loxer')
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        X = np.arange(100)
+        PSF = models.Moffat1D()
+        p = (50, 50, 5, 2)
+        Y = PSF.evaluate(X, *p)
+        plt.plot(X, Y)
         plt.show()
+
     >>> guess = (45, 48, 4, 2)
     >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
     >>> fit = fit_moffat1d(X, Y, guess=guess, bounds=bounds)
     >>> res = [getattr(fit, p).value for p in fit.param_names]
     >>> assert(np.all(np.isclose(p, res, 1e-6)))
 
-    ..plot:
-        plt.imshow(Z-fit(X, Y), origin='loxer')
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from astropy.modeling import models
+        from spectractor.tools import fit_moffat1d
+        X = np.arange(100)
+        PSF = models.Moffat1D()
+        p = (50, 50, 5, 2)
+        Y = PSF.evaluate(X, *p)
+        guess = (45, 48, 4, 2)
+        bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
+        fit = fit_moffat1d(X, Y, guess=guess, bounds=bounds)
+        plt.plot(X, Y-fit(X))
         plt.show()
     """
     my_logger = set_logger(__name__)
@@ -983,6 +1138,187 @@ class LevMarLSQFitterWithNan(fitting.LevMarLSQFitter):
             a = np.ravel(weights * (model(*args[2: -1]) - meas))
             a[~np.isfinite(a)] = 0
             return a
+
+
+def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
+    """
+    Compute the full width half maximum of y(x) curve,
+    using an interpolation of the data points and dichotomie method.
+
+    Parameters
+    ----------
+    x: array_like
+        The abscisse array.
+    y: array_like
+        The function array.
+    minimum: float, optional
+        The minimum reference from which to compyte half the height (default: 0).
+    center: float, optional
+        The center of the curve. If None, the weighted averageof the y(x) distribution is computed (default: None).
+    full_output: bool, optional
+        If True, half maximum, the edges of the curve and the curve center are given in output (default: False).
+
+    Returns
+    -------
+    FWHM: float
+        The full width half maximum of the curve.
+    half: float, optional
+        The half maximum value. Only if full_output=True.
+    center: float, optional
+        The y(x) center value. Only if full_output=True.
+    left_edge: float, optional
+        The left_edge value at half maximum. Only if full_output=True.
+    right_edge: float, optional
+        The right_edge value at half maximum. Only if full_output=True.
+
+    Examples
+    --------
+
+    Gaussian example
+
+    >>> x = np.arange(0, 100, 1)
+    >>> stddev = 4
+    >>> middle = 40
+    >>> psf = gauss(x, 1, middle, stddev)
+    >>> fwhm, half, center, a, b = compute_fwhm(x, psf, full_output=True)
+    >>> print(f"{fwhm:.4f} {2.355*stddev:.4f} {center:.4f}")
+    9.4329 9.4200 40.0000
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(fwhm, 2.355*stddev, atol=2e-1)
+        >>> assert np.isclose(center, middle, atol=1e-3)
+
+    .. plot ::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from spectractor.tools import gauss, compute_fwhm
+        x = np.arange(0, 100, 1)
+        stddev = 4
+        middle = 40
+        psf = gauss(x, 1, middle, stddev)
+        fwhm, half, center, a, b = compute_fwhm(x, psf, full_output=True)
+        plt.figure()
+        plt.plot(x, psf, label="function")
+        plt.axvline(center, color="gray", label="center")
+        plt.axvline(a, color="k", label="edges at half max")
+        plt.axvline(b, color="k", label="edges at half max")
+        plt.axhline(half, color="r", label="half max")
+        plt.legend()
+        plt.title(f"FWHM={fwhm:.3f}")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.show()
+
+    Defocused PSF example
+
+    >>> from spectractor.extractor.psf import MoffatGauss
+    >>> p = [2,40,40,4,2,-0.4,1,10]
+    >>> psf = MoffatGauss(p)
+    >>> fwhm, half, center, a, b = compute_fwhm(x, psf.evaluate(x), full_output=True)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(fwhm, 7.05, atol=1e-2)
+        >>> assert np.isclose(center, p[1], atol=1e-2)
+
+    .. plot ::
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from spectractor.tools import gauss, compute_fwhm
+        from spectractor.extractor.psf import MoffatGauss
+        x = np.arange(0, 100, 1)
+        p = [2,40,40,4,2,-0.4,1,10]
+        psf = MoffatGauss(p)
+        fwhm, half, center, a, b = compute_fwhm(x, psf.evaluate(x), full_output=True)
+        plt.figure()
+        plt.plot(x, psf.evaluate(x, p), label="function")
+        plt.axvline(center, color="gray", label="center")
+        plt.axvline(a, color="k", label="edges at half max")
+        plt.axvline(b, color="k", label="edges at half max")
+        plt.axhline(half, color="r", label="half max")
+        plt.legend()
+        plt.title(f"FWHM={fwhm:.3f}")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.show()
+    """
+    if y.ndim > 1:
+        # TODO: implement fwhm for 2D curves
+        return -1
+    interp = interp1d(x, y, kind="linear", bounds_error=False, fill_value="extrapolate")
+    maximum = np.max(y) - minimum
+    imax = np.argmax(y)
+    a = x[imax + np.argmin(np.abs(y[imax:] - 0.9 * maximum))]
+    b = x[imax + np.argmin(np.abs(y[imax:] - 0.1 * maximum))]
+
+    def eq(xx):
+        return interp(xx) - 0.5 * maximum
+
+    res = dichotomie(eq, a, b, 1e-3)
+    if center is None:
+        center = np.average(x, weights=y)
+    fwhm = abs(2 * (res - center))
+    if not full_output:
+        return fwhm
+    else:
+        return fwhm, 0.5 * maximum, center, res, center - abs(res - center)
+
+
+def compute_integral(x, y, bounds=None):
+    """
+    Compute the integral of an y(x) curve. The curve is interpolated and extrapolated with cubic splines.
+    If not provided, bounds are set to the x array edges.
+
+    Parameters
+    ----------
+    x: array_like
+        The abscisse array.
+    y: array_like
+        The function array.
+    bounds: array_like, optional
+        The bounds of the integral. If None, the edges of thex array are taken (default bounds=None).
+
+    Returns
+    -------
+    result: float
+        The integral of the PSF model.
+
+    Examples
+    --------
+
+    Gaussian example
+
+    .. doctest::
+
+        >>> x = np.arange(0, 100, 0.5)
+        >>> stddev = 4
+        >>> middle = 40
+        >>> psf = gauss(x, 1/(stddev*np.sqrt(2*np.pi)), middle, stddev)
+        >>> integral = compute_integral(x, psf)
+        >>> print(f"{integral:.6f}")
+        1.000000
+
+    Defocused PSF example
+
+    .. doctest::
+
+        >>> from spectractor.extractor.psf import MoffatGauss
+        >>> p = [2,30,30,4,2,-0.5,1,10]
+        >>> psf = MoffatGauss(p)
+        >>> integral = compute_integral(x, psf.evaluate(x))
+        >>> assert np.isclose(integral, p[0], atol=1e-2)
+
+    """
+    if bounds is None:
+        bounds = (np.min(x), np.max(x))
+    interp = interp1d(x, y, kind="cubic", bounds_error=False, fill_value="extrapolate")
+    integral = quad(interp, bounds[0], bounds[1], limit=200)
+    return integral[0]
 
 
 def find_nearest(array, value):
@@ -1034,7 +1370,7 @@ def ensure_dir(directory_name):
     if not os.path.exists(directory_name):
         os.makedirs(directory_name)
 
-        
+
 def weighted_avg_and_std(values, weights):
     """
     Return the weighted average and standard deviation.
@@ -1057,10 +1393,10 @@ def weighted_avg_and_std(values, weights):
 
 def hessian_and_theta(data, margin_cut=1):
     # compute hessian matrices on the image
-    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order='xy')
+    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order='rc')
     lambda_plus = 0.5 * ((Hxx + Hyy) + np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     lambda_minus = 0.5 * ((Hxx + Hyy) - np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
-    theta = 0.5 * np.arctan2(2 * Hxy, Hyy - Hxx) * 180 / np.pi
+    theta = 0.5 * np.arctan2(2 * Hxy, Hxx - Hyy) * 180 / np.pi
     # remove the margins
     lambda_minus = lambda_minus[margin_cut:-margin_cut, margin_cut:-margin_cut]
     lambda_plus = lambda_plus[margin_cut:-margin_cut, margin_cut:-margin_cut]
@@ -1097,17 +1433,13 @@ def fftconvolve_gaussian(array, reso):
     >>> array = np.ones(100)
     >>> output = fftconvolve_gaussian(array, 3)
     >>> print(output[:3])
-<<<<<<< HEAD
-    [0.5        0.63125312 0.74870357]
-=======
-    [ 0.5         0.63114657  0.74850168]
+    [0.5        0.63114657 0.74850168]
     >>> array = np.ones((100, 100))
     >>> output = fftconvolve_gaussian(array, 3)
     >>> print(output[0][:3])
-    [ 0.5         0.63114657  0.74850168]
+    [0.5        0.63114657 0.74850168]
     >>> array = np.ones((100, 100, 100))
     >>> output = fftconvolve_gaussian(array, 3)
->>>>>>> 0e123b8e16fd5d6e5d5995d961478e73bc23105c
     """
     my_logger = set_logger(__name__)
     if array.ndim == 2:
@@ -1120,7 +1452,7 @@ def fftconvolve_gaussian(array, reso):
         kernel /= np.sum(kernel)
         array = fftconvolve(array, kernel, mode='same')
     else:
-        my_logger.error('\n\tArray dimension must be 1 or 2.')
+        my_logger.error(f'\n\tArray dimension must be 1 or 2. Here I have array.ndim={array.ndim}.')
     return array
 
 
@@ -1198,8 +1530,8 @@ def formatting_numbers(value, error_high, error_low, std=None, label=None):
             if std is not None:
                 str_std = f"{std:.2g}"
     out += [str_value, str_error_high]
-    if not np.isclose(error_high, error_low):
-        out += [str_error_low]
+    # if not np.isclose(error_high, error_low):
+    out += [str_error_low]
     if std is not None:
         out += [str_std]
     out = tuple(out)
@@ -1234,11 +1566,15 @@ def pixel_rotation(x, y, theta, x0=0, y0=0):
     >>> pixel_rotation(0, 0, 45)
     (0.0, 0.0)
     >>> u, v = pixel_rotation(1, 0, np.pi/4)
-    >>> assert np.isclose(u, 1/np.sqrt(2))
-    >>> assert np.isclose(v, -1/np.sqrt(2))
-    >>> u, v = pixel_rotation(1, 2, -np.pi/2, x0=1, y0=0)
-    >>> assert np.isclose(u, -2)
-    >>> assert np.isclose(v, 0)
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(u, 1/np.sqrt(2))
+        >>> assert np.isclose(v, -1/np.sqrt(2))
+        >>> u, v = pixel_rotation(1, 2, -np.pi/2, x0=1, y0=0)
+        >>> assert np.isclose(u, -2)
+        >>> assert np.isclose(v, 0)
     """
     u = np.cos(theta) * (x - x0) + np.sin(theta) * (y - y0)
     v = -np.sin(theta) * (x - x0) + np.cos(theta) * (y - y0)
@@ -1270,9 +1606,13 @@ def detect_peaks(image):
     >>> im[10,20] = -3
     >>> im[49,49] = 1
     >>> detected_peaks = detect_peaks(im)
-    >>> assert detected_peaks[4,6]
-    >>> assert not detected_peaks[10,20]
-    >>> assert detected_peaks[49,49]
+
+    .. doctest::
+        :hide:
+
+        >>> assert detected_peaks[4,6]
+        >>> assert not detected_peaks[10,20]
+        >>> assert detected_peaks[49,49]
     """
 
     # define an 8-connected neighborhood
@@ -1334,7 +1674,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     data: array_like
         The image data 2D array.
     scale: str
-        Scaling of the image (choose between: lin, log or log10) (default: lin)
+        Scaling of the image (choose between: lin, log or log10, symlog) (default: lin)
     title: str
         Title of the image (default: "")
     units: str
@@ -1342,7 +1682,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     cmap: colormap
         Color map label (default: None)
     target_pixcoords: array_like, optional
-        2D array  giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
+        2D array giving the (x,y) coordinates of the targets on the image: add a scatter plot (default: None)
     vmin: float
         Minimum value of the image (default: None)
     vmax: float
@@ -1354,13 +1694,19 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
 
     Examples
     --------
-    >>> import matplotlib.pyplot as plt
-    >>> from spectractor.extractor.images import Image
-    >>> f, ax = plt.subplots(1,1)
-    >>> im = Image('tests/data/reduc_20170605_028.fits')
-    >>> plot_image_simple(ax, im.data, scale="log10", units="ADU", target_pixcoords=(815,580),
-    ...                     title="tests/data/reduc_20170605_028.fits")
-    >>> if parameters.DISPLAY: plt.show()
+
+    .. plot::
+        :include-source:
+
+        >>> import matplotlib.pyplot as plt
+        >>> from spectractor.extractor.images import Image
+        >>> from spectractor import parameters
+        >>> from spectractor.tools import plot_image_simple
+        >>> f, ax = plt.subplots(1,1)
+        >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
+        >>> plot_image_simple(ax, im.data, scale="symlog", units="ADU", target_pixcoords=(815,580),
+        ...                     title="tests/data/reduc_20170605_028.fits")
+        >>> if parameters.DISPLAY: plt.show()
     """
     if scale == "log" or scale == "log10":
         # removes the zeros and negative pixels first
@@ -1368,17 +1714,23 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         min_noz = np.min(data[np.where(data > 0)])
         data[zeros] = min_noz
         # apply log
-        data = np.log10(data)
-
-    im = ax.imshow(data, origin='lower', cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect)
+        # data = np.log10(data)
+    if scale == "log10" or scale == "log":
+        norm = matplotlib.colors.LogNorm(vmin=vmin, vmax=vmax)
+    elif scale == "symlog":
+        norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=10, base=10)
+    else:
+        norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
     ax.grid(color='silver', ls='solid')
     ax.grid(True)
-    ax.set_xlabel('X [pixels]')
-    ax.set_ylabel('Y [pixels]')
+    ax.set_xlabel(parameters.PLOT_XLABEL)
+    ax.set_ylabel(parameters.PLOT_YLABEL)
     cb = plt.colorbar(im, ax=ax, cax=cax)
-    cb.formatter.set_powerlimits((0, 0))
-    cb.locator = MaxNLocator(7, prune=None)
-    cb.update_ticks()
+    if scale == "lin":
+        cb.formatter.set_powerlimits((0, 0))
+        cb.locator = MaxNLocator(7, prune=None)
+        cb.update_ticks()
     cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
     if title != "":
         ax.set_title(title)
@@ -1387,48 +1739,69 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
                    label='Target', linewidth=2)
 
 
-def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, ylim=None,color='r', label='', title='', units=''):
+def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', linestyle='none', lw=2, label='',
+                         title='', units=''):
     """Simple function to plot a spectrum with error bars and labels.
 
     Parameters
     ----------
     ax: Axes
-        Axes instance to make the plot
+        Axes instance to make the plot.
+    lambdas: array
+        The wavelengths array.
+    data: array
+        The spectrum data array.
+    data_err: array, optional
+        The spectrum uncertainty array (default: None).
     xlim: list, optional
-        List of minimum and maximum abscisses
-    color: str
-        String for the color of the spectrum (default: 'r')
-    label: str
-        String label for the plot legend
-    lambdas: array, optional
-        The wavelengths array if it has been given externally (default: None)
+        List of minimum and maximum abscisses (default: None).
+    color: str, optional
+        String for the color of the spectrum (default: 'r').
+    linestyle: str, optional
+        String for the linestyle of the spectrum (default: 'none').
+    lw: int, optional
+        Integer for line width (default: 2).
+    label: str, optional
+        String label for the plot legend (default: '').
+    title: str, optional
+        String label for the plot title (default: '').
+    units: str, optional
+        String label for the plot units (default: '').
+
 
     Examples
     --------
-    >>> import matplotlib.pyplot as plt
-    >>> from spectractor.extractor.spectrum import Spectrum
-    >>> f, ax = plt.subplots(1,1)
-    >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
-    >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=[500,700], color='r', label='test')
-    >>> if parameters.DISPLAY: plt.show()
+
+    .. plot::
+        :include-source:
+
+        >>> import matplotlib.pyplot as plt
+        >>> from spectractor.extractor.spectrum import Spectrum
+        >>> from spectractor import parameters
+        >>> from spectractor.tools import plot_spectrum_simple
+        >>> f, ax = plt.subplots(1,1)
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
+        >>> plot_spectrum_simple(ax, s.lambdas, s.data, data_err=s.err, xlim=None, color='r', label='test')
+        >>> if parameters.DISPLAY: plt.show()
     """
     xs = lambdas
     if xs is None:
         xs = np.arange(data.size)
     if data_err is not None:
-        ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=1, label=label, zorder=0, markersize=2)
+        ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=lw, label=label,
+                    zorder=0, markersize=2, linestyle=linestyle)
     else:
-        ax.plot(xs, data, f'{color}-', lw=2, label=label)
+        ax.plot(xs, data, color=color, lw=lw, label=label, linestyle=linestyle)
     ax.grid(True)
     if xlim is None and lambdas is not None:
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
     ax.set_xlim(xlim)
-    ax.set_ylim(0., np.nanmax(data) * 1.2)
-    if ylim is not None:
-        ax.set_ylim(ylim)
-
+    try:
+        ax.set_ylim(0., np.nanmax(data[np.logical_and(xs > xlim[0], xs < xlim[1])]) * 1.2)
+    except ValueError:
+        pass
     if lambdas is not None:
-        ax.set_xlabel('$\lambda$ [nm]')
+        ax.set_xlabel(r'$\lambda$ [nm]')
     else:
         ax.set_xlabel('X [pixels]')
     if units != '':
@@ -1439,35 +1812,129 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, ylim=None,
         ax.set_title(title)
 
 
+def plot_compass_simple(ax, parallactic_angle=None, arrow_size=0.1, origin=[0.15, 0.15]):
+    """Plot small (N,W) compass, and optionally zenith direction.
+
+    Parameters
+    ----------
+    ax: Axes
+        Axes instance to make the plot.
+    parallactic_angle: float, optional
+        Value is the parallactic angle with respect to North eastward and plot the zenith direction (default: None).
+    arrow_size: float, optional
+        Length of the arrow as a fraction of axe sizes (default: 0.1)
+    origin: array_like, optional
+        (x0, y0) position of the compass as axes fraction (default: [0.15, 0.15]).
+
+    Examples
+    --------
+
+    >>> from spectractor.extractor.images import Image
+    >>> from spectractor import parameters
+    >>> from spectractor.tools import plot_image_simple, plot_compass_simple
+    >>> f, ax = plt.subplots(1,1)
+    >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
+    >>> plot_image_simple(ax, im.data, scale="symlog", units="ADU", target_pixcoords=(750,700),
+    ...                   title='tests/data/reduc_20170530_134.fits')
+    >>> plot_compass_simple(ax, im.parallactic_angle)
+    >>> if parameters.DISPLAY: plt.show()
+
+    """
+    # North arrow
+    N_arrow = [0, arrow_size]
+    N_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(N_arrow[0], N_arrow[1],
+                                                                    camera_angle=parameters.OBS_CAMERA_ROTATION,
+                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+    ax.annotate("N", xy=origin, xycoords='axes fraction', xytext=N_xy + origin, textcoords='axes fraction',
+                arrowprops=dict(arrowstyle="<|-", fc="yellow", ec="yellow"), color="yellow",
+                horizontalalignment='center', verticalalignment='center')
+    # West arrow
+    W_arrow = [arrow_size, 0]
+    W_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(W_arrow[0], W_arrow[1],
+                                                                    camera_angle=parameters.OBS_CAMERA_ROTATION,
+                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+    ax.annotate("W", xy=origin, xycoords='axes fraction', xytext=W_xy + origin, textcoords='axes fraction',
+                arrowprops=dict(arrowstyle="<|-", fc="yellow", ec="yellow"), color="yellow",
+                horizontalalignment='center', verticalalignment='center')
+    # Central dot
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    ax.scatter(origin[0] * xmax, origin[1] * ymax, color="yellow", s=20)
+    # Zenith direction
+    if parallactic_angle is not None:
+        p_arrow = [0, arrow_size]  # angle with respect to North in RADEC counterclockwise
+        angle = parameters.OBS_CAMERA_ROTATION + parameters.OBS_CAMERA_RA_FLIP_SIGN * parallactic_angle
+        p_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(p_arrow[0], p_arrow[1],
+                                                                        camera_angle=angle,
+                                                                        flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                        flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+        ax.annotate("Z", xy=origin, xycoords='axes fraction', xytext=p_xy + origin, textcoords='axes fraction',
+                    arrowprops=dict(arrowstyle="<|-", fc="lightgreen", ec="lightgreen"), color="lightgreen",
+                    horizontalalignment='center', verticalalignment='center')
+
+
 def load_fits(file_name, hdu_index=0):
+    """Generic function to load a FITS file.
+
+    Parameters
+    ----------
+    file_name: str
+        The FITS file name.
+    hdu_index: int, optional
+        The HDU index in the file (default: 0).
+
+    Returns
+    -------
+    header: fits.Header
+        Header of the FITS file.
+    data: np.array
+        The data array.
+
+    Examples
+    --------
+    >>> header, data = load_fits("./tests/data/reduc_20170530_134.fits")
+    >>> header["DATE-OBS"]
+    '2017-05-31T02:53:52.356'
+    >>> data.shape
+    (2048, 2048)
+
+    """
     hdu_list = fits.open(file_name)
     header = hdu_list[0].header
     data = hdu_list[hdu_index].data
-    hdu_list.close()  # need to free allocation for file descripto
+    hdu_list.close()  # need to free allocation for file description
     return header, data
 
 
-def extract_info_from_CTIO_header(obj, header):
-    obj.date_obs = header['DATE-OBS']
-    obj.airmass = header['AIRMASS']
-    obj.expo = header['EXPTIME']
-    obj.filters = header['FILTERS']
-    obj.filter_label = header['FILTER1']
-    obj.disperser_label = header['FILTER2']
-
-def extract_info_from_PDM_header(obj, header):
-    obj.date_obs = header['DATE-OBS']
-    # SDC : note AIRMASS is in logbook, but it will be moved later in reduced image
-    obj.airmass = header['AIRMASS']
-    # SDC: note reduction already divides by exposure
-    obj.expo = header['EXPOSURE']
-    # SDC: note information is more in the filename
-    obj.filters = header['FILTER']
-    obj.filter_label = header['FILTER']
-    obj.disperser_label = header['FILTER']
-
-
 def save_fits(file_name, header, data, overwrite=False):
+    """Generic function to save a FITS file.
+
+    Parameters
+    ----------
+    file_name: str
+        The FITS file name.
+    header: fits.Header
+        Header of the FITS file.
+    data: np.array
+        The data array.
+    overwrite: bool, optional
+        If True and the file already exists, it is overwritten (default: False).
+
+    Examples
+    --------
+
+    >>> header, data = load_fits("./tests/data/reduc_20170530_134.fits")
+    >>> save_fits("./outputs/save_fits_test.fits", header, data, overwrite=True)
+    >>> assert os.path.isfile("./outputs/save_fits_test.fits")
+
+    .. doctest:
+        :hide:
+
+        >>> os.remove("./outputs/save_fits_test.fits")
+
+    """
     hdu = fits.PrimaryHDU()
     hdu.header = header
     hdu.data = data
@@ -1500,6 +1967,7 @@ def dichotomie(f, a, b, epsilon):
     --------
 
     Search for the Gaussian FWHM:
+
     >>> p = [1,0,1]
     >>> xx = np.arange(-10,10,0.1)
     >>> PSF = gauss(xx, *p)
@@ -1521,7 +1989,7 @@ def dichotomie(f, a, b, epsilon):
 
 
 def wavelength_to_rgb(wavelength, gamma=0.8):
-    ''' taken from http://www.noah.org/wiki/Wavelength_to_RGB_in_Python
+    """ taken from http://www.noah.org/wiki/Wavelength_to_RGB_in_Python
     This converts a given wavelength of light to an
     approximate RGB color value. The wavelength must be given
     in nanometers in the range from 380 nm through 750 nm
@@ -1530,7 +1998,7 @@ def wavelength_to_rgb(wavelength, gamma=0.8):
     Based on code by Dan Bruton
     http://www.physics.sfasu.edu/astro/color/spectra.html
     Additionally alpha value set to 0.5 outside range
-    '''
+    """
     wavelength = float(wavelength)
     if 380 <= wavelength <= 750:
         A = 1.
@@ -1570,19 +2038,375 @@ def wavelength_to_rgb(wavelength, gamma=0.8):
         R = 0.0
         G = 0.0
         B = 0.0
-    return (R, G, B, A)
+    return R, G, B, A
 
 
 def from_lambda_to_colormap(lambdas):
+    """Convert an array of wavelength in nm into a color map.
+
+    Parameters
+    ----------
+    lambdas: array_like
+        Wavelength array in nm.
+
+    Returns
+    -------
+    spectral_map: matplotlib.colors.LinearSegmentedColormap
+        Color map.
+
+    Examples
+    --------
+    >>> lambdas = np.arange(300, 1000, 10)
+    >>> spec = from_lambda_to_colormap(lambdas)
+    >>> plt.scatter(lambdas, np.zeros(lambdas.size), cmap=spec, c=lambdas)  #doctest: +ELLIPSIS
+    <matplotlib.collections.PathCollection object at ...>
+    >>> plt.grid()
+    >>> plt.xlabel("Wavelength [nm]")  #doctest: +ELLIPSIS
+    Text(..., 'Wavelength [nm]')
+    >>> plt.show()
+
+    ..plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.tools import from_lambda_to_colormap
+        lambdas = np.arange(300, 1000, 10)
+        spec = from_lambda_to_colormap(lambdas)
+        plt.scatter(lambdas, np.zeros(lambdas.size), cmap=spec, c=lambdas)
+        plt.xlabel("Wavelength [nm]")
+        plt.grid()
+        plt.show()
+
+    """
     colorlist = [wavelength_to_rgb(lbda) for lbda in lambdas]
     spectralmap = matplotlib.colors.LinearSegmentedColormap.from_list("spectrum", colorlist)
     return spectralmap
 
 
+def rebin(arr, new_shape):
+    """Rebin and reshape a numpy array.
+
+    Parameters
+    ----------
+    arr: np.array
+        Numpy array to be reshaped.
+    new_shape: array_like
+        New shape of the array.
+
+    Returns
+    -------
+    arr_rebinned: np.array
+        Rebinned array.
+
+    Examples
+    --------
+    >>> a = 4 * np.ones((10, 10))
+    >>> b = rebin(a, (5, 5))
+    >>> b
+    array([[4., 4., 4., 4., 4.],
+           [4., 4., 4., 4., 4.],
+           [4., 4., 4., 4., 4.],
+           [4., 4., 4., 4., 4.],
+           [4., 4., 4., 4., 4.]])
+    """
+    if np.any(new_shape * parameters.CCD_REBIN != arr.shape):
+        shape_cropped = new_shape * parameters.CCD_REBIN
+        margins = np.asarray(arr.shape) - shape_cropped
+        arr = arr[:-margins[0], :-margins[1]]
+    shape = (new_shape[0], arr.shape[0] // new_shape[0],
+             new_shape[1], arr.shape[1] // new_shape[1])
+    return arr.reshape(shape).mean(-1).mean(1)
+
+
+def set_wcs_output_directory(file_name, output_directory=""):
+    """Returns the WCS output directory corresponding to the analyzed image. The name of the directory is
+    the anme of the image with the suffix _wcs.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the image.
+    output_directory: str, optional
+        If not set, the main output directory is the one the image,
+        otherwise the specified directory is taken (default: "").
+
+    Returns
+    -------
+    output: str
+        The name of the output directory
+
+    Examples
+    --------
+    >>> set_wcs_output_directory("image.fits", output_directory="")
+    'image_wcs'
+    >>> set_wcs_output_directory("image.png", output_directory="outputs")
+    'outputs/image_wcs'
+
+    """
+    outdir = os.path.dirname(file_name)
+    if output_directory != "":
+        outdir = output_directory
+    output_directory = os.path.join(outdir, os.path.splitext(os.path.basename(file_name))[0]) + "_wcs"
+    return output_directory
+
+
+def set_wcs_tag(file_name):
+    """Returns the WCS tag name associated to the analyzed image: the file name without the extension.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the image.
+
+    Returns
+    -------
+    tag: str
+        The tag.
+
+    Examples
+    --------
+    >>> set_wcs_tag("image.fits")
+    'image'
+
+    """
+    tag = os.path.splitext(os.path.basename(file_name))[0]
+    return tag
+
+
+def set_wcs_file_name(file_name, output_directory=""):
+    """Returns the WCS file name associated to the analyzed image, placed in the output directory.
+    The extension is .wcs.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the image.
+    output_directory: str, optional
+        If not set, the main output directory is the one the image,
+        otherwise the specified directory is taken (default: "").
+
+    Returns
+    -------
+    wcs_file_name: str
+        The WCS file name.
+
+    Examples
+    --------
+    >>> set_wcs_file_name("image.fits", output_directory="")
+    'image_wcs/image.wcs'
+    >>> set_wcs_file_name("image.png", output_directory="outputs")
+    'outputs/image_wcs/image.wcs'
+
+    """
+    output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
+    tag = set_wcs_tag(file_name)
+    return os.path.join(output_directory, tag + '.wcs')
+
+
+def set_sources_file_name(file_name, output_directory=""):
+    """Returns the file name containing the deteted sources associated to the analyzed image,
+    placed in the output directory. The suffix is _source.fits.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the image.
+    output_directory: str, optional
+        If not set, the main output directory is the one the image,
+        otherwise the specified directory is taken (default: "").
+
+    Returns
+    -------
+    sources_file_name: str
+        The detected sources file name.
+
+    Examples
+    --------
+    >>> set_sources_file_name("image.fits", output_directory="")
+    'image_wcs/image_sources.fits'
+    >>> set_sources_file_name("image.png", output_directory="outputs")
+    'outputs/image_wcs/image_sources.fits'
+
+    """
+    output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
+    tag = set_wcs_tag(file_name)
+    return os.path.join(output_directory, f"{tag}_sources.fits")
+
+
+def set_gaia_catalog_file_name(file_name, output_directory=""):
+    """Returns the file name containing the Gaia catalog associated to the analyzed image,
+    placed in the output directory. The suffix is _gaia.ecsv.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the image.
+    output_directory: str, optional
+        If not set, the main output directory is the one the image,
+        otherwise the specified directory is taken (default: "").
+
+    Returns
+    -------
+    sources_file_name: str
+        The Gaia catalog file name.
+
+    Examples
+    --------
+    >>> set_gaia_catalog_file_name("image.fits", output_directory="")
+    'image_wcs/image_gaia.ecsv'
+    >>> set_gaia_catalog_file_name("image.png", output_directory="outputs")
+    'outputs/image_wcs/image_gaia.ecsv'
+
+    """
+    output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
+    tag = set_wcs_tag(file_name)
+    return os.path.join(output_directory, f"{tag}_gaia.ecsv")
+
+
+def load_wcs_from_file(file_name):
+    """Open the WCS FITS file and returns a WCS astropy object.
+
+    Parameters
+    ----------
+    file_name: str
+        File name of the WCS FITS file.
+
+    Returns
+    -------
+    wcs: WCS
+        WCS Astropy object.
+
+    """
+    # Load the FITS hdulist using astropy.io.fits
+    hdulist = fits.open(file_name)
+    # Parse the WCS keywords in the primary HDU
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore")
+        wcs = WCS.WCS(hdulist[0].header, fix=False)
+    return wcs
+
+
+def imgslice(slicespec):
+    """
+    Utility function: convert a FITS slice specification (1-based)
+    into the corresponding numpy array slice spec (0-based as python does, xy swapped).
+
+    Parameters
+    ----------
+    slicespec: str
+        FITS slice specification with the format [xmin:xmax,ymin:ymax]
+
+    Returns
+    -------
+    slice: slice
+        Slice object to be injected in a np.array for instance.
+
+    Examples
+    --------
+    >>> imgslice('[11:522,1:2002]')
+    (slice(0, 2002, None), slice(10, 522, None))
+    """
+
+    parts = slicespec.replace('[', '').replace(']', '').split(',')
+    xbegin, xend = [int(i) for i in parts[0].split(':')]
+    ybegin, yend = [int(i) for i in parts[1].split(':')]
+    xbegin -= 1
+    ybegin -= 1
+    return np.s_[ybegin:yend, xbegin:xend]
+
+
+def compute_correlation_matrix(cov):
+    rho = np.zeros_like(cov)
+    for i in range(cov.shape[0]):
+        for j in range(cov.shape[1]):
+            rho[i, j] = cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
+    return rho
+
+
+def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):
+    if ipar is None:
+        ipar = np.arange(rho.shape[0]).astype(int)
+    im = plt.imshow(rho[ipar[:, None], ipar], interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
+    ax.set_title("Correlation matrix")
+    if axis_names is not None:
+        names = [axis_names[ip] for ip in ipar]
+        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=11)
+        plt.yticks(np.arange(ipar.size), names, fontsize=11)
+    cbar = plt.colorbar(im)
+    cbar.ax.tick_params(labelsize=9)
+    plt.gcf().tight_layout()
+
+
+def resolution_operator(cov, Q, reg):
+    N = cov.shape[0]
+    return np.eye(N) - reg * cov @ Q
+
+
+def flip_and_rotate_radec_to_image_xy_coordinates(ra, dec, camera_angle=0, flip_ra_sign=1, flip_dec_sign=1):
+    """Flip and rotate the vectors in pixels along (RA,DEC) directions to (x, y) image coordinates.
+    The parity transformations are applied first, then rotation.
+
+    Parameters
+    ----------
+    ra: array_like
+        Vector coordinates along RA direction.
+    dec: array_like
+        Vector coordinates along DEC direction.
+    camera_angle: float
+        Angle of the camera between y axis and the North Celestial Pole counterclockwise, or equivalently between
+        the x axis and the West direction counterclokwise. Units are degrees. (default: 0).
+    flip_ra_sign: -1, 1, optional
+        Flip RA axis is value is -1 (default: 1).
+    flip_dec_sign: -1, 1, optional
+        Flip DEC axis is value is -1 (default: 1).
+
+    Returns
+    -------
+    x: array_like
+       Vector coordinates along the x direction.
+    y: array_like
+       Vector coordinates along the y direction.
+
+    Examples
+    --------
+
+    >>> from spectractor import parameters
+    >>> parameters.OBS_CAMERA_ROTATION = 180
+    >>> parameters.OBS_CAMERA_DEC_FLIP_SIGN = 1
+    >>> parameters.OBS_CAMERA_RA_FLIP_SIGN = 1
+
+    North vector
+
+    >>> N_ra, N_dec = [0, 1]
+
+    Compute North direction in (x, y) frame
+
+    >>> flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=1)
+    (0.0, 1.0)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 180, flip_ra_sign=1, flip_dec_sign=1)
+    '-0.0, -1.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=1)
+    '-1.0, 0.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=-1)
+    '1.0, -0.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=-1, flip_dec_sign=-1)
+    '1.0, -0.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=-1)
+    '0.0, -1.0'
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=-1, flip_dec_sign=1)
+    '0.0, 1.0'
+
+    """
+    flip = np.array([[flip_ra_sign, 0], [0, flip_dec_sign]], dtype=float)
+    a = - camera_angle * np.pi / 180
+    # minus sign as rotation matrix is apply on the right on the adr vector
+    rotation = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]], dtype=float)
+    transformation = flip @ rotation
+    x, y = (np.asarray([ra, dec]).T @ transformation).T
+    return x, y
+
+
 if __name__ == "__main__":
     import doctest
-    if np.__version__ >= "1.14.0":
-        np.set_printoptions(legacy="1.13")
 
     doctest.testmod()
-
