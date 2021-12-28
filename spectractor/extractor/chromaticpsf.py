@@ -122,6 +122,7 @@ class ChromaticPSF:
     def set_polynomial_degrees(self, deg):
         self.deg = deg
         self.degrees = {key: deg for key in self.psf.param_names}
+        self.degrees["x_c"] = max(self.degrees["x_c"], 1)
         self.degrees['saturation'] = 0
 
     def generate_test_poly_params(self):
