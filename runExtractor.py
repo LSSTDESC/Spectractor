@@ -41,7 +41,7 @@ if __name__ == "__main__":
     logbook = LogBook(logbook=args.logbook)
     for file_name in file_names:
         disperser_label = args.disperser_label
-        if parameters.OBS_NAME == "CTIO":
+        if parameters.OBS_NAME == "CTIO" or parameters.OBS_NAME == "PICDUMIDI":
             tag = file_name.split('/')[-1]
             tag = tag.replace('sim_', 'reduc_')
             disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)

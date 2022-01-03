@@ -243,6 +243,7 @@ class Image(object):
         self.header['OUTPRESS'] = self.pressure
         self.header['OUTHUM'] = self.humidity
         self.header['CCDREBIN'] = parameters.CCD_REBIN
+        print(self.disperser_label, parameters.DISPERSER_DIR)
 
         self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                   data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
@@ -409,10 +410,11 @@ class Image(object):
         if not np.isclose(gain, np.mean(self.gain), rtol=1e-2):
             self.my_logger.warning(f"\n\tFitted gain seems to be different than input gain. "
                                    f"Fit={gain} but average of self.gain is {np.mean(self.gain)}.")
-        if not np.isclose(read_out, np.mean(self.read_out_noise), rtol=1e-2):
-            self.my_logger.warning(f"\n\tFitted read out noise seems to be different than input readout noise. "
-                                   f"Fit={read_out} but average of self.read_out_noise is "
-                                   f"{np.mean(self.read_out_noise)}.")
+        if self.read_out_noise is not None:
+            if not np.isclose(read_out, np.mean(self.read_out_noise), rtol=1e-2):
+                self.my_logger.warning(f"\n\tFitted read out noise seems to be different than input readout noise. "
+                                       f"Fit={read_out} but average of self.read_out_noise is "
+                                       f"{np.mean(self.read_out_noise)}.")
         return fit, x, y, model
 
     def plot_statistical_error(self):
@@ -680,7 +682,15 @@ def load_PDM_image(image):
 
     image.header, image.data = load_fits(image.file_name)
 
-    extract_info_from_PDM_header(image, image.header)
+    image.date_obs = image.header['DATE-OBS']
+    # SDC : note AIRMASS is in logbook, but it will be moved later in reduced image
+    image.airmass = image.header['AIRMASS']
+    # SDC: note reduction already divides by exposure
+    image.expo = image.header['EXPOSURE']
+    # SDC: note information is more in the filename
+    image.filters = image.header['FILTER']
+    image.filter_label = ""
+    # image.disperser_label = image.header['FILTER']
 
     image.header['LSHIFT'] = 0.
     image.header['D2CCD'] = parameters.DISTANCE2CCD
@@ -713,11 +723,15 @@ def load_PDM_image(image):
     image.my_logger.info('\n\tImage loaded')
 
     # retrieve RA and DEC from logbook
-    load_LogBook(image)
+    #load_LogBook(image)
+    #image.disperser_label = disperser_label
+    image.ra = Angle(image.header['RA'], unit="hourangle")
+    image.dec = Angle(image.header['DEC'], unit="deg")
+    image.hour_angle = Angle(image.header['RA'], unit="hourangle")
 
     image.my_logger.warning(f'\n\tload_PDM_image :: coord: ra = {image.header["RA"]} hour ...')
     image.my_logger.warning(f'\n\tload_PDM_image :: coord: dec = {image.header["DEC"]} dec ...')
-    image.my_logger.warning(f'\n\tload_PDM_image :: date: dec = {image.header["DATE-OBS"]} ...')
+    image.my_logger.warning(f'\n\tload_PDM_image :: date: date = {image.header["DATE-OBS"]} ...')
 
 
 
@@ -1366,7 +1380,6 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         >>> assert np.isclose(theta, np.arctan(slope)*180/np.pi, rtol=1e-1)
 
     """
-    image.my_logger.info(f'\n\t compute_rotation_angle_hessian, width_cut={width_cut}....,deg_threshold={deg_threshold}......')
     x0, y0 = np.array(image.target_pixcoords).astype(int)
 
     # extract a region
