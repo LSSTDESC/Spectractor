@@ -381,8 +381,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
 
         A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, B,  *psf = self.p
-        plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
-                     f'D={D:.2f}mm, shift_y={shift_y:.2f}pix, B={B:.3f}', y=1)
+        #plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
+        #             f'D={D:.2f}mm, shift_y={shift_y:.2f}pix, B={B:.3f}', y=1)
         # main plot
         self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
         # zoom O2
