@@ -17,7 +17,6 @@ Spectractor.egg-info/
 build/
 dist/
 *libradtran/
-outputs/
 docs/_build
 *_wcs/
 *.bak
