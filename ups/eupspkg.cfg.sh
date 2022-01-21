@@ -1,3 +1,4 @@
 build() {
-    pip install --prefix="$PREFIX" -e .
+   python setup.py nosetests
+   default_build
 }
