@@ -11,7 +11,7 @@ import unittest
 
 
 # TODO: DM-33441 Fix broken spectractor tests
-@unittest.skipIf(True, 'Skipping to avoid libradtran dependency')
+@unittest.skip('Skipping to avoid libradtran dependency')
 def test_atmosphere():
     a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
     transmission = a.simulate(ozone=400, pwv=5, aerosols=0.05)
@@ -46,7 +46,7 @@ def test_atmosphere():
 
 
 # TODO: DM-33441 Fix broken spectractor tests
-@unittest.skipIf(True, 'Skipping due to broken test (IndexError: list index out of range)')
+@unittest.skip('Skipping due to broken test (IndexError: list index out of range)')
 def test_simulator():
     file_names = ['tests/data/reduc_20170530_134_spectrum.fits']
 

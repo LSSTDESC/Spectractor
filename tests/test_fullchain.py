@@ -181,7 +181,7 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
 
 
 # TODO: DM-33441 Fix broken spectractor tests
-@unittest.skipIf(True, 'Skipping due to broken test (index out of range error)')
+@unittest.skip('Skipping due to broken test (index out of range error)')
 def test_fullchain():
     parameters.VERBOSE = True
     parameters.DEBUG = True

@@ -66,7 +66,7 @@ def test_extractor_ctio():
 
 
 # TODO: DM-33441 Fix broken spectractor tests
-@unittest.skipIf(True, 'Skipping due broken test (TypeError: argument of type bool is not iterable)')
+@unittest.skip('Skipping due broken test (TypeError: argument of type bool is not iterable)')
 def test_extractor_ctio_planetary_nebula():
     file_names = ['tests/data/reduc_20170605_028.fits']
     output_directory = "./outputs"
