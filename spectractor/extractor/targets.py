@@ -202,6 +202,9 @@ class Star(Target):
         2d03m08.598s
 
         """
+        # currently (pending a new release) astroquery has a race
+        # condition at import time, so putting here rather than at the
+        # module level so that multiple test runners don't run the race
         from astroquery.simbad import Simbad
         Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
                                   'parallax', 'pm', 'z_value')
@@ -282,6 +285,10 @@ class Star(Target):
             if 'PNG' not in self.label:
                 # Try with NED query
                 # print 'Loading target %s from NED...' % self.label
+
+                # currently (pending a new release) astroquery has a race
+                # condition at import time, so putting here rather than at the
+                # module level so that multiple test runners don't run the race
                 from astroquery.ned import Ned
                 ned = Ned.query_object(self.label)
                 hdulists = Ned.get_spectra(self.label, show_progress=False)
