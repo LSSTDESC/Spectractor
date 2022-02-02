@@ -2,8 +2,6 @@ from astropy.coordinates import SkyCoord, Distance
 import astropy.units as u
 from astropy.time import Time
 
-from astroquery.ned import Ned
-from astroquery.simbad import Simbad
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 import os
@@ -16,8 +14,6 @@ from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINE
 
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
-
-Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype')
 
 
 def load_target(label, verbose=False):
@@ -206,6 +202,7 @@ class Star(Target):
         2d03m08.598s
 
         """
+        from astroquery.simbad import Simbad
         Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
                                   'parallax', 'pm', 'z_value')
         simbad = Simbad.query_object(self.label)
@@ -285,6 +282,7 @@ class Star(Target):
             if 'PNG' not in self.label:
                 # Try with NED query
                 # print 'Loading target %s from NED...' % self.label
+                from astroquery.ned import Ned
                 ned = Ned.query_object(self.label)
                 hdulists = Ned.get_spectra(self.label, show_progress=False)
                 self.redshift = ned['Redshift'][0]
