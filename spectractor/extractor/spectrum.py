@@ -6,6 +6,7 @@ from iminuit import Minuit
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import astropy
 
 from spectractor import parameters
 from spectractor.config import set_logger, load_config, apply_rebinning_to_parameters
@@ -18,6 +19,22 @@ from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 from spectractor.simulation.throughput import TelescopeTransmission
+
+
+fits_mappings = {'date_obs': 'DATE-OBS',
+                 'expo': 'EXPTIME',
+                 'airmass': 'AIRMASS',
+                 'disperser_label': 'GRATING',
+                 'units': 'UNIT2',
+                 'rotation_angle': 'ROTANGLE',
+                 'dec': 'DEC',
+                 'hour_angle': 'HA',
+                 'temperature': 'OUTTEMP',
+                 'pressure': 'OUTPRESS',
+                 'humidity': 'OUTHUM',
+                 'lambda_ref': 'LBDA_REF',
+                 'parallactic_angle': 'PARANGLE',
+                 }
 
 
 class Spectrum:
@@ -203,6 +220,12 @@ class Spectrum:
         self.lambdas_order2 = None
         self.data_order2 = None
         self.err_order2 = None
+        self.dec = None
+        self.hour_angle = None
+        self.temperature = None
+        self.pressure = None
+        self.humidity = None
+        self.parallactic_angle = None
         self.filename = file_name
         if file_name != "":
             self.load_spectrum(file_name)
@@ -484,6 +507,18 @@ class Spectrum:
                                   'third column the corresponding errors.'
         hdu1 = fits.PrimaryHDU()
         hdu1.header = self.header
+
+        for attribute, header_key in fits_mappings.items():
+            try:
+                value = getattr(self, attribute)
+            except AttributeError:
+                print(f"Failed to get {attribute}")
+                continue
+            if isinstance(value, astropy.coordinates.angles.Angle):
+                value = value.degree
+            hdu1.header[header_key] = value
+            print(f"Set header key {header_key} to {value} from attr {attribute}")
+
         hdu1.header["EXTNAME"] = "SPECTRUM"
         hdu2 = fits.ImageHDU()
         hdu2.header["EXTNAME"] = "SPEC_COV"
@@ -575,42 +610,28 @@ class Spectrum:
             self.data = raw_data[1]
             if len(raw_data) > 2:
                 self.err = raw_data[2]
-            if self.header['DATE-OBS'] != "":
-                self.date_obs = self.header['DATE-OBS']
-            if self.header['EXPTIME'] != "":
-                self.expo = self.header['EXPTIME']
-            if self.header['AIRMASS'] != "":
-                self.airmass = self.header['AIRMASS']
-            if self.header['GRATING'] != "":
-                self.disperser_label = self.header['GRATING']
-            if self.header['TARGET'] != "":
-                self.target = load_target(self.header['TARGET'], verbose=parameters.VERBOSE)
+
+            # set the simple items from the mappings. More complex items, i.e.
+            # those needing function calls, follow
+            for attribute, header_key in fits_mappings.items():
+                if (item := self.header.get(header_key)) is not None:
+                    setattr(self, attribute, item)
+                    print(f'set {attribute} to {item}')
+                else:
+                    print(f'Failed to set spectrum attribute {attribute} using header {header_key}')
+
+            # set the more complex items by hand here
+            if target := self.header.get('TARGET'):
+                self.target = load_target(target, verbose=parameters.VERBOSE)
                 self.lines = self.target.lines
-            if self.header['UNIT2'] != "":
-                self.units = self.header['UNIT2']
-            if self.header['ROTANGLE'] != "":
-                self.rotation_angle = self.header['ROTANGLE']
-            if self.header['TARGETX'] != "" and self.header['TARGETY'] != "":
-                self.x0 = [self.header['TARGETX'], self.header['TARGETY']]
-            if self.header['D2CCD'] != "":
-                parameters.DISTANCE2CCD = float(self.header["D2CCD"])
-            if 'DEC' in self.header and self.header['DEC'] != "":
-                self.dec = self.header['DEC']
-            if 'RA' in self.header and self.header['HA'] != "":
-                self.hour_angle = self.header['HA']
-            if 'OUTTEMP' in self.header and self.header['OUTTEMP'] != "":
-                self.temperature = self.header['OUTTEMP']
-            if 'OUTPRESS' in self.header and self.header['OUTPRESS'] != "":
-                self.pressure = self.header['OUTPRESS']
-            if 'OUTHUM' in self.header and self.header['OUTHUM'] != "":
-                self.humidity = self.header['OUTHUM']
-            if self.header['LBDA_REF'] != "":
-                self.lambda_ref = self.header['LBDA_REF']
-            if 'PARANGLE' in self.header and self.header['PARANGLE'] != "":
-                self.parallactic_angle = self.header['PARANGLE']
-            if 'CCDREBIN' in self.header and self.header['CCDREBIN'] != "":
-                if parameters.CCD_REBIN != self.header['CCDREBIN']:
+            if (targetx := self.header.get('TARGETX')) and (targety := self.header.get('TARGETY')):
+                self.x0 = [targetx, targety]  # should be a tuple not a list
+            if rebin := self.header.get('CCDREBIN'):
+                if parameters.CCD_REBIN != rebin:
                     raise ValueError("Different values of rebinning parameters between config file and header. Choose.")
+                parameters.CCD_REBIN = rebin
+            if dist := self.header.get('D2CCD'):
+                parameters.DISTANCE2CCD = float(dist)
 
             self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
