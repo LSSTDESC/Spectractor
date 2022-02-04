@@ -341,6 +341,8 @@ class Contours(Grid):
             plt.xlabel(self.axis_names[0])
             plt.ylabel(self.axis_names[1])
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 class Likelihood(Grid):
@@ -474,6 +476,8 @@ class Likelihood(Grid):
         if output_filename != '':
             print(f'Save figure: {output_filename}')
             fig.savefig(output_filename, dpi=100, bbox_inches='tight')
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
         return fig
 
     def max_likelihood_stats(self):

@@ -442,6 +442,8 @@ class Spectrum:
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         if parameters.DISPLAY:
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).

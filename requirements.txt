@@ -5,7 +5,7 @@ pandas
 llvmlite #==0.29.0
 numba #==0.44.1
 astropy>=3.2
-photutils
+photutils>=0.7
 astroquery
 coloredlogs
 scikit-image
@@ -21,3 +21,4 @@ coveralls
 pysynphot
 deprecated
 pyyaml
+nose

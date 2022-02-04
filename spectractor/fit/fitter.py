@@ -515,6 +515,8 @@ class FitWorkspace:
         plt.subplots_adjust(hspace=0)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
         figure_name = self.emcee_filename.replace('.h5', '_convergence.pdf')
         print(f'Save figure: {figure_name}')
         fig.savefig(figure_name, dpi=100)
@@ -1209,6 +1211,8 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
         fig.savefig(figname, dpi=100, bbox_inches='tight')
     if parameters.DISPLAY:  # pragma: no cover
         plt.show()
+    if parameters.PdfPages:  # args from the above? MFL
+        parameters.PdfPages.savefig()
 
     fit_workspace.simulate(*fit_workspace.p)
     fit_workspace.live_fit = False

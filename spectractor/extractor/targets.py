@@ -2,8 +2,6 @@ from astropy.coordinates import SkyCoord, Distance
 import astropy.units as u
 from astropy.time import Time
 
-from astroquery.ned import Ned
-from astroquery.simbad import Simbad
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 import os
@@ -16,8 +14,6 @@ from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINE
 
 if os.getenv("PYSYN_CDBS"):
     import pysynphot as S
-
-Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype')
 
 
 def load_target(label, verbose=False):
@@ -206,6 +202,10 @@ class Star(Target):
         2d03m08.598s
 
         """
+        # currently (pending a new release) astroquery has a race
+        # condition at import time, so putting here rather than at the
+        # module level so that multiple test runners don't run the race
+        from astroquery.simbad import Simbad
         Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
                                   'parallax', 'pm', 'z_value')
         simbad = Simbad.query_object(self.label)
@@ -275,7 +275,7 @@ class Star(Target):
                 else:
                     self.wavelengths.append(data.wave)
                     self.spectra.append(data.flux)
-        elif 'HD' in self.label:  # it is a star
+        elif 'HD' in self.label or self.label in parameters.STAR_NAMES:  # it is a star
             self.emission_spectrum = False
             self.hydrogen_only = False
             self.lines = Lines(ATMOSPHERIC_LINES + HYDROGEN_LINES + STELLAR_LINES,
@@ -285,6 +285,11 @@ class Star(Target):
             if 'PNG' not in self.label:
                 # Try with NED query
                 # print 'Loading target %s from NED...' % self.label
+
+                # currently (pending a new release) astroquery has a race
+                # condition at import time, so putting here rather than at the
+                # module level so that multiple test runners don't run the race
+                from astroquery.ned import Ned
                 ned = Ned.query_object(self.label)
                 hdulists = Ned.get_spectra(self.label, show_progress=False)
                 self.redshift = ned['Redshift'][0]
@@ -391,6 +396,8 @@ class Star(Target):
         plt.legend()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 if __name__ == "__main__":

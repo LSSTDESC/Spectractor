@@ -154,6 +154,7 @@ SAVE = False
 # Verbosity
 VERBOSE = False
 DEBUG = False
+DEBUG_LOGGING = False
 MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
 
 # Plots
