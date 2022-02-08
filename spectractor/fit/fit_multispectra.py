@@ -602,6 +602,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             ax[i, 1].get_yaxis().set_label_coords(2.6, 0.5)
             ax[i, 0].get_yaxis().set_label_coords(-0.06, 0.5)
         fig.tight_layout()
+        if parameters.SAVE:
+            fig.savefig(self.output_file_name + '_bestfit.pdf', dpi=100, bbox_inches='tight')
         if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
@@ -609,8 +611,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         else:  # pragma: no cover
             if parameters.DISPLAY and self.verbose:
                 plt.show()
-        if parameters.SAVE:
-            fig.savefig(self.output_file_name + '_bestfit.pdf', dpi=100, bbox_inches='tight')
 
     def plot_transmissions(self):
         """Plot the fit result for transmissions.

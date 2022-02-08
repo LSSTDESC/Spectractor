@@ -290,7 +290,7 @@ class SpectrumFitWorkspace(FitWorkspace):
             if parameters.SAVE:
                 figname = self.filename.replace('.fits', '_bestfit.pdf')
                 self.my_logger.info(f'Save figure {figname}.')
-                fig.savefig(figname, dpi=100, bbox_inches='tight')
+                fig.savefig(figname, dpi=100, bbox_inches='tight', transparent=True)
 
     def decontaminate_order2(self):  # pragma: no cover
         lambdas = self.spectrum.lambdas

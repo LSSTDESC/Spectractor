@@ -377,6 +377,7 @@ class Spectrum:
         ax.legend(loc='best')
         if self.filters is not None:
             ax.get_legend().set_title(self.filters)
+        plt.gcf().tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, f'{self.target.label}_spectrum.pdf'))
         if parameters.DISPLAY:

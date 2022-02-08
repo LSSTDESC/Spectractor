@@ -514,7 +514,7 @@ class Image(object):
         plt.legend()
         plt.gcf().tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'))
+            plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'), transparent=True)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
 
