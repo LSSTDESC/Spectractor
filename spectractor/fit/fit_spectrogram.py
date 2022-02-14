@@ -406,7 +406,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if parameters.SAVE:
             figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
             self.my_logger.info(f"\n\tSave figure {figname}.")
-            fig.savefig(figname, dpi=100, bbox_inches='tight')
+            fig.savefig(figname, dpi=100, bbox_inches='tight', transparent=True)
 
 
 def lnprob_spectrogram(p):  # pragma: no cover
