@@ -2330,10 +2330,10 @@ def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):
     ax.set_title("Correlation matrix")
     if axis_names is not None:
         names = [axis_names[ip] for ip in ipar]
-        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=11)
-        plt.yticks(np.arange(ipar.size), names, fontsize=11)
+        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=9)
+        plt.yticks(np.arange(ipar.size), names, fontsize=7)
     cbar = plt.colorbar(im)
-    cbar.ax.tick_params(labelsize=9)
+    cbar.ax.tick_params(labelsize=7)
     plt.gcf().tight_layout()
 
 
