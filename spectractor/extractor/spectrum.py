@@ -140,7 +140,9 @@ class Spectrum:
         Size of the spectrogram along the y axis.
     """
 
-    def __init__(self, file_name="", image=None, order=1, target=None, config="", fast_load=False):
+    def __init__(self, file_name="", image=None, order=1, target=None, config="", fast_load=False,
+                 spectrogram_file_name_override=None,
+                 psf_file_name_override=None,):
         """ Class used to store information and methods relative to spectra and their extraction.
 
         Parameters
@@ -228,7 +230,7 @@ class Spectrum:
         self.parallactic_angle = None
         self.filename = file_name
         if file_name != "":
-            self.load_spectrum(file_name)
+            self.load_spectrum(file_name, spectrogram_file_name_override, psf_file_name_override)
         if image is not None:
             self.header = image.header
             self.date_obs = image.date_obs
@@ -588,13 +590,19 @@ class Spectrum:
         hdu.writeto(output_file_name, overwrite=overwrite)
         self.my_logger.info('\n\tSpectrogram saved in %s' % output_file_name)
 
-    def load_spectrum(self, input_file_name):
+    def load_spectrum(self, input_file_name, spectrogram_file_name_override, psf_file_name_override):
         """Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
         ----------
         input_file_name: str
             Path to the input fits file
+
+        spectrogram_file_name_override : str
+            Manually specify a path to the spectrogram file.
+
+        psf_file_name_override : str
+            Manually specify a path to the psf file.
 
         Examples
         --------
@@ -637,7 +645,6 @@ class Spectrum:
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                       data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
             self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
-            spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
             if parameters.OBS_OBJECT_TYPE == "STAR":
                 self.adr_params = [self.dec, self.hour_angle, self.temperature,
                                    self.pressure, self.humidity, self.airmass]
@@ -653,13 +660,25 @@ class Spectrum:
                         self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
             else:
                 self.cov_matrix = np.diag(self.err ** 2)
+
+            # original, hard-coded spectrogram/table relative paths
+            spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
+            psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
+
+            # for LSST-DM supplied filenames
+            if spectrogram_file_name_override and psf_file_name_override:
+                self.fast_load = False
+                spectrogram_file_name = spectrogram_file_name_override
+                psf_file_name = psf_file_name_override
+                self.my_logger.info(f'Applying spectrogram filename override {spectrogram_file_name}')
+                self.my_logger.info(f'Applying psf filename override {psf_file_name}')
+
             if not self.fast_load:
                 self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
                 if os.path.isfile(spectrogram_file_name):
                     self.load_spectrogram(spectrogram_file_name)
                 else:
                     raise FileNotFoundError(f"Spectrogram file {spectrogram_file_name} does not exist.")
-                psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
                 self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
                 if os.path.isfile(psf_file_name):
                     self.load_chromatic_psf(psf_file_name)
