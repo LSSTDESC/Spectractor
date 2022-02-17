@@ -26,3 +26,5 @@ spectractor/version.py
 .sconsign.dblite
 config.log
 tests/.tests/
+*__pycache__/
+
