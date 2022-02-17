@@ -230,7 +230,9 @@ class Spectrum:
         self.parallactic_angle = None
         self.filename = file_name
         if file_name != "":
-            self.load_spectrum(file_name, spectrogram_file_name_override, psf_file_name_override)
+            self.load_spectrum(file_name,
+                               spectrogram_file_name_override=spectrogram_file_name_override,
+                               psf_file_name_override=psf_file_name_override)
         if image is not None:
             self.header = image.header
             self.date_obs = image.date_obs
@@ -590,7 +592,8 @@ class Spectrum:
         hdu.writeto(output_file_name, overwrite=overwrite)
         self.my_logger.info('\n\tSpectrogram saved in %s' % output_file_name)
 
-    def load_spectrum(self, input_file_name, spectrogram_file_name_override, psf_file_name_override):
+    def load_spectrum(self, input_file_name, spectrogram_file_name_override=None,
+                      psf_file_name_override=None):
         """Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
