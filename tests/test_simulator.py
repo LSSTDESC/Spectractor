@@ -1,13 +1,16 @@
-from numpy.testing import run_module_suite
-import numpy as np
+import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
+mpl.use('Agg')
 
-from spectractor import parameters
-from spectractor.simulation.simulator import (SpectrumSimulatorSimGrid, SpectrumSimulator,
-                                              Atmosphere, AtmosphereGrid, SpectrogramSimulator)
-from spectractor.simulation.image_simulation import ImageSim
-from spectractor.config import load_config
-import os
-import unittest
+from numpy.testing import run_module_suite  # noqa: E402
+import numpy as np  # noqa: E402
+
+from spectractor import parameters  # noqa: E402
+from spectractor.simulation.simulator import (SpectrumSimulatorSimGrid, SpectrumSimulator,  # noqa: E402
+                                              Atmosphere, AtmosphereGrid, SpectrogramSimulator)  # noqa: E402
+from spectractor.simulation.image_simulation import ImageSim  # noqa: E402
+from spectractor.config import load_config  # noqa: E402
+import os  # noqa: E402
+import unittest  # noqa: E402
 
 
 # TODO: DM-33441 Fix broken spectractor tests

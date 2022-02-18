@@ -1,13 +1,16 @@
-from numpy.testing import run_module_suite
+import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
+mpl.use('Agg')
 
-from spectractor import parameters
-from spectractor.extractor.extractor import Spectractor
-from spectractor.logbook import LogBook
-from spectractor.config import load_config, apply_rebinning_to_parameters
-import os
-import sys
-import numpy as np
-import unittest
+from numpy.testing import run_module_suite  # noqa: E402
+
+from spectractor import parameters  # noqa: E402
+from spectractor.extractor.extractor import Spectractor  # noqa: E402
+from spectractor.logbook import LogBook  # noqa: E402
+from spectractor.config import load_config, apply_rebinning_to_parameters  # noqa: E402
+import os  # noqa: E402
+import sys  # noqa: E402
+import numpy as np  # noqa: E402
+import unittest  # noqa: E402
 
 
 def test_logbook():
