@@ -1,10 +1,15 @@
-from numpy.testing import run_module_suite
-import numpy as np
-from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_emcee, run_minimisation_sigma_clipping
-from spectractor.config import set_logger
-from spectractor import parameters
+import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
+mpl.use('Agg')
 
-import os
+from numpy.testing import run_module_suite  # noqa: E402
+import numpy as np  # noqa: E402
+from spectractor.fit.fitter import (FitWorkspace, run_minimisation,  # noqa: E402
+                                    run_emcee, run_minimisation_sigma_clipping)  # noqa: E402
+from spectractor.config import set_logger  # noqa: E402
+from spectractor import parameters  # noqa: E402
+
+import os  # noqa: E402
+
 
 
 class LineFitWorkspace(FitWorkspace):

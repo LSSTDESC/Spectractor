@@ -1,3 +1,1 @@
-setupRequired(sconsUtils)
-
-envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
+envPrepend(PYTHONPATH, ${PRODUCT_DIR}/lib/python)

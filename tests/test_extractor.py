@@ -1,12 +1,16 @@
-from numpy.testing import run_module_suite
+import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
+mpl.use('Agg')
 
-from spectractor import parameters
-from spectractor.extractor.extractor import Spectractor
-from spectractor.logbook import LogBook
-from spectractor.config import load_config, apply_rebinning_to_parameters
-import os
-import numpy as np
-import unittest
+from numpy.testing import run_module_suite  # noqa: E402
+
+from spectractor import parameters  # noqa: E402
+from spectractor.extractor.extractor import Spectractor  # noqa: E402
+from spectractor.logbook import LogBook  # noqa: E402
+from spectractor.config import load_config, apply_rebinning_to_parameters  # noqa: E402
+import os  # noqa: E402
+import sys  # noqa: E402
+import numpy as np  # noqa: E402
+import unittest  # noqa: E402
 
 
 def test_logbook():
@@ -21,6 +25,7 @@ def test_logbook():
     # logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
 
 
+@unittest.skipIf(sys.platform != "darwin", 'Skipping full test for speed unless on macOS')
 def test_extractor_ctio():
     file_names = ['tests/data/reduc_20170530_134.fits']
     output_directory = "./outputs"
@@ -111,6 +116,7 @@ def test_extractor_ctio_planetary_nebula():
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
 
 
+@unittest.skipIf(sys.platform != "darwin", 'Skipping full test for speed unless on macOS')
 def extractor_auxtel():
     file_names = ['tests/data/calexp_2020031500162-EMPTY_ronchi90lpmm-det000.fits']  # image 1
     # file_names = ['tests/data/calexp_2020031200313-EMPTY_ronchi90lpmm-det000.fits']  # image 2

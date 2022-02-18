@@ -1,20 +1,25 @@
-from numpy.testing import run_module_suite
-from scipy.interpolate import interp1d
+import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
+mpl.use('Agg')
 
-from spectractor import parameters
-from spectractor.extractor.images import Image
-from spectractor.extractor.spectrum import Spectrum
-from spectractor.extractor.extractor import Spectractor
-from spectractor.logbook import LogBook
-from spectractor.config import load_config
-from spectractor.simulation.image_simulation import ImageSim
-from spectractor.tools import plot_spectrum_simple
-from spectractor.fit.fit_spectrum import SpectrumFitWorkspace, run_spectrum_minimisation
-from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace, run_spectrogram_minimisation
-import os
-import numpy as np
-import matplotlib.pyplot as plt
-import unittest
+from numpy.testing import run_module_suite  # noqa: E402
+from scipy.interpolate import interp1d  # noqa: E402
+
+from spectractor import parameters  # noqa: E402
+from spectractor.extractor.images import Image  # noqa: E402
+from spectractor.extractor.spectrum import Spectrum  # noqa: E402
+from spectractor.extractor.extractor import Spectractor  # noqa: E402
+from spectractor.logbook import LogBook  # noqa: E402
+from spectractor.config import load_config  # noqa: E402
+from spectractor.simulation.image_simulation import ImageSim  # noqa: E402
+from spectractor.tools import plot_spectrum_simple  # noqa: E402
+from spectractor.fit.fit_spectrum import SpectrumFitWorkspace, run_spectrum_minimisation  # noqa: E402
+from spectractor.fit.fit_spectrogram import (SpectrogramFitWorkspace,  # noqa: E402
+                                             run_spectrogram_minimisation)  # noqa: E402
+import os  # noqa: E402
+import numpy as np  # noqa: E402
+import matplotlib.pyplot as plt  # noqa: E402
+import unittest  # noqa: E402
+
 
 PSF_POLY_ORDER = 2
 PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
