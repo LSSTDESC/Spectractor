@@ -9,7 +9,8 @@ from spectractor.config import set_logger  # noqa: E402
 from spectractor import parameters  # noqa: E402
 
 import os  # noqa: E402
-
+import sys  # noqa: E402
+import unittest  # noqa: E402
 
 
 class LineFitWorkspace(FitWorkspace):
@@ -35,6 +36,8 @@ class LineFitWorkspace(FitWorkspace):
         return self.x, self.model, self.model_err
 
 
+@unittest.skipIf(sys.platform == "darwin", 'Skipping because macOS 11.0 passes but 10.15 fails '
+                 'some np.all() asserts in this package. Attempt to turn back on as part of DM-33747.')
 def test_fitworkspace():
     # Create mock data
     N = 100
@@ -84,6 +87,8 @@ def test_fitworkspace():
     assert np.all([np.abs(w.p[i] - truth[i]) / np.sqrt(w.cov[i, i]) < 3 for i in range(w.ndim)])
 
 
+@unittest.skipIf(sys.platform == "darwin", 'Skipping because macOS 11.0 passes but 10.15 fails '
+                 'some np.all() asserts in this package. Attempt to turn back on as part of DM-33747.')
 def test_minimisation_sigma_clipping():
     # Create mock data
     N = 100
