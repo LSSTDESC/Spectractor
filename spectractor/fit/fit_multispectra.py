@@ -560,7 +560,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         gs_kw = dict(width_ratios=[3, 0.13], height_ratios=[1, 1, 1])
         fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(7, 6), gridspec_kw=gs_kw)
         ozone, pwv, aerosols, reso, *A1s = self.p
-        plt.suptitle(f'VAOD={aerosols:.3f}, ozone={ozone:.0f}db, PWV={pwv:.2f}mm, reso={reso:.2f}', y=0.995)
+        #plt.suptitle(f'VAOD={aerosols:.3f}, ozone={ozone:.0f}db, PWV={pwv:.2f}mm, reso={reso:.2f}', y=0.995)
         norm = np.nanmax(data)
         y = np.arange(0, self.nspectra+1).astype(int) - 0.5
         xx, yy = np.meshgrid(self.lambdas[0], y)
@@ -677,6 +677,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             ax[1, 1].remove()
         ax[0, 1].legend()
         fig.tight_layout()
+        if parameters.SAVE:
+            fig.savefig(self.output_file_name + '_Tinst_best_fit.pdf', dpi=100, bbox_inches='tight')
         if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
@@ -684,8 +686,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         else:  # pragma: no cover
             if parameters.DISPLAY and self.verbose:
                 plt.show()
-        if parameters.SAVE:
-            fig.savefig(self.output_file_name + '_Tinst_best_fit.pdf', dpi=100, bbox_inches='tight')
 
     def plot_A1s(self):
         """
