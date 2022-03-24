@@ -98,7 +98,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
                                                 (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
-                                                (-10 * parameters.CCD_PIXEL2ARCSEC, 10 * parameters.PIXSHIFT_PRIOR),
+                                                (-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR),
                                                 (-90, 90), (0.2, 5), (-360, 360)]), psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
