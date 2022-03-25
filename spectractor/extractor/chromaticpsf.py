@@ -80,8 +80,15 @@ class ChromaticPSF:
         self.y0 = y0
         self.profile_params = np.zeros((Nx, len(self.psf.param_names)))
         self.pixels = np.mgrid[:Nx, :Ny]
+        self.init_table(file_name=file_name, saturation=saturation)
+        self.opt_reg = parameters.PSF_FIT_REG_PARAM
+        self.cov_matrix = np.zeros((Nx, Nx))
+        if file_name != "":
+            self.poly_params = self.from_table_to_poly_params()
+
+    def init_table(self, file_name='', saturation=None):
         if file_name == '':
-            arr = np.zeros((Nx, len(self.psf.param_names) + 10))
+            arr = np.zeros((self.Nx, len(self.psf.param_names) + 10))
             self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
                                            'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(
                 self.psf.param_names))
@@ -111,14 +118,11 @@ class ChromaticPSF:
                     self.poly_params_labels.append(f"{p}_{k}")
                     self.poly_params_names.append("$" + self.psf.axis_names[ip].replace("$", "")
                                                   + "^{(" + str(k) + ")}$")
-        self.opt_reg = parameters.PSF_FIT_REG_PARAM
-        self.cov_matrix = np.zeros((Nx, Nx))
-        if file_name != "":
-            self.poly_params = self.from_table_to_poly_params()
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg
         self.degrees = {key: deg for key in self.psf.param_names}
+        self.degrees["x_c"] = max(self.degrees["x_c"], 1)
         self.degrees['saturation'] = 0
 
     def generate_test_poly_params(self):
@@ -1120,6 +1124,7 @@ class ChromaticPSF:
                 w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
                 w_reg.run_regularisation()
                 w.reg = np.copy(w_reg.opt_reg)
+                w.trace_r = np.trace(w_reg.resolution)
                 self.opt_reg = w_reg.opt_reg
                 w.simulate(*w.p)
                 if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
@@ -1244,6 +1249,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.amplitude_priors_method = amplitude_priors_method
         self.fwhm_priors = np.copy(self.chromatic_psf.table['fwhm'])
         self.reg = parameters.PSF_FIT_REG_PARAM
+        self.trace_r = -1
         self.Q = np.zeros((self.Nx, self.Nx))
         self.Q_dot_A0 = np.zeros(self.Nx)
         if amplitude_priors_method not in self.amplitude_priors_list:
@@ -1312,6 +1318,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         ax[3, 0].legend(fontsize=7)
         ax[3, 0].set_xlim((0, data.shape[1]))
         ax[3, 0].grid(True)
+        fig.tight_layout()
         if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)

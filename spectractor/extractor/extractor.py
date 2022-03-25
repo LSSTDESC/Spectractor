@@ -96,12 +96,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.p = np.concatenate([self.p, self.psf_poly_params])
         self.input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]",
                              r"angle [deg]", "B", "R"] + list(self.psf_poly_params_labels)
-        self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
-                           r"$\theta$ [deg]", "$B$", "R"] + list(self.psf_poly_params_names)
+        self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^(\mathrm{fit})$ [pix]",
+                           r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]",
+                           r"$\alpha$ [deg]", "$B$", "R"] + list(self.psf_poly_params_names)
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
                                                 (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
-                                                (-10 * parameters.CCD_PIXEL2ARCSEC, 10 * parameters.PIXSHIFT_PRIOR),
+                                                (-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR),
                                                 (-90, 90), (0.2, 5), (-360, 360)]), psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
@@ -110,7 +111,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # This set of fixed parameters was determined so that the reconstructed spectrum has a ZERO bias
         # with respect to the true spectrum injected in the simulation
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        self.fixed[0] = not self.spectrum.disperser.flat_ratio_order_2over1
+        self.fixed[0] = (not self.spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in self.spectrum.header))
         self.fixed[1] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_pectrum
         self.fixed[2] = True  # delta x: if False, extracted spectrum is biased compared with truth
         # self.fixed[3] = True  # delta y
@@ -578,9 +579,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
 
-        A2, D2CCD, dx0, dy0, angle, B, rot, *poly_params = self.p
-        plt.suptitle(f'A2={A2:.3f}, D={D2CCD:.2f}mm, shift_x={dx0:.3f}pix, shift_y={dy0:.3f}pix, '
-                     f'angle={angle:.2f}pix, B={B:.3f}', y=1)
+        # A2, D2CCD, dx0, dy0, angle, B, rot, *poly_params = self.p
+        # plt.suptitle(f'A2={A2:.3f}, D={D2CCD:.2f}mm, shift_x={dx0:.3f}pix, shift_y={dy0:.3f}pix, '
+        #              f'angle={angle:.2f}pix, B={B:.3f}', y=1)
         # main plot
         self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
         # zoom O2
@@ -594,6 +595,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             for j in range(1, 3):
                 ax[i, 2 * j].set_ylabel("")
         fig.tight_layout()
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            figname = os.path.join(parameters.LSST_SAVEFIGPATH, f'ffm_bestfit.pdf')
+            self.my_logger.info(f"\n\tSave figure {figname}.")
+            fig.savefig(figname, dpi=100, bbox_inches='tight')
+            gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
+            fig2, ax2 = plt.subplots(nrows=4, ncols=2, figsize=(6, 8), gridspec_kw=gs_kw)
+            self.plot_spectrogram_comparison_simple(ax2, title='Spectrogram model', dispersion=True)
+            # plt.delaxes(ax2[3, 1])
+            fig2.tight_layout()
+            figname = os.path.join(parameters.LSST_SAVEFIGPATH, f'ffm_bestfit_2.pdf')
+            self.my_logger.info(f"\n\tSave figure {figname}.")
+            fig2.savefig(figname, dpi=100, bbox_inches='tight')
         if self.live_fit:  # pragma: no cover
             plt.draw()
             plt.pause(1e-8)
@@ -601,10 +614,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         else:
             if parameters.DISPLAY and self.verbose:
                 plt.show()
-        if parameters.SAVE:  # pragma: no cover
-            figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
-            self.my_logger.info(f"\n\tSave figure {figname}.")
-            fig.savefig(figname, dpi=100, bbox_inches='tight')
 
     def adjust_spectrogram_position_parameters(self):
         # fit the spectrogram trace
@@ -956,8 +965,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     if ws is None:
         ws = [signal_width + 20, signal_width + 30]
     my_logger.info(
-        f'\n\tExtracting spectrum from image: spectrum with width 2*{signal_width:d} pixels '
-        f'and background from {ws[0]:d} to {ws[1]:d} pixels')
+        f'\n\tExtracting spectrum from image: spectrum with width 2*{signal_width:.0f} pixels '
+        f'and background from {ws[0]:.0f} to {ws[1]:.0f} pixels')
 
     # Make a data copy
     data = np.copy(image.data_rotated)[:, 0:right_edge]
@@ -1254,6 +1263,8 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
     s.table['Dy_fwhm_sup'] = s.table['Dy'] + 0.5 * s.table['fwhm']
     spectrum.chromatic_psf = s
     spectrum.header['PSF_REG'] = s.opt_reg
+    spectrum.header['TRACE_R'] = w.trace_r
+    spectrum.header['MEANFWHM'] = np.mean(np.array(s.table['fwhm']))
 
     # Plot FHWM(lambda)
     if parameters.DEBUG:
@@ -1292,7 +1303,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
     s0.from_profile_params_to_shape_params(s0.profile_params)
     gs_kw = dict(width_ratios=[2, 1], height_ratios=[2, 1])
-    fig, ax = plt.subplots(2, 2, figsize=(9, 5), sharex="all", gridspec_kw=gs_kw)
+    fig, ax = plt.subplots(2, 2, figsize=(11, 5), sharex="all", gridspec_kw=gs_kw)
     ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth")
     amplitude_priors_err = [np.sqrt(w.amplitude_priors_cov_matrix[x, x]) for x in range(w.Nx)]
     ax[0, 0].errorbar(spectrum.lambdas, w.amplitude_priors, yerr=amplitude_priors_err, label="prior")
@@ -1340,5 +1351,5 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     if parameters.DISPLAY:
         plt.show()
     if parameters.LSST_SAVEFIGPATH:
-        fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'deconvolution_truth.pdf'))
+        fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'deconvolution_truth.pdf'), transparent=True)
     plt.show()

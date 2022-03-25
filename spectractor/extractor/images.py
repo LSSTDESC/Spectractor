@@ -514,8 +514,9 @@ class Image(object):
         if parameters.OBS_OBJECT_TYPE == "STAR":
             plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
         plt.legend()
+        plt.gcf().tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'))
+            plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'), transparent=True)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         if parameters.PdfPages:
@@ -1220,7 +1221,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         im = ax1.imshow(theta_mask, origin='lower', cmap=cmap, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
         cb = plt.colorbar(im, ax=ax1)
         cb.set_label(parameters.PLOT_ROT_LABEL, labelpad=-10)
-        ax1.plot(x_new, y_new, 'k-', label=rf"Mean dispersion axis: $\varphi_d$={theta_median:.2f}°")
+        ax1.plot(x_new, y_new, 'k-', label=rf"Mean dispersion axis: $\alpha$={theta_median:.2f}°")
         ax1.set_ylim(0, theta_mask.shape[0])
         ax1.set_xlim(0, theta_mask.shape[1])
         ax1.legend()

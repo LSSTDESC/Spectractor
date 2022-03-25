@@ -580,8 +580,13 @@ class FitWorkspace:
         fig = plt.figure()
         self.rho = compute_correlation_matrix(self.cov)
         plot_correlation_matrix_simple(plt.gca(), self.rho, axis_names=[self.axis_names[i] for i in ipar])
-        if parameters.SAVE and self.filename != "":  # pragma: no cover
+        fig.tight_layout()
+        if (parameters.SAVE or parameters.LSST_SAVEFIGPATH) and self.filename != "":  # pragma: no cover
             figname = os.path.splitext(self.filename)[0] + "_correlation.pdf"
+            self.my_logger.info(f"Save figure {figname}.")
+            fig.savefig(figname, dpi=100, bbox_inches='tight')
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            figname = os.path.join(parameters.LSST_SAVEFIGPATH, "parameters_correlation.pdf")
             self.my_logger.info(f"Save figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
         if parameters.DISPLAY:  # pragma: no cover
@@ -1550,6 +1555,7 @@ class RegFitWorkspace(FitWorkspace):
         plot_correlation_matrix_simple(plt.gca(), rho, axis_names=[''] * len(self.w.amplitude_params))
         # ipar=np.arange(10, 20))
         plt.gca().set_title(r"Correlation matrix $\mathbf{\rho}$")
+        fig.tight_layout()
         if parameters.LSST_SAVEFIGPATH:
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'amplitude_correlation_matrix.pdf'))
         if parameters.DISPLAY:
