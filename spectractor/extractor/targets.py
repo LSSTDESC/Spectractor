@@ -215,7 +215,7 @@ class Star(Target):
                 self.my_logger.info(f'\n\tSimbad:\n{simbad}')
             self.radec_position = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(u.hourangle, u.deg))
         else:
-           self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
+            self.my_logger.warning(f'Target {self.label} not found in Simbad')
         self.get_radec_position_after_pm(date_obs="J2000")
         if not np.ma.is_masked(simbad['Z_VALUE']):
             self.redshift = float(simbad['Z_VALUE'])
@@ -253,9 +253,9 @@ class Star(Target):
         if os.getenv("PYSYN_CDBS") is not None:
             dirname = os.path.expandvars('$PYSYN_CDBS/calspec/')
             for fname in os.listdir(dirname):
-                if os.path.isfile(dirname + fname):
-                    if self.label.lower() in fname.lower():
-                        file_names.append(dirname + fname)
+                if os.path.isfile(os.path.join(dirname, fname)):
+                    if self.label.lower().replace(' ','') in fname.lower():
+                        file_names.append(os.path.join(dirname, fname))
         if len(file_names) > 0:
             is_calspec = True
             self.emission_spectrum = False
