@@ -281,13 +281,14 @@ class Star(Target):
             self.lines = Lines(ATMOSPHERIC_LINES + HYDROGEN_LINES + STELLAR_LINES,
                                redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
-        else:
-            if 'PNG' not in self.label:
-                # Try with NED query
-                # print 'Loading target %s from NED...' % self.label
-                ned = Ned.query_object(self.label)
-                hdulists = Ned.get_spectra(self.label, show_progress=False)
-                self.redshift = ned['Redshift'][0]
+        elif 'PNG' in self.label:
+            self.emission_spectrum = True
+            self.lines = Lines(ATMOSPHERIC_LINES + ISM_LINES + HYDROGEN_LINES,
+                               redshift=self.redshift, emission_spectrum=self.emission_spectrum,
+                               hydrogen_only=self.hydrogen_only)
+        else:  # maybe a quasar, try with NED query
+            hdulists = Ned.get_spectra(self.label, show_progress=False)
+            if len(hdulists) > 0:
                 self.emission_spectrum = True
                 self.hydrogen_only = False
                 if self.redshift > 0.2:
@@ -321,11 +322,6 @@ class Star(Target):
                             self.wavelengths.append(waves)
                     else:
                         self.wavelengths.append(waves)
-            else:
-                self.emission_spectrum = True
-                self.lines = Lines(ATMOSPHERIC_LINES+ISM_LINES+HYDROGEN_LINES,
-                                   redshift=self.redshift, emission_spectrum=self.emission_spectrum,
-                                   hydrogen_only=self.hydrogen_only)
         self.build_sed()
         self.my_logger.debug(f"\n\tTarget label: {self.label}"
                              f"\n\tCalspec? {is_calspec}"
