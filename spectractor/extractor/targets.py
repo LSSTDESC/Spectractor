@@ -289,6 +289,7 @@ class Star(Target):
                                redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
         else:  # maybe a quasar, try with NED query
+            from astroquery.ned import Ned
             hdulists = Ned.get_spectra(self.label, show_progress=False)
             if len(hdulists) > 0:
                 self.emission_spectrum = True
