@@ -414,6 +414,8 @@ class SpectrogramModel(Spectrum):
             plt.title(f"x0={new_x0}")
             plt.legend()
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
         return self.lambdas, self.lambdas_order2, dispersion_law, dispersion_law_order2
 
@@ -570,6 +572,9 @@ class SpectrogramModel(Spectrum):
             # ax[2].legend()
             fig.tight_layout()
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
+
         return self.lambdas, self.data, self.err
 
 

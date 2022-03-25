@@ -403,6 +403,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         else:
             if parameters.DISPLAY and self.verbose:
                 plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
         if parameters.SAVE:
             figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
             self.my_logger.info(f"\n\tSave figure {figname}.")

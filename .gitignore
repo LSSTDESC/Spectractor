@@ -17,9 +17,14 @@ Spectractor.egg-info/
 build/
 dist/
 *libradtran/
-outputs/
 docs/_build
 *_wcs/
 *.bak
 *.backup
 *.h5
+spectractor/version.py
+.sconsign.dblite
+config.log
+tests/.tests/
+*__pycache__/
+

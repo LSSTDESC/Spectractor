@@ -18,6 +18,10 @@ from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colo
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 from spectractor.fit.fitter import run_minimisation, run_minimisation_sigma_clipping, RegFitWorkspace, FitWorkspace
 
+def dumpParameters():
+    for item in dir(parameters):
+        if not item.startswith("__"):
+            print(item, getattr(parameters, item))
 
 class FullForwardModelFitWorkspace(FitWorkspace):
 
@@ -776,9 +780,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
     return w.spectrum
 
-
-def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config="",
-                atmospheric_lines=True):
+def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='./config/ctio.ini',
+                atmospheric_lines=True, line_detection=True):
     """ Spectractor
     Main function to extract a spectrum from an image
 
