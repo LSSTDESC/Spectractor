@@ -625,7 +625,7 @@ class Hologram(Grating):
         """
         Grating.__init__(self, 350, D=D, label=label, data_dir=data_dir, verbose=False)
         self.holo_center = None  # center of symmetry of the hologram interferences in pixels
-        self.theta = None  # interpolated rotation angle map of the hologram from data in degrees
+        self.theta_interp = None  # interpolated rotation angle map of the hologram from data in degrees
         self.theta_data = None  # rotation angle map data of the hologram from data in degrees
         self.theta_x = None  # x coordinates for the interpolated rotation angle map
         self.theta_y = None  # y coordinates for the interpolated rotation angle map
@@ -670,10 +670,33 @@ class Hologram(Grating):
 
         if x[0] < np.min(self.N_x) or x[0] > np.max(self.N_x) \
                 or x[1] < np.min(self.N_y) or x[1] > np.max(self.N_y):
-            N = self.N_fit(x[0], x[1])
+            N = float(self.N_fit(*x))
         else:
-            N = int(self.N_interp(x))
+            N = int(self.N_interp(*x))
         return N
+
+    def theta(self, x):
+        """Return the mean dispersion angle of the grating at position x.
+
+        Parameters
+        ----------
+        x: float, array
+            The [x,y] pixel position on the CCD.
+
+        Returns
+        -------
+        theta: float
+            The mean dispersion angle at position x in degrees.
+
+        Examples
+        --------
+        >>> h = Hologram('HoloPhP')
+        >>> h.theta((500,500))
+        -1.3393287109201792
+        >>> h.theta((0,0))
+        -2.0936702173289983
+        """
+        return float(self.theta_interp(*x))
 
     def load_specs(self, verbose=True):
         """Load the files in data_dir/label/ to set the main
@@ -699,13 +722,10 @@ class Hologram(Grating):
 
         The files do not exist:
 
-        >>> h = Hologram(label='XXX')
-        >>> h.N((500,500))
-        350
-        >>> h.theta((500,500))
-        0
-        >>> h.holo_center
-        [1024.0, 1024.0]
+        >>> h = Hologram(label='XXX')  # doctest: +ELLIPSIS
+        Traceback (most recent call last):
+        ...
+        FileNotFoundError:...
 
         """
         if verbose:
@@ -717,9 +737,8 @@ class Hologram(Grating):
             if parameters.CCD_REBIN > 1:
                 self.N_x /= parameters.CCD_REBIN
                 self.N_y /= parameters.CCD_REBIN
-            N_interp = interpolate.interp2d(self.N_x, self.N_y, self.N_data, kind='cubic')
+            self.N_interp = interpolate.interp2d(self.N_x, self.N_y, self.N_data, kind='cubic')
             self.N_fit = fit_poly2d(self.N_x, self.N_y, self.N_data, order=2)
-            self.N_interp = lambda x: float(N_interp(x[0], x[1]))
         else:
             self.is_hologram = False
             self.N_x = np.arange(0, parameters.CCD_IMSIZE)
@@ -727,8 +746,11 @@ class Hologram(Grating):
             filename = self.data_dir + self.label + "/N.txt"
             if os.path.isfile(filename):
                 a = np.loadtxt(filename)
-                self.N_interp = lambda x: a[0]
-                self.N_fit = lambda x, y: a[0]
+
+                def N_func(x, y):
+                    return a[0]
+                self.N_interp = N_func
+                self.N_fit = N_func
             else:
                 raise ValueError("To define an hologram, you must provide hologram_grooves_per_mm.txt or N.txt files.")
         filename = self.data_dir + self.label + "/hologram_center.txt"
@@ -746,10 +768,11 @@ class Hologram(Grating):
             if parameters.CCD_REBIN > 1:
                 self.theta_x /= parameters.CCD_REBIN
                 self.theta_y /= parameters.CCD_REBIN
-            theta_interp = interpolate.interp2d(self.theta_x, self.theta_y, self.theta_data, kind='cubic')
-            self.theta = lambda x: float(theta_interp(x[0], x[1]))
+            self.theta_interp = interpolate.interp2d(self.theta_x, self.theta_y, self.theta_data, kind='cubic')
         else:
-            self.theta = lambda x: self.theta_tilt
+            def theta_func(x, y):
+                return self.theta_tilt
+            self.theta_interp = theta_func
         self.x_lines, self.line1, self.line2 = neutral_lines(self.holo_center[0], self.holo_center[1], self.theta_tilt)
         if verbose:
             if self.is_hologram:
