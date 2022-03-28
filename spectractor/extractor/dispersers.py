@@ -361,7 +361,7 @@ class Grating:
         0
 
         """
-        filename = self.data_dir + self.label + "/N.txt"
+        filename = os.path.join(self.data_dir, self.label, "N.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             self.N_input = a[0]
@@ -369,7 +369,7 @@ class Grating:
         else:
             raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
 
-        filename = self.data_dir + self.label + "/full_name.txt"
+        filename = os.path.join(self.data_dir, self.label, "full_name.txt")
         if os.path.isfile(filename):
             with open(filename, 'r') as f:
                 for line in f:  # MFL: you really just want the last line of the file?
@@ -377,7 +377,7 @@ class Grating:
         else:
             raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
 
-        filename = self.data_dir + self.label + "/transmission.txt"
+        filename = os.path.join(self.data_dir, self.label, "transmission.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             l, t, e = a.T
@@ -389,7 +389,7 @@ class Grating:
             msg = f"Failed to load {filename} for {self.label}, using default (perfect) transmission"
             self.my_logger.info(msg)
 
-        filename = self.data_dir + self.label + "/ratio_order_2over1.txt"
+        filename = os.path.join(self.data_dir, self.label, "ratio_order_2over1.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             if a.T.shape[0] == 2:
@@ -402,7 +402,7 @@ class Grating:
         else:
             self.ratio_order_2over1 = lambda x: parameters.GRATING_ORDER_2OVER1 * np.ones_like(x).astype(float)
             self.flat_ratio_order_2over1 = True
-        filename = self.data_dir + self.label + "/hologram_center.txt"
+        filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
         if os.path.isfile(filename):
             lines = [ll.rstrip('\n') for ll in open(filename)]
             self.theta_tilt = float(lines[1].split(' ')[2])
@@ -730,7 +730,7 @@ class Hologram(Grating):
         """
         if verbose:
             self.my_logger.info(f'\n\tLoad disperser {self.label}:\n\tfrom {os.path.join(self.data_dir, self.label)}')
-        filename = self.data_dir + self.label + "/hologram_grooves_per_mm.txt"
+        filename = os.path.join(self.data_dir, self.label, "hologram_grooves_per_mm.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             self.N_x, self.N_y, self.N_data = a.T
@@ -743,7 +743,7 @@ class Hologram(Grating):
             self.is_hologram = False
             self.N_x = np.arange(0, parameters.CCD_IMSIZE)
             self.N_y = np.arange(0, parameters.CCD_IMSIZE)
-            filename = self.data_dir + self.label + "/N.txt"
+            filename = os.path.join(self.data_dir, self.label, "N.txt")
             if os.path.isfile(filename):
                 a = np.loadtxt(filename)
 
@@ -753,7 +753,7 @@ class Hologram(Grating):
                 self.N_fit = N_func
             else:
                 raise ValueError("To define an hologram, you must provide hologram_grooves_per_mm.txt or N.txt files.")
-        filename = self.data_dir + self.label + "/hologram_center.txt"
+        filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
         if os.path.isfile(filename):
             lines = [ll.rstrip('\n') for ll in open(filename)]
             self.holo_center = list(map(float, lines[1].split(' ')[:2]))
@@ -761,7 +761,7 @@ class Hologram(Grating):
         else:
             self.holo_center = [0.5 * parameters.CCD_IMSIZE, 0.5 * parameters.CCD_IMSIZE]
             self.theta_tilt = 0
-        filename = self.data_dir + self.label + "/hologram_rotation_angles.txt"
+        filename = os.path.join(self.data_dir, self.label, "hologram_rotation_angles.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             self.theta_x, self.theta_y, self.theta_data = a.T
