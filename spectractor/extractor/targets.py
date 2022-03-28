@@ -35,7 +35,7 @@ def GetSimbadName(target_name):
                   "KF06T1","KF06T2","KF08T3","KSI2CETI","P041C","P177D","P330E","SF1615001A","SF1615+001A","SNAP-1","SNAP-2","SUN_REFERENCE","WD0947_857","WD1026_453",
                    "HZ43B","DELUMI","SDSS132811","SDSSJ151421","WD-0308-565","C26202",
                   "WD0320_539"]:
-        print(">>>>> SKIP TARGET {} ".format(object_name))
+        #print(">>>>> SKIP TARGET {} ".format(object_name))
         return None
 
 
@@ -137,7 +137,7 @@ def maptargetnametpfilename(all_selected_calspec):
     for file in all_selected_calspec:
 
         if file in ["WDcovar_001.fits", "WDcovar_002.fits"]:
-            print(">>>>> SKIP file {} ".format(file))
+            #print(">>>>> SKIP file {} ".format(file))
             continue
 
         fullfilename = os.path.join(path_sed_calspec,file)
