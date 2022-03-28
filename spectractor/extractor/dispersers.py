@@ -384,8 +384,9 @@ class Grating:
             self.transmission = interpolate.interp1d(l, t, bounds_error=False, fill_value=0.)
             self.transmission_err = interpolate.interp1d(l, e, bounds_error=False, fill_value=0.)
         else:
-            self.transmission = lambda x: np.ones_like(x).astype(float)
-            self.transmission_err = lambda x: np.zeros_like(x).astype(float)
+            ones = np.ones_like(parameters.LAMBDAS).astype(float)
+            self.transmission = interpolate.interp1d(parameters.LAMBDAS, ones, bounds_error=False, fill_value=0.)
+            self.transmission_err = interpolate.interp1d(parameters.LAMBDAS, 0*ones, bounds_error=False, fill_value=0.)
             msg = f"Failed to load {filename} for {self.label}, using default (perfect) transmission"
             self.my_logger.info(msg)
 
@@ -400,7 +401,9 @@ class Grating:
                                                            fill_value="extrapolate")  # "(0, t[-1]))
             self.flat_ratio_order_2over1 = False
         else:
-            self.ratio_order_2over1 = lambda x: parameters.GRATING_ORDER_2OVER1 * np.ones_like(x).astype(float)
+            ratio = parameters.GRATING_ORDER_2OVER1 * np.ones_like(parameters.LAMBDAS).astype(float)
+            self.ratio_order_2over1 = interpolate.interp1d(parameters.LAMBDAS, ratio, bounds_error=False, kind="linear",
+                                                           fill_value="extrapolate")  # "(0, t[-1]))
             self.flat_ratio_order_2over1 = True
         filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
         if os.path.isfile(filename):
