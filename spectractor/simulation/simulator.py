@@ -214,7 +214,7 @@ class SpectrumSimulation(Spectrum):
 class SpectrogramModel(Spectrum):
 
     def __init__(self, spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True,
-                 full_image=False):
+                 full_image=False, with_adr=True):
         """Class to simulate a spectrogram.
 
         Parameters
@@ -235,6 +235,8 @@ class SpectrogramModel(Spectrum):
         full_image: bool, optional
             If True, simulate the spectrogram on the full CCD size,
             otherwise only the cropped spectrogram (default: False).
+        with_adr: bool, optional
+            If True, simulate the spectrogram with ADR effect (default: True).
 
         Examples
         --------
@@ -263,6 +265,7 @@ class SpectrogramModel(Spectrum):
         self.fast_sim = fast_sim
         self.with_background = with_background
         self.full_image = full_image
+        self.with_adr = with_adr
         if self.full_image:
             self.Nx = parameters.CCD_IMSIZE
             self.Ny = self.spectrogram_Ny  # too long if =parameters.CCD_IMSIZE
@@ -370,7 +373,8 @@ class SpectrogramModel(Spectrum):
         # Compute lambdas at pixel column x
         # lambdas = self.disperser.grating_pixel_to_lambda(distance - 0*adr_u, new_x0, order=1)
         # Position (not distance) in pixel of wavelength lambda order 1 centroid in the (x,y) spectrogram frame
-        dispersion_law = self.r0 + (Dx + shift_x + adr_x) + 1j * (Dy_disp_axis + adr_y + shift_y)
+        dispersion_law = self.r0 + (Dx + shift_x + self.with_adr * adr_x) + \
+                         1j * (Dy_disp_axis + self.with_adr * adr_y + shift_y)
 
         # ADR for order 2
         adr_ra, adr_dec = adr_calib(self.lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
@@ -382,7 +386,8 @@ class SpectrogramModel(Spectrum):
         # Compute lambdas at pixel column x
         # lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - 0*adr_u, new_x0, order=2)
         # Position (not distance) in pixel of wavelength lambda order 2 centroid in the (x,y) spectrogram frame
-        dispersion_law_order2 = self.r0 + (Dx_order2 + shift_x + adr_x) + 1j * (Dy_disp_axis_order2 + adr_y + shift_y)
+        dispersion_law_order2 = self.r0 + (Dx_order2 + shift_x + self.with_adr * adr_x) + \
+                                1j * (Dy_disp_axis_order2 + self.with_adr * adr_y + shift_y)
 
         # Dx_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
         # Dy_mean_func=interp1d(lambdas/2,self.chromatic_psf.table['Dy_disp_axis'],bounds_error=False,fill_value=(0,0))
@@ -720,7 +725,8 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
 def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
                              pwv=5, ozone=300, aerosols=0.05, A1=1.0, A2=0.,
                              D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0.,
-                             B=1., psf_poly_params=None, with_background=True, fast_sim=False, full_image=False):
+                             B=1., psf_poly_params=None, with_background=True, fast_sim=False, full_image=False,
+                             with_adr=True):
     """ SimulatorCore
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
@@ -736,7 +742,8 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
     # SPECTRUM SIMULATION
     # --------------------
     spectrogram_simulation = SpectrogramModel(spectrum, atmosphere, telescope, disperser,
-                                              with_background=with_background, fast_sim=fast_sim, full_image=full_image)
+                                              with_background=with_background, fast_sim=fast_sim, full_image=full_image,
+                                              with_adr=with_adr)
     spectrogram_simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, psf_poly_params)
     return spectrogram_simulation
 

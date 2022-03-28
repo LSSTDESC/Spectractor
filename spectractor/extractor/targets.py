@@ -215,7 +215,7 @@ class Star(Target):
                 self.my_logger.info(f'\n\tSimbad:\n{simbad}')
             self.radec_position = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(u.hourangle, u.deg))
         else:
-           self.my_logger.warning('Target {} not found in Simbad'.format(self.label))
+            self.my_logger.warning(f'Target {self.label} not found in Simbad')
         self.get_radec_position_after_pm(date_obs="J2000")
         if not np.ma.is_masked(simbad['Z_VALUE']):
             self.redshift = float(simbad['Z_VALUE'])
@@ -253,9 +253,9 @@ class Star(Target):
         if os.getenv("PYSYN_CDBS") is not None:
             dirname = os.path.expandvars('$PYSYN_CDBS/calspec/')
             for fname in os.listdir(dirname):
-                if os.path.isfile(dirname + fname):
-                    if self.label.lower() in fname.lower():
-                        file_names.append(dirname + fname)
+                if os.path.isfile(os.path.join(dirname, fname)):
+                    if self.label.lower().replace(' ','') in fname.lower():
+                        file_names.append(os.path.join(dirname, fname))
         if len(file_names) > 0:
             is_calspec = True
             self.emission_spectrum = False
@@ -283,18 +283,15 @@ class Star(Target):
             self.lines = Lines(ATMOSPHERIC_LINES + HYDROGEN_LINES + STELLAR_LINES,
                                redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
-        else:
-            if 'PNG' not in self.label:
-                # Try with NED query
-                # print 'Loading target %s from NED...' % self.label
-
-                # currently (pending a new release) astroquery has a race
-                # condition at import time, so putting here rather than at the
-                # module level so that multiple test runners don't run the race
-                from astroquery.ned import Ned
-                ned = Ned.query_object(self.label)
-                hdulists = Ned.get_spectra(self.label, show_progress=False)
-                self.redshift = ned['Redshift'][0]
+        elif 'PNG' in self.label:
+            self.emission_spectrum = True
+            self.lines = Lines(ATMOSPHERIC_LINES + ISM_LINES + HYDROGEN_LINES,
+                               redshift=self.redshift, emission_spectrum=self.emission_spectrum,
+                               hydrogen_only=self.hydrogen_only)
+        else:  # maybe a quasar, try with NED query
+            from astroquery.ned import Ned
+            hdulists = Ned.get_spectra(self.label, show_progress=False)
+            if len(hdulists) > 0:
                 self.emission_spectrum = True
                 self.hydrogen_only = False
                 if self.redshift > 0.2:
@@ -328,11 +325,6 @@ class Star(Target):
                             self.wavelengths.append(waves)
                     else:
                         self.wavelengths.append(waves)
-            else:
-                self.emission_spectrum = True
-                self.lines = Lines(ATMOSPHERIC_LINES+ISM_LINES+HYDROGEN_LINES,
-                                   redshift=self.redshift, emission_spectrum=self.emission_spectrum,
-                                   hydrogen_only=self.hydrogen_only)
         self.build_sed()
         self.my_logger.debug(f"\n\tTarget label: {self.label}"
                              f"\n\tCalspec? {is_calspec}"

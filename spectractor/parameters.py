@@ -120,7 +120,7 @@ PIXWIDTH_BOXSIZE = 20  # box size for sextractor evaluation of the background
 BGD_ORDER = 1  # the order of the polynomial background to fit in the transverse direction
 
 # PSF
-PSF_TYPE = "Moffat"  # the PSF model: Moffat or MoffatGauss
+PSF_TYPE = "Moffat"  # the PSF model: Gauss, Moffat or MoffatGauss
 PSF_POLY_ORDER = 2  # the order of the polynomials to model wavelength dependence of the PSF shape parameters
 PSF_FIT_REG_PARAM = 0.01  # regularisation parameter for the chisq minimisation to extract the spectrum
 PSF_PIXEL_STEP_TRANSVERSE_FIT = 10  # step size in pixels for the first transverse PSF1D fit

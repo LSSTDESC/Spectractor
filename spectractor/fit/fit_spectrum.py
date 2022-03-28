@@ -274,7 +274,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.title = f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f},\n ' \
                      f'reso={reso:.2f}pix, D={D:.2f}mm, shift={shift:.2f}pix, B={B:.2g}'
         # main plot
-        self.plot_spectrum_comparison_simple(ax3, title=self.title, size=0.8)
+        self.plot_spectrum_comparison_simple(ax3, title="", size=0.8)
         # zoom O2
         self.plot_spectrum_comparison_simple(ax2, extent=[730, 800], title='Zoom $O_2$', size=0.8)
         # zoom H2O
@@ -292,7 +292,7 @@ class SpectrumFitWorkspace(FitWorkspace):
             if parameters.SAVE:
                 figname = self.filename.replace('.fits', '_bestfit.pdf')
                 self.my_logger.info(f'Save figure {figname}.')
-                fig.savefig(figname, dpi=100, bbox_inches='tight')
+                fig.savefig(figname, dpi=100, bbox_inches='tight', transparent=True)
 
     def decontaminate_order2(self):  # pragma: no cover
         lambdas = self.spectrum.lambdas
