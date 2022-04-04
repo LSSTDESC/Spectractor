@@ -38,6 +38,7 @@ SPECTRACTOR_FIT_TARGET_CENTROID = "fit"  # method to get target centroid, choose
 SPECTRACTOR_COMPUTE_ROTATION_ANGLE = "hessian"  # method to get image rotation angle: False, disperser, hessian
 SPECTRACTOR_DECONVOLUTION_PSF2D = True  # deconvolve spectrogram with simple 2D PSF analysis: False, True
 SPECTRACTOR_DECONVOLUTION_FFM = True  # deconvolve spectrogram with full forward model: False, True
+SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP = 20  # value of sigma clip parameter for the spectractor deconvolution process PSF2D and FFM
 
 # Paths
 mypath = os.path.dirname(__file__)
