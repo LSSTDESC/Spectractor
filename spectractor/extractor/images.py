@@ -723,7 +723,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
         image.target_guess = [parameters.CCD_IMSIZE - float(image.header["OBJECTY"]),
                               parameters.CCD_IMSIZE - float(image.header["OBJECTX"])]
     image.disperser_label = image.header["GRATING"]
-    parameters.DISTANCE2CCD = 115 + float(image.header["LINSPOS"])  # mm
+    parameters.DISTANCE2CCD = 113 + float(image.header["LINSPOS"])  # mm
     image.compute_parallactic_angle()
 
 
