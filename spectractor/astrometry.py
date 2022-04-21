@@ -100,6 +100,9 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, m
         if parameters.DISPLAY:
             # fig.tight_layout()
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
+
     return sources
 
 
@@ -215,6 +218,8 @@ def plot_shifts_histograms(dra, ddec):
     # ax[1].legend()
     if parameters.DISPLAY:
         plt.show()
+    if parameters.PdfPages:
+        parameters.PdfPages.savefig()
 
 
 class Astrometry(Image):
@@ -237,6 +242,12 @@ class Astrometry(Image):
         """
         Image.__init__(self, file_name, target_label=target_label, disperser_label=disperser_label)
         self.my_logger = set_logger(self.__class__.__name__)
+        # Use fast mode
+        if parameters.CCD_REBIN > 1:
+            self.rebin()
+            if parameters.DEBUG:
+                self.plot_image(scale='symlog', target_pixcoords=self.target_guess)
+
         self.output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
         ensure_dir(self.output_directory)
         self.tag = set_wcs_tag(file_name)
@@ -519,12 +530,12 @@ class Astrometry(Image):
         if gaia_coord is not None:
             gaia_x, gaia_y = self.wcs.all_world2pix(self.gaia_radec_positions_after_pm.ra,
                                                     self.gaia_radec_positions_after_pm.dec, 0, quiet=True)
-            ax.scatter(gaia_x, gaia_y, s=300, marker="+", edgecolor='blue', facecolor='blue', label=f"Gaia stars", lw=2)
+            ax.scatter(gaia_x, gaia_y, s=300, marker="+", facecolor='blue', label=f"Gaia stars", lw=2)
         if center is None:
             target_x, target_y = self.get_target_pixel_position()
         else:
             target_x, target_y = center
-        ax.scatter(target_x, target_y, s=300, marker="x", edgecolor='cyan', facecolor='cyan', label=f"{label}", lw=2)
+        ax.scatter(target_x, target_y, s=300, marker="x", facecolor='cyan', label=f"{label}", lw=2)
         if quad is not None:
             if len(quad) > 3:
                 points = np.concatenate([quad, [quad[-1]]])
@@ -792,6 +803,8 @@ class Astrometry(Image):
         ax[1].legend()
         if parameters.DISPLAY:
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
     def merge_wcs_with_new_exposure(self, log_file=None):
         """Merge the WCS solution with the current FITS file image.
@@ -932,6 +945,8 @@ class Astrometry(Image):
         if parameters.DISPLAY:
             fig.tight_layout()
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
     def run_simple_astrometry(self, extent=None, sources=None):
         """Build a World Coordinate System (WCS) using astrometry.net library given an exposure as a FITS file.
@@ -1014,8 +1029,8 @@ class Astrometry(Image):
         self.write_sources()
         # run astrometry.net
         command = f"{os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')} --scale-unit arcsecperpix " \
-                  f"--scale-low {0.999 * parameters.CCD_PIXEL2ARCSEC} " \
-                  f"--scale-high {1.001 * parameters.CCD_PIXEL2ARCSEC} " \
+                  f"--scale-low {0.95 * parameters.CCD_PIXEL2ARCSEC} " \
+                  f"--scale-high {1.05 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--ra {self.target.radec_position.ra.value} --dec {self.target.radec_position.dec.value} " \
                   f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
                   f"--dir {self.output_directory} --out {self.tag} " \

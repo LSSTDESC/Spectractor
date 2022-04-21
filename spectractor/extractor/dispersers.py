@@ -227,10 +227,10 @@ def neutral_lines(x_center, y_center, theta_tilt):
     return xs, line1, line2
 
 
-def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
+def order01_positions(holo_center, N, theta_tilt, theta0=0, lambda_constructor=639e-6, verbose=True):  # pragma: no cover
     """Return the order 0 and order 1 positions of an hologram."""
     # refraction angle between order 0 and order 1 at construction
-    alpha = np.arcsin(N * parameters.LAMBDA_CONSTRUCTOR + np.sin(theta0))
+    alpha = np.arcsin(N * lambda_constructor + np.sin(theta0))
     # distance between order 0 and order 1 in pixels
     AB = (np.tan(alpha) - np.tan(theta0)) * parameters.DISTANCE2CCD / parameters.CCD_PIXEL2MM
     # position of order 1 in pixels
@@ -249,19 +249,21 @@ def order01_positions(holo_center, N, theta_tilt, theta0=0, verbose=True):
     return order0_position, order1_position, AB
 
 
-def find_order01_positions(holo_center, N_interp, theta_interp, verbose=True):
+def find_order01_positions(holo_center, N_interp, theta_interp, lambda_constructor=639e-6, verbose=True):  # pragma: no cover
     """Find the order 0 and order 1 positions of an hologram."""
     N = N_interp(holo_center)
     theta_tilt = theta_interp(holo_center)
     theta0 = 0
     convergence = 0
     while abs(N - convergence) > 1e-6:
-        order0_position, order1_position, AB = order01_positions(holo_center, N, theta_tilt, theta0, verbose=False)
+        order0_position, order1_position, AB = order01_positions(holo_center, N, theta_tilt, theta0,
+                                                                 lambda_constructor=lambda_constructor, verbose=False)
         convergence = np.copy(N)
         N = N_interp(order0_position)
         theta_tilt = theta_interp(order0_position)
         theta0 = get_theta0(order0_position)
-    order0_position, order1_position, AB = order01_positions(holo_center, N, theta_tilt, theta0, verbose=verbose)
+    order0_position, order1_position, AB = order01_positions(holo_center, N, theta_tilt, theta0,
+                                                             lambda_constructor=lambda_constructor, verbose=verbose)
     return order0_position, order1_position, AB
 
 
@@ -302,7 +304,6 @@ class Grating:
         self.label = label
         self.full_name = label
         self.data_dir = data_dir
-        self.plate_center = [0.5 * parameters.CCD_IMSIZE, 0.5 * parameters.CCD_IMSIZE]
         self.theta_tilt = 0
         self.transmission = None
         self.transmission_err = None
@@ -360,26 +361,36 @@ class Grating:
         0
 
         """
-        filename = self.data_dir + self.label + "/N.txt"
+        filename = os.path.join(self.data_dir, self.label, "N.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             self.N_input = a[0]
             self.N_err = a[1]
-        filename = self.data_dir + self.label + "/full_name.txt"
+        else:
+            raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
+
+        filename = os.path.join(self.data_dir, self.label, "full_name.txt")
         if os.path.isfile(filename):
             with open(filename, 'r') as f:
-                for line in f:
+                for line in f:  # MFL: you really just want the last line of the file?
                     self.full_name = line.rstrip('\n')
-        filename = self.data_dir + self.label + "/transmission.txt"
+        else:
+            raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
+
+        filename = os.path.join(self.data_dir, self.label, "transmission.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             l, t, e = a.T
             self.transmission = interpolate.interp1d(l, t, bounds_error=False, fill_value=0.)
             self.transmission_err = interpolate.interp1d(l, e, bounds_error=False, fill_value=0.)
         else:
-            self.transmission = lambda x: np.ones_like(x).astype(float)
-            self.transmission_err = lambda x: np.zeros_like(x).astype(float)
-        filename = self.data_dir + self.label + "/ratio_order_2over1.txt"
+            ones = np.ones_like(parameters.LAMBDAS).astype(float)
+            self.transmission = interpolate.interp1d(parameters.LAMBDAS, ones, bounds_error=False, fill_value=0.)
+            self.transmission_err = interpolate.interp1d(parameters.LAMBDAS, 0*ones, bounds_error=False, fill_value=0.)
+            msg = f"Failed to load {filename} for {self.label}, using default (perfect) transmission"
+            self.my_logger.info(msg)
+
+        filename = os.path.join(self.data_dir, self.label, "ratio_order_2over1.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             if a.T.shape[0] == 2:
@@ -390,18 +401,21 @@ class Grating:
                                                            fill_value="extrapolate")  # "(0, t[-1]))
             self.flat_ratio_order_2over1 = False
         else:
-            self.ratio_order_2over1 = lambda x: parameters.GRATING_ORDER_2OVER1 * np.ones_like(x).astype(float)
+            ratio = parameters.GRATING_ORDER_2OVER1 * np.ones_like(parameters.LAMBDAS).astype(float)
+            self.ratio_order_2over1 = interpolate.interp1d(parameters.LAMBDAS, ratio, bounds_error=False, kind="linear",
+                                                           fill_value="extrapolate")  # "(0, t[-1]))
             self.flat_ratio_order_2over1 = True
-        filename = self.data_dir + self.label + "/hologram_center.txt"
+        filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
         if os.path.isfile(filename):
             lines = [ll.rstrip('\n') for ll in open(filename)]
             self.theta_tilt = float(lines[1].split(' ')[2])
         else:
             self.theta_tilt = 0
+            msg = f"Failed to load {filename} for {self.label}, using default tilt of {self.theta_tilt}"
+            self.my_logger.info(msg)
+
         if verbose:
-            self.my_logger.info(f'\n\tGrating plate center at x0 = {self.plate_center[0]:.1f} '
-                                f'and y0 = {self.plate_center[1]:.1f} '
-                                f'with average tilt of {self.theta_tilt:.1f} degrees')
+            self.my_logger.info(f'\n\tGrating average tilt of {self.theta_tilt:.1f} degrees')
 
     def refraction_angle(self, deltaX, x0):
         """ Return the refraction angle with respect to the disperser normal, using geometrical consideration,
@@ -489,11 +503,11 @@ class Grating:
         Parameters
         ----------
         deltaX: array, float
-            Pixel distances to order 0.
+            *Algebraic* pixel distances to order 0 along the dispersion axis.
         x0: float or [float, float]
             Order 0 position detected in the non-rotated image.
         order: int
-            Order of the spectrum (default: 1)
+            Order of the spectrum (default: 1).
 
         Examples
         --------
@@ -546,7 +560,7 @@ class Grating:
         """ Return wavelength resolution in nm per pixel.
         See mathematica notebook: derivative of the grating formula.
         x0: the order 0 position on the full raw image.
-        deltaX: the distance in pixels between order 0 and signal point 
+        deltaX: the distance in pixels between order 0 and signal point
         in the rotated image."""
         delta = get_delta_pix_ortho(deltaX, x0, D=self.D) * parameters.CCD_PIXEL2MM
         # theta = self.refraction_angle(x,x0,order=order)
@@ -578,6 +592,8 @@ class Grating:
         plt.legend(loc='best')
         if parameters.DISPLAY:
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 class Hologram(Grating):
@@ -610,10 +626,9 @@ class Hologram(Grating):
         345.4794168822986
 
         """
-        Grating.__init__(self, parameters.GROOVES_PER_MM, D=D, label=label, data_dir=data_dir, verbose=False)
+        Grating.__init__(self, 350, D=D, label=label, data_dir=data_dir, verbose=False)
         self.holo_center = None  # center of symmetry of the hologram interferences in pixels
-        self.plate_center = None  # center of the hologram plate
-        self.theta = None  # interpolated rotation angle map of the hologram from data in degrees
+        self.theta_interp = None  # interpolated rotation angle map of the hologram from data in degrees
         self.theta_data = None  # rotation angle map data of the hologram from data in degrees
         self.theta_x = None  # x coordinates for the interpolated rotation angle map
         self.theta_y = None  # y coordinates for the interpolated rotation angle map
@@ -658,10 +673,33 @@ class Hologram(Grating):
 
         if x[0] < np.min(self.N_x) or x[0] > np.max(self.N_x) \
                 or x[1] < np.min(self.N_y) or x[1] > np.max(self.N_y):
-            N = self.N_fit(x[0], x[1])
+            N = float(self.N_fit(*x))
         else:
-            N = int(self.N_interp(x))
+            N = int(self.N_interp(*x))
         return N
+
+    def theta(self, x):
+        """Return the mean dispersion angle of the grating at position x.
+
+        Parameters
+        ----------
+        x: float, array
+            The [x,y] pixel position on the CCD.
+
+        Returns
+        -------
+        theta: float
+            The mean dispersion angle at position x in degrees.
+
+        Examples
+        --------
+        >>> h = Hologram('HoloPhP')
+        >>> h.theta((500,500))
+        -1.3393287109201792
+        >>> h.theta((0,0))
+        -2.0936702173289983
+        """
+        return float(self.theta_interp(*x))
 
     def load_specs(self, verbose=True):
         """Load the files in data_dir/label/ to set the main
@@ -687,40 +725,38 @@ class Hologram(Grating):
 
         The files do not exist:
 
-        >>> h = Hologram(label='XXX')
-        >>> h.N((500,500))
-        350
-        >>> h.theta((500,500))
-        0
-        >>> h.holo_center
-        [1024.0, 1024.0]
+        >>> h = Hologram(label='XXX')  # doctest: +ELLIPSIS
+        Traceback (most recent call last):
+        ...
+        FileNotFoundError:...
 
         """
         if verbose:
             self.my_logger.info(f'\n\tLoad disperser {self.label}:\n\tfrom {os.path.join(self.data_dir, self.label)}')
-        filename = self.data_dir + self.label + "/hologram_grooves_per_mm.txt"
+        filename = os.path.join(self.data_dir, self.label, "hologram_grooves_per_mm.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             self.N_x, self.N_y, self.N_data = a.T
             if parameters.CCD_REBIN > 1:
                 self.N_x /= parameters.CCD_REBIN
                 self.N_y /= parameters.CCD_REBIN
-            N_interp = interpolate.interp2d(self.N_x, self.N_y, self.N_data, kind='cubic')
+            self.N_interp = interpolate.interp2d(self.N_x, self.N_y, self.N_data, kind='cubic')
             self.N_fit = fit_poly2d(self.N_x, self.N_y, self.N_data, order=2)
-            self.N_interp = lambda x: float(N_interp(x[0], x[1]))
         else:
             self.is_hologram = False
             self.N_x = np.arange(0, parameters.CCD_IMSIZE)
             self.N_y = np.arange(0, parameters.CCD_IMSIZE)
-            filename = self.data_dir + self.label + "/N.txt"
+            filename = os.path.join(self.data_dir, self.label, "N.txt")
             if os.path.isfile(filename):
                 a = np.loadtxt(filename)
-                self.N_interp = lambda x: a[0]
-                self.N_fit = lambda x, y: a[0]
+
+                def N_func(x, y):
+                    return a[0]
+                self.N_interp = N_func
+                self.N_fit = N_func
             else:
-                self.N_interp = lambda x: parameters.GROOVES_PER_MM
-                self.N_fit = lambda x, y: parameters.GROOVES_PER_MM
-        filename = self.data_dir + self.label + "/hologram_center.txt"
+                raise ValueError("To define an hologram, you must provide hologram_grooves_per_mm.txt or N.txt files.")
+        filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
         if os.path.isfile(filename):
             lines = [ll.rstrip('\n') for ll in open(filename)]
             self.holo_center = list(map(float, lines[1].split(' ')[:2]))
@@ -728,28 +764,24 @@ class Hologram(Grating):
         else:
             self.holo_center = [0.5 * parameters.CCD_IMSIZE, 0.5 * parameters.CCD_IMSIZE]
             self.theta_tilt = 0
-        filename = self.data_dir + self.label + "/hologram_rotation_angles.txt"
+        filename = os.path.join(self.data_dir, self.label, "hologram_rotation_angles.txt")
         if os.path.isfile(filename):
             a = np.loadtxt(filename)
             self.theta_x, self.theta_y, self.theta_data = a.T
             if parameters.CCD_REBIN > 1:
                 self.theta_x /= parameters.CCD_REBIN
                 self.theta_y /= parameters.CCD_REBIN
-            theta_interp = interpolate.interp2d(self.theta_x, self.theta_y, self.theta_data, kind='cubic')
-            self.theta = lambda x: float(theta_interp(x[0], x[1]))
+            self.theta_interp = interpolate.interp2d(self.theta_x, self.theta_y, self.theta_data, kind='cubic')
         else:
-            self.theta = lambda x: self.theta_tilt
-        self.plate_center = [0.5 * parameters.CCD_IMSIZE + parameters.PLATE_CENTER_SHIFT_X / parameters.CCD_PIXEL2MM,
-                             0.5 * parameters.CCD_IMSIZE + parameters.PLATE_CENTER_SHIFT_Y / parameters.CCD_PIXEL2MM]
+            def theta_func(x, y):
+                return self.theta_tilt
+            self.theta_interp = theta_func
         self.x_lines, self.line1, self.line2 = neutral_lines(self.holo_center[0], self.holo_center[1], self.theta_tilt)
         if verbose:
             if self.is_hologram:
                 self.my_logger.info(f'\n\tHologram characteristics:'
-                                    f'\n\tN = {self.N(self.plate_center):.2f} +/- {self.N_err:.2f} '
-                                    f'grooves/mm at plate center'
-                                    f'\n\tPlate center at x0 = {self.plate_center[0]:.1f} and '
-                                    f'y0 = {self.plate_center[1]:.1f} with average tilt of {self.theta_tilt:.1f} '
-                                    f'degrees'
+                                    f'\n\tN = {self.N(self.holo_center):.2f} +/- {self.N_err:.2f} '
+                                    f'grooves/mm at hologram center'
                                     f'\n\tHologram center at x0 = {self.holo_center[0]:.1f} '
                                     f'and y0 = {self.holo_center[1]:.1f} with average tilt of {self.theta_tilt:.1f} '
                                     f'degrees')
@@ -757,10 +789,6 @@ class Hologram(Grating):
                 self.my_logger.info(f'\n\tGrating characteristics:'
                                     f'\n\tN = {self.N([0, 0]):.2f} +/- {self.N_err:.2f} grooves/mm'
                                     f'\n\tAverage tilt of {self.theta_tilt:.1f} degrees')
-        if self.is_hologram:
-            self.order0_position, self.order1_position, self.AB = find_order01_positions(self.holo_center,
-                                                                                         self.N_interp, self.theta,
-                                                                                         verbose=verbose)
 
 
 if __name__ == "__main__":

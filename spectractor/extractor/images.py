@@ -18,12 +18,77 @@ from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.tools import (plot_image_simple, save_fits, load_fits, fit_poly1d, plot_compass_simple,
                                fit_poly1d_outlier_removal, weighted_avg_and_std,
                                fit_poly2d_outlier_removal, hessian_and_theta,
-                               set_wcs_file_name, load_wcs_from_file, imgslice)
+                               set_wcs_file_name, load_wcs_from_file, imgslice, rebin)
 
 
 class Image(object):
+    """ The image class contains all the features necessary to load an image and extract a spectrum.
 
-    def __init__(self, file_name, target_label="", disperser_label="", config=""):
+    Attributes
+    ----------
+    my_logger: logging
+        Logging object
+    file_name: str
+        The file name of the exposure.
+    units: str
+        Units of the image.
+    data: array
+        Image 2D array in self.units units.
+    stat_errors: array
+        Image 2D uncertainty array in self.units units.
+    target_pixcoords: array
+        Target position [x,y] in the image in pixels.
+    data_rotated: array
+        Rotated image 2D array in self.units units.
+    stat_errors_rotated: array
+        Rotated image 2D uncertainty array in self.units units.
+    target_pixcoords_rotated: array
+        Target position [x,y] in the rotated image in pixels.
+    date_obs: str
+        Date of the observation.
+    airmass: float
+        Airmass of the current target.
+    expo: float
+        Exposure time in seconds.
+    disperser_label: str
+        Label of the disperser.
+    filter_label: str
+        Label of the filter.
+    target_label: str:
+        Label of the current target.
+    rotation_angle: float
+        Dispersion axis angle in the image in degrees, positive if anticlockwise.
+    parallactic_angle: float
+        Parallactic angle in degrees.
+    header: Fits.Header
+        FITS file header.
+    disperser: Disperser
+        Disperser instance that describes the disperser.
+    target: Target
+        Target instance that describes the current target.
+    ra: float
+        Right ascension coordinate of the current exposure.
+    dec: float
+        Declination coordinate of the current exposure.
+    hour_angle: float
+        Hour angle coordinate of the current exposure.
+    temperature: float
+        Outside temperature in Celsius degrees.
+    pressure: float
+        Outside pressure in hPa.
+    humidity: float
+        Outside relative humidity in fraction of one.
+    saturation: float
+        Level of saturation in the image in image units.
+    target_star2D: PSF
+        PSF instance fitted on the current target.
+    target_bkgd2D: callable
+        Function that models the background behind the current target.
+
+    """
+
+    def __init__(self, file_name, *, target_label="", disperser_label="",
+                 config="", **kwargs):
         """
         The image class contains all the features necessary to load an image and extract a spectrum.
 
@@ -58,7 +123,7 @@ class Image(object):
         self.my_logger = set_logger(self.__class__.__name__)
         if config != "":
             load_config(config)
-        if not os.path.isfile(file_name):
+        if not os.path.isfile(file_name) and parameters.CALLING_CODE != 'LSST_DM':
             raise FileNotFoundError(f"File {file_name} does not exist.")
         self.file_name = file_name
         self.units = 'ADU'
@@ -95,6 +160,7 @@ class Image(object):
             # data provided by the LSST shim, just instantiate objects
             # necessary for the following code not to fail
             self.header = fits.header.Header()
+            self.filter_label = kwargs.get('filter_label', '')
         # Load the target if given
         self.target = None
         self.target_pixcoords = None
@@ -119,6 +185,30 @@ class Image(object):
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
             self.header['REDSHIFT'] = str(self.target.redshift)
+
+    def rebin(self):
+        """Rebin the image and reset some related parameters.
+
+        Examples
+        --------
+        >>> parameters.CCD_REBIN = 2
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im.target_guess = [810, 590]
+        >>> im.data.shape
+        (2048, 2048)
+        >>> im.rebin()
+        >>> im.data.shape
+        (1024, 1024)
+        >>> im.stat_errors.shape
+        (1024, 1024)
+        >>> im.target_guess
+        array([405., 295.])
+        """
+        new_shape = np.asarray(self.data.shape) // parameters.CCD_REBIN
+        self.data = rebin(self.data, new_shape)
+        self.stat_errors = np.sqrt(rebin(self.stat_errors ** 2, new_shape))
+        if self.target_guess is not None:
+            self.target_guess = np.asarray(self.target_guess) / parameters.CCD_REBIN
 
     def load_image(self, file_name):
         """
@@ -424,11 +514,13 @@ class Image(object):
         if parameters.OBS_OBJECT_TYPE == "STAR":
             plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
         plt.legend()
+        plt.gcf().tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'))
+            plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'), transparent=True)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 def load_CTIO_image(image):
     """Specific routine to load CTIO fits files and load their data and properties for Spectractor.
@@ -594,7 +686,10 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.disperser_label = image.header['GRATING']
     image.ra = Angle(image.header['RA'], unit="deg")
     image.dec = Angle(image.header['DEC'], unit="deg")
-    image.hour_angle = Angle(image.header['HASTART'], unit="hourangle")
+    if 'HASTART' in image.header and image.header['HASTART'] is not None:
+        image.hour_angle = Angle(image.header['HASTART'], unit="hourangle")
+    else:
+        image.hour_angle = Angle(image.header['HA'], unit="deg")
     if 'AIRTEMP' in image.header:
         image.temperature = image.header['AIRTEMP']
     else:
@@ -632,7 +727,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.compute_parallactic_angle()
 
 
-def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[parameters.XWINDOW, parameters.YWINDOW]):
+def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
     """Find the target in the Image instance.
 
     The object is search in a windows of size defined by the XWINDOW and YWINDOW parameters,
@@ -647,9 +742,6 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
         Two parameter array giving the estimated position of the target in the image, optional if WCS is used.
     rotated: bool
         If True, the target is searched in the rotated image.
-    use_wcs: bool
-        If True, the WCS file (if found) is used to set the target position in pixels,
-        guess parameter is then unnecessary.
     widths: (int, int)
         Two parameter array to define the width of the cropped image (default: [parameters.XWINDOW, parameters.YWINDOW])
 
@@ -667,13 +759,21 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
     >>> guess = [820, 580]
     >>> parameters.VERBOSE = True
     >>> parameters.DEBUG = True
-    >>> x1, y1 = find_target(im, guess)
+    >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "fit"
+    >>> find_target(im, guess)  #doctest: +ELLIPSIS
+    [816.8... 587.3...]
+    >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "WCS"
+    >>> find_target(im, guess)  #doctest: +ELLIPSIS
+    [816.9... 587.1...]
+    >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "guess"
+    >>> find_target(im, guess)
+    [820, 580]
     """
     my_logger = set_logger(__name__)
     target_pixcoords = [-1, -1]
     theX = -1
     theY = -1
-    if use_wcs:
+    if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
         wcs_file_name = set_wcs_file_name(image.file_name)
         if os.path.isfile(wcs_file_name):
             my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
@@ -696,54 +796,70 @@ def find_target(image, guess=None, rotated=False, use_wcs=True, widths=[paramete
                 plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
                                   target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
                 plt.show()
+            if parameters.PdfPages:
+                parameters.PdfPages.savefig()
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
-    if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
-        if guess is None:
-            raise ValueError(f"Guess parameter must be set if WCS solution is not found.")
-        Dx, Dy = widths
-        theX, theY = guess
-        if rotated:
-            guess2 = find_target_after_rotation(image)
-            x0 = int(guess2[0])
-            y0 = int(guess2[1])
-            guess = [x0, y0]
-        niter = 2
-        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
-                                                                            widths=(Dx, Dy))
-        sub_image_x0, sub_image_y0 = x0, y0
-        for i in range(niter):
-            # find the target
-            # try:
-            sub_image_x0, sub_image_y0 = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
-            # except (Exception, ValueError):
-            #     image.target_star2D = None
-            #     avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
-            # compute target position
-            theX = x0 - Dx + sub_image_x0
-            theY = y0 - Dy + sub_image_y0
-            # crop for next iteration
-            if i < niter - 1:
-                Dx = Dx // (i + 2)
-                Dy = Dy // (i + 2)
-                x0 = int(theX)
-                y0 = int(theY)
-                NY, NX = sub_image_subtracted.shape
-                sub_image_subtracted = sub_image_subtracted[
-                                       max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
-                                       max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
-                sub_errors = sub_errors[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
-                             max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
-                if int(sub_image_x0) - Dx < 0:
-                    Dx = int(sub_image_x0)
-                if int(sub_image_y0) - Dy < 0:
-                    Dy = int(sub_image_y0)
-    else:
+    if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "fit" or rotated:
+        if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
+            if guess is None:
+                raise ValueError(f"Guess parameter must be set if WCS solution is not found.")
+            Dx, Dy = widths
+            theX, theY = guess
+            if rotated:
+                guess2 = find_target_after_rotation(image)
+                x0 = int(guess2[0])
+                y0 = int(guess2[1])
+                guess = [x0, y0]
+            niter = 2
+            sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
+                                                                                widths=(Dx, Dy))
+            sub_image_x0, sub_image_y0 = x0, y0
+            for i in range(niter):
+                # find the target
+                # try:
+                sub_image_x0, sub_image_y0 = find_target_Moffat2D(image, sub_image_subtracted, sub_errors=sub_errors)
+                # except (Exception, ValueError):
+                #     image.target_star2D = None
+                #     avX, avY = find_target_2DprofileASTROPY(image, sub_image_subtracted, sub_errors=sub_errors)
+                # compute target position
+                theX = x0 - Dx + sub_image_x0
+                theY = y0 - Dy + sub_image_y0
+                # crop for next iteration
+                if i < niter - 1:
+                    Dx = Dx // (i + 2)
+                    Dy = Dy // (i + 2)
+                    x0 = int(theX)
+                    y0 = int(theY)
+                    NY, NX = sub_image_subtracted.shape
+                    sub_image_subtracted = sub_image_subtracted[
+                                           max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                                           max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
+                    sub_errors = sub_errors[max(0, int(sub_image_y0) - Dy):min(NY, int(sub_image_y0) + Dy),
+                                 max(0, int(sub_image_x0) - Dx):min(NX, int(sub_image_x0) + Dx)]
+                    if int(sub_image_x0) - Dx < 0:
+                        Dx = int(sub_image_x0)
+                    if int(sub_image_y0) - Dy < 0:
+                        Dy = int(sub_image_y0)
+        else:
+            Dx, Dy = widths
+            sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
+                                                                                rotated=rotated, widths=(Dx, Dy))
+            theX, theY = target_pixcoords
+            sub_image_x0 = target_pixcoords[0] - x0 + Dx
+            sub_image_y0 = target_pixcoords[1] - y0 + Dy
+    elif parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "guess":
         Dx, Dy = widths
         sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=target_pixcoords,
                                                                             rotated=rotated, widths=(Dx, Dy))
-        sub_image_x0 = target_pixcoords[0] - x0 + Dx
-        sub_image_y0 = target_pixcoords[1] - y0 + Dy
+        theX, theY = guess
+        sub_image_x0 = theX - x0 + Dx
+        sub_image_y0 = theY - y0 + Dy
+    elif parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
+        pass
+    else:
+        raise ValueError(f"For unrotated images, parameters.SPECTRACTOR_FIT_TARGET_CENTROID muste be either: "
+                         f"guess, fit or WCS. Got {parameters.SPECTRACTOR_FIT_TARGET_CENTROID}.")
     image.my_logger.info(f'\n\tX,Y target position in pixels: {theX:.3f},{theY:.3f}')
     if rotated:
         image.target_pixcoords_rotated = [theX, theY]
@@ -896,6 +1012,8 @@ def find_target_1Dprofile(image, sub_image, guess):
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'namethisplot1.pdf'))
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
     return avX, avY
 
 
@@ -942,7 +1060,7 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     # fit a 2D star profile close to this position
     # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2Ds
     # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
-    psf = Moffat()
+    psf = Moffat(clip=True)
     total_flux = np.sum(sub_image_subtracted)
     psf.p[:3] = [total_flux, avX, avY]
     psf.p[-1] = image.saturation
@@ -1072,7 +1190,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         theta_mask = np.copy(theta)
         theta_mask[mask] = np.nan
         # print len(theta_mask[~np.isnan(theta_mask)]), lambda_threshold
-    theta_guess = image.disperser.theta(image.target_pixcoords)
+    theta_guess = float(image.disperser.theta(image.target_pixcoords))
     mask2 = np.logical_or(angle_range[0] > theta - theta_guess, theta - theta_guess > angle_range[1])
     theta_mask[mask2] = np.nan
     theta_mask = theta_mask[2:-2, 2:-2]
@@ -1103,7 +1221,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         im = ax1.imshow(theta_mask, origin='lower', cmap=cmap, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
         cb = plt.colorbar(im, ax=ax1)
         cb.set_label(parameters.PLOT_ROT_LABEL, labelpad=-10)
-        ax1.plot(x_new, y_new, 'k-', label=rf"Mean dispersion axis: $\varphi_d$={theta_median:.2f}°")
+        ax1.plot(x_new, y_new, 'k-', label=rf"Mean dispersion axis: $\alpha$={theta_median:.2f}°")
         ax1.set_ylim(0, theta_mask.shape[0])
         ax1.set_xlim(0, theta_mask.shape[1])
         ax1.legend()
@@ -1119,6 +1237,8 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotation_hessian.pdf'))
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
     return theta_median
 
 
@@ -1131,6 +1251,11 @@ def turn_image(image):
     ----------
     image: Image
         The Image instance.
+
+    Returns
+    -------
+    rotation_angle: float
+        Rotation angle in degree.
 
     Examples
     --------
@@ -1163,7 +1288,15 @@ def turn_image(image):
 
     >>> im.target_pixcoords=(N//2, N//2)
     >>> parameters.DEBUG = True
+    >>> parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE = False
     >>> turn_image(im)
+    0
+    >>> parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE = "disperser"
+    >>> turn_image(im)
+    -1.915
+    >>> parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE = "hessian"
+    >>> turn_image(im)  #doctest: +ELLIPSIS
+    -5.90...
 
     .. doctest::
         :hide:
@@ -1189,10 +1322,18 @@ def turn_image(image):
         plt.imshow(im.data_rotated, origin='lower')
         plt.show()
     """
-    image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
-                                                          angle_range=(parameters.ROT_ANGLE_MIN,
-                                                                       parameters.ROT_ANGLE_MAX),
-                                                          edges=(0, parameters.CCD_IMSIZE))
+    if parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE == "hessian":
+        image.rotation_angle = compute_rotation_angle_hessian(image, width_cut=parameters.YWINDOW,
+                                                              angle_range=(parameters.ROT_ANGLE_MIN,
+                                                                           parameters.ROT_ANGLE_MAX),
+                                                              edges=(0, parameters.CCD_IMSIZE))
+    elif parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE == "disperser":
+        image.rotation_angle = image.disperser.theta_tilt
+    elif parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE is False:
+        image.rotation_angle = 0
+    else:
+        raise ValueError(f"Unknown method for rotation angle computation: choose among False, disperser, hessian. "
+                         f"Got {parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE}")
     image.header['ROTANGLE'] = image.rotation_angle
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
@@ -1229,6 +1370,7 @@ def turn_image(image):
             plt.show()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             f.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rotated_image.pdf'))
+    return image.rotation_angle
 
 
 if __name__ == "__main__":

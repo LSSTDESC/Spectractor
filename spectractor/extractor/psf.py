@@ -12,7 +12,7 @@ from spectractor.fit.fitter import FitWorkspace, run_minimisation
 from numba import njit
 
 
-@njit
+@njit(fastmath=True, cache=True)
 def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):  # pragma: nocover
     r"""Compute a 1D Moffat function, whose integral is not normalised to unity.
 
@@ -92,7 +92,7 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):  # pragma: 
     return a
 
 
-@njit
+@njit(fastmath=True, cache=True)
 def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
     r"""Compute a 1D Moffat-Gaussian function, whose integral is not normalised to unity.
 
@@ -181,7 +181,7 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gau
     return a
 
 
-@njit
+@njit(fastmath=True, cache=True)
 def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocover
     r"""Compute a 2D Moffat function, whose integral is normalised to unity.
 
@@ -260,7 +260,7 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocov
     return a
 
 
-@njit
+@njit(fastmath=True, cache=True)
 def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
     r"""Compute a 2D Moffat-Gaussian function, whose integral is normalised to unity.
 
@@ -347,6 +347,149 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
     return a
 
 
+@njit(fastmath=True, cache=True)
+def evaluate_gauss1d(y, amplitude, y_c, sigma):  # pragma: nocover
+    r"""Compute a 2D Gaussian function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(x, y) = \frac{A}{\sigma \sqrt{2 \pi}\left\lbrace e^{-\left[ \left(x-x_c\right)^2\right]/(2 \sigma^2)}
+        \right\rbrace
+
+    .. math ::
+        \quad\text{with}\quad
+        \int_{-\infty}^{\infty}f(y) \mathrm{d}y = A
+
+    Parameters
+    ----------
+    y: array_like
+        2D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    y_c: float
+        X axis center  :math:`y_c` of the function.
+    sigma: float
+        Width :math:`\sigma` of the Gaussian function.
+
+    Returns
+    -------
+    output: array_like
+        1D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Ny = 50
+    >>> y = np.arange(Ny)
+    >>> amplitude = 10
+    >>> sigma = 2
+    >>> a = evaluate_gauss1d(y, amplitude=amplitude, y_c=Ny/2, sigma=sigma)
+    >>> print(f"{np.sum(a):.6f}")
+    10.000000
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
+        >>> assert np.isclose(np.argmax(a), Ny/2, atol=0.5)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Ny = 50
+        y = np.arange(Ny)
+        amplitude = 10
+        a = evaluate_gauss1d(y, amplitude=amplitude, y_c=Ny/2, sigma=2)
+        plt.plot(a)
+        plt.grid()
+        plt.xlabel("y")
+        plt.ylabel("Gauss")
+        plt.show()
+
+    """
+    rr = (y - y_c) * (y - y_c)
+    a = np.exp(-(rr / (2. * sigma * sigma)))
+    norm = np.sqrt(2 * np.pi) * sigma
+    a *= amplitude / norm
+    return a
+
+
+@njit(fastmath=True, cache=True)
+def evaluate_gauss2d(x, y, amplitude, x_c, y_c, sigma):  # pragma: nocover
+    r"""Compute a 2D Gaussian function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(x, y) = \frac{A}{2 \pi \sigma^2}\left\lbrace e^{-\left[ \left(x-x_c\right)^2+\left(y-y_c\right)^2\right]/(2 \sigma^2)}
+        \right\rbrace
+
+    .. math ::
+        \quad\text{with}\quad
+        \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
+
+    Parameters
+    ----------
+    x: array_like
+        2D array of pixels :math:`x`, regularly spaced.
+    y: array_like
+        2D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    x_c: float
+        X axis center  :math:`x_c` of the function.
+    y_c: float
+        Y axis center  :math:`y_c` of the function.
+    sigma: float
+        Width :math:`\sigma` of the Gaussian function.
+
+    Returns
+    -------
+    output: array_like
+        2D array of the function evaluated on the y pixel array.
+
+    Examples
+    --------
+
+    >>> Nx = 50
+    >>> Ny = 50
+    >>> yy, xx = np.mgrid[:Ny, :Nx]
+    >>> amplitude = 10
+    >>> a = evaluate_gauss2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, sigma=1)
+    >>> print(f"{np.sum(a):.6f}")
+    10.000000
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.isclose(np.sum(a), amplitude)
+
+    .. plot::
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from spectractor.extractor.psf import *
+        Nx = 50
+        Ny = 50
+        yy, xx = np.mgrid[:Nx, :Ny]
+        amplitude = 10
+        a = evaluate_gauss2d(xx, yy, amplitude, Nx/2, Ny/2, sigma=1)
+        im = plt.pcolor(xx, yy, a)
+        plt.grid()
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.colorbar(im, label="Gauss 2D")
+        plt.show()
+
+    """
+    rr = ((x - x_c) * (x - x_c) + (y - y_c) * (y - y_c))
+    a = np.exp(-(rr / (2. * sigma * sigma)))
+    norm = 2 * np.pi * sigma * sigma
+    a *= amplitude / norm
+    return a
+
+
 class PSF:
     """Generic PSF model class.
 
@@ -360,7 +503,14 @@ class PSF:
 
     """
 
-    def __init__(self):
+    def __init__(self, clip=False):
+        """
+        Parameters
+        ----------
+        clip: bool, optional
+            If True, PSF evaluation is clipped between 0 and saturation level (slower) (default: False)
+
+        """
         self.my_logger = set_logger(self.__class__.__name__)
         self.p = np.array([])
         self.param_names = ["amplitude", "x_c", "y_c", "saturation"]
@@ -368,6 +518,7 @@ class PSF:
         self.bounds = [[]]
         self.p_default = np.array([1, 0, 0, 1])
         self.max_half_width = np.inf
+        self.clip = clip
 
     def evaluate(self, pixels, p=None):  # pragma: no cover
         if p is not None:
@@ -475,8 +626,8 @@ class PSF:
 
 class Moffat(PSF):
 
-    def __init__(self, p=None):
-        PSF.__init__(self)
+    def __init__(self, p=None, clip=False):
+        PSF.__init__(self, clip=clip)
         self.p_default = np.array([1, 0, 0, 3, 2, 1]).astype(float)
         if p is not None:
             self.p = np.asarray(p).astype(float)
@@ -519,7 +670,7 @@ class Moffat(PSF):
         Examples
         --------
         >>> p = [2,20,30,4,2,10]
-        >>> psf = Moffat(p)
+        >>> psf = Moffat(p, clip=True)
         >>> yy, xx = np.mgrid[:50, :60]
         >>> out = psf.evaluate(pixels=np.array([xx, yy]))
 
@@ -537,6 +688,8 @@ class Moffat(PSF):
             plt.xlabel("X [pixels]")
             plt.ylabel("Y [pixels]")
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
         """
         if p is not None:
@@ -544,19 +697,107 @@ class Moffat(PSF):
         amplitude, x_c, y_c, gamma, alpha, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            return np.clip(evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha), 0, saturation)
+            out = evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
         elif pixels.ndim == 1:
             y = np.array(pixels)
             norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
-            return np.clip(evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha) / norm, 0, saturation)
+            out = evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha) / norm
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
+        else:  # pragma: no cover
+            raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
+
+
+class Gauss(PSF):
+
+    def __init__(self, p=None, clip=False):
+        PSF.__init__(self, clip=clip)
+        self.p_default = np.array([1, 0, 0, 1, 1]).astype(float)
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        else:
+            self.p = np.copy(self.p_default)
+        self.param_names = ["amplitude", "x_c", "y_c", "sigma", "saturation"]
+        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\sigma$", "saturation"]
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (0, np.inf)])
+
+    def apply_max_width_to_bounds(self, max_half_width=None):
+        if max_half_width is not None:
+            self.max_half_width = max_half_width
+        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
+                                (1, self.max_half_width), (0, np.inf)])
+
+    def evaluate(self, pixels, p=None):
+        r"""Evaluate the Gauss function.
+
+        The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
+
+        Parameters
+        ----------
+        pixels: list
+            List containing the X abscisse 2D array and the Y abscisse 2D array.
+        p: array_like
+            The parameter array. If None, the array used to instanciate the class is taken.
+            If given, the class instance parameter array is updated.
+
+        Returns
+        -------
+        output: array_like
+            The PSF function evaluated.
+
+        Examples
+        --------
+        >>> p = [2,20,30,2,10]
+        >>> psf = Gauss(p, clip=True)
+        >>> yy, xx = np.mgrid[:50, :60]
+        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.psf import Moffat
+            p = [2,20,30,2,10]
+            psf = Gauss(p)
+            yy, xx = np.mgrid[:50, :60]
+            out = psf.evaluate(pixels=np.array([xx, yy]))
+            fig = plt.figure(figsize=(5,5))
+            plt.imshow(out, origin="lower")
+            plt.xlabel("X [pixels]")
+            plt.ylabel("Y [pixels]")
+            plt.show()
+
+        """
+        if p is not None:
+            self.p = np.asarray(p).astype(float)
+        amplitude, x_c, y_c, sigma, saturation = self.p
+        if pixels.ndim == 3 and pixels.shape[0] == 2:
+            x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
+            out = evaluate_gauss2d(x, y, amplitude, x_c, y_c, sigma)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
+        elif pixels.ndim == 1:
+            y = np.array(pixels)
+            if amplitude > 0 and sigma > 0:
+                out = evaluate_gauss1d(y, amplitude, y_c, sigma)
+            else:
+                out = np.zeros_like(y)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
         else:  # pragma: no cover
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
 
 class MoffatGauss(PSF):
 
-    def __init__(self, p=None):
-        PSF.__init__(self)
+    def __init__(self, p=None, clip=False):
+        PSF.__init__(self, clip=clip)
         self.p_default = np.array([1, 0, 0, 3, 2, 0, 1, 1]).astype(float)
         if p is not None:
             self.p = np.asarray(p).astype(float)
@@ -626,23 +867,26 @@ class MoffatGauss(PSF):
         amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            return np.clip(evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c,
-                                                  gamma, alpha, eta_gauss, stddev), 0, saturation)
+            out = evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
         elif pixels.ndim == 1:
             y = np.array(pixels)
             norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha) + eta_gauss * np.sqrt(
                 2 * np.pi) * stddev
-            return np.clip(
-                evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, stddev) / norm, 0,
-                saturation)
+            out = evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, stddev) / norm
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
         else:  # pragma: no cover
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
 
 class Order0(PSF):
 
-    def __init__(self, target, p=None):
-        PSF.__init__(self)
+    def __init__(self, target, p=None, clip=False):
+        PSF.__init__(self, clip=clip)
         self.p_default = np.array([1, 0, 0, 1, 1]).astype(float)
         if p is not None:
             self.p = np.asarray(p).astype(float)
@@ -751,12 +995,17 @@ class Order0(PSF):
         amplitude, x_c, y_c, gamma, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            return np.clip(self.psf_func(x[0], y[:, 0], amplitude, x_c, y_c, gamma), 0, saturation)
+            out = self.psf_func(x[0], y[:, 0], amplitude, x_c, y_c, gamma)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
         elif pixels.ndim == 1:
             y = np.array(pixels)
             out = self.psf_func(x_c, y, amplitude, x_c, y_c, gamma).T[0]
             out *= amplitude / np.sum(out)
-            return np.clip(out, 0, saturation)
+            if self.clip:
+                out = np.clip(out, 0, saturation)
+            return out
         else:  # pragma: no cover
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
@@ -1033,9 +1282,11 @@ class PSFFitWorkspace(FitWorkspace):
             figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
-def load_PSF(psf_type=parameters.PSF_TYPE, target=None):
+def load_PSF(psf_type=parameters.PSF_TYPE, target=None, clip=False):
     """Load the PSF model with a keyword.
 
     Parameters
@@ -1044,6 +1295,8 @@ def load_PSF(psf_type=parameters.PSF_TYPE, target=None):
         PSF model keyword (default: parameters.PSF_TYPE).
     target: Target, optional
         The Target instance to make Order0 PSF model (default: None).
+    clip: bool, optional
+        If True, PSF evaluation is clipped between 0 and saturation level (slower) (default: False)
 
     Returns
     -------
@@ -1053,22 +1306,24 @@ def load_PSF(psf_type=parameters.PSF_TYPE, target=None):
     Examples
     --------
 
-    >>> load_PSF(psf_type="Moffat")  # doctest: +ELLIPSIS
+    >>> load_PSF(psf_type="Moffat", clip=True)  # doctest: +ELLIPSIS
     <....Moffat object at ...>
-    >>> load_PSF(psf_type="MoffatGauss")  # doctest: +ELLIPSIS
+    >>> load_PSF(psf_type="MoffatGauss", clip=False)  # doctest: +ELLIPSIS
     <....MoffatGauss object at ...>
 
     """
     if psf_type == "Moffat":
-        psf = Moffat()
+        psf = Moffat(clip=clip)
     elif psf_type == "MoffatGauss":
-        psf = MoffatGauss()
+        psf = MoffatGauss(clip=clip)
+    elif psf_type == "Gauss":
+        psf = Gauss(clip=clip)
     elif psf_type == "Order0":
         if target is None:
             raise ValueError(f"A Target instance must be given when PSF_TYPE='Order0'. I got target={target}.")
-        psf = Order0(target=target)
+        psf = Order0(target=target, clip=clip)
     else:
-        raise ValueError(f"Unknown PSF_TYPE={psf_type}. Must be either Moffat or MoffatGauss.")
+        raise ValueError(f"Unknown PSF_TYPE={psf_type}. Must be either Gauss, Moffat or MoffatGauss.")
     return psf
 
 

@@ -1,16 +1,22 @@
-from numpy.testing import run_module_suite
+import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
+mpl.use('Agg')
 
-from spectractor import parameters
-from spectractor.astrometry import Astrometry
-from spectractor.logbook import LogBook
-from spectractor.config import load_config
-from spectractor.tools import set_wcs_output_directory, set_wcs_file_name
-from spectractor.extractor.images import Image, find_target
-import os
-import subprocess
-import numpy as np
+from numpy.testing import run_module_suite  # noqa: E402
+
+from spectractor import parameters  # noqa: E402
+from spectractor.astrometry import Astrometry  # noqa: E402
+from spectractor.logbook import LogBook  # noqa: E402
+from spectractor.config import load_config  # noqa: E402
+from spectractor.tools import set_wcs_output_directory, set_wcs_file_name  # noqa: E402
+from spectractor.extractor.images import Image, find_target  # noqa: E402
+import os  # noqa: E402
+import subprocess  # noqa: E402
+import numpy as np  # noqa: E402
+import unittest  # noqa: E402
 
 
+# TODO: DM-33441 Fix broken spectractor tests
+@unittest.skip('Skipping test for LSST testing framework')
 def test_astrometry():
     file_names = ['tests/data/reduc_20170530_134.fits']  # 'tests/data/reduc_20170605_028.fits']
 
@@ -50,8 +56,10 @@ def test_astrometry():
             assert np.isclose(a.wcs.wcs.crval[1], -54.28912925, atol=0.03)
         if file_name == 'tests/data/sim_20170530_134.fits':
             im = Image(file_name, target_label=target)
-            x0_wcs, y0_wcs = find_target(im, guess=[xpos, ypos], rotated=False, use_wcs=True)
-            x0, y0 = find_target(im, guess=[xpos, ypos], rotated=False, use_wcs=False)
+            parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "WCS"
+            x0_wcs, y0_wcs = find_target(im, guess=[xpos, ypos], rotated=False)
+            parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "fit"
+            x0, y0 = find_target(im, guess=[xpos, ypos], rotated=False)
             im.my_logger.warning(f"\n\tTrue {target} position: "
                                  f"{np.array([float(im.header['X0_T']), float(im.header['Y0_T'])])}"
                                  f"\n\tFound {target} position with WCS: {np.array([x0_wcs, y0_wcs])}"

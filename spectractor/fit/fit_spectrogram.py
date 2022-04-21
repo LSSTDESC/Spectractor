@@ -134,7 +134,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.bounds[4] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
-                                           with_background=True, fast_sim=False)
+                                           with_background=True, fast_sim=False, with_adr=True)
         self.lambdas_truth = None
         self.amplitude_truth = None
         self.get_spectrogram_truth()
@@ -381,8 +381,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
 
         A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, B,  *psf = self.p
-        plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
-                     f'D={D:.2f}mm, shift_y={shift_y:.2f}pix, B={B:.3f}', y=1)
+        #plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
+        #             f'D={D:.2f}mm, shift_y={shift_y:.2f}pix, B={B:.3f}', y=1)
         # main plot
         self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
         # zoom O2
@@ -403,10 +403,12 @@ class SpectrogramFitWorkspace(FitWorkspace):
         else:
             if parameters.DISPLAY and self.verbose:
                 plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
         if parameters.SAVE:
             figname = os.path.splitext(self.filename)[0] + "_bestfit.pdf"
             self.my_logger.info(f"\n\tSave figure {figname}.")
-            fig.savefig(figname, dpi=100, bbox_inches='tight')
+            fig.savefig(figname, dpi=100, bbox_inches='tight', transparent=True)
 
 
 def lnprob_spectrogram(p):  # pragma: no cover

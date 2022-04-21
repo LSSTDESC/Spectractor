@@ -90,6 +90,8 @@ class StarModel:
                           units='Arbitrary units')
         if parameters.DISPLAY:
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 class StarFieldModel:
@@ -101,7 +103,7 @@ class StarFieldModel:
 
         >>> from spectractor.extractor.images import Image, find_target
         >>> im = Image('tests/data/reduc_20170530_134.fits', target_label="HD111980")
-        >>> x0, y0 = find_target(im, guess=(740, 680), use_wcs=False)
+        >>> x0, y0 = find_target(im, guess=(740, 680))
         >>> s = StarFieldModel(im)
         >>> s.plot_model()
 
@@ -163,7 +165,7 @@ class StarFieldModel:
             mask = np.zeros(data.shape, dtype=bool)
             for y in range(int(y0) - 100, int(y0) + 100):
                 for x in range(parameters.CCD_IMSIZE):
-                    u, v = pixel_rotation(x, y, self.image.disperser.theta([x0, y0]) * np.pi / 180., x0, y0)
+                    u, v = pixel_rotation(x, y, self.image.disperser.theta(x0, y0) * np.pi / 180., x0, y0)
                     if margin > v > -margin:
                         mask[y, x] = True
             # remove background and detect sources
@@ -207,6 +209,8 @@ class StarFieldModel:
         # cb.set_label('Arbitrary units')  # ,fontsize=16)
         if parameters.DISPLAY:
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 class BackgroundModel:
@@ -301,6 +305,8 @@ class BackgroundModel:
         cb.set_label('Arbitrary units')  # ,fontsize=16)
         if parameters.DISPLAY:
             plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
 
 class ImageModel(Image):
@@ -357,9 +363,7 @@ class ImageModel(Image):
 
 
 def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1,
-             psf_poly_params=None,
-             with_rotation=True,
-             with_stars=True):
+             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -373,6 +377,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     - A2: the relative amplitude of second order compared with first order
     - with_rotation: rotate the spectrum according to the disperser characteristics (True by default)
     - with_stars: include stars in the image field (True by default)
+    - with_adr: include ADR effect (True by default)
     """
     my_logger = set_logger(__name__)
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
@@ -386,11 +391,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         image.plot_image(scale='symlog', target_pixcoords=guess)
     # Fit the star 2D profile
     my_logger.info('\n\tSearch for the target in the image...')
-    target_pixcoords = find_target(image, guess, use_wcs=False)
-    # Find the exact target position using WCS if available
-    wcs_file_name = set_wcs_file_name(image.file_name)
-    if os.path.isfile(wcs_file_name):
-        target_pixcoords = find_target(image, guess, use_wcs=True)
+    target_pixcoords = find_target(image, guess)
     # Background model
     my_logger.info('\n\tBackground model...')
     bgd_level = float(np.mean(spectrum.spectrogram_bgd))
@@ -428,25 +429,35 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         rotation_angle = spectrum.rotation_angle
 
     # Load PSF
+    if psf_type is not None:
+        from spectractor.extractor.psf import load_PSF
+        parameters.PSF_TYPE = psf_type
+        psf = load_PSF(psf_type=psf_type)
+        spectrum.psf = psf
+        spectrum.chromatic_psf.psf = psf
     if psf_poly_params is None:
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
     else:
         spectrum.chromatic_psf.deg = (len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.param_names) - 2) - 1
         spectrum.chromatic_psf.set_polynomial_degrees(spectrum.chromatic_psf.deg)
+        if spectrum.chromatic_psf.deg == 0:  # x_c must have deg >= 1
+            psf_poly_params.insert(1, 0)
         my_logger.info(f'\n\tUse PSF parameters {psf_poly_params} as polynoms of '
                        f'degree {spectrum.chromatic_psf.degrees}')
+    if psf_type is not None and psf_poly_params is not None:
+        spectrum.chromatic_psf.init_table()
 
     # Simulate spectrogram
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0., B=1.,
                                            psf_poly_params=psf_poly_params, angle=rotation_angle, with_background=False,
-                                           fast_sim=False, full_image=True)
+                                           fast_sim=False, full_image=True, with_adr=with_adr)
 
     # now we include effects related to the wrong extraction of the spectrum:
     # wrong estimation of the order 0 position and wrong DISTANCE2CCD
-    # distance = spectrum.chromatic_psf.get_distance_along_dispersion_axis()
+    # distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis()
     # spectrum.disperser.D = parameters.DISTANCE2CCD
     # spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=1)
 

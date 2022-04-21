@@ -495,6 +495,8 @@ class Lines:
                 t.write(output_file_name, overwrite=overwrite)
             if print_table:
                 print(t)
+            if parameters.LSST_SAVEFIGPATH:
+                t.write(os.path.join(parameters.LSST_SAVEFIGPATH, 'extractedLines.fits'), overwrite=True)
         return t
 
 
@@ -514,10 +516,11 @@ CAII1 = Line(393.366, atmospheric=False, label=r'$Ca_{II}$', label_pos=[-0.016, 
 CAII2 = Line(396.847, atmospheric=False, label=r'$Ca_{II}$', label_pos=[-0.016, 0.02])
 FE2 = Line(430.790, atmospheric=False, label=r'$Fe_{I}$', label_pos=[-0.016, 0.02])
 FE3 = Line(438.355, atmospheric=False, label=r'$Fe_{I}$', label_pos=[-0.016, 0.02])
+HEI1 = Line(447.1, atmospheric=False, label=r'$He_{I}$', label_pos=[-0.016, 0.02])
 MG1 = Line(517.27, atmospheric=False, label=r'$Mg_{I}$', label_pos=[-0.016, 0.02])
 MG2 = Line(518.36, atmospheric=False, label=r'$Mg_{I}$', label_pos=[-0.016, 0.02])
 FE4 = Line(527.039, atmospheric=False, label=r'$Fe_{I}$', label_pos=[-0.016, 0.02])
-STELLAR_LINES = [FE1, FE2, FE3, FE4, CAII1, CAII2, MG1, MG2]
+STELLAR_LINES = [FE1, FE2, FE3, FE4, CAII1, CAII2, HEI1, MG1, MG2]
 
 # Atmospheric lines
 # O2 = Line(762.2, atmospheric=True, label=r'$O_2$',  # 762.2 is a weighted average of the O2 line simulated by Libradtran
@@ -534,9 +537,9 @@ O2Y = Line(898.765, atmospheric=True, label=r'$O_2(Y)$',
 O2Z = Line(822.696, atmospheric=True, label=r'$O_2(Z)$',
            label_pos=[0.007, 0.02])  # https://en.wikipedia.org/wiki/Fraunhofer_lines
 # H2O = Line( 960,atmospheric=True,label='$H_2 O$',label_pos=[0.007,0.02],width_bounds=(1,50))  #
-H2O_1 = Line(935, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
+H2O_1 = Line(935, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],  # MFL: don't these need different labels?
              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
-# H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],
+# H2O_2 = Line(960, atmospheric=True, label=r'$H_2 O$', label_pos=[0.007, 0.02],  # MFL: don't these need different labels?
 #              width_bounds=[5, 30])  # libradtran paper fig.3, broad line
 ATMOSPHERIC_LINES = [O2_1, O2_2, O2B, O2Y, O2Z, H2O_1]
 
@@ -566,7 +569,7 @@ HEI10 = Line(923.5, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02
 HEI11 = Line(951.9, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
 HEI12 = Line(1023.5, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
 HEI13 = Line(353.1, atmospheric=False, label=r'$He_{I}$', label_pos=[0.007, 0.02])
-OI = Line(630.0, atmospheric=False, label=r'$O_{II}$', label_pos=[0.007, 0.02])
+OI = Line(630.0, atmospheric=False, label=r'$O_{II}$', label_pos=[0.007, 0.02])  # MFL: label typo?
 OII = Line(732.5, atmospheric=False, label=r'$O_{II}$', label_pos=[0.007, 0.02])
 HEII1 = Line(468.6, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])
 HEII2 = Line(611.8, atmospheric=False, label=r'$He_{II}$', label_pos=[0.007, 0.02])

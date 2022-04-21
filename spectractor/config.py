@@ -3,11 +3,12 @@ import os
 import sys
 import re
 import numpy as np
-import coloredlogs
 import logging
 import astropy.units as units
 
 from spectractor import parameters
+if not parameters.CALLING_CODE:
+    import coloredlogs
 
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
 logging.getLogger("numba").setLevel(logging.ERROR)
@@ -50,13 +51,16 @@ def from_config_to_parameters(config):
             setattr(parameters, options.upper(), value)
 
 
-def load_config(config_filename):
+def load_config(config_filename, rebin=True):
     """Load configuration parameters from a .ini config file.
 
     Parameters
     ----------
     config_filename: str
         The path to the config file.
+    rebin: bool, optional
+        If True, the parameters.REBIN parameter is used and every parameters are changed to comply with the REBIN value.
+        If False, the parameters.REBIN parameter is skipped and set to 1.
 
     Examples
     --------
@@ -106,6 +110,12 @@ def load_config(config_filename):
                                    * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
 
+    if parameters.CCD_REBIN > 1 and rebin:
+        apply_rebinning_to_parameters()
+    else:
+        parameters.CCD_REBIN = 1
+        print("No rebinning: parameters.REBIN is forced to 1.")
+
     # check consistency
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
         sys.exit(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
@@ -117,6 +127,37 @@ def load_config(config_filename):
                 value = config.get(section, options)
                 par = getattr(parameters, options.upper())
                 print(f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}")
+
+
+def apply_rebinning_to_parameters():
+    """Divide or multiply original parameters by parameters.CCD_REBIN to set them correctly
+    in the case of an image rebinning.
+
+    Examples
+    --------
+    >>> parameters.PIXWIDTH_SIGNAL = 40
+    >>> parameters.CCD_PIXEL2MM = 10
+    >>> parameters.CCD_REBIN = 2
+    >>> apply_rebinning_to_parameters()
+    >>> parameters.PIXWIDTH_SIGNAL
+    20
+    >>> parameters.CCD_PIXEL2MM
+    20
+
+    """
+    # Apply rebinning
+    parameters.PIXDIST_BACKGROUND //= parameters.CCD_REBIN
+    parameters.PIXWIDTH_BOXSIZE = max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN)
+    parameters.PIXWIDTH_BACKGROUND //= parameters.CCD_REBIN
+    parameters.PIXWIDTH_SIGNAL //= parameters.CCD_REBIN
+    parameters.CCD_IMSIZE //= parameters.CCD_REBIN
+    parameters.CCD_PIXEL2MM *= parameters.CCD_REBIN
+    parameters.CCD_PIXEL2ARCSEC *= parameters.CCD_REBIN
+    parameters.XWINDOW //= parameters.CCD_REBIN
+    parameters.YWINDOW //= parameters.CCD_REBIN
+    parameters.XWINDOW_ROT //= parameters.CCD_REBIN
+    parameters.YWINDOW_ROT //= parameters.CCD_REBIN
+    parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT //= parameters.CCD_REBIN
 
 
 def set_logger(logger):
@@ -150,17 +191,21 @@ def set_logger(logger):
     
     """
     my_logger = logging.getLogger(logger)
-    coloredlogs.DEFAULT_LEVEL_STYLES['warn'] = {'color': 'yellow'}
-    coloredlogs.DEFAULT_FIELD_STYLES['levelname'] = {'color': 'white', 'bold': True}
+    if not parameters.CALLING_CODE:
+        coloredlogs.DEFAULT_LEVEL_STYLES['warn'] = {'color': 'yellow'}
+        coloredlogs.DEFAULT_FIELD_STYLES['levelname'] = {'color': 'white', 'bold': True}
     if parameters.VERBOSE > 0:
         my_logger.setLevel(logging.INFO)
-        coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.INFO)
+        if not parameters.CALLING_CODE:
+            coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.INFO)
     else:
         my_logger.setLevel(logging.WARNING)
-        coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.WARNING)
-    if parameters.DEBUG:
+        if not parameters.CALLING_CODE:
+            coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.WARNING)
+    if parameters.DEBUG_LOGGING:
         my_logger.setLevel(logging.DEBUG)
-        coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.DEBUG)
+        if not parameters.CALLING_CODE:
+            coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.DEBUG)
     return my_logger
 
 
