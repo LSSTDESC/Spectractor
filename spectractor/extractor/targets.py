@@ -537,7 +537,8 @@ class Star(Target):
         array(1.67605113e-11)
         """
         if len(self.spectra) == 0:
-            self.sed = lambda x: np.zeros_like(x)
+            self.sed = interp1d(parameters.LAMBDAS, np.zeros_like(parameters.LAMBDAS), kind='linear', bounds_error=False,
+                                fill_value=0.)
         else:
             self.sed = interp1d(self.wavelengths[index], self.spectra[index], kind='linear', bounds_error=False,
                                 fill_value=0.)

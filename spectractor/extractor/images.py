@@ -1190,7 +1190,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         theta_mask = np.copy(theta)
         theta_mask[mask] = np.nan
         # print len(theta_mask[~np.isnan(theta_mask)]), lambda_threshold
-    theta_guess = image.disperser.theta(image.target_pixcoords)
+    theta_guess = float(image.disperser.theta(image.target_pixcoords))
     mask2 = np.logical_or(angle_range[0] > theta - theta_guess, theta - theta_guess > angle_range[1])
     theta_mask[mask2] = np.nan
     theta_mask = theta_mask[2:-2, 2:-2]

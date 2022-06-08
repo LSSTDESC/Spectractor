@@ -165,7 +165,7 @@ class StarFieldModel:
             mask = np.zeros(data.shape, dtype=bool)
             for y in range(int(y0) - 100, int(y0) + 100):
                 for x in range(parameters.CCD_IMSIZE):
-                    u, v = pixel_rotation(x, y, self.image.disperser.theta([x0, y0]) * np.pi / 180., x0, y0)
+                    u, v = pixel_rotation(x, y, self.image.disperser.theta(x0, y0) * np.pi / 180., x0, y0)
                     if margin > v > -margin:
                         mask[y, x] = True
             # remove background and detect sources
