@@ -21,16 +21,16 @@ Some submodules complete the structures with generic functions:
 
 ## Installation
 
-Spectractor is written in Python 3.7. The dependencies are listed in the `requirements.txt` file. To install Spectractor, just run
+Spectractor is written in Python 3.9. The dependencies are listed in the `requirements.txt` file. To install Spectractor, just run
 ```
 pip install -r requirements.txt .
 ```
-Be careful, Spectractor can perform fits using the MCMC library [emcee](https://emcee.readthedocs.io/en/stable/) with [mpi4py](https://mpi4py.readthedocs.io/en/stable/) and [h5py](https://www.h5py.org/).  The latter might be better installed using `conda install ...` command to get their own dependencies (openmp and hdf5).
-
 For the simulation of spectra, Spectractor needs the following external libraries:
 - [libradtran](http://www.libradtran.org/doku.php) to simulate atmospheric transmission: it needs the installation of [netcdf](https://www.unidata.ucar.edu/software/netcdf/) and a python 2 environment (for the compilation only, not the usage); `uvpsec` executable must in the user `$PATH` or the user has to set an environmental variable `$LIBRADTRAN_DIR` pointing to the install directory.
-- [pysynphot](https://pysynphot.readthedocs.io/en/latest/) to get the CALSPEC star spectra: the HST CALSPEC calibration spectra must be downloaded and the environment variable `$PYSYN_CDBS` must be created.
+- [getCalspec](https://github.com/LSSTDESC/getCalspec) to get the CALSPEC star spectra;
 - [astrometry.net](https://astrometrynet.readthedocs.io/en/latest/) (optional): needed to create World Coordinate System files from the images; `solve-field` executable must in the user `$PATH` or the user has to set an environmental variable `$ASTROMETRYNET_DIR` pointing to the install directory. Version below or equal v0.78 should be used.
+
+Be careful, Spectractor can perform fits using the MCMC library [emcee](https://emcee.readthedocs.io/en/stable/) with [mpi4py](https://mpi4py.readthedocs.io/en/stable/) and [h5py](https://www.h5py.org/).  The latter might be better installed using `conda install ...` command to get their own dependencies (openmp and hdf5).
 
 Detailled command lines for the installation of Spectractor and the external dependencies can be found in the file `.travis.yml`.
 

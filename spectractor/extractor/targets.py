@@ -4,160 +4,14 @@ from astropy.time import Time
 
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
-import os
 import numpy as np
-import re
-
-from astropy.io import fits
 
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
                                                 ISM_LINES, STELLAR_LINES)
 
-if os.getenv("PYSYN_CDBS"):
-    import pysynphot as S
-
-
-def GetSimbadName(target_name):
-    """
-    Try to find the simbad target name from the provided target_name
-    :param target_name: target name provided by the caller
-    :return: existing target name in simbad
-    """
-
-    object_name = (target_name).upper()
-    simbad_object_name = object_name
-
-    # I was not able to find these entries in simbad database
-    if object_name in ["1732526","1740346","1743045","1757132","1802271","1805292","1808347","1812095","1812524","2M0036+18","2M0559-14","AGK+81D266",
-                   "BD02D3375","BD17D4708","BD21D0607","BD26D2606","BD29D2091","BD54D1216","BD60D1753","BD75","ETAUMA","GRW+70D5824","HS2027","KF01T5",
-                  "KF06T1","KF06T2","KF08T3","KSI2CETI","P041C","P177D","P330E","SF1615001A","SF1615+001A","SNAP-1","SNAP-2","SUN_REFERENCE","WD0947_857","WD1026_453",
-                   "HZ43B","DELUMI","SDSS132811","SDSSJ151421","WD-0308-565","C26202",
-                  "WD0320_539"]:
-        #print(">>>>> SKIP TARGET {} ".format(object_name))
-        return None
-
-
-    # for some special target name requiring a particular format in simbad
-
-    if object_name == "LAMLEP":
-        simbad_object_name = "LAM LEP"
-    elif (object_name == "MUCOL") or (object_name == "MU COL") or (object_name == "MU. COL") or (
-            object_name == "MU.COL"):
-        simbad_object_name = "mu. Col"
-    elif object_name == 'ETA1DOR' or object_name == "ETADOR" or object_name == "ETA DOR":
-        simbad_object_name = "ETA1 DOR"
-    elif object_name == 'BD11D3759':
-        simbad_object_name = "BD-11 3759"
-    elif object_name == 'WD0320-539':
-        simbad_object_name = "WD0320-539"
-    elif object_name == 'WD1327_083':
-        simbad_object_name = "WD1327-083"
-    elif object_name == 'GJ7541A':
-        simbad_object_name = "GJ754.1A"
-    elif object_name.split("-")[0] == 'NGC6681':
-        simbad_object_name = "NGC 6681"
-    else:
-        simbad_object_name = target_name
-
-    return simbad_object_name
-
-
-def GetListOfCAMSPECFiles(thedir):
-    """
-    Get the list of CALSPEC files (fits file) inside the directory thedir
-    - thedir : directory where are the files
-    """
-
-    all_files=os.listdir(thedir)
-    sorted_files=sorted(all_files)
-    selected_files=[]
-    for sfile in sorted_files:
-        if re.search(".*fits$",sfile):
-            selected_files.append(sfile)
-    return selected_files
-
-def FilterListOfCALSPECFiles(listOfFiles):
-    """
-    Filter list of files:
-
-    The filename of spectrum could come in serveral sample in the input list. Only the last version is kept
-
-    """
-
-    all_selected_files=[]
-
-    current_root_fn=None  # root of filename ex hd000000
-    current_fn=None    # filename of calspec ex hd000000_stis.fits
-
-    for fn in listOfFiles:
-
-        root_fn=fn.split("_")[0]
-
-        if root_fn == "ngc6681":
-            root_fn = fn.split("_")[0]+"_"+fn.split("_")[1]
-
-
-        # special case for galaxy
-        #if root_fn == "ngc6681":
-        #    all_selected_files.append(fn)
-        #    current_root_fn=root_fn+"_"+fn.split("_")[1]
-        #    current_fn=fn
-        #    continue
-
-        if current_root_fn==None:
-            current_root_fn=root_fn
-            current_fn=fn
-            continue
-
-        if root_fn != current_root_fn:
-            all_selected_files.append(current_fn)
-
-        current_fn=fn
-        current_root_fn=root_fn
-
-    return all_selected_files
-
-def maptargetnametpfilename(all_selected_calspec):
-    """
-    Make a dictionary target-name - filename
-    :param all_selected_calspec: list of calspec filename
-    :return: : dictionnary simbad - target filename : calspec filename
-    """
-
-
-    pysynphot_root_path = os.environ['PYSYN_CDBS']
-    path_sed_calspec = os.path.join(pysynphot_root_path, 'calspec')
-
-
-    dict_target_tofilename = {}
-
-
-    for file in all_selected_calspec:
-
-        if file in ["WDcovar_001.fits", "WDcovar_002.fits"]:
-            #print(">>>>> SKIP file {} ".format(file))
-            continue
-
-        fullfilename = os.path.join(path_sed_calspec,file)
-
-        hdu = fits.open(fullfilename)
-        img = hdu[0].data
-        hd = hdu[0].header
-
-        OBJNAME = hd["TARGETID"]
-
-        simbad_target_name = GetSimbadName(OBJNAME)
-
-        if simbad_target_name is not None:
-            dict_target_tofilename[simbad_target_name ] = file
-
-    return dict_target_tofilename
-
-
-
-
+from getCalspec import getCalspec
 
 
 def load_target(label, verbose=False):
@@ -341,10 +195,15 @@ class Star(Target):
 
         Examples
         --------
+        >>> parameters.VERBOSE = True
         >>> s = Star('3C273')
         >>> print(s.radec_position.dec)
-        2d03m08.598s
-
+        2d03m08.597s
+        >>> print(s.redshift)
+        0.158339
+        >>> s = Star('eta dor')
+        >>> print(s.radec_position.dec)
+        -66d02m22.635s
         """
         # currently (pending a new release) astroquery has a race
         # condition at import time, so putting here rather than at the
@@ -352,18 +211,12 @@ class Star(Target):
         from astroquery.simbad import Simbad
         Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
                                   'parallax', 'pm', 'z_value')
-
-        simbad_object_name = GetSimbadName(self.label)
-
-        print(f"target_name = {self.label}, Selected object name for Simbad : {simbad_object_name}")
-
-        simbad = Simbad.query_object(simbad_object_name)
-        print(simbad)
-
-        self.label = simbad_object_name
+        astroquery_label = self.label
+        if getCalspec.is_calspec(self.label):
+            calspec = getCalspec.Calspec(self.label)
+            astroquery_label = calspec.Astroquery_Name
+        simbad = Simbad.query_object(astroquery_label)
         self.simbad = simbad
-
-
         if simbad is not None:
             if self.verbose or True:
                 self.my_logger.info(f'\n\tSimbad:\n{simbad}')
@@ -401,51 +254,21 @@ class Star(Target):
         """
         self.wavelengths = []  # in nm
         self.spectra = []
-        # first try with pysynphot
-        file_names = []
-        is_calspec = False
-        if os.getenv("PYSYN_CDBS") is not None:
-            dirname = os.path.expandvars('$PYSYN_CDBS/calspec/')
-            #for fname in os.listdir(dirname):
-            #    if os.path.isfile(os.path.join(dirname, fname)):
-            #        if self.label.lower().replace(' ','') in fname.lower():
-            #            file_names.append(os.path.join(dirname, fname))
-
-            # get all calspec filenames
-            filenames_found_incalspecdir = GetListOfCAMSPECFiles(dirname)
-
-            # select the last version of filenames
-            selected_filenames = FilterListOfCALSPECFiles(filenames_found_incalspecdir)
-
-            # build a dictionnary to linl simbad target name with calspec filename
-            dict_star_filename = maptargetnametpfilename(selected_filenames)
-
-            # select the unique filename corresponding to the target name
-            the_filename = dict_star_filename[self.label]
-            file_names.append(os.path.join(dirname,the_filename))
-
-
-
-
-        if len(file_names) > 0:
-            is_calspec = True
+        # first try if it is a Calspec star
+        is_calspec = getCalspec.is_calspec(self.label)
+        if is_calspec:
+            calspec = getCalspec.Calspec(self.label)
             self.emission_spectrum = False
             self.hydrogen_only = False
             self.lines = Lines(HYDROGEN_LINES + ATMOSPHERIC_LINES + STELLAR_LINES,
                                redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
-            for k, f in enumerate(file_names):
-                if '_mod_' in f:
-                    continue
-                if self.verbose:
-                    self.my_logger.info('\n\tLoading %s' % f)
-                data = S.FileSpectrum(f, keepneg=True)
-                if isinstance(data.waveunits, S.units.Angstrom):
-                    self.wavelengths.append(data.wave / 10.)
-                    self.spectra.append(data.flux * 10.)
-                else:
-                    self.wavelengths.append(data.wave)
-                    self.spectra.append(data.flux)
+            spec_dict = calspec.get_spectrum_numpy()
+            # official units in spectractor are nanometers for wavelengths and erg/s/cm2/nm for fluxes
+            spec_dict["WAVELENGTH"] = spec_dict["WAVELENGTH"].to(u.nm)
+            spec_dict["FLUX"] = spec_dict["FLUX"].to(u.erg / u.second / u.cm**2 / u.nm)
+            self.wavelengths.append(spec_dict["WAVELENGTH"].value)
+            self.spectra.append(spec_dict["FLUX"].value)
         # TODO DM-33731: the use of self.label in parameters.STAR_NAMES:
         # below works for running but breaks a test so needs fixing for DM
         elif 'HD' in self.label:  # or self.label in parameters.STAR_NAMES:  # it is a star
@@ -554,10 +377,10 @@ class Star(Target):
         # target.load_spectra()  ## No global target object available  here (SDC)
         plt.figure()  # necessary to create a new plot (SDC)
         for isp, sp in enumerate(self.spectra):
-            plt.plot(self.wavelengths[isp], sp, label='Spectrum %d' % isp)
+            plt.plot(self.wavelengths[isp], sp, label=f'Spectrum {isp}')
         plt.xlim((300, 1100))
         plt.xlabel(r'$\lambda$ [nm]')
-        plt.ylabel('Flux')
+        plt.ylabel('Flux [erg/s/cm2/nm]')
         plt.title(self.label)
         plt.legend()
         if parameters.DISPLAY:  # pragma: no cover
