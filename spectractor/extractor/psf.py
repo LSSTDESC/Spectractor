@@ -641,8 +641,8 @@ class Moffat(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
-                                (0.1, self.max_half_width), (1.1, 100), (0, np.inf)])
+        self.bounds[2] = (0, 2 * self.max_half_width)
+        self.bounds[3] = (0.1, self.max_half_width)
 
     def evaluate(self, pixels, p=None):
         r"""Evaluate the Moffat function.
@@ -728,8 +728,8 @@ class Gauss(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
-                                (1, self.max_half_width), (0, np.inf)])
+        self.bounds[2] = (0, 2 * self.max_half_width)
+        self.bounds[3] = (1, self.max_half_width)
 
     def evaluate(self, pixels, p=None):
         r"""Evaluate the Gauss function.
@@ -812,9 +812,9 @@ class MoffatGauss(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width),
-                                (0.1, self.max_half_width), (1.1, 100), (-1, 0), (0.1, self.max_half_width),
-                                (0, np.inf)])
+        self.bounds[2] = (0, 2 * self.max_half_width)
+        self.bounds[3] = (0.1, self.max_half_width)
+        self.bounds[6] = (0.1, self.max_half_width)
 
     def evaluate(self, pixels, p=None):
         r"""Evaluate the MoffatGauss function.
@@ -924,7 +924,7 @@ class Order0(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (0, 2 * self.max_half_width), (0.5, 5), (0, np.inf)])
+        self.bounds[2] = (0, 2 * self.max_half_width)
 
     def evaluate(self, pixels, p=None):
         r"""Evaluate the Order 0 interpolated function.

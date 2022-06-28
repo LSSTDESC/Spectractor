@@ -1142,7 +1142,8 @@ class ChromaticPSF:
             w.set_mask(poly_params=w.poly_params)
             # precise fit with sigma clipping
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
-                                            fix=w.fixed, sigma_clip=20, niter_clip=3, verbose=verbose)
+                                            fix=w.fixed, sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP,
+                                            niter_clip=3, verbose=verbose)
         else:
             raise ValueError(f"Unknown fitting mode={mode}. Must be '1D' or '2D'.")
 

@@ -704,7 +704,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
         image.humidity = 40
     if 'adu' in image.header['BUNIT']:
         image.units = 'ADU'
-    parameters.OBS_CAMERA_ROTATION = 90 - float(image.header["ROTPA"])
+    parameters.OBS_CAMERA_ROTATION = 270 - float(image.header["ROTPA"])
     if parameters.OBS_CAMERA_ROTATION > 360:
         parameters.OBS_CAMERA_ROTATION -= 360
     if parameters.OBS_CAMERA_ROTATION < -360:
@@ -723,7 +723,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
         image.target_guess = [parameters.CCD_IMSIZE - float(image.header["OBJECTY"]),
                               parameters.CCD_IMSIZE - float(image.header["OBJECTX"])]
     image.disperser_label = image.header["GRATING"]
-    parameters.DISTANCE2CCD = 115 + float(image.header["LINSPOS"])  # mm
+    parameters.DISTANCE2CCD = 113 + float(image.header["LINSPOS"])  # mm
     image.compute_parallactic_angle()
 
 

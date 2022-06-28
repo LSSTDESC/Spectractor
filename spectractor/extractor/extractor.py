@@ -701,7 +701,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         for i in range(niter):
             w.set_mask(psf_poly_params=w.p[w.psf_params_start_index:])
             run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
-                                            ftol=1 / w.data.size, sigma_clip=20, niter_clip=3)
+                                            ftol=1 / w.data.size, niter_clip=3,
+                                            sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP)
             my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
 
             if parameters.DEBUG:
