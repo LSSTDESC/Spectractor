@@ -600,7 +600,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
             gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
-            fig2, ax2 = plt.subplots(nrows=4, ncols=2, figsize=(12, 16), gridspec_kw=gs_kw)
+            fig2, ax2 = plt.subplots(nrows=4, ncols=2, figsize=(10, 12), gridspec_kw=gs_kw)
             self.plot_spectrogram_comparison_simple(ax2, title='Spectrogram model', dispersion=True)
             # plt.delaxes(ax2[3, 1])
             fig2.tight_layout()
