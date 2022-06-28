@@ -543,14 +543,48 @@ class FitWorkspace:
             A header to add to the file (default: "").
         """
         output_filename = os.path.splitext(self.filename)[0] + "_bestfit.txt"
+        
+        print(">>>>> \t fitter.py :: save_parameters_summary ::  output_filename = ",  output_filename)
+        
         f = open(output_filename, 'w')
         txt = self.filename + "\n"
         if header != "":
             txt += header + "\n"
+            
+        print(">>>>> \t save_parameters_summary :: cov = ",self.cov, " type = ",type(self.cov), " shape = ",self.cov.shape)
+        
+        mycov = np.copy(self.cov)
+        maxk = np.min(mycov.shape)
+        
         for k, ip in enumerate(ipar):
-            txt += "%s: %s +%s -%s\n" % formatting_numbers(self.p[ip], np.sqrt(self.cov[k, k]),
-                                                           np.sqrt(self.cov[k, k]),
-                                                           label=self.input_labels[ip])
+            print(">>>> \t \t  k = ", k)
+            
+            if k < maxk:
+                
+                covariance_matrix_element = mycov[k, k]
+                print(">>>>> \t save_parameters_summary ::  k = ", k , 
+                      " ,  ip = ", ip , 
+                      " p[ip] = " , self.p[ip],
+                      " , label = ", self.input_labels[ip] , 
+                      " , cov = ",covariance_matrix_element)
+            
+                if covariance_matrix_element >= 0:
+                    covariance_matrix_element_sigma = np.sqrt(covariance_matrix_element)
+                else:
+                    print(">>>>> \t save_parameters_summary ::  k = ", k , " ,  ip = ", ip , " , label = ", self.input_labels[ip] , " , Negative cov = ",covariance_matrix_element)
+                    covariance_matrix_element_sigma = np.sqrt(-covariance_matrix_element)
+                
+                txt += "%s: %s +%s - %s\n" % formatting_numbers(self.p[ip], covariance_matrix_element_sigma,
+                                                               covariance_matrix_element_sigma,
+                                                               label=self.input_labels[ip])
+            else:
+                print(">>>>> \t save_parameters_summary ::  SKIP k = ", k , ' >=  kmax = ',maxk)
+                
+                
+            
+            #txt += "%s: %s +%s - %s\n" % formatting_numbers(self.p[ip], np.sqrt(self.cov[k, k]),
+            #                                               np.sqrt(self.cov[k, k]),
+            #                                               label=self.input_labels[ip])
         for row in self.cov:
             txt += np.array_str(row, max_line_width=20 * self.cov.shape[0]) + '\n'
         self.my_logger.info(f"\n\tSave best fit parameters in {output_filename}.")
@@ -1187,6 +1221,8 @@ def print_parameter_summary(params, cov, labels):
     """
     my_logger = set_logger(__name__)
     txt = ""
+    print("\t >>>>> cov = ",cov,">>>>  cov.shape = ",cov.shape)
+
     for ip in np.arange(0, cov.shape[0]).astype(int):
         txt += "%s: %s +%s -%s\n\t" % formatting_numbers(params[ip], np.sqrt(cov[ip, ip]), np.sqrt(cov[ip, ip]),
                                                          label=labels[ip])
