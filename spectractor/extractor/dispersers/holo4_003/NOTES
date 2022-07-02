@@ -1,4 +1,2 @@
-transmission.txt and ratio_order_2_over1.txt are made with the merge-efficiencies.py script here
-https://gitlab.in2p3.fr/llg/lsst-lpnhe-bench/-/tree/master/py/analysis/AuxTel-holograms
-combining two sets of transmission measurement of the holo-4-003 holograms performed on the optical test bench at LPNHE.
-The error bars come from the difference between the two runs.
+- transmission.txt : measurements from LPNHE optical test bench using holo-4-003-diffraction-efficiencies-merged.npy
+- ratio_order_2over1.txt : chimera with LPNHE optical test bench measurements between 430 and 1000nm, then extrapolating with an hologram efficiency model fitted on data
