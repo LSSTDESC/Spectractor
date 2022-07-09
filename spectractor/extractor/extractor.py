@@ -23,6 +23,21 @@ def dumpParameters():
         if not item.startswith("__"):
             print(item, getattr(parameters, item))
 
+
+def dumpfitparameters(w,thelogguer):
+    N1 = len(w.input_labels)
+    N2 = len(w.p)
+    assert N1 == N2
+
+    list_of_strings = ["\n"]
+    for idx in range(N1):
+        tag = w.input_labels[idx]
+        val = w.p[idx]
+        line = "- fit param #{} :: {} = {}".format(idx,tag,val)
+        list_of_strings.append(line)
+    txt = "\n".join(list_of_strings)
+    thelogguer.info(txt)
+
 class FullForwardModelFitWorkspace(FitWorkspace):
 
     def __init__(self, spectrum, amplitude_priors_method="noprior", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
@@ -682,7 +697,17 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         epsilon = 1e-4 * w.p
         epsilon[epsilon == 0] = 1e-4
 
+        if parameters.DEBUG:
+            my_logger.info("--- before  run_minimisation ---")
+            dumpfitparameters(w,my_logger)
+
+
         run_minimisation(w, method=method, fix=w.fixed, xtol=1e-4, ftol=10 / w.data.size)
+
+        if parameters.DEBUG:
+            my_logger.info("--- after  run_minimisation ---")
+            dumpfitparameters(w,my_logger)
+
         # Optimize the regularisation parameter only if it was not done before
         if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
@@ -708,10 +733,16 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
                                             ftol=1 / w.data.size, niter_clip=3,
                                             sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP)
-            my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
+            my_logger.info(f"\n\t  niter = {i} : Newton: total computation time: {time.time() - start}s")
+
+            if parameters.DEBUG:
+                my_logger.info("--- after  run_minimisation_sigma_clipping ---")
+                dumpfitparameters(w,my_logger)
 
             if parameters.DEBUG:
                 w.plot_fit()
+
+
             w.spectrum.lambdas = np.copy(w.lambdas)
             w.spectrum.data = np.copy(w.amplitude_params)
             w.spectrum.err = np.copy(w.amplitude_params_err)
@@ -871,13 +902,14 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         my_logger.info(f"\n\tNo guess position of order 0 has been given. Assuming the spectrum to extract comes "
                        f"from the brightest object, guess position is set as {image.target_guess}.")
     if parameters.DEBUG:
-        image.plot_image(scale='symlog', target_pixcoords=image.target_guess)
+        image.plot_image(scale='symlog', title="before rebinning",target_pixcoords=image.target_guess)
 
     # Use fast mode
     if parameters.CCD_REBIN > 1:
+        my_logger.info('\n\t  ======================= REBIN =============================')
         image.rebin()
         if parameters.DEBUG:
-            image.plot_image(scale='symlog', target_pixcoords=image.target_guess)
+            image.plot_image(scale='symlog', title="after rebinning ",target_pixcoords=image.target_guess)
 
     # Set output path
     ensure_dir(output_directory)
@@ -889,15 +921,21 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
     # Find the exact target position in the raw cut image: several methods
     my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
-    find_target(image, image.target_guess, widths=(parameters.XWINDOW, parameters.YWINDOW))
+
+    find_target(image, image.target_guess, widths=(parameters.XWINDOW,
+                                                   parameters.YWINDOW))
     # Rotate the image
     turn_image(image)
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
-    find_target(image, image.target_guess, rotated=True, widths=(parameters.XWINDOW_ROT, parameters.YWINDOW_ROT))
+
+    find_target(image, image.target_guess, rotated=True, widths=(parameters.XWINDOW_ROT,
+                                                                 parameters.YWINDOW_ROT))
     # Create Spectrum object
     spectrum = Spectrum(image=image, order=parameters.SPEC_ORDER)
     # First 1D spectrum extraction and background extraction
+
+    my_logger.info('\n\t  ======================= PSF1D Extraction ====================================')
     w_psf1d, bgd_model_func = extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
                                                           ws=(parameters.PIXDIST_BACKGROUND,
                                                               parameters.PIXDIST_BACKGROUND
@@ -907,6 +945,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # PSF2D deconvolution
     if parameters.SPECTRACTOR_DECONVOLUTION_PSF2D:
+        my_logger.info('\n\t == ======================= PSF2D DECONVOLUTION  ===============================')
         run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func=bgd_model_func)
 
     # Calibrate the spectrum
@@ -920,11 +959,13 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
     if parameters.SPECTRACTOR_DECONVOLUTION_FFM:
+        my_logger.info('\n\t  ======================= FFM DECONVOLUTION =============================')
         w = FullForwardModelFitWorkspace(spectrum, verbose=parameters.VERBOSE, plot=True, live_fit=False,
                                          amplitude_priors_method="spectrum")
         spectrum = run_ffm_minimisation(w, method="newton", niter=2)
 
     # Save the spectrum
+    my_logger.info('\n\t  ======================= SAVE SPECTRUM =============================')
     spectrum.save_spectrum(output_filename, overwrite=True)
     spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
     spectrum.lines.print_detected_lines(output_file_name=output_filename.replace('_spectrum.fits', '_lines.csv'),
@@ -933,6 +974,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
+
     spectrum.chromatic_psf.table['lambdas'] = spectrum.lambdas
     spectrum.chromatic_psf.table.write(output_filename_psf, overwrite=True)
 
@@ -972,6 +1014,10 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     my_logger = set_logger(__name__)
     if ws is None:
         ws = [signal_width + 20, signal_width + 30]
+
+    my_logger.info('\n\t  ======================= extract_spectrum_from_image =============================')
+
+
     my_logger.info(
         f'\n\tExtracting spectrum from image: spectrum with width 2*{signal_width:.0f} pixels '
         f'and background from {ws[0]:.0f} to {ws[1]:.0f} pixels')
@@ -1027,6 +1073,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     err = np.sqrt(err * err + bgd_rms * bgd_rms)
 
     # Fit the transverse profile
+    my_logger.info('\n\t  ======================= Fit the transverse profile =============================')
+
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     psf = load_PSF(psf_type=parameters.PSF_TYPE, target=image.target, clip=False)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
@@ -1052,6 +1100,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Fit the data:
     method = "noprior"
     mode = "1D"
+
+    my_logger.info('\n\t  ======================= ChromaticPSF polynomial fit  =============================')
+
     my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
                    f'mode={mode} and amplitude_priors_method={method}...')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
@@ -1106,6 +1157,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     my_logger.info(f'\n\tExtract spectrogram: crop raw image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Extract the non rotated background
+
+    my_logger.info('\n\t  ======================= Extract the non rotated background  =============================')
+
     bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
     my_logger.info(f"\n\tBackground statistics: mean={np.nanmean(bgd):.3f} {image.units}, "
@@ -1115,6 +1169,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     err = np.sqrt(err * err + bgd_rms * bgd_rms)
 
     # First guess for lambdas
+
+    my_logger.info('\n\t  ======================= first guess for lambdas  =============================')
+
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
                                                                   x0=image.target_pixcoords, order=spectrum.order)
     s.table['lambdas'] = first_guess_lambdas
@@ -1159,7 +1216,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Summary plot
     if parameters.DEBUG or parameters.LSST_SAVEFIGPATH:
         gs_kw = dict(width_ratios=[3, 0.08], height_ratios=[1, 1, 1])
-        fig, ax = plt.subplots(3, 2, sharex='none', figsize=(12, 6), gridspec_kw=gs_kw)
+        fig, ax = plt.subplots(3, 2, sharex='none', figsize=(16, 8), gridspec_kw=gs_kw)
         xx = np.arange(s.table['Dx'].size)
         plot_image_simple(ax[2, 0], data=data, scale="symlog", title='', units=image.units, aspect='auto', cax=ax[2, 1])
         ax[2, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_disp_axis'], label='Dispersion axis', color="r")
@@ -1310,6 +1367,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     s0.set_polynomial_degrees(s0.deg)
     s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
     s0.from_profile_params_to_shape_params(s0.profile_params)
+
     gs_kw = dict(width_ratios=[2, 1], height_ratios=[2, 1])
     fig, ax = plt.subplots(2, 2, figsize=(11, 5), sharex="all", gridspec_kw=gs_kw)
     ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth")

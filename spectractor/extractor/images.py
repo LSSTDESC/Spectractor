@@ -3,6 +3,7 @@ from astropy.io import fits
 import astropy.units as units
 from scipy import ndimage
 from matplotlib import cm
+from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -204,9 +205,40 @@ class Image(object):
         >>> im.target_guess
         array([405., 295.])
         """
+
+        old_data=np.copy(self.data)
+        old_shape=old_data.shape
+
         new_shape = np.asarray(self.data.shape) // parameters.CCD_REBIN
         self.data = rebin(self.data, new_shape)
         self.stat_errors = np.sqrt(rebin(self.stat_errors ** 2, new_shape))
+        new_shape = self.data.shape
+
+        if parameters.DEBUG and parameters.DISPLAY:
+            fig, ax = plt.subplots(1, 3, figsize=(18, 5))
+
+            im0 = ax[0].imshow(old_data, origin='lower', norm=LogNorm())
+            fig.colorbar(im0, ax=ax[0],orientation = 'horizontal')
+            ax[0].grid()
+            ax[0].set_title(f"original data : {old_shape}")
+
+
+            im1=ax[1].imshow(self.data,origin='lower',norm=LogNorm())
+            fig.colorbar(im1, ax=ax[1],orientation = 'horizontal')
+            ax[1].grid()
+            ax[1].set_title(f"rebinned data : {new_shape}")
+
+            im2=ax[2].imshow(self.stat_errors,origin='lower',norm=LogNorm())
+            fig.colorbar(im2, ax=ax[2],orientation = 'horizontal')
+            ax[2].grid()
+            ax[2].set_title("rebinned stat errors")
+
+            if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+                plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'rebinned_image.pdf'), transparent=True)
+            if parameters.DISPLAY:  # pragma: no cover
+                plt.show()
+
+
         if self.target_guess is not None:
             self.target_guess = np.asarray(self.target_guess) / parameters.CCD_REBIN
 
@@ -800,6 +832,9 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
                 parameters.PdfPages.savefig()
         else:
             my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
+
+
+
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "fit" or rotated:
         if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
             if guess is None:
@@ -815,6 +850,25 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
             sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
                                                                                 widths=(Dx, Dy))
             sub_image_x0, sub_image_y0 = x0, y0
+
+            if parameters.DEBUG:
+
+                if parameters.DISPLAY:
+
+                    fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+                    im0 = ax[0].imshow(sub_image_subtracted,origin="lower",norm=LogNorm())
+                    fig.colorbar(im0, ax=ax[0])
+                    ax[0].set_title("sub_image_subtracted")
+                    im1=ax[1].imshow(sub_errors, origin="lower", norm=LogNorm())
+                    ax[1].set_title("sub_image_errors")
+                    fig.colorbar(im1, ax=ax[1])
+
+                    if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+                        plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'sub_image_subtracted.pdf'),
+                                          transparent=True)
+                    if parameters.DISPLAY:  # pragma: no cover
+                        plt.show()
+
             for i in range(niter):
                 # find the target
                 # try:
@@ -922,12 +976,21 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     else:
         sub_image = np.copy(image.data[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
         sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-    image.saturation = parameters.CCD_MAXADU / image.expo
+
+    # usually one rebin by adding pixel contents
+    image.saturation = parameters.CCD_MAXADU / image.expo *parameters.CCD_REBIN**2
+
     NY, NX = sub_image.shape
     Y, X = np.mgrid[:NY, :NX]
+
     bkgd_2D = fit_poly2d_outlier_removal(X, Y, sub_image, order=1, sigma=3)
     image.target_bkgd2D = bkgd_2D
+
     sub_image_subtracted = sub_image - bkgd_2D(X, Y)
+
+    # SDC : very important clipping negative signal, avoiding crash later
+    sub_image_subtracted = np.where(sub_image_subtracted<0,0,sub_image_subtracted)
+
     saturated_pixels = np.where(sub_image >= image.saturation)
     if len(saturated_pixels[0]) > 0:
         image.my_logger.debug(

@@ -2083,7 +2083,7 @@ def from_lambda_to_colormap(lambdas):
     return spectralmap
 
 
-def rebin(arr, new_shape):
+def rebin(arr, new_shape, FLAG_MAKESUM=True):
     """Rebin and reshape a numpy array.
 
     Parameters
@@ -2109,13 +2109,23 @@ def rebin(arr, new_shape):
            [4., 4., 4., 4., 4.],
            [4., 4., 4., 4., 4.]])
     """
+
+
+
     if np.any(new_shape * parameters.CCD_REBIN != arr.shape):
         shape_cropped = new_shape * parameters.CCD_REBIN
         margins = np.asarray(arr.shape) - shape_cropped
         arr = arr[:-margins[0], :-margins[1]]
     shape = (new_shape[0], arr.shape[0] // new_shape[0],
              new_shape[1], arr.shape[1] // new_shape[1])
-    return arr.reshape(shape).mean(-1).mean(1)
+
+    if FLAG_MAKESUM:
+        # SDC : conservation of energy
+        return arr.reshape(shape).sum(-1).sum(1)
+
+    else:
+        # SDC : sure of conservation of energy
+        return arr.reshape(shape).mean(-1).mean(1)
 
 
 def set_wcs_output_directory(file_name, output_directory=""):
@@ -2330,10 +2340,10 @@ def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):
     ax.set_title("Correlation matrix")
     if axis_names is not None:
         names = [axis_names[ip] for ip in ipar]
-        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=9)
-        plt.yticks(np.arange(ipar.size), names, fontsize=7)
+        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=15)
+        plt.yticks(np.arange(ipar.size), names, fontsize=15)
     cbar = plt.colorbar(im)
-    cbar.ax.tick_params(labelsize=7)
+    cbar.ax.tick_params(labelsize=15)
     plt.gcf().tight_layout()
 
 

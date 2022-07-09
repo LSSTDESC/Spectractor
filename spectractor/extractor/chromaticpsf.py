@@ -1286,7 +1286,11 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             model = model.reshape((self.Ny, self.Nx))
             err = err.reshape((self.Ny, self.Nx))
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
-        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), gridspec_kw=gs_kw)
+
+
+        #fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), gridspec_kw=gs_kw)
+        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(14, 14), gridspec_kw=gs_kw)
+
         norm = np.nanmax(data)
         plot_image_simple(ax[1, 0], data=model / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
                           units='1/max(data)', cmap=cmap_viridis)
@@ -1301,6 +1305,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         std = float(np.nanstd(residuals))
         plot_image_simple(ax[2, 0], data=residuals, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
                           aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
+
         ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
         ax[2, 0].text(0.05, 0.05, f'mean={np.nanmean(residuals):.3f}\nstd={np.nanstd(residuals):.3f}',
                       horizontalalignment='left', verticalalignment='bottom',
