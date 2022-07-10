@@ -677,18 +677,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
     def plot_fitted_parameters(self,title="output from simulate"):
 
-        plt.figure(figsize=(18,4))
+        plt.figure(figsize=(18,5))
         plt.imshow(self.data.reshape((self.Ny, self.Nx)), origin="lower")
         plt.scatter(self.profile_params[:, 1], self.profile_params[:, 2], label="profile",
-                         cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
+                         cmap=from_lambda_to_colormap(self.lambdas), s=30, c=self.lambdas)
         plt.scatter(self.profile_params_order2[:, 1], self.profile_params_order2[:, 2], label="order 2",
-                         cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
-        plt.plot(self.profile_params[:, 1], self.profile_params[:, 2], label="profile")
+                         cmap=from_lambda_to_colormap(self.lambdas), s=30, c=self.lambdas)
+        plt.plot(self.profile_params[:, 1], self.profile_params[:, 2], label="profile",lw=3)
         plt.plot(self.profile_params[:, 1], self.Dy_disp_axis + self.spectrum.spectrogram_y0 + self.dy0 - self.bgd_width, 'k-',
-                      label="disp_axis")
+                      label="disp_axis",lw=3)
         plt.plot(self.spectrum.chromatic_psf.table['Dx'] + self.spectrum.spectrogram_x0 + self.dx0,
                       self.spectrum.chromatic_psf.table['Dy'] + self.spectrum.spectrogram_y0 + self.dy0 - self.bgd_width,
-                      label="y_c")
+                      label="y_c",lw=3)
         plt.legend()
         plt.title(f"D_CCD={self.D2CCD:.2f}, dx0={self.dx0:.2g}, dy0={self.dy0:.2g}")
         plt.xlim((0, self.Nx))
@@ -696,6 +696,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         plt.grid()
         plt.gca().set_aspect("auto")
         plt.suptitle(title)
+        plt.tight_layout()
         plt.show()
 
 
