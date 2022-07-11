@@ -120,7 +120,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                            r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]",
                            r"$\alpha$ [deg]", "$B$", "R", r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]"]\
                           + list(self.psf_poly_params_names)
-        bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
+        bounds_D = (self.D - 3 * parameters.DISTANCE2CCD_ERR, self.D + 3 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
                                                 (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
                                                 (-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR),
@@ -677,7 +677,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
     def plot_fitted_parameters(self,title="output from simulate"):
 
-        plt.figure(figsize=(18,5))
+        plt.figure(figsize=(18,6))
         plt.imshow(self.data.reshape((self.Ny, self.Nx)), origin="lower")
         plt.scatter(self.profile_params[:, 1], self.profile_params[:, 2], label="profile",
                          cmap=from_lambda_to_colormap(self.lambdas), s=30, c=self.lambdas)
