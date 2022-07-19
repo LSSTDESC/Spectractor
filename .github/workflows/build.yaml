@@ -21,6 +21,11 @@ jobs:
           channel-priority: strict
           show-channel-urls: true
 
+      - name: Test Simbad URL is contactable
+        shell: bash -l {0}
+        run: |
+          curl -L http://simbad.u-strasbg.fr/ > /dev/null
+
       - name: Install dependencies
         # Might be quicker to install rubin-env plus any necessary additions.
         shell: bash -l {0}
