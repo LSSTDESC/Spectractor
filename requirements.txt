@@ -18,7 +18,8 @@ iminuit>=2
 coverage>=3.6 # <5
 configparser
 coveralls
-pysynphot
 deprecated
 pyyaml
 nose
+getCalspec
+pysynphot

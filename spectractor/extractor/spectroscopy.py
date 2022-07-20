@@ -66,7 +66,9 @@ class Line:
         self.fit_snr = None
         self.fit_fwhm = None
         self.fit_popt = None
+        self.fit_pcov = None
         self.fit_popt_gaussian = None
+        self.fit_pcov_gaussian = None
         self.fit_chisq = None
         self.fit_eqwidth_mod = None
         self.fit_eqwidth_data = None
@@ -471,18 +473,19 @@ class Lines:
                 peak_pos = popt[bgd_npar + 3 * j + 1]
                 FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
                 signal_level = popt[bgd_npar + 3 * j]
+                err = np.sqrt(line.fit_pcov[bgd_npar + 3 * j + 1, bgd_npar + 3 * j + 1])
                 if line.high_snr:
-                    rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength,
+                    rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength, err,
                                  FWHM, signal_level, line.fit_snr, line.fit_chisq, line.fit_eqwidth_mod,
                                  line.fit_eqwidth_data))
                 j += 1
         t = None
         if len(rows) > 0:
             t = Table(rows=rows, names=(
-                'Line', 'Tabulated', 'Detected', 'Shift', 'FWHM', 'Amplitude', 'SNR', 'Chisq', 'Eqwidth_mod',
+                'Line', 'Tabulated', 'Detected', 'Shift', 'Err', 'FWHM', 'Amplitude', 'SNR', 'Chisq', 'Eqwidth_mod',
                 'Eqwidth_data'),
-                      dtype=('a12', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
-            for col in t.colnames[1:5]:
+                      dtype=('a12', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
+            for col in t.colnames[1:6]:
                 t[col].unit = 'nm'
             t[t.colnames[5]].unit = amplitude_units
             for col in t.colnames[-2:]:

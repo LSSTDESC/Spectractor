@@ -647,6 +647,12 @@ class Hologram(Grating):
         self.is_hologram = True
         self.load_specs(verbose=verbose)
 
+    def theta_func(self, x, y):
+        return self.theta_tilt
+
+    def N_func(self, x, y):
+        return self.N_input
+
     def N(self, x):
         """Return the number of grooves per mm of the grating at position x. If the position is inside
         the data provided by the text files, this number is computed from an interpolation. If it lies outside,
@@ -749,11 +755,10 @@ class Hologram(Grating):
             filename = os.path.join(self.data_dir, self.label, "N.txt")
             if os.path.isfile(filename):
                 a = np.loadtxt(filename)
-
-                def N_func(x, y):
-                    return a[0]
-                self.N_interp = N_func
-                self.N_fit = N_func
+                self.N_input = a[0]
+                self.N_err = a[1]
+                self.N_interp = self.N_func
+                self.N_fit = self.N_func
             else:
                 raise ValueError("To define an hologram, you must provide hologram_grooves_per_mm.txt or N.txt files.")
         filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
@@ -773,9 +778,7 @@ class Hologram(Grating):
                 self.theta_y /= parameters.CCD_REBIN
             self.theta_interp = interpolate.interp2d(self.theta_x, self.theta_y, self.theta_data, kind='cubic')
         else:
-            def theta_func(x, y):
-                return self.theta_tilt
-            self.theta_interp = theta_func
+            self.theta_interp = self.theta_func
         self.x_lines, self.line1, self.line2 = neutral_lines(self.holo_center[0], self.holo_center[1], self.theta_tilt)
         if verbose:
             if self.is_hologram:

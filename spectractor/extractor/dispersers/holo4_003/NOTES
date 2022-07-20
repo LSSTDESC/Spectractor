@@ -1,0 +1,2 @@
+- transmission.txt : measurements from LPNHE optical test bench using holo-4-003-diffraction-efficiencies-merged.npy
+- ratio_order_2over1.txt : chimera with LPNHE optical test bench measurements between 430 and 1000nm, then extrapolating with an hologram efficiency model fitted on data

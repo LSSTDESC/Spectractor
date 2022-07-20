@@ -1,10 +1,10 @@
 from astropy.coordinates import SkyCoord, Distance
 import astropy.units as u
 from astropy.time import Time
+from astroquery.simbad import SimbadClass
 
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
-import os
 import numpy as np
 
 from spectractor import parameters
@@ -12,8 +12,7 @@ from spectractor.config import set_logger
 from spectractor.extractor.spectroscopy import (Lines, HGAR_LINES, HYDROGEN_LINES, ATMOSPHERIC_LINES,
                                                 ISM_LINES, STELLAR_LINES)
 
-if os.getenv("PYSYN_CDBS"):
-    import pysynphot as S
+from getCalspec import getCalspec
 
 
 def load_target(label, verbose=False):
@@ -151,6 +150,13 @@ class Monochromator(Target):
         pass
 
 
+def patchSimbadURL(simbad):
+    """Monkeypatch the URL that Simbad is using to force it to use https.
+    """
+    simbad.SIMBAD_URL = (simbad.SIMBAD_URL.replace('http', 'https')
+                         if 'https' not in simbad.SIMBAD_URL else simbad.SIMBAD_URL)
+
+
 class Star(Target):
 
     def __init__(self, label, verbose=False):
@@ -189,7 +195,6 @@ class Star(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
-        self.simbad = None
         self.load()
 
     def load(self):
@@ -197,28 +202,41 @@ class Star(Target):
 
         Examples
         --------
+        >>> parameters.VERBOSE = True
         >>> s = Star('3C273')
         >>> print(s.radec_position.dec)
-        2d03m08.598s
-
+        2d03m08.597s
+        >>> print(s.redshift)
+        0.158339
+        >>> s = Star('eta dor')
+        >>> print(s.radec_position.dec)
+        -66d02m22.635s
         """
-        # currently (pending a new release) astroquery has a race
-        # condition at import time, so putting here rather than at the
-        # module level so that multiple test runners don't run the race
-        from astroquery.simbad import Simbad
-        Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
-                                  'parallax', 'pm', 'z_value')
-        simbad = Simbad.query_object(self.label)
-        self.simbad = simbad
-        if simbad is not None:
+        # explicitly make a class instance here because:
+        # when using ``from astroquery.simbad import Simbad`` and then using
+        # ``Simbad...`` methods secretly makes an instance, which stays around,
+        # has a connection go stale, and then raises an exception seemingly
+        # at some random time later
+        simbadQuerier = SimbadClass()
+        patchSimbadURL(simbadQuerier)
+
+        simbadQuerier.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
+                                         'parallax', 'pm', 'z_value')
+        astroquery_label = self.label
+        if getCalspec.is_calspec(self.label):
+            calspec = getCalspec.Calspec(self.label)
+            astroquery_label = calspec.Astroquery_Name
+        simbad_table = simbadQuerier.query_object(astroquery_label)
+
+        if simbad_table is not None:
             if self.verbose or True:
-                self.my_logger.info(f'\n\tSimbad:\n{simbad}')
-            self.radec_position = SkyCoord(simbad['RA'][0] + ' ' + simbad['DEC'][0], unit=(u.hourangle, u.deg))
+                self.my_logger.info(f'\n\tSimbad:\n{simbad_table}')
+            self.radec_position = SkyCoord(simbad_table['RA'][0] + ' ' + simbad_table['DEC'][0], unit=(u.hourangle, u.deg))
         else:
-            self.my_logger.warning(f'Target {self.label} not found in Simbad')
-        self.get_radec_position_after_pm(date_obs="J2000")
-        if not np.ma.is_masked(simbad['Z_VALUE']):
-            self.redshift = float(simbad['Z_VALUE'])
+            raise RuntimeError(f"Target {self.label} not found in Simbad")
+        self.get_radec_position_after_pm(simbad_table, date_obs="J2000")
+        if not np.ma.is_masked(simbad_table['Z_VALUE']):
+            self.redshift = float(simbad_table['Z_VALUE'])
         else:
             self.redshift = 0
         self.load_spectra()
@@ -247,34 +265,21 @@ class Star(Target):
         """
         self.wavelengths = []  # in nm
         self.spectra = []
-        # first try with pysynphot
-        file_names = []
-        is_calspec = False
-        if os.getenv("PYSYN_CDBS") is not None:
-            dirname = os.path.expandvars('$PYSYN_CDBS/calspec/')
-            for fname in os.listdir(dirname):
-                if os.path.isfile(os.path.join(dirname, fname)):
-                    if self.label.lower().replace(' ','') in fname.lower():
-                        file_names.append(os.path.join(dirname, fname))
-        if len(file_names) > 0:
-            is_calspec = True
+        # first try if it is a Calspec star
+        is_calspec = getCalspec.is_calspec(self.label)
+        if is_calspec:
+            calspec = getCalspec.Calspec(self.label)
             self.emission_spectrum = False
             self.hydrogen_only = False
             self.lines = Lines(HYDROGEN_LINES + ATMOSPHERIC_LINES + STELLAR_LINES,
                                redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
-            for k, f in enumerate(file_names):
-                if '_mod_' in f:
-                    continue
-                if self.verbose:
-                    self.my_logger.info('\n\tLoading %s' % f)
-                data = S.FileSpectrum(f, keepneg=True)
-                if isinstance(data.waveunits, S.units.Angstrom):
-                    self.wavelengths.append(data.wave / 10.)
-                    self.spectra.append(data.flux * 10.)
-                else:
-                    self.wavelengths.append(data.wave)
-                    self.spectra.append(data.flux)
+            spec_dict = calspec.get_spectrum_numpy()
+            # official units in spectractor are nanometers for wavelengths and erg/s/cm2/nm for fluxes
+            spec_dict["WAVELENGTH"] = spec_dict["WAVELENGTH"].to(u.nm)
+            spec_dict["FLUX"] = spec_dict["FLUX"].to(u.erg / u.second / u.cm**2 / u.nm)
+            self.wavelengths.append(spec_dict["WAVELENGTH"].value)
+            self.spectra.append(spec_dict["FLUX"].value)
         # TODO DM-33731: the use of self.label in parameters.STAR_NAMES:
         # below works for running but breaks a test so needs fixing for DM
         elif 'HD' in self.label:  # or self.label in parameters.STAR_NAMES:  # it is a star
@@ -333,14 +338,14 @@ class Star(Target):
                              f"\n\tEmission spectrum ? {self.emission_spectrum}"
                              f"\n\tLines: {[l.label for l in self.lines.lines]}")
 
-    def get_radec_position_after_pm(self, date_obs):
-        target_pmra = self.simbad[0]['PMRA'] * u.mas / u.yr
+    def get_radec_position_after_pm(self, simbad_table, date_obs):
+        target_pmra = simbad_table[0]['PMRA'] * u.mas / u.yr
         if np.isnan(target_pmra):
             target_pmra = 0 * u.mas / u.yr
-        target_pmdec = self.simbad[0]['PMDEC'] * u.mas / u.yr
+        target_pmdec = simbad_table[0]['PMDEC'] * u.mas / u.yr
         if np.isnan(target_pmdec):
             target_pmdec = 0 * u.mas / u.yr
-        target_parallax = self.simbad[0]['PLX_VALUE'] * u.mas
+        target_parallax = simbad_table[0]['PLX_VALUE'] * u.mas
         if target_parallax == 0 * u.mas:
             target_parallax = 1e-4 * u.mas
         target_coord = SkyCoord(ra=self.radec_position.ra, dec=self.radec_position.dec,
@@ -383,10 +388,10 @@ class Star(Target):
         # target.load_spectra()  ## No global target object available  here (SDC)
         plt.figure()  # necessary to create a new plot (SDC)
         for isp, sp in enumerate(self.spectra):
-            plt.plot(self.wavelengths[isp], sp, label='Spectrum %d' % isp)
+            plt.plot(self.wavelengths[isp], sp, label=f'Spectrum {isp}')
         plt.xlim((300, 1100))
         plt.xlabel(r'$\lambda$ [nm]')
-        plt.ylabel('Flux')
+        plt.ylabel('Flux [erg/s/cm2/nm]')
         plt.title(self.label)
         plt.legend()
         if parameters.DISPLAY:  # pragma: no cover
