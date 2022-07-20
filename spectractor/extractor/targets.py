@@ -149,6 +149,13 @@ class Monochromator(Target):
         pass
 
 
+def patchSimbadURL(simbad):
+    """Monkeypatch the URL that Simbad is using to force it to use https.
+    """
+    simbad.SIMBAD_URL = (simbad.SIMBAD_URL.replace('http', 'https')
+                         if 'https' not in simbad.SIMBAD_URL else simbad.SIMBAD_URL)
+
+
 class Star(Target):
 
     def __init__(self, label, verbose=False):
@@ -209,6 +216,7 @@ class Star(Target):
         # condition at import time, so putting here rather than at the
         # module level so that multiple test runners don't run the race
         from astroquery.simbad import Simbad
+        patchSimbadURL(Simbad)
         Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
                                   'parallax', 'pm', 'z_value')
         astroquery_label = self.label
