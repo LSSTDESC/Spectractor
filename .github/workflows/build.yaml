@@ -56,8 +56,8 @@ jobs:
 #          python setup.py nosetests
 
       - name: Coveralls
-        uses: coverallsapp/github-action@master
-        with:
+        #uses: coverallsapp/github-action@master
+        env:
             github-token: ${{ secrets.GITHUB_TOKEN }}
         run: |
           coveralls --service=github
