@@ -163,7 +163,7 @@ def fullchain_run(sim_image="./tests/data/sim_20170530_134.fits"):
                                 f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
                                 f"{np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma}")
         assert np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma
-    assert np.abs(w.p[1]) / np.sqrt(w.cov[1, 1]) < nsigma  # A2
+    assert np.abs(w.p[1]) / np.sqrt(w.cov[1, 1]) < 2*nsigma  # A2
     assert np.isclose(w.p[6], spectrum.header["D2CCD_T"], atol=parameters.DISTANCE2CCD_ERR)  # D2CCD
     assert np.isclose(np.abs(w.p[7]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
     assert np.isclose(np.abs(w.p[8]), 0, atol=1e-3)  # B
