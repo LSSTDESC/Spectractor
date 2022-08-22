@@ -137,7 +137,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # self.fixed[4] = True  # angle
         self.fixed[5] = True  # B: not needed in simulations, to check with data
         self.fixed[6] = True  # camera rot
-        self.fixed[7] = False  # pressure
+        self.fixed[7] = True  # pressure
+        self.fixed[8] = True  # temperature
         self.fixed[-1] = True  # saturation
         self.nwalkers = max(2 * self.ndim, nwalkers)
 
