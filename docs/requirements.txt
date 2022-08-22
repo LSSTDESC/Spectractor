@@ -6,3 +6,4 @@ astropy>3.1
 coloredlogs
 recommonmark
 m2r
+mistune==2.0.3
