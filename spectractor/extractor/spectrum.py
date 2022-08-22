@@ -628,7 +628,7 @@ class Spectrum:
             for attribute, header_key in fits_mappings.items():
                 if (item := self.header.get(header_key)) is not None:
                     setattr(self, attribute, item)
-                    print(f'set {attribute} to {item}')
+                    # print(f'set {attribute} to {item}')
                 else:
                     print(f'Failed to set spectrum attribute {attribute} using header {header_key}')
 
