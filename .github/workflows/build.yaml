@@ -55,14 +55,14 @@ jobs:
 #        run: |
 #          python setup.py nosetests
 
+      - name: Run doctests and coverage
+        shell: bash -l {0}
+        run: |
+          ./coverage_and_test.sh
+
       - name: Coveralls
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pip3 install --upgrade coveralls
           coveralls --service=github
-#      - name: Coveralls
-#        uses: coverallsapp/github-action@master
-#        with:
-#            github-token: ${{ secrets.GITHUB_TOKEN }}
-#            path-to-lcov: ${{ github.workspace }}/.coverage
