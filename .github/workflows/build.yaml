@@ -54,3 +54,8 @@ jobs:
         shell: bash -l {0}
         run: |
           nosetests tests/run_full_chain.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
+
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+            github-token: ${{ secrets.GITHUB_TOKEN }}
