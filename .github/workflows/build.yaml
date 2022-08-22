@@ -45,15 +45,15 @@ jobs:
         run: |
           pip install -v -e .
 
-      - name: Run nosetests
-        shell: bash -l {0}
-        run: |
-          python setup.py nosetests
-
       - name: Run full chain
         shell: bash -l {0}
         run: |
           nosetests tests/run_full_chain.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
+
+      - name: Run nosetests
+        shell: bash -l {0}
+        run: |
+          python setup.py nosetests
 
       - name: Coveralls
         uses: coverallsapp/github-action@master
