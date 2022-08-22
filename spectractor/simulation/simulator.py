@@ -735,8 +735,11 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
     my_logger.info('\n\tStart SPECTROGRAMSIMULATOR core program')
     # SIMULATE ATMOSPHERE
     # -------------------
-
-    atmosphere = Atmosphere(airmass, pressure, temperature)
+    atmgrid_filename = spectrum.filename.replace('sim', 'reduc').replace('.fits', '_atmsim.fits')
+    if os.path.isfile(atmgrid_filename):
+        atmosphere = AtmosphereGrid(filename=atmgrid_filename)
+    else:
+        atmosphere = Atmosphere(airmass, pressure, temperature)
     spectrum.rotation_angle = angle
 
     # SPECTRUM SIMULATION
