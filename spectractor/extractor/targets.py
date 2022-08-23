@@ -34,8 +34,8 @@ def load_target(label, verbose=False):
     >>> t = load_target("HD111980", verbose=False)
     >>> print(t.label)
     HD111980
-    >>> print(t.radec_position.dec)
-    -18d31m20.009s
+    >>> print(t.radec_position.dec)  # doctest: +ELLIPSIS
+    -18d31m...s
     >>> parameters.OBS_OBJECT_TYPE = "MONOCHROMATOR"
     >>> t = load_target("XX", verbose=False)
     >>> print(t.label)
@@ -177,8 +177,8 @@ class Star(Target):
         >>> s = Star('3C273')
         >>> print(s.label)
         3C273
-        >>> print(s.radec_position.dec)
-        2d03m08.598s
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        2d03m...s
         >>> print(s.emission_spectrum)
         True
 
@@ -187,8 +187,8 @@ class Star(Target):
         >>> s = Star('HD111980')
         >>> print(s.label)
         HD111980
-        >>> print(s.radec_position.dec)
-        -18d31m20.009s
+        >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
+        -18d31m...s
         >>> print(s.emission_spectrum)
         False
 
@@ -254,7 +254,7 @@ class Star(Target):
         [0.0000000e+00 2.5048577e-14 2.4238061e-14 2.4088789e-14]
         >>> s = Star('HD111980')
         >>> print(s.spectra[0][:4])
-        [2.16890002e-13 2.66480010e-13 2.03540011e-13 2.38780004e-13]
+        [2.3621000e-13 2.1016000e-13 2.1632999e-13 2.4676000e-13]
         >>> s = Star('PKS1510-089')
         >>> print(s.redshift)
         0.36
@@ -368,7 +368,7 @@ class Star(Target):
         >>> s = Star('HD111980')
         >>> s.build_sed(index=0)
         >>> s.sed(550)
-        array(1.67605113e-11)
+        array(1.67448019e-11)
         """
         if len(self.spectra) == 0:
             self.sed = interp1d(parameters.LAMBDAS, np.zeros_like(parameters.LAMBDAS), kind='linear', bounds_error=False,
