@@ -220,7 +220,7 @@ def get_N(deltaX, x0, D=parameters.DISTANCE2CCD, wavelength=656, order=1):
 
 
 def neutral_lines(x_center, y_center, theta_tilt):
-    """Return the nuetrla lines of an hologram."""
+    """Return the neutral lines of a hologram."""
     xs = np.linspace(0, parameters.CCD_IMSIZE, 20)
     line1 = np.tan(theta_tilt * np.pi / 180) * (xs - x_center) + y_center
     line2 = np.tan((theta_tilt + 90) * np.pi / 180) * (xs - x_center) + y_center
@@ -228,7 +228,7 @@ def neutral_lines(x_center, y_center, theta_tilt):
 
 
 def order01_positions(holo_center, N, theta_tilt, theta0=0, lambda_constructor=639e-6, verbose=True):  # pragma: no cover
-    """Return the order 0 and order 1 positions of an hologram."""
+    """Return the order 0 and order 1 positions of a hologram."""
     # refraction angle between order 0 and order 1 at construction
     alpha = np.arcsin(N * lambda_constructor + np.sin(theta0))
     # distance between order 0 and order 1 in pixels
@@ -250,7 +250,7 @@ def order01_positions(holo_center, N, theta_tilt, theta0=0, lambda_constructor=6
 
 
 def find_order01_positions(holo_center, N_interp, theta_interp, lambda_constructor=639e-6, verbose=True):  # pragma: no cover
-    """Find the order 0 and order 1 positions of an hologram."""
+    """Find the order 0 and order 1 positions of a hologram."""
     N = N_interp(holo_center)
     theta_tilt = theta_interp(holo_center)
     theta0 = 0
@@ -311,7 +311,7 @@ class Grating:
         self.transmission_err = None
         self.ratio_order_2over1 = None
         self.flat_ratio_order_2over1 = True
-        self.load_specs(verbose=verbose)
+        self.load_files(verbose=verbose)
 
     def N(self, x):
         """Return the number of grooves per mm of the grating at position x.
@@ -334,8 +334,8 @@ class Grating:
         """
         return self.N_input
 
-    def load_specs(self, verbose=False):
-        """If they exists, load the files in data_dir/label/ to set the main
+    def load_files(self, verbose=False):
+        """If they exist, load the files in data_dir/label/ to set the main
         characteristics of the grating. Overrides the N input at initialisation.
 
         Parameters
@@ -602,7 +602,7 @@ class Hologram(Grating):
 
     def __init__(self, label, D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR,
                  lambda_plot=256000, verbose=False):
-        """Initialize an Hologram object, given its label. Specification are loaded from text files
+        """Initialize a Hologram object, given its label. Specification are loaded from text files
         in data_dir/label/... Inherit from the Grating class.
 
         Parameters
