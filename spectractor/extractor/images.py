@@ -754,6 +754,7 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
 
     Examples
     --------
+    >>> parameters.CCD_REBIN = 1
     >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9")
     >>> im.plot_image()
     >>> guess = [820, 580]

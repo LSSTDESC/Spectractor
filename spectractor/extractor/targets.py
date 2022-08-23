@@ -195,6 +195,7 @@ class Star(Target):
         """
         Target.__init__(self, label, verbose=verbose)
         self.my_logger = set_logger(self.__class__.__name__)
+        self.simbad_table = None
         self.load()
 
     def load(self):
@@ -226,17 +227,17 @@ class Star(Target):
         if getCalspec.is_calspec(self.label):
             calspec = getCalspec.Calspec(self.label)
             astroquery_label = calspec.Astroquery_Name
-        simbad_table = simbadQuerier.query_object(astroquery_label)
+        self.simbad_table = simbadQuerier.query_object(astroquery_label)
 
-        if simbad_table is not None:
+        if self.simbad_table is not None:
             if self.verbose or True:
-                self.my_logger.info(f'\n\tSimbad:\n{simbad_table}')
-            self.radec_position = SkyCoord(simbad_table['RA'][0] + ' ' + simbad_table['DEC'][0], unit=(u.hourangle, u.deg))
+                self.my_logger.info(f'\n\tSimbad:\n{self.simbad_table}')
+            self.radec_position = SkyCoord(self.simbad_table['RA'][0] + ' ' + self.simbad_table['DEC'][0], unit=(u.hourangle, u.deg))
         else:
             raise RuntimeError(f"Target {self.label} not found in Simbad")
-        self.get_radec_position_after_pm(simbad_table, date_obs="J2000")
-        if not np.ma.is_masked(simbad_table['Z_VALUE']):
-            self.redshift = float(simbad_table['Z_VALUE'])
+        self.get_radec_position_after_pm(date_obs="J2000")
+        if not np.ma.is_masked(self.simbad_table['Z_VALUE']):
+            self.redshift = float(self.simbad_table['Z_VALUE'])
         else:
             self.redshift = 0
         self.load_spectra()
@@ -338,22 +339,27 @@ class Star(Target):
                              f"\n\tEmission spectrum ? {self.emission_spectrum}"
                              f"\n\tLines: {[l.label for l in self.lines.lines]}")
 
-    def get_radec_position_after_pm(self, simbad_table, date_obs):
-        target_pmra = simbad_table[0]['PMRA'] * u.mas / u.yr
-        if np.isnan(target_pmra):
-            target_pmra = 0 * u.mas / u.yr
-        target_pmdec = simbad_table[0]['PMDEC'] * u.mas / u.yr
-        if np.isnan(target_pmdec):
-            target_pmdec = 0 * u.mas / u.yr
-        target_parallax = simbad_table[0]['PLX_VALUE'] * u.mas
-        if target_parallax == 0 * u.mas:
-            target_parallax = 1e-4 * u.mas
-        target_coord = SkyCoord(ra=self.radec_position.ra, dec=self.radec_position.dec,
-                                distance=Distance(parallax=target_parallax),
-                                pm_ra_cosdec=target_pmra, pm_dec=target_pmdec, frame='icrs', equinox="J2000",
-                                obstime="J2000")
-        self.radec_position_after_pm = target_coord.apply_space_motion(new_obstime=Time(date_obs))
-        return self.radec_position_after_pm
+    def get_radec_position_after_pm(self, date_obs):
+        if self.simbad_table is not None:
+            target_pmra = self.simbad_table[0]['PMRA'] * u.mas / u.yr
+            if np.isnan(target_pmra):
+                target_pmra = 0 * u.mas / u.yr
+            target_pmdec = self.simbad_table[0]['PMDEC'] * u.mas / u.yr
+            if np.isnan(target_pmdec):
+                target_pmdec = 0 * u.mas / u.yr
+            target_parallax = self.simbad_table[0]['PLX_VALUE'] * u.mas
+            if target_parallax == 0 * u.mas:
+                target_parallax = 1e-4 * u.mas
+            target_coord = SkyCoord(ra=self.radec_position.ra, dec=self.radec_position.dec,
+                                    distance=Distance(parallax=target_parallax),
+                                    pm_ra_cosdec=target_pmra, pm_dec=target_pmdec, frame='icrs', equinox="J2000",
+                                    obstime="J2000")
+            self.radec_position_after_pm = target_coord.apply_space_motion(new_obstime=Time(date_obs))
+            return self.radec_position_after_pm
+        else:
+            self.my_logger.warning("No Simbad table provided: can't apply proper motion correction. "
+                                   "Return original (RA,DEC) coordinates of the object.")
+            return self.radec_position
 
     def build_sed(self, index=0):
         """Interpolate the database reference spectra and return self.sed as a function of the wavelength.
