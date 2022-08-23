@@ -435,9 +435,8 @@ class Astrometry(Image):
         >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
         ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_gaia_catalog_around_target()  #doctest: +ELLIPSIS
-        Created TAP+ (v1.2.1) - Connection:...
         INFO: Query finished...
-
+        <Table length=...>...
         """
         radius = 0.5*np.sqrt(2) * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
                                       np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
@@ -1034,7 +1033,8 @@ class Astrometry(Image):
                   f"--ra {self.target.radec_position.ra.value} --dec {self.target.radec_position.dec.value} " \
                   f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
                   f"--dir {self.output_directory} --out {self.tag} " \
-                  f"--overwrite --x-column X --y-column Y {self.sources_file_name}"
+                  f"--overwrite --x-column X --y-column Y {self.sources_file_name} " \
+                  f"--width {self.data.shape[1]} --height {self.data.shape[0]}"
         self.my_logger.info(f'\n\tRun astrometry.net solve_field command:\n\t{command}')
         log = subprocess.check_output(command, shell=True)
         log_file = open(self.log_file_name, "w+")
