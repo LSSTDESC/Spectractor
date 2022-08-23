@@ -146,7 +146,7 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
     def gauss_jacobian_wrapper(*params):
         return np.array(gauss_jacobian(*params)).T
     popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds, tr_solver='exact', jac=gauss_jacobian_wrapper,
-                           sigma=sigma, method='dogbox', verbose=0, xtol=1e-20, ftol=1e-20)
+                           sigma=sigma, method='dogbox', verbose=0, xtol=1e-15, ftol=1e-15)
     return popt, pcov
 
 
