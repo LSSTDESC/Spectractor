@@ -270,13 +270,13 @@ def find_order01_positions(holo_center, N_interp, theta_interp, lambda_construct
 class Grating:
     """Generic class for dispersers."""
 
-    def __init__(self, N, label="", D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR, verbose=False):
+    def __init__(self, N=-1, label="", D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR, verbose=False):
         """Initialize a standard grating object.
 
         Parameters
         ----------
         N: float
-            The number of grooves per mm of the grating
+            The number of grooves per mm of the grating (default: -1)
         label: str
             String label for the grating (default: '')
         D: float
@@ -298,6 +298,8 @@ class Grating:
         >>> assert g.D is parameters.DISTANCE2CCD
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        if N <= 0 and label == '':
+            raise ValueError("Set either N grooves per mm or the grating label.")
         self.N_input = N
         self.N_err = 1
         self.D = D
@@ -309,7 +311,7 @@ class Grating:
         self.transmission_err = None
         self.ratio_order_2over1 = None
         self.flat_ratio_order_2over1 = True
-        self.load_files(verbose=verbose)
+        self.load_specs(verbose=verbose)
 
     def N(self, x):
         """Return the number of grooves per mm of the grating at position x.
@@ -332,7 +334,7 @@ class Grating:
         """
         return self.N_input
 
-    def load_files(self, verbose=False):
+    def load_specs(self, verbose=False):
         """If they exists, load the files in data_dir/label/ to set the main
         characteristics of the grating. Overrides the N input at initialisation.
 
@@ -366,16 +368,16 @@ class Grating:
             a = np.loadtxt(filename)
             self.N_input = a[0]
             self.N_err = a[1]
-        else:
-            raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
+        # else:
+        #     raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
 
         filename = os.path.join(self.data_dir, self.label, "full_name.txt")
         if os.path.isfile(filename):
             with open(filename, 'r') as f:
                 for line in f:  # MFL: you really just want the last line of the file?
                     self.full_name = line.rstrip('\n')
-        else:
-            raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
+        # else:
+        #     raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
 
         filename = os.path.join(self.data_dir, self.label, "transmission.txt")
         if os.path.isfile(filename):
@@ -734,7 +736,7 @@ class Hologram(Grating):
         >>> h = Hologram(label='XXX')  # doctest: +ELLIPSIS
         Traceback (most recent call last):
         ...
-        FileNotFoundError:...
+        ValueError:...
 
         """
         if verbose:
