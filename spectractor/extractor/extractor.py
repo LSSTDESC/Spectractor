@@ -33,7 +33,10 @@ def dumpfitparameters(w,thelogguer):
     for idx in range(N1):
         tag = w.input_labels[idx]
         val = w.p[idx]
-        line = "- fit param #{} :: {} = {}".format(idx,tag,val)
+        fixed=w.fixed[idx]
+        b1= w.bounds[idx][0]
+        b2= w.bounds[idx][1]
+        line = "- fit param #{} :: {} = {} \t fixed = {} \t bounds {:.3f} - {:.3f}".format(idx,tag,val,fixed,b1,b2)
         list_of_strings.append(line)
     txt = "\n".join(list_of_strings)
     thelogguer.info(txt)
@@ -117,10 +120,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                            r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]",
                            r"$\alpha$ [deg]", "$B$", "R", r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]"]\
                           + list(self.psf_poly_params_names)
-        bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
+        bounds_D = (self.D - 3 * parameters.DISTANCE2CCD_ERR, self.D + 3 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
                                                 (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
                                                 (-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR),
+ #                                               (-20 , 20 ),
                                                 (-90, 90), (0.2, 5), (-360, 360), (300, 1100), (-100, 100)]),
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
@@ -206,6 +210,16 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.Q = L.T @ np.linalg.inv(self.amplitude_priors_cov_matrix) @ L
             # self.Q = L.T @ U.T @ U @ L
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
+
+        # profile params saved to be plotted
+        self.profile_params = None
+        self.profile_params_order2 = None
+        self.D2CCD = parameters.DISTANCE2CCD
+        self.Dy_disp_axis = None
+        self.dx0 = 0
+        self.dy0 = 0
+
+
 
     def set_mask(self, psf_poly_params=None):
         if psf_poly_params is None:
@@ -328,6 +342,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # linear regression for the amplitude parameters
         # prepare the vectors
         A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, *poly_params = params
+
+        # for heavy debugging
+        #self.my_logger.info(f"(dx0,dy0) = ( {dx0:.3f} , {dy0:.3f} ) ")
+
+
         parameters.OBS_CAMERA_ROTATION = rot
         self.p = np.asarray(params)
         W_dot_data = self.W * (self.data + (1 - B) * self.bgd_flat)
@@ -398,25 +417,34 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             profile_params_order2[:, k] = interp1d(distance, profile_params_order2[:, k],
                                                    kind="cubic", fill_value="extrapolate")(distance_order2)
 
-        # if parameters.DEBUG:
-        #     plt.imshow(self.data.reshape((self.Ny, self.Nx)), origin="lower")
-        #     plt.scatter(profile_params[:, 1], profile_params[:, 2], label="profile",
-        #                 cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
-        #     plt.scatter(profile_params_order2[:, 1], profile_params_order2[:, 2], label="order 2",
-        #                 cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
-        #     plt.plot(profile_params[:, 1], profile_params[:, 2], label="profile")
-        #     plt.plot(profile_params[:, 1], Dy_disp_axis + self.spectrum.spectrogram_y0 + dy0 - self.bgd_width, 'k-',
-        #              label="disp_axis")
-        #     plt.plot(self.spectrum.chromatic_psf.table['Dx'] + self.spectrum.spectrogram_x0 + dx0,
-        #              self.spectrum.chromatic_psf.table['Dy'] + self.spectrum.spectrogram_y0 + dy0 - self.bgd_width,
-        #              label="y_c")
-        #     plt.legend()
-        #     plt.title(f"D_CCD={D2CCD:.2f}, dx0={dx0:.2g}, dy0={dy0:.2g}")
-        #     plt.xlim((0, self.Nx))
-        #     plt.ylim((0, self.Ny))
-        #     plt.grid()
-        #     plt.gca().set_aspect("auto")
-        #     plt.show()
+        if parameters.DEBUG and False:
+            plt.figure(figsize=(18,4))
+            plt.imshow(self.data.reshape((self.Ny, self.Nx)), origin="lower")
+            plt.scatter(profile_params[:, 1], profile_params[:, 2], label="profile",
+                         cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
+            plt.scatter(profile_params_order2[:, 1], profile_params_order2[:, 2], label="order 2",
+                         cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
+            plt.plot(profile_params[:, 1], profile_params[:, 2], label="profile")
+            plt.plot(profile_params[:, 1], Dy_disp_axis + self.spectrum.spectrogram_y0 + dy0 - self.bgd_width, 'k-',
+                      label="disp_axis")
+            plt.plot(self.spectrum.chromatic_psf.table['Dx'] + self.spectrum.spectrogram_x0 + dx0,
+                      self.spectrum.chromatic_psf.table['Dy'] + self.spectrum.spectrogram_y0 + dy0 - self.bgd_width,
+                      label="y_c")
+            plt.legend()
+            plt.title(f"D_CCD={D2CCD:.2f}, dx0={dx0:.2g}, dy0={dy0:.2g}")
+            plt.xlim((0, self.Nx))
+            plt.ylim((0, self.Ny))
+            plt.grid()
+            plt.gca().set_aspect("auto")
+            plt.suptitle("simulate")
+            plt.show()
+
+        # save for plotting
+        self.profile_params = profile_params
+        self.profile_params_order2 = profile_params_order2
+        self.Dy_disp_axis = Dy_disp_axis
+        self.dx0 = dx0
+        self.dy0 = dy0
 
         # Matrix filling
         psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params,
@@ -648,6 +676,30 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         run_minimisation(self, "newton", epsilon, fixed, xtol=1e-4, ftol=100 / self.data.size)
         self.sparse_indices = None
 
+    def plot_fitted_parameters(self,title="output from simulate"):
+
+        plt.figure(figsize=(18,6))
+        plt.imshow(self.data.reshape((self.Ny, self.Nx)), origin="lower")
+        plt.scatter(self.profile_params[:, 1], self.profile_params[:, 2], label="profile",
+                         cmap=from_lambda_to_colormap(self.lambdas), s=30, c=self.lambdas)
+        plt.scatter(self.profile_params_order2[:, 1], self.profile_params_order2[:, 2], label="order 2",
+                         cmap=from_lambda_to_colormap(self.lambdas), s=30, c=self.lambdas)
+        plt.plot(self.profile_params[:, 1], self.profile_params[:, 2], label="profile",lw=3)
+        plt.plot(self.profile_params[:, 1], self.Dy_disp_axis + self.spectrum.spectrogram_y0 + self.dy0 - self.bgd_width, 'k-',
+                      label="disp_axis",lw=3)
+        plt.plot(self.spectrum.chromatic_psf.table['Dx'] + self.spectrum.spectrogram_x0 + self.dx0,
+                      self.spectrum.chromatic_psf.table['Dy'] + self.spectrum.spectrogram_y0 + self.dy0 - self.bgd_width,
+                      label="y_c",lw=3)
+        plt.legend()
+        plt.title(f"D_CCD={self.D2CCD:.2f}, dx0={self.dx0:.2g}, dy0={self.dy0:.2g}")
+        plt.xlim((0, self.Nx))
+        plt.ylim((0, self.Ny))
+        plt.grid()
+        plt.gca().set_aspect("auto")
+        plt.suptitle(title)
+        plt.tight_layout()
+        plt.show()
+
 
 def run_ffm_minimisation(w, method="newton", niter=2):
     """Interface function to fit spectrogram simulation parameters to data.
@@ -685,7 +737,11 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
     """
     my_logger = set_logger(__name__)
+    my_logger.info(f"\n --- Start FFM with adjust_spectrogram_position_parameters --- ")
     w.adjust_spectrogram_position_parameters()
+
+    if parameters.DEBUG and parameters.DISPLAY:
+        w.plot_fitted_parameters(title="output of adjust_spectrogram_parameters")
 
     if method != "newton":
         run_minimisation(w, method=method)
@@ -699,16 +755,29 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         epsilon[epsilon == 0] = 1e-4
 
         if parameters.DEBUG:
-            my_logger.info("--- before  run_minimisation ---")
+            my_logger.info("\n --- before  run_minimisation ---")
             dumpfitparameters(w,my_logger)
 
 
         run_minimisation(w, method=method, fix=w.fixed, xtol=1e-4, ftol=10 / w.data.size)
 
         if parameters.DEBUG:
-            my_logger.info("--- after  run_minimisation ---")
+            my_logger.info("\n --- after  run_minimisation ---")
             dumpfitparameters(w,my_logger)
 
+        if parameters.DEBUG and parameters.DISPLAY:
+            w.plot_fit()
+            w.plot_fitted_parameters(title="output of run_minimisation")
+
+        # don't want to fix parameters that should not be fixed
+        #my_logger.info(f"\n --- Start intermediate FFM with adjust_spectrogram_position_parameters (added to see if it help)")
+        #w.adjust_spectrogram_position_parameters()
+
+
+
+
+
+        my_logger.info("\n --- Start regularization parameter only  ---")
         # Optimize the regularisation parameter only if it was not done before
         if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
@@ -722,26 +791,33 @@ def run_ffm_minimisation(w, method="newton", niter=2):
                     f"below the trace of the prior covariance matrix "
                     f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
                     f"high regularisation parameter in case of a bad fit. Therefore the final "
-                    f"covariance matrix is mulitiplied by the ratio of the traces and "
+                    f"covariance matrix is multiplied by the ratio of the traces and "
                     f"the amplitude parameters are very close the amplitude priors.")
                 r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
                 w.amplitude_cov_matrix *= r
                 w.amplitude_params_err = np.array(
                     [np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
 
+        if parameters.DEBUG and parameters.DISPLAY:
+            w.plot_fit()
+            w.plot_fitted_parameters(title="output of regularization parameter")
+
+
+        my_logger.info("\n --- Start run_minimisation_sigma_clipping  ---")
         for i in range(niter):
             w.set_mask(psf_poly_params=w.p[w.psf_params_start_index:])
             run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
                                             ftol=1 / w.data.size, niter_clip=3,
-                                            sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP)
+                                            sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP,verbose=True)
             my_logger.info(f"\n\t  niter = {i} : Newton: total computation time: {time.time() - start}s")
 
             if parameters.DEBUG:
-                my_logger.info("--- after  run_minimisation_sigma_clipping ---")
+                my_logger.info("\n --- after  run_minimisation_sigma_clipping ---")
                 dumpfitparameters(w,my_logger)
 
-            if parameters.DEBUG:
+            if parameters.DEBUG and parameters.DISPLAY:
                 w.plot_fit()
+                w.plot_fitted_parameters(title="run_minimisation_sigma_clipping")
 
 
             w.spectrum.lambdas = np.copy(w.lambdas)
