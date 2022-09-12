@@ -345,10 +345,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # prepare the vectors
         A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *poly_params = params
 
-        # for heavy debugging
-        #self.my_logger.info(f"(dx0,dy0) = ( {dx0:.3f} , {dy0:.3f} ) ")
-
-
         parameters.OBS_CAMERA_ROTATION = rot
         self.p = np.asarray(params)
         W_dot_data = self.W * (self.data + (1 - B) * self.bgd_flat)
@@ -399,15 +395,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Fill spectrogram trace as a function of the pixel column x
         profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + adr_x + dx0
         profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y + dy0) - self.bgd_width
-        # Dy_disp_axis = np.copy(profile_params[:, 2])
-        # profile_params[:, 2] += adr_y + dy0 - self.bgd_width
 
         # Prepare order 2 profile params indexed by the pixel column x
         profile_params_order2 = np.copy(profile_params)
         profile_params_order2[:, 0] = self.spectrum.disperser.ratio_order_2over1(self.lambdas)
-        profile_params_order2[:, 1] = np.arange(self.Nx) + adr_x_2 + dx0
+        profile_params_order2[:, 1] = Dx + self.spectrum.spectrogram_x0 + adr_x_2 + dx0
         profile_params_order2[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y_2 + dy0) - self.bgd_width
-        # profile_params_order2[:, 2] = Dy_disp_axis + adr_y_2 + dy0 - self.bgd_width
 
         # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
         # same PSF as for the order 1 but at the same position
@@ -838,6 +831,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.header['D2CCD'] = w.p[1]
             w.spectrum.header['A2_FIT'] = w.p[0]
             w.spectrum.header["ROTANGLE"] = w.p[4]
+            w.spectrum.header["AM_FIT"] = w.p[9]
 
             # Calibrate the spectrum
             calibrate_spectrum(w.spectrum, with_adr=False)
