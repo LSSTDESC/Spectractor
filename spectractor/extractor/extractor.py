@@ -101,6 +101,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.rotation = parameters.OBS_CAMERA_ROTATION
         self.pressure = np.copy(self.spectrum.pressure)
         self.temperature = np.copy(self.spectrum.temperature)
+        self.airmass = np.copy(self.spectrum.airmass)
         self.psf_poly_params = np.copy(self.spectrum.chromatic_psf.from_table_to_poly_params())
         self.psf_profile_params = np.copy(self.spectrum.chromatic_psf.from_table_to_profile_params())
         length = len(self.spectrum.chromatic_psf.table)
@@ -111,21 +112,21 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
         self.saturation = self.spectrum.spectrogram_saturation
-        self.p = np.array([self.A2, self.D, self.shift_x, self.shift_y, self.angle, self.B, self.rotation, self.pressure, self.temperature])
+        self.p = np.array([self.A2, self.D, self.shift_x, self.shift_y, self.angle, self.B, self.rotation, self.pressure, self.temperature, self.airmass])
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params])
         self.input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]",
-                             r"angle [deg]", "B", "R", "P [hPa]", "T [Celsius]"] + list(self.psf_poly_params_labels)
+                             r"angle [deg]", "B", "R", "P [hPa]", "T [Celsius]", "z"] + list(self.psf_poly_params_labels)
         self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^(\mathrm{fit})$ [pix]",
                            r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]",
-                           r"$\alpha$ [deg]", "$B$", "R", r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]"]\
+                           r"$\alpha$ [deg]", "$B$", "R", r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]", "$z$"]\
                           + list(self.psf_poly_params_names)
         bounds_D = (self.D - 3 * parameters.DISTANCE2CCD_ERR, self.D + 3 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
                                                 (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
                                                 (-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR),
  #                                               (-20 , 20 ),
-                                                (-90, 90), (0.2, 5), (-360, 360), (300, 1100), (-100, 100)]),
+                                                (-90, 90), (0.2, 5), (-360, 360), (300, 1100), (-100, 100), (1.001, 3)]),
                                       psf_poly_params_bounds])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
@@ -143,6 +144,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.fixed[6] = True  # camera rot
         self.fixed[7] = True  # pressure
         self.fixed[8] = True  # temperature
+        self.fixed[9] = False  # airmass
         self.fixed[-1] = True  # saturation
         self.nwalkers = max(2 * self.ndim, nwalkers)
 
@@ -341,7 +343,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         """
         # linear regression for the amplitude parameters
         # prepare the vectors
-        A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, *poly_params = params
+        A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *poly_params = params
 
         # for heavy debugging
         #self.my_logger.info(f"(dx0,dy0) = ( {dx0:.3f} , {dy0:.3f} ) ")
@@ -374,6 +376,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Evaluate ADR
         self.spectrum.adr_params[2] = temperature
         self.spectrum.adr_params[3] = pressure
+        self.spectrum.adr_params[-1] = airmass
         adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
                                     lambda_ref=self.spectrum.lambda_ref)
         adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
