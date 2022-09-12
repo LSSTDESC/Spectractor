@@ -4,6 +4,8 @@
 
 import astropy.coordinates as AC
 from astropy import units as u
+from astropy.coordinates import Latitude
+from scipy.integrate import simpson
 import numpy as np
 from spectractor import parameters
 from spectractor.tools import flip_and_rotate_radec_to_image_xy_coordinates
@@ -94,6 +96,105 @@ class ADR:
 
         return refractive_index(lbda, self.pressure, self.temperature, self.relathumidity)
 
+
+class ADRSinclair1985(ADR):
+
+    def __init__(self, airmass, lbdaref, pressure, parangle, relathumidity, temperature, zenithangle, latitude):
+        ADR.__init__(self, airmass, lbdaref, pressure, parangle, relathumidity, temperature)
+
+        h = parameters.OBS_ALTITUDE * 1000  # observation altitude in meter
+        ht = 11e3  # altitude of tropopause in m
+        hs = 80e3  # altitude of end of atmosphere in m
+        self.P0 = pressure  # observation pressure in millibar
+        self.T0 = temperature + 273.15  # observation temperature in kelvin
+        self.alpha = 6.5e-3  # temperature lapse rate in kelvin/m
+        self.delta = 18.36  # exponent of temperature dependence of water vapour pressure
+        self.Pw0 = relathumidity / 100 * (self.T0 / 247.1) ** self.delta  # partial pressure of water vapour at observer in millibar
+        self.R = 8314.36  # universal gas constant
+        self.Md = 28.966  # mol weight of dry air
+        self.Mw = 18.016  # mol weight of water vapour
+        phi = Latitude(parameters.OBS_LATITUDE, unit=u.deg)  # observation latitude
+        self.g = 9.784 * (1 - 0.0026 * np.cos(2 * phi.value) - 2.8e-7 * h)  # pesanteur acceleration at observation
+        rT = 6378120  # earth radius
+        self.r0 = rT + h
+        self.rt = rT + ht
+        self.rs = rT + hs
+        self.gamma = self.g * self.Md / (self.R * self.alpha)
+        self.z0 = zenithangle
+
+    def get_scale(self, lbda):
+        lbdas = np.atleast_1d(lbda)
+        xis = np.zeros_like(lbdas)
+        dr = (self.rs - self.r0) / 100
+        rr = np.arange(self.r0, self.rs, dr)
+        for i, lbda in enumerate(lbdas):
+            xis[i] = -simpson(self.integrand_r(rr, lbda), x=rr, dx=dr)
+
+        xi_ref = -simpson(self.integrand_r(rr, self.lbdaref * 1e-3), rr, dx=dr)
+        return np.rad2deg(xis - xi_ref) * 3600
+
+    def integrand_r(self, r, lbda):
+        r = np.atleast_1d(r)
+        out = np.zeros_like(r)
+        ind_tropo = r <= self.rt
+        r_tropo = r[ind_tropo]
+        r_strato = r[~ind_tropo]
+
+        # initialisations
+        n0 = self.n(self.r0, lbda)
+        nt = self.n(self.rt, lbda)
+        Tt = self.Tatm_tropo(self.rt)
+        Albda = self.A(lbda)
+        T = self.Tatm_tropo(r_tropo)
+        P = self.Patm_tropo(r_tropo)
+        Pw = self.Pw_tropo(r_tropo)
+
+        # dndr tropopause
+        dndr_tropo = -(self.gamma - 1) * self.alpha * Albda * 1e-6 / (self.T0 * self.T0) * (
+                        self.P0 + (1 - self.Mw / self.Md) * self.gamma / (self.delta - self.gamma) * self.Pw0) * (T / self.T0) ** (self.gamma - 2) + (
+                               self.delta - 1) * self.alpha * 1e-6 / (self.T0 * self.T0) * (
+                               Albda * (1 - self.Mw / self.Md) * self.gamma / (self.delta - self.gamma) + 11.2684) * self.Pw0 * (T / self.T0) ** (
+                               self.delta - 2)
+        # n tropopause
+        n_tropo = 1 + 1e-6 * (Albda * P - 11.2684*Pw)/T
+
+        # n stratosphere
+        n_strato = 1 + (nt - 1) * np.exp(-self.g * self.Md * (r_strato - self.rt) / (self.R * Tt))
+
+        # dndr stratosphere
+        dndr_strato = -self.g * self.Md / (self.R * Tt) * (nt - 1) * np.exp(-self.g * self.Md * (r_strato - self.rt) / (self.R * Tt))
+
+        # integrand
+        z_tropo = np.arcsin(n0 * self.r0 * np.sin(self.z0) / (n_tropo * r_tropo))
+        z_strato = np.arcsin(n0 * self.r0 * np.sin(self.z0) / (n_strato * r_strato))
+        out[ind_tropo] = np.tan(z_tropo) / n_tropo * dndr_tropo
+        out[~ind_tropo] = np.tan(z_strato) / n_strato * dndr_strato
+        return out
+
+    def n(self, r, lbda):
+        r = np.atleast_1d(r)
+        out = np.zeros_like(r)
+        ind_tropo = r <= self.rt
+        out[ind_tropo] = 1 + 1e-6 * (
+                    self.A(lbda) * self.Patm_tropo(r[ind_tropo]) - 11.2684 * self.Pw_tropo(r[ind_tropo])) / self.Tatm_tropo(r[ind_tropo])
+
+        Tt = self.Tatm_tropo(self.rt)
+        nt = 1 + 1e-6 * (self.A(lbda) * self.Patm_tropo(self.rt) - 11.2684 * self.Pw_tropo(self.rt)) / Tt
+        n_strato = 1 + (nt - 1) * np.exp(-self.g * self.Md * (r[~ind_tropo] - self.rt) / (self.R * Tt))
+        out[~ind_tropo] = n_strato
+        return out
+
+    def Patm_tropo(self, r):
+        return (self.P0 + (1 - self.Mw/self.Md)*self.gamma/(self.delta - self.gamma) * self.Pw0) * (self.Tatm_tropo(r)/self.T0)**self.gamma - (1-self.Mw/self.Md)*self.gamma/(self.delta-self.gamma)*self.Pw_tropo(r)
+
+    def Pw_tropo(self, r):
+        return self.Pw0 * (self.Tatm_tropo(r)/self.T0)**self.delta
+
+    def Tatm_tropo(self, r):
+        return self.T0 - self.alpha * (r - self.r0)
+    @staticmethod
+    def A(lbda):
+        return (287.604 + 1.6288/lbda**2 + 0.0136/lbda**4) * 273.15 / 1013.25
 
 ##############################
 #                            #
@@ -301,9 +402,13 @@ def instanciation_adr(params, latitude, lbda_ref):
 
     temperature, pressure, humidity, airmass = params[2:]
 
-    _, parangle = hadec2zdpar(hour_angle.degree, dec.degree, latitude.degree, deg=True)
+    z0, parangle = hadec2zdpar(hour_angle.degree, dec.degree, latitude.degree, deg=True)
     adr = ADR(airmass=airmass, parangle=parangle, temperature=temperature,
               pressure=pressure, lbdaref=lbda_ref, relathumidity=humidity)
+
+    # adr = ADRSinclair1985(airmass=airmass, parangle=parangle, temperature=temperature,
+    #                       pressure=pressure, lbdaref=lbda_ref, relathumidity=humidity,
+    #                       latitude=latitude.degree, zenithangle=z0)
 
     return adr
 
