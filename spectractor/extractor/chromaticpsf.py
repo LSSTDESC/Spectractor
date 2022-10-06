@@ -273,7 +273,7 @@ class ChromaticPSF:
         return np.clip(output, 0, self.saturation)
 
     def build_psf_cube(self, pixels, profile_params, fwhmx_clip=parameters.PSF_FWHM_CLIP,
-                       fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float64"):
+                       fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float64", mask=None):
         Ny_pix, Nx_pix = pixels[0].shape
         psf_cube = np.zeros((len(profile_params), Ny_pix, Nx_pix), dtype=dtype)
         fwhms = self.table["fwhm"]
@@ -283,13 +283,22 @@ class ChromaticPSF:
                 continue
             if xc > Nx_pix + fwhmx_clip * fwhms[x]:
                 break
-            xmin = max(0, int(xc - max(fwhmx_clip * fwhms[x], parameters.PIXWIDTH_SIGNAL)))
-            xmax = min(Nx_pix, int(xc + max(parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
-            ymin = max(0, int(yc - max(parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
-            ymax = min(Ny_pix, int(yc + max(parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
-            # print(x, xc, yc, xmin, xmax, ymin, ymax, fwhms[x])
-            psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax],
-                                                                  p=profile_params[x, :])
+            if mask is None:
+                xmin = max(0, int(xc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
+                xmax = min(Nx_pix, int(xc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
+                ymin = max(0, int(yc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
+                ymax = min(Ny_pix, int(yc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
+                # print(x, xc, yc, xmin, xmax, ymin, ymax, fwhms[x])
+                psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax],
+                                                                      p=profile_params[x, :])
+            else:
+                maskx = np.any(mask[x], axis=0)
+                masky = np.any(mask[x], axis=1)
+                xmin = np.argmax(maskx)
+                ymin = np.argmax(masky)
+                xmax = len(maskx) - np.argmax(maskx[::-1])
+                ymax = len(masky) - np.argmax(masky[::-1])
+                psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], p=profile_params[x, :])
         return psf_cube
 
     def fill_table_with_profile_params(self, profile_params):
