@@ -1,5 +1,5 @@
 import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
-mpl.use('Agg')
+#mpl.use('Agg')
 
 from numpy.testing import run_module_suite  # noqa: E402
 
