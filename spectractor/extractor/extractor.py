@@ -951,7 +951,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.header["ROTANGLE"] = w.p[4]
             w.spectrum.header["AM_FIT"] = w.p[9]
             # Compute order 2 contamination
-            w.spectrum.lambdas_order2 = w.lambdas_order2
+            w.spectrum.lambdas_order2 = w.lambdas
             w.spectrum.data_order2 = w.p[0] * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
             w.spectrum.err_order2 = w.p[0] * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
 
