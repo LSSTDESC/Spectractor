@@ -950,6 +950,10 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.header['A2_FIT'] = w.p[0]
             w.spectrum.header["ROTANGLE"] = w.p[4]
             w.spectrum.header["AM_FIT"] = w.p[9]
+            # Compute order 2 contamination
+            w.spectrum.lambdas_order2 = w.lambdas_order2
+            w.spectrum.data_order2 = w.p[0] * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+            w.spectrum.err_order2 = w.p[0] * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
 
             # Calibrate the spectrum
             calibrate_spectrum(w.spectrum, with_adr=False)
@@ -967,8 +971,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             parameters.SAVE = False
 
     # Save results
-    w.spectrum.convert_from_ADUrate_to_flam()
-    x, model, model_err = w.simulate(*w.p)
+    # w.spectrum.convert_from_ADUrate_to_flam()
+    # x, model, model_err = w.simulate(*w.p)
 
     # Propagate uncertainties
     # from spectractor.tools import plot_correlation_matrix_simple, compute_correlation_matrix
@@ -1005,11 +1009,6 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     w.spectrum.x0[1] += dy0
     w.spectrum.header["TARGETX"] = w.spectrum.x0[0]
     w.spectrum.header["TARGETY"] = w.spectrum.x0[1]
-
-    # Compute order 2 contamination
-    w.spectrum.lambdas_order2 = w.lambdas
-    w.spectrum.data_order2 = A2 * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
-    w.spectrum.err_order2 = A2 * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
 
     # Convert to flam
     w.spectrum.convert_from_ADUrate_to_flam()
@@ -1407,40 +1406,30 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Summary plot
     if parameters.DEBUG or parameters.LSST_SAVEFIGPATH:
-        gs_kw = dict(width_ratios=[3, 0.08], height_ratios=[1, 1, 1])
-        fig, ax = plt.subplots(3, 2, sharex='none', figsize=(16, 8), gridspec_kw=gs_kw)
+        gs_kw = dict(width_ratios=[3, 0.08], height_ratios=[1, 1])
+        fig, ax = plt.subplots(2, 2, sharex='none', figsize=(16, 6), gridspec_kw=gs_kw)
         xx = np.arange(s.table['Dx'].size)
-        plot_image_simple(ax[2, 0], data=data, scale="symlog", title='', units=image.units, aspect='auto', cax=ax[2, 1])
-        ax[2, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_disp_axis'], label='Dispersion axis', color="r")
-        ax[2, 0].scatter(xx, target_pixcoords_spectrogram[1] + s.table['Dy'],
+        plot_image_simple(ax[1, 0], data=data, scale="symlog", title='', units=image.units, aspect='auto', cax=ax[1, 1])
+        ax[1, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_disp_axis'], label='Dispersion axis', color="r")
+        ax[1, 0].scatter(xx, target_pixcoords_spectrogram[1] + s.table['Dy'],
                          c=s.table['lambdas'], edgecolors='None', cmap=from_lambda_to_colormap(s.table['lambdas']),
                          label='Fitted spectrum centers', marker='o', s=10)
-        ax[2, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
-        ax[2, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-', label='')
-        ax[2, 0].set_ylim(0.5 * Ny - signal_width, 0.5 * Ny + signal_width)
-        ax[2, 0].set_xlim(0, xx.size)
-        ax[2, 0].legend(loc='best')
+        ax[1, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
+        ax[1, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-', label='')
+        ax[1, 0].set_ylim(0.5 * Ny - signal_width, 0.5 * Ny + signal_width)
+        ax[1, 0].set_xlim(0, xx.size)
+        ax[1, 0].legend(loc='best')
         plot_spectrum_simple(ax[0, 0], spectrum.lambdas, spectrum.data, data_err=spectrum.err,
                              units=image.units, label='Fitted spectrum')
         ax[0, 0].plot(spectrum.lambdas, s.table['flux_sum'], 'k-', label='Cross spectrum')
         ax[1, 0].set_xlabel(r"$\lambda$ [nm]")
         ax[0, 0].legend(loc='best')
-        ax[1, 0].plot(spectrum.lambdas, (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
-                      label='(model_integral-cross_sum)/cross_sum')
-        ax[1, 0].legend()
-        ax[1, 0].grid(True)
-        ax[1, 0].set_xlim(ax[0, 0].get_xlim())
-        ax[1, 0].set_ylim(-1, 1)
-        ax[1, 0].set_ylabel('Relative difference')
         fig.tight_layout()
         # fig.subplots_adjust(hspace=0)
         pos0 = ax[0, 0].get_position()
         pos1 = ax[1, 0].get_position()
-        pos2 = ax[2, 0].get_position()
-        ax[0, 0].set_position([pos2.x0, pos0.y0, pos2.width, pos0.height])
-        ax[1, 0].set_position([pos2.x0, pos1.y0, pos2.width, pos1.height])
+        ax[0, 0].set_position([pos1.x0, pos0.y0, pos1.width, pos0.height])
         ax[0, 1].remove()
-        ax[1, 1].remove()
         if parameters.DISPLAY:
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
