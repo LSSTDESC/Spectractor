@@ -522,7 +522,7 @@ class Spectrum:
             if isinstance(value, astropy.coordinates.angles.Angle):
                 value = value.degree
             hdu1.header[header_key] = value
-            print(f"Set header key {header_key} to {value} from attr {attribute}")
+            # print(f"Set header key {header_key} to {value} from attr {attribute}")
 
         hdu1.header["EXTNAME"] = "SPECTRUM"
         hdu2 = fits.ImageHDU()
