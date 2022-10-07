@@ -59,11 +59,11 @@ class Spectrum:
     lambdas_binwidths: array
         Bin widths of the wavelength array in nm.
     lambdas_order2: array
-        Spectrum wavelengths for order 2 contamination in nm.
+        Spectrum wavelengths for order 2 in nm.
     data_order2: array
-        Spectrum amplitude array  for order 2 contamination in self.units units.
+        Spectrum amplitude array  for order 2 in self.units units.
     err_order2: array
-        Spectrum amplitude uncertainties  for order 2 contamination in self.units units.
+        Spectrum amplitude uncertainties  for order 2 in self.units units.
     lambda_ref: float
         Reference wavelength for ADR computations in nm.
     order: int
@@ -379,16 +379,9 @@ class Spectrum:
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
-        if self.lambdas_order2 is not None:
-            distance = self.disperser.grating_lambda_to_pixel(self.lambdas_order2, self.x0, order=2)
-            lambdas_order2_contamination = self.disperser.grating_pixel_to_lambda(distance, self.x0, order=1)
-            data_order2_contamination = self.data_order2 * (self.lambdas_order2 * np.gradient(self.lambdas_order2)) \
-                                        / (lambdas_order2_contamination * np.gradient(lambdas_order2_contamination))
-            if np.sum(data_order2_contamination) / np.sum(self.data) > 0.01:
-                data_interp = interp1d(self.lambdas, self.data, kind="linear", fill_value="0", bounds_error=False)
-                plot_spectrum_simple(ax, lambdas_order2_contamination,
-                                     data_interp(lambdas_order2_contamination) + data_order2_contamination,
-                                     data_err=None, xlim=xlim, label='Order 2 contamination', linestyle="--", lw=1)
+        if self.lambdas_order2 is not None and np.sum(self.data_order2) > 0.05 * np.sum(self.data):
+            plot_spectrum_simple(ax, self.lambdas_order2, self.data_order2, data_err=self.err_order2,
+                                 xlim=xlim, label=f'Order {parameters.SPEC_ORDER+1} spectrum', linestyle="--", lw=1)
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title=title, units=self.units)
         if len(self.target.spectra) > 0:
