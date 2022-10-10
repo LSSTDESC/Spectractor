@@ -375,7 +375,9 @@ class Spectrum:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
         if self.data_order2 is not None and np.sum(self.data_order2) > 0.05 * np.sum(self.data):
-            plot_spectrum_simple(ax, self.lambdas, self.data_order2, data_err=self.err_order2,
+            distance = self.disperser.grating_lambda_to_pixel(self.lambdas, self.x0, order=parameters.SPEC_ORDER+1)
+            max_index = np.argmin(np.abs(distance + self.x0[0] - parameters.CCD_IMSIZE))
+            plot_spectrum_simple(ax, self.lambdas[:max_index], self.data_order2[:max_index], data_err=self.err_order2[:max_index],
                                  xlim=xlim, label=f'Order {parameters.SPEC_ORDER+1} spectrum', linestyle="--", lw=1, color="firebrick")
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title=title, units=self.units, lw=1, linestyle="-")
