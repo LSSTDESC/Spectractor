@@ -435,6 +435,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.spectrum.adr_params[2] = temperature
         self.spectrum.adr_params[3] = pressure
         self.spectrum.adr_params[-1] = airmass
+        adr_x = np.zeros_like(Dx)
+        adr_y = np.zeros_like(Dy_disp_axis)
         for k in range(3):
             adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
                                         lambda_ref=self.spectrum.lambda_ref)
@@ -514,8 +516,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Matrix filling
         # if self.psf_cube is None or not self.fix_psf_cube:  # slower
         psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params,
-                                                                       fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                                       fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cube_masked)
+                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32",
+                                                              mask=self.psf_cube_masked)
         if A2 > 0:  # and (self.psf_cube_order2 is None or not self.fix_psf_cube_order2):  # slower
             # for x in range(self.Nx):
             # M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
