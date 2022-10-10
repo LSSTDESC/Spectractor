@@ -415,7 +415,7 @@ class SpectrogramModel(Spectrum):
                         cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
             plt.scatter(dispersion_law_order2.real-self.r0.real, -self.r0.imag + dispersion_law_order2.imag,
                         label="dispersion_law_order2",
-                        cmap=from_lambda_to_colormap(self.lambdas_order2), c=self.lambdas_order2)
+                        cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
             plt.title(f"x0={new_x0}")
             plt.legend()
             plt.show()

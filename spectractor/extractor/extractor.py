@@ -81,7 +81,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # crop data to fit faster
         self.lambdas = self.spectrum.lambdas
-        self.lambdas_order2 = self.spectrum.lambdas_order2
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         self.data = spectrum.spectrogram[self.bgd_width:-self.bgd_width, :]
         self.err = spectrum.spectrogram_err[self.bgd_width:-self.bgd_width, :]
@@ -428,14 +427,16 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
                                                                        self.spectrum.x0 + np.asarray([dx0, dy0]),
                                                                        order=self.spectrum.order)
-        self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
-                                                                              self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                              order=self.spectrum.order+np.sign(self.spectrum.order))
+        lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
+                                                                         self.spectrum.x0 + np.asarray([dx0, dy0]),
+                                                                         order=self.spectrum.order+np.sign(self.spectrum.order))
 
         # Evaluate ADR
         self.spectrum.adr_params[2] = temperature
         self.spectrum.adr_params[3] = pressure
         self.spectrum.adr_params[-1] = airmass
+        adr_x = np.zeros_like(Dx)
+        adr_y = np.zeros_like(Dy_disp_axis)
         for k in range(3):
             adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
                                         lambda_ref=self.spectrum.lambda_ref)
@@ -443,7 +444,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
 
             # Evaluate ADR for order 2
-            adr_ra, adr_dec = adr_calib(self.lambdas_order2, self.spectrum.adr_params, parameters.OBS_LATITUDE,
+            adr_ra, adr_dec = adr_calib(lambdas_order2, self.spectrum.adr_params, parameters.OBS_LATITUDE,
                                         lambda_ref=self.spectrum.lambda_ref)
             # adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
             adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
@@ -452,9 +453,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u,
                                                                            self.spectrum.x0 + np.asarray([dx0, dy0]),
                                                                            order=self.spectrum.order)
-            self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u_2,
-                                                                                  self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                                  order=self.spectrum.order+np.sign(self.spectrum.order))
+            lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u_2,
+                                                                             self.spectrum.x0 + np.asarray([dx0, dy0]),
+                                                                             order=self.spectrum.order+np.sign(self.spectrum.order))
 
         # Fill spectrogram trace as a function of the pixel column x
         profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + adr_x + dx0
@@ -462,6 +463,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Prepare order 2 profile params indexed by the wavelength associated to x
         profile_params_order2 = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params_order2, apply_bounds=True)
+        # Second diffraction order amplitude is the first order amplitude multiplied by ratio 2/1
+        # Ratio 2/1 is in flam/flam but no need to convert in ADU/ADU because lambda*dlambda is the same for both orders
         profile_params_order2[:, 0] = self.spectrum.disperser.ratio_order_2over1(self.lambdas)
         # profile_params_order2[:, 1] = Dx + self.spectrum.spectrogram_x0 + adr_x_2 + dx0
         # profile_params_order2[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y_2 + dy0) - self.bgd_width
@@ -513,8 +516,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Matrix filling
         # if self.psf_cube is None or not self.fix_psf_cube:  # slower
         psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params,
-                                                                       fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                                       fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cube_masked)
+                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32",
+                                                              mask=self.psf_cube_masked)
         if A2 > 0:  # and (self.psf_cube_order2 is None or not self.fix_psf_cube_order2):  # slower
             # for x in range(self.Nx):
             # M[:, x] += A2 * self.spectrum.chromatic_psf.psf.evaluate(self.pixels,
@@ -951,7 +955,6 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.header["ROTANGLE"] = w.p[4]
             w.spectrum.header["AM_FIT"] = w.p[9]
             # Compute order 2 contamination
-            w.spectrum.lambdas_order2 = w.lambdas
             w.spectrum.data_order2 = w.p[0] * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
             w.spectrum.err_order2 = w.p[0] * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
 
@@ -1145,8 +1148,8 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     if parameters.OBS_OBJECT_TYPE != "STAR":
         with_adr = False
     calibrate_spectrum(spectrum, with_adr=with_adr)
-    spectrum.data_order2 = np.zeros_like(spectrum.lambdas_order2)
-    spectrum.err_order2 = np.zeros_like(spectrum.lambdas_order2)
+    spectrum.data_order2 = np.zeros_like(spectrum.lambdas)
+    spectrum.err_order2 = np.zeros_like(spectrum.lambdas)
 
     # Full forward model extraction: add transverse ADR and order 2 subtraction
     if parameters.SPECTRACTOR_DECONVOLUTION_FFM:

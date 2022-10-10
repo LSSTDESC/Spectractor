@@ -58,8 +58,6 @@ class Spectrum:
         Spectrum amplitude covariance matrix between wavelengths in self.units units.
     lambdas_binwidths: array
         Bin widths of the wavelength array in nm.
-    lambdas_order2: array
-        Spectrum wavelengths for order 2 in nm.
     data_order2: array
         Spectrum amplitude array  for order 2 in self.units units.
     err_order2: array
@@ -219,7 +217,6 @@ class Spectrum:
         self.spectrogram_saturation = None
         self.spectrogram_Nx = None
         self.spectrogram_Ny = None
-        self.lambdas_order2 = None
         self.data_order2 = None
         self.err_order2 = None
         self.dec = None
@@ -289,9 +286,8 @@ class Spectrum:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix /= ldl_mat
         if self.data_order2 is not None:
-            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.abs(np.gradient(self.lambdas_order2))
-            self.data_order2 /= ldl_2
-            self.err_order2 /= ldl_2
+            self.data_order2 /= ldl
+            self.err_order2 /= ldl
         self.units = 'erg/s/cm$^2$/nm'
 
     def convert_from_flam_to_ADUrate(self):
@@ -322,9 +318,8 @@ class Spectrum:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix *= ldl_mat
         if self.data_order2 is not None:
-            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.abs(np.gradient(self.lambdas_order2))
-            self.data_order2 *= ldl_2
-            self.err_order2 *= ldl_2
+            self.data_order2 *= ldl
+            self.err_order2 *= ldl
         self.units = 'ADU/s'
 
     def load_filter(self):
@@ -379,11 +374,11 @@ class Spectrum:
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
-        if self.lambdas_order2 is not None and np.sum(self.data_order2) > 0.05 * np.sum(self.data):
-            plot_spectrum_simple(ax, self.lambdas_order2, self.data_order2, data_err=self.err_order2,
-                                 xlim=xlim, label=f'Order {parameters.SPEC_ORDER+1} spectrum', linestyle="--", lw=1)
+        if self.data_order2 is not None and np.sum(self.data_order2) > 0.05 * np.sum(self.data):
+            plot_spectrum_simple(ax, self.lambdas, self.data_order2, data_err=self.err_order2,
+                                 xlim=xlim, label=f'Order {parameters.SPEC_ORDER+1} spectrum', linestyle="--", lw=1, color="firebrick")
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
-                             title=title, units=self.units)
+                             title=title, units=self.units, lw=1, linestyle="-")
         if len(self.target.spectra) > 0:
             for k in range(len(self.target.spectra)):
                 plot_indices = np.logical_and(self.target.wavelengths[k] > np.min(self.lambdas),
@@ -526,7 +521,7 @@ class Spectrum:
         hdu4.header["EXTNAME"] = "ORDER0"
         hdu1.data = [self.lambdas, self.data, self.err]
         hdu2.data = self.cov_matrix
-        hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
+        hdu3.data = [self.lambdas, self.data_order2, self.err_order2]
         hdu4.data = self.target.image
         hdu4.header["IM_X0"] = self.target.image_x0
         hdu4.header["IM_Y0"] = self.target.image_y0
@@ -650,7 +645,7 @@ class Spectrum:
             if len(hdu_list) > 1:
                 self.cov_matrix = hdu_list["SPEC_COV"].data
                 if len(hdu_list) > 2:
-                    self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+                    _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
                     if len(hdu_list) > 3:
                         self.target.image = hdu_list["ORDER0"].data
                         self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
@@ -1271,7 +1266,7 @@ def calibrate_spectrum(spectrum, with_adr=False):
         return chisq
 
     # grid exploration of the parameters
-    # necessary because of the the line detection algo
+    # necessary because of the line detection algo
     D = parameters.DISTANCE2CCD
     if spectrum.header['D2CCD'] != '':
         D = spectrum.header['D2CCD']
@@ -1336,8 +1331,6 @@ def calibrate_spectrum(spectrum, with_adr=False):
     distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=pixel_shift)
     lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
-    spectrum.lambdas_order2 = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0,
-                                                                         order=spectrum.order + 1)
     spectrum.lambdas_binwidths = np.gradient(lambdas)
     spectrum.convert_from_ADUrate_to_flam()
     spectrum.chromatic_psf.table['Dx'] -= pixel_shift

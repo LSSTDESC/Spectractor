@@ -1740,7 +1740,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
 
 
 def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', linestyle='none', lw=2, label='',
-                         title='', units=''):
+                         title='', units='', marker='o'):
     """Simple function to plot a spectrum with error bars and labels.
 
     Parameters
@@ -1761,6 +1761,8 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         String for the linestyle of the spectrum (default: 'none').
     lw: int, optional
         Integer for line width (default: 2).
+    marker: str, optional
+        Character for marker style (default: 'o').
     label: str, optional
         String label for the plot legend (default: '').
     title: str, optional
@@ -1788,7 +1790,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
     if xs is None:
         xs = np.arange(data.size)
     if data_err is not None:
-        ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=lw, label=label,
+        ax.errorbar(xs, data, yerr=data_err, color=color, marker=marker, lw=lw, label=label,
                     zorder=0, markersize=2, linestyle=linestyle)
     else:
         ax.plot(xs, data, color=color, lw=lw, label=label, linestyle=linestyle)
