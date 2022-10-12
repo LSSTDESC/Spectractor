@@ -18,12 +18,14 @@ from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colo
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 from spectractor.fit.fitter import run_minimisation, run_minimisation_sigma_clipping, RegFitWorkspace, FitWorkspace
 
+
 def dumpParameters():
     for item in dir(parameters):
         if not item.startswith("__"):
             print(item, getattr(parameters, item))
 
 
+<<<<<<< HEAD
 def dumpfitparameters(w,thelogguer):
     N1 = len(w.input_labels)
     N2 = len(w.p)
@@ -41,6 +43,8 @@ def dumpfitparameters(w,thelogguer):
     txt = "\n".join(list_of_strings)
     thelogguer.info(txt)
 
+=======
+>>>>>>> a65b9424bc8a147c3b7717df786c505e688e5f46
 class FullForwardModelFitWorkspace(FitWorkspace):
 
     def __init__(self, spectrum, amplitude_priors_method="noprior", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
@@ -1021,6 +1025,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         plot_comparison_truth(w.spectrum, w)
 
     return w.spectrum
+
 
 def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='./config/ctio.ini',
                 atmospheric_lines=True, line_detection=True):

@@ -1158,7 +1158,9 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             line.fit_eqwidth_data = integrate.simps(Ydata, x_int)  # sol2
 
             line.fit_popt = popt
+            line.fit_pcov = pcov
             line.fit_popt_gaussian = popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3]
+            line.fit_pcov_gaussian = pcov[bgd_npar + 3 * j:bgd_npar + 3 * j + 3, bgd_npar + 3 * j:bgd_npar + 3 * j + 3]
             line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
 
             line.fit_bgd = np.polynomial.legendre.legval(x_norm, popt[:bgd_npar])

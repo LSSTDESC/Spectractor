@@ -1,0 +1,49 @@
+name: build_and_test
+
+on:
+  push:
+    branches:
+      - main
+      - lsst-dev
+      - master
+  pull_request:
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          python-version: 3.8
+          channels: conda-forge,defaults
+          channel-priority: strict
+          show-channel-urls: true
+
+      - name: Install dependencies
+        # Might be quicker to install rubin-env plus any necessary additions.
+        shell: bash -l {0}
+        run: |
+          conda install -y -q numpy scipy matplotlib pandas llvmlite numba astropy photutils astroquery coloredlogs scikit-image h5py emcee tqdm schwimmbad iminuit coverage configparser coveralls pysynphot deprecated pyyaml nose
+
+      - name: List installed packages
+        shell: bash -l {0}
+        run: |
+          conda list
+          pip list -v
+
+      - name: Build and install
+        shell: bash -l {0}
+        run: |
+          pip install -v -e .
+
+      - name: Run nosetests
+        shell: bash -l {0}
+        run: |
+          python setup.py nosetests
+
+      - name: Run full chain
+        shell: bash -l {0}
+        run: |
+          nosetests tests/run_full_chain.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
