@@ -580,10 +580,11 @@ def load_CTIO_image(image):
     image.humidity = image.header['OUTHUM']
 
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
-    parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
+    parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE']) * parameters.CCD_REBIN
     if image.header['YLENGTH'] != parameters.CCD_IMSIZE:
         image.my_logger.warning(
             f'\n\tImage rectangular: X={parameters.CCD_IMSIZE:d} pix, Y={image.header["YLENGTH"]:d} pix')
+    parameters.CCD_IMSIZE //= parameters.CCD_REBIN
     image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
                            obstime=image.header['DATE-OBS'])
     image.my_logger.info(f'\n\tImage {image.file_name} loaded.')
@@ -676,7 +677,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
     image.read_out_noise = float(image.header['CCDNOISE']) * np.ones_like(image.data)
-    parameters.CCD_IMSIZE = image.data.shape[1]
+    parameters.CCD_IMSIZE = image.data.shape[1] // parameters.CCD_REBIN
     # save xys platform position into main header
     image.header["XPOS"] = hdus["XYZ"].header["XPOS"]
     image.header.comments["XPOS"] = hdus["XYZ"].header.comments["XPOS"]
@@ -714,7 +715,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
-    parameters.CCD_IMSIZE = image.data.shape[1]
+    parameters.CCD_IMSIZE = image.data.shape[1] // parameters.CCD_REBIN
     image.disperser_label = image.header['GRATING']
     image.ra = Angle(image.header['RA'], unit="deg")
     image.dec = Angle(image.header['DEC'], unit="deg")
