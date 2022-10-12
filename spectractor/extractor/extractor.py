@@ -25,7 +25,6 @@ def dumpParameters():
             print(item, getattr(parameters, item))
 
 
-<<<<<<< HEAD
 def dumpfitparameters(w,thelogguer):
     N1 = len(w.input_labels)
     N2 = len(w.p)
@@ -43,8 +42,7 @@ def dumpfitparameters(w,thelogguer):
     txt = "\n".join(list_of_strings)
     thelogguer.info(txt)
 
-=======
->>>>>>> a65b9424bc8a147c3b7717df786c505e688e5f46
+
 class FullForwardModelFitWorkspace(FitWorkspace):
 
     def __init__(self, spectrum, amplitude_priors_method="noprior", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
