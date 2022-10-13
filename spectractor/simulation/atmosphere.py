@@ -42,6 +42,7 @@ class Atmosphere:
         self.airmass = airmass
         self.pressure = pressure
         self.temperature = temperature
+        self.lambdas = None
         self.pwv = None
         self.ozone = None
         self.aerosols = None
@@ -120,6 +121,7 @@ class Atmosphere:
         wl = data[:, 0]
         atm = data[:, 1]
         self.transmission = interp1d(wl, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
+        self.lambdas = wl
         return self.transmission
 
     def plot_transmission(self):
@@ -422,9 +424,9 @@ class AtmosphereGrid(Atmosphere):
             hdr['OZMIN'] = self.OZ_Points.min()
             hdr['OZMAX'] = self.OZ_Points.max()
 
-            hdr['AER_PTS'] = np.array_str(self.AER_Points)
-            hdr['PWV_PTS'] = np.array_str(self.PWV_Points)
-            hdr['OZ_PTS'] = np.array_str(self.OZ_Points)
+            # hdr['AER_PTS'] = np.array_str(self.AER_Points)
+            # hdr['PWV_PTS'] = np.array_str(self.PWV_Points)
+            # hdr['OZ_PTS'] = np.array_str(self.OZ_Points)
             hdr['NBWLBIN'] = parameters.LAMBDAS.size
             hdr['WLMIN'] = parameters.LAMBDA_MIN
             hdr['WLMAX'] = parameters.LAMBDA_MAX

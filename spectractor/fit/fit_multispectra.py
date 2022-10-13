@@ -167,7 +167,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             lambdas_bin_edges = np.arange(int(np.min(np.concatenate(list(self.spectrum_lambdas)))),
                                           int(np.max(np.concatenate(list(self.spectrum_lambdas)))) + 1,
                                           self.bin_widths)
-            self.lambdas_bin_edges = lambdas_bin_edges
             lbdas = []
             for i in range(1, lambdas_bin_edges.size):
                 lbdas.append(0.5 * (0*lambdas_bin_edges[i] + 2*lambdas_bin_edges[i - 1]))  # lambda bin value on left
@@ -184,6 +183,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             self.lambdas = np.copy(self.spectrum_lambdas)
             dlbda = self.lambdas[0, -1] - self.lambdas[0, -2]
             lambdas_bin_edges = list(self.lambdas[0]) + [self.lambdas[0, -1] + dlbda]
+        self.lambdas_bin_edges = lambdas_bin_edges
         # mask
         lambdas_to_mask = [np.arange(300, 355, self.bin_widths)]
         for line in [HALPHA, HBETA, HGAMMA, HDELTA, O2_1, O2_2, O2B]:
@@ -456,12 +456,19 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             a = self.atmospheres[k].simulate(ozone, pwv, aerosols)
             lbdas = self.atmospheres[k].lambdas
             for i in range(1, self.lambdas_bin_edges.size):
-                delta = self.atmosphere_lambda_bins[i][-1] - self.atmosphere_lambda_bins[i][0]
-                if delta > 0:
-                    atm.append(
-                        np.trapz(a(lbdas[self.atmosphere_lambda_bins[i]]), dx=self.atmosphere_lambda_step) / delta)
+                if isinstance(self.atmospheres[k], AtmosphereGrid):
+                    delta = self.atmosphere_lambda_bins[i][-1] - self.atmosphere_lambda_bins[i][0]
+                    if delta > 0:
+                        atm.append(
+                            np.trapz(a(lbdas[self.atmosphere_lambda_bins[i]]), dx=self.atmosphere_lambda_step) / delta)
+                    else:
+                        atm.append(1)
                 else:
-                    atm.append(1)
+                    delta = self.lambdas_bin_edges[i] - self.lambdas_bin_edges[i-1]
+                    if delta > 0:
+                        atm.append(quad(a, self.lambdas_bin_edges[i-1], self.lambdas_bin_edges[i])[0] / delta)
+                    else:
+                        atm.append(1)
             if reso > 0:
                 M.append(A1s[k] * np.diag(fftconvolve_gaussian(self.ref_spectrum_cube[k] * np.array(atm), reso)))
             else:
@@ -812,7 +819,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         return np.asarray(J)
 
 
-def run_multispectra_minimisation(fit_workspace, method="newton"):
+def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False):
     """Interface function to fit spectrum simulation parameters to data.
 
     Parameters
@@ -839,14 +846,17 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
         epsilon = 1e-2 * guess
         epsilon[epsilon == 0] = 1e-2
-        epsilon = np.array([np.gradient(fit_workspace.atmospheres[0].OZ_Points)[0],
+        if isinstance(fit_workspace.atmospheres[0], AtmosphereGrid):
+            epsilon = np.array([np.gradient(fit_workspace.atmospheres[0].OZ_Points)[0],
                             np.gradient(fit_workspace.atmospheres[0].PWV_Points)[0],
                             np.gradient(fit_workspace.atmospheres[0].AER_Points)[0], 0.04]) / 2
+        else:
+            epsilon = np.array([1, 0.01, 0.0001])
         epsilon = np.array(list(epsilon) + [1e-4] * fit_workspace.A1s.size)
 
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
                                         xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=5, niter_clip=3,
-                                        verbose=False)
+                                        verbose=verbose)
 
         # w_reg = RegFitWorkspace(fit_workspace, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=parameters.VERBOSE)
         # run_minimisation(w_reg, method="minimize", ftol=1e-4, xtol=1e-2, verbose=parameters.VERBOSE, epsilon=[1e-1],
