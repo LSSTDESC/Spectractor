@@ -917,6 +917,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
                 w.amplitude_cov_matrix *= r
                 w.amplitude_params_err = np.array(
                     [np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
+            w.spectrum.header['PSF_REG'] = w.opt_reg
+            w.spectrum.header['TRACE_R'] = np.trace(w_reg.resolution)
 
         if parameters.DEBUG and parameters.DISPLAY:
             w.plot_fit()
@@ -1014,6 +1016,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     w.spectrum.x0[1] += dy0
     w.spectrum.header["TARGETX"] = w.spectrum.x0[0]
     w.spectrum.header["TARGETY"] = w.spectrum.x0[1]
+    w.spectrum.header['MEANFWHM'] = np.mean(np.array(w.spectrum.chromatic_psf.table['fwhm']))
 
     # Convert to flam
     w.spectrum.convert_from_ADUrate_to_flam()
