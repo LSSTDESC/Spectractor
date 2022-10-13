@@ -68,7 +68,7 @@ class Target:
 
         """
         self.my_logger = set_logger(self.__class__.__name__)
-        self.label = label
+        self.label = label.replace(".", " ")
         self.type = None
         self.wavelengths = []
         self.spectra = []
