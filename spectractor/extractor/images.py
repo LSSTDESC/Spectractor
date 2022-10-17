@@ -751,7 +751,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     parameters.OBS_ALTITUDE = float(image.header['OBS-ELEV']) / 1000
     parameters.OBS_LATITUDE = image.header['OBS-LAT']
     image.read_out_noise = 8.5 * np.ones_like(image.data)
-    image.target_label = image.header["OBJECT"].replace(" ", "")
+    image.target_label = image.header["OBJECT"]  #.replace(" ", "")
     if "OBJECTX" in image.header:
         image.target_guess = [parameters.CCD_IMSIZE - float(image.header["OBJECTY"]),
                               parameters.CCD_IMSIZE - float(image.header["OBJECTX"])]
