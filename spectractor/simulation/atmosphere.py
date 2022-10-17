@@ -116,10 +116,8 @@ class Atmosphere:
         self.my_logger.debug(f'\n\t{self.title}\n\t\t{self.label}')
 
         lib = libradtran.Libradtran()
-        path = lib.simulate(self.airmass, pwv, ozone, aerosols, self.pressure)
-        data = np.loadtxt(path)
-        wl = data[:, 0]
-        atm = data[:, 1]
+        wl, atm = lib.simulate(self.airmass, pwv, ozone, aerosols, self.pressure,
+                               lambda_min=parameters.LAMBDA_MIN, lambda_max=parameters.LAMBDA_MAX)
         self.transmission = interp1d(wl, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
         self.lambdas = wl
         return self.transmission
