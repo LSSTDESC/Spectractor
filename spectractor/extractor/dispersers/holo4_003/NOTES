@@ -1,3 +1,3 @@
-- transmission.txt : measurements from LPNHE optical test bench using holo-4-003-diffraction-efficiencies-merged.npy
+- transmission.txt : prediction from the chimera built with LPNHE optical test bench measurements between 430 and 1000nm, then extrapolating with an hologram efficiency model fitted on data
 - ratio_order_2over1.txt : computed using separated extraction of spectrum order 1 and 2 from BG40 exposures, nights 20220608, 20220628, 20220629 and 20220630 with ratio 3/2 model, CCD_REBIN=2 with Savitsky Golay filter
 - ratio_order_3over2.txt : prediction from the chimera built with LPNHE optical test bench measurements between 430 and 1000nm, then extrapolating with an hologram efficiency model fitted on data
