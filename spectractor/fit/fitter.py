@@ -544,41 +544,42 @@ class FitWorkspace:
         """
         output_filename = os.path.splitext(self.filename)[0] + "_bestfit.txt"
         
-        print(">>>>> \t fitter.py :: save_parameters_summary ::  output_filename = ",  output_filename)
+        #print(">>>>> \t fitter.py :: save_parameters_summary ::  output_filename = ",  output_filename)
         
         f = open(output_filename, 'w')
         txt = self.filename + "\n"
         if header != "":
             txt += header + "\n"
             
-        print(">>>>> \t save_parameters_summary :: cov = ",self.cov, " type = ",type(self.cov), " shape = ",self.cov.shape)
+        #print(">>>>> \t save_parameters_summary :: cov = ",self.cov, " type = ",type(self.cov), " shape = ",self.cov.shape)
         
         mycov = np.copy(self.cov)
         maxk = np.min(mycov.shape)
         
         for k, ip in enumerate(ipar):
-            print(">>>> \t \t  k = ", k)
+            #print(">>>> \t \t  k = ", k)
             
             if k < maxk:
                 
                 covariance_matrix_element = mycov[k, k]
-                print(">>>>> \t save_parameters_summary ::  k = ", k , 
-                      " ,  ip = ", ip , 
-                      " p[ip] = " , self.p[ip],
-                      " , label = ", self.input_labels[ip] , 
-                      " , cov = ",covariance_matrix_element)
+                #print(">>>>> \t save_parameters_summary ::  k = ", k , 
+                #      " ,  ip = ", ip , 
+                #      " p[ip] = " , self.p[ip],
+                #      " , label = ", self.input_labels[ip] , 
+                #      " , cov = ",covariance_matrix_element)
             
                 if covariance_matrix_element >= 0:
                     covariance_matrix_element_sigma = np.sqrt(covariance_matrix_element)
                 else:
-                    print(">>>>> \t save_parameters_summary ::  k = ", k , " ,  ip = ", ip , " , label = ", self.input_labels[ip] , " , Negative cov = ",covariance_matrix_element)
+                    #print(">>>>> \t save_parameters_summary ::  k = ", k , " ,  ip = ", ip , " , label = ", self.input_labels[ip] , " , Negative cov = ",covariance_matrix_element)
                     covariance_matrix_element_sigma = np.sqrt(-covariance_matrix_element)
                 
                 txt += "%s: %s +%s - %s\n" % formatting_numbers(self.p[ip], covariance_matrix_element_sigma,
                                                                covariance_matrix_element_sigma,
                                                                label=self.input_labels[ip])
             else:
-                print(">>>>> \t save_parameters_summary ::  SKIP k = ", k , ' >=  kmax = ',maxk)
+                #print(">>>>> \t save_parameters_summary ::  SKIP k = ", k , ' >=  kmax = ',maxk)
+                pass
                 
                 
             
