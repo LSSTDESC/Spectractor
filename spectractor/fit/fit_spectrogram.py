@@ -107,26 +107,31 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 9])
         self.atm_params_indices = np.array([2, 3, 4])
         self.psf_params_start_index = self.p.size
-        self.p = np.concatenate([self.p, self.psf_poly_params])
+        self.p = np.concatenate([self.p, self.psf_poly_params, np.copy(self.psf_poly_params)])
         self.input_labels = ["A1", "A2", "ozone [db]", "PWV [mm]", "VAOD", r"D_CCD [mm]",
-                             r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"] + list(self.psf_poly_params_labels)
+                             r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"] + list(self.psf_poly_params_labels) * 2
         self.axis_names = ["$A_1$", "$A_2$", "ozone [db]", "PWV [mm]", "VAOD", r"$D_{CCD}$ [mm]",
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
-                           r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names)
+                           r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names) * 2
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (100, 700), (0, 10),
                                                 (0, 0.1), bounds_D, (-2, 2), (-10, 10), (-90, 90), (0.8, 1.2)]),
-                                      psf_poly_params_bounds])
+                                      list(psf_poly_params_bounds) * 2])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
-            if "x_c" in par or "saturation" in par or "y_c" in par:
+            if "x_c" in par or "saturation" in par: # or "y_c" in par:
                 self.fixed[k] = True
+        for k, par in enumerate(self.input_labels):
+            if "y_c" in par:
+                self.fixed[k] = False
+                self.p[k] = 0
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
         self.fixed[1] = "A2_T" not in self.spectrum.header  # not self.spectrum.disperser.flat_ratio_order_2over1
         # self.fixed[5:7] = [True, True]  # DCCD, x0
+        self.fixed[1] = False
         self.fixed[6] = True  # Delta x
-        # self.fixed[7] = True  # Delta y
-        # self.fixed[8] = True  # angle
+        self.fixed[7] = True  # Delta y
+        self.fixed[8] = True  # angle
         self.fixed[9] = True  # B
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
@@ -138,6 +143,16 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.lambdas_truth = None
         self.amplitude_truth = None
         self.get_spectrogram_truth()
+
+        # PSF cube computation
+        self.psf_cube_masked = None
+        self.psf_cube = None
+        self.psf_cube_order2 = None
+        self.fix_psf_cube = False
+        self.fix_psf_cube_order2 = False
+        self.psf_params_index = np.arange(0, self.psf_params_start_index+len(self.psf_poly_params))
+        self.psf_params_index_order2 = np.concatenate([np.arange(0, self.psf_params_start_index), np.arange(np.max(self.psf_params_index)+1, len(self.p))])
+        self.psf_params_start_index_order2 = np.max(self.psf_params_index)+1
 
     def crop_spectrogram(self):
         """Crop the spectrogram in the middle, keeping a vertical width of 2*parameters.PIXWIDTH_SIGNAL around
@@ -480,11 +495,15 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         # fit_workspace.simulation.fast_sim = True
         # fit_workspace.simulation.fix_psf_cube = False
         # fit_workspace.fixed = np.copy(fixed)
-        # guess = fit_workspace.p
-        # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
-        #                                            fix=fit_workspace.fixed, xtol=1e-5, ftol=1e-3, niter=10)
+        # for ip, label in enumerate(fit_workspace.input_labels):
+        #     if "y_c_0" in label:
+        #         fit_workspace.fixed[ip] = False
+        #     else:
+        #         fit_workspace.fixed[ip] = True
+        # run_minimisation(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
+        #                  xtol=1e-2, ftol=10 / fit_workspace.data.size, verbose=False)
 
-        fit_workspace.simulation.fast_sim = False
+        fit_workspace.simulation.fast_sim = True
         fit_workspace.simulation.fix_psf_cube = False
         fit_workspace.fixed = np.copy(fixed)
         # guess = fit_workspace.p
@@ -492,7 +511,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
         #                                            niter=40)
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
+                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3,
                                         verbose=False)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":

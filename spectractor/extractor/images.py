@@ -742,6 +742,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
         parameters.OBS_CAMERA_ROTATION -= 360
     if parameters.OBS_CAMERA_ROTATION < -360:
         parameters.OBS_CAMERA_ROTATION += 360
+    image.header["CAM_ROT"] = parameters.OBS_CAMERA_ROTATION
     if "CD2_1" in hdu_list[1].header:
         rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[1].header["CD2_1"], hdu_list[1].header["CD1_1"]) + 90
         if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):

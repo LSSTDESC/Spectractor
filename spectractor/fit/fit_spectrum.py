@@ -81,8 +81,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.A2 = 0
         self.ozone = 400.
         self.pwv = 3
-        self.aerosols = 0.05
-        self.reso = -1
+        self.aerosols = 0.01
+        self.reso = 1
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.B = 0
@@ -91,7 +91,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.fixed = [False] * self.p.size
         # self.fixed[0] = True
         self.fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
-        self.fixed[5] = True
+        self.fixed[5] = False
         # self.fixed[6:8] = [True, True]
         self.fixed[7] = True
         self.fixed[8] = True
