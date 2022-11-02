@@ -42,7 +42,7 @@ def test_atmosphere():
     a.plot_transmission()
     a.plot_transmission_image()
 
-    a = AtmosphereGrid(filename='tests/data/reduc_20170530_134_atmsim.fits')
+    a = AtmosphereGrid(atmgrid_filename='tests/data/reduc_20170530_134_atmsim.fits')
     lambdas = np.arange(200, 1200)
     transmission = a.simulate(ozone=400, pwv=5, aerosols=0.05)
     assert np.max(transmission(lambdas)) < 1 and np.min(transmission(lambdas)) >= 0

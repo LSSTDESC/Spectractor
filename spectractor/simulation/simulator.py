@@ -131,7 +131,7 @@ class SpectrumSimulation(Spectrum):
         Examples
         --------
         >>> spectrum, telescope, disperser, target = SimulatorInit("./tests/data/reduc_20170530_134_spectrum.fits")
-        >>> atmosphere = AtmosphereGrid(filename="./tests/data/reduc_20170530_134_atmsim.fits")
+        >>> atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
         >>> sim = SpectrumSimulation(spectrum, atmosphere, telescope, disperser, fast_sim=True)
         >>> lambdas, model, model_err = sim.simulate(A1=1, A2=1, ozone=300, pwv=5, aerosols=0.05, reso=0.,
         ... D=parameters.DISTANCE2CCD, shift_x=0., B=0.)
@@ -379,7 +379,7 @@ class SpectrogramModel(Spectrum):
         -------
 
         >>> spectrum, telescope, disperser, target = SimulatorInit('./tests/data/reduc_20170530_134_spectrum.fits')
-        >>> atmosphere = AtmosphereGrid(filename="./tests/data/reduc_20170530_134_atmsim.fits")
+        >>> atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
         >>> psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
         >>> sim = SpectrogramModel(spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True)
         >>> lambdas, model, model_err = sim.simulate(A2=1, angle=-1.5, psf_poly_params=psf_poly_params)
