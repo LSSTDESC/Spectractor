@@ -70,7 +70,7 @@ class SpectrumFitWorkspace(FitWorkspace):
             self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
         else:
             self.use_grid = True
-            self.atmosphere = AtmosphereGrid(file_name, atmgrid_file_name)
+            self.atmosphere = AtmosphereGrid(spectrum_filename=file_name, atmgrid_filename=atmgrid_file_name)
             if parameters.VERBOSE:
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
         self.lambdas = self.spectrum.lambdas
