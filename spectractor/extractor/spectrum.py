@@ -34,6 +34,7 @@ fits_mappings = {'date_obs': 'DATE-OBS',
                  'humidity': 'OUTHUM',
                  'lambda_ref': 'LBDA_REF',
                  'parallactic_angle': 'PARANGLE',
+                 'filter_label': 'FILTER'
                  }
 
 
