@@ -9,7 +9,7 @@ import os
 import astropy
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config, apply_rebinning_to_parameters
+from spectractor.config import set_logger, load_config
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
@@ -34,7 +34,8 @@ fits_mappings = {'date_obs': 'DATE-OBS',
                  'humidity': 'OUTHUM',
                  'lambda_ref': 'LBDA_REF',
                  'parallactic_angle': 'PARANGLE',
-                 'filter_label': 'FILTER'
+                 'filter_label': 'FILTER',
+                 'camera_angle': 'CAM_ROT'
                  }
 
 
@@ -87,6 +88,8 @@ class Spectrum:
         Dispersion axis angle in the image in degrees, positive if anticlockwise.
     parallactic_angle: float
         Parallactic angle in degrees.
+    camera_angle: float
+        The North-West axe angle with respect to the camera horizontal axis in degrees.
     lines: Lines
         Lines instance that contains data on the emission or absorption lines to be searched and fitted in the spectrum.
     header: Fits.Header
@@ -202,6 +205,7 @@ class Spectrum:
         self.chromatic_psf = ChromaticPSF(self.psf, Nx=1, Ny=1, deg=1, saturation=1)
         self.rotation_angle = 0
         self.parallactic_angle = None
+        self.camera_angle = 0
         self.spectrogram = None
         self.spectrogram_bgd = None
         self.spectrogram_bgd_rms = None
@@ -248,6 +252,7 @@ class Spectrum:
             self.units = image.units
             self.gain = image.gain
             self.rotation_angle = image.rotation_angle
+            self.camera_angle = parameters.OBS_CAMERA_ROTATION
             self.my_logger.info('\n\tSpectrum info copied from image')
             self.dec = image.dec
             self.hour_angle = image.hour_angle
