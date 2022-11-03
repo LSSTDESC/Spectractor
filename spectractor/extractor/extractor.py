@@ -435,12 +435,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         profile_params_order2[:, 1] = dispersion_law_order2.real + self.spectrum.spectrogram_x0
         profile_params_order2[:, 2] += dispersion_law_order2.imag - self.bgd_width
 
-        # save for plotting
-        # self.profile_params = profile_params
-        # self.profile_params_order2 = profile_params_order2
-        # self.dx0 = dx0
-        # self.dy0 = dy0
-
         # Matrix filling
         # if self.psf_cube is None or not self.fix_psf_cube:  # slower
         psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params,
