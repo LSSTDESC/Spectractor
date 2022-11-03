@@ -6,11 +6,11 @@ import numpy as np
 import copy
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config
+from spectractor.config import set_logger
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.simulation.simulator import SimulatorInit, SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_gradient_descent, run_minimisation_sigma_clipping
+from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping
 
 plot_counter = 0
 
@@ -109,10 +109,12 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params, np.copy(self.psf_poly_params)])
         self.input_labels = ["A1", "A2", "ozone [db]", "PWV [mm]", "VAOD", r"D_CCD [mm]",
-                             r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"] + list(self.psf_poly_params_labels) * 2
+                             r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"] + \
+                            list(self.psf_poly_params_labels) + [label+"_2" for label in self.psf_poly_params_labels]
         self.axis_names = ["$A_1$", "$A_2$", "ozone [db]", "PWV [mm]", "VAOD", r"$D_{CCD}$ [mm]",
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
-                           r"$\theta$ [deg]", "$B$"] + list(self.psf_poly_params_names) * 2
+                           r"$\theta$ [deg]", "$B$"] + \
+                          list(self.psf_poly_params_names) + [label+"_2" for label in self.psf_poly_params_names]
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (100, 700), (0, 10),
                                                 (0, 0.1), bounds_D, (-2, 2), (-10, 10), (-90, 90), (0.8, 1.2)]),
