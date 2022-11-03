@@ -143,7 +143,8 @@ class Atmosphere:
 # ----------------------------------------------------------------------------------
 class AtmosphereGrid(Atmosphere):
 
-    def __init__(self, image_filename="", filename="", airmass=1., pressure=800., temperature=10.,
+    def __init__(self, image_filename="", spectrum_filename="", atmgrid_filename="",
+                 airmass=1., pressure=800., temperature=10.,
                  pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
         """Class to load and interpolate grids of atmospheric transmission computed with Libradtran.
 
@@ -151,14 +152,16 @@ class AtmosphereGrid(Atmosphere):
         ----------
         image_filename: str, optional
             The original image fits file name from which the grid was computed or has to be computed (default: "").
-        filename: str, optional
+        spectrum_filename: str, optional
+            The file name of the spectrum fits file name from which the grid was computed or has to be computed (default: "").
+        atmgrid_filename: str, optional
             The file name of the atmospheric grid if it exists (default: "").
         airmass: float, optional
-            Airmass of the source object (default: 1).
+            Airmass of the source object (default: 1). Overwritten if spectrum_filename is given.
         pressure: float, optional
-            Pressure of the atmosphere in hPa (default: 800).
+            Pressure of the atmosphere in hPa (default: 800). Overwritten if spectrum_filename is given.
         temperature: float, optional
-            Temperature of the atmosphere in Celsius degrees (default: 10).
+            Temperature of the atmosphere in Celsius degrees (default: 10). Overwritten if spectrum_filename is given.
         pwv_grid: list
             List of 3 numbers for the PWV quantity: min, max, number of simulations (default: [0, 10, 10]).
         ozone_grid: list
@@ -168,14 +171,16 @@ class AtmosphereGrid(Atmosphere):
 
         Examples
         --------
-        >>> a = AtmosphereGrid(filename='./tests/data/reduc_20170530_134_atmsim.fits')
+        >>> a = AtmosphereGrid(atmgrid_filename='./tests/data/reduc_20170530_134_atmsim.fits')
         >>> a.image_filename.split('/')[-1]
         'reduc_20170530_134_spectrum.fits'
         """
         Atmosphere.__init__(self, airmass, pressure, temperature)
         self.my_logger = set_logger(self.__class__.__name__)
         self.image_filename = image_filename
-        self.filename = filename
+        if spectrum_filename != "":
+            self.image_filename = spectrum_filename
+        self.filename = atmgrid_filename
         # ------------------------------------------------------------------------
         # Definition of data format for the atmospheric grid
         # -----------------------------------------------------------------------------
@@ -206,8 +211,13 @@ class AtmosphereGrid(Atmosphere):
         self.model = None
 
         self.header = fits.Header()
-        if filename != "":
-            self.load_file(filename)
+        if atmgrid_filename != "":
+            self.load_file(atmgrid_filename)
+        if spectrum_filename != "":
+            hdr = fits.getheader(spectrum_filename)
+            self.pressure = hdr["OUTPRESS"]
+            self.temperature = hdr["OUTTEMP"]
+            self.airmass = hdr["AIRMASS"]
 
     def set_grid(self, pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
         """Set the size of the simulation grid self.atmgrid before compute it.
@@ -347,7 +357,7 @@ class AtmosphereGrid(Atmosphere):
 
         Examples
         --------
-        >>> a = AtmosphereGrid(filename='tests/data/reduc_20170530_134_atmsim.fits')
+        >>> a = AtmosphereGrid(atmgrid_filename='tests/data/reduc_20170530_134_atmsim.fits')
         >>> a.plot_transmission_image()
 
         .. plot::
@@ -550,7 +560,7 @@ class AtmosphereGrid(Atmosphere):
             >>> from spectractor import parameters
             >>> import numpy as np
             >>> import matplotlib.pyplot as plt
-            >>> a = AtmosphereGrid(filename='tests/data/reduc_20170530_134_atmsim.fits')
+            >>> a = AtmosphereGrid(atmgrid_filename='tests/data/reduc_20170530_134_atmsim.fits')
             >>> lambdas = np.arange(200, 1200)
             >>> fig = plt.figure()
             >>> for pwv in np.arange(5):

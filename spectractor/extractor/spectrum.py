@@ -9,7 +9,7 @@ import os
 import astropy
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config, apply_rebinning_to_parameters
+from spectractor.config import set_logger, load_config
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
@@ -34,6 +34,8 @@ fits_mappings = {'date_obs': 'DATE-OBS',
                  'humidity': 'OUTHUM',
                  'lambda_ref': 'LBDA_REF',
                  'parallactic_angle': 'PARANGLE',
+                 'filter_label': 'FILTER',
+                 'camera_angle': 'CAM_ROT'
                  }
 
 
@@ -86,6 +88,8 @@ class Spectrum:
         Dispersion axis angle in the image in degrees, positive if anticlockwise.
     parallactic_angle: float
         Parallactic angle in degrees.
+    camera_angle: float
+        The North-West axe angle with respect to the camera horizontal axis in degrees.
     lines: Lines
         Lines instance that contains data on the emission or absorption lines to be searched and fitted in the spectrum.
     header: Fits.Header
@@ -201,6 +205,7 @@ class Spectrum:
         self.chromatic_psf = ChromaticPSF(self.psf, Nx=1, Ny=1, deg=1, saturation=1)
         self.rotation_angle = 0
         self.parallactic_angle = None
+        self.camera_angle = 0
         self.spectrogram = None
         self.spectrogram_bgd = None
         self.spectrogram_bgd_rms = None
@@ -247,6 +252,7 @@ class Spectrum:
             self.units = image.units
             self.gain = image.gain
             self.rotation_angle = image.rotation_angle
+            self.camera_angle = parameters.OBS_CAMERA_ROTATION
             self.my_logger.info('\n\tSpectrum info copied from image')
             self.dec = image.dec
             self.hour_angle = image.hour_angle
@@ -618,9 +624,12 @@ class Spectrum:
             for attribute, header_key in fits_mappings.items():
                 if (item := self.header.get(header_key)) is not None:
                     setattr(self, attribute, item)
-                    # print(f'set {attribute} to {item}')
                 else:
                     print(f'Failed to set spectrum attribute {attribute} using header {header_key}')
+            if "CAM_ROT" in self.header:
+                parameters.OBS_CAMERA_ROTATION = float(self.header["CAM_ROT"])
+            else:
+                self.my_logger.warning("No information about camera rotation in Spectrum header.")
 
             # set the more complex items by hand here
             if target := self.header.get('TARGET'):
@@ -745,6 +754,83 @@ class Spectrum:
             self.my_logger.info(f'\n\tSpectrogram loaded from {input_file_name}')
         else:
             self.my_logger.warning(f'\n\tSpectrogram file {input_file_name} not found')
+
+    def compute_dispersion_in_spectrogram(self, D, shift_x, shift_y, angle, niter=3, with_adr=True):
+        """Compute the dispersion relation in a spectrogram, using grating dispersion model and ADR.
+        Origin is the order 0 centroid.
+
+        Parameters
+        ----------
+        D: float
+            The distance between the CCD and the disperser in mm.
+        shift_x: float
+            Shift in the x axis direction for order 0 position in pixel.
+        shift_y: float
+            Shift in the y axis direction for order 0 position in pixel.
+        angle: float
+            Main dispersion axis angle in degrees.
+        niter: int, optional
+            Number of iterations to compute ADR (default: 3).
+        with_adr: bool, optional
+            If True, add ADR effect to grating dispersion model (default: True).
+
+        Returns
+        -------
+        lambdas: array_like
+            Wavelength array for parameters.SPECTRUM_ORDER diffraction.
+        lambdas_order2: array_like
+            Wavelength array for parameters.SPECTRUM_ORDER+1 diffraction.
+        dispersion_law: array_like
+            Complex array coding the 2D dispersion relation in the spectrogram for parameters.SPECTRUM_ORDER diffraction.
+        dispersion_law_order2: array_like
+            Complex array coding the 2D dispersion relation in the spectrogram for parameters.SPECTRUM_ORDER+1 diffraction.
+
+        """
+        # Distance in x and y with respect to the true order 0 position at lambda_ref
+        Dx = np.arange(self.spectrogram_Nx) - self.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
+        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
+        distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
+
+        # Wavelengths using the order 0 shifts (ADR has no impact as it shifts order 0 and order p equally)
+        new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
+        # First guess of wavelengths
+        self.disperser.D = np.copy(D)
+        lambdas = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=self.order)
+        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=self.order+np.sign(self.order))
+
+        # Evaluate ADR
+        adr_x = np.zeros_like(Dx)
+        adr_y = np.zeros_like(Dy_disp_axis)
+        for k in range(niter):
+            adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
+                                        lambda_ref=self.lambda_ref)
+            adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+            adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+
+            # Evaluate ADR for order 2
+            adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
+                                        lambda_ref=self.lambda_ref)
+            # adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+            adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+
+            # Compute lambdas at pixel column x
+            lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=self.order)
+            lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - adr_u_2, new_x0, order=self.order+np.sign(self.order))
+
+        # Compute lambdas at pixel column x
+        # lambdas = self.disperser.grating_pixel_to_lambda(distance - 0*adr_u, new_x0, order=1)
+        # Position (not distance) in pixel of wavelength lambda order 1 centroid in the (x,y) spectrogram frame
+        dispersion_law = (Dx + shift_x + with_adr * adr_x) + 1j * (Dy_disp_axis + with_adr * adr_y + shift_y)
+
+        # Compute lambdas at pixel column x
+        # lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - 0*adr_u, new_x0, order=2)
+        # Position (not distance) in pixel of wavelength lambda order 2 centroid in the (x,y) spectrogram frame
+        distance_order2 = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=self.order+np.sign(self.order))
+        Dx_order2 = distance_order2 * np.cos(angle * np.pi / 180)
+        Dy_disp_axis_order2 = distance_order2 * np.sin(angle * np.pi / 180)
+        dispersion_law_order2 = (Dx_order2 + shift_x + with_adr * adr_x) + \
+                                1j * (Dy_disp_axis_order2 + with_adr * adr_y + shift_y)
+        return lambdas, lambdas_order2, dispersion_law, dispersion_law_order2
 
 
 def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func=None, snr_minlevel=3, ax=None,
