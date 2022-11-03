@@ -14,7 +14,6 @@ from spectractor.extractor.background import extract_spectrogram_background_sext
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
 from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple
-from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 from spectractor.fit.fitter import run_minimisation, run_minimisation_sigma_clipping, RegFitWorkspace, FitWorkspace
 
 
@@ -24,7 +23,7 @@ def dumpParameters():
             print(item, getattr(parameters, item))
 
 
-def dumpfitparameters(w,thelogguer):
+def dumpfitparameters(w, thelogger):
     N1 = len(w.input_labels)
     N2 = len(w.p)
     assert N1 == N2
@@ -33,13 +32,13 @@ def dumpfitparameters(w,thelogguer):
     for idx in range(N1):
         tag = w.input_labels[idx]
         val = w.p[idx]
-        fixed=w.fixed[idx]
-        b1= w.bounds[idx][0]
-        b2= w.bounds[idx][1]
-        line = "- fit param #{} :: {} = {} \t fixed = {} \t bounds {:.3f} - {:.3f}".format(idx,tag,val,fixed,b1,b2)
+        fixed = w.fixed[idx]
+        b1 = w.bounds[idx][0]
+        b2 = w.bounds[idx][1]
+        line = "- fit param #{} :: {} = {} \t fixed = {} \t bounds {:.3f} - {:.3f}".format(idx, tag, val, fixed, b1, b2)
         list_of_strings.append(line)
     txt = "\n".join(list_of_strings)
-    thelogguer.info(txt)
+    thelogger.info(txt)
 
 
 class FullForwardModelFitWorkspace(FitWorkspace):
@@ -259,7 +258,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         Examples
         --------
         >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
-        >>> spec = Spectrum("outputs/exposure_2022031600330_postisrccd_spectrum.fits", config="./config/auxtel.ini")
         >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="fixed", verbose=True)
         >>> _ = w.simulate(*w.p)
         >>> w.plot_fit()
@@ -769,14 +767,13 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
         if parameters.DEBUG:
             my_logger.info("\n --- before  run_minimisation ---")
-            dumpfitparameters(w,my_logger)
-
+            dumpfitparameters(w, my_logger)
 
         run_minimisation(w, method=method, fix=w.fixed, xtol=1e-4, ftol=100 / (w.data.size - len(w.mask)))
 
         if parameters.DEBUG:
             my_logger.info("\n --- after  run_minimisation ---")
-            dumpfitparameters(w,my_logger)
+            dumpfitparameters(w, my_logger)
 
         if parameters.DEBUG and parameters.DISPLAY:
             w.plot_fit()
@@ -817,7 +814,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
             if parameters.DEBUG:
                 my_logger.info("\n --- after  run_minimisation_sigma_clipping ---")
-                dumpfitparameters(w,my_logger)
+                dumpfitparameters(w, my_logger)
 
             if parameters.DEBUG and parameters.DISPLAY:
                 w.plot_fit()
@@ -909,7 +906,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
 
 def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='./config/ctio.ini',
-                atmospheric_lines=True, line_detection=True):
+                atmospheric_lines=True):
     """ Spectractor
     Main function to extract a spectrum from an image
 
@@ -982,14 +979,14 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         my_logger.info(f"\n\tNo guess position of order 0 has been given. Assuming the spectrum to extract comes "
                        f"from the brightest object, guess position is set as {image.target_guess}.")
     if parameters.DEBUG:
-        image.plot_image(scale='symlog', title="before rebinning",target_pixcoords=image.target_guess)
+        image.plot_image(scale='symlog', title="before rebinning", target_pixcoords=image.target_guess)
 
     # Use fast mode
     if parameters.CCD_REBIN > 1:
         my_logger.info('\n\t  ======================= REBIN =============================')
         image.rebin()
         if parameters.DEBUG:
-            image.plot_image(scale='symlog', title="after rebinning ",target_pixcoords=image.target_guess)
+            image.plot_image(scale='symlog', title="after rebinning ", target_pixcoords=image.target_guess)
 
     # Set output path
     ensure_dir(output_directory)
@@ -1096,8 +1093,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         ws = [signal_width + 20, signal_width + 30]
 
     my_logger.info('\n\t  ======================= extract_spectrum_from_image =============================')
-
-
     my_logger.info(
         f'\n\tExtracting spectrum from image: spectrum with width 2*{signal_width:.0f} pixels '
         f'and background from {ws[0]:.0f} to {ws[1]:.0f} pixels')
