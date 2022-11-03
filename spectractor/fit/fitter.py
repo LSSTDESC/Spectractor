@@ -678,6 +678,32 @@ class FitWorkspace:
                 res = L @ (model - self.data)
         return res
 
+    def compute_W_with_model_error(self, model_err):
+        W = self.W
+        if self.W.ndim == 1 and self.W.dtype != object:
+            if np.any(model_err > 0):
+                W = 1 / (self.data_cov + model_err * model_err)
+        elif self.W.dtype == object:
+            K = len(self.W)
+            if self.W[0].ndim == 1:
+                if np.any(model_err > 0):
+                    W = [1 / (self.data_cov[k] + model_err * model_err) for k in range(K)]
+            elif self.W[0].ndim == 2:
+                K = len(self.W)
+                if np.any(model_err > 0):
+                    cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
+                    L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
+                    W = [L[k].T @ L[k] for k in range(K)]
+            else:
+                raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
+                                 f"I get W[0]={self.W[0]}")
+        elif self.W.ndim == 2 and self.W.dtype != object:
+            if np.any(model_err > 0):
+                cov = self.data_cov + np.diag(model_err * model_err)
+                L = np.linalg.inv(np.linalg.cholesky(cov))
+                W = L.T @ L
+        return W
+
     def chisq(self, p, model_output=False):
         """Compute the chi square for a set of model parameters p.
 
@@ -704,57 +730,28 @@ class FitWorkspace:
         # prepare weight matrices in case they have not been built before
         self.prepare_weight_matrices()
         x, model, model_err = self.simulate(*p)
-        if self.W.ndim == 1 and self.W.dtype != np.object:
-            if np.any(model_err > 0):
-                W = 1 / (self.data_cov + model_err * model_err)
-            else:
-                W = self.W
+        W = self.compute_W_with_model_error(model_err)
+        if W.ndim == 1 and W.dtype != object:
             res = (model - self.data)
             chisq = res @ (W * res)
-            # fit_workspace.my_logger.warning(f"ll {tmp_params}")
-            # fit_workspace.my_logger.warning(f"yyyy {np.sum(residuals)} {np.sum(W)} {np.sum(W*residuals)}")
-            # fit_workspace.my_logger.warning(f"yoooo {np.sum(residuals)} {np.sum(W*residuals)} ")
-            # fit_workspace.my_logger.warning(f"yiiii {np.sum(tmp_model.flatten()[fit_workspace.not_outliers])} {np.sum(fit_workspace.data.flatten()[fit_workspace.not_outliers])} ")
-            # self.my_logger.warning(f"ll {p}")
-            # self.my_logger.warning(f"yyyy {np.sum(res)} {np.sum(W)} {np.sum(W*res)}")
-            # self.my_logger.warning(f"yoooo {np.sum(res[self.not_outliers])} {np.sum(W[self.not_outliers]*res[self.not_outliers])} ")
-            # self.my_logger.warning(f"yiiii {np.sum(model[self.not_outliers])} {np.sum(self.data[self.not_outliers])} ")
-        elif self.W.dtype == np.object:
-            K = len(self.W)
-            if self.W[0].ndim == 1:
-                if np.any(model_err > 0):
-                    W = [1 / (self.data_cov[k] + model_err * model_err) for k in range(K)]
-                else:
-                    W = self.W
-                res = [model[k] - self.data[k] for k in range(K)]
+        elif W.dtype == object:
+            K = len(W)
+            res = [model[k] - self.data[k] for k in range(K)]
+            if W[0].ndim == 1:
                 chisq = np.sum([res[k] @ (W[k] * res[k]) for k in range(K)])
-            elif self.W[0].ndim == 2:
-                K = len(self.W)
-                if np.any(model_err > 0):
-                    cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
-                    L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
-                    W = [L[k].T @ L[k] for k in range(K)]
-                else:
-                    W = self.W
-                res = [model[k] - self.data[k] for k in range(K)]
+            elif W[0].ndim == 2:
                 chisq = np.sum([res[k] @ W[k] @ res[k] for k in range(K)])
             else:
                 raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
-                                 f"I get W[0]={self.W[0]}")
-        elif self.W.ndim == 2 and self.W.dtype != np.object:
-            if np.any(model_err > 0):
-                cov = self.data_cov + np.diag(model_err * model_err)
-                L = np.linalg.inv(np.linalg.cholesky(cov))
-                W = L.T @ L
-            else:
-                W = self.W
+                                 f"I get W[0]={W[0]}")
+        elif W.ndim == 2 and W.dtype != object:
             res = (model - self.data)
             chisq = res @ W @ res
         else:
             raise ValueError(
                 f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
                 f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
-                f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
+                f"\nHere W type is {type(W)}, shape is {W.shape} and W is {W}.")
         if model_output:
             return chisq, x, model, model_err
         else:
@@ -970,7 +967,6 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     tmp_params = np.copy(params)
     fit_workspace.prepare_weight_matrices()
     n_data_masked = len(fit_workspace.mask) + len(fit_workspace.outliers)
-    W = fit_workspace.W
     ipar = np.arange(params.size)
     if fixed_params is not None:
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
@@ -980,12 +976,15 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     for i in range(niter):
         start = time.time()
         cost, tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.chisq(tmp_params, model_output=True)
-        if isinstance(fit_workspace.W, np.ndarray) and fit_workspace.W.dtype != np.object:
+        # W matrix
+        W = fit_workspace.compute_W_with_model_error(tmp_model_err)
+        # residuals
+        if isinstance(W, np.ndarray) and W.dtype != object:
             residuals = (tmp_model - fit_workspace.data).flatten()
-        elif isinstance(fit_workspace.W, np.ndarray) and fit_workspace.W.dtype == np.object:
-            residuals = [(tmp_model[k] - fit_workspace.data[k]) for k in range(len(fit_workspace.W))]
+        elif isinstance(W, np.ndarray) and W.dtype == object:
+            residuals = [(tmp_model[k] - fit_workspace.data[k]) for k in range(len(W))]
         else:
-            raise TypeError(f"Type of fit_workspace.W is {type(fit_workspace.W)}. It must be a np.ndarray.")
+            raise TypeError(f"Type of fit_workspace.W is {type(W)}. It must be a np.ndarray.")
         # Jacobian
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params,
                                    model_input=[tmp_lambdas, tmp_model, tmp_model_err])
@@ -1002,15 +1001,14 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                     f"at its last known current value ({tmp_params[ip]}).")
         # remove fixed parameters
         J = J[ipar].T
-        # algebra
-        if fit_workspace.W.ndim == 1 and fit_workspace.W.dtype != np.object:
+        if W.ndim == 1 and W.dtype != object:
             JT_W = J.T * W
             JT_W_J = JT_W @ J
-        elif fit_workspace.W.ndim == 2 and fit_workspace.W.dtype != np.object:
+        elif W.ndim == 2 and W.dtype != object:
             JT_W = J.T @ W
             JT_W_J = JT_W @ J
         else:
-            if fit_workspace.W[0].ndim == 1:
+            if W[0].ndim == 1:
                 JT_W = J.T * np.concatenate(W).ravel()
                 JT_W_J = JT_W @ J
             else:
@@ -1018,7 +1016,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                 # because W inverse covariance is block diagonal and blocks can have different sizes
                 # the philosophy is to temporarily flatten the data arrays
                 JT_W = [np.concatenate([J[ip][k].T @ W[k]
-                                        for k in range(fit_workspace.W.shape[0])]).ravel()
+                                        for k in range(W.shape[0])]).ravel()
                         for ip in range(len(J))]
                 JT_W_J = np.array([[JT_W[ip2] @ np.concatenate(J[ip1][:]).ravel() for ip1 in range(len(J))]
                                    for ip2 in range(len(J))])
