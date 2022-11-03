@@ -141,7 +141,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # with respect to the true spectrum injected in the simulation
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
         self.fixed[0] = (not self.spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in self.spectrum.header))
-        self.fixed[1] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_pectrum
+        self.fixed[1] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_spectrum
         self.fixed[2] = True  # delta x: if False, extracted spectrum is biased compared with truth
         self.fixed[3] = True  # delta y
         self.fixed[4] = True  # angle
