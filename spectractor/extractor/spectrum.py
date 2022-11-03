@@ -624,17 +624,10 @@ class Spectrum:
             for attribute, header_key in fits_mappings.items():
                 if (item := self.header.get(header_key)) is not None:
                     setattr(self, attribute, item)
-                    # print(f'set {attribute} to {item}')
                 else:
                     print(f'Failed to set spectrum attribute {attribute} using header {header_key}')
             if "CAM_ROT" in self.header:
                 parameters.OBS_CAMERA_ROTATION = float(self.header["CAM_ROT"])
-            elif "ROTPA" in self.header:
-                parameters.OBS_CAMERA_ROTATION = 270 - float(self.header["ROTPA"])
-                if parameters.OBS_CAMERA_ROTATION > 360:
-                    parameters.OBS_CAMERA_ROTATION -= 360
-                if parameters.OBS_CAMERA_ROTATION < -360:
-                    parameters.OBS_CAMERA_ROTATION += 360
             else:
                 self.my_logger.warning("No information about camera rotation in Spectrum header.")
 
