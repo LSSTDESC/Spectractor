@@ -35,7 +35,7 @@ if __name__ == "__main__":
         atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
         w = SpectrumFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                  burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
-        #run_spectrum_minimisation(w, method="newton")
+        run_spectrum_minimisation(w, method="newton")
         w = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=2000,
                                     burnin=1000, nbins=10, verbose=1, plot=True, live_fit=False)
         run_spectrogram_minimisation(w, method="newton")

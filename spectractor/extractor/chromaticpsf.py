@@ -771,11 +771,10 @@ class ChromaticPSF:
     def update(self, psf_poly_params, x0, y0, angle, plot=False):
         profile_params = self.from_poly_params_to_profile_params(psf_poly_params, apply_bounds=True)
         self.fill_table_with_profile_params(profile_params)
-        Dx = np.arange(self.Nx) - x0 #self.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
+        Dx = np.arange(self.Nx) - x0  # distance in (x,y) spectrogram frame for column x
         self.table["Dx"] = Dx
         self.table['Dy_disp_axis'] = np.tan(angle * np.pi / 180) * self.table['Dx']
         self.table['Dy'] = np.copy(self.table['y_c']) - y0
-        # self.profile_params = self.from_table_to_profile_params()
         if plot:
             self.plot_summary()
         return profile_params

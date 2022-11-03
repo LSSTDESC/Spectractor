@@ -3,7 +3,6 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
-from scipy.interpolate import interp1d
 from scipy import sparse
 import time
 
@@ -117,11 +116,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params, self.psf_poly_params])
         self.input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]",
-                             r"angle [deg]", "B", "R", "P [hPa]", "T [Celsius]", "z"] + list(self.psf_poly_params_labels) * 2
+                             r"angle [deg]", "B", "R", "P [hPa]", "T [Celsius]", "z"] + \
+                            list(self.psf_poly_params_labels) + [label+"_2" for label in self.psf_poly_params_labels]
         self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^(\mathrm{fit})$ [pix]",
                            r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]",
-                           r"$\alpha$ [deg]", "$B$", "R", r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]", "$z$"]\
-                          + list(self.psf_poly_params_names) * 2
+                           r"$\alpha$ [deg]", "$B$", "R", r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]",
+                           "$z$"] + list(self.psf_poly_params_names) + [label+"_2" for label in self.psf_poly_params_names]
         bounds_D = (self.D - 3 * parameters.DISTANCE2CCD_ERR, self.D + 3 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
                                                 (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
@@ -229,12 +229,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
 
         # profile params saved to be plotted
-        self.profile_params = None
-        self.profile_params_order2 = None
-        self.D2CCD = parameters.DISTANCE2CCD
-        self.Dy_disp_axis = None
-        self.dx0 = 0
-        self.dy0 = 0
+        # self.profile_params = None
+        # self.profile_params_order2 = None
+        # self.D2CCD = parameters.DISTANCE2CCD
+        # self.Dy_disp_axis = None
+        # self.dx0 = 0
+        # self.dy0 = 0
 
     def set_y_c(self):
         for k, par in enumerate(self.input_labels):
@@ -414,118 +414,32 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         parameters.OBS_CAMERA_ROTATION = rot
         W_dot_data = self.W * (self.data + (1 - B) * self.bgd_flat)
-        profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params_order1, apply_bounds=True)
-        profile_params[:, 0] = 1
-        profile_params[:, 1] = np.arange(self.Nx)
-        self.spectrum.chromatic_psf.fill_table_with_profile_params(profile_params)
 
-        # # Distance in x and y with respect to the true order 0 position at lambda_ref
-        Dx = np.arange(self.Nx) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
-        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
+        # Evaluate PSF profile
+        profile_params = self.spectrum.chromatic_psf.update(poly_params_order1, self.spectrum.spectrogram_x0 + dx0,
+                                                            self.spectrum.spectrogram_y0 + dy0, angle, plot=False)
 
-        # First guess of wavelengths
-        self.spectrum.disperser.D = np.copy(D2CCD)
-        self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
-                                                                       self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                       order=self.spectrum.order)
-        lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
-                                                                         self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                         order=self.spectrum.order+np.sign(self.spectrum.order))
-
-        # Evaluate ADR
-        adr_x = np.zeros_like(Dx)
-        adr_y = np.zeros_like(Dy_disp_axis)
-        for k in range(3):
-            adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
-                                        lambda_ref=self.spectrum.lambda_ref)
-            adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-            adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
-
-            # Evaluate ADR for order 2
-            adr_ra, adr_dec = adr_calib(lambdas_order2, self.spectrum.adr_params, parameters.OBS_LATITUDE,
-                                        lambda_ref=self.spectrum.lambda_ref)
-            # adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-            adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
-
-            # Compute lambdas at pixel column x
-            self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u,
-                                                                           self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                           order=self.spectrum.order)
-            lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u_2,
-                                                                             self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                             order=self.spectrum.order+np.sign(self.spectrum.order))
-        print("bef",self.lambdas[-5:], lambdas_order2[-5:])
-        self.lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.spectrum.compute_dispersion_in_spectrogram(D2CCD, dx0, dy0, angle, with_adr=True, niter=3)
-        print("aft",self.lambdas[-5:], lambdas_order2[-5:])
-
+        # Evaluate ADR and compute wavelength arrays
+        self.lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.spectrum.compute_dispersion_in_spectrogram(D2CCD, dx0, dy0, angle, with_adr=True, niter=5)
 
         # Fill spectrogram trace as a function of the pixel column x
-        # self.spectrum.chromatic_psf.table["Dy_disp_axis"] = Dy_disp_axis
-        # self.spectrum.chromatic_psf.table["Dx"] = Dx
-        befx = Dx + self.spectrum.spectrogram_x0 + adr_x + dx0
-        befy = Dy_disp_axis - self.bgd_width + adr_y + dy0
-        print("dispx bef", befx[-5:])
-        print("dispy bef", befy[-5:])
-        profile_params[:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0 #+ adr_x + dx0
-        profile_params[:, 2] += dispersion_law.imag - self.bgd_width # Dy_disp_axis + adr_y + dy0
-        print("dispx aft", dispersion_law.real[-5:] + self.spectrum.spectrogram_x0)
-        print("dispy aft", dispersion_law.imag[-5:] - self.bgd_width)
+        profile_params[:, 0] = 1
+        profile_params[:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
+        profile_params[:, 2] += dispersion_law.imag - self.bgd_width
 
         # Prepare order 2 profile params indexed by the wavelength associated to x
         profile_params_order2 = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params_order2, apply_bounds=True)
         # Second diffraction order amplitude is the first order amplitude multiplied by ratio 2/1
         # Ratio 2/1 is in flam/flam but no need to convert in ADU/ADU because lambda*dlambda is the same for both orders
         profile_params_order2[:, 0] = self.spectrum.disperser.ratio_order_2over1(self.lambdas)
-
-        # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
-        # same PSF as for the order 1 but at the same position
-        distance_order2 = self.spectrum.disperser.grating_lambda_to_pixel(self.lambdas,
-                                                                         self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                         order=self.spectrum.order+np.sign(self.spectrum.order))
-        # for k in range(3, profile_params.shape[1]):
-        #     # profile_params_order2[:, k] = interp1d(self.lambdas_order2, profile_params_order2[:, k],
-        #     #                                       kind="cubic", fill_value="extrapolate")(self.lambdas)
-        #     profile_params_order2[:, k] = interp1d(distance, profile_params_order2[:, k],
-        #                                            kind="cubic", fill_value="extrapolate")(distance_order2)
-        Dx_order2 = distance_order2 * np.cos(angle * np.pi / 180)
-        Dy_disp_axis_order2 = distance_order2 * np.sin(angle * np.pi / 180)
-        befx = Dx_order2 + self.spectrum.spectrogram_x0 + adr_x + dx0
-        befy = Dy_disp_axis_order2 - self.bgd_width + adr_y + dy0
-        print("dispx bef", befx[-5:])
-        print("dispy bef", befy[-5:])
-        profile_params_order2[:, 1] = dispersion_law_order2.real + self.spectrum.spectrogram_x0 # Dx_order2 + adr_x + dx0
-        profile_params_order2[:, 2] += dispersion_law_order2.imag - self.bgd_width # Dy_disp_axis_order2 + (0*self.spectrum.spectrogram_y0 + adr_y + dy0) - self.bgd_width
-        print("dispx aft", dispersion_law_order2.real[-5:] + self.spectrum.spectrogram_x0)
-        print("dispy aft", dispersion_law_order2.imag[-5:] - self.bgd_width)
-
-        if parameters.DEBUG and False:
-            plt.figure(figsize=(18,4))
-            plt.imshow(self.data.reshape((self.Ny, self.Nx)), origin="lower")
-            plt.scatter(profile_params[:, 1], profile_params[:, 2], label="profile",
-                        cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
-            plt.scatter(profile_params_order2[:, 1], profile_params_order2[:, 2], label="order 2",
-                        cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
-            plt.plot(profile_params[:, 1], profile_params[:, 2], label="profile")
-            plt.plot(profile_params[:, 1], self.spectrum.chromatic_psf["Dy_disp_axis"] + self.spectrum.spectrogram_y0 + dy0 - self.bgd_width, 'k-',
-                     label="disp_axis")
-            plt.plot(self.spectrum.chromatic_psf.table['Dx'] + self.spectrum.spectrogram_x0 + dx0,
-                     self.spectrum.chromatic_psf.table['Dy'] + self.spectrum.spectrogram_y0 + dy0 - self.bgd_width,
-                     label="y_c")
-            plt.legend()
-            plt.title(f"D_CCD={D2CCD:.2f}, dx0={dx0:.2g}, dy0={dy0:.2g}")
-            plt.xlim((0, self.Nx))
-            plt.ylim((0, self.Ny))
-            plt.grid()
-            plt.gca().set_aspect("auto")
-            plt.suptitle("simulate")
-            plt.show()
+        profile_params_order2[:, 1] = dispersion_law_order2.real + self.spectrum.spectrogram_x0
+        profile_params_order2[:, 2] += dispersion_law_order2.imag - self.bgd_width
 
         # save for plotting
-        self.profile_params = profile_params
-        self.profile_params_order2 = profile_params_order2
-        self.dx0 = dx0
-        self.dy0 = dy0
+        # self.profile_params = profile_params
+        # self.profile_params_order2 = profile_params_order2
+        # self.dx0 = dx0
+        # self.dy0 = dy0
 
         # Matrix filling
         # if self.psf_cube is None or not self.fix_psf_cube:  # slower
@@ -807,30 +721,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.sparse_indices = None
         self.set_mask(params=self.p)
         # self.set_y_c()
-
-    def plot_fitted_parameters(self,title="output from simulate"):
-
-        plt.figure(figsize=(18,6))
-        plt.imshow(self.data.reshape((self.Ny, self.Nx)), origin="lower")
-        plt.scatter(self.profile_params[:, 1], self.profile_params[:, 2], label="profile",
-                         cmap=from_lambda_to_colormap(self.lambdas), s=30, c=self.lambdas)
-        plt.scatter(self.profile_params_order2[:, 1], self.profile_params_order2[:, 2], label="order 2",
-                         cmap=from_lambda_to_colormap(self.lambdas), s=30, c=self.lambdas)
-        plt.plot(self.profile_params[:, 1], self.profile_params[:, 2], label="profile",lw=3)
-        plt.plot(self.profile_params[:, 1], self.spectrum.chromatic_psf.table['Dy_disp_axis'] + self.spectrum.spectrogram_y0 + self.dy0 - self.bgd_width, 'k-',
-                      label="disp_axis",lw=3)
-        plt.plot(self.spectrum.chromatic_psf.table['Dx'] + self.spectrum.spectrogram_x0 + self.dx0,
-                      self.spectrum.chromatic_psf.table['Dy'] + self.spectrum.spectrogram_y0 + self.dy0 - self.bgd_width,
-                      label="y_c",lw=3)
-        plt.legend()
-        plt.title(f"D_CCD={self.D2CCD:.2f}, dx0={self.dx0:.2g}, dy0={self.dy0:.2g}")
-        plt.xlim((0, self.Nx))
-        plt.ylim((0, self.Ny))
-        plt.grid()
-        plt.gca().set_aspect("auto")
-        plt.suptitle(title)
-        plt.tight_layout()
-        plt.show()
 
 
 def run_ffm_minimisation(w, method="newton", niter=2):
