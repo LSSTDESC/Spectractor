@@ -227,14 +227,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             # self.Q = L.T @ U.T @ U @ L
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
 
-        # profile params saved to be plotted
-        # self.profile_params = None
-        # self.profile_params_order2 = None
-        # self.D2CCD = parameters.DISTANCE2CCD
-        # self.Dy_disp_axis = None
-        # self.dx0 = 0
-        # self.dy0 = 0
-
     def set_y_c(self):
         for k, par in enumerate(self.input_labels):
             if "y_c" in par:
