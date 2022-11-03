@@ -15,7 +15,6 @@ from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 import spectractor.parameters as parameters
-from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 
 
 class SpectrumSimulation(Spectrum):
@@ -153,17 +152,6 @@ class SpectrumSimulation(Spectrum):
         distance = self.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=shift_x)
         lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
         lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
-        # lambda_ref = self.lambda_ref
-        # adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        # adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-        #                                                        dispersion_axis_angle=self.rotation_angle)
-        # distance_order1 = distance - adr_u
-        # adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=lambda_ref)
-        # adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-        #                                                        dispersion_axis_angle=self.rotation_angle)
-        # distance_order2 = distance - adr_u
-        # lambdas = self.disperser.grating_pixel_to_lambda(distance_order1, x0=new_x0, order=1)
-        # lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
         self.lambdas = lambdas
         self.lambdas_order2 = lambdas_order2
         atmospheric_transmission = self.atmosphere.simulate(ozone, pwv, aerosols)
@@ -440,18 +428,11 @@ class SpectrogramModel(Spectrum):
             if self.psf_cube_order2 is None or not self.fix_psf_cube:
                 start = time.time()
                 self.psf_cube_order2 = np.zeros((nlbda2, self.Ny, self.Nx))
-                # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
-                # same PSF as for the order 1 but at the same position
                 profile_params_order2 = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params_order2,
                                                                                               apply_bounds=True)
                 profile_params_order2[:, 0] = 1
                 profile_params_order2[:nlbda2, 1] = dispersion_law_order2.real + self.r0.real
                 profile_params_order2[:nlbda2, 2] += dispersion_law_order2.imag
-                # distance = np.abs(dispersion_law)
-                # distance_order2 = np.abs(dispersion_law_order2)
-                # for k in range(3, self.profile_params.shape[1]):
-                #     profile_params_order2[:nlbda2, k] = interp1d(distance, profile_params_order2[:, k], kind="cubic",
-                #                                                  fill_value="extrapolate")(distance_order2)
                 for i in range(0, nlbda2, 1):
                     self.psf_cube_order2[i] = self.psf.evaluate(self.pixels, p=profile_params_order2[i, :])
                 self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')
