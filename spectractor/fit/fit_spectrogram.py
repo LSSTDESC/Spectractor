@@ -86,7 +86,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.A1 = 1.0
         self.A2 = 1.0
         self.ozone = 400.
-        self.pwv = 3
+        self.pwv = 5
         self.aerosols = 0.05
         self.D = self.spectrum.header['D2CCD']
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()

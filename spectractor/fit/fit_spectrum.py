@@ -4,7 +4,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping
@@ -80,7 +80,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.A1 = 1.0
         self.A2 = 0
         self.ozone = 400.
-        self.pwv = 3
+        self.pwv = 5
         self.aerosols = 0.01
         self.reso = 1
         self.D = self.spectrum.header['D2CCD']
