@@ -420,8 +420,8 @@ class SpectrogramModel(Spectrum):
 
         # Add order 2
         if A2 > 0.:
-            spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(self.lambdas) * \
-                                                   self.simulate_spectrum(self.lambdas, self.atmosphere_sim)
+            spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(lambdas_order2) * \
+                                                   self.simulate_spectrum(lambdas_order2, self.atmosphere_sim)
             if np.any(np.isnan(spectrum_order2)):
                 spectrum_order2[np.isnan(spectrum_order2)] = 0.
             nlbda2 = dispersion_law_order2.size
