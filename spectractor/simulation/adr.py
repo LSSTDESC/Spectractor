@@ -392,8 +392,9 @@ def instanciation_adr(params, latitude, lbda_ref):
 
     if (isinstance(dec, str) and isinstance(hour_angle, str)) \
             or (isinstance(dec, float) and isinstance(hour_angle, float)):
+        # default units after loading a Spectrum file are decimal degrees
         dec = AC.Angle(params[0], unit=u.deg)
-        hour_angle = AC.Angle(params[1], unit=u.hourangle)
+        hour_angle = AC.Angle(params[1], unit=u.deg)
     elif isinstance(dec, AC.Angle) and isinstance(hour_angle, AC.Angle):
         dec = dec
         hour_angle = hour_angle
