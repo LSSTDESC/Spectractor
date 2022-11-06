@@ -680,6 +680,7 @@ class FitWorkspace:
 
     def compute_W_with_model_error(self, model_err):
         W = self.W
+        zeros = W == 0
         if self.W.ndim == 1 and self.W.dtype != object:
             if np.any(model_err > 0):
                 W = 1 / (self.data_cov + model_err * model_err)
@@ -702,6 +703,7 @@ class FitWorkspace:
                 cov = self.data_cov + np.diag(model_err * model_err)
                 L = np.linalg.inv(np.linalg.cholesky(cov))
                 W = L.T @ L
+        W[zeros] = 0
         return W
 
     def chisq(self, p, model_output=False):
