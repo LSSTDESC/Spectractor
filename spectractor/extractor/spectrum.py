@@ -99,9 +99,9 @@ class Spectrum:
     target: Target
         Target instance that describes the current exposure.
     dec: float
-        Declination coordinate of the current exposure.
+        Declination coordinate of the current exposure in degrees.
     hour_angle float
-        Hour angle coordinate of the current exposure.
+        Hour angle coordinate of the current exposure in degrees.
     temperature: float
         Outside temperature in Celsius degrees.
     pressure: float

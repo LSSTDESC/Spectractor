@@ -3,6 +3,7 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
+from scipy.signal import convolve2d
 import copy
 
 from spectractor import parameters
@@ -130,7 +131,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
         self.fixed[1] = "A2_T" not in self.spectrum.header  # not self.spectrum.disperser.flat_ratio_order_2over1
         # self.fixed[5:7] = [True, True]  # DCCD, x0
-        self.fixed[1] = False
         self.fixed[6] = True  # Delta x
         self.fixed[7] = True  # Delta y
         self.fixed[8] = True  # angle
@@ -156,6 +156,18 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_params_index_order2 = np.concatenate([np.arange(0, self.psf_params_start_index), np.arange(np.max(self.psf_params_index)+1, len(self.p))])
         self.psf_params_start_index_order2 = np.max(self.psf_params_index)+1
 
+        # error matrix
+        # here image uncertainties are assumed to be uncorrelated
+        # (which is not exactly true in rotated images)
+        self.W = 1. / (self.err * self.err)
+        self.W = self.W.flatten()
+
+        # flat data for fitworkspace
+        self.data_before_mask = np.copy(self.data)
+        self.W_before_mask = np.copy(self.W)
+        # create mask
+        self.set_mask()
+
     def crop_spectrogram(self):
         """Crop the spectrogram in the middle, keeping a vertical width of 2*parameters.PIXWIDTH_SIGNAL around
         the signal region.
@@ -173,6 +185,55 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.chromatic_psf.table["y_c"] -= bgd_width
         self.my_logger.debug(f'\n\tSize of the spectrogram region after cropping: '
                              f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')
+
+    def set_mask(self, params=None):
+        """
+
+        Parameters
+        ----------
+        params
+
+        Returns
+        -------
+
+        Examples
+        --------
+        >>> from spectractor.extractor.spectrum import Spectrum
+        >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
+        >>> w = SpectrogramFitWorkspace(spectrum=spec, amplitude_priors_method="fixed", verbose=True)
+        >>> _ = w.simulate(*w.p)
+        >>> w.plot_fit()
+
+        """
+        self.my_logger.info("\n\tReset spectrogram mask with current parameters.")
+        if params is None:
+            params = self.p
+        A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, *psf_poly_params = params
+        psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params,
+                                                                                            apply_bounds=True)
+        self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
+        Dx = np.arange(len(psf_profile_params[:,
+                           0])) - self.spectrum.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
+        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
+        psf_profile_params[:, 0] = 1
+        psf_profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + shift_x
+        psf_profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + shift_y)  # - self.bgd_width
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.simulation.pixels, psf_profile_params,
+                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+        self.simulation.psf_cube_masked = psf_cube > 0
+        flat_spectrogram = np.sum(self.simulation.psf_cube_masked.reshape(len(psf_profile_params), self.simulation.pixels[0].size),
+                                  axis=0)
+        mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
+        mask = mask.reshape(self.simulation.pixels[0].shape)
+        kernel = np.ones((3, self.spectrum.spectrogram_Nx//10))  # enlarge a bit more the edges of the mask
+        mask = convolve2d(mask, kernel, 'same').astype(bool)
+        for k in range(self.simulation.psf_cube_masked.shape[0]):
+            self.simulation.psf_cube_masked[k] *= ~mask
+        mask = mask.reshape((self.simulation.pixels[0].size,))
+        self.W = np.copy(self.W_before_mask)
+        self.W[mask] = 0
+        self.mask = list(np.where(mask)[0])
 
     def get_spectrogram_truth(self):
         """Load the truth parameters (if provided) from the file header.
@@ -216,9 +277,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         cmap_viridis = copy.copy(cm.get_cmap('viridis'))
         cmap_viridis.set_bad(color='lightgrey')
 
-        data = np.copy(self.data)
-        if len(self.outliers) > 0:
-            bad_indices = self.get_bad_indices()
+        data = np.copy(self.data_before_mask)
+        if len(self.outliers) > 0 or len(self.mask) > 0:
+            bad_indices = np.array(list(self.get_bad_indices()) + list(self.mask)).astype(int)
             data[bad_indices] = np.nan
 
         lambdas = self.spectrum.lambdas
@@ -250,13 +311,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 ax[1, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
             residuals = (data - model)
             # residuals_err = self.spectrum.spectrogram_err / self.model
-            norm = err
+            norm = np.sqrt(err**2 + self.model_err.reshape((self.Ny, self.Nx))**2)
             residuals /= norm
             std = float(np.nanstd(residuals[:, sub]))
             plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
                               aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
             ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
-            ax[2, 0].text(0.05, 0.05, f'mean={np.mean(residuals[:, sub]):.3f}\nstd={np.std(residuals[:, sub]):.3f}',
+            ax[2, 0].text(0.05, 0.05, f'mean={np.nanmean(residuals[:, sub]):.3f}\nstd={np.nanstd(residuals[:, sub]):.3f}',
                           horizontalalignment='left', verticalalignment='bottom',
                           color='black', transform=ax[2, 0].transAxes)
             ax[0, 0].set_xticks(ax[2, 0].get_xticks()[1:-1])

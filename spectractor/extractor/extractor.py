@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from scipy import sparse
+from scipy.signal import convolve2d
 import time
 
 from spectractor import parameters
@@ -274,8 +275,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.psf_cube_masked = psf_cube > 0
         flat_spectrogram = np.sum(self.psf_cube_masked.reshape(len(psf_profile_params), self.pixels[0].size), axis=0)
         mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
-        self.data = np.copy(self.data_before_mask)
-        self.data[mask] = 0
+        mask = mask.reshape(self.pixels[0].shape)
+        kernel = np.ones((3, self.spectrum.spectrogram_Nx//10))  # enlarge a bit more the edges of the mask
+        mask = convolve2d(mask, kernel, 'same').astype(bool)
+        for k in range(self.psf_cube_masked.shape[0]):
+            self.psf_cube_masked[k] *= ~mask
+        mask = mask.reshape((self.pixels[0].size,))
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
         self.sqrtW = np.sqrt(sparse.diags(self.W))
