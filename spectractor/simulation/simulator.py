@@ -247,6 +247,7 @@ class SpectrogramModel(Spectrum):
         self.profile_params = None
         self.psf_cube = None
         self.psf_cube_order2 = None
+        self.psf_cube_masked = None
         self.fix_psf_cube = False
         self.fix_atm_sim = False
         self.atmosphere_sim = None
@@ -382,7 +383,7 @@ class SpectrogramModel(Spectrum):
         import time
         start = time.time()
         self.rotation_angle = angle
-        self.lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.compute_dispersion_in_spectrogram(D, shift_x, shift_y, angle, with_adr=True)
+        self.lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.compute_dispersion_in_spectrogram(D, shift_x, shift_y, angle, with_adr=True, niter=5)
         self.lambdas_binwidths = np.gradient(self.lambdas)
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
@@ -405,9 +406,10 @@ class SpectrogramModel(Spectrum):
         nlbda = dispersion_law.size
         if self.psf_cube is None or not self.fix_psf_cube:
             start = time.time()
-            self.psf_cube = np.zeros((nlbda, self.Ny, self.Nx))
-            for i in range(0, nlbda, 1):
-                self.psf_cube[i] = self.psf.evaluate(self.pixels, p=self.profile_params[i, :])
+            self.psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, self.profile_params,
+                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32",
+                                                              mask=self.psf_cube_masked)
             self.my_logger.debug(f'\n\tAfter psf cube: {time.time() - start}')
         start = time.time()
         ima1 = np.zeros((self.Ny, self.Nx))
@@ -420,21 +422,22 @@ class SpectrogramModel(Spectrum):
 
         # Add order 2
         if A2 > 0.:
-            spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(lambdas_order2) * \
-                                                   self.simulate_spectrum(lambdas_order2, self.atmosphere_sim)
+            spectrum_order2 = self.disperser.ratio_order_2over1(self.lambdas) * spectrum
+            spectrum_order2_err = self.disperser.ratio_order_2over1(self.lambdas) * spectrum_err
             if np.any(np.isnan(spectrum_order2)):
                 spectrum_order2[np.isnan(spectrum_order2)] = 0.
             nlbda2 = dispersion_law_order2.size
             if self.psf_cube_order2 is None or not self.fix_psf_cube:
                 start = time.time()
-                self.psf_cube_order2 = np.zeros((nlbda2, self.Ny, self.Nx))
                 profile_params_order2 = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params_order2,
                                                                                               apply_bounds=True)
                 profile_params_order2[:, 0] = 1
                 profile_params_order2[:nlbda2, 1] = dispersion_law_order2.real + self.r0.real
                 profile_params_order2[:nlbda2, 2] += dispersion_law_order2.imag
-                for i in range(0, nlbda2, 1):
-                    self.psf_cube_order2[i] = self.psf.evaluate(self.pixels, p=profile_params_order2[i, :])
+                self.psf_cube_order2 = self.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
+                                                                         fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                                         fwhmy_clip=parameters.PSF_FWHM_CLIP,
+                                                                         dtype="float32", mask=None)
                 self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')
             start = time.time()
             ima2 = np.zeros_like(ima1)
