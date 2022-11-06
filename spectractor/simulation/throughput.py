@@ -201,11 +201,18 @@ class TelescopeTransmission:
 
     def reset_lambda_range(self, transmission_threshold=1e-4):
         integral = np.cumsum(self.transmission(parameters.LAMBDAS))
-        parameters.LAMBDA_MIN = max(parameters.LAMBDAS[np.argmin(np.abs(integral - transmission_threshold))],
-                                    parameters.LAMBDA_MIN)
-        parameters.LAMBDA_MAX = min(parameters.LAMBDAS[np.argmin(np.abs(integral -
-                                                                        (integral[-1] - transmission_threshold)))],
-                                    parameters.LAMBDA_MAX)
+        lambda_min = parameters.LAMBDAS[0]
+        for k, tr in enumerate(integral):
+            if tr > transmission_threshold:
+                lambda_min = parameters.LAMBDAS[k]
+                break
+        lambda_max = parameters.LAMBDAS[0]
+        for k, tr in enumerate(integral):
+            if tr > integral[-1] - transmission_threshold:
+                lambda_max = parameters.LAMBDAS[k]
+                break
+        parameters.LAMBDA_MIN = max(lambda_min, parameters.LAMBDA_MIN)
+        parameters.LAMBDA_MAX = min(lambda_max, parameters.LAMBDA_MAX)
         parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, parameters.LAMBDA_STEP)
         self.my_logger.info(f"\n\tWith filter {self.filter_label}, set parameters.LAMBDA_MIN={parameters.LAMBDA_MIN} "
                             f"and parameters.LAMBDA_MAX={parameters.LAMBDA_MAX}.")

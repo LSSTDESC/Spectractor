@@ -181,7 +181,7 @@ class Image(object):
 
         if self.filter_label != "" and "empty" not in self.filter_label.lower():
             t = TelescopeTransmission(filter_label=self.filter_label)
-            t.reset_lambda_range(transmission_threshold=1e-4)
+            t.reset_lambda_range(transmission_threshold=1e-5)
 
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
