@@ -56,8 +56,8 @@ def test_extractor_ctio():
         assert np.sum(spectrum.data) * parameters.CCD_REBIN**2 > 2e-11 / parameters.CCD_REBIN
         if parameters.CCD_REBIN == 1:
             if parameters.SPECTRACTOR_DECONVOLUTION_PSF2D or parameters.SPECTRACTOR_DECONVOLUTION_FFM:
-                assert np.isclose(spectrum.lambdas[0], 343, atol=1)
-                assert np.isclose(spectrum.lambdas[-1], 1084.0, atol=1)
+                assert np.isclose(spectrum.lambdas[0], 345, atol=1)
+                assert np.isclose(spectrum.lambdas[-1], 1083.0, atol=1)
             else:
                 assert np.isclose(spectrum.lambdas[0], 347, atol=1)
                 assert np.isclose(spectrum.lambdas[-1], 1085.0, atol=1)
