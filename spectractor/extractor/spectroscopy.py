@@ -7,7 +7,7 @@ import os
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_for_legendre, plot_spectrum_simple
+from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_to_legendre, plot_spectrum_simple
 
 
 class Line:
@@ -398,7 +398,7 @@ class Lines:
                     lambdas = np.copy(line.fit_lambdas)
                     if ax is not None:
                         ax.plot(lambdas, multigauss_and_bgd(lambdas, *line.fit_popt), lw=2, color='b')
-                        x_norm = rescale_x_for_legendre(lambdas)
+                        x_norm = rescale_x_to_legendre(lambdas)
                         bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
                         ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
         if print_table:

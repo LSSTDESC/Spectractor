@@ -224,13 +224,18 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
     return popt, pcov
 
 
-def rescale_x_for_legendre(x):
+def rescale_x_to_legendre(x):
     middle = 0.5 * (np.max(x) + np.min(x))
     x_norm = x - middle
     if np.max(x_norm) != 0:
         return x_norm / np.max(x_norm)
     else:
         return x_norm
+
+
+def rescale_x_from_legendre(x, Xmax, Xmin):
+    X = 0.5 * x * (Xmax - Xmin) + 0.5 * (Xmax + Xmin)
+    return X
 
 
 # noinspection PyTypeChecker
@@ -277,7 +282,7 @@ def multigauss_and_bgd(x, *params):
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
     # out = np.polyval(params[0:bgd_nparams], x)
-    x_norm = rescale_x_for_legendre(x)
+    x_norm = rescale_x_to_legendre(x)
     out = np.polynomial.legendre.legval(x_norm, params[0:bgd_nparams])
     for k in range((len(params) - bgd_nparams) // 3):
         out += gauss(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
@@ -317,7 +322,7 @@ def multigauss_and_bgd_jacobian(x, *params):
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
     out = []
-    x_norm = rescale_x_for_legendre(x)
+    x_norm = rescale_x_to_legendre(x)
     for k in range(bgd_nparams):
         # out.append(params[k]*(parameters.CALIB_BGD_ORDER-k)*x**(parameters.CALIB_BGD_ORDER-(k+1)))
         # out.append(x ** (bgd_nparams - 1 - k))
@@ -559,7 +564,7 @@ def fit_poly1d_legendre(x, y, order, w=None):
         plt.show()
     """
     cov = -1
-    x_norm = rescale_x_for_legendre(x)
+    x_norm = rescale_x_to_legendre(x)
     if len(x) > order:
         fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True, w=w)
         model = np.polynomial.legendre.legval(x_norm, fit)
