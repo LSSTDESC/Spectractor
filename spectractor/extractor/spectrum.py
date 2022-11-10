@@ -1277,7 +1277,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
     return global_chisq
 
 
-def calibrate_spectrum(spectrum, with_adr=False):
+def calibrate_spectrum(spectrum, with_adr=False, niter=5):
     """Convert pixels into wavelengths given the position of the order 0,
     the data for the spectrum, the properties of the disperser. Fit the absorption
     (and eventually the emission) lines to perform a second calibration of the
@@ -1293,6 +1293,8 @@ def calibrate_spectrum(spectrum, with_adr=False):
     with_adr: bool, optional
         If True, the ADR longitudinal shift is subtracted to distances.
         Must be False if the spectrum has already been decontaminated from ADR (default: False).
+    niter: int, optional
+        Number of iterations for ADR accurate evaluation (default: 5).
 
     Returns
     -------
@@ -1317,10 +1319,12 @@ def calibrate_spectrum(spectrum, with_adr=False):
     # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
     # Must project ADR along dispersion axis
     if with_adr > 0:
-        adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
-                                    lambda_ref=spectrum.lambda_ref)
-        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                               dispersion_axis_angle=spectrum.rotation_angle)
+        for k in range(niter):
+            adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
+                                        lambda_ref=spectrum.lambda_ref)
+            adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                                   dispersion_axis_angle=spectrum.rotation_angle)
+            spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - adr_u, spectrum.x0, order=spectrum.order)
     else:
         adr_u = np.zeros_like(distance)
     x0 = spectrum.x0
