@@ -817,13 +817,8 @@ class Spectrum:
             lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=self.order)
             lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - adr_u_2, new_x0, order=self.order+np.sign(self.order))
 
-        # Compute lambdas at pixel column x
-        # lambdas = self.disperser.grating_pixel_to_lambda(distance - 0*adr_u, new_x0, order=1)
         # Position (not distance) in pixel of wavelength lambda order 1 centroid in the (x,y) spectrogram frame
         dispersion_law = (Dx + shift_x + with_adr * adr_x) + 1j * (Dy_disp_axis + with_adr * adr_y + shift_y)
-
-        # Compute lambdas at pixel column x
-        # lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - 0*adr_u, new_x0, order=2)
         # Position (not distance) in pixel of wavelength lambda order 2 centroid in the (x,y) spectrogram frame
         distance_order2 = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=self.order+np.sign(self.order))
         Dx_order2 = distance_order2 * np.cos(angle * np.pi / 180)
@@ -1151,16 +1146,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             else:
                 w = np.ones_like(lambdas[index])
             fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index], order=bgd_npar - 1, w=w)
-        # lines.my_logger.warning(f'{bgd_npar} {fit}')
-        # fig = plt.figure()
-        # plt.plot(lambdas[index], spec[index])
-        # plt.plot(lambdas[bgd_index], spec[bgd_index], 'ro')
-        # x_norm = rescale_x_for_legendre(lambdas[index])
-        # lines.my_logger.warning(f'tototot {x_norm}')
-        # plt.plot(lambdas[index], np.polynomial.legendre.legval(x_norm, fit), 'b-')
-        # plt.plot(lambdas[bgd_index], model, 'b--')
-        # plt.title(f"{fit}")
-        # plt.show()
         for n in range(bgd_npar):
             # guess[n] = getattr(bgd, bgd.param_names[parameters.CALIB_BGD_ORDER - n]).value
             guess[n] = fit[n]
