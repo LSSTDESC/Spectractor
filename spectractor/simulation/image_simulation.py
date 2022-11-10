@@ -383,6 +383,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
     # Load reduced image
     spectrum, telescope, disperser, target = SimulatorInit(spectrum_filename)
+    print(spectrum.lambda_ref)
     image = ImageModel(image_filename, target_label=target.label)
     guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
     if "CCDREBIN" in spectrum.header:
