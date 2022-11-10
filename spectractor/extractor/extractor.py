@@ -1426,8 +1426,8 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     s0 = ChromaticPSF(s.psf, lambdas_truth.size, s.Ny, deg=deg_truth,
                       saturation=spectrum.spectrogram_saturation)
     s0.poly_params = np.asarray(list(amplitude_truth) + list(psf_poly_truth))
-    s0.deg = (len(s0.poly_params[s0.Nx:]) - 1) // (len(s0.psf.param_names) - 2) - 1
-    s0.set_polynomial_degrees(s0.deg)
+    # s0.deg = (len(s0.poly_params[s0.Nx:]) - 1) // ((len(s0.psf.param_names) - 2) - 1) // 2
+    # s0.set_polynomial_degrees(s0.deg)
     s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
     s0.from_profile_params_to_shape_params(s0.profile_params)
 
