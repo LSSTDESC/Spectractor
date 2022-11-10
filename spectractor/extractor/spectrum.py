@@ -194,7 +194,7 @@ class Spectrum:
         self.lambdas = None
         self.lambdas_binwidths = None
         self.lambdas_indices = None
-        self.lambda_ref = None
+        self.lambda_ref = 550
         self.order = order
         self.chromatic_psf = None
         self.filter_label = ""
@@ -262,6 +262,11 @@ class Spectrum:
             self.parallactic_angle = image.parallactic_angle
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
                                self.humidity, self.airmass]
+            if self.target is not None and len(self.target.spectra) > 0:
+                lambda_ref = np.sum(self.target.wavelengths[0] * self.target.spectra[0])/np.sum(self.target.spectra[0])
+                self.lambda_ref = lambda_ref
+                self.header['LBDA_REF'] = lambda_ref
+
         self.load_filter()
 
     def convert_from_ADUrate_to_flam(self):
@@ -1297,10 +1302,6 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5):
     with_adr = int(with_adr)
     distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis()
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
-    if spectrum.lambda_ref is None:
-        lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
-        spectrum.lambda_ref = lambda_ref
-        spectrum.header['LBDA_REF'] = lambda_ref
     # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
     # Must project ADR along dispersion axis
     if with_adr > 0:
