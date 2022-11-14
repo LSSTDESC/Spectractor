@@ -54,15 +54,6 @@ class Libradtran:
         # sa for scattering and absorption, ae with aerosols default, as with aerosol special
         self.Mod = 'rt'  # Models for absorption bands : rt for REPTRAN, lt for LOWTRAN, k2 for Kato2
 
-    def write_input(self, filename):
-        f = open(filename, 'w')
-        for key in sorted(self.settings):
-            if key == "mol_modify2":
-                f.write("mol_modify" + ' ' + str(self.settings[key]) + '\n')
-            else:
-                f.write(key + ' ' + str(self.settings[key]) + '\n')
-        f.close()
-
     def run(self, path=''):
         """Run the libratran command uvpsec.
 
