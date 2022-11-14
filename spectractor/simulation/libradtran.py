@@ -63,54 +63,6 @@ class Libradtran:
                 f.write(key + ' ' + str(self.settings[key]) + '\n')
         f.close()
 
-    def old_run(self, base_filename, path=''):
-        """Run the libratran command uvpsec.
-
-        Parameters
-        ----------
-        base_filename: str
-            Base file name.
-        path: str, optional
-            Path to bin/uvpsec if necessary, otherwise use  self.home (default: "")
-
-        Returns
-        -------
-        lambdas: array_like
-            Wavelength array.
-        atmosphere: array_like
-            Atmospheric transmission array.
-        """
-        # for simulation select only two atmosphere
-        # atmospheres = np.array(['afglus','afglms','afglmw','afglt','afglss','afglsw'])
-        atmosphere_map = dict()  # map atmospheric names to short names
-        atmosphere_map['afglus'] = 'us'
-        atmosphere_map['afglms'] = 'ms'
-        atmosphere_map['afglmw'] = 'mw'
-        atmosphere_map['afglt'] = 'tp'
-        atmosphere_map['afglss'] = 'ss'
-        atmosphere_map['afglsw'] = 'sw'
-
-        # manage settings and output directories
-        topdir = f'{self.simulation_directory}/{self.equation_solver}/{atmosphere_map[self.Atm]}/{self.proc}/{self.Mod}'
-        ensure_dir(topdir)
-        input_directory = topdir + '/' + 'in'
-        ensure_dir(input_directory)
-        output_directory = topdir + '/' + 'out'
-        ensure_dir(output_directory)
-        input_filename = os.path.join(input_directory, base_filename + '.INP')
-        output_filename = os.path.join(input_directory, base_filename + '.OUT')
-
-        self.write_input(input_filename)
-        if path != '':
-            cmd = os.path.join(path, 'bin/uvspec') + ' < ' + input_filename + ' > ' + output_filename
-        else:
-            cmd = os.path.join(self.home, '/libRadtran/bin/uvspec') + ' < ' + input_filename + ' > ' + output_filename
-        subprocess.run(cmd, shell=True, check=True)
-        data = np.loadtxt(output_filename)
-        wl = data[:, 0]
-        atm = data[:, 1]
-        return wl, atm
-
     def run(self, path=''):
         """Run the libratran command uvpsec.
 
