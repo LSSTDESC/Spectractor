@@ -115,7 +115,7 @@ def test_ctio_fullchain():
     # extractor
     tag = os.path.basename(sim_image)
     tag = tag.replace('sim_', 'reduc_')
-    logbook = LogBook(logbook="./ctiofulllogbook_jun2017_v5.csv")
+    logbook = LogBook(logbook="./tests/data/ctiofulllogbook_jun2017_v5.csv")
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,

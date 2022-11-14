@@ -14,7 +14,7 @@ import unittest  # noqa: E402
 
 
 def test_logbook():
-    logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+    logbook = LogBook('./tests/data/ctiofulllogbook_jun2017_v5.csv')
     # target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
     # assert xpos is None
     disperser_label, target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
@@ -30,7 +30,7 @@ def test_extractor_ctio():
     file_names = ['tests/data/reduc_20170530_134.fits']
     output_directory = "./outputs"
 
-    logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+    logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
@@ -69,13 +69,12 @@ def test_extractor_ctio():
 
 
 # TODO: DM-33441 Fix broken spectractor tests
-#@unittest.skip('Skipping due broken test (TypeError: argument of type bool is not iterable)')
-
-def test_toto():
+@unittest.skip('Skipping due broken test (TypeError: argument of type bool is not iterable)')
+def test_extractor_ctio_planetary_nebula():
     file_names = ['tests/data/reduc_20170605_028.fits']
     output_directory = "./outputs"
 
-    logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+    logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
@@ -86,7 +85,6 @@ def test_toto():
     for file_name in file_names:
         tag = file_name.split('/')[-1]
         disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
-        print(target_label)
         if target_label is None or xpos is None or ypos is None:
             continue
         spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,

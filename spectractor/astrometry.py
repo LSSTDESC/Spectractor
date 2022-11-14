@@ -986,7 +986,7 @@ class Astrometry(Image):
         >>> from spectractor.astrometry import Astrometry
         >>> from spectractor import parameters
         >>> parameters.VERBOSE = True
-        >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> if os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs'):
         ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
@@ -1079,7 +1079,7 @@ class Astrometry(Image):
         >>> from spectractor import parameters
         >>> parameters.VERBOSE = True
         >>> parameters.DEBUG = True
-        >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> if os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs'):
         ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
@@ -1257,7 +1257,7 @@ class Astrometry(Image):
         >>> parameters.DEBUG = True
         >>> radius = 100
         >>> maxiter = 10
-        >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> if os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs'):
         ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')

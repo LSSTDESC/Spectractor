@@ -947,7 +947,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
         >>> import os
         >>> from spectractor.logbook import LogBook
-        >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> for file_name in file_names:
         ...     tag = file_name.split('/')[-1]
@@ -1048,12 +1048,16 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Save the spectrum
     my_logger.info('\n\t  ======================= SAVE SPECTRUM =============================')
-    spectrum.lines.table = spectrum.lines.print_detected_lines(amplitude_units=spectrum.units)
     spectrum.save_spectrum(output_filename, overwrite=True)
+    # spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
+    spectrum.lines.print_detected_lines(output_file_name=output_filename.replace('_spectrum.fits', '_lines.csv'),
+                                        overwrite=True, amplitude_units=spectrum.units)
 
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
+
+    spectrum.chromatic_psf.table.write(output_filename_psf, overwrite=True)
 
     return spectrum
 
