@@ -68,7 +68,7 @@ class Target:
 
         """
         self.my_logger = set_logger(self.__class__.__name__)
-        self.label = label.replace(".", " ")
+        self.label = label
         self.type = None
         self.wavelengths = []
         self.spectra = []
@@ -204,6 +204,9 @@ class Star(Target):
         >>> s = Star('eta dor')
         >>> print(s.radec_position.dec)
         -66d02m22.635s
+        >>> s = Star('mu.col')
+        >>> print(s.radec_position.dec)
+        -32d18m23.162s
         """
         # currently (pending a new release) astroquery has a race
         # condition at import time, so putting here rather than at the
@@ -211,6 +214,8 @@ class Star(Target):
         from astroquery.simbad import Simbad
         Simbad.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
                                   'parallax', 'pm', 'z_value')
+        if not getCalspec.is_calspec(self.label) and getCalspec.is_calspec(self.label.replace(".", " ")):
+            self.label = self.label.replace(".", " ")
         astroquery_label = self.label
         if getCalspec.is_calspec(self.label):
             calspec = getCalspec.Calspec(self.label)
@@ -243,7 +248,7 @@ class Star(Target):
         [0.0000000e+00 2.5048577e-14 2.4238061e-14 2.4088789e-14]
         >>> s = Star('HD111980')
         >>> print(s.spectra[0][:4])
-        [2.16890002e-13 2.66480010e-13 2.03540011e-13 2.38780004e-13]
+        [2.3621000e-13 2.1016000e-13 2.1632999e-13 2.4676000e-13]
         >>> s = Star('PKS1510-089')
         >>> print(s.redshift)
         0.36
