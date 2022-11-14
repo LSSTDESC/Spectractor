@@ -57,7 +57,6 @@ def test_simulator():
     output_directory = './outputs/'
 
     for file_name in file_names:
-        tag = file_name.split('/')[-1]
         spectrum_simulation = SpectrumSimulator(file_name, output_directory, pwv=5, ozone=300, aerosols=0.03,
                                                 A1=1, A2=1, reso=2, D=56, shift=-1)
         assert np.sum(spectrum_simulation.data) > 0
@@ -66,11 +65,6 @@ def test_simulator():
 
         SpectrumSimulatorSimGrid(file_name, output_directory, pwv_grid=[0, 10, 2], ozone_grid=[200, 400, 2],
                                  aerosol_grid=[0, 0.1, 2])
-        atmgrid = AtmosphereGrid(image_filename=file_name, atmgrid_filename=file_name.replace('spectrum', 'atmsim'))
-        atm = Atmosphere(atmgrid.airmass, atmgrid.pressure, atmgrid.temperature)
-        assert os.path.isfile(output_directory + tag.replace('_spectrum.fits', '_atmsim.fits')) is True
-        assert os.path.isfile(output_directory + tag.replace('reduc', 'sim').replace('_spectrum.fits', '.fits'))
-        assert atm.transmission is not None
 
 
 if __name__ == "__main__":
