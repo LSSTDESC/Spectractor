@@ -589,7 +589,16 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
     my_logger.info('\n\tStart SPECTRUMSIMULATOR core program')
     # SIMULATE ATMOSPHERE
     # -------------------
-    atmosphere = Atmosphere(airmass, pressure, temperature)
+    if parameters.LIBRADTRAN_DIR != '':
+        atmosphere = Atmosphere(airmass, pressure, temperature)
+    else:
+        atmgrid_filename = spectrum.filename.replace('sim', 'reduc').replace('_spectrum.fits', '_atmsim.fits')
+        if os.path.isfile(atmgrid_filename):
+            spectrum.my_logger.debug(f"\n\tUse {atmgrid_filename} for atmosphere simulation.")
+            atmosphere = AtmosphereGrid(atmgrid_filename=atmgrid_filename)
+        else:
+            raise ValueError("No parameters.LIBRADTRAN_DIR set and no atmgrid file associated to the spectrum. "
+                             "I can't simulate atmosphere transmission.")
 
     # SPECTRUM SIMULATION
     # --------------------
@@ -672,7 +681,6 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
         my_logger.info(f"\n\tFile {output_atmfilename} does not exist yet. Compute it...")
         atm.compute()
         atm.save_file(filename=output_atmfilename)
-        # libradtran.clean_simulation_directory()
     if parameters.DEBUG:
         infostring = '\n\t ========= Atmospheric simulation :  ==============='
         my_logger.info(infostring)
@@ -688,7 +696,6 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
     if parameters.DEBUG:
         spectra.plot_spectra()
         spectra.plot_spectra_img()
-    # ---------------------------------------------------------------------------
 
 
 def SpectrumSimulator(filename, outputdir="", pwv=5, ozone=300, aerosols=0.05, A1=1., A2=0.,
