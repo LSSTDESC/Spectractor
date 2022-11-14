@@ -70,14 +70,14 @@ def test_simulator():
         #                                               A1=1, A2=1, D=56, shift_x=-1, shift_y=1, angle=-1)
         # assert np.sum(spectrogram_simulation.data) > 20
         # psf_poly_params = spectrogram_simulation.chromatic_psf.from_table_to_poly_params()
-        image_simulation = ImageSim(file_name.replace('_spectrum.fits', '.fits'), file_name, output_directory, A2=1,
-                                    psf_poly_params=None, with_stars=True)
+        # image_simulation = ImageSim(file_name.replace('_spectrum.fits', '.fits'), file_name, output_directory, A2=1,
+        #                             psf_poly_params=None, with_stars=True)
         SpectrumSimulatorSimGrid(file_name, output_directory, pwv_grid=[0, 10, 2], ozone_grid=[200, 400, 2],
                                  aerosol_grid=[0, 0.1, 2])
         atmgrid = AtmosphereGrid(image_filename=file_name, atmgrid_filename=file_name.replace('spectrum', 'atmsim'))
         atm = Atmosphere(atmgrid.airmass, atmgrid.pressure, atmgrid.temperature)
         assert os.path.isfile(output_directory + tag.replace('_spectrum.fits', '_atmsim.fits')) is True
-        assert image_simulation.data is not None
+        # assert image_simulation.data is not None
         # assert spectrum_simulation.data is not None
         # assert spectrogram_simulation.data is not None
         assert os.path.isfile(output_directory + tag.replace('reduc', 'sim').replace('_spectrum.fits', '.fits'))

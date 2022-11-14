@@ -22,7 +22,31 @@ Original Source: http://emtoolbox.nist.gov/Wavelength/Documentation.asp
 class ADR:
 
     def __init__(self, airmass, lbdaref, pressure, parangle, relathumidity, temperature):
+        """Class to store main ADR params and functions.
 
+        Parameters
+        ----------
+        airmass: float
+            Airmass.
+        lbdaref: float
+            Reference wavelength in Angstrom.
+        pressure: float
+            Local pressure in hPa.
+        parangle: float
+            Parallactic angle in degrees.
+        relathumidity: float
+            Local relative humidity in percent.
+        temperature: float
+            Local temperature in Celsius degrees.
+
+        Examples
+        --------
+        >>> adr = ADR(1, 5000, 700, 1, 25, 10)
+        >>> adr.get_refractive_index(5000)  # refractive index
+        array([1.00019599])
+        >>> adr.get_scale(5000)  # total displacement in arcsec
+        array([0.])
+        """
         self.airmass = airmass
         self.lbdaref = lbdaref
         self.pressure = pressure
@@ -214,7 +238,7 @@ def refractive_index(lbda, pressure=617., temperature=2., relathumidity=0):
     pressure: [float] -optional-
         air pressure in mbar
     temperature: [float] -optional-
-        air temperature in Celcius
+        air temperature in Celsius
     relathumidity: [float] -optional-
         air relative humidity in percent.
         [the water vapor pressure will be derived from it,
