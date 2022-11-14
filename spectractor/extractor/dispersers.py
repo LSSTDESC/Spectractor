@@ -220,7 +220,7 @@ def get_N(deltaX, x0, D=parameters.DISTANCE2CCD, wavelength=656, order=1):
 
 
 def neutral_lines(x_center, y_center, theta_tilt):
-    """Return the nuetrla lines of an hologram."""
+    """Return the neutral lines of a hologram."""
     xs = np.linspace(0, parameters.CCD_IMSIZE, 20)
     line1 = np.tan(theta_tilt * np.pi / 180) * (xs - x_center) + y_center
     line2 = np.tan((theta_tilt + 90) * np.pi / 180) * (xs - x_center) + y_center
@@ -228,7 +228,7 @@ def neutral_lines(x_center, y_center, theta_tilt):
 
 
 def order01_positions(holo_center, N, theta_tilt, theta0=0, lambda_constructor=639e-6, verbose=True):  # pragma: no cover
-    """Return the order 0 and order 1 positions of an hologram."""
+    """Return the order 0 and order 1 positions of a hologram."""
     # refraction angle between order 0 and order 1 at construction
     alpha = np.arcsin(N * lambda_constructor + np.sin(theta0))
     # distance between order 0 and order 1 in pixels
@@ -250,7 +250,7 @@ def order01_positions(holo_center, N, theta_tilt, theta0=0, lambda_constructor=6
 
 
 def find_order01_positions(holo_center, N_interp, theta_interp, lambda_constructor=639e-6, verbose=True):  # pragma: no cover
-    """Find the order 0 and order 1 positions of an hologram."""
+    """Find the order 0 and order 1 positions of a hologram."""
     N = N_interp(holo_center)
     theta_tilt = theta_interp(holo_center)
     theta0 = 0
@@ -270,13 +270,13 @@ def find_order01_positions(holo_center, N_interp, theta_interp, lambda_construct
 class Grating:
     """Generic class for dispersers."""
 
-    def __init__(self, N, label="", D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR, verbose=False):
+    def __init__(self, N=-1, label="", D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR, verbose=False):
         """Initialize a standard grating object.
 
         Parameters
         ----------
         N: float
-            The number of grooves per mm of the grating
+            The number of grooves per mm of the grating (default: -1)
         label: str
             String label for the grating (default: '')
         D: float
@@ -298,6 +298,8 @@ class Grating:
         >>> assert g.D is parameters.DISTANCE2CCD
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        if N <= 0 and label == '':
+            raise ValueError("Set either N grooves per mm or the grating label.")
         self.N_input = N
         self.N_err = 1
         self.D = D
@@ -333,7 +335,7 @@ class Grating:
         return self.N_input
 
     def load_files(self, verbose=False):
-        """If they exists, load the files in data_dir/label/ to set the main
+        """If they exist, load the files in data_dir/label/ to set the main
         characteristics of the grating. Overrides the N input at initialisation.
 
         Parameters
@@ -366,16 +368,16 @@ class Grating:
             a = np.loadtxt(filename)
             self.N_input = a[0]
             self.N_err = a[1]
-        else:
-            raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
+        # else:
+        #     raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
 
         filename = os.path.join(self.data_dir, self.label, "full_name.txt")
         if os.path.isfile(filename):
             with open(filename, 'r') as f:
                 for line in f:  # MFL: you really just want the last line of the file?
                     self.full_name = line.rstrip('\n')
-        else:
-            raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
+        # else:
+        #     raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
 
         filename = os.path.join(self.data_dir, self.label, "transmission.txt")
         if os.path.isfile(filename):
@@ -600,7 +602,7 @@ class Hologram(Grating):
 
     def __init__(self, label, D=parameters.DISTANCE2CCD, data_dir=parameters.DISPERSER_DIR,
                  lambda_plot=256000, verbose=False):
-        """Initialize an Hologram object, given its label. Specification are loaded from text files
+        """Initialize a Hologram object, given its label. Specification are loaded from text files
         in data_dir/label/... Inherit from the Grating class.
 
         Parameters
@@ -734,7 +736,7 @@ class Hologram(Grating):
         >>> h = Hologram(label='XXX')  # doctest: +ELLIPSIS
         Traceback (most recent call last):
         ...
-        FileNotFoundError:...
+        ValueError:...
 
         """
         if verbose:

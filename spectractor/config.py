@@ -79,6 +79,7 @@ def load_config(config_filename, rebin=True):
         FileNotFoundError: Config file ./config/unknown_file.ini does not exist.
 
     """
+    my_logger = set_logger(__name__)
     if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, "default.ini")):
         raise FileNotFoundError('Config file default.ini does not exist.')
     # Load the configuration file
@@ -114,7 +115,7 @@ def load_config(config_filename, rebin=True):
         apply_rebinning_to_parameters()
     else:
         parameters.CCD_REBIN = 1
-        print("No rebinning: parameters.REBIN is forced to 1.")
+        my_logger.warning("No rebinning: parameters.REBIN is forced to 1.")
 
     # check consistency
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:

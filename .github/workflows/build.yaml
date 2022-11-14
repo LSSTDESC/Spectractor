@@ -45,12 +45,24 @@ jobs:
         run: |
           pip install -v -e .
 
-      - name: Run nosetests
-        shell: bash -l {0}
-        run: |
-          python setup.py nosetests
-
       - name: Run full chain
         shell: bash -l {0}
         run: |
           nosetests tests/run_full_chain.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
+
+      - name: Run nosetests
+        shell: bash -l {0}
+        run: |
+          nosetests tests/run_tests.py --all --debug --detailed-errors --verbose --process-restartworker --with-coverage --cover-package=spectractor
+
+      - name: Run doctests and coverage
+        shell: bash -l {0}
+        run: |
+          ./coverage_and_test.sh
+
+      - name: Coveralls
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pip3 install --upgrade coveralls
+          coveralls --service=github

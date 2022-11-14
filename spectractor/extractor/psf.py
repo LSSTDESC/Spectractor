@@ -704,7 +704,11 @@ class Moffat(PSF):
         elif pixels.ndim == 1:
             y = np.array(pixels)
             norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
-            out = evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha) / norm
+            if norm > 0:
+                out = evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha)
+                out /= norm
+            else:
+                out = np.zeros_like(y)
             if self.clip:
                 out = np.clip(out, 0, saturation)
             return out

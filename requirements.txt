@@ -22,4 +22,3 @@ deprecated
 pyyaml
 nose
 getCalspec
-pysynphot
