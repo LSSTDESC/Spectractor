@@ -619,7 +619,7 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
         atmgrid_filename = spectrum.filename.replace('sim', 'reduc').replace('_spectrum.fits', '_atmsim.fits')
         if os.path.isfile(atmgrid_filename):
             spectrum.my_logger.debug(f"\n\tUse {atmgrid_filename} for atmosphere simulation.")
-            atmosphere = AtmosphereGrid(filename=atmgrid_filename)
+            atmosphere = AtmosphereGrid(atmgrid_filename=atmgrid_filename)
         else:
             raise ValueError("No parameters.LIBRADTRAN_DIR set and no atmgrid file associated to the spectrum. "
                              "I can't simulate atmosphere transmission.")
