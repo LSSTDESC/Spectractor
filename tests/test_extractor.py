@@ -25,7 +25,6 @@ def test_logbook():
     # logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
 
 
-@unittest.skipIf(sys.platform != "darwin", 'Skipping full test for speed unless on macOS')
 def test_extractor_ctio():
     file_names = ['tests/data/reduc_20170530_134.fits']
     output_directory = "./outputs"
@@ -112,7 +111,6 @@ def test_extractor_ctio_planetary_nebula():
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrum.fits'))) is True
 
 
-@unittest.skipIf(sys.platform != "darwin", 'Skipping full test for speed unless on macOS')
 def extractor_auxtel():
     file_names = ['tests/data/calexp_2020031500162-EMPTY_ronchi90lpmm-det000.fits']  # image 1
     # file_names = ['tests/data/calexp_2020031200313-EMPTY_ronchi90lpmm-det000.fits']  # image 2

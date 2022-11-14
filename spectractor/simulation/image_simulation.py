@@ -504,7 +504,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['A2_T'] = A2
     image.header['X0_T'] = spectrum.x0[0]
     image.header['Y0_T'] = spectrum.x0[1]
-    image.header['D2CCD_T'] = spectrum.disperser.D
+    image.header['D2CCD_T'] = float(spectrum.disperser.D)
     image.header['OZONE_T'] = ozone
     image.header['PWV_T'] = pwv
     image.header['VAOD_T'] = aerosols

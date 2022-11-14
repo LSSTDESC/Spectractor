@@ -215,7 +215,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         #     self.spectra[k].disperser.D = D2CCD
         #     self.spectra[k].lambdas = self.spectra[k].disperser.grating_pixel_to_lambda(dist, x0=self.spectra[k].x0)
         # rebin data
-        self.data = np.empty(self.nspectra, dtype=np.object)
+        self.data = np.empty(self.nspectra, dtype=object)
         if self.bin_widths > 0:
             for k in range(self.nspectra):
                 data_func = interp1d(self.spectra[k].lambdas, self.spectra[k].data,
@@ -260,7 +260,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 self.ref_spectrum_cube.append(np.copy(ref))
         self.ref_spectrum_cube = np.asarray(self.ref_spectrum_cube)
         # rebin errors
-        self.err = np.empty(self.nspectra, dtype=np.object)
+        self.err = np.empty(self.nspectra, dtype=object)
         if self.bin_widths > 0:
             for k in range(self.nspectra):
                 err_func = interp1d(self.spectra[k].lambdas, self.spectra[k].err ** 2,
@@ -286,8 +286,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # rebin W matrices
         # import time
         # start = time.time()
-        self.data_cov = np.empty(self.nspectra, dtype=np.object)
-        self.W = np.empty(self.nspectra, dtype=np.object)
+        self.data_cov = np.empty(self.nspectra, dtype=object)
+        self.W = np.empty(self.nspectra, dtype=object)
         if self.bin_widths > 0:
             lmins = []
             lmaxs = []
@@ -573,14 +573,14 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         xx, yy = np.meshgrid(self.lambdas[0], y)
         ylbda = -0.45 * np.ones_like(self.lambdas[0][1:-1])
         # model
-        im = ax[1, 0].pcolormesh(xx, yy, model / norm, vmin=0, vmax=1, cmap=cmap_viridis)
+        im = ax[1, 0].pcolormesh(xx, yy, model / norm, vmin=0, vmax=1, cmap=cmap_viridis, shading="auto")
         plt.colorbar(im, cax=ax[1, 1], label='1/max(data)', format="%.1f")
         ax[1, 0].set_title("Model", fontsize=12, color='white', x=0.91, y=0.76)
         ax[1, 0].grid(color='silver', ls='solid')
         ax[1, 0].scatter(self.lambdas[0][1:-1], ylbda, cmap=from_lambda_to_colormap(self.lambdas[0][1:-1]),
                          edgecolors='None', c=self.lambdas[0][1:-1], label='', marker='o', s=20)
         # data
-        im = ax[0, 0].pcolormesh(xx, yy, data / norm, vmin=0, vmax=1, cmap=cmap_viridis)
+        im = ax[0, 0].pcolormesh(xx, yy, data / norm, vmin=0, vmax=1, cmap=cmap_viridis, shading="auto")
         plt.colorbar(im, cax=ax[0, 1], label='1/max(data)', format="%.1f")
         ax[0, 0].set_title("Data", fontsize=12, color='white', x=0.91, y=0.76)
         ax[0, 0].grid(color='silver', ls='solid')
@@ -591,7 +591,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         norm = err
         residuals /= norm
         std = float(np.nanstd(residuals))
-        im = ax[2, 0].pcolormesh(xx, yy, residuals, vmin=-3 * std, vmax=3 * std, cmap=cmap_bwr)
+        im = ax[2, 0].pcolormesh(xx, yy, residuals, vmin=-3 * std, vmax=3 * std, cmap=cmap_bwr, shading="auto")
         plt.colorbar(im, cax=ax[2, 1], label='(Data-Model)/Err', format="%.0f")
         # ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, color='black', x=0.84, y=0.76)
         ax[2, 0].grid(color='silver', ls='solid')
@@ -788,7 +788,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # inv_M_dot_W_dot_M = np.copy(self.amplitude_cov_matrix)
         # M_dot_W_dot_D = np.copy(self.M_dot_W_dot_D)
         # Tinst = np.copy(self.amplitude_params)
-        if self.W.dtype == np.object and self.W[0].ndim == 2:
+        if self.W.dtype == object and self.W[0].ndim == 2:
             J = [[] for _ in range(params.size)]
         else:
             model = model.flatten()
@@ -802,7 +802,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             tmp_p[ip] += epsilon[ip]
             # if "A1_" not in self.input_labels[ip]:
             tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            if self.W.dtype == np.object and self.W[0].ndim == 2:
+            if self.W.dtype == object and self.W[0].ndim == 2:
                 for k in range(model.shape[0]):
                     J[ip].append((tmp_model[k] - model[k]) / epsilon[ip])
             else:

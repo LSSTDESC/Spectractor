@@ -119,8 +119,7 @@ def test_ctio_fullchain():
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
-                           disperser_label=disperser_label, config="")
-
+                           disperser_label=disperser_label, config="")  # config already loaded, do not overwrite PSF_POLY_ORDER
     # tests
     residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
 
@@ -154,7 +153,6 @@ def test_ctio_fullchain():
     assert np.std(residuals[100:-100]) < 3
     spectrum_file_name = "./tests/data/sim_20170530_134_spectrum.fits"
     assert os.path.isfile(spectrum_file_name)
-    spectrum = Spectrum(spectrum_file_name)
     atmgrid_filename = sim_image.replace('sim', 'reduc').replace('.fits', '_atmsim.fits')
     assert os.path.isfile(atmgrid_filename)
 
@@ -164,7 +162,7 @@ def test_ctio_fullchain():
     nsigma = 6
     labels = ["OZONE_T", "PWV_T", "VAOD_T"]
     indices = [2, 3, 4]
-    assert w.costs[-1] / w.data.size < 0.9
+    assert w.costs[-1] / w.data.size < 0.95
     for i, l in zip(indices, labels):
         spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.cov[i, i]):.3f} "
                                 f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "

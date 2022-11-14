@@ -1,5 +1,5 @@
-import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
-mpl.use('Agg')
+#import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
+#mpl.use('Agg')
 
 from numpy.testing import run_module_suite  # noqa: E402
 import numpy as np  # noqa: E402
@@ -62,7 +62,7 @@ def test_simulator():
     for file_name in file_names:
         tag = file_name.split('/')[-1]
         spectrum_simulation = SpectrumSimulator(file_name, output_directory, pwv=5, ozone=300, aerosols=0.03,
-                                                A1=1, A2=10, reso=2, D=56, shift=-1)
+                                                A1=1, A2=1, reso=2, D=56, shift=-1)
         assert np.sum(spectrum_simulation.data) > 0
         assert np.sum(spectrum_simulation.data) < 1e-10
         assert np.sum(spectrum_simulation.data_order2) < 1e-10
@@ -74,7 +74,7 @@ def test_simulator():
                                     psf_poly_params=None, with_stars=True)
         SpectrumSimulatorSimGrid(file_name, output_directory, pwv_grid=[0, 10, 2], ozone_grid=[200, 400, 2],
                                  aerosol_grid=[0, 0.1, 2])
-        atmgrid = AtmosphereGrid(file_name, file_name.replace('spectrum', 'atmsim'))
+        atmgrid = AtmosphereGrid(image_filename=file_name, atmgrid_filename=file_name.replace('spectrum', 'atmsim'))
         atm = Atmosphere(atmgrid.airmass, atmgrid.pressure, atmgrid.temperature)
         assert os.path.isfile(output_directory + tag.replace('_spectrum.fits', '_atmsim.fits')) is True
         assert image_simulation.data is not None
