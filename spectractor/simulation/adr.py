@@ -123,7 +123,34 @@ class ADR:
 
 class ADRSinclair1985(ADR):
 
-    def __init__(self, airmass, lbdaref, pressure, parangle, relathumidity, temperature, zenithangle, latitude):
+    def __init__(self, airmass, lbdaref, pressure, parangle, relathumidity, temperature, zenithangle):
+        """Class to store main ADR params and functions.
+
+        Parameters
+        ----------
+        airmass: float
+            Airmass.
+        lbdaref: float
+            Reference wavelength in Angstrom.
+        pressure: float
+            Local pressure in hPa.
+        parangle: float
+            Parallactic angle in degrees.
+        zenithangle: float
+            Zenithal angle in degrees.
+        relathumidity: float
+            Local relative humidity in percent.
+        temperature: float
+            Local temperature in Celsius degrees.
+
+        Examples
+        --------
+        >>> adr = ADRSinclair1985(1, 5000, 700, 1, 0, 25, 10)
+        >>> adr.get_refractive_index(5000)  # refractive index
+        1.0001862229650382
+        >>> adr.get_scale(5000)  # total displacement in arcsec
+        array([24.2620973])
+        """
         ADR.__init__(self, airmass, lbdaref, pressure, parangle, relathumidity, temperature)
 
         h = parameters.OBS_ALTITUDE * 1000  # observation altitude in meter
@@ -226,7 +253,7 @@ class ADRSinclair1985(ADR):
 #                            #
 ##############################
 
-def refractive_index(lbda, pressure=617., temperature=2., relathumidity=0):
+def refractive_index(lbda, pressure=617., temperature=2., relathumidity=0.):
     """Compute refractive index at vacuum wavelength.
     source: NIST/IAPWS via SNfactory ToolBox
             http://emtoolbox.nist.gov/Wavelength/Documentation.asp
