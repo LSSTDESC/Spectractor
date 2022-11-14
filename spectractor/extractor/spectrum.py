@@ -1,6 +1,7 @@
 from scipy.signal import argrelextrema, savgol_filter
 from scipy.interpolate import interp1d
 from astropy.io import fits
+from astropy.table import Table
 from scipy import integrate
 from iminuit import Minuit
 import matplotlib.pyplot as plt
@@ -35,7 +36,17 @@ fits_mappings = {'date_obs': 'DATE-OBS',
                  'lambda_ref': 'LBDA_REF',
                  'parallactic_angle': 'PARANGLE',
                  'filter_label': 'FILTER',
-                 'camera_angle': 'CAM_ROT'
+                 'camera_angle': 'CAM_ROT',
+                 'spectrogram_x0': 'S_X0',
+                 'spectrogram_y0': 'S_Y0',
+                 'spectrogram_xmin': 'S_XMIN',
+                 'spectrogram_xmax': 'S_XMAX',
+                 'spectrogram_ymin': 'S_YMIN',
+                 'spectrogram_ymax': 'S_YMAX',
+                 'spectrogram_Nx': 'S_NX',
+                 'spectrogram_Ny': 'S_NY',
+                 'spectrogram_deg': 'S_DEG',
+                 'spectrogram_saturation': 'S_SAT'
                  }
 
 
@@ -487,7 +498,7 @@ class Spectrum:
         Examples
         --------
         >>> import os
-        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits', config="./config/ctio.ini")
         >>> s.save_spectrum('./tests/test.fits')
 
         .. doctest::
@@ -518,34 +529,61 @@ class Spectrum:
             try:
                 value = getattr(self, attribute)
             except AttributeError:
-                print(f"Failed to get {attribute}")
+                self.my_logger.warning(f"Failed to get {attribute}")
                 continue
             if isinstance(value, astropy.coordinates.angles.Angle):
                 value = value.degree
             hdu1.header[header_key] = value
             # print(f"Set header key {header_key} to {value} from attr {attribute}")
 
-        hdu1.header["EXTNAME"] = "SPECTRUM"
-        hdu2 = fits.ImageHDU()
-        hdu2.header["EXTNAME"] = "SPEC_COV"
-        hdu3 = fits.ImageHDU()
-        hdu3.header["EXTNAME"] = "ORDER2"
-        hdu4 = fits.ImageHDU()
-        hdu4.header["EXTNAME"] = "ORDER0"
-        hdu1.data = [self.lambdas, self.data, self.err]
-        hdu2.data = self.cov_matrix
-        hdu3.data = [self.lambdas, self.data_order2, self.err_order2]
-        hdu4.data = self.target.image
-        hdu4.header["IM_X0"] = self.target.image_x0
-        hdu4.header["IM_Y0"] = self.target.image_y0
-        hdu = fits.HDUList([hdu1, hdu2, hdu3, hdu4])
+        extnames = ["SPECTRUM", "SPEC_COV", "ORDER2", "ORDER0"]  # spectrum data
+        extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES"]  # spectrogram data
+        extnames += ["PSF_TAB"]  # PSF parameter table
+        extnames += ["LINES"]  # spectroscopic line table
+        hdus = {"SPECTRUM": hdu1}
+        for k, extname in enumerate(extnames):
+            if extname == "SPECTRUM":
+                hdus[extname].data = [self.lambdas, self.data, self.err]
+                continue
+            hdus[extname] = fits.ImageHDU()
+            if extname == "SPEC_COV":
+                hdus[extname].data = self.cov_matrix
+            elif extname == "ORDER2":
+                hdus[extname].data = [self.lambdas, self.data_order2, self.err_order2]
+            elif extname == "ORDER0":
+                hdus[extname].data = self.target.image
+                hdus[extname].header["IM_X0"] = self.target.image_x0
+                hdus[extname].header["IM_Y0"] = self.target.image_y0
+            elif extname == "S_DATA":
+                hdus[extname].data = self.spectrogram
+                hdus[extname].header['UNIT1'] = self.units
+            elif extname == "S_ERR":
+                hdus[extname].data = self.spectrogram_err
+            elif extname == "S_BGD":
+                hdus[extname].data = self.spectrogram_bgd
+            elif extname == "S_BGD_ER":
+                hdus[extname].data = self.spectrogram_bgd_rms
+            elif extname == "S_FIT":
+                hdus[extname].data = self.spectrogram_fit
+            elif extname == "S_RES":
+                hdus[extname].data = self.spectrogram_residuals
+            elif extname == "PSF_TAB":
+                hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
+            elif extname == "LINES":
+                tab = self.lines.print_detected_lines(amplitude_units=self.units, print_table=False)
+                hdus[extname] = fits.table_to_hdu(tab)
+            else:
+                raise ValueError(f"Unknown EXTNAME extension: {extname}.")
+            hdus[extname].header["EXTNAME"] = extname
+
+        hdu = fits.HDUList([hdus[extname] for extname in extnames])
         output_directory = '/'.join(output_file_name.split('/')[:-1])
         ensure_dir(output_directory)
         hdu.writeto(output_file_name, overwrite=overwrite)
         self.my_logger.info(f'\n\tSpectrum saved in {output_file_name}')
 
     def save_spectrogram(self, output_file_name, overwrite=False):
-        """Save the spectrogram into a fits file (data, error and background).
+        """OBOSOLETE: save the spectrogram into a fits file (data, error and background).
 
         Parameters
         ----------
@@ -611,8 +649,8 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum()
-        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(config="./config/ctio.ini")
+        >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> print(s.units)
         erg/s/cm$^2$/nm
         """
@@ -623,6 +661,7 @@ class Spectrum:
             self.data = raw_data[1]
             if len(raw_data) > 2:
                 self.err = raw_data[2]
+                self.cov_matrix = np.diag(self.err ** 2)
 
             # set the simple items from the mappings. More complex items, i.e.
             # those needing function calls, follow
@@ -630,7 +669,7 @@ class Spectrum:
                 if (item := self.header.get(header_key)) is not None:
                     setattr(self, attribute, item)
                 else:
-                    print(f'Failed to set spectrum attribute {attribute} using header {header_key}')
+                    self.my_logger.warning(f'Failed to set spectrum attribute {attribute} using header {header_key}')
             if "CAM_ROT" in self.header:
                 parameters.OBS_CAMERA_ROTATION = float(self.header["CAM_ROT"])
             else:
@@ -649,25 +688,20 @@ class Spectrum:
             if dist := self.header.get('D2CCD'):
                 parameters.DISTANCE2CCD = float(dist)
 
-            self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
+            self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
                                       data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
-            self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
+            self.my_logger.info(f'\n\tSpectrum loaded from {input_file_name}')
             if parameters.OBS_OBJECT_TYPE == "STAR":
                 self.adr_params = [self.dec, self.hour_angle, self.temperature,
                                    self.pressure, self.humidity, self.airmass]
 
-            hdu_list = fits.open(input_file_name)
-            if len(hdu_list) > 1:
-                self.cov_matrix = hdu_list["SPEC_COV"].data
-                if len(hdu_list) > 2:
-                    _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
-                    if len(hdu_list) > 3:
-                        self.target.image = hdu_list["ORDER0"].data
-                        self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
-                        self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
-            else:
-                self.cov_matrix = np.diag(self.err ** 2)
+            self.psf = load_PSF(psf_type=parameters.PSF_TYPE, target=self.target)
+            self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
+                                              x0=self.spectrogram_x0, y0=self.spectrogram_y0,
+                                              deg=self.spectrogram_deg, saturation=self.spectrogram_saturation)
+            if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
+                self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
 
             # original, hard-coded spectrogram/table relative paths
             spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
@@ -682,21 +716,48 @@ class Spectrum:
                 self.my_logger.info(f'Applying psf filename override {psf_file_name}')
 
             if not self.fast_load:
-                self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
-                if os.path.isfile(spectrogram_file_name):
+                hdu_list = fits.open(input_file_name)
+                # load other spectrum info
+                if len(hdu_list) > 1:
+                    self.cov_matrix = hdu_list["SPEC_COV"].data
+                    if len(hdu_list) > 2:
+                        _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+                        if len(hdu_list) > 3:
+                            self.target.image = hdu_list["ORDER0"].data
+                            self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+                            self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
+                # load spectrogram info
+                if len(hdu_list) > 4:
+                    self.spectrogram = hdu_list["S_DATA"].data
+                    self.spectrogram_err = hdu_list["S_ERR"].data
+                    self.spectrogram_bgd = hdu_list["S_BGD"].data
+                    if len(hdu_list) > 7:
+                        self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
+                        self.spectrogram_fit = hdu_list["S_FIT"].data
+                        self.spectrogram_residuals = hdu_list["S_RES"].data
+                elif os.path.isfile(spectrogram_file_name):
+                    self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
                     self.load_spectrogram(spectrogram_file_name)
                 else:
-                    raise FileNotFoundError(f"Spectrogram file {spectrogram_file_name} does not exist.")
-                self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
-                if os.path.isfile(psf_file_name):
+                    raise FileNotFoundError(f"No spectrogram info in {input_file_name} "
+                                            f"and not even a spectrogram file {spectrogram_file_name}.")
+                if "PSF_TAB" in hdu_list:
+                    self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]),
+                                                  saturation=self.spectrogram_saturation)
+                elif os.path.isfile(psf_file_name):  # retro-compatibility
+                    self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
                     self.load_chromatic_psf(psf_file_name)
                 else:
-                    raise FileNotFoundError(f"PSF file {psf_file_name} does not exist.")
+                    raise FileNotFoundError(f"No PSF info in {input_file_name} "
+                                            f"and not even a PSF file {psf_file_name}.")
+                if "LINES" in hdu_list:
+                    self.lines.table = Table.read(hdu_list["LINES"])
+                hdu_list.close()
         else:
             raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
 
     def load_spectrogram(self, input_file_name):
-        """Load the spectrum from a fits file (data, error and wavelengths).
+        """OBSOLETE: Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
         ----------
@@ -728,13 +789,13 @@ class Spectrum:
             self.spectrogram_saturation = float(header['S_SAT'])
             self.spectrogram_Nx = self.spectrogram_xmax - self.spectrogram_xmin
             self.spectrogram_Ny = self.spectrogram_ymax - self.spectrogram_ymin
-            hdu_list.close()  # need to free allocation for file descripto
+            hdu_list.close()  # need to free allocation for file description
             self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
 
     def load_chromatic_psf(self, input_file_name):
-        """Load the spectrum from a fits file (data, error and wavelengths).
+        """OBSOLETE: Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
         ----------

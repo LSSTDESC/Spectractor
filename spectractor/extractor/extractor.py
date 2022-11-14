@@ -824,6 +824,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             #             new_angle += np.arctan(pval_poly[k]) * 180 / np.pi
 
             w.spectrum.lambdas = np.copy(w.lambdas)
+            w.spectrum.chromatic_psf.table['lambdas'] = np.copy(w.lambdas)
             w.spectrum.data = np.copy(w.amplitude_params)
             w.spectrum.err = np.copy(w.amplitude_params_err)
             w.spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
@@ -1047,17 +1048,12 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Save the spectrum
     my_logger.info('\n\t  ======================= SAVE SPECTRUM =============================')
+    spectrum.lines.table = spectrum.lines.print_detected_lines(amplitude_units=spectrum.units)
     spectrum.save_spectrum(output_filename, overwrite=True)
-    spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
-    spectrum.lines.print_detected_lines(output_file_name=output_filename.replace('_spectrum.fits', '_lines.csv'),
-                                        overwrite=True, amplitude_units=spectrum.units)
 
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
-
-    spectrum.chromatic_psf.table['lambdas'] = spectrum.lambdas
-    spectrum.chromatic_psf.table.write(output_filename_psf, overwrite=True)
 
     return spectrum
 

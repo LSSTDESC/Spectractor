@@ -66,13 +66,12 @@ def test_extractor_ctio():
         assert np.isclose(spectrum.x0[1] * parameters.CCD_REBIN, 683.0577836601408, atol=1 * parameters.CCD_REBIN)
         assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) * parameters.CCD_REBIN < 3.5
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrum.fits'))) is True
-        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrogram.fits'))) is True
-        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
 
 
 # TODO: DM-33441 Fix broken spectractor tests
-@unittest.skip('Skipping due broken test (TypeError: argument of type bool is not iterable)')
-def test_extractor_ctio_planetary_nebula():
+#@unittest.skip('Skipping due broken test (TypeError: argument of type bool is not iterable)')
+
+def test_toto():
     file_names = ['tests/data/reduc_20170605_028.fits']
     output_directory = "./outputs"
 
@@ -87,6 +86,7 @@ def test_extractor_ctio_planetary_nebula():
     for file_name in file_names:
         tag = file_name.split('/')[-1]
         disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+        print(target_label)
         if target_label is None or xpos is None or ypos is None:
             continue
         spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
@@ -112,8 +112,6 @@ def test_extractor_ctio_planetary_nebula():
         assert np.isclose(spectrum.x0[1] * parameters.CCD_REBIN, 587.67, atol=1 * parameters.CCD_REBIN)
         assert 1 < np.mean(spectrum.chromatic_psf.table['gamma']) * parameters.CCD_REBIN < 2.5
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrum.fits'))) is True
-        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrogram.fits'))) is True
-        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
 
 
 @unittest.skipIf(sys.platform != "darwin", 'Skipping full test for speed unless on macOS')

@@ -80,20 +80,25 @@ class ChromaticPSF:
         self.y0 = y0
         self.profile_params = np.zeros((Nx, len(self.psf.param_names)))
         self.pixels = np.mgrid[:Nx, :Ny]
-        self.init_table(file_name=file_name, saturation=saturation)
+        self.table = Table()
+        self.saturation = 1e20
+        self.poly_params_labels = []
+        self.poly_params_names = []
+        self.psf_param_start_index = 0
+        self.n_poly_params = 0
+        self.fitted_pixels = 0
+        self.load_table(file_name=file_name, saturation=saturation)
         self.opt_reg = parameters.PSF_FIT_REG_PARAM
         self.cov_matrix = np.zeros((Nx, Nx))
         if file_name != "":
             self.poly_params = self.from_table_to_poly_params()
 
-    def init_table(self, file_name='', saturation=None):
-        if file_name == '':
+    def init_table(self, table=None, saturation=None):
+        if table is None:
             arr = np.zeros((self.Nx, len(self.psf.param_names) + 10))
-            self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
-                                           'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(
-                self.psf.param_names))
-        else:
-            self.table = Table.read(file_name)
+            table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
+                                      'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(self.psf.param_names))
+        self.table = table
         self.psf_param_start_index = 10
         self.n_poly_params = len(self.table)
         self.fitted_pixels = np.arange(len(self.table)).astype(int)
@@ -118,6 +123,15 @@ class ChromaticPSF:
                     self.poly_params_labels.append(f"{p}_{k}")
                     self.poly_params_names.append("$" + self.psf.axis_names[ip].replace("$", "")
                                                   + "^{(" + str(k) + ")}$")
+
+    def load_table(self, file_name='', saturation=None):
+        if file_name == '':
+            arr = np.zeros((self.Nx, len(self.psf.param_names) + 10))
+            table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
+                                      'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(self.psf.param_names))
+        else:
+            table = Table.read(file_name)
+        self.init_table(table, saturation=saturation)
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg

@@ -185,7 +185,7 @@ class Image(object):
 
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
-            self.header['REDSHIFT'] = str(self.target.redshift)
+            self.header['REDSHIFT'] = self.target.redshift
 
     def rebin(self):
         """Rebin the image and reset some related parameters.
