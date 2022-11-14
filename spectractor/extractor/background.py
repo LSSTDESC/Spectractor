@@ -203,8 +203,11 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     #                    filter_size=((ws[1] - ws[0]) // 2, (ws[1] - ws[0]) // 2),
     #                    sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
     #                    mask=mask)
+    filter_size = parameters.PIXWIDTH_BOXSIZE // 2
+    if filter_size % 2 == 0:  # must be odd since photutils 1.5.0
+        filter_size += 1
     bkg = Background2D(data, (parameters.PIXWIDTH_BOXSIZE, parameters.PIXWIDTH_BOXSIZE),
-                       filter_size=(parameters.PIXWIDTH_BOXSIZE // 2, parameters.PIXWIDTH_BOXSIZE // 2),
+                       filter_size=(filter_size, filter_size),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False,
