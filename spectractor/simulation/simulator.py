@@ -660,30 +660,26 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
     # extract the basename : simimar as os.path.basename(file)
     base_filename = filename.split('/')[-1]
     output_filename = os.path.join(outputdir, base_filename.replace('spectrum', 'spectrasim'))
-    output_atmfilename = os.path.join(outputdir, base_filename.replace('spectrum', 'atmsim'))
+    atmfilename = filename.replace('spectrum', 'atmsim')
 
     # SIMULATE ATMOSPHERE GRID
     # ------------------------
     airmass = spectrum.header['AIRMASS']
     pressure = spectrum.header['OUTPRESS']
     temperature = spectrum.header['OUTTEMP']
-    atm = AtmosphereGrid(filename, airmass=airmass, pressure=pressure, temperature=temperature)
+    atm = AtmosphereGrid(spectrum_filename=filename, airmass=airmass, pressure=pressure, temperature=temperature)
     atm.set_grid(pwv_grid, ozone_grid, aerosol_grid)
 
     # test if file already exists
-    if os.path.exists(output_atmfilename) and os.path.getsize(output_atmfilename) > 20000:
-        filesize = os.path.getsize(output_atmfilename)
-        infostring = " atmospheric simulation file %s of size %d already exists, thus load_image it ..." % (
-            output_atmfilename, filesize)
-        my_logger.info(infostring)
-        atm.load_file(output_atmfilename)
+    if os.path.exists(atmfilename) and os.path.getsize(atmfilename) > 20000:
+        my_logger.info(f"\n\tAtmospheric simulation file {atmfilename} of size {os.path.getsize(atmfilename):d} already exists, thus load_image it ...")
+        atm.load_file(atmfilename)
     else:
-        my_logger.info(f"\n\tFile {output_atmfilename} does not exist yet. Compute it...")
+        my_logger.info(f"\n\tFile {atmfilename} does not exist yet. Compute it...")
         atm.compute()
-        atm.save_file(filename=output_atmfilename)
+        atm.save_file(filename=atmfilename)
     if parameters.DEBUG:
-        infostring = '\n\t ========= Atmospheric simulation :  ==============='
-        my_logger.info(infostring)
+        my_logger.info('\n\t ========= Atmospheric simulation :  ===============')
         atm.plot_transmission()  # plot all atm transp profiles
         atm.plot_transmission_image()  # plot 2D image summary of atm simulations
 
