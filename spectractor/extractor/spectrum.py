@@ -419,7 +419,7 @@ class Spectrum:
         plt.gcf().tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, f'{self.target.label}_spectrum.pdf'))
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             if live_fit:
                 plt.draw()
                 plt.pause(1e-8)
@@ -480,9 +480,9 @@ class Spectrum:
             data = np.copy(self.spectrogram_err)
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-        if parameters.PdfPages:
+        if parameters.PdfPages:  # pragma: no cover
             parameters.PdfPages.savefig()
 
     def save_spectrum(self, output_file_name, overwrite=False):
@@ -582,7 +582,7 @@ class Spectrum:
         hdu.writeto(output_file_name, overwrite=overwrite)
         self.my_logger.info(f'\n\tSpectrum saved in {output_file_name}')
 
-    def save_spectrogram(self, output_file_name, overwrite=False):
+    def save_spectrogram(self, output_file_name, overwrite=False):  # pragma: no cover
         """OBOSOLETE: save the spectrogram into a fits file (data, error and background).
 
         Parameters
@@ -756,7 +756,7 @@ class Spectrum:
         else:
             raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
 
-    def load_spectrogram(self, input_file_name):
+    def load_spectrogram(self, input_file_name):  # pragma: no cover
         """OBSOLETE: Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
@@ -794,7 +794,7 @@ class Spectrum:
         else:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
 
-    def load_chromatic_psf(self, input_file_name):
+    def load_chromatic_psf(self, input_file_name):  # pragma: no cover
         """OBSOLETE: Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
