@@ -1,6 +1,7 @@
 version: 2
 
 python:
+  image: testing
   version: 3.9
   install:
      - requirements: docs/requirements.txt
