@@ -1,11 +1,3 @@
-#version: 2
-#
-#python:
-#  image: testing
-#  version: 3.9
-#  install:
-#     - requirements: docs/requirements.txt
-
 # .readthedocs.yaml
 # Read the Docs configuration file
 # See https://docs.readthedocs.io/en/stable/config-file/v2.html for details

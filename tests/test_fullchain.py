@@ -162,7 +162,7 @@ def test_ctio_fullchain():
     nsigma = 6
     labels = ["OZONE_T", "PWV_T", "VAOD_T"]
     indices = [2, 3, 4]
-    assert w.costs[-1] / w.data.size < 0.95
+    assert w.costs[-1] / w.data.size < 2
     for i, l in zip(indices, labels):
         spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.cov[i, i]):.3f} "
                                 f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
@@ -181,7 +181,7 @@ def test_ctio_fullchain():
     labels = ["A1_T", "A2_T", "OZONE_T", "PWV_T", "VAOD_T"]
     indices = [0, 1, 2, 3, 4, 5]
     A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, shift_t, B, *psf_poly_params = w.p
-    assert w.costs[-1] / w.data.size < 0.65
+    assert w.costs[-1] / w.data.size < 0.8
     for i, l in zip(indices, labels):
         spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.cov[i, i]):.3f} "
                                 f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "

@@ -55,6 +55,7 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.napoleon',
               'matplotlib.sphinxext.plot_directive',
               'sphinx.ext.autosummary',
+              'sphinx_mdinclude',
               ]  #
 
 plot_html_show_source_link = True
