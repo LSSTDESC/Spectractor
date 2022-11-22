@@ -343,7 +343,7 @@ class Spectrum:
         >>> s.plot_spectrum(xlim=[500,900], live_fit=False, force_lines=True)
         """
         if ax is None:
-            plt.figure(figsize=[12, 6])
+            plt.figure(figsize=[7, 5])
             ax = plt.gca()
         if label == '':
             label = f'Order {self.order:d} spectrum\n' \
@@ -365,11 +365,11 @@ class Spectrum:
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title=title, units=self.units)
         if len(self.target.spectra) > 0:
-            for k in range(len(self.target.spectra)):
-                plot_indices = np.logical_and(self.target.wavelengths[k] > np.min(self.lambdas),
-                                              self.target.wavelengths[k] < np.max(self.lambdas))
-                s = self.target.spectra[k] / np.max(self.target.spectra[k][plot_indices]) * np.max(self.data)
-                ax.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
+            # for k in range(len(self.target.spectra)):
+            plot_indices = np.logical_and(self.target.wavelengths[0] > np.min(self.lambdas),
+                                          self.target.wavelengths[0] < np.max(self.lambdas))
+            s = self.target.spectra[0] / np.max(self.target.spectra[0][plot_indices]) * np.max(self.data)
+            ax.plot(self.target.wavelengths[0], s, lw=2, label='Tabulated spectra')
         if self.lambdas is not None:
             self.lines.plot_detected_lines(ax, print_table=parameters.VERBOSE)
         if self.lambdas is not None and self.lines is not None:

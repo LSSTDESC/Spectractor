@@ -463,7 +463,7 @@ class Image(object):
 
     def plot_image(self, ax=None, scale="lin", title="", units="", plot_stats=False,
                    target_pixcoords=None, figsize=(7.3, 6), aspect=None, vmin=None, vmax=None,
-                   cmap=None, cax=None):
+                   cmap=None, cax=None, linthresh=10):
         """Plot image.
 
         Parameters
@@ -492,11 +492,13 @@ class Image(object):
             Figure size (default: [9.3, 8]).
         plot_stats: bool
             If True, plot the uncertainty map instead of the image (default: False).
+        linthresh: float, optional
+            Threshold between log and linear scales for symlog scale choice (default: 10).
 
         Examples
         --------
         >>> im = Image('tests/data/reduc_20170605_028.fits', config="./config/ctio.ini")
-        >>> im.plot_image(target_pixcoords=[820, 580], scale="symlog")
+        >>> im.plot_image(target_pixcoords=[820, 580], scale="symlog", linthresh=1)
         >>> if parameters.DISPLAY: plt.show()
         """
         if ax is None:
@@ -507,11 +509,12 @@ class Image(object):
             data = np.copy(self.stat_errors)
         if units == "":
             units = self.units
-        plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
+        plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax, linthresh=linthresh,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
         if parameters.OBS_OBJECT_TYPE == "STAR":
             plot_compass_simple(ax, self.parallactic_angle, arrow_size=0.1, origin=[0.15, 0.15])
-        plt.legend()
+        if target_pixcoords is not None:
+            plt.legend()
         plt.gcf().tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'image.pdf'), transparent=True)

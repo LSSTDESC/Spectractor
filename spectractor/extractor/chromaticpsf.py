@@ -42,7 +42,7 @@ class ChromaticPSF:
 
     """
 
-    def __init__(self, psf, Nx, Ny, x0=0, y0=None, deg=4, saturation=None, file_name=''):
+    def __init__(self, psf, Nx, Ny, x0=0, y0=None, deg=4, saturation=None, file_name='', units=""):
         """Initialize a ChromaticPSF instance.
 
 
@@ -75,6 +75,7 @@ class ChromaticPSF:
         self.Nx = Nx
         self.Ny = Ny
         self.x0 = x0
+        self.units = units
         if y0 is None:
             y0 = Ny / 2
         self.y0 = y0
@@ -1286,13 +1287,20 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             err = err.reshape((self.Ny, self.Nx))
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
         fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), gridspec_kw=gs_kw)
+        linthresh = 0.1
         norm = np.nanmax(data)
-        plot_image_simple(ax[1, 0], data=model / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
-                          units='1/max(data)', cmap=cmap_viridis)
+        plot_image_simple(ax[1, 0], data=model / norm, aspect='auto', cax=ax[1, 1], vmin=0.01, vmax=1,
+                          units='1/max(data)', cmap=cmap_viridis, scale="log10", linthresh=linthresh)
         ax[1, 0].set_title("Model", fontsize=10, loc='center', color='white', y=0.8)
-        plot_image_simple(ax[0, 0], data=data / norm, title='Data', aspect='auto',
-                          cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)', cmap=cmap_viridis)
+        cb = ax[1, 0].images[-1].colorbar
+        cb.set_ticks([0.01, 0.1, 1])
+        cb.set_ticklabels(["0.01", "0.1", "1"])
+        plot_image_simple(ax[0, 0], data=data / norm, title='Data', aspect='auto', scale="log10", linthresh=linthresh,
+                          cax=ax[0, 1], vmin=0.01, vmax=1, units='1/max(data)', cmap=cmap_viridis)
         ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+        cb = ax[0, 0].images[-1].colorbar
+        cb.set_ticks([0.01, 0.1, 1])
+        cb.set_ticklabels(["0.01", "0.1", "1"])
         residuals = (data - model)
         # residuals_err = self.spectrum.spectrogram_err / self.model
         norm = err
@@ -1309,11 +1317,9 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
         ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
         ax[3, 1].remove()
-        ax[3, 0].errorbar(np.arange(self.Nx), np.nansum(data, axis=0), yerr=np.sqrt(np.nansum(err ** 2, axis=0)),
-                          label='Data', fmt='k.', markersize=0.1)
         model[np.isnan(data)] = np.nan  # mask background values outside fitted region
-        ax[3, 0].plot(np.arange(self.Nx), np.nansum(model, axis=0), label='Model')
-        ax[3, 0].set_ylabel('Transverse sum')
+        ax[3, 0].plot(np.arange(self.Nx), np.nanmean(residuals, axis=0), label='Model')
+        ax[3, 0].set_ylabel('Projected\nmean residuals')
         ax[3, 0].set_xlabel(parameters.PLOT_XLABEL)
         ax[3, 0].legend(fontsize=7)
         ax[3, 0].set_xlim((0, data.shape[1]))

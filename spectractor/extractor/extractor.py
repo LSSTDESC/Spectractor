@@ -503,11 +503,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
             norm = np.nanmax(data[:, sub])
-            plot_image_simple(ax[0, 0], data=data[:, sub] / norm, title='Data', aspect='auto',
-                              cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)', cmap=cmap_viridis)
+            plot_image_simple(ax[0, 0], data=data[:, sub] / norm, title='Data', aspect='auto', scale="log",
+                              cax=ax[0, 1], vmin=0.01, vmax=1, units='1/max(data)', cmap=cmap_viridis)
             ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
-            plot_image_simple(ax[1, 0], data=model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
-                              units='1/max(data)', cmap=cmap_viridis)
+            cb = ax[0, 0].images[-1].colorbar
+            cb.set_ticks([0.01, 0.1, 1])
+            cb.set_ticklabels(["0.01", "0.1", "1"])
+            plot_image_simple(ax[1, 0], data=model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0.01, vmax=1,
+                              units='1/max(data)', cmap=cmap_viridis, scale="log")
             if dispersion:
                 x = self.spectrum.chromatic_psf.table['Dx'][sub[5:-5]] + self.spectrum.spectrogram_x0 - sub[0]
                 y = np.ones_like(x)
@@ -520,6 +523,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
                 ax[1, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
+            cb = ax[1, 0].images[-1].colorbar
+            cb.set_ticks([0.01, 0.1, 1])
+            cb.set_ticklabels(["0.01", "0.1", "1"])
             residuals = (data - model)
             # residuals_err = self.spectrum.spectrogram_err / self.model
             norm = err
@@ -537,12 +543,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[3, 1].remove()
-            ax[3, 0].plot(self.lambdas[sub], np.nansum(data, axis=0)[sub], label='Data')
-            model[np.isnan(data)] = np.nan  # mask background values outside fitted region
-            ax[3, 0].plot(self.lambdas[sub], np.nansum(model, axis=0)[sub], label='Model')
-            ax[3, 0].set_ylabel('Cross spectrum')
+            ax[3, 0].plot(self.lambdas[sub], np.nanmean(residuals, axis=0)[sub])
+            ax[3, 0].set_ylabel('Projected\nmean residuals')
             ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
-            ax[3, 0].legend(fontsize=7)
+            # ax[3, 0].legend(fontsize=7)
             ax[3, 0].grid(True)
 
     def plot_fit(self):
@@ -579,11 +583,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # plt.suptitle(f'A2={A2:.3f}, D={D2CCD:.2f}mm, shift_x={dx0:.3f}pix, shift_y={dy0:.3f}pix, '
         #              f'angle={angle:.2f}pix, B={B:.3f}', y=1)
         # main plot
-        self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
+        self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=False)
         # zoom O2
-        self.plot_spectrogram_comparison_simple(ax[:, 2:4], extent=[730, 800], title='Zoom $O_2$', dispersion=True)
+        self.plot_spectrogram_comparison_simple(ax[:, 2:4], extent=[730, 800], title='Zoom $O_2$', dispersion=False)
         # zoom H2O
-        self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, 1000], title='Zoom $H_2 O$', dispersion=True)
+        self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, 1000], title='Zoom $H_2 O$', dispersion=False)
         for i in range(3):  # clear middle colorbars
             for j in range(2):
                 plt.delaxes(ax[i, 2 * j + 1])
@@ -597,7 +601,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             fig.savefig(figname, dpi=100, bbox_inches='tight')
             gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
             fig2, ax2 = plt.subplots(nrows=4, ncols=2, figsize=(6, 8), gridspec_kw=gs_kw)
-            self.plot_spectrogram_comparison_simple(ax2, title='Spectrogram model', dispersion=True)
+            self.plot_spectrogram_comparison_simple(ax2, title='Spectrogram model', dispersion=False)
             # plt.delaxes(ax2[3, 1])
             fig2.tight_layout()
             figname = os.path.join(parameters.LSST_SAVEFIGPATH, f'ffm_bestfit_2.pdf')
@@ -860,7 +864,8 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         my_logger.info(f"\n\tNo guess position of order 0 has been given. Assuming the spectrum to extract comes "
                        f"from the brightest object, guess position is set as {image.target_guess}.")
     if parameters.DEBUG:
-        image.plot_image(scale='symlog', target_pixcoords=image.target_guess)
+        image.plot_image(scale='symlog', target_pixcoords=image.target_guess,
+                         linthresh=10**int(np.log10(np.max(image.data))-2), cmap="gray")
 
     # Use fast mode
     if parameters.CCD_REBIN > 1:
@@ -1019,7 +1024,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     psf = load_PSF(psf_type=parameters.PSF_TYPE, target=image.target, clip=False)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
-                     deg=parameters.PSF_POLY_ORDER, saturation=image.saturation)
+                     deg=parameters.PSF_POLY_ORDER, saturation=image.saturation, units=image.units)
     verbose = copy.copy(parameters.VERBOSE)
     debug = copy.copy(parameters.DEBUG)
     parameters.VERBOSE = False
@@ -1215,7 +1220,7 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
 
     # initialize a new ChromaticPSF
     s = ChromaticPSF(s.psf, Nx=Nx, Ny=Ny, x0=spectrum.spectrogram_x0, y0=spectrum.spectrogram_y0,
-                     deg=s.deg, saturation=s.saturation)
+                     deg=s.deg, saturation=s.saturation, units="")
 
     # fill a first table with first guess
     s.table['Dx'] = (np.arange(spectrum.spectrogram_xmin, spectrum.spectrogram_xmax, 1)

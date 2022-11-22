@@ -209,7 +209,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     bgd_res[mask] = np.nan
 
     if parameters.DEBUG:
-        gs = gridspec.GridSpec(3, 2, width_ratios=[4, 1], height_ratios=[1, 1, 1], wspace=0.1, hspace=0.04,
+        gs = gridspec.GridSpec(3, 2, width_ratios=[4, 1], height_ratios=[1, 1, 1], wspace=0.1, hspace=0.1,
                                right=0.98, left=0.1, top=0.98, bottom=0.1)
         fig = plt.figure(figsize=(7, 5))
         ax0 = plt.subplot(gs[0, 0])
@@ -225,8 +225,9 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         cmap.set_bad(color='lightgrey')
         im = ax0.imshow(bgd_bands, origin='lower', aspect="auto", vmin=mean - 3 * std, vmax=mean + 3 * std)
         v1 = np.linspace(mean - 3 * std, mean + 3 * std, 5, endpoint=True)
+        v1 = np.around(v1, decimals=max(0, -int(np.log10(v1[1]-v1[0]))+1))
         cb = plt.colorbar(im, ticks=v1, ax=ax0, label=f'Data units')
-        cb.ax.set_yticklabels(["{:2.0f}".format(i) for i in v1])
+        cb.ax.set_yticklabels([f"{i}" for i in v1])
         ax0.text(0.05, 0.95, f'Data background', color="white",
                  horizontalalignment='left', verticalalignment='top', transform=ax0.transAxes)  # : mean={np.mean(b):.3f}, std={np.std(b):.3f}')
         ax0.set_xlabel(parameters.PLOT_XLABEL)
@@ -239,8 +240,9 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         ax1.set_xlabel(parameters.PLOT_XLABEL)
         ax1.set_ylabel(parameters.PLOT_YLABEL)
         v1 = np.linspace(np.nanmin(b), np.nanmax(b), 5, endpoint=True)
+        v1 = np.around(v1, decimals=max(0, -int(np.log10(v1[1]-v1[0]))+1))
         cb1 = plt.colorbar(im, ticks=v1, ax=ax1, label=f'Data units')
-        cb1.ax.set_yticklabels(["{:2.0f}".format(i) for i in v1])
+        cb1.ax.set_yticklabels([f"{i}" for i in v1])
         ax1.text(0.05, 0.95, f'Fitted background', color="white",
                  horizontalalignment='left', verticalalignment='top', transform=ax1.transAxes)  # : mean={np.mean(b):.3f}, std={np.std(b):.3f}')
         res = (bgd_bands - b) / err
@@ -251,7 +253,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
                  horizontalalignment='left', verticalalignment='top', transform=ax2.transAxes)  # : mean={np.mean(b):.3f}, std={np.std(b):.3f}')
         v1 = np.array([-5, -2, 0, 2, 5])
         cb2 = plt.colorbar(im, ticks=v1, ax=ax2, label=f'')
-        cb2.ax.set_yticklabels(["{:1.0f}".format(i) for i in v1])
+        cb2.ax.set_yticklabels([f"{i:.0f}" for i in v1])
         # ax3.set_title(f'Pull')  #  mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}')
         hist_res = res[~np.isnan(res)].flatten()
         hist_res = hist_res[hist_res < 5]

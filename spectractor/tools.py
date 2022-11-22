@@ -1664,7 +1664,7 @@ def clean_target_spikes(data, saturation):
 
 
 def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap=None,
-                      target_pixcoords=None, vmin=None, vmax=None, aspect=None, cax=None):
+                      target_pixcoords=None, vmin=None, vmax=None, aspect=None, cax=None, linthresh=10):
     """Simple function to plot a spectrum with error bars and labels.
 
     Parameters
@@ -1691,6 +1691,8 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         Aspect keyword to be passed to imshow (default: None)
     cax: Axes, optional
         Color bar axes if necessary (default: None).
+    linthresh: float, optional
+        Threshold between log and linear scales for symlog scale choice (default: 10).
 
     Examples
     --------
@@ -1718,7 +1720,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     if scale == "log10" or scale == "log":
         norm = matplotlib.colors.LogNorm(vmin=vmin, vmax=vmax)
     elif scale == "symlog":
-        norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=10, base=10)
+        norm = matplotlib.colors.SymLogNorm(vmin=vmin, vmax=vmax, linthresh=linthresh, base=10)
     else:
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
     im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
@@ -1731,11 +1733,11 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         cb.formatter.set_powerlimits((0, 0))
         cb.locator = MaxNLocator(7, prune=None)
         cb.update_ticks()
-    cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
+    cb.set_label(f'{units}')  # ({scale} scale)')  # ,fontsize=16)
     if title != "":
         ax.set_title(title)
     if target_pixcoords is not None:
-        ax.scatter(target_pixcoords[0], target_pixcoords[1], marker='o', s=100, edgecolors='k', facecolors='none',
+        ax.scatter(target_pixcoords[0], target_pixcoords[1], marker='o', s=100, edgecolors='yellow', facecolors='none',
                    label='Target', linewidth=2)
 
 
