@@ -25,7 +25,7 @@ PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
 A1_T = 1
 A2_T = 1
 
-#
+# parameters for wide PSF simulation
 # PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
 #                          0, 0, 0,
 #                          10, 2, 5,
