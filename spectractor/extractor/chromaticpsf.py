@@ -1285,8 +1285,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             data = data.reshape((self.Ny, self.Nx))
             model = model.reshape((self.Ny, self.Nx))
             err = err.reshape((self.Ny, self.Nx))
-        gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
-        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), gridspec_kw=gs_kw)
+        gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1])
+        fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(7, 6), gridspec_kw=gs_kw)
         linthresh = 0.1
         norm = np.nanmax(data)
         plot_image_simple(ax[1, 0], data=model / norm, aspect='auto', cax=ax[1, 1], vmin=0.01, vmax=1,
@@ -1316,14 +1316,13 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
         ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
         ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
-        ax[3, 1].remove()
-        model[np.isnan(data)] = np.nan  # mask background values outside fitted region
-        ax[3, 0].plot(np.arange(self.Nx), np.nanmean(residuals, axis=0), label='Model')
-        ax[3, 0].set_ylabel('Projected\nmean residuals')
-        ax[3, 0].set_xlabel(parameters.PLOT_XLABEL)
-        ax[3, 0].legend(fontsize=7)
-        ax[3, 0].set_xlim((0, data.shape[1]))
-        ax[3, 0].grid(True)
+        # ax[3, 1].remove()
+        # model[np.isnan(data)] = np.nan  # mask background values outside fitted region
+        # ax[3, 0].plot(np.arange(self.Nx), np.nanmean(residuals, axis=0))
+        # ax[3, 0].set_ylabel('Projected\nmean residuals')
+        # ax[3, 0].set_xlabel(parameters.PLOT_XLABEL)
+        # ax[3, 0].set_xlim((0, data.shape[1]))
+        # ax[3, 0].grid(True)
         fig.tight_layout()
         if self.live_fit:  # pragma: no cover
             plt.draw()

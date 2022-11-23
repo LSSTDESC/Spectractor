@@ -230,14 +230,14 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         cb.ax.set_yticklabels([f"{i}" for i in v1])
         ax0.text(0.05, 0.95, f'Data background', color="white",
                  horizontalalignment='left', verticalalignment='top', transform=ax0.transAxes)  # : mean={np.mean(b):.3f}, std={np.std(b):.3f}')
-        ax0.set_xlabel(parameters.PLOT_XLABEL)
+        # ax0.set_xlabel(parameters.PLOT_XLABEL)
         ax0.set_ylabel(parameters.PLOT_YLABEL)
         ax0.set_xticks([])
         ax1.set_xticks([])
         bkg.plot_meshes(outlines=True, color='red', axes=ax1, linewidth=0.5)
         b = bkg.background
         im = ax1.imshow(b, origin='lower', aspect="auto")
-        ax1.set_xlabel(parameters.PLOT_XLABEL)
+        # ax1.set_xlabel(parameters.PLOT_XLABEL)
         ax1.set_ylabel(parameters.PLOT_YLABEL)
         v1 = np.linspace(np.nanmin(b), np.nanmax(b), 5, endpoint=True)
         v1 = np.around(v1, decimals=max(0, -int(np.log10(v1[1]-v1[0]))+1))

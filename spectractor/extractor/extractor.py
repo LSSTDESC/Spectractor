@@ -505,7 +505,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             norm = np.nanmax(data[:, sub])
             plot_image_simple(ax[0, 0], data=data[:, sub] / norm, title='Data', aspect='auto', scale="log",
                               cax=ax[0, 1], vmin=0.01, vmax=1, units='1/max(data)', cmap=cmap_viridis)
-            ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+            ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.75)
             cb = ax[0, 0].images[-1].colorbar
             cb.set_ticks([0.01, 0.1, 1])
             cb.set_ticklabels(["0.01", "0.1", "1"])
@@ -522,7 +522,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             # p0 = ax.plot(lambdas, self.model(lambdas), label='model')
             # # ax.plot(self.lambdas, self.model_noconv, label='before conv')
             if title != '':
-                ax[1, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.8)
+                ax[1, 0].set_title(title, fontsize=10, loc='center', color='white', y=0.75)
             cb = ax[1, 0].images[-1].colorbar
             cb.set_ticks([0.01, 0.1, 1])
             cb.set_ticklabels(["0.01", "0.1", "1"])
@@ -533,7 +533,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             std = float(np.nanstd(residuals[:, sub]))
             plot_image_simple(ax[2, 0], data=residuals[:, sub], vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
                               aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
-            ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
+            ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.75)
             ax[2, 0].text(0.05, 0.05,
                           f'mean={np.nanmean(residuals[:, sub]):.3f}\nstd={np.nanstd(residuals[:, sub]):.3f}',
                           horizontalalignment='left', verticalalignment='bottom',
@@ -542,12 +542,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             ax[0, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[1, 1].get_yaxis().set_label_coords(3.5, 0.5)
             ax[2, 1].get_yaxis().set_label_coords(3.5, 0.5)
-            ax[3, 1].remove()
-            ax[3, 0].plot(self.lambdas[sub], np.nanmean(residuals, axis=0)[sub])
-            ax[3, 0].set_ylabel('Projected\nmean residuals')
-            ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
-            # ax[3, 0].legend(fontsize=7)
-            ax[3, 0].grid(True)
+            # ax[3, 1].remove()
+            # ax[3, 0].plot(self.lambdas[sub], np.nanmean(residuals, axis=0)[sub])
+            # ax[3, 0].set_ylabel('Projected\nmean residuals')
+            # ax[3, 0].set_xlabel(r'$\lambda$ [nm]')
+            # ax[3, 0].grid(True)
 
     def plot_fit(self):
         """Plot the fit result.
@@ -576,8 +575,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             fit_workspace.plot_fit()
 
         """
-        gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
-        fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(10, 8), gridspec_kw=gs_kw)
+        gs_kw = dict(width_ratios=[3, 0.001, 1, 0.001, 1, 0.1], height_ratios=[1, 1, 1])
+        fig, ax = plt.subplots(nrows=3, ncols=6, figsize=(10, 6), gridspec_kw=gs_kw)
 
         # A2, D2CCD, dx0, dy0, angle, B, rot, *poly_params = self.p
         # plt.suptitle(f'A2={A2:.3f}, D={D2CCD:.2f}mm, shift_x={dx0:.3f}pix, shift_y={dy0:.3f}pix, '
@@ -591,7 +590,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         for i in range(3):  # clear middle colorbars
             for j in range(2):
                 plt.delaxes(ax[i, 2 * j + 1])
-        for i in range(4):  # clear middle y axis labels
+        for i in range(3):  # clear middle y axis labels
             for j in range(1, 3):
                 ax[i, 2 * j].set_ylabel("")
         fig.tight_layout()
@@ -599,8 +598,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             figname = os.path.join(parameters.LSST_SAVEFIGPATH, f'ffm_bestfit.pdf')
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
-            gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
-            fig2, ax2 = plt.subplots(nrows=4, ncols=2, figsize=(6, 8), gridspec_kw=gs_kw)
+            gs_kw = dict(width_ratios=[3, 0.1], height_ratios=[1, 1, 1])
+            fig2, ax2 = plt.subplots(nrows=3, ncols=2, figsize=(7, 6), gridspec_kw=gs_kw)
             self.plot_spectrogram_comparison_simple(ax2, title='Spectrogram model', dispersion=False)
             # plt.delaxes(ax2[3, 1])
             fig2.tight_layout()
@@ -1306,7 +1305,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     s0.from_profile_params_to_shape_params(s0.profile_params)
     gs_kw = dict(width_ratios=[2, 1], height_ratios=[2, 1])
     fig, ax = plt.subplots(2, 2, figsize=(11, 5), sharex="all", gridspec_kw=gs_kw)
-    ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth")
+    ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth", zorder=42, lw=2)
     amplitude_priors_err = [np.sqrt(w.amplitude_priors_cov_matrix[x, x]) for x in range(w.Nx)]
     ax[0, 0].errorbar(spectrum.lambdas, w.amplitude_priors, yerr=amplitude_priors_err, label="prior")
     ax[0, 0].errorbar(spectrum.lambdas, w.amplitude_params, yerr=w.amplitude_params_err, label="2D")
@@ -1314,7 +1313,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     ax[0, 0].legend()
     ax[0, 0].set_xlabel(r"$\lambda$ [nm]")
     ax[0, 0].set_ylabel(f"Amplitude $A$ [ADU/s]")
-    ax[1, 0].plot(lambdas_truth, np.zeros_like(lambdas_truth), label="truth")
+    ax[1, 0].plot(lambdas_truth, np.zeros_like(lambdas_truth), label="truth", zorder=42, lw=2)
     amplitude_truth_interp = np.interp(spectrum.lambdas, lambdas_truth, amplitude_truth)
     res = (w.amplitude_priors - amplitude_truth_interp) / amplitude_priors_err
     ax[1, 0].errorbar(spectrum.lambdas, res, yerr=np.ones_like(res),
@@ -1323,7 +1322,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     ax[1, 0].errorbar(spectrum.lambdas, res, yerr=np.ones_like(res),
                       label=f"2D: mean={np.mean(res):.2f}, std={np.std(res):.2f}")
     ax[1, 0].grid()
-    ax[1, 0].legend()
+    ax[1, 0].legend().set_zorder(43)
     ax[1, 0].set_xlabel(r"$\lambda$ [nm]")
     ax[1, 0].set_ylim(-5, 5)
     ax[1, 0].set_ylabel(r"$(A - A_{\rm truth})/\sigma_A$")
