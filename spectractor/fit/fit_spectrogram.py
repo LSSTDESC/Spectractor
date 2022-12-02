@@ -215,10 +215,16 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if len(sub) > 0:
             norm = np.nanmax(data[:, sub])
             plot_image_simple(ax[0, 0], data=data[:, sub] / norm, title='Data', aspect='auto',
-                              cax=ax[0, 1], vmin=0, vmax=1, units='1/max(data)', cmap=cmap_viridis)
+                              cax=ax[0, 1], vmin=0.01, vmax=1, units='1/max(data)', cmap=cmap_viridis, scale="log10")
             ax[0, 0].set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
-            plot_image_simple(ax[1, 0], data=model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
-                              units='1/max(data)', cmap=cmap_viridis)
+            cb = ax[0, 0].images[-1].colorbar
+            cb.set_ticks([0.01, 0.1, 1])
+            cb.set_ticklabels(["0.01", "0.1", "1"])
+            plot_image_simple(ax[1, 0], data=model[:, sub] / norm, aspect='auto', cax=ax[1, 1], vmin=0.01, vmax=1,
+                              units='1/max(data)', cmap=cmap_viridis, scale="log10")
+            cb = ax[1, 0].images[-1].colorbar
+            cb.set_ticks([0.01, 0.1, 1])
+            cb.set_ticklabels(["0.01", "0.1", "1"])
             if dispersion:
                 x = self.spectrum.chromatic_psf.table['Dx'][sub[5:-5]] + self.spectrum.spectrogram_x0 - sub[0]
                 y = np.ones_like(x)
@@ -384,11 +390,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
         #plt.suptitle(f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f}, '
         #             f'D={D:.2f}mm, shift_y={shift_y:.2f}pix, B={B:.3f}', y=1)
         # main plot
-        self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=True)
+        self.plot_spectrogram_comparison_simple(ax[:, 0:2], title='Spectrogram model', dispersion=False)
         # zoom O2
-        self.plot_spectrogram_comparison_simple(ax[:, 2:4], extent=[730, 800], title='Zoom $O_2$', dispersion=True)
+        self.plot_spectrogram_comparison_simple(ax[:, 2:4], extent=[730, 800], title='Zoom $O_2$', dispersion=False)
         # zoom H2O
-        self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, 1000], title='Zoom $H_2 O$', dispersion=True)
+        self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, 1000], title='Zoom $H_2 O$', dispersion=False)
         for i in range(3):  # clear middle colorbars
             for j in range(2):
                 plt.delaxes(ax[i, 2*j+1])
@@ -560,7 +566,7 @@ if __name__ == "__main__":
                  'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_199_spectrum.fits']
     params = []
     chisqs = []
-    filenames = ['outputs/sim_20170530_134_spectrum.fits']
+    filenames = ['outputs/reduc_20170530_134_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 

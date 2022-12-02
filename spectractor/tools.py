@@ -1742,7 +1742,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
 
 
 def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', linestyle='none', lw=2, label='',
-                         title='', units=''):
+                         title='', units='', zorder=None):
     """Simple function to plot a spectrum with error bars and labels.
 
     Parameters
@@ -1769,6 +1769,8 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         String label for the plot title (default: '').
     units: str, optional
         String label for the plot units (default: '').
+    zorder: int, optional
+        Zorder of the plot (default: '').
 
 
     Examples
@@ -1791,9 +1793,9 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         xs = np.arange(data.size)
     if data_err is not None:
         ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=lw, label=label,
-                    zorder=0, markersize=2, linestyle=linestyle)
+                    zorder=zorder, markersize=2, linestyle=linestyle)
     else:
-        ax.plot(xs, data, color=color, lw=lw, label=label, linestyle=linestyle)
+        ax.plot(xs, data, color=color, lw=lw, label=label, linestyle=linestyle, zorder=zorder)
     ax.grid(True)
     if xlim is None and lambdas is not None:
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]

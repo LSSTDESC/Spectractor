@@ -22,7 +22,7 @@ def test_logbook():
 
 def test_extractor_ctio():
     file_names = ['tests/data/reduc_20170530_134.fits']
-    file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod4/data_30may17/reduc_20170530_131.fits']
+    # file_names = ['../CTIODataJune2017_reduced_RG715_v2_prod4/data_30may17/reduc_20170530_131.fits']
     output_directory = "./outputs"
 
     logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')

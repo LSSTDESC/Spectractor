@@ -154,7 +154,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))
         plot_spectrum_simple(ax, lambdas=lambdas, data=self.data, data_err=self.err,
-                             units=self.spectrum.units)
+                             units=self.spectrum.units, zorder=-1, label="data")
         p0 = ax.plot(lambdas, self.model, label='model')
         ax.fill_between(lambdas, self.model - self.model_err,
                         self.model + self.model_err, alpha=0.3, color=p0[0].get_color())
@@ -171,7 +171,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         idx = np.logical_not(np.isclose(self.model[sub], 0, atol=0.01 * min_positive))
         residuals = (self.spectrum.data[sub][idx] - self.model[sub][idx]) / self.err[sub][idx]
         residuals_err = self.spectrum.err[sub][idx] / self.err[sub][idx]
-        ax2.errorbar(lambdas[sub][idx], residuals, yerr=residuals_err, fmt='ro', markersize=2, label='(Data-Model)/Err')
+        ax2.errorbar(lambdas[sub][idx], residuals, yerr=residuals_err, fmt='ro', markersize=2,
+                     label='(Data-Model)/Err', zorder=-1)
         ax2.axhline(0, color=p0[0].get_color())
         ax2.grid(True)
         ylim = ax2.get_ylim()
