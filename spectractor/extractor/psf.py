@@ -1322,7 +1322,7 @@ def load_PSF(psf_type=parameters.PSF_TYPE, target=None, clip=False):
 
     Examples
     --------
-
+    >>> parameters.VERBOSE = False
     >>> load_PSF(psf_type="Gauss", clip=True)  # doctest: +ELLIPSIS
     <....Gauss object at ...>
     >>> load_PSF(psf_type="Moffat", clip=True)  # doctest: +ELLIPSIS

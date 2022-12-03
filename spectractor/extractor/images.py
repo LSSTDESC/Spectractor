@@ -398,13 +398,13 @@ class Image(object):
         fit, cov, model = fit_poly1d(x, y, order=1)
         gain = 1 / fit[0]
         read_out = np.sqrt(fit[1]) * gain
-        if not np.isclose(gain, np.mean(self.gain), rtol=1e-2):
+        if not np.isclose(gain, np.nanmean(self.gain), rtol=1e-2):
             self.my_logger.warning(f"\n\tFitted gain seems to be different than input gain. "
-                                   f"Fit={gain} but average of self.gain is {np.mean(self.gain)}.")
-        if not np.isclose(read_out, np.mean(self.read_out_noise), rtol=1e-2):
+                                   f"Fit={gain} but average of self.gain is {np.nanmean(self.gain)}.")
+        if not np.isclose(read_out, np.nanmean(self.read_out_noise), rtol=1e-2):
             self.my_logger.warning(f"\n\tFitted read out noise seems to be different than input readout noise. "
                                    f"Fit={read_out} but average of self.read_out_noise is "
-                                   f"{np.mean(self.read_out_noise)}.")
+                                   f"{np.nanmean(self.read_out_noise)}.")
         return fit, x, y, model
 
     def plot_statistical_error(self):
