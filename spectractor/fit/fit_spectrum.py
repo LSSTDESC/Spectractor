@@ -86,7 +86,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.B = 0
-        self.p = np.array([self.A1, self.A2, self.ozone, self.pwv, self.aerosols, self.reso, self.D,
+        self.p = np.array([self.A1, self.A2, self.aerosols, self.ozone, self.pwv, self.reso, self.D,
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
         # self.fixed[0] = True
@@ -96,17 +96,17 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.fixed[7] = True
         self.fixed[8] = True
         # self.fixed[-1] = True
-        self.input_labels = ["A1", "A2", "ozone", "PWV", "VAOD", "reso [pix]", r"D_CCD [mm]",
+        self.input_labels = ["A1", "A2", "VAOD", "ozone", "PWV", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]", "B"]
-        self.axis_names = ["$A_1$", "$A_2$", "ozone", "PWV", "VAOD", "reso [pix]", r"$D_{CCD}$ [mm]",
+        self.axis_names = ["$A_1$", "$A_2$", "VAOD", "ozone", "PWV", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (100, 700), (0, 10), (0, 0.1),
+        self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (100, 700), (0, 10),
                        (0.1, 10), bounds_D, (-2, 2), (-np.inf, np.inf)]
         if atmgrid_file_name != "":
-            self.bounds[2] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
-            self.bounds[3] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
-            self.bounds[4] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
+            self.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
+            self.bounds[3] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
+            self.bounds[4] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
         self.amplitude_truth = None
@@ -128,7 +128,7 @@ class SpectrumFitWorkspace(FitWorkspace):
             D_truth = self.spectrum.header['D2CCD_T']
             shift_truth = 0
             B_truth = 0
-            self.truth = (A1_truth, A2_truth, ozone_truth, pwv_truth, aerosols_truth,
+            self.truth = (A1_truth, A2_truth, aerosols_truth, ozone_truth, pwv_truth,
                           reso_truth, D_truth, shift_truth, B_truth)
             self.lambdas_truth = np.fromstring(self.spectrum.header['LBDAS_T'][1:-1], sep=' ', dtype=float)
             self.amplitude_truth = np.fromstring(self.spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
@@ -190,7 +190,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax.get_yaxis().set_label_coords(-0.08, 0.6)
         # ax2.get_yaxis().set_label_coords(-0.11, 0.5)
 
-    def simulate(self, A1, A2, ozone, pwv, aerosols, reso, D, shift_x, B):
+    def simulate(self, A1, A2, aerosols, ozone, pwv, reso, D, shift_x, B):
         """Interface method to simulate a spectrogram.
 
         Parameters
@@ -199,12 +199,12 @@ class SpectrumFitWorkspace(FitWorkspace):
             Main amplitude parameter.
         A2: float
             Relative amplitude of the order 2 spectrogram.
+        aerosols: float
+            Vertical Aerosols Optical Depth quantity for Libradtran (no units).
         ozone: float
             Ozone parameter for Libradtran (in db).
         pwv: float
             Precipitable Water Vapor quantity for Libradtran (in mm).
-        aerosols: float
-            Vertical Aerosols Optical Depth quantity for Libradtran (no units).
         reso: float
             Width of the Gaussian kernel to convolve the spectrum.
         D: float
@@ -234,7 +234,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         >>> w.plot_fit()
 
         """
-        lambdas, model, model_err = self.simulation.simulate(A1, A2, ozone, pwv, aerosols, reso, D, shift_x, B)
+        lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, ozone, pwv, reso, D, shift_x, B)
         self.model = model
         self.model_err = model_err
         return lambdas, model, model_err
@@ -259,8 +259,8 @@ class SpectrumFitWorkspace(FitWorkspace):
             file_name = 'tests/data/reduc_20170530_134_spectrum.fits'
             atmgrid_file_name = file_name.replace('spectrum', 'atmsim')
             fit_workspace = SpectrumFitWorkspace(file_name, atmgrid_file_name=atmgrid_file_name, verbose=True)
-            A1, A2, ozone, pwv, aerosols, reso, D, shift_x = fit_workspace.p
-            lambdas, model, model_err = fit_workspace.simulation.simulate(A1,A2,ozone, pwv, aerosols, reso, D, shift_x)
+            A1, A2, aerosols, ozone, pwv, reso, D, shift_x = fit_workspace.p
+            lambdas, model, model_err = fit_workspace.simulation.simulate(A1, A2, aerosols, ozone, pwv, reso, D, shift_x)
             fit_workspace.lambdas = lambdas
             fit_workspace.model = model
             fit_workspace.model_err = model_err
@@ -271,7 +271,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax1 = plt.subplot(222)
         ax2 = plt.subplot(224)
         ax3 = plt.subplot(121)
-        A1, A2, ozone, pwv, aerosols, reso, D, shift, B = self.p
+        A1, A2, aerosols, ozone, pwv, reso, D, shift, B = self.p
         self.title = f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f},\n ' \
                      f'reso={reso:.2f}pix, D={D:.2f}mm, shift={shift:.2f}pix, B={B:.2g}'
         # main plot
@@ -298,7 +298,7 @@ class SpectrumFitWorkspace(FitWorkspace):
     def decontaminate_order2(self):  # pragma: no cover
         lambdas = self.spectrum.lambdas
         lambdas_order2 = self.simulation.lambdas_order2
-        A1, A2, ozone, pwv, aerosols, reso, D, shift, B = self.p
+        A1, A2, aerosols, ozone, pwv, reso, D, shift, B = self.p
         lambdas_binwidths_order2 = np.gradient(lambdas_order2)
         lambdas_binwidths = np.gradient(lambdas)
         sim_conv = interp1d(lambdas, self.model * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
@@ -309,7 +309,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.model_err = (err_conv(lambdas) - A2 * err_order2) / lambdas
 
     def get_truth_without_order2(self):  # pragma: no cover
-        lambdas, model, model_err = self.simulation.simulate(1., 0., self.ozone, self.pwv, self.aerosols, self.reso,
+        lambdas, model, model_err = self.simulation.simulate(1., 0., self.aerosols, self.ozone, self.pwv, self.reso,
                                                              self.D, self.shift_x)
         self.lambdas_truth = lambdas
         self.amplitude_truth = model

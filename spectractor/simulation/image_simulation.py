@@ -466,7 +466,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.compute(star, background, spectrogram, starfield=starfield)
 
     # Recover true spectrum
-    spectrogram.set_true_spectrum(spectrogram.lambdas, ozone, pwv, aerosols, shift_t=0)
+    spectrogram.set_true_spectrum(spectrogram.lambdas, aerosols, ozone, pwv, shift_t=0)
     true_lambdas = np.copy(spectrogram.true_lambdas)
     true_spectrum = np.copy(spectrogram.true_spectrum)
 
