@@ -33,7 +33,7 @@ jobs:
         shell: bash -l {0}
         run: |
           mamba install -y -q numpy>1.15 scipy matplotlib>3.1 pandas llvmlite numba astropy>=3.2 photutils>=0.7 astroquery coloredlogs scikit-image h5py emcee tqdm mpi4py schwimmbad iminuit>=2 coverage>=3.6 configparser coveralls deprecated pyyaml nose rubin-libradtran
-          pip install getCalspec>=0.1.5
+          pip install "getCalspec>=0.1.5"
           python -c "from getCalspec.rebuild import rebuild_tables; rebuild_tables()"
 
       - name: List installed packages
