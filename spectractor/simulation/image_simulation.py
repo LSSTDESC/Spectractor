@@ -363,7 +363,7 @@ class ImageModel(Image):
 
 
 def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1,
-             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True):
+             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -482,7 +482,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.convert_to_ADU_units()
 
     # Add Poisson and read-out noise
-    image.add_poisson_and_read_out_noise()
+    if with_noise:
+        image.add_poisson_and_read_out_noise()
 
     # Round float ADU into closest integers
     # image.data = np.around(image.data)
