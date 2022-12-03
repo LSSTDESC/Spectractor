@@ -121,7 +121,7 @@ class ADR:
         return refractive_index(lbda, self.pressure, self.temperature, self.relathumidity)
 
 
-class ADRSinclair1985(ADR):
+class ADRSinclair1985(ADR):  # pragma: nocover
 
     def __init__(self, airmass, lbdaref, pressure, parangle, relathumidity, temperature, zenithangle):
         """Class to store main ADR params and functions.

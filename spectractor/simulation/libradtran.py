@@ -82,7 +82,7 @@ class Libradtran:
                                      stderr=subprocess.PIPE,
                                      input=inputstr, encoding='ascii')
             return np.genfromtxt(io.StringIO(process.stdout)).T
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError as e:  # pragma: nocover
             self.my_logger.warning(f"\n\tLibradtran input command:\n{inputstr}")
             self.my_logger.error(f"\n\t{e.stderr}")
             sys.exit()
