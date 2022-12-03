@@ -1368,13 +1368,11 @@ def turn_image(image):
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
     if not np.isnan(image.rotation_angle):
-        image.data_rotated = ndimage.interpolation.rotate(image.data, image.rotation_angle,
-                                                          prefilter=parameters.ROT_PREFILTER,
-                                                          order=parameters.ROT_ORDER)
+        image.data_rotated = ndimage.rotate(image.data, image.rotation_angle,
+                                            prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
         image.stat_errors_rotated = np.sqrt(
-            np.abs(ndimage.interpolation.rotate(image.stat_errors ** 2, image.rotation_angle,
-                                                prefilter=parameters.ROT_PREFILTER,
-                                                order=parameters.ROT_ORDER)))
+            np.abs(ndimage.rotate(image.stat_errors ** 2, image.rotation_angle,
+                                  prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)))
         min_noz = np.min(image.stat_errors_rotated[image.stat_errors_rotated > 0])
         image.stat_errors_rotated[image.stat_errors_rotated <= 0] = min_noz
     if parameters.DEBUG:

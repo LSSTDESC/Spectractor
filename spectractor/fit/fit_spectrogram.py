@@ -619,33 +619,7 @@ if __name__ == "__main__":
 
     load_config(args.config)
 
-    # filename = 'outputs/reduc_20170530_130_spectrum.fits'
-    filename = 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_134_spectrum.fits'
-    # filename = 'outputs/sim_20170530_134_spectrum.fits'
-    filenames = [
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_104_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_109_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_114_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_119_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_124_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_129_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_134_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_139_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_144_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_149_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_154_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_159_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_164_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_169_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_174_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_179_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_184_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_189_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_194_spectrum.fits',
-                 'outputs/data_30may17_HoloAmAg_prod7.1/sim_20170530_199_spectrum.fits']
-    params = []
-    chisqs = []
-    filenames = ['outputs/sim_20170530_134_spectrum.fits']
+    filenames = ['/tests/data/reduc_20170530_134_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 
@@ -654,16 +628,4 @@ if __name__ == "__main__":
         # w.simulate(*w.truth)
         # w.plot_fit()
         run_spectrogram_minimisation(w, method="newton")
-        # run_emcee(w, ln=lnprob_spectrogram)
-        # w.analyze_chains()
-        params.append(w.p)
-        chisqs.append(w.costs[-1])
-    # params = np.asarray(params).T
-    #
-    # fig, ax = plt.subplots(1, len(params))
-    # for ip, p in enumerate(params):
-    #     print(f"{w.input_labels[ip]}:", np.mean(p), np.std(p))
-    #     ax[ip].plot(p, label=f"{w.input_labels[ip]}")
-    #     ax[ip].grid()
-    #     ax[ip].legend()
-    # plt.show()
+

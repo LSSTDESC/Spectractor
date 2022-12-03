@@ -1321,9 +1321,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             err = err.reshape((self.Ny, self.Nx))
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
 
-
-        #fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), gridspec_kw=gs_kw)
-        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(14, 14), gridspec_kw=gs_kw)
+        fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), gridspec_kw=gs_kw)
 
         norm = np.nanmax(data)
         plot_image_simple(ax[1, 0], data=model / norm, aspect='auto', cax=ax[1, 1], vmin=0, vmax=1,
@@ -1336,6 +1334,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # residuals_err = self.spectrum.spectrogram_err / self.model
         norm = err
         residuals /= norm
+        self.my_logger.warning(f"res mean {np.nanmean(residuals)}")
         std = float(np.nanstd(residuals))
         plot_image_simple(ax[2, 0], data=residuals, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
                           aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
@@ -1488,19 +1487,6 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
             >>> assert mod is not None
             >>> assert np.mean(np.abs(mod.flatten()-np.concatenate(w.data).ravel())/np.concatenate(w.err).ravel()) < 1
 
-        Set the amplitude parameters fixing the transverse PSF1D fit amplitudes:
-
-        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True,
-        ... amplitude_priors_method="fixed")
-        >>> y, mod, mod_err = w.simulate(*s.poly_params[s.Nx:])
-        >>> w.plot_fit()
-
-        ..  doctest::
-            :hide:
-
-            >>> assert mod is not None
-            >>> assert np.mean(np.abs(mod.flatten()-np.concatenate(w.data).ravel())/np.concatenate(w.err).ravel()) < 1
-
         """
         # linear regression for the amplitude parameters
         poly_params = np.copy(self.poly_params)
@@ -1561,12 +1547,17 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x])
                                               if cov_matrix[x, x] > 0 else 0 for x in range(self.Nx)])
         self.amplitude_cov_matrix = np.copy(cov_matrix)
-        poly_params[:self.Nx] = amplitude_params
+        poly_params[:self.Nx] = np.copy(amplitude_params)
         self.poly_params = np.copy(poly_params)
         poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
+        self.my_logger.warning(f"{poly_params}")
+
         if self.amplitude_priors_method == "fixed":
             self.model = self.chromatic_psf.build_spectrogram_image(poly_params, mode="1D")[
                          self.bgd_width:-self.bgd_width, :].T
+            fig = plt.figure()
+            plt.imshow(self.model, origin="lower")
+            plt.show()
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 

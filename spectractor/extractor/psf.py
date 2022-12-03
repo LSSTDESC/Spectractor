@@ -1330,7 +1330,8 @@ def load_PSF(psf_type=parameters.PSF_TYPE, target=None, clip=False):
     >>> load_PSF(psf_type="MoffatGauss", clip=False)  # doctest: +ELLIPSIS
     <....MoffatGauss object at ...>
     >>> from spectractor.extractor.spectrum import Spectrum
-    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
+    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")  # doctest: +ELLIPSIS
+    ...
     >>> load_PSF(psf_type="Order0", clip=True, target=spec.target)  # doctest: +ELLIPSIS
     <....Order0 object at ...>
 

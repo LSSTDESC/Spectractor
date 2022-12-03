@@ -356,7 +356,7 @@ class Spectrum:
         .. doctest::
             :hide:
 
-            >>> assert np.isclose(parameters.LAMBDA_MIN, 350, atol=1)
+            >>> assert np.isclose(parameters.LAMBDA_MIN, 358, atol=1)
             >>> assert np.isclose(parameters.LAMBDA_MAX, 760, atol=1)
 
         """
