@@ -349,15 +349,15 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum()
+        >>> s = Spectrum(config="./config/ctio.ini")
         >>> s.filter_label = 'FGB37'
         >>> s.load_filter()
 
         .. doctest::
             :hide:
 
-            >>> assert np.isclose(parameters.LAMBDA_MIN, 350, atol=0.5)
-            >>> assert np.isclose(parameters.LAMBDA_MAX, 760, atol=0.5)
+            >>> assert np.isclose(parameters.LAMBDA_MIN, 350, atol=1)
+            >>> assert np.isclose(parameters.LAMBDA_MAX, 760, atol=1)
 
         """
         if self.filter_label != "" and "empty" not in self.filter_label.lower():
@@ -383,7 +383,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits', config="./config/ctio.ini")
         >>> s.plot_spectrum(xlim=[500,900], live_fit=False, force_lines=True)
         """
         if ax is None:
@@ -766,8 +766,8 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum()
-        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits', config="./config/ctio.ini")
+        >>> s = Spectrum(config="./config/ctio.ini")
+        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
         """
         if os.path.isfile(input_file_name):
             hdu_list = fits.open(input_file_name)
@@ -804,8 +804,8 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum()
-        >>> s.load_spectrum('./tests/data/reduc_20170530_134_spectrum.fits', config="./config/ctio.ini")
+        >>> s = Spectrum(config="./config/ctio.ini")
+        >>> s.load_spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
         >>> print(s.chromatic_psf.table)  #doctest: +ELLIPSIS
              lambdas               Dx        ...
         """

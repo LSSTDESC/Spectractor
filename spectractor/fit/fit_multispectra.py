@@ -59,6 +59,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("./config/ctio.ini")
         >>> file_names = ["./tests/data/reduc_20170530_134_spectrum.fits"]
         >>> w = MultiSpectraFitWorkspace("./outputs/test", file_names, bin_width=5, verbose=True)
         >>> w.output_file_name
@@ -80,20 +82,21 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         self.spectra = []
         self.atmospheres = []
         self.file_names = file_names
+        for name in file_names:
+            spectrum = Spectrum(name, fast_load=True)
+            self.spectra.append(spectrum)
         self.nspectra = len(self.spectra)
         self.spectrum_lambdas = [self.spectra[k].lambdas for k in range(self.nspectra)]
         self.spectrum_data = [self.spectra[k].data for k in range(self.nspectra)]
         self.spectrum_err = [self.spectra[k].err for k in range(self.nspectra)]
         self.spectrum_data_cov = [self.spectra[k].cov_matrix for k in range(self.nspectra)]
-        for name in file_names:
-            spectrum = Spectrum(name, fast_load=True)
-            self.spectra.append(spectrum)
+        for k, name in enumerate(file_names):
             atmgrid_file_name = name.replace("sim", "reduc").replace("spectrum.fits", "atmsim.fits")
             if os.path.isfile(atmgrid_file_name):
-                self.atmospheres.append(AtmosphereGrid(name, atmgrid_file_name))
+                self.atmospheres.append(AtmosphereGrid(spectrum_filename=name, atmgrid_filename=atmgrid_file_name))
             else:
                 self.my_logger.warning(f"\n\tNo atmosphere grid {atmgrid_file_name}, the fit will be slower...")
-                self.atmospheres.append(Atmosphere(spectrum.airmass, spectrum.pressure, spectrum.temperature,
+                self.atmospheres.append(Atmosphere(self.spectra[k].airmass, self.spectra[k].pressure, self.spectra[k].temperature,
                                                    lambda_min=np.min(self.spectrum_lambdas),
                                                    lambda_max=np.max(self.spectrum_lambdas)+1))
         self.lambdas = np.empty(1)
@@ -168,9 +171,14 @@ class MultiSpectraFitWorkspace(FitWorkspace):
     def _prepare_data(self):
         # rebin wavelengths
         if self.bin_widths > 0:
-            lambdas_bin_edges = np.arange(int(np.min(np.concatenate(list(self.spectrum_lambdas)))),
-                                          int(np.max(np.concatenate(list(self.spectrum_lambdas)))) + 1,
-                                          self.bin_widths)
+            if self.nspectra > 1:
+                lambdas_bin_edges = np.arange(int(np.min(np.concatenate(list(self.spectrum_lambdas)))),
+                                              int(np.max(np.concatenate(list(self.spectrum_lambdas)))) + 1,
+                                              self.bin_widths)
+            else:
+                lambdas_bin_edges = np.arange(int(np.min(self.spectrum_lambdas[0])),
+                                              int(np.max(self.spectrum_lambdas[0])) + 1,
+                                              self.bin_widths)
             lbdas = []
             for i in range(1, lambdas_bin_edges.size):
                 lbdas.append(0.5 * (0*lambdas_bin_edges[i] + 2*lambdas_bin_edges[i - 1]))  # lambda bin value on left

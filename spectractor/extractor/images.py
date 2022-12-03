@@ -317,7 +317,7 @@ class Image(object):
         --------
         .. doctest::
 
-            >>> im = Image('tests/data/reduc_20170530_134.fits')
+            >>> im = Image('tests/data/reduc_20170530_134.fits', config="./config/ctio.ini")
             >>> im.convert_to_ADU_units()
             >>> im.compute_statistical_error()
             >>> im.plot_statistical_error()
@@ -759,7 +759,7 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     Examples
     --------
     >>> parameters.CCD_REBIN = 1
-    >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9")
+    >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9", config="./config/ctio.ini")
     >>> im.plot_image()
     >>> guess = [820, 580]
     >>> parameters.VERBOSE = True
@@ -771,7 +771,7 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     >>> find_target(im, guess)  #doctest: +ELLIPSIS
     [816.9... 587.1...]
     >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "guess"
-    >>> find_target(im, guess)
+    >>> find_target(im, guess, widths=(100, 100))
     [820, 580]
     """
     my_logger = set_logger(__name__)
