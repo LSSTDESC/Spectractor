@@ -18,21 +18,23 @@ Some submodules complete the structures with generic functions:
 - `spectractor.logbook`: tools to read logbook `.csv` text files and get some metadata relative to the data images that are not contained in the header;
 - `spectractor.tools`: contains generic functions shared by all  the subpackages (fitting procedures, plotting functions, etc).
 
-
 ## Installation
 
-Spectractor is written in Python 3.9. The dependencies are listed in the `requirements.txt` file. To install Spectractor, just run
+Spectractor is written in Python 3.9. The mandatory dependencies are listed in the `requirements.txt` file. To install Spectractor, just run
 ```
 pip install -r requirements.txt .
 ```
-For the simulation of spectra, Spectractor needs the following external libraries:
-- [libradtran](http://www.libradtran.org/doku.php) to simulate atmospheric transmission: it needs the installation of [netcdf](https://www.unidata.ucar.edu/software/netcdf/) and a python 2 environment (for the compilation only, not the usage); `uvpsec` executable must in the user `$PATH` or the user has to set an environmental variable `$LIBRADTRAN_DIR` pointing to the install directory.
-- [getCalspec](https://github.com/LSSTDESC/getCalspec) to get the CALSPEC star spectra;
-- [astrometry.net](https://astrometrynet.readthedocs.io/en/latest/) (optional): needed to create World Coordinate System files from the images; `solve-field` executable must in the user `$PATH` or the user has to set an environmental variable `$ASTROMETRYNET_DIR` pointing to the install directory. Version below or equal v0.78 should be used.
 
-Be careful, Spectractor can perform fits using the MCMC library [emcee](https://emcee.readthedocs.io/en/stable/) with [mpi4py](https://mpi4py.readthedocs.io/en/stable/) and [h5py](https://www.h5py.org/).  The latter might be better installed using `conda install ...` command to get their own dependencies (openmp and hdf5).
+To simulate atmospheric transmission, Spectractor needs [libradtran](http://www.libradtran.org/doku.php). There are two ways to install this software:
+- use the [Rubin observatory conda package](https://anaconda.org/conda-forge/rubin-libradtran)
+```
+conda install -c conda-forge rubin-libradtran
+```
+- compile it from [sources](http://www.libradtran.org/doku.php): it needs the installation of [netcdf](https://www.unidata.ucar.edu/software/netcdf/) and a python 2 environment (for the compilation only, not the usage); `uvpsec` executable must in the user `$PATH` or the user has to set an environmental variable `$LIBRADTRAN_DIR` pointing to the install directory.
 
-Detailled command lines for the installation of Spectractor and the external dependencies can be found in the file `.travis.yml`.
+To find accurate star centroids using astrometry, one can install [astrometry.net](https://astrometrynet.readthedocs.io/en/latest/) (optional). It is needed to create World Coordinate System files from the images; `solve-field` executable must in the user `$PATH` or the user has to set an environmental variable `$ASTROMETRYNET_DIR` pointing to the install directory. Version below or equal v0.78 should be used.
+
+Spectractor is able perform fits using the MCMC library [emcee](https://emcee.readthedocs.io/en/stable/) (optional) with [mpi4py](https://mpi4py.readthedocs.io/en/stable/) and [h5py](https://www.h5py.org/).  The latter might be better installed using `conda install ...` command to get their own dependencies (openmp and hdf5).
 
 ## Basic extraction
 
@@ -80,20 +82,4 @@ This object is also returned by the `Spectractor` function.
 ### Tutorial notebook
 
 A tutorial Jupyter notebook is available in the `notebooks` folder.
-
-## Detailed description
-
-### Dispersers
-
-### Shot noise
-
-### Rotation
-
-### Background extraction
-
-### Wavelength calibration
-#### First geometrical calibration
-#### Second calibration with line detection
-
-### Second order subtraction
 
