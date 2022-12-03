@@ -619,7 +619,7 @@ if __name__ == "__main__":
 
     load_config(args.config)
 
-    filenames = ['/tests/data/reduc_20170530_134_spectrum.fits']
+    filenames = ['./tests/data/reduc_20170530_134_spectrum.fits']
     for filename in filenames:
         atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
 

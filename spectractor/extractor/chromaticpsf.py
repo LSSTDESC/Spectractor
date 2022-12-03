@@ -1334,7 +1334,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # residuals_err = self.spectrum.spectrogram_err / self.model
         norm = err
         residuals /= norm
-        self.my_logger.warning(f"res mean {np.nanmean(residuals)}")
         std = float(np.nanstd(residuals))
         plot_image_simple(ax[2, 0], data=residuals, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
                           aspect='auto', cax=ax[2, 1], units='', cmap=cmap_bwr)
@@ -1550,7 +1549,6 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         poly_params[:self.Nx] = np.copy(amplitude_params)
         self.poly_params = np.copy(poly_params)
         poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
-        self.my_logger.warning(f"{poly_params}")
 
         if self.amplitude_priors_method == "fixed":
             self.model = self.chromatic_psf.build_spectrogram_image(poly_params, mode="1D")[
