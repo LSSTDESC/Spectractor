@@ -196,7 +196,7 @@ def get_gaia_coords_after_proper_motion(gaia_catalog, date_obs):
     return gaia_coords_after_proper_motion
 
 
-def plot_shifts_histograms(dra, ddec):
+def plot_shifts_histograms(dra, ddec):  # pragma: no cover
     dra_median = np.median(dra.to(u.arcsec).value)
     ddec_median = np.median(ddec.to(u.arcsec).value)
     dra_rms = np.std(dra.to(u.arcsec).value)
@@ -222,7 +222,7 @@ def plot_shifts_histograms(dra, ddec):
         parameters.PdfPages.savefig()
 
 
-class Astrometry(Image):
+class Astrometry(Image):  # pragma: no cover
 
     def __init__(self, file_name, target_label="", disperser_label="", wcs_file_name="", output_directory=""):
         """Class to handle astrometric computations.

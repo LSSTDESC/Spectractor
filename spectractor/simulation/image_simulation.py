@@ -329,7 +329,7 @@ class ImageModel(Image):
         if starfield is not None:
             self.data += starfield.model(xx, yy)
 
-    def add_poisson_and_read_out_noise(self):
+    def add_poisson_and_read_out_noise(self):  # pragma: no cover
         if self.units != 'ADU':
             raise AttributeError('Poisson noise procedure has to be applied on map in ADU units')
         d = np.copy(self.data).astype(float)

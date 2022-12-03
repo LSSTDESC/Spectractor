@@ -591,41 +591,6 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
 
 
 if __name__ == "__main__":
-    from argparse import ArgumentParser
-    from spectractor.config import load_config
+    import doctest
 
-    parser = ArgumentParser()
-    parser.add_argument(dest="input", metavar='path', default=["tests/data/reduc_20170530_134_spectrum.fits"],
-                        help="Input fits file name. It can be a list separated by spaces, or it can use * as wildcard.",
-                        nargs='*')
-    parser.add_argument("-d", "--debug", dest="debug", action="store_true",
-                        help="Enter debug mode (more verbose and plots).", default=False)
-    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
-                        help="Enter verbose (print more stuff).", default=False)
-    parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
-                        help="Write results in given output directory (default: ./outputs/).")
-    parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
-                        help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
-    parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
-                        help="INI config file. (default: config/ctio.ini).")
-    args = parser.parse_args()
-
-    parameters.VERBOSE = args.verbose
-    if args.debug:
-        parameters.DEBUG = True
-        parameters.VERBOSE = True
-
-    file_names = args.input
-
-    load_config(args.config)
-
-    filenames = ['./tests/data/reduc_20170530_134_spectrum.fits']
-    for filename in filenames:
-        atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-
-        w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                                    burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-        # w.simulate(*w.truth)
-        # w.plot_fit()
-        run_spectrogram_minimisation(w, method="newton")
-
+    doctest.testmod()

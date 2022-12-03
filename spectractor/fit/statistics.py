@@ -365,7 +365,7 @@ class Likelihood(Grid):
         self.rho_matrix = None
         self.mean_vec = None
 
-    def setValue(self, indices, value):
+    def setValue(self, indices, value):  # pragma: no cover
         if self.dim == 4:
             self.grid[indices[0]][indices[1]][indices[2]][indices[3]] = value
         elif self.dim == 5:
@@ -377,7 +377,7 @@ class Likelihood(Grid):
         else:
             sys.exit('Warning! In setValue, unsupported grid dimension.')
 
-    def marginalize(self, pdfonly=False):
+    def marginalize(self, pdfonly=False):  # pragma: no cover
         for i in self.rangedim:
             for j in self.rangedim:
                 axes = [n for n in self.rangedim if n not in [i, j]]
