@@ -177,7 +177,7 @@ class Spectrum:
         Examples
         --------
         Load a spectrum from a fits file
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits', config="./config/ctio.ini")
         >>> print(s.order)
         1
         >>> print(s.target.label)
@@ -187,7 +187,7 @@ class Spectrum:
 
         Load a spectrum from a fits image file
         >>> from spectractor.extractor.images import Image
-        >>> image = Image('tests/data/reduc_20170605_028.fits', target_label='PNG321.0+3.9')
+        >>> image = Image('tests/data/reduc_20170605_028.fits', target_label='PNG321.0+3.9', config="./config/ctio.ini")
         >>> s = Spectrum(image=image)
         >>> print(s.target.label)
         PNG321.0+3.9
@@ -286,7 +286,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits', config="./config/ctio.ini")
         >>> s.convert_from_ADUrate_to_flam()
 
         .. doctest::
@@ -318,7 +318,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits', config="./config/ctio.ini")
         >>> s.convert_from_flam_to_ADUrate()
 
         .. doctest::
@@ -356,8 +356,8 @@ class Spectrum:
         .. doctest::
             :hide:
 
-            >>> assert np.isclose(parameters.LAMBDA_MIN, 300)
-            >>> assert np.isclose(parameters.LAMBDA_MAX, 760)
+            >>> assert np.isclose(parameters.LAMBDA_MIN, 350, atol=0.5)
+            >>> assert np.isclose(parameters.LAMBDA_MAX, 760, atol=0.5)
 
         """
         if self.filter_label != "" and "empty" not in self.filter_label.lower():
@@ -767,7 +767,7 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum()
-        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits', config="./config/ctio.ini")
         """
         if os.path.isfile(input_file_name):
             hdu_list = fits.open(input_file_name)
@@ -805,7 +805,7 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum()
-        >>> s.load_spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s.load_spectrum('./tests/data/reduc_20170530_134_spectrum.fits', config="./config/ctio.ini")
         >>> print(s.chromatic_psf.table)  #doctest: +ELLIPSIS
              lambdas               Dx        ...
         """
