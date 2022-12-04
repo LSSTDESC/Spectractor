@@ -401,9 +401,9 @@ class Image(object):
         if not np.isclose(gain, np.nanmean(self.gain), rtol=1e-2):
             self.my_logger.warning(f"\n\tFitted gain seems to be different than input gain. "
                                    f"Fit={gain} but average of self.gain is {np.nanmean(self.gain)}.")
-        if not np.isclose(read_out, np.nanmean(self.read_out_noise), rtol=1e-2):
+        if not np.isclose(read_out / parameters.CCD_REBIN, np.nanmean(self.read_out_noise), rtol=1e-2):
             self.my_logger.warning(f"\n\tFitted read out noise seems to be different than input readout noise. "
-                                   f"Fit={read_out} but average of self.read_out_noise is "
+                                   f"Fit={read_out / parameters.CCD_REBIN} but average of self.read_out_noise is "
                                    f"{np.nanmean(self.read_out_noise)}.")
         return fit, x, y, model
 
@@ -572,16 +572,16 @@ def build_CTIO_gain_map(image):
     image: Image
         The Image instance to fill with file data and header.
     """
-    size = parameters.CCD_IMSIZE
-    image.gain = np.zeros_like(image.data)
+    sizey, sizex = image.data.shape
+    image.gain = parameters.CCD_GAIN * np.ones_like(image.data)
     # ampli 11
-    image.gain[0:size // 2, 0:size // 2] = image.header['GTGAIN11']
+    image.gain[0:sizey // 2, 0:sizex // 2] = image.header['GTGAIN11']
     # ampli 12
-    image.gain[0:size // 2, size // 2:size] = image.header['GTGAIN12']
+    image.gain[0:sizey // 2, sizex // 2:sizex] = image.header['GTGAIN12']
     # ampli 21
-    image.gain[size // 2:size, 0:size] = image.header['GTGAIN21']
+    image.gain[sizey // 2:sizey, 0:sizex] = image.header['GTGAIN21']
     # ampli 22
-    image.gain[size // 2:size, size // 2:size] = image.header['GTGAIN22']
+    image.gain[sizey // 2:sizey, sizex // 2:sizex] = image.header['GTGAIN22']
 
 
 def build_CTIO_read_out_noise_map(image):

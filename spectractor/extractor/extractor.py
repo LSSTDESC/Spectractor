@@ -910,7 +910,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     return w.spectrum
 
 
-def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='./config/ctio.ini',
+def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='',
                 atmospheric_lines=True):
     """ Spectractor
     Main function to extract a spectrum from an image

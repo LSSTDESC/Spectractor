@@ -33,7 +33,7 @@ def test_extractor_ctio():
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    parameters.CCD_REBIN = 1
+    parameters.CCD_REBIN = 2
     apply_rebinning_to_parameters()
 
     for file_name in file_names:
@@ -42,7 +42,7 @@ def test_extractor_ctio():
         if target_label is None or xpos is None or ypos is None:
             continue
         spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
-                               atmospheric_lines=True)
+                               atmospheric_lines=True, config="")
         assert spectrum.data is not None
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
                                    f"\n\t\tspectrum.lambdas[0]={spectrum.lambdas[0]}"
