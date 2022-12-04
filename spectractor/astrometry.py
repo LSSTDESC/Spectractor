@@ -1,6 +1,7 @@
 import os
 from copy import deepcopy
 import subprocess
+import shutil
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clipped_stats
