@@ -380,7 +380,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 invcov_matrix[:, lambdas_to_mask_indices[k]] = 0
                 self.W[k] = invcov_matrix
 
-    def inject_random_A1s(self):
+    def inject_random_A1s(self):  # pragma: no cover
         random_A1s = np.random.uniform(0.5, 1, size=self.nspectra)
         for k in range(self.nspectra):
             self.data[k] *= random_A1s[k]
@@ -446,6 +446,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("./config/ctio.ini")
         >>> file_names = ["./tests/data/reduc_20170530_134_spectrum.fits"]
         >>> w = MultiSpectraFitWorkspace("./outputs/test", file_names, bin_width=5, verbose=True)
         >>> lambdas, model, model_err = w.simulate(*w.p)
@@ -554,6 +556,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("./config/ctio.ini")
         >>> file_names = 3 * ["./tests/data/reduc_20170530_134_spectrum.fits"]
         >>> w = MultiSpectraFitWorkspace("./outputs/test", file_names, bin_width=5, verbose=True)
         >>> w.simulate(*w.p)  #doctest: +ELLIPSIS
@@ -636,6 +640,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("./config/ctio.ini")
         >>> file_names = ["./tests/data/sim_20170530_134_spectrum.fits"]
         >>> w = MultiSpectraFitWorkspace("./outputs/test", file_names, bin_width=5, verbose=True)
         >>> w.plot_transmissions()
@@ -710,6 +716,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         """
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("./config/ctio.ini")
         >>> file_names = ["./tests/data/sim_20170530_134_spectrum.fits"]
         >>> w = MultiSpectraFitWorkspace("./outputs/test", file_names, bin_width=5, verbose=True)
         >>> w.cov = np.eye(3 + w.nspectra - 1)
@@ -758,12 +766,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         throughput = self.amplitude_params / self.disperser.transmission(self.lambdas[0])
         throughput_err = self.amplitude_params_err / self.disperser.transmission(self.lambdas[0])
-        # mask_good = throughput_err < 10 * np.nanmedian(throughput_err)
-        # throughput_err[~mask_good] = np.interp(self.lambdas[0][~mask_good],
-        #                                        self.lambdas[0][mask_good], throughput_err[mask_good])
-        # from scipy.signal import savgol_filter
-        # throughput = savgol_filter(throughput, 17, 3)
-        # throughput_err = savgol_filter(throughput_err, 17, 3)
         if "sim" in self.file_names[0]:
             file_name = self.output_file_name + f"_sim_transmissions.txt"
         else:
@@ -796,10 +798,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             x, model, model_err = model_input
         else:
             x, model, model_err = self.simulate(*params)
-        # M = np.copy(self.M)
-        # inv_M_dot_W_dot_M = np.copy(self.amplitude_cov_matrix)
-        # M_dot_W_dot_D = np.copy(self.M_dot_W_dot_D)
-        # Tinst = np.copy(self.amplitude_params)
         if self.W.dtype == object and self.W[0].ndim == 2:
             J = [[] for _ in range(params.size)]
         else:
@@ -819,15 +817,6 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                     J[ip].append((tmp_model[k] - model[k]) / epsilon[ip])
             else:
                 J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
-            # else:
-            #     import time
-            #     start = time.time()
-            #     k = int(self.input_labels[ip].split("_")[-1])
-            #     for k in range(self.nspectra):
-            #         dcov_dA1k = - 2 * inv_M_dot_W_dot_M @ (M[k].T @ self.W[k] @ M[k]) @ inv_M_dot_W_dot_M
-            #         dTinst_dA1k = dcov_dA1k @ M_dot_W_dot_D + inv_M_dot_W_dot_M @ (M[k].T @ self.W[k] @ self.data[k])
-            #         J[ip].append((M[k] @ Tinst + 0*M[k] @ dTinst_dA1k) / p)
-            #     print("JA1", time.time()-start)
         return np.asarray(J)
 
 
@@ -843,6 +832,8 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False)
 
     Examples
     --------
+    >>> from spectractor.config import load_config
+    >>> load_config("./config/ctio.ini")
     >>> file_names = 4 * ["./tests/data/reduc_20170530_134_spectrum.fits"]
     >>> w = MultiSpectraFitWorkspace("./outputs/test", file_names, bin_width=5, verbose=True, fixed_A1s=False)
     >>> parameters.VERBOSE = True
@@ -859,11 +850,11 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False)
         epsilon = 1e-2 * guess
         epsilon[epsilon == 0] = 1e-2
         if isinstance(fit_workspace.atmospheres[0], AtmosphereGrid):
-            epsilon = np.array([np.gradient(fit_workspace.atmospheres[0].OZ_Points)[0],
-                            np.gradient(fit_workspace.atmospheres[0].PWV_Points)[0],
-                            np.gradient(fit_workspace.atmospheres[0].AER_Points)[0], 0.04]) / 2
+            epsilon = np.array([np.gradient(fit_workspace.atmospheres[0].AER_Points)[0],
+                                np.gradient(fit_workspace.atmospheres[0].OZ_Points)[0],
+                                np.gradient(fit_workspace.atmospheres[0].PWV_Points)[0], 0.04]) / 2
         else:
-            epsilon = np.array([1, 0.01, 0.0001])
+            epsilon = np.array([0.0001, 1, 0.01])
         epsilon = np.array(list(epsilon) + [1e-4] * fit_workspace.A1s.size)
 
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
