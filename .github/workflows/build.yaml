@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          packages: netpbm wcslib-dev libcfitsio-dev
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -22,7 +24,6 @@ jobs:
           channel-priority: strict
           show-channel-urls: true
           activate-environment: test
-          packages: netpbm wcslib-dev libcfitsio-dev
 
       - name: Test Simbad URL is contactable
         shell: bash -l {0}
