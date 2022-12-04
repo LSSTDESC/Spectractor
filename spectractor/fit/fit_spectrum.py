@@ -4,10 +4,10 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config
+from spectractor.config import set_logger
 from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping
+from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping, run_minimisation
 from spectractor.tools import plot_spectrum_simple
 
 
@@ -49,9 +49,10 @@ class SpectrumFitWorkspace(FitWorkspace):
         Examples
         --------
 
+        >>> from spectractor.config import load_config
+        >>> load_config("config/ctio.ini")
         >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> load_config("config/ctio.ini")
         >>> w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
         ... burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
@@ -226,9 +227,10 @@ class SpectrumFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
-        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
+        >>> from spectractor.config import load_config
         >>> load_config("config/ctio.ini")
+        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
+        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
         >>> w.plot_fit()
@@ -245,9 +247,10 @@ class SpectrumFitWorkspace(FitWorkspace):
         Examples
         --------
 
+        >>> from spectractor.config import load_config
+        >>> load_config("config/ctio.ini")
         >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> load_config("config/ctio.ini")
         >>> w = SpectrumFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
         >>> w.plot_fit()
@@ -349,9 +352,10 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
     Examples
     --------
 
+    >>> from spectractor.config import load_config
+    >>> load_config("config/ctio.ini")
     >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
     >>> atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-    >>> load_config("config/ctio.ini")
     >>> w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, verbose=1, plot=True, live_fit=False)
     >>> parameters.VERBOSE = True
     >>> run_spectrum_minimisation(w, method="newton")

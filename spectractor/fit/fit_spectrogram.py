@@ -53,9 +53,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
 
+        >>> from spectractor.config import load_config
+        >>> load_config("config/ctio.ini")
         >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> load_config("config/ctio.ini")
         >>> w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
         ... burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
@@ -433,9 +434,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
 
+        >>> from spectractor.config import load_config
+        >>> load_config("config/ctio.ini")
         >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> load_config("config/ctio.ini")
         >>> w = SpectrogramFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
         >>> w.plot_fit()
@@ -524,9 +526,10 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
     Examples
     --------
 
+    >>> from spectractor.config import load_config
+    >>> load_config("config/ctio.ini")
     >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
     >>> atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-    >>> load_config("config/ctio.ini")
     >>> w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, verbose=1, plot=True, live_fit=False)
     >>> parameters.VERBOSE = True
     >>> run_spectrogram_minimisation(w, method="newton")

@@ -751,7 +751,7 @@ class Spectrum:
                     raise FileNotFoundError(f"No PSF info in {input_file_name} "
                                             f"and not even a PSF file {psf_file_name}.")
                 if "LINES" in hdu_list:
-                    self.lines.table = Table.read(hdu_list["LINES"])
+                    self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
                 hdu_list.close()
         else:
             raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
