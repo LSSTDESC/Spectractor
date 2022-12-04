@@ -1344,7 +1344,5 @@ class Astrometry(Image):  # pragma: no cover
 
 if __name__ == "__main__":
     import doctest
-    import shutil
 
-    if shutil.which("solve-field") != "" or os.getenv("ASTROMETRYNET_DIR") != "":
-        doctest.testmod()
+    doctest.testmod()
