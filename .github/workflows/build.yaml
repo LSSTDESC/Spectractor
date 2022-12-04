@@ -36,7 +36,7 @@ jobs:
           python -c "from getCalspec.rebuild import rebuild_tables; rebuild_tables()"
           wget http://astrometry.net/downloads/astrometry.net-0.78.tar.gz
           tar xvzf astrometry.net-0.78.tar.gz
-          cd astrometry.net-*
+          cd astrometry.net-0.78/
           make
           make py
           make extra
