@@ -1027,7 +1027,15 @@ class Astrometry(Image):  # pragma: no cover
         # write results in fits file
         self.write_sources()
         # run astrometry.net
-        command = f"{os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')} --scale-unit arcsecperpix " \
+        if shutil.which('solve-field') != "":
+            exec = shutil.which('solve-field')
+        elif parameters.ASTROMETRYNET_DIR != "":
+            exec = os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')
+        else:
+            raise OSError(f"solve-field executable not found in $PATH "
+                          f"or {os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')}")
+
+        command = f"{exec} --scale-unit arcsecperpix " \
                   f"--scale-low {0.95 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--scale-high {1.05 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--ra {self.target.radec_position.ra.value} --dec {self.target.radec_position.dec.value} " \
