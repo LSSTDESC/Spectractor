@@ -25,16 +25,22 @@ Spectractor is written in Python 3.9. The mandatory dependencies are listed in t
 pip install -r requirements.txt .
 ```
 
-To simulate atmospheric transmission, Spectractor needs [libradtran](http://www.libradtran.org/doku.php). There are two ways to install this software:
+To simulate atmospheric transmission, Spectractor needs [libradtran](http://www.libradtran.org/doku.php) (optional). There are two ways to install this software:
 - use the [Rubin observatory conda package](https://anaconda.org/conda-forge/rubin-libradtran)
 ```
 conda install -c conda-forge rubin-libradtran
 ```
 - compile it from [sources](http://www.libradtran.org/doku.php): it needs the installation of [netcdf](https://www.unidata.ucar.edu/software/netcdf/) and a python 2 environment (for the compilation only, not the usage); `uvpsec` executable must in the user `$PATH` or the user has to set an environmental variable `$LIBRADTRAN_DIR` pointing to the install directory.
 
-To find accurate star centroids using astrometry, one can install [astrometry.net](https://astrometrynet.readthedocs.io/en/latest/) (optional). It is needed to create World Coordinate System files from the images; `solve-field` executable must in the user `$PATH` or the user has to set an environmental variable `$ASTROMETRYNET_DIR` pointing to the install directory. Version below or equal v0.78 should be used.
+To find accurate star centroids using astrometry, one can install [astrometry.net](https://astrometrynet.readthedocs.io/en/latest/) (optional). There are two ways to install this software:
+- use the anaconda package
+```
+conda install -c conda-forge astrometry
+```
+and then download and move [index files](http://astrometry.net/doc/readme.html#getting-index-files) in the `$CONDA_PREFIX/data` folder.
+- compile it from [sources](https://astrometrynet.readthedocs.io/en/latest/): it needs the installation of [netpbm](https://netpbm.sourceforge.net/) and [wcslib](https://www.atnf.csiro.au/people/mcalabre/WCS/wcslib/); `solve-field` executable must in the user `$PATH` or the user has to set an environmental variable `$ASTROMETRYNET_DIR` pointing to the install directory.
 
-Spectractor is able perform fits using the MCMC library [emcee](https://emcee.readthedocs.io/en/stable/) (optional) with [mpi4py](https://mpi4py.readthedocs.io/en/stable/) and [h5py](https://www.h5py.org/).  The latter might be better installed using `conda install ...` command to get their own dependencies (openmp and hdf5).
+Spectractor is able to perform parameter fits using the MCMC library [emcee](https://emcee.readthedocs.io/en/stable/) (optional) with [mpi4py](https://mpi4py.readthedocs.io/en/stable/) and [h5py](https://www.h5py.org/).  The latter might be better installed using `conda install ...` command to get their own dependencies (openmp and hdf5).
 
 ## Basic extraction
 

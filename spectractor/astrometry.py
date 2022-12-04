@@ -255,7 +255,7 @@ class Astrometry(Image):  # pragma: no cover
         self.new_file_name = self.file_name.replace('.fits', '_new.fits')
         self.sources_file_name = set_sources_file_name(file_name, output_directory=output_directory)
         self.wcs_file_name = wcs_file_name
-        self.log_file_name = os.path.join(self.output_directory, self.tag) + ".log"
+        self.match_file_name = os.path.join(self.output_directory, self.tag) + ".match"
         self.wcs = None
         if self.wcs_file_name != "":
             if os.path.isfile(self.wcs_file_name):
@@ -286,7 +286,7 @@ class Astrometry(Image):  # pragma: no cover
         self.dist_ra = 0 * u.arcsec
         self.dist_dec = 0 * u.arcsec
         self.target_radec_position_after_pm = self.target.get_radec_position_after_pm(date_obs=self.date_obs)
-        if os.path.isfile(self.log_file_name):
+        if os.path.isfile(self.match_file_name):
             self.quad_stars_pixel_positions = self.get_quad_stars_pixel_positions()
 
     def get_target_pixel_position(self):
@@ -380,17 +380,18 @@ class Astrometry(Image):  # pragma: no cover
 
         """
         coords = []
-        f = open(self.log_file_name, 'r')
-        for line in f:
-            if 'field_xy' in line:
-                coord = line.split(' ')[5].split(',')
-                coords.append([float(coord[0]), float(coord[1])])
-        f.close()
+        hdu = fits.open(self.match_file_name)
+        table = Table.read(hdu)
+        hdu.close()
+        for k in range(0, len(table["QUADPIX"][0]), 2):
+            coord = [float(table["QUADPIX"][0][k]), float(table["QUADPIX"][0][k+1])]
+            if np.sum(coord) > 0:
+                coords.append(coord)
         if len(coords) < 4:
             self.my_logger.warning(f"\n\tOnly {len(coords)} calibration stars has been extracted from "
-                                   f"{self.log_file_name}, with positions {coords}. "
+                                   f"{self.match_file_name}, with positions {coords}. "
                                    f"A quad of at least 4 stars is expected. "
-                                   f"Please check {self.log_file_name}.")
+                                   f"Please check {self.match_file_name}.")
         self.quad_stars_pixel_positions = np.array(coords)
         return self.quad_stars_pixel_positions
 
@@ -881,7 +882,7 @@ class Astrometry(Image):  # pragma: no cover
         k = -1
         for k in range(len(self.sources)):
             if abs(self.sources['xcentroid'][k] - quad_star[0]) < eps \
-                    and abs(self.sources['ycentroid'][k] - quad_star[1]):
+                    and abs(self.sources['ycentroid'][k] - quad_star[1]) < eps:
                 break
         return k
 
@@ -1043,10 +1044,10 @@ class Astrometry(Image):  # pragma: no cover
                   f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
                   f"--dir {self.output_directory} --out {self.tag} " \
                   f"--overwrite --x-column X --y-column Y {self.sources_file_name} " \
-                  f"--width {self.data.shape[1]} --height {self.data.shape[0]}"
+                  f"--width {self.data.shape[1]} --height {self.data.shape[0]} --no-plots"
         self.my_logger.info(f'\n\tRun astrometry.net solve_field command:\n\t{command}')
         log = subprocess.check_output(command, shell=True)
-        log_file = open(self.log_file_name, "w+")
+        log_file = open(self.match_file_name.replace(".match", ".log"), "w+")
         log_file.write(command + "\n")
         log_file.write(log.decode("utf-8") + "\n")
         # save new WCS in original fits file
