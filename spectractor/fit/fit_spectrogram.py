@@ -199,9 +199,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> from spectractor.extractor.spectrum import Spectrum
-        >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
-        >>> w = SpectrogramFitWorkspace(spectrum=spec, amplitude_priors_method="fixed", verbose=True)
+        >>> from spectractor.config import load_config
+        >>> load_config("config/ctio.ini")
+        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
+        >>> w = SpectrogramFitWorkspace(filename, verbose=True)
         >>> _ = w.simulate(*w.p)
         >>> w.plot_fit()
 
@@ -374,7 +375,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         --------
 
         >>> from spectractor.config import load_config
-        >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
+        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
         >>> load_config("config/ctio.ini")
         >>> w = SpectrogramFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
