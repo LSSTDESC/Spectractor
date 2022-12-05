@@ -1,7 +1,6 @@
 import os
 from copy import deepcopy
 import subprocess
-import shutil
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clipped_stats
@@ -197,7 +196,7 @@ def get_gaia_coords_after_proper_motion(gaia_catalog, date_obs):
     return gaia_coords_after_proper_motion
 
 
-def plot_shifts_histograms(dra, ddec):  # pragma: no cover
+def plot_shifts_histograms(dra, ddec):
     dra_median = np.median(dra.to(u.arcsec).value)
     ddec_median = np.median(ddec.to(u.arcsec).value)
     dra_rms = np.std(dra.to(u.arcsec).value)
@@ -223,7 +222,7 @@ def plot_shifts_histograms(dra, ddec):  # pragma: no cover
         parameters.PdfPages.savefig()
 
 
-class Astrometry(Image):  # pragma: no cover
+class Astrometry(Image):
 
     def __init__(self, file_name, target_label="", disperser_label="", wcs_file_name="", output_directory=""):
         """Class to handle astrometric computations.
@@ -255,7 +254,7 @@ class Astrometry(Image):  # pragma: no cover
         self.new_file_name = self.file_name.replace('.fits', '_new.fits')
         self.sources_file_name = set_sources_file_name(file_name, output_directory=output_directory)
         self.wcs_file_name = wcs_file_name
-        self.match_file_name = os.path.join(self.output_directory, self.tag) + ".match"
+        self.log_file_name = os.path.join(self.output_directory, self.tag) + ".log"
         self.wcs = None
         if self.wcs_file_name != "":
             if os.path.isfile(self.wcs_file_name):
@@ -286,7 +285,7 @@ class Astrometry(Image):  # pragma: no cover
         self.dist_ra = 0 * u.arcsec
         self.dist_dec = 0 * u.arcsec
         self.target_radec_position_after_pm = self.target.get_radec_position_after_pm(date_obs=self.date_obs)
-        if os.path.isfile(self.match_file_name):
+        if os.path.isfile(self.log_file_name):
             self.quad_stars_pixel_positions = self.get_quad_stars_pixel_positions()
 
     def get_target_pixel_position(self):
@@ -380,18 +379,17 @@ class Astrometry(Image):  # pragma: no cover
 
         """
         coords = []
-        hdu = fits.open(self.match_file_name)
-        table = Table.read(hdu)
-        hdu.close()
-        for k in range(0, len(table["QUADPIX"][0]), 2):
-            coord = [float(table["QUADPIX"][0][k]), float(table["QUADPIX"][0][k+1])]
-            if np.sum(coord) > 0:
-                coords.append(coord)
+        f = open(self.log_file_name, 'r')
+        for line in f:
+            if 'field_xy' in line:
+                coord = line.split(' ')[5].split(',')
+                coords.append([float(coord[0]), float(coord[1])])
+        f.close()
         if len(coords) < 4:
             self.my_logger.warning(f"\n\tOnly {len(coords)} calibration stars has been extracted from "
-                                   f"{self.match_file_name}, with positions {coords}. "
+                                   f"{self.log_file_name}, with positions {coords}. "
                                    f"A quad of at least 4 stars is expected. "
-                                   f"Please check {self.match_file_name}.")
+                                   f"Please check {self.log_file_name}.")
         self.quad_stars_pixel_positions = np.array(coords)
         return self.quad_stars_pixel_positions
 
@@ -882,7 +880,7 @@ class Astrometry(Image):  # pragma: no cover
         k = -1
         for k in range(len(self.sources)):
             if abs(self.sources['xcentroid'][k] - quad_star[0]) < eps \
-                    and abs(self.sources['ycentroid'][k] - quad_star[1]) < eps:
+                    and abs(self.sources['ycentroid'][k] - quad_star[1]):
                 break
         return k
 
@@ -987,7 +985,7 @@ class Astrometry(Image):  # pragma: no cover
         >>> from spectractor.astrometry import Astrometry
         >>> from spectractor import parameters
         >>> parameters.VERBOSE = True
-        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> if os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs'):
         ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
@@ -1029,25 +1027,17 @@ class Astrometry(Image):  # pragma: no cover
         # write results in fits file
         self.write_sources()
         # run astrometry.net
-        if shutil.which('solve-field') != "":
-            exec = shutil.which('solve-field')
-        elif parameters.ASTROMETRYNET_DIR != "":
-            exec = os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')
-        else:
-            raise OSError(f"solve-field executable not found in $PATH "
-                          f"or {os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')}")
-
-        command = f"{exec} --scale-unit arcsecperpix " \
+        command = f"{os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')} --scale-unit arcsecperpix " \
                   f"--scale-low {0.95 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--scale-high {1.05 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--ra {self.target.radec_position.ra.value} --dec {self.target.radec_position.dec.value} " \
                   f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
                   f"--dir {self.output_directory} --out {self.tag} " \
                   f"--overwrite --x-column X --y-column Y {self.sources_file_name} " \
-                  f"--width {self.data.shape[1]} --height {self.data.shape[0]} --no-plots"
+                  f"--width {self.data.shape[1]} --height {self.data.shape[0]}"
         self.my_logger.info(f'\n\tRun astrometry.net solve_field command:\n\t{command}')
         log = subprocess.check_output(command, shell=True)
-        log_file = open(self.match_file_name.replace(".match", ".log"), "w+")
+        log_file = open(self.log_file_name, "w+")
         log_file.write(command + "\n")
         log_file.write(log.decode("utf-8") + "\n")
         # save new WCS in original fits file
@@ -1089,7 +1079,7 @@ class Astrometry(Image):  # pragma: no cover
         >>> from spectractor import parameters
         >>> parameters.VERBOSE = True
         >>> parameters.DEBUG = True
-        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> if os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs'):
         ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
@@ -1267,7 +1257,7 @@ class Astrometry(Image):  # pragma: no cover
         >>> parameters.DEBUG = True
         >>> radius = 100
         >>> maxiter = 10
-        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
         >>> file_names = ['./tests/data/reduc_20170530_134.fits']
         >>> if os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs'):
         ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
