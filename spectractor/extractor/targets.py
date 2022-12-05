@@ -212,6 +212,9 @@ class Star(Target):
         >>> s = Star('eta dor')
         >>> print(s.radec_position.dec)
         -66d02m22.635s
+        >>> s = Star('mu.col')
+        >>> print(s.radec_position.dec)
+        -32d18m23.162s
         """
         # explicitly make a class instance here because:
         # when using ``from astroquery.simbad import Simbad`` and then using
@@ -223,6 +226,8 @@ class Star(Target):
 
         simbadQuerier.add_votable_fields('flux(U)', 'flux(B)', 'flux(V)', 'flux(R)', 'flux(I)', 'flux(J)', 'sptype',
                                          'parallax', 'pm', 'z_value')
+        if not getCalspec.is_calspec(self.label) and getCalspec.is_calspec(self.label.replace(".", " ")):
+            self.label = self.label.replace(".", " ")
         astroquery_label = self.label
         if getCalspec.is_calspec(self.label):
             calspec = getCalspec.Calspec(self.label)
@@ -295,7 +300,7 @@ class Star(Target):
                                redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
         else:  # maybe a quasar, try with NED query
-            from astroquery.ned import Ned
+            from astroquery.ipac.ned import Ned
             hdulists = Ned.get_spectra(self.label, show_progress=False)
             if len(hdulists) > 0:
                 self.emission_spectrum = True

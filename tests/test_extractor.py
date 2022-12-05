@@ -1,5 +1,5 @@
 import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
-mpl.use('Agg')
+#mpl.use('Agg')
 
 from numpy.testing import run_module_suite  # noqa: E402
 
@@ -14,7 +14,7 @@ import unittest  # noqa: E402
 
 
 def test_logbook():
-    logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+    logbook = LogBook('./tests/data/ctiofulllogbook_jun2017_v5.csv')
     # target, xpos, ypos = logbook.search_for_image('reduc_20170529_085.fits')
     # assert xpos is None
     disperser_label, target, xpos, ypos = logbook.search_for_image('reduc_20170603_020.fits')
@@ -29,11 +29,11 @@ def test_extractor_ctio():
     file_names = ['tests/data/reduc_20170530_134.fits']
     output_directory = "./outputs"
 
-    logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+    logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    parameters.CCD_REBIN = 1
+    parameters.CCD_REBIN = 2
     apply_rebinning_to_parameters()
 
     for file_name in file_names:
@@ -42,7 +42,7 @@ def test_extractor_ctio():
         if target_label is None or xpos is None or ypos is None:
             continue
         spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
-                               atmospheric_lines=True)
+                               atmospheric_lines=True, config="")
         assert spectrum.data is not None
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
                                    f"\n\t\tspectrum.lambdas[0]={spectrum.lambdas[0]}"
@@ -55,8 +55,8 @@ def test_extractor_ctio():
         assert np.sum(spectrum.data) * parameters.CCD_REBIN**2 > 2e-11 / parameters.CCD_REBIN
         if parameters.CCD_REBIN == 1:
             if parameters.SPECTRACTOR_DECONVOLUTION_PSF2D or parameters.SPECTRACTOR_DECONVOLUTION_FFM:
-                assert np.isclose(spectrum.lambdas[0], 343, atol=1)
-                assert np.isclose(spectrum.lambdas[-1], 1084.0, atol=1)
+                assert np.isclose(spectrum.lambdas[0], 345, atol=1)
+                assert np.isclose(spectrum.lambdas[-1], 1083.0, atol=1)
             else:
                 assert np.isclose(spectrum.lambdas[0], 347, atol=1)
                 assert np.isclose(spectrum.lambdas[-1], 1085.0, atol=1)
@@ -65,8 +65,6 @@ def test_extractor_ctio():
         assert np.isclose(spectrum.x0[1] * parameters.CCD_REBIN, 683.0577836601408, atol=1 * parameters.CCD_REBIN)
         assert 2 < np.mean(spectrum.chromatic_psf.table['gamma']) * parameters.CCD_REBIN < 3.5
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrum.fits'))) is True
-        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrogram.fits'))) is True
-        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
 
 
 # TODO: DM-33441 Fix broken spectractor tests
@@ -75,7 +73,7 @@ def test_extractor_ctio_planetary_nebula():
     file_names = ['tests/data/reduc_20170605_028.fits']
     output_directory = "./outputs"
 
-    logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+    logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
@@ -111,8 +109,6 @@ def test_extractor_ctio_planetary_nebula():
         assert np.isclose(spectrum.x0[1] * parameters.CCD_REBIN, 587.67, atol=1 * parameters.CCD_REBIN)
         assert 1 < np.mean(spectrum.chromatic_psf.table['gamma']) * parameters.CCD_REBIN < 2.5
         assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrum.fits'))) is True
-        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_spectrogram.fits'))) is True
-        assert os.path.isfile(os.path.join(output_directory, tag.replace('.fits', '_lines.csv'))) is True
 
 
 def extractor_auxtel():

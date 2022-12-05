@@ -50,7 +50,7 @@ def build_hologram(order0_position, order1_position, theta_tilt=0, lambda_plot=2
     yholo = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
     xxholo, yyholo = np.meshgrid(xholo, yholo)
     holo = intensity(xxholo, yyholo)
-    rotated_holo = ndimage.interpolation.rotate(holo, theta_tilt)
+    rotated_holo = ndimage.rotate(holo, theta_tilt)
     return rotated_holo
 
 
@@ -90,7 +90,7 @@ def build_ronchi(x_center, theta_tilt=0, grooves=400):
     yronchi = np.linspace(0, parameters.CCD_IMSIZE * parameters.CCD_PIXEL2MM, parameters.CCD_IMSIZE)
     xxronchi, yyronchi = np.meshgrid(xronchi, yronchi)
     ronchi = (intensity(xxronchi, yyronchi)).astype(int)
-    rotated_ronchi = ndimage.interpolation.rotate(ronchi, theta_tilt)
+    rotated_ronchi = ndimage.rotate(ronchi, theta_tilt)
     return rotated_ronchi
 
 

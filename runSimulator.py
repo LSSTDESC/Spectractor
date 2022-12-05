@@ -18,8 +18,8 @@ if __name__ == "__main__":
                         help="Enter verbose (print more stuff).", default=False)
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
                         help="Write results in given output directory (default: ./outputs/).")
-    parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
-                        help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
+    parser.add_argument("-l", "--logbook", dest="logbook", default="./tests/data/ctiofulllogbook_jun2017_v5.csv",
+                        help="CSV logbook file. (default: ./tests/data/ctiofulllogbook_jun2017_v5.csv).")
     parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
                         help="INI config file. (default: config.ctio.ini).")
     args = parser.parse_args()

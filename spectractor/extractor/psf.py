@@ -672,7 +672,22 @@ class Moffat(PSF):
         >>> p = [2,20,30,4,2,10]
         >>> psf = Moffat(p, clip=True)
         >>> yy, xx = np.mgrid[:50, :60]
-        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+        >>> output = psf.evaluate(pixels=np.array([xx, yy]))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert np.sum(output) > 0
+
+        >>> p = [2,20,30,4,2,10]
+        >>> psf = Moffat(p, clip=True)
+        >>> xx = np.arange(0, 50, 1)
+        >>> output = psf.evaluate(pixels=xx)
+
+        ..  doctest::
+            :hide:
+
+            >>> assert np.sum(output) > 0
 
         .. plot::
 
@@ -688,8 +703,6 @@ class Moffat(PSF):
             plt.xlabel("X [pixels]")
             plt.ylabel("Y [pixels]")
             plt.show()
-        if parameters.PdfPages:
-            parameters.PdfPages.savefig()
 
         """
         if p is not None:
@@ -1309,11 +1322,17 @@ def load_PSF(psf_type=parameters.PSF_TYPE, target=None, clip=False):
 
     Examples
     --------
-
+    >>> parameters.VERBOSE = False
+    >>> load_PSF(psf_type="Gauss", clip=True)  # doctest: +ELLIPSIS
+    <....Gauss object at ...>
     >>> load_PSF(psf_type="Moffat", clip=True)  # doctest: +ELLIPSIS
     <....Moffat object at ...>
     >>> load_PSF(psf_type="MoffatGauss", clip=False)  # doctest: +ELLIPSIS
     <....MoffatGauss object at ...>
+    >>> from spectractor.extractor.spectrum import Spectrum
+    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")  # doctest: +ELLIPSIS
+    >>> load_PSF(psf_type="Order0", clip=True, target=spec.target)  # doctest: +ELLIPSIS
+    <....Order0 object at ...>
 
     """
     if psf_type == "Moffat":

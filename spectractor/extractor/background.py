@@ -10,7 +10,7 @@ from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_rem
 
 from astropy.stats import SigmaClip
 from photutils import Background2D, SExtractorBackground
-from photutils import make_source_mask
+from photutils.segmentation import make_source_mask
 
 from scipy.signal import medfilt2d
 from scipy.interpolate import interp2d

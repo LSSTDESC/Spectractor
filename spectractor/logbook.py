@@ -10,7 +10,7 @@ import numpy as np
 class LogBook:
     """Class to load_image and analyse observation logbook csv files."""
 
-    def __init__(self, logbook="ctiofulllogbook_jun2017_v5.csv"):
+    def __init__(self, logbook="./tests/data/ctiofulllogbook_jun2017_v5.csv"):
         """Load and initialise the logbook
 
         Parameters
@@ -21,10 +21,10 @@ class LogBook:
         Examples
         ----------
 
-        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook = LogBook('./tests/data/ctiofulllogbook_jun2017_v5.csv')
         >>> assert logbook.df is not None
         >>> print(logbook.logbook)
-        ./ctiofulllogbook_jun2017_v5.csv
+        ./tests/data/ctiofulllogbook_jun2017_v5.csv
         >>> print(logbook.df['disperser'][:2])
         0    Ron400
         1    Ron400
@@ -70,7 +70,7 @@ class LogBook:
         Examples
         --------
 
-        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook = LogBook('./tests/data/ctiofulllogbook_jun2017_v5.csv')
         >>> disperser_label, target, xpos, ypos = logbook.search_for_image("unknown_file.fits")
         >>> print(disperser_label, target, xpos, ypos)
         None None None None
@@ -133,7 +133,7 @@ class LogBook:
 
         Examples
         --------
-        >>> logbook = LogBook('./ctiofulllogbook_jun2017_v5.csv')
+        >>> logbook = LogBook('./tests/data/ctiofulllogbook_jun2017_v5.csv')
         >>> logbook.plot_columns_vs_date(['seeing'])
         >>> logbook.plot_columns_vs_date(['P', 'T'])
         """

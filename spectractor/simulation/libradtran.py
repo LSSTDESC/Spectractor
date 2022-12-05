@@ -8,8 +8,9 @@
 #
 #################################################################
 import os
-import re
+import io
 import sys
+import shutil
 import numpy as np
 
 import subprocess
@@ -21,81 +22,90 @@ from spectractor.config import set_logger
 
 class Libradtran:
 
-    def __init__(self, home=''):
+    def __init__(self, libradtran_path="", atm_standard="afglus", absorption_model="reptran"):
         """Initialize the Libradtran settings for Spectractor.
 
         Parameters
         ----------
-        home: str, optional
-            The path to the directory where libradtran directory is. If not specified $HOME is taken (default: '').
+        libradtran_path: str, optional
+            The path to the directory where libradtran directory is (default: '').
+        atm_standard: str, optional
+            Short name of atmospheric sky (default: afglus, US standard).
+        absorption_model: str, optional
+            Name of model for absorption bands: can be reptran, lowtran, kato, kato2, fu, crs (default: reptran).
+
         """
         self.my_logger = set_logger(self.__class__.__name__)
-        if home == '':
-            self.home = os.environ['HOME']
-        else:
-            self.home = home
         self.settings = {}
-
-        # Definitions and configuration
-        # -------------------------------------
-
-        # LibRadTran installation directory
-        self.simulation_directory = 'libradtran'
-        ensure_dir(self.simulation_directory)
-        self.libradtran_path = parameters.LIBRADTRAN_DIR
-
-        # Filename : RT_LS_pp_us_sa_rt_z15_wv030_oz30.txt
-        #          : Prog_Obs_Rte_Atm_proc_Mod_zXX_wv_XX_oz_XX
-        self.Prog = 'RT'  # definition the simulation program is libRadTran
-        self.proc = 'as'  # Absoprtion + Rayleigh + aerosols special
+        if absorption_model not in ["reptran", "lowtran", "kato"," kato2", "fu", "crs"]:
+            raise ValueError(f"absorption_model={absorption_model}: value must be either "
+                             f"reptran, lowtran, kato, kato2, fu or crs.")
+        if libradtran_path != "":
+            self.libradtran_path = ""
+        elif parameters.LIBRADTRAN_DIR != "":
+            self.libradtran_path = parameters.LIBRADTRAN_DIR
+        elif os.getenv("CONDA_PREFIX") != "" and os.path.isdir(os.path.join(os.getenv("CONDA_PREFIX"), "share/libRadtran/data")):
+            self.libradtran_path = os.path.join(os.getenv("CONDA_PREFIX"), "share/libRadtran/")
+        else:
+            self.my_logger.warning(f"\n\tYou should set a LIBRADTRAN_DIR environment variable (={parameters.LIBRADTRAN_DIR})"
+                                   f" or give a path to the Libradtran class (={libradtran_path}) or install rubin-libradtran package.")
+        self.proc = 'as'  # Absorption + Rayleigh + aerosols special
         self.equation_solver = 'pp'  # pp for parallel plane or ps for pseudo-spherical
-        self.Atm = ['us']  # short name of atmospheric sky here US standard and  Subarctic winter
-        self.Proc = 'sa'  # light interaction processes : sc for pure scattering,ab for pure absorption
-        # sa for scattering and absorption, ae with aerosols default, as with aerosol special
-        self.Mod = 'rt'  # Models for absorption bands : rt for REPTRAN, lt for LOWTRAN, k2 for Kato2
+        self.atmosphere_standard = atm_standard  # short name of atmospheric sky
+        self.absorption_model = absorption_model  # absorption model
 
-    def write_input(self, filename):
-        f = open(filename, 'w')
-        for key in sorted(self.settings):
-            if key == "mol_modify2":
-                f.write("mol_modify" + ' ' + str(self.settings[key]) + '\n')
-            else:
-                f.write(key + ' ' + str(self.settings[key]) + '\n')
-        f.close()
-
-    def run(self, inp, out, path=''):
-        """Run the libratran command uvpsec.
+    def run(self, path=''):
+        """Run the Libradtran command uvspec.
 
         Parameters
         ----------
-        inp: str
-            Input file.
-        out: str
-            Output file.
         path: str, optional
-            Path to bin/uvpsec if necessary, otherwise use  self.home (default: "")
-        """
-        if path != '':
-            cmd = os.path.join(path, 'bin/uvspec') + ' < ' + inp + ' > ' + out
-        else:
-            cmd = os.path.join(self.home, '/libRadtran/bin/uvspec') + ' < ' + inp + ' > ' + out
-        subprocess.run(cmd, shell=True, check=True)
+            Path to bin/uvspec if necessary, otherwise use $PATH (default: "")
 
-    def simulate(self, airmass, pwv, ozone, aerosol, pressure):
+        Returns
+        -------
+        lambdas: array_like
+            Wavelength array.
+        atmosphere: array_like
+            Atmospheric transmission array.
+        """
+        if shutil.which("uvspec"):
+            cmd = shutil.which("uvspec")
+        elif path != '':
+            cmd = os.path.join(path, 'bin/uvspec')
+        else:
+            raise OSError(f"uvspec executable not found in $PATH or {os.path.join(path, 'bin/uvspec')}")
+
+        inputstr = '\n'.join([f'{name} {self.settings[name]}' for name in self.settings.keys()])
+        try:
+            process = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE,
+                                     input=inputstr, encoding='ascii')
+            return np.genfromtxt(io.StringIO(process.stdout)).T
+        except subprocess.CalledProcessError as e:  # pragma: nocover
+            self.my_logger.warning(f"\n\tLibradtran input command:\n{inputstr}")
+            self.my_logger.error(f"\n\t{e.stderr}")
+            sys.exit()
+
+    def simulate(self, airmass, aerosol, ozone, pwv, pressure, lambda_min=250, lambda_max=1200):
         """Simulate the atmosphere transmission with Libratran.
 
         Parameters
         ----------
         airmass: float
             The airmass of the atmosphere.
-        pwv: float
-            Precipitable Water Vapor amount in mm.
-        ozone: float
-            Ozone quantity in Dobson units.
         aerosol: float
             VAOD of the aerosols.
+        ozone: float
+            Ozone quantity in Dobson units.
+        pwv: float
+            Precipitable Water Vapor amount in mm.
         pressure: float
-            Pressure of the atmosphere in hPa.
+            Pressure of the atmosphere at observatory altitude in hPa.
+        lambda_min: float
+            Minimum wavelength for simulation in nm.
+        lambda_max: float
+            Maximum wavelength for simulation in nm.
 
         Returns
         -------
@@ -106,9 +116,11 @@ class Libradtran:
         --------
         >>> parameters.DEBUG = True
         >>> lib = Libradtran()
-        >>> output = lib.simulate(1.2, 2, 400, 0.07, 800)
-        >>> print(output)
-        libradtran/pp/us/as/rt/in/RT_CTIO_pp_us_as_rt_z12_pwv20_oz40_aer7.OUT
+        >>> lambdas, atmosphere = lib.simulate(1.2, 0.07, 400, 2, 800, lambda_max=1200)
+        >>> print(lambdas[-5:])
+        [1196. 1197. 1198. 1199. 1200.]
+        >>> print(atmosphere[-5:])
+        [0.9617202 0.9617202 0.9529933 0.9529933 0.9512588]
         """
 
         self.my_logger.debug(
@@ -120,13 +132,6 @@ class Libradtran:
             f'\n\t 4) aer = {aerosol}'
             f'\n\t 5) pressure =  {pressure}'
             f'\n\t--------------------------------------------')
-
-        # build the part 1 of file_name
-        base_filename_part1 = self.Prog + '_' + parameters.OBS_NAME + '_' + self.equation_solver + '_'
-
-        aerosol_string = f'500 {aerosol:.20f}'
-        # aerosol_str=str(wl0_num)+ ' '+str(tau0_num)
-        aerosol_index = int(aerosol * 100.)
 
         # Set up type of run
         if self.proc == 'sc':
@@ -149,125 +154,62 @@ class Libradtran:
             self.my_logger.error(f'Unknown RTE equation solver {self.equation_solver}.')
             sys.exit()
 
-        #   Selection of absorption model
-        absorption_model = 'reptran'
-        if self.Mod == 'rt':
-            absorption_model = 'reptran'
-        if self.Mod == 'lt':
-            absorption_model = 'lowtran'
-        if self.Mod == 'kt':
-            absorption_model = 'kato'
-        if self.Mod == 'k2':
-            absorption_model = 'kato2'
-        if self.Mod == 'fu':
-            absorption_model = 'fu'
-        if self.Mod == 'cr':
-            absorption_model = 'crs'
+        # loop on molecular model resolution
+        # molecular_resolution = np.array(['coarse','medium','fine'])
+        # select only COARSE Model
+        molecular_resolution = 'coarse'
 
-        # for simulation select only two atmosphere
-        # atmospheres = np.array(['afglus','afglms','afglmw','afglt','afglss','afglsw'])
-        atmosphere_map = dict()  # map atmospheric names to short names
-        atmosphere_map['afglus'] = 'us'
-        atmosphere_map['afglms'] = 'ms'
-        atmosphere_map['afglmw'] = 'mw'
-        atmosphere_map['afglt'] = 'tp'
-        atmosphere_map['afglss'] = 'ss'
-        atmosphere_map['afglsw'] = 'sw'
+        self.settings["data_files_path"] = os.path.join(self.libradtran_path, 'data')
+        self.settings["atmosphere_file"] = os.path.join(self.libradtran_path, 'data/atmmod/', self.atmosphere_standard + '.dat')
+        self.settings["albedo"] = '0.2'
+        self.settings["rte_solver"] = equation_solver_equations
 
-        atmospheres = []
-        for skyindex in self.Atm:
-            if re.search('us', skyindex):
-                atmospheres.append('afglus')
-            if re.search('sw', skyindex):
-                atmospheres.append('afglsw')
+        if self.absorption_model == 'reptran':
+            self.settings["mol_abs_param"] = self.absorption_model + ' ' + molecular_resolution
+        else:
+            self.settings["mol_abs_param"] = self.absorption_model
 
-        output_directory, output_filename = None, None
-        # 1) LOOP ON ATMOSPHERE
-        for atmosphere in atmospheres:
-            # if atmosphere != 'afglus':  # just take us standard sky
-            #    break
-            atmkey = atmosphere_map[atmosphere]
+        # Convert airmass into zenith angle
+        sza = np.arccos(1. / airmass) * 180. / np.pi
 
-            # manage settings and output directories
-            topdir = f'{self.simulation_directory}/{self.equation_solver}/{atmkey}/{self.proc}/{self.Mod}'
-            ensure_dir(topdir)
-            input_directory = topdir + '/' + 'in'
-            ensure_dir(input_directory)
-            output_directory = topdir + '/' + 'out'
-            ensure_dir(output_directory)
+        # Should be no_absorption
+        aerosol_string = f'500 {aerosol:.20f}'
+        if runtype == 'aerosol_default':
+            self.settings["aerosol_default"] = ''
+        elif runtype == 'aerosol_special':
+            self.settings["aerosol_default"] = ''
+            self.settings["aerosol_set_tau_at_wvl"] = aerosol_string
 
-            # loop on molecular model resolution
-            # molecular_resolution = np.array(['coarse','medium','fine'])
-            # select only COARSE Model
-            molecular_resolution = 'coarse'
+        if runtype == 'no_scattering':
+            self.settings["no_scattering"] = ''
+        if runtype == 'no_absorption':
+            self.settings["no_absorption"] = ''
 
-            # water vapor
-            pwv_str = f'H2O {pwv:.20f} MM'
-            pwv_index = int(10 * pwv)
+        # water vapor
+        self.settings["mol_modify H2O"] = f'{pwv:.20f} MM'
 
-            # airmass
-            airmass_index = int(airmass * 10)
+        # Ozone
+        self.settings["mol_modify O3"] = f'{ozone:.20f} DU'
 
-            # Ozone
-            oz_str = f'O3 {ozone:.20f} DU'
-            ozone_index = int(ozone / 10.)
+        # rescale pressure if reasonable pressure values are provided
+        if 600. < pressure < 1015.:
+            self.settings["pressure"] = pressure
+        else:
+            self.my_logger.error(f'\n\tcrazy pressure p={pressure} hPa')
+        # only for mie executable from libradtran to compute mie diffusion
+        # self.settings["temperature"] = temperature + 273.15
 
-            base_filename = f'{base_filename_part1}{atmkey}_{self.proc}_{self.Mod}_z{airmass_index}' \
-                            f'_pwv{pwv_index}_oz{ozone_index}_aer{aerosol_index}'
+        self.settings["altitude"] = str(parameters.OBS_ALTITUDE)  # observatory altitude
+        self.settings["source"] = 'solar ' + os.path.join(self.libradtran_path, 'data/solar_flux/kurudz_1.0nm.dat')
+        self.settings["sza"] = str(sza)
+        self.settings["phi0"] = '0'
+        self.settings["wavelength"] = f'{int(lambda_min)} {int(np.ceil(lambda_max))}'
+        self.settings["output_user"] = 'lambda edir'
+        self.settings["output_quantity"] = 'reflectivity'  # transmittance
+        self.settings["quiet"] = ''
 
-            self.settings["data_files_path"] = self.libradtran_path + 'data'
-
-            self.settings["atmosphere_file"] = self.libradtran_path + 'data/atmmod/' + atmosphere + '.dat'
-            self.settings["albedo"] = '0.2'
-
-            self.settings["rte_solver"] = equation_solver_equations
-
-            if self.Mod == 'rt':
-                self.settings["mol_abs_param"] = absorption_model + ' ' + molecular_resolution
-            else:
-                self.settings["mol_abs_param"] = absorption_model
-
-            # Convert airmass into zenith angle
-            sza = np.arccos(1. / airmass) * 180. / np.pi
-
-            # Should be no_absorption
-            if runtype == 'aerosol_default':
-                self.settings["aerosol_default"] = ''
-            elif runtype == 'aerosol_special':
-                self.settings["aerosol_default"] = ''
-                self.settings["aerosol_set_tau_at_wvl"] = aerosol_string
-
-            if runtype == 'no_scattering':
-                self.settings["no_scattering"] = ''
-            if runtype == 'no_absorption':
-                self.settings["no_absorption"] = ''
-
-            # set up the ozone value
-            self.settings["mol_modify"] = pwv_str
-            self.settings["mol_modify2"] = oz_str
-
-            # rescale pressure   if reasonable pressure values are provided
-            if 600. < pressure < 1015.:
-                self.settings["pressure"] = pressure
-            else:
-                self.my_logger.error(f'\n\tcrazy pressure p={pressure} hPa')
-
-            self.settings["output_user"] = 'lambda edir'
-            self.settings["altitude"] = str(parameters.OBS_ALTITUDE)  # Altitude LSST observatory
-            self.settings["source"] = 'solar ' + self.libradtran_path + 'data/solar_flux/kurudz_1.0nm.dat'
-            self.settings["sza"] = str(sza)
-            self.settings["phi0"] = '0'
-            self.settings["wavelength"] = '250.0 1200.0'
-            self.settings["output_quantity"] = 'reflectivity'  # 'transmittance' #
-            self.settings["quiet"] = ''
-
-            input_filename = os.path.join(input_directory, base_filename + '.INP')
-            output_filename = os.path.join(input_directory, base_filename + '.OUT')
-
-            self.write_input(input_filename)
-            self.run(input_filename, output_filename, path=self.libradtran_path)
-
-        return output_filename
+        wl, atm = self.run(path=self.libradtran_path)
+        return wl, atm
 
 
 def clean_simulation_directory():

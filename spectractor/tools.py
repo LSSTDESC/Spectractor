@@ -224,13 +224,18 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
     return popt, pcov
 
 
-def rescale_x_for_legendre(x):
+def rescale_x_to_legendre(x):
     middle = 0.5 * (np.max(x) + np.min(x))
     x_norm = x - middle
     if np.max(x_norm) != 0:
         return x_norm / np.max(x_norm)
     else:
         return x_norm
+
+
+def rescale_x_from_legendre(x, Xmax, Xmin):
+    X = 0.5 * x * (Xmax - Xmin) + 0.5 * (Xmax + Xmin)
+    return X
 
 
 # noinspection PyTypeChecker
@@ -277,7 +282,7 @@ def multigauss_and_bgd(x, *params):
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
     # out = np.polyval(params[0:bgd_nparams], x)
-    x_norm = rescale_x_for_legendre(x)
+    x_norm = rescale_x_to_legendre(x)
     out = np.polynomial.legendre.legval(x_norm, params[0:bgd_nparams])
     for k in range((len(params) - bgd_nparams) // 3):
         out += gauss(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
@@ -317,7 +322,7 @@ def multigauss_and_bgd_jacobian(x, *params):
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
     out = []
-    x_norm = rescale_x_for_legendre(x)
+    x_norm = rescale_x_to_legendre(x)
     for k in range(bgd_nparams):
         # out.append(params[k]*(parameters.CALIB_BGD_ORDER-k)*x**(parameters.CALIB_BGD_ORDER-(k+1)))
         # out.append(x ** (bgd_nparams - 1 - k))
@@ -559,7 +564,7 @@ def fit_poly1d_legendre(x, y, order, w=None):
         plt.show()
     """
     cov = -1
-    x_norm = rescale_x_for_legendre(x)
+    x_norm = rescale_x_to_legendre(x)
     if len(x) > order:
         fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True, w=w)
         model = np.polynomial.legendre.legval(x_norm, fit)
@@ -1740,7 +1745,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
 
 
 def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', linestyle='none', lw=2, label='',
-                         title='', units=''):
+                         title='', units='', marker='o'):
     """Simple function to plot a spectrum with error bars and labels.
 
     Parameters
@@ -1761,6 +1766,8 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         String for the linestyle of the spectrum (default: 'none').
     lw: int, optional
         Integer for line width (default: 2).
+    marker: str, optional
+        Character for marker style (default: 'o').
     label: str, optional
         String label for the plot legend (default: '').
     title: str, optional
@@ -1788,7 +1795,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
     if xs is None:
         xs = np.arange(data.size)
     if data_err is not None:
-        ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=lw, label=label,
+        ax.errorbar(xs, data, yerr=data_err, color=color, marker=marker, lw=lw, label=label,
                     zorder=0, markersize=2, linestyle=linestyle)
     else:
         ax.plot(xs, data, color=color, lw=lw, label=label, linestyle=linestyle)
@@ -2083,7 +2090,7 @@ def from_lambda_to_colormap(lambdas):
     return spectralmap
 
 
-def rebin(arr, new_shape):
+def rebin(arr, new_shape, FLAG_MAKESUM=True):
     """Rebin and reshape a numpy array.
 
     Parameters
@@ -2109,13 +2116,23 @@ def rebin(arr, new_shape):
            [4., 4., 4., 4., 4.],
            [4., 4., 4., 4., 4.]])
     """
+
+
+
     if np.any(new_shape * parameters.CCD_REBIN != arr.shape):
         shape_cropped = new_shape * parameters.CCD_REBIN
         margins = np.asarray(arr.shape) - shape_cropped
         arr = arr[:-margins[0], :-margins[1]]
     shape = (new_shape[0], arr.shape[0] // new_shape[0],
              new_shape[1], arr.shape[1] // new_shape[1])
-    return arr.reshape(shape).mean(-1).mean(1)
+
+    if FLAG_MAKESUM:
+        # SDC : conservation of energy
+        return arr.reshape(shape).sum(-1).sum(1)
+
+    else:
+        # SDC : sure of conservation of energy
+        return arr.reshape(shape).mean(-1).mean(1)
 
 
 def set_wcs_output_directory(file_name, output_directory=""):
@@ -2330,10 +2347,10 @@ def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):
     ax.set_title("Correlation matrix")
     if axis_names is not None:
         names = [axis_names[ip] for ip in ipar]
-        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=9)
-        plt.yticks(np.arange(ipar.size), names, fontsize=7)
+        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=15)
+        plt.yticks(np.arange(ipar.size), names, fontsize=15)
     cbar = plt.colorbar(im)
-    cbar.ax.tick_params(labelsize=7)
+    cbar.ax.tick_params(labelsize=15)
     plt.gcf().tight_layout()
 
 

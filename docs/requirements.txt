@@ -5,5 +5,6 @@ pandas
 astropy>3.1
 coloredlogs
 recommonmark
-m2r
 mistune==2.0.3
+docutils<1.0,>=0.16
+sphinx-mdinclude

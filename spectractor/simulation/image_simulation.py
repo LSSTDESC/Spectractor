@@ -329,7 +329,7 @@ class ImageModel(Image):
         if starfield is not None:
             self.data += starfield.model(xx, yy)
 
-    def add_poisson_and_read_out_noise(self):
+    def add_poisson_and_read_out_noise(self):  # pragma: no cover
         if self.units != 'ADU':
             raise AttributeError('Poisson noise procedure has to be applied on map in ADU units')
         d = np.copy(self.data).astype(float)
@@ -363,7 +363,7 @@ class ImageModel(Image):
 
 
 def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1,
-             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True):
+             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -439,7 +439,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
     else:
-        spectrum.chromatic_psf.deg = (len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.param_names) - 2) - 1
+        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.param_names) - 2) - 1) // 2
         spectrum.chromatic_psf.set_polynomial_degrees(spectrum.chromatic_psf.deg)
         if spectrum.chromatic_psf.deg == 0:  # x_c must have deg >= 1
             psf_poly_params.insert(1, 0)
@@ -466,7 +466,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.compute(star, background, spectrogram, starfield=starfield)
 
     # Recover true spectrum
-    spectrogram.set_true_spectrum(spectrogram.lambdas, ozone, pwv, aerosols, shift_t=0)
+    spectrogram.set_true_spectrum(spectrogram.lambdas, aerosols, ozone, pwv, shift_t=0)
     true_lambdas = np.copy(spectrogram.true_lambdas)
     true_spectrum = np.copy(spectrogram.true_spectrum)
 
@@ -482,7 +482,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.convert_to_ADU_units()
 
     # Add Poisson and read-out noise
-    image.add_poisson_and_read_out_noise()
+    if with_noise:
+        image.add_poisson_and_read_out_noise()
 
     # Round float ADU into closest integers
     # image.data = np.around(image.data)
@@ -504,7 +505,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['A2_T'] = A2
     image.header['X0_T'] = spectrum.x0[0]
     image.header['Y0_T'] = spectrum.x0[1]
-    image.header['D2CCD_T'] = spectrum.disperser.D
+    image.header['D2CCD_T'] = float(spectrum.disperser.D)
     image.header['OZONE_T'] = ozone
     image.header['PWV_T'] = pwv
     image.header['VAOD_T'] = aerosols
@@ -512,7 +513,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     image.header['ROTATION'] = int(with_rotation)
     image.header['STARS'] = int(with_stars)
     image.header['BKGD_LEV'] = background.level
-    image.header['PSF_DEG'] = spectrum.spectrogram_deg
+    image.header['PSF_DEG'] = spectrogram.chromatic_psf.deg
     image.header['PSF_TYPE'] = parameters.PSF_TYPE
     psf_poly_params_truth = np.array(psf_poly_params)
     if psf_poly_params_truth.size > spectrum.spectrogram_Nx:
@@ -528,52 +529,3 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod()
-
-#
-# if __name__ == "__main__":
-#     from spectractor.logbook import LogBook
-#     from argparse import ArgumentParser
-#
-#     parser = ArgumentParser()
-#     parser.add_argument("-d", "--debug", dest="debug", action="store_true",
-#                         help="Enter debug mode (more verbose and plots).", default=False)
-#     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
-#                         help="Enter verbose (print more stuff).", default=False)
-#     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
-#                         help="Write results in given output directory (default: ./outputs/).")
-#     parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
-#                         help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
-#     args = parser.parse_args()
-#
-#     parameters.VERBOSE = args.verbose
-#     if args.debug:
-#         parameters.DEBUG = True
-#         parameters.VERBOSE = True
-#
-#     file_names = ['tests/data/reduc_20170530_134.fits']
-#     spectrum_file_name = 'outputs/reduc_20170530_134_spectrum.fits'
-#     # guess = [720, 670]
-#     # hologramme HoloAmAg
-#     psf_poly_params = [0.11298966008548948, -0.396825836448203, 0.2060387678061209, 2.0649268678546955,
-#                        -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
-#                        0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
-#                        528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
-#     # psf_poly_params = [0.11298966008548948, -0.396825836448203, 10.60387678061209, 2.0649268678546955,
-#     #                    -1.3753936625491252, 0.9242067418613167, 1.6950153822467129, -0.6942452135351901,
-#     #                    0.3644178350759512, -0.0028059253333737044, -0.003111527339787137, -0.00347648933169673,
-#     #                    528.3594585697788, 628.4966480821147, 12.438043546369354, 499.99999999999835]
-#     # file_name="../CTIOAnaJun2017/ana_31may17/OverScanRemove/trim_images/trim_20170531_150.fits"
-#     # guess = [840, 530]
-#     # target = "HD205905"
-#     # x = np.linspace(-1, 1, 100)
-#     # plt.plot(x, np.polynomial.legendre.legval(x, psf_poly_params[0:3]))
-#     # plt.show()
-#     logbook = LogBook(logbook=args.logbook)
-#     for file_name in file_names:
-#         tag = file_name.split('/')[-1]
-#         disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-#         if target is None or xpos is None or ypos is None:
-#             continue
-#
-#         image = ImageSim(file_name, spectrum_file_name, args.output_directory, A1=1, A2=0.05,
-#                          psf_poly_params=psf_poly_params, with_stars=False)

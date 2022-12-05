@@ -115,7 +115,6 @@ def load_config(config_filename, rebin=True):
         apply_rebinning_to_parameters()
     else:
         parameters.CCD_REBIN = 1
-        my_logger.warning("No rebinning: parameters.REBIN is forced to 1.")
 
     # check consistency
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
