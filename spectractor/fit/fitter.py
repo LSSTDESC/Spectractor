@@ -1337,7 +1337,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
-            fit_workspace.plot_fit()
+            if parameters.DEBUG:
+                fit_workspace.plot_fit()
     elif method == 'basinhopping':
         start = time.time()
         minimizer_kwargs = dict(method=minimizer_method, bounds=bounds)
@@ -1346,7 +1347,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
-            fit_workspace.plot_fit()
+            if parameters.DEBUG:
+                fit_workspace.plot_fit()
     elif method == "least_squares":  # pragma: no cover
         fit_workspace.my_logger.warning("least_squares might not work, use with caution... "
                                         "or repair carefully the function weighted_residuals()")
@@ -1359,7 +1361,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\t{p}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
-            fit_workspace.plot_fit()
+            if parameters.DEBUG:
+                fit_workspace.plot_fit()
     elif method == "minuit":
         start = time.time()
         # fit_workspace.simulation.fix_psf_cube = False
@@ -1383,7 +1386,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\t{m}")
             my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
-            fit_workspace.plot_fit()
+            if parameters.DEBUG:
+                fit_workspace.plot_fit()
     elif method == "newton":
         if fit_workspace.costs.size == 0:
             costs = np.array([fit_workspace.chisq(guess)])
