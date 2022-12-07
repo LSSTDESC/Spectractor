@@ -999,8 +999,6 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     output_filename = output_filename.replace('.fits', '_spectrum.fits')
     output_filename = output_filename.replace('.fz', '_spectrum.fits')
     output_filename = os.path.join(output_directory, output_filename)
-    output_filename_spectrogram = output_filename.replace('spectrum', 'spectrogram')
-    output_filename_psf = output_filename.replace('spectrum.fits', 'table.csv')
     # Find the exact target position in the raw cut image: several methods
     my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
 
@@ -1023,7 +1021,6 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
                                                               parameters.PIXDIST_BACKGROUND
                                                               + parameters.PIXWIDTH_BACKGROUND),
                                                           right_edge=image.data.shape[1])
-    spectrum.atmospheric_lines = atmospheric_lines
 
     # PSF2D deconvolution
     if parameters.SPECTRACTOR_DECONVOLUTION_PSF2D:
@@ -1049,15 +1046,12 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     # Save the spectrum
     my_logger.info('\n\t  ======================= SAVE SPECTRUM =============================')
     spectrum.save_spectrum(output_filename, overwrite=True)
-    # spectrum.save_spectrogram(output_filename_spectrogram, overwrite=True)
     spectrum.lines.print_detected_lines(output_file_name=output_filename.replace('_spectrum.fits', '_lines.csv'),
                                         overwrite=True, amplitude_units=spectrum.units)
 
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
-
-    spectrum.chromatic_psf.table.write(output_filename_psf, overwrite=True)
 
     return spectrum
 
