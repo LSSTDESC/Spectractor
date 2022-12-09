@@ -666,8 +666,8 @@ class Spectrum:
             # set the simple items from the mappings. More complex items, i.e.
             # those needing function calls, follow
             for attribute, header_key in fits_mappings.items():
-                if (item := self.header.get(header_key)) is not None:
-                    setattr(self, attribute, item)
+                if self.header.get(header_key) is not None:
+                    setattr(self, attribute, self.header.get(header_key))
                 else:
                     self.my_logger.warning(f'Failed to set spectrum attribute {attribute} using header {header_key}')
             if "CAM_ROT" in self.header:
@@ -676,17 +676,17 @@ class Spectrum:
                 self.my_logger.warning("No information about camera rotation in Spectrum header.")
 
             # set the more complex items by hand here
-            if target := self.header.get('TARGET'):
-                self.target = load_target(target, verbose=parameters.VERBOSE)
+            if self.header.get('TARGET'):
+                self.target = load_target(self.header.get('TARGET'), verbose=parameters.VERBOSE)
                 self.lines = self.target.lines
-            if (targetx := self.header.get('TARGETX')) and (targety := self.header.get('TARGETY')):
-                self.x0 = [targetx, targety]  # should be a tuple not a list
-            if rebin := self.header.get('CCDREBIN'):
-                if parameters.CCD_REBIN != rebin:
+            if self.header.get('TARGETX') and self.header.get('TARGETY'):
+                self.x0 = [self.header.get('TARGETX'), self.header.get('TARGETY')]  # should be a tuple not a list
+            if self.header.get('CCDREBIN'):
+                if parameters.CCD_REBIN != self.header.get('CCDREBIN'):
                     raise ValueError("Different values of rebinning parameters between config file and header. Choose.")
-                parameters.CCD_REBIN = rebin
-            if dist := self.header.get('D2CCD'):
-                parameters.DISTANCE2CCD = float(dist)
+                parameters.CCD_REBIN = self.header.get('CCDREBIN')
+            if self.header.get('D2CCD'):
+                parameters.DISTANCE2CCD = float(self.header.get('D2CCD'))
 
             self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
             self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,

@@ -136,7 +136,7 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
     return bgd_model_func
 
 
-def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signal_region=True):
+def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signal_region=True, Dy_disp_axis=None):
     """
     Use photutils library median filter to estimate background behgin the sources.
 
@@ -150,6 +150,8 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
     mask_signal_region: bool
         If True, the signal region is masked with np.nan values (default: True)
+    Dy_disp_axis: array, optional
+       Vertical position of the dispersion axis (default: None). If None, use the middle of the spectrogram instead.
 
     Returns
     -------
@@ -185,18 +187,20 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
 
     """
     Ny, Nx = data.shape
-    middle = Ny // 2
-
+    if Dy_disp_axis is None:
+        Dy_disp_axis = np.ones(Nx) * (Ny // 2)
+    
     # mask sources
     mask = make_source_mask(data, nsigma=3, npixels=5, dilate_size=11)
 
     # Estimate the background in the two lateral bands together
     sigma_clip = SigmaClip(sigma=3.)
     bkg_estimator = SExtractorBackground()
+    bgd_bands = np.copy(data).astype(float)
     if mask_signal_region:
-        bgd_bands = np.copy(data).astype(float)
-        bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
-        mask += (np.isnan(bgd_bands))
+        for dx in range(Nx):
+            bgd_bands[int(Dy_disp_axis[dx] - ws[0]):int(Dy_disp_axis[dx] + ws[0]), dx] = np.nan
+            mask += (np.isnan(bgd_bands))
     # windows size in x is set to only 6 pixels to be able to estimate rapid variations of the background on real data
     # filter window size is set to window // 2 so 3
     # bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
@@ -223,9 +227,6 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         ax1 = plt.subplot(gs[1, 0])
         ax2 = plt.subplot(gs[2, 0])
         ax3 = plt.subplot(gs[:, 1])
-        bgd_bands = np.copy(data).astype(float)
-        bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
-        bgd_bands[mask] = np.nan
         mean = np.nanmean(bgd_bands)
         std = np.nanstd(bgd_bands)
         cmap = copy.copy(cm.get_cmap())

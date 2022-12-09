@@ -226,8 +226,10 @@ class Image(object):
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
             load_LPNHE_image(self)
-        if parameters.OBS_NAME == "AUXTEL":
+        elif parameters.OBS_NAME == "AUXTEL":
             load_AUXTEL_image(self)
+        elif parameters.OBS_NAME == "STARDICE":
+            load_STARDICE_image(self)
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.header["GRATING"] = self.disperser_label
@@ -728,6 +730,53 @@ def load_AUXTEL_image(image):  # pragma: no cover
                               parameters.CCD_IMSIZE - float(image.header["OBJECTX"])]
     image.disperser_label = image.header["GRATING"]
     parameters.DISTANCE2CCD = 113 + float(image.header["LINSPOS"])  # mm
+    image.compute_parallactic_angle()
+
+def load_STARDICE_image(image):  # pragma: no cover
+    """Specific routine to load STARDICE fits files and load their data and properties for Spectractor.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+    image.my_logger.info(f'\n\tLoading STARDICE image {image.file_name}...')
+    hdu_list = fits.open(image.file_name)
+    image.header = hdu_list[0].header
+    image.data = hdu_list[0].data.astype(np.float64)
+    hdu_list.close()  # need to free allocation for file descripto
+    del image.header["BZERO"]
+    del image.header["BSCALE"]
+    image.date_obs = image.header['DATE-OBS']
+    image.expo = float(image.header['cameraexptime'])
+    image.filter_label = 'EMPTY'
+    # transformations so that stars are like in Stellarium up to a rotation
+    # with spectrogram nearly horizontal and on the right of central star
+    image.data = image.data[::-1, ::-1]
+    image.airmass = 1/np.cos(np.radians(90-image.header['MOUNTALT']))
+       
+    image.my_logger.info('\n\tImage loaded')
+    # compute CCD gain map
+    image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
+    parameters.CCD_IMSIZE = image.data.shape[1] // parameters.CCD_REBIN
+    image.disperser_label = "star_analyzer_200"
+    image.ra = Angle(image.header['MOUNTRA'], unit="deg")
+    image.dec = Angle(image.header['MOUNTDEC'], unit="deg")
+    image.hour_angle = Angle(image.header['MOUNTHA'], unit="deg")
+    image.temperature = 10
+    image.pressure = 1000
+    image.humidity = 87
+    image.units = 'ADU'
+    
+    if "CD2_1" in hdu_list[0].header:
+        rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[0].header["CD2_1"], hdu_list[0].header["CD1_1"]) + 90
+        if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
+            image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
+                                    f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degree. "
+                                    f"\nBoth differs by more than 2 degree... bug ?")
+    
+    image.read_out_noise = 8.5 * np.ones_like(image.data)
+    #image.target_label = image.header["OBJECT"]  #.replace(" ", "")
     image.compute_parallactic_angle()
 
 

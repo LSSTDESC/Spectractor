@@ -1337,7 +1337,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
-            fit_workspace.plot_fit()
+            if parameters.DEBUG:
+                fit_workspace.plot_fit()
     elif method == 'basinhopping':
         start = time.time()
         minimizer_kwargs = dict(method=minimizer_method, bounds=bounds)
