@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
@@ -286,12 +287,14 @@ class SpectrumFitWorkspace(FitWorkspace):
             plt.pause(1e-8)
             plt.close()
         else:
-            if parameters.DISPLAY and parameters.VERBOSE:
-                plt.show()
+            if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+                plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, f'fit_spectrum_bestfit.pdf'))
             if parameters.SAVE:
                 figname = self.filename.replace('.fits', '_bestfit.pdf')
                 self.my_logger.info(f'Save figure {figname}.')
                 fig.savefig(figname, dpi=100, bbox_inches='tight', transparent=True)
+            if parameters.DISPLAY and parameters.VERBOSE:
+                plt.show()
 
     def decontaminate_order2(self):  # pragma: no cover
         lambdas = self.spectrum.lambdas
