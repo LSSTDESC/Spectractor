@@ -51,6 +51,8 @@ def load_target(label, verbose=False):
         return ArcLamp(label, verbose)
     elif parameters.OBS_OBJECT_TYPE == 'MONOCHROMATOR':
         return Monochromator(label, verbose)
+    elif parameters.OBS_OBJECT_TYPE == "LED":
+        return Led(label, verbose)
     else:
         raise ValueError(f'Unknown parameters.OBS_OBJECT_TYPE: {parameters.OBS_OBJECT_TYPE}')
 
@@ -135,6 +137,37 @@ class Monochromator(Target):
         --------
 
         >>> t = Monochromator("XX", verbose=False)
+        >>> print(t.label)
+        XX
+        >>> print(t.emission_spectrum)
+        True
+
+        """
+        Target.__init__(self, label, verbose=verbose)
+        self.my_logger = set_logger(self.__class__.__name__)
+        self.emission_spectrum = True
+        self.lines = Lines([], emission_spectrum=True, orders=[1, 2])
+
+    def load(self):  # pragma: no cover
+        pass
+
+
+class Led(Target):
+
+    def __init__(self, label, verbose=False):
+        """Initialize Led class.
+
+        Parameters
+        ----------
+        label: str
+            String label to name the led.
+        verbose: bool, optional
+            Set True to increase verbosity (default: False)
+
+        Examples
+        --------
+
+        >>> t = Led("XX", verbose=False)
         >>> print(t.label)
         XX
         >>> print(t.emission_spectrum)

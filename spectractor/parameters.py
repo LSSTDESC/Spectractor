@@ -39,6 +39,7 @@ SPECTRACTOR_COMPUTE_ROTATION_ANGLE = "hessian"  # method to get image rotation a
 SPECTRACTOR_DECONVOLUTION_PSF2D = True  # deconvolve spectrogram with simple 2D PSF analysis: False, True
 SPECTRACTOR_DECONVOLUTION_FFM = True  # deconvolve spectrogram with full forward model: False, True
 SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP = 20  # value of sigma clip parameter for the spectractor deconvolution process PSF2D and FFM
+SPECTRACTOR_BACKGROUND_SUBTRACTION = True #if True the background is estimated and subtracted 
 
 # Paths
 mypath = os.path.dirname(__file__)

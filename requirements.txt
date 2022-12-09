@@ -12,7 +12,7 @@ scikit-image
 h5py #==2.8.0
 emcee #==3.0rc2
 tqdm
-mpi4py
+#mpi4py
 schwimmbad
 iminuit>=2
 coverage>=3.6 # <5

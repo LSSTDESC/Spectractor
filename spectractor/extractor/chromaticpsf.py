@@ -6,6 +6,7 @@ from tqdm import tqdm
 import copy
 
 from scipy.interpolate import interp1d
+from scipy.signal import convolve2d
 from scipy import sparse
 
 from astropy.table import Table
@@ -1586,6 +1587,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.data_before_mask = np.copy(self.data)
         self.W_before_mask = np.copy(self.W)
         self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.psf_cube_masked = None
         self.set_mask()
 
         # regularisation matrices
@@ -1606,16 +1608,21 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         if poly_params is None:
             poly_params = self.poly_params
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
-        if np.sum(self.chromatic_psf.table["fwhm"]) == 0:
-            self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
+        #if np.sum(self.chromatic_psf.table["fwhm"]) == 0:
+        self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
         psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
                                                      fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
                                                      fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
-        flat_spectrogram = np.sum(psf_cube.reshape(len(profile_params), self.pixels[0].size), axis=0)
-        mask = flat_spectrogram / np.max(flat_spectrogram) == 0
-        self.data = np.copy(self.data_before_mask)
+        self.psf_cube_masked = psf_cube > 0
+        flat_spectrogram = np.sum(self.psf_cube_masked.reshape(len(profile_params), self.pixels[0].size), axis=0)
+        mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
+        mask = mask.reshape(self.pixels[0].shape)
+        kernel = np.ones((3, self.Nx//10))  # enlarge a bit more the edges of the mask
+        mask = convolve2d(mask, kernel, 'same').astype(bool)
+        for k in range(self.psf_cube_masked.shape[0]):
+            self.psf_cube_masked[k] *= ~mask
+        mask = mask.reshape((self.pixels[0].size,))
         self.W = np.copy(self.W_before_mask)
-        self.data[mask] = 0
         self.W[mask] = 0
         self.sqrtW = np.sqrt(sparse.diags(self.W))
         self.sparse_indices = None
@@ -1777,7 +1784,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             # Matrix filling
             psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
                                                          fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                         fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+                                                         fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cube_masked)
             M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
             self.sparse_indices = np.where(M > 0)
             M = sparse.csr_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
