@@ -745,8 +745,10 @@ def load_STARDICE_image(image):  # pragma: no cover
     image.header = hdu_list[0].header
     image.data = hdu_list[0].data.astype(np.float64)
     hdu_list.close()  # need to free allocation for file descripto
-    del image.header["BZERO"]
-    del image.header["BSCALE"]
+    if "BZERO" in image.header:
+        del image.header["BZERO"]
+    if "BSCALE" in image.header:
+        del image.header["BSCALE"]
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['cameraexptime'])
     image.filter_label = 'EMPTY'
