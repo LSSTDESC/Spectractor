@@ -262,25 +262,37 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if params is None:
             params = self.p
         A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *psf_poly_params = params
-        psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params,
-                                                                                            apply_bounds=True)
-        self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
-        Dx = np.arange(len(psf_profile_params[:, 0])) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
-        _, _, dispersion_law, _ = self.spectrum.compute_dispersion_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True)
-        psf_profile_params[:, 0] = 1
-        psf_profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + dx0
-        psf_profile_params[:, 2] += dispersion_law.imag + 0*self.spectrum.spectrogram_y0 - self.bgd_width
-        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, psf_profile_params,
+        poly_params_order1 = psf_poly_params[:len(psf_poly_params)//2]
+        poly_params_order2 = psf_poly_params[len(psf_poly_params)//2:]
+        profile_params_order1 = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params_order1,
+                                                                                               apply_bounds=True)
+        profile_params_order2 = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params_order2,
+                                                                                               apply_bounds=True)
+        self.spectrum.chromatic_psf.from_profile_params_to_shape_params(profile_params_order1)
+        _, _, dispersion_law, dispersion_law_order2 = self.spectrum.compute_dispersion_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True)
+        profile_params_order1[:, 0] = 1
+        profile_params_order1[:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
+        profile_params_order1[:, 2] += dispersion_law.imag - self.bgd_width
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order1,
                                                               fwhmx_clip=fwhmx_clip,
                                                               fwhmy_clip=fwhmy_clip, dtype="float32")
+        profile_params_order2[:, 0] = 1
+        profile_params_order2[:, 1] = dispersion_law_order2.real + self.spectrum.spectrogram_x0
+        profile_params_order2[:, 2] += dispersion_law_order2.imag - self.bgd_width
+        psf_cube_order2 = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
+                                                                     fwhmx_clip=fwhmx_clip,
+                                                                     fwhmy_clip=fwhmy_clip, dtype="float32")
+
         self.psf_cube_masked = psf_cube > 0
-        flat_spectrogram = np.sum(self.psf_cube_masked.reshape(len(psf_profile_params), self.pixels[0].size), axis=0)
+        self.psf_cube_masked_order2 = psf_cube_order2 > 0
+        flat_spectrogram = np.sum(self.psf_cube_masked.reshape(len(profile_params_order1), self.pixels[0].size), axis=0)
         mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
         mask = mask.reshape(self.pixels[0].shape)
         kernel = np.ones((3, self.spectrum.spectrogram_Nx//10))  # enlarge a bit more the edges of the mask
         mask = convolve2d(mask, kernel, 'same').astype(bool)
         for k in range(self.psf_cube_masked.shape[0]):
             self.psf_cube_masked[k] *= ~mask
+            self.psf_cube_masked_order2[k] *= ~mask
         mask = mask.reshape((self.pixels[0].size,))
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
@@ -436,7 +448,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             psf_cube_order2 = A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
                                                                               fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
                                                                               fwhmy_clip=parameters.PSF_FWHM_CLIP,
-                                                                              dtype="float32", mask=None)
+                                                                              dtype="float32", mask=self.psf_cube_masked_order2)
             psf_cube += psf_cube_order2
         M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
         if self.sparse_indices is None:
@@ -762,7 +774,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             my_logger.info("\n --- before  run_minimisation ---")
             dumpfitparameters(w, my_logger)
 
-        run_minimisation(w, method=method, fix=w.fixed, xtol=1e-4, ftol=100 / (w.data.size - len(w.mask)))
+        run_minimisation(w, method=method, fix=w.fixed, xtol=1e-3, ftol=1e-2)  # 1000 / (w.data.size - len(w.mask)))
 
         if parameters.DEBUG:
             my_logger.info("\n --- after  run_minimisation ---")
@@ -801,7 +813,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         for i in range(niter):
             w.set_mask(params=w.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
             run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
-                                            ftol=100 / (w.data.size - len(w.mask)), niter_clip=3,
+                                            ftol=1e-3, niter_clip=3,  # ftol=100 / (w.data.size - len(w.mask))
                                             sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP, verbose=True)
             my_logger.info(f"\n\t  niter = {i} : Newton: total computation time: {time.time() - start}s")
 
