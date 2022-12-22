@@ -928,7 +928,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     return w.spectrum
 
 
-def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='',
+def Spectractor(file_name, output_directory, target_label='', guess=None, disperser_label="", config='',
                 atmospheric_lines=True):
     """ Spectractor
     Main function to extract a spectrum from an image
@@ -939,7 +939,7 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         Input file nam of the image to analyse.
     output_directory: str
         Output directory.
-    target_label: str
+    target_label: str, optional
         The name of the targeted object.
     guess: [int,int], optional
         [x0,y0] list of the guessed pixel positions of the target in the image (must be integers). Mandatory if
