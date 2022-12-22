@@ -217,7 +217,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # regularisation matrices
         if amplitude_priors_method == "spectrum":
             # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
-            self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
+            # self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
+            self.U = np.linalg.inv(self.amplitude_priors_cov_matrix)
             L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] \
                 + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
             L.astype(float)
@@ -786,7 +787,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         weighted_mean_fwhm = np.average(w.spectrum.chromatic_psf.table['fwhm'], weights=w.spectrum.chromatic_psf.table['amplitude'])
         my_logger.info(f"\n\tMean FWHM: {weighted_mean_fwhm} pixels (weighted with spectrum amplitude)")
         if parameters.DEBUG:
-            fig, ax = plt.subplots(1, 1, figsize=(10, 8), sharex="all")
+            fig, ax = plt.subplots(1, 1, figsize=(7, 5), sharex="all")
             ax.plot(w.spectrum.lambdas, np.array(w.spectrum.chromatic_psf.table['fwhm']), label=f"weighted mean={weighted_mean_fwhm} pix")
             ax.set_xlabel(r"$\lambda$ [nm]")
             ax.set_ylabel("Transverse FWHM [pixels]")
