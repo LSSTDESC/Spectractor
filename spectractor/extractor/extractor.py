@@ -181,7 +181,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # create mask
         self.sqrtW = np.sqrt(sparse.diags(self.W))
         self.sparse_indices = None
-        self.set_mask()
+        self.set_mask(fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=2*parameters.PSF_FWHM_CLIP)  # not a narrow mask for first fit
 
         # design matrix
         self.M = np.zeros((self.Nx, self.data.size))
@@ -238,12 +238,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 else:
                     self.p[k] = 0
 
-    def set_mask(self, params=None):
+    def set_mask(self, params=None, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP):
         """
 
         Parameters
         ----------
         params
+        fwhmx_clip
+        fwhmy_clip
 
         Returns
         -------
@@ -264,14 +266,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                                                                                             apply_bounds=True)
         self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
         Dx = np.arange(len(psf_profile_params[:, 0])) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
-        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
+        _, _, dispersion_law, _ = self.spectrum.compute_dispersion_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True)
         psf_profile_params[:, 0] = 1
         psf_profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + dx0
-        psf_profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + dy0) - self.bgd_width
-        # psf_profile_params[:, 2] -= self.bgd_width
+        psf_profile_params[:, 2] += dispersion_law.imag + 0*self.spectrum.spectrogram_y0 - self.bgd_width
         psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, psf_profile_params,
-                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+                                                              fwhmx_clip=fwhmx_clip,
+                                                              fwhmy_clip=fwhmy_clip, dtype="float32")
         self.psf_cube_masked = psf_cube > 0
         flat_spectrogram = np.sum(self.psf_cube_masked.reshape(len(psf_profile_params), self.pixels[0].size), axis=0)
         mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
@@ -693,12 +694,17 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         epsilon[epsilon == 0] = 1e-4
         fixed_default = np.copy(self.fixed)
         self.fixed = [True] * len(self.p)
-        self.fixed[3:5] = [False, False]  # shift_y and angle
+        if fixed_default[3] is False and fixed_default[4] is False:
+            self.fixed[3:5] = [False, False]  # shift_y and angle
+        else:
+            for k, par in enumerate(self.input_labels):
+                if "y_c" in par and "_2" not in par:
+                    self.fixed[k] = False
         self.sparse_indices = None
-        run_minimisation(self, "newton", epsilon, self.fixed, xtol=1e-4, ftol=100 / self.data.size)
+        run_minimisation(self, "newton", epsilon, self.fixed, xtol=1e-2, ftol=0.01)  # 1000 / self.data.size)
         self.fixed = fixed_default
         self.sparse_indices = None
-        self.set_mask(params=self.p)
+        self.set_mask(params=self.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
         # self.set_y_c()
 
 
@@ -793,7 +799,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
         my_logger.info("\n --- Start run_minimisation_sigma_clipping  ---")
         for i in range(niter):
-            w.set_mask(params=w.p)
+            w.set_mask(params=w.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
             run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
                                             ftol=100 / (w.data.size - len(w.mask)), niter_clip=3,
                                             sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP, verbose=True)
