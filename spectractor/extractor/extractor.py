@@ -783,6 +783,21 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         if parameters.DEBUG and parameters.DISPLAY:
             w.plot_fit()
 
+        weighted_mean_fwhm = np.average(w.spectrum.chromatic_psf.table['fwhm'], weights=w.spectrum.chromatic_psf.table['amplitude'])
+        my_logger.info(f"\n\tMean FWHM: {weighted_mean_fwhm} pixels (weighted with spectrum amplitude)")
+        if parameters.DEBUG:
+            fig, ax = plt.subplots(1, 1, figsize=(10, 8), sharex="all")
+            ax.plot(w.spectrum.lambdas, np.array(w.spectrum.chromatic_psf.table['fwhm']), label=f"weighted mean={weighted_mean_fwhm} pix")
+            ax.set_xlabel(r"$\lambda$ [nm]")
+            ax.set_ylabel("Transverse FWHM [pixels]")
+            ax.set_ylim((0.8 * np.min(w.spectrum.chromatic_psf.table['fwhm']), 1.2 * np.max(w.spectrum.chromatic_psf.table['fwhm'])))  # [-10:])))
+            ax.grid()
+            ax.legend()
+            if parameters.DISPLAY:
+                plt.show()
+            if parameters.LSST_SAVEFIGPATH:
+                fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'fwhm_2.pdf'))
+
         my_logger.info("\n --- Start regularization parameter only  ---")
         # Optimize the regularisation parameter only if it was not done before
         if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
