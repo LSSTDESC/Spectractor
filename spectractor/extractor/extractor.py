@@ -707,12 +707,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         epsilon[epsilon == 0] = 1e-4
         fixed_default = np.copy(self.fixed)
         self.fixed = [True] * len(self.p)
-        if fixed_default[3] is False and fixed_default[4] is False:
-            self.fixed[3:5] = [False, False]  # shift_y and angle
-        else:
-            for k, par in enumerate(self.input_labels):
-                if "y_c" in par and "_2" not in par:
-                    self.fixed[k] = False
+        # if fixed_default[3] is False and fixed_default[4] is False:
+        self.fixed[3:5] = [False, False]  # shift_y and angle
+        # else:
+        #     for k, par in enumerate(self.input_labels):
+        #         if "y_c" in par and "_2" not in par:
+        #             self.fixed[k] = False
         self.sparse_indices = None
         run_minimisation(self, "newton", epsilon, self.fixed, xtol=1e-2, ftol=0.01)  # 1000 / self.data.size)
         self.fixed = fixed_default
