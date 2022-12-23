@@ -1080,8 +1080,7 @@ def Spectractor(file_name, output_directory, target_label='', guess=None, disper
     # Save the spectrum
     my_logger.info('\n\t  ======================= SAVE SPECTRUM =============================')
     spectrum.save_spectrum(output_filename, overwrite=True)
-    spectrum.lines.print_detected_lines(output_file_name=output_filename.replace('_spectrum.fits', '_lines.csv'),
-                                        overwrite=True, amplitude_units=spectrum.units)
+    spectrum.lines.print_detected_lines(amplitude_units=spectrum.units)
 
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
