@@ -1354,13 +1354,15 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5):
 
     Examples
     --------
-    >>> spectrum = Spectrum('tests/data/reduc_20170605_028_spectrum.fits')
+    >>> spectrum = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
     >>> parameters.LAMBDA_MIN = 550
     >>> parameters.LAMBDA_MAX = 800
     >>> lambdas = calibrate_spectrum(spectrum, with_adr=False)
     >>> spectrum.plot_spectrum()
     """
     with_adr = int(with_adr)
+    if spectrum.units != "ADU/s":  # go back in ADU/s to remove previous lambda*dlambda normalisation
+        spectrum.convert_from_flam_to_ADUrate()
     distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis()
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
     # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward

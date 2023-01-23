@@ -795,7 +795,7 @@ class ChromaticPSF:
         return profile_params
 
     def plot_summary(self, truth=None):
-        fig, ax = plt.subplots(2, 1, sharex='all', figsize=(12, 6))
+        fig, ax = plt.subplots(1, 1, sharex='all', figsize=(7, 4))
         PSF_models = []
         PSF_truth = []
         if truth is not None:
@@ -805,35 +805,18 @@ class ChromaticPSF:
             fit, cov, model = fit_poly1d(all_pixels, self.profile_params[:, i], order=self.degrees[name])
             PSF_models.append(np.polyval(fit, all_pixels))
         for i, name in enumerate(self.psf.param_names):
-            p = ax[0].plot(all_pixels, self.profile_params[:, i], marker='+', linestyle='none')
-            ax[0].plot(self.fitted_pixels, self.profile_params[self.fitted_pixels, i], label=name,
+            p = ax.plot(all_pixels, self.profile_params[:, i], marker='+', linestyle='none')
+            ax.plot(self.fitted_pixels, self.profile_params[self.fitted_pixels, i], label=name,
                        marker='o', linestyle='none', color=p[0].get_color())
             if i > 0:
-                ax[0].plot(all_pixels, PSF_models[i], color=p[0].get_color())
+                ax.plot(all_pixels, PSF_models[i], color=p[0].get_color())
             if truth is not None:
-                ax[0].plot(all_pixels, PSF_truth[:, i], color=p[0].get_color(), linestyle='--')
-        img = np.zeros((self.Ny, self.Nx)).astype(float)
-        yy, xx = np.mgrid[:self.Ny, :self.Nx]
-        for x in all_pixels[::self.Nx // 10]:
-            params = [PSF_models[p][x] for p in range(len(self.psf.param_names))]
-            params[:3] = [1, x, self.Ny // 2]
-            out = self.psf.evaluate(np.asarray([xx, yy]), p=params)
-            if np.max(out) <= 0:
-                continue
-            out /= np.max(out)
-            img += out
-        ax[1].imshow(img, origin='lower')  # , extent=[0, self.Nx,
-        #        self.Ny//2-parameters.PIXWIDTH_SIGNAL,
-        #        self.Ny//2+parameters.PIXWIDTH_SIGNAL])
-        ax[1].set_xlabel('X [pixels]')
-        ax[1].set_ylabel('Y [pixels]')
-        ax[0].set_ylabel('PSF parameters')
-        ax[0].grid()
-        ax[1].grid(color='white', ls='solid')
-        ax[1].grid(True)
-        ax[0].set_yscale('symlog', linthresh=10)
-        ax[1].legend(title='PSF(x)')
-        ax[0].legend()
+                ax.plot(all_pixels, PSF_truth[:, i], color=p[0].get_color(), linestyle='--')
+        ax.set_xlabel('X pixels')
+        ax.set_ylabel('PSF parameters')
+        ax.grid()
+        ax.set_yscale('symlog', linthresh=10)
+        ax.legend()
         fig.tight_layout()
         # fig.subplots_adjust(hspace=0)
         if parameters.DISPLAY:  # pragma: no cover
