@@ -15,7 +15,8 @@ from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
-                               rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
+                               rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
+                               shortKeyedDictToLongKeyedDict, parametersToShortKeyedDict)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
@@ -578,26 +579,15 @@ class Spectrum:
                 tab = self.lines.print_detected_lines(amplitude_units=self.units, print_table=False)
                 hdus[extname] = fits.table_to_hdu(tab)
             elif extname == "CONFIG":
-                attributes = [item for item in dir(parameters) if not item.startswith("__") and item[0].isupper()]
-                for attribute in attributes:
-                    try:
-                        value = getattr(parameters, attribute)
-                        if isinstance(value, astropy.coordinates.angles.Angle):
-                            value = value.degree
-                        if isinstance(value, astropy.units.quantity.Quantity):
-                            value = value.value
-                        if not isinstance(value, (float, int, str)):
-                            continue
-                    except AttributeError:
-                        self.my_logger.warning(f"Failed to get parameters.{attribute}")
-                        continue
-                    if attribute != "DISPERSER_DIR" and attribute != "LIBRADTRAN_DIR" and attribute != "MY_FORMAT" and attribute != 'OBS_FULL_INSTRUMENT_TRANSMISSON' and attribute != 'THROUGHPUT_DIR':
-                        hdus[extname].header["HIERARCH " + attribute] = value
+                # HIERARCH and CONTINUE not compatible together in FITS headers
+                # We must use short keys built by parametersToShortKeyedDict and use CONTINUE
+                # waiting for cfitsio upgrade
+                shortKeyedDict = parametersToShortKeyedDict(parameters)
+                for key in shortKeyedDict.keys():
+                    hdus[extname].header[key] = shortKeyedDict[key]
             else:
                 raise ValueError(f"Unknown EXTNAME extension: {extname}.")
             hdus[extname].header["EXTNAME"] = extname
-        print(hdus["CONFIG"].header)
-        print(parameters.DISPERSER_DIR)
         hdu = fits.HDUList([hdus[extname] for extname in extnames])
         ensure_dir(os.path.dirname(output_file_name))
         hdu.writeto(output_file_name, overwrite=overwrite)
@@ -838,13 +828,9 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum(config="./config/ctio.ini")
-        # >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
-        >>> s.load_spectrum('tests/test.fits')
+        >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> print(s.units)
         erg/s/cm$^2$/nm
-        #>>> print(s.header)
-        #>>> for p in dir(parameters):
-        #...     print(p, getattr(parameters, p))
 
         .. doctest::
             :hide:
@@ -865,16 +851,13 @@ class Spectrum:
             self.cov_matrix = np.diag(self.err ** 2)
 
         # set the config parameters first
-        try:
-            param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
-            for key in param_header:
-                setattr(parameters, key, param_header[key])
-            update_derived_parameters()
-            if parameters.CCD_REBIN > 1:
-                apply_rebinning_to_parameters()
-        except KeyError:
-            self.my_logger.warning(f"\n\tNo CONFIG hdu in Spectrum file to recover Spectractor config parameters. "
-                                   f"Default config parameters from file {self.config} are used.")
+        param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
+        parametersDict = shortKeyedDictToLongKeyedDict(param_header)
+        for key in parametersDict.keys():
+            setattr(parameters, key, parametersDict[key])
+        update_derived_parameters()
+        if parameters.CCD_REBIN > 1:
+            apply_rebinning_to_parameters()
 
         # set the simple items from the mappings. More complex items, i.e.
         # those needing function calls, follow

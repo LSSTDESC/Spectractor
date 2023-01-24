@@ -1,5 +1,6 @@
 import os
 
+import astropy.io.fits
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting
@@ -2421,6 +2422,110 @@ def flip_and_rotate_radec_to_image_xy_coordinates(ra, dec, camera_angle=0, flip_
     transformation = flip @ rotation
     x, y = (np.asarray([ra, dec]).T @ transformation).T
     return x, y
+
+
+import hashlib
+import base64
+
+
+def makeRemappingDict(parameters):
+    """Get a dictionary which maps all >8 char parameter names to 8 chars.
+    """
+
+    def getHash(item):  # get an 8 character hash of a long string
+        md5 = hashlib.md5(item.encode('utf-8')).digest()
+        hashedName = str(base64.urlsafe_b64encode(md5))[4:12].upper()   # FITS header convert hash keys in capital
+        return hashedName
+
+    mapping = {}
+    for item in dir(parameters):
+        if item.startswith("__") or item[0].islower():  # ignore the special stuff
+            continue
+        hashedName = getHash(str(item))
+        if hashedName in mapping.values():
+            # this should be more or less impossible, but must check just in case
+            raise RuntimeError(f'Hash collision! More than one parameter hashed to {hashedName}')
+        mapping[item] = hashedName
+    return mapping
+
+
+def parametersToShortKeyedDict(parameters):
+    """Get all the parameters as dict with no keys over 8 chars.
+
+    Any keys longer than 8 chars are hashed down using ``makeRemappingDict()``
+    The full length dict can be retrieved with the shortKeyedDictToLongKeyedDict() method.
+
+    Examples
+    --------
+    >>> from spectractor import parameters
+    >>> pDict = parametersToShortKeyedDict(parameters)
+    >>> assert pDict
+    """
+    import astropy
+    my_logger = set_logger(__name__)
+    remapping = makeRemappingDict(parameters)
+
+    parameterDict = {}
+    for item in dir(parameters):
+        if not item.startswith("__") and item[0].isupper():
+            new_item = remapping.get(item, item)
+            try:
+                value = getattr(parameters, item)
+                if isinstance(value, astropy.coordinates.angles.Angle):
+                    value = value.degree
+                if isinstance(value, astropy.units.quantity.Quantity):
+                    value = value.value
+                if not isinstance(value, (float, int, str)):
+                    continue
+            except AttributeError:
+                my_logger.warning(f"Failed to get parameters.{item}")
+                continue
+            parameterDict[new_item] = value
+    return parameterDict
+
+
+def shortKeyedDictToLongKeyedDict(shortKeyedDict):
+    """Expand the keys from parametersToShortKeyedDict back to full length.
+
+    Examples
+    --------
+    >>> from spectractor import parameters
+    >>> remapping = makeRemappingDict(parameters)
+    >>> pDict = parametersToShortKeyedDict(parameters)
+
+    # Test robustness: change value and delete one parameter
+    >>> pDict[remapping[list(remapping.keys())[0]]] = "toto"
+    >>> del parameters.YWINDOW
+    >>> params = shortKeyedDictToLongKeyedDict(pDict)
+    >>> params["XWINDOW"] == parameters.XWINDOW
+    True
+    >>> params[list(remapping.keys())[0]]
+    'toto'
+    >>> "YWINDOW" in params.keys()
+    False
+    >>> params["FSQSHVFY"]
+    100
+
+    """
+    my_logger = set_logger(__name__)
+    remapping = makeRemappingDict(parameters)
+    remapping_reversed = {v: k for k, v in remapping.items()}
+
+    parameterDict = {}
+    default_keys = ["EXTNAME"]
+    for hdu in [astropy.io.fits.PrimaryHDU, astropy.io.fits.ImageHDU]:
+        default_keys += list(hdu().header)
+    for key in shortKeyedDict:
+        if key in default_keys:
+            continue
+        try:
+            new_item = remapping_reversed[key]
+        except KeyError:
+            my_logger.warning(f"\n\tFailed to map hash key {key} with one config parameter from parameters.py. "
+                              f"Associated config parameter is not used anymore ?")
+            new_item = key
+        parameterDict[new_item] = shortKeyedDict[key]
+    return parameterDict
 
 
 if __name__ == "__main__":
