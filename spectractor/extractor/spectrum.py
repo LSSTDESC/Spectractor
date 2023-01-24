@@ -660,9 +660,23 @@ class Spectrum:
 
         Examples
         --------
+
+        # Latest Spectractor output format
+        >>> from spectractor import parameters
         >>> s = Spectrum(config="./config/ctio.ini")
         >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
-        #>>> s.load_spectrum('tests/test.fits', fast_load=True)
+
+        .. doctest::
+            :hide:
+
+            >>> assert parameters.OBS_CAMERA_ROTATION == s.header["CAM_ROT"]
+            >>> assert parameters.CCD_REBIN == s.header["REBIN"]
+            >>> assert s.parallactic_angle == s.header["PARANGLE"]
+
+        # Spectractor output format older than version <=2.3
+        >>> parameters.VERBOSE = False
+        >>> s = Spectrum(config="./config/ctio.ini")
+        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
         >>> print(s.units)
         erg/s/cm$^2$/nm
 
@@ -853,6 +867,7 @@ class Spectrum:
         # set the config parameters first
         param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
         parametersDict = shortKeyedDictToLongKeyedDict(param_header)
+        self.my_logger.warning(f"{parametersDict}")
         for key in parametersDict.keys():
             setattr(parameters, key, parametersDict[key])
         update_derived_parameters()
