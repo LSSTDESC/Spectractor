@@ -10,7 +10,7 @@ import os
 import astropy
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config
+from spectractor.config import set_logger, load_config, update_derived_parameters, apply_rebinning_to_parameters
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
@@ -22,7 +22,8 @@ from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_x
 from spectractor.simulation.throughput import TelescopeTransmission
 
 
-fits_mappings = {'date_obs': 'DATE-OBS',
+fits_mappings = {'config': 'CONFIG',
+                 'date_obs': 'DATE-OBS',
                  'expo': 'EXPTIME',
                  'airmass': 'AIRMASS',
                  'disperser_label': 'GRATING',
@@ -194,6 +195,7 @@ class Spectrum:
         """
         self.fast_load = fast_load
         self.my_logger = set_logger(self.__class__.__name__)
+        self.config = config
         if config != "":
             load_config(config)
         self.target = target
@@ -245,7 +247,7 @@ class Spectrum:
         if file_name != "":
             self.load_spectrum(file_name,
                                spectrogram_file_name_override=spectrogram_file_name_override,
-                               psf_file_name_override=psf_file_name_override)
+                               psf_file_name_override=psf_file_name_override, fast_load=fast_load)
         if image is not None:
             self.header = image.header
             self.date_obs = image.date_obs
@@ -515,6 +517,8 @@ class Spectrum:
             >>> assert os.path.isfile('./tests/test.fits')
             >>> os.remove('./tests/test.fits')
         """
+        from spectractor._version import __version__
+        self.header["VERSION"] = str(__version__)
         self.header["REBIN"] = parameters.CCD_REBIN
         self.header.comments['REBIN'] = 'original image rebinning factor to get spectrum.'
         self.header['UNIT1'] = "nanometer"
@@ -540,6 +544,7 @@ class Spectrum:
         extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES"]  # spectrogram data
         extnames += ["PSF_TAB"]  # PSF parameter table
         extnames += ["LINES"]  # spectroscopic line table
+        extnames += ["CONFIG"]  # config parameters
         hdus = {"SPECTRUM": hdu1}
         for k, extname in enumerate(extnames):
             if extname == "SPECTRUM":
@@ -572,13 +577,29 @@ class Spectrum:
             elif extname == "LINES":
                 tab = self.lines.print_detected_lines(amplitude_units=self.units, print_table=False)
                 hdus[extname] = fits.table_to_hdu(tab)
+            elif extname == "CONFIG":
+                attributes = [item for item in dir(parameters) if not item.startswith("__") and item[0].isupper()]
+                for attribute in attributes:
+                    try:
+                        value = getattr(parameters, attribute)
+                        if isinstance(value, astropy.coordinates.angles.Angle):
+                            value = value.degree
+                        if isinstance(value, astropy.units.quantity.Quantity):
+                            value = value.value
+                        if not isinstance(value, (float, int, str)):
+                            continue
+                    except AttributeError:
+                        self.my_logger.warning(f"Failed to get parameters.{attribute}")
+                        continue
+                    if attribute != "DISPERSER_DIR" and attribute != "LIBRADTRAN_DIR" and attribute != "MY_FORMAT" and attribute != 'OBS_FULL_INSTRUMENT_TRANSMISSON' and attribute != 'THROUGHPUT_DIR':
+                        hdus[extname].header["HIERARCH " + attribute] = value
             else:
                 raise ValueError(f"Unknown EXTNAME extension: {extname}.")
             hdus[extname].header["EXTNAME"] = extname
-
+        print(hdus["CONFIG"].header)
+        print(parameters.DISPERSER_DIR)
         hdu = fits.HDUList([hdus[extname] for extname in extnames])
-        output_directory = '/'.join(output_file_name.split('/')[:-1])
-        ensure_dir(output_directory)
+        ensure_dir(os.path.dirname(output_file_name))
         hdu.writeto(output_file_name, overwrite=overwrite)
         self.my_logger.info(f'\n\tSpectrum saved in {output_file_name}')
 
@@ -633,19 +654,69 @@ class Spectrum:
         self.my_logger.info('\n\tSpectrogram saved in %s' % output_file_name)
 
     def load_spectrum(self, input_file_name, spectrogram_file_name_override=None,
-                      psf_file_name_override=None):
+                      psf_file_name_override=None, fast_load=False):
         """Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
         ----------
         input_file_name: str
             Path to the input fits file
-
         spectrogram_file_name_override : str
             Manually specify a path to the spectrogram file.
-
         psf_file_name_override : str
             Manually specify a path to the psf file.
+        fast_load: bool, optional
+            If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
+
+        Examples
+        --------
+        >>> s = Spectrum(config="./config/ctio.ini")
+        >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        #>>> s.load_spectrum('tests/test.fits', fast_load=True)
+        >>> print(s.units)
+        erg/s/cm$^2$/nm
+
+        .. doctest::
+            :hide:
+
+            >>> assert parameters.DISTANCE2CCD == s.header["D2CCD"]
+            >>> assert parameters.OBS_CAMERA_ROTATION == s.header["CAM_ROT"]
+            >>> assert parameters.CCD_REBIN == s.header["REBIN"]
+            >>> assert s.parallactic_angle == s.header["PARANGLE"]
+
+        """
+        self.fast_load = fast_load
+        if not os.path.isfile(input_file_name):
+            raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
+
+        self.header, raw_data = load_fits(input_file_name)
+        # check the version of the file
+        if "VERSION" in self.header:
+            from spectractor._version import __version__
+            if self.header["VERSION"] != str(__version__):
+                self.my_logger.warning(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
+                                       f"different from current Spectractor software {__version__}.")
+            self.load_spectrum_latest(input_file_name)
+        else:
+            self.my_logger.warning("\n\tNo information about Spectractor software version is given in the header. "
+                                   "Use old load function.")
+            self.load_spectrum_older_23(input_file_name, spectrogram_file_name_override=spectrogram_file_name_override,
+                                        psf_file_name_override=psf_file_name_override)
+
+    def load_spectrum_older_23(self, input_file_name, spectrogram_file_name_override=None,
+                               psf_file_name_override=None, fast_load=False):
+        """Load the spectrum from a fits file (data, error and wavelengths).
+
+        Parameters
+        ----------
+        input_file_name: str
+            Path to the input fits file
+        spectrogram_file_name_override : str
+            Manually specify a path to the spectrogram file.
+        psf_file_name_override : str
+            Manually specify a path to the psf file.
+        fast_load: bool, optional
+            If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
 
         Examples
         --------
@@ -654,107 +725,204 @@ class Spectrum:
         >>> print(s.units)
         erg/s/cm$^2$/nm
         """
-        if os.path.isfile(input_file_name):
-            self.header, raw_data = load_fits(input_file_name)
-            self.lambdas = raw_data[0]
-            self.lambdas_binwidths = np.gradient(self.lambdas)
-            self.data = raw_data[1]
-            if len(raw_data) > 2:
-                self.err = raw_data[2]
-                self.cov_matrix = np.diag(self.err ** 2)
-
-            # set the simple items from the mappings. More complex items, i.e.
-            # those needing function calls, follow
-            for attribute, header_key in fits_mappings.items():
-                if self.header.get(header_key) is not None:
-                    setattr(self, attribute, self.header.get(header_key))
-                else:
-                    self.my_logger.warning(f'Failed to set spectrum attribute {attribute} using header {header_key}')
-            if "CAM_ROT" in self.header:
-                parameters.OBS_CAMERA_ROTATION = float(self.header["CAM_ROT"])
-            else:
-                self.my_logger.warning("No information about camera rotation in Spectrum header.")
-
-            # set the more complex items by hand here
-            if self.header.get('TARGET'):
-                self.target = load_target(self.header.get('TARGET'), verbose=parameters.VERBOSE)
-                self.lines = self.target.lines
-            if self.header.get('TARGETX') and self.header.get('TARGETY'):
-                self.x0 = [self.header.get('TARGETX'), self.header.get('TARGETY')]  # should be a tuple not a list
-            if self.header.get('CCDREBIN'):
-                if parameters.CCD_REBIN != self.header.get('CCDREBIN'):
-                    raise ValueError("Different values of rebinning parameters between config file and header. Choose.")
-                parameters.CCD_REBIN = self.header.get('CCDREBIN')
-            if self.header.get('D2CCD'):
-                parameters.DISTANCE2CCD = float(self.header.get('D2CCD'))
-
-            self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
-            self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
-                                      data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
-            self.my_logger.info(f'\n\tSpectrum loaded from {input_file_name}')
-            if parameters.OBS_OBJECT_TYPE == "STAR":
-                self.adr_params = [self.dec, self.hour_angle, self.temperature,
-                                   self.pressure, self.humidity, self.airmass]
-
-            self.psf = load_PSF(psf_type=parameters.PSF_TYPE, target=self.target)
-            self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
-                                              x0=self.spectrogram_x0, y0=self.spectrogram_y0,
-                                              deg=self.spectrogram_deg, saturation=self.spectrogram_saturation)
-            if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
-                self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
-
-            # original, hard-coded spectrogram/table relative paths
-            spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
-            psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
-
-            # for LSST-DM supplied filenames
-            if spectrogram_file_name_override and psf_file_name_override:
-                self.fast_load = False
-                spectrogram_file_name = spectrogram_file_name_override
-                psf_file_name = psf_file_name_override
-                self.my_logger.info(f'Applying spectrogram filename override {spectrogram_file_name}')
-                self.my_logger.info(f'Applying psf filename override {psf_file_name}')
-
-            if not self.fast_load:
-                hdu_list = fits.open(input_file_name)
-                # load other spectrum info
-                if len(hdu_list) > 1:
-                    self.cov_matrix = hdu_list["SPEC_COV"].data
-                    if len(hdu_list) > 2:
-                        _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
-                        if len(hdu_list) > 3:
-                            self.target.image = hdu_list["ORDER0"].data
-                            self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
-                            self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
-                # load spectrogram info
-                if len(hdu_list) > 4:
-                    self.spectrogram = hdu_list["S_DATA"].data
-                    self.spectrogram_err = hdu_list["S_ERR"].data
-                    self.spectrogram_bgd = hdu_list["S_BGD"].data
-                    if len(hdu_list) > 7:
-                        self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
-                        self.spectrogram_fit = hdu_list["S_FIT"].data
-                        self.spectrogram_residuals = hdu_list["S_RES"].data
-                elif os.path.isfile(spectrogram_file_name):
-                    self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
-                    self.load_spectrogram(spectrogram_file_name)
-                else:
-                    raise FileNotFoundError(f"No spectrogram info in {input_file_name} "
-                                            f"and not even a spectrogram file {spectrogram_file_name}.")
-                if "PSF_TAB" in hdu_list:
-                    self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]),
-                                                  saturation=self.spectrogram_saturation)
-                elif os.path.isfile(psf_file_name):  # retro-compatibility
-                    self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
-                    self.load_chromatic_psf(psf_file_name)
-                else:
-                    raise FileNotFoundError(f"No PSF info in {input_file_name} "
-                                            f"and not even a PSF file {psf_file_name}.")
-                if "LINES" in hdu_list:
-                    self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
-                hdu_list.close()
-        else:
+        self.fast_load = fast_load
+        if not os.path.isfile(input_file_name):
             raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
+
+        self.header, raw_data = load_fits(input_file_name)
+        self.lambdas = raw_data[0]
+        self.lambdas_binwidths = np.gradient(self.lambdas)
+        self.data = raw_data[1]
+        if len(raw_data) > 2:
+            self.err = raw_data[2]
+            self.cov_matrix = np.diag(self.err ** 2)
+
+        # set the config parameters first
+        if "CAM_ROT" in self.header:
+            parameters.OBS_CAMERA_ROTATION = float(self.header["CAM_ROT"])
+        else:
+            self.my_logger.warning("\n\tNo information about camera rotation in Spectrum header.")
+        if self.header.get('CCDREBIN'):
+            if parameters.CCD_REBIN != self.header.get('CCDREBIN'):
+                raise ValueError("Different values of rebinning parameters between config file and header. Choose.")
+            parameters.CCD_REBIN = self.header.get('CCDREBIN')
+        if self.header.get('D2CCD'):
+            parameters.DISTANCE2CCD = float(self.header.get('D2CCD'))
+
+        # set the simple items from the mappings. More complex items, i.e.
+        # those needing function calls, follow
+        for attribute, header_key in fits_mappings.items():
+            if self.header.get(header_key) is not None:
+                setattr(self, attribute, self.header.get(header_key))
+            else:
+                self.my_logger.warning(f'\n\tFailed to set spectrum attribute {attribute} using header {header_key}')
+
+        # set the more complex items by hand here
+        if self.header.get('TARGET'):
+            self.target = load_target(self.header.get('TARGET'), verbose=parameters.VERBOSE)
+            self.lines = self.target.lines
+        if self.header.get('TARGETX') and self.header.get('TARGETY'):
+            self.x0 = [self.header.get('TARGETX'), self.header.get('TARGETY')]  # should be a tuple not a list
+        self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
+        self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
+                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+        self.my_logger.info(f'\n\tSpectrum loaded from {input_file_name}')
+        if parameters.OBS_OBJECT_TYPE == "STAR":
+            self.adr_params = [self.dec, self.hour_angle, self.temperature,
+                               self.pressure, self.humidity, self.airmass]
+
+        self.psf = load_PSF(psf_type=parameters.PSF_TYPE, target=self.target)
+        self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
+                                          x0=self.spectrogram_x0, y0=self.spectrogram_y0,
+                                          deg=self.spectrogram_deg, saturation=self.spectrogram_saturation)
+        if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
+            self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
+
+        # original, hard-coded spectrogram/table relative paths
+        spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
+        psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
+        if spectrogram_file_name_override and psf_file_name_override:
+            self.fast_load = False
+            spectrogram_file_name = spectrogram_file_name_override
+            psf_file_name = psf_file_name_override
+            self.my_logger.info(f'\n\tApplying spectrogram filename override {spectrogram_file_name}')
+            self.my_logger.info(f'\n\tApplying psf filename override {psf_file_name}')
+
+        if not self.fast_load:
+            hdu_list = fits.open(input_file_name)
+            # load other spectrum info
+            if len(hdu_list) > 1:
+                self.cov_matrix = hdu_list["SPEC_COV"].data
+                if len(hdu_list) > 2:
+                    _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+                    if len(hdu_list) > 3:
+                        self.target.image = hdu_list["ORDER0"].data
+                        self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+                        self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
+            # load spectrogram info
+            if len(hdu_list) > 4:
+                self.spectrogram = hdu_list["S_DATA"].data
+                self.spectrogram_err = hdu_list["S_ERR"].data
+                self.spectrogram_bgd = hdu_list["S_BGD"].data
+                if len(hdu_list) > 7:
+                    self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
+                    self.spectrogram_fit = hdu_list["S_FIT"].data
+                    self.spectrogram_residuals = hdu_list["S_RES"].data
+            elif os.path.isfile(spectrogram_file_name):
+                self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
+                self.load_spectrogram(spectrogram_file_name)
+            else:
+                raise FileNotFoundError(f"\n\tNo spectrogram info in {input_file_name} "
+                                        f"and not even a spectrogram file {spectrogram_file_name}.")
+            if "PSF_TAB" in hdu_list:
+                self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]),
+                                              saturation=self.spectrogram_saturation)
+            elif os.path.isfile(psf_file_name):  # retro-compatibility
+                self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
+                self.load_chromatic_psf(psf_file_name)
+            else:
+                raise FileNotFoundError(f"\n\tNo PSF info in {input_file_name} "
+                                        f"and not even a PSF file {psf_file_name}.")
+            if "LINES" in hdu_list:
+                self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
+            hdu_list.close()
+
+    def load_spectrum_latest(self, input_file_name):
+        """Load the spectrum from a fits file (data, error and wavelengths).
+
+        Parameters
+        ----------
+        input_file_name: str
+            Path to the input fits file
+
+        Examples
+        --------
+        >>> s = Spectrum(config="./config/ctio.ini")
+        # >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s.load_spectrum('tests/test.fits')
+        >>> print(s.units)
+        erg/s/cm$^2$/nm
+        #>>> print(s.header)
+        #>>> for p in dir(parameters):
+        #...     print(p, getattr(parameters, p))
+
+        .. doctest::
+            :hide:
+
+            >>> assert parameters.DISTANCE2CCD == s.header["D2CCD"]
+            >>> assert parameters.OBS_CAMERA_ROTATION == s.header["CAM_ROT"]
+            >>> assert parameters.CCD_REBIN == s.header["REBIN"]
+            >>> assert parameters.OBS_OBJECT_TYPE == "STAR"
+            >>> assert s.parallactic_angle == s.header["PARANGLE"]
+
+        """
+        self.header, raw_data = load_fits(input_file_name)
+        self.lambdas = raw_data[0]
+        self.lambdas_binwidths = np.gradient(self.lambdas)
+        self.data = raw_data[1]
+        if len(raw_data) > 2:
+            self.err = raw_data[2]
+            self.cov_matrix = np.diag(self.err ** 2)
+
+        # set the config parameters first
+        try:
+            param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
+            for key in param_header:
+                setattr(parameters, key, param_header[key])
+            update_derived_parameters()
+            if parameters.CCD_REBIN > 1:
+                apply_rebinning_to_parameters()
+        except KeyError:
+            self.my_logger.warning(f"\n\tNo CONFIG hdu in Spectrum file to recover Spectractor config parameters. "
+                                   f"Default config parameters from file {self.config} are used.")
+
+        # set the simple items from the mappings. More complex items, i.e.
+        # those needing function calls, follow
+        for attribute, header_key in fits_mappings.items():
+            if self.header.get(header_key) is not None:
+                setattr(self, attribute, self.header.get(header_key))
+            else:
+                self.my_logger.warning(f'\n\tFailed to set spectrum attribute {attribute} using header {header_key}')
+
+        # set the more complex items by hand here
+        if self.header.get('TARGET'):
+            self.target = load_target(self.header.get('TARGET'), verbose=parameters.VERBOSE)
+            self.lines = self.target.lines
+        if self.header.get('TARGETX') and self.header.get('TARGETY'):
+            self.x0 = [self.header.get('TARGETX'), self.header.get('TARGETY')]  # should be a tuple not a list
+        self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
+        self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
+                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+        self.my_logger.info(f'\n\tSpectrum loaded from {input_file_name}')
+        if parameters.OBS_OBJECT_TYPE == "STAR":
+            self.adr_params = [self.dec, self.hour_angle, self.temperature,
+                               self.pressure, self.humidity, self.airmass]
+
+        self.psf = load_PSF(psf_type=parameters.PSF_TYPE, target=self.target)
+        self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
+                                          x0=self.spectrogram_x0, y0=self.spectrogram_y0,
+                                          deg=self.spectrogram_deg, saturation=self.spectrogram_saturation)
+        if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
+            self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
+
+        if not self.fast_load:
+            hdu_list = fits.open(input_file_name)
+            # load other spectrum info
+            self.cov_matrix = hdu_list["SPEC_COV"].data
+            _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+            self.target.image = hdu_list["ORDER0"].data
+            self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+            self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
+            # load spectrogram info
+            self.spectrogram = hdu_list["S_DATA"].data
+            self.spectrogram_err = hdu_list["S_ERR"].data
+            self.spectrogram_bgd = hdu_list["S_BGD"].data
+            self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
+            self.spectrogram_fit = hdu_list["S_FIT"].data
+            self.spectrogram_residuals = hdu_list["S_RES"].data
+            self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]), saturation=self.spectrogram_saturation)
+            self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
+            hdu_list.close()
 
     def load_spectrogram(self, input_file_name):  # pragma: no cover
         """OBSOLETE: Load the spectrum from a fits file (data, error and wavelengths).

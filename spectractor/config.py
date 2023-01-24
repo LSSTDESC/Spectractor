@@ -5,6 +5,7 @@ import re
 import numpy as np
 import logging
 import astropy.units as units
+from astropy import constants as const
 
 from spectractor import parameters
 if not parameters.CALLING_CODE:
@@ -79,8 +80,8 @@ def load_config(config_filename, rebin=True):
         FileNotFoundError: Config file ./config/unknown_file.ini does not exist.
 
     """
-    my_logger = set_logger(__name__)
-    if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, "default.ini")):
+    mypath = os.path.dirname(__file__)
+    if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini")):
         raise FileNotFoundError('Config file default.ini does not exist.')
     # Load the configuration file
     config = configparser.ConfigParser()
@@ -88,29 +89,19 @@ def load_config(config_filename, rebin=True):
     from_config_to_parameters(config)
 
     if not os.path.isfile(config_filename):
-        if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, config_filename)):
+        if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, config_filename)):
             raise FileNotFoundError(f'Config file {config_filename} does not exist.')
         else:
-            config_filename = os.path.join(parameters.CONFIG_DIR, config_filename)
+            config_filename = os.path.join(mypath, parameters.CONFIG_DIR, config_filename)
     # Load the configuration file
     config = configparser.ConfigParser()
     config.read(config_filename)
     from_config_to_parameters(config)
 
     # Derive other parameters
-    parameters.MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
-    logging.basicConfig(format=parameters.MY_FORMAT, level=logging.WARNING)
-    mypath = os.path.dirname(__file__)
-    parameters.DISPERSER_DIR = os.path.join(mypath, parameters.DISPERSER_DIR)
-    parameters.THROUGHPUT_DIR = os.path.join(mypath, parameters.THROUGHPUT_DIR)
-    parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
-    parameters.OBS_DIAMETER = parameters.OBS_DIAMETER * units.m  # Diameter of the telescope
-    parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4.  # Surface of telescope
-    parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 1)
-    parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * parameters.TIME_UNIT
-                                   * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
-    parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
+    update_derived_parameters()
 
+    # Apply rebinning
     if parameters.CCD_REBIN > 1 and rebin:
         apply_rebinning_to_parameters()
     else:
@@ -127,6 +118,31 @@ def load_config(config_filename, rebin=True):
                 value = config.get(section, options)
                 par = getattr(parameters, options.upper())
                 print(f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}")
+
+
+def update_derived_parameters():
+    # Derive other parameters
+    parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
+    parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 1)
+    parameters.MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
+    logging.basicConfig(format=parameters.MY_FORMAT, level=logging.WARNING)
+    if not os.path.isabs(parameters.DISPERSER_DIR):
+        mypath = os.path.dirname(__file__)
+        parameters.DISPERSER_DIR = os.path.join(mypath, parameters.DISPERSER_DIR)
+    if not os.path.isabs(parameters.THROUGHPUT_DIR):
+        mypath = os.path.dirname(__file__)
+        parameters.THROUGHPUT_DIR = os.path.join(mypath, parameters.THROUGHPUT_DIR)
+    parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
+    parameters.OBS_DIAMETER = parameters.OBS_DIAMETER * units.m  # Diameter of the telescope
+    parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4.  # Surface of telescope
+    # Conversion factor
+    # Units of SEDs in flam (erg/s/cm2/nm) :
+    parameters.hc = const.h * const.c  # h.c product of fontamental constants c and h
+    parameters.SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
+    parameters.TIME_UNIT = 1 * units.s  # flux for 1 second
+    parameters.wl_dwl_unit = units.nanometer ** 2  # lambda.dlambda  in wavelength in nm
+    parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * parameters.TIME_UNIT
+                                   * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
 
 
 def apply_rebinning_to_parameters():

@@ -1,7 +1,4 @@
-import numpy as np
 import os
-import astropy.units as units
-from astropy import constants as const
 import matplotlib as mpl
 
 
@@ -42,10 +39,9 @@ SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP = 20  # value of sigma clip parameter for t
 SPECTRACTOR_BACKGROUND_SUBTRACTION = True #if True the background is estimated and subtracted 
 
 # Paths
-mypath = os.path.dirname(__file__)
-DISPERSER_DIR = os.path.join(mypath, "extractor/dispersers/")
-CONFIG_DIR = os.path.join(mypath, "../config/")
-THROUGHPUT_DIR = os.path.join(mypath, "simulation/CTIOThroughput/")
+DISPERSER_DIR = "./extractor/dispersers/"
+CONFIG_DIR = "../config/"
+THROUGHPUT_DIR = "./simulation/CTIOThroughput/"
 if 'ASTROMETRYNET_DIR' in os.environ:
     ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
 else:
@@ -59,7 +55,6 @@ else:
 CCD_IMSIZE = 2048  # size of the image in pixel
 CCD_PIXEL2MM = 24e-3  # pixel size in mm
 CCD_PIXEL2ARCSEC = 0.401  # pixel size in arcsec
-CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
 CCD_MAXADU = 60000  # approximate maximum ADU output of the CCD
 CCD_GAIN = 3.  # electronic gain : elec/ADU
 CCD_REBIN = 1  # rebinning of the image in pixel
@@ -68,8 +63,7 @@ CCD_REBIN = 1  # rebinning of the image in pixel
 OBS_NAME = 'CTIO'
 OBS_ALTITUDE = 2.200  # CTIO altitude in k meters from astropy package (Cerro Pachon)
 OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
-OBS_DIAMETER = 0.9 * units.m  # Diameter of the telescope
-OBS_SURFACE = np.pi * OBS_DIAMETER ** 2 / 4.  # Surface of telescope
+OBS_DIAMETER = 0.9  # Diameter of the telescope in meter
 OBS_EPOCH = "J2000.0"
 OBS_TRANSMISSION_SYSTEMATICS = 0.005
 OBS_OBJECT_TYPE = 'STAR'  # To choose between STAR, HG-AR, MONOCHROMATOR
@@ -79,15 +73,6 @@ OBS_QUANTUM_EFFICIENCY = "qecurve.txt"  # quantum efficiency of the detector fil
 OBS_CAMERA_ROTATION = 0  # Camera (x,y) rotation angle with respect to (north-up, east-left) system in degrees
 OBS_CAMERA_DEC_FLIP_SIGN = 1  # Camera (x,y) flip signs with respect to (north-up, east-left) system
 OBS_CAMERA_RA_FLIP_SIGN = 1  # Camera (x,y) flip signs with respect to (north-up, east-left) system
-
-# Filters
-HALPHA_CENTER = 655.9e-6  # center of the filter in mm
-HALPHA_WIDTH = 6.4e-6  # width of the filter in mm
-FGB37 = {'label': 'FGB37', 'min': 350, 'max': 750}
-RG715 = {'label': 'RG715', 'min': 690, 'max': 1100}
-HALPHA_FILTER = {'label': 'Halfa', 'min': HALPHA_CENTER - 2 * HALPHA_WIDTH, 'max': HALPHA_CENTER + 2 * HALPHA_WIDTH}
-ZGUNN = {'label': 'Z-Gunn', 'min': 800, 'max': 1100}
-FILTERS = [RG715, FGB37, HALPHA_FILTER, ZGUNN]
 
 # Spectrograph
 DISTANCE2CCD = 55.45  # distance between hologram and CCD in mm
@@ -111,7 +96,6 @@ ROT_ANGLE_MAX = 10  # in the Hessian analysis to compute rotation angle, cut all
 LAMBDA_MIN = 300  # minimum wavelength for spectrum extraction (in nm)
 LAMBDA_MAX = 1100  # maximum wavelength for spectrum extraction (in nm)
 LAMBDA_STEP = 0.2  # step size for the wavelength array (in nm)
-LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, LAMBDA_STEP)
 SPEC_ORDER = 1  # spectrum order to extract
 
 # Background subtraction parameters
@@ -130,22 +114,10 @@ PSF_FWHM_CLIP = 2  # PSF is not evaluated outside a region larger than max(PIXWI
 
 # Detection line algorithm
 CALIB_BGD_ORDER = 3  # order of the background polynome to fit
-CALIB_BGD_NPARAMS = CALIB_BGD_ORDER + 1  # number of unknown parameters for background
 CALIB_PEAK_WIDTH = 7  # half range to look for local extrema in pixels around tabulated line values
 CALIB_BGD_WIDTH = 10  # size of the peak sides to use to fit spectrum base line
 CALIB_SAVGOL_WINDOW = 5  # window size for the savgol filter in pixels
 CALIB_SAVGOL_ORDER = 2  # polynom order for the savgol filter
-
-# Conversion factor
-# Units of SEDs in flam (erg/s/cm2/nm) :
-SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
-TIME_UNIT = 1 * units.s  # flux for 1 second
-hc = const.h * const.c  # h.c product of fontamental constants c and h
-wl_dwl_unit = units.nanometer ** 2  # lambda.dlambda  in wavelength in nm
-FLAM_TO_ADURATE = ((OBS_SURFACE * SED_UNIT * TIME_UNIT * wl_dwl_unit / hc / CCD_GAIN).decompose()).value
-
-# fit workspace
-# FIT_WORKSPACE = None
 
 # Plotting
 PAPER = False
@@ -157,7 +129,6 @@ SAVE = False
 VERBOSE = False
 DEBUG = False
 DEBUG_LOGGING = False
-MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
 
 # Plots
 DISPLAY = True

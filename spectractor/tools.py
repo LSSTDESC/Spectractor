@@ -1889,7 +1889,7 @@ def load_fits(file_name, hdu_index=0):
     ----------
     file_name: str
         The FITS file name.
-    hdu_index: int, optional
+    hdu_index: int, str, optional
         The HDU index in the file (default: 0).
 
     Returns
@@ -1909,7 +1909,7 @@ def load_fits(file_name, hdu_index=0):
 
     """
     hdu_list = fits.open(file_name)
-    header = hdu_list[0].header
+    header = hdu_list[hdu_index].header
     data = hdu_list[hdu_index].data
     hdu_list.close()  # need to free allocation for file description
     return header, data
