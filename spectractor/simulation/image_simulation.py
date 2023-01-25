@@ -108,6 +108,7 @@ class StarFieldModel:
         >>> s.plot_model()
 
         """
+        self.my_logger = set_logger(self.__class__.__name__)
         self.image = base_image
         self.target = base_image.target
         self.field = None
@@ -382,9 +383,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger = set_logger(__name__)
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
     # Load reduced image
-    spectrum, telescope, disperser, target = SimulatorInit(spectrum_filename)
-    if config != "":
-        load_config(config)
+    spectrum, telescope, disperser, target = SimulatorInit(spectrum_filename, config=config)
     image = ImageModel(image_filename, target_label=target.label)
     guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
     if "CCDREBIN" in spectrum.header:
