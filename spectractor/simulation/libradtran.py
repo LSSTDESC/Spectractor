@@ -46,6 +46,8 @@ class Libradtran:
             if not os.path.isdir(parameters.LIBRADTRAN_DIR):
                 # reset libradtran path
                 if 'LIBRADTRAN_DIR' in os.environ:
+                    self.my_logger.warning(f"Reset parameters.LIBRADTRAN_DIR={parameters.LIBRADTRAN_DIR} (not found) "
+                                           f"to {os.getenv('LIBRADTRAN_DIR')}.")
                     parameters.LIBRADTRAN_DIR = os.getenv('LIBRADTRAN_DIR') + '/'
                 else:
                     self.my_logger.error(f"parameters.LIBRADTRAN_DIR={parameters.LIBRADTRAN_DIR} but directory does "
