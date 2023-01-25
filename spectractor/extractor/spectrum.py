@@ -869,8 +869,7 @@ class Spectrum:
         parametersDict = shortKeyedDictToLongKeyedDict(param_header)
         self.my_logger.warning(f"{parametersDict}")
         for key in parametersDict.keys():
-            if "_DIR" not in key:
-                setattr(parameters, key, parametersDict[key])
+            setattr(parameters, key, parametersDict[key])
         update_derived_parameters()
         if parameters.CCD_REBIN > 1:
             apply_rebinning_to_parameters()
