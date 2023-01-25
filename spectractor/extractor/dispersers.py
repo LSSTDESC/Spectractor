@@ -282,7 +282,8 @@ class Grating:
         D: float
             The distance between the CCD and the disperser in mm.
         data_dir: str
-            The directory where information about this disperser is stored. Must be in the form data_dir/label/...
+            The directory where information about this disperser is stored. If relative, then the starting point is the
+            installation package directory spectractor/. If absolute, it is taken as it is.
             (default: parameters.DISPERSER_DIR)
         verbose: bool
             Set to True to increase the verbosity of the initialisation (default: False)
