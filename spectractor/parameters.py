@@ -1,6 +1,6 @@
 import os
 import matplotlib as mpl
-
+import numpy as np
 
 # These parameters are the default values adapted to CTIO
 # To modify them, please create a new config file and load it.
@@ -97,6 +97,7 @@ LAMBDA_MIN = 300  # minimum wavelength for spectrum extraction (in nm)
 LAMBDA_MAX = 1100  # maximum wavelength for spectrum extraction (in nm)
 LAMBDA_STEP = 0.2  # step size for the wavelength array (in nm)
 SPEC_ORDER = 1  # spectrum order to extract
+LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, 1)
 
 # Background subtraction parameters
 PIXWIDTH_SIGNAL = 10  # half transverse width of the signal rectangular window in pixels
