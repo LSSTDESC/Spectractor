@@ -126,12 +126,6 @@ def update_derived_parameters():
     parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 1)
     parameters.MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
     logging.basicConfig(format=parameters.MY_FORMAT, level=logging.WARNING)
-    if not os.path.isabs(parameters.DISPERSER_DIR):
-        mypath = os.path.dirname(__file__)
-        parameters.DISPERSER_DIR = os.path.join(mypath, parameters.DISPERSER_DIR)
-    if not os.path.isabs(parameters.THROUGHPUT_DIR):
-        mypath = os.path.dirname(__file__)
-        parameters.THROUGHPUT_DIR = os.path.join(mypath, parameters.THROUGHPUT_DIR)
     parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
     parameters.OBS_DIAMETER = parameters.OBS_DIAMETER * units.m  # Diameter of the telescope
     parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4.  # Surface of telescope

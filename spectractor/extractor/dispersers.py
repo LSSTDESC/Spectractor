@@ -305,7 +305,11 @@ class Grating:
         self.D = D
         self.label = label
         self.full_name = label
-        self.data_dir = data_dir
+        if os.path.isabs(data_dir):
+            self.data_dir = data_dir
+        else:
+            mypath = os.path.dirname(os.path.dirname(__file__))
+            self.data_dir = os.path.join(mypath, parameters.DISPERSER_DIR)
         self.theta_tilt = 0
         self.transmission = None
         self.transmission_err = None
