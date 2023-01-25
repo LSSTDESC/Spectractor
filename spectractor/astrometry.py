@@ -816,8 +816,22 @@ class Astrometry(Image):  # pragma: no cover
             Log file to write the output of the merge command.
 
         """
-        command = f"{os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/new-wcs')} -v -d -i {self.file_name} " \
-                  f"-w {self.wcs_file_name} -o {self.new_file_name}\n"
+        if shutil.which('new-wcs') != "":
+            exec = shutil.which('new-wcs')
+        elif parameters.ASTROMETRYNET_DIR != "":
+            if not os.path.isdir(parameters.ASTROMETRYNET_DIR):
+                # reset astrometry.net path
+                if 'ASTROMETRYNET_DIR' in os.environ:
+                    parameters.ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
+                else:
+                    self.my_logger.error(f"parameters.ASTROMETRYNET_DIR={parameters.ASTROMETRYNET_DIR} but directory does "
+                                         f"not exist and ASTROMETRYNET_DIR is not in OS environment.")
+                    raise OSError("No solve-field binary found with parameters.ASTROMETRYNET_DIR or ASTROMETRYNET_DIR environment.")
+            exec = os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/new-wcs')
+        else:
+            raise OSError(f"solve-field executable not found in $PATH "
+                          f"or {os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/new-wcs')}")
+        command = f"{exec} -v -d -i {self.file_name} -w {self.wcs_file_name} -o {self.new_file_name}\n"
         self.my_logger.info(f'\n\tSave WCS in original file:\n\t{command}')
         log = subprocess.check_output(command, shell=True)
         if log_file is not None:
@@ -1032,6 +1046,14 @@ class Astrometry(Image):  # pragma: no cover
         if shutil.which('solve-field') != "":
             exec = shutil.which('solve-field')
         elif parameters.ASTROMETRYNET_DIR != "":
+            if not os.path.isdir(parameters.ASTROMETRYNET_DIR):
+                # reset astrometry.net path
+                if 'ASTROMETRYNET_DIR' in os.environ:
+                    parameters.ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
+                else:
+                    self.my_logger.error(f"parameters.ASTROMETRYNET_DIR={parameters.ASTROMETRYNET_DIR} but directory does "
+                                         f"not exist and ASTROMETRYNET_DIR is not in OS environment.")
+                    raise OSError("No solve-field binary found with parameters.ASTROMETRYNET_DIR or ASTROMETRYNET_DIR environment.")
             exec = os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')
         else:
             raise OSError(f"solve-field executable not found in $PATH "

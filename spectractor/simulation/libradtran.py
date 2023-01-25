@@ -43,6 +43,14 @@ class Libradtran:
         if libradtran_path != "":
             self.libradtran_path = ""
         elif parameters.LIBRADTRAN_DIR != "":
+            if not os.path.isdir(parameters.LIBRADTRAN_DIR):
+                # reset libradtran path
+                if 'LIBRADTRAN_DIR' in os.environ:
+                    parameters.LIBRADTRAN_DIR = os.getenv('LIBRADTRAN_DIR') + '/'
+                else:
+                    self.my_logger.error(f"parameters.LIBRADTRAN_DIR={parameters.LIBRADTRAN_DIR} but directory does "
+                                         f"not exist and LIBRADTRAN_DIR is not in OS environment.")
+                    raise OSError("No Libtradtran library found with parameters.LIBRADTRAN_DIR or LIBRADTRAN_DIR environment.")
             self.libradtran_path = parameters.LIBRADTRAN_DIR
         elif os.getenv("CONDA_PREFIX") != "" and os.path.isdir(os.path.join(os.getenv("CONDA_PREFIX"), "share/libRadtran/data")):
             self.libradtran_path = os.path.join(os.getenv("CONDA_PREFIX"), "share/libRadtran/")
