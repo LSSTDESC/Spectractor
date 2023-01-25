@@ -11,7 +11,7 @@ from spectractor.extractor.dispersers import Grating, Hologram
 from spectractor.extractor.targets import Target
 from spectractor.extractor.psf import load_PSF
 from spectractor.tools import fftconvolve_gaussian, ensure_dir
-from spectractor.config import set_logger
+from spectractor.config import set_logger, apply_rebinning_to_parameters
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 import spectractor.parameters as parameters
@@ -46,6 +46,9 @@ class SpectrumSimulation(Spectrum):
         for k, v in list(spectrum.__dict__.items()):
             self.__dict__[k] = copy.copy(v)
         self.my_logger = set_logger(self.__class__.__name__)
+        if parameters.CCD_REBIN > 1:
+            self.chromatic_psf.table['Dx'] *= parameters.CCD_REBIN
+            apply_rebinning_to_parameters(reverse=True)
         self.disperser = disperser
         self.telescope = telescope
         self.atmosphere = atmosphere
@@ -235,6 +238,9 @@ class SpectrogramModel(Spectrum):
         Spectrum.__init__(self)
         for k, v in list(spectrum.__dict__.items()):
             self.__dict__[k] = copy.copy(v)
+        if parameters.CCD_REBIN > 1:
+            raise ValueError("Simulation from a rebinned Spectractor output is not implemented. "
+                             "Feed the simulation pipeline with a non-rebinned spectrum.")
         self.disperser = disperser
         self.telescope = telescope
         self.atmosphere = atmosphere

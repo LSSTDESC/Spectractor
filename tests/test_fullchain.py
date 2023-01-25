@@ -103,8 +103,8 @@ def test_ctio_fullchain():
     sim_image = "./tests/data/sim_20170530_134.fits"
 
     # load test and make image simulation
-    #if not os.path.isfile(sim_image):
-    make_image()
+    if not os.path.isfile(sim_image):
+        make_image()
     image = Image(sim_image, config="./config/ctio.ini")
     lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
     amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)

@@ -139,7 +139,7 @@ def update_derived_parameters():
                                    * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
 
 
-def apply_rebinning_to_parameters():
+def apply_rebinning_to_parameters(reverse=False):
     """Divide or multiply original parameters by parameters.CCD_REBIN to set them correctly
     in the case of an image rebinning.
 
@@ -153,21 +153,30 @@ def apply_rebinning_to_parameters():
     20
     >>> parameters.CCD_PIXEL2MM
     20
+    >>> apply_rebinning_to_parameters(reverse=True)
+    >>> parameters.PIXWIDTH_SIGNAL
+    40
+    >>> parameters.CCD_PIXEL2MM
+    10.0
 
     """
+    if reverse:
+        parameters.CCD_REBIN = 1 / parameters.CCD_REBIN
     # Apply rebinning
-    parameters.PIXDIST_BACKGROUND //= parameters.CCD_REBIN
-    parameters.PIXWIDTH_BOXSIZE = max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN)
-    parameters.PIXWIDTH_BACKGROUND //= parameters.CCD_REBIN
-    parameters.PIXWIDTH_SIGNAL //= parameters.CCD_REBIN
-    parameters.CCD_IMSIZE //= parameters.CCD_REBIN
+    parameters.PIXDIST_BACKGROUND = int(parameters.PIXDIST_BACKGROUND // parameters.CCD_REBIN)
+    parameters.PIXWIDTH_BOXSIZE = int(max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN))
+    parameters.PIXWIDTH_BACKGROUND = int(parameters.PIXWIDTH_BACKGROUND // parameters.CCD_REBIN)
+    parameters.PIXWIDTH_SIGNAL = int(parameters.PIXWIDTH_SIGNAL // parameters.CCD_REBIN)
+    parameters.CCD_IMSIZE = int(parameters.CCD_IMSIZE // parameters.CCD_REBIN)
     parameters.CCD_PIXEL2MM *= parameters.CCD_REBIN
     parameters.CCD_PIXEL2ARCSEC *= parameters.CCD_REBIN
-    parameters.XWINDOW //= parameters.CCD_REBIN
-    parameters.YWINDOW //= parameters.CCD_REBIN
-    parameters.XWINDOW_ROT //= parameters.CCD_REBIN
-    parameters.YWINDOW_ROT //= parameters.CCD_REBIN
-    parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT //= parameters.CCD_REBIN
+    parameters.XWINDOW = int(parameters.XWINDOW // parameters.CCD_REBIN)
+    parameters.YWINDOW = int(parameters.YWINDOW // parameters.CCD_REBIN)
+    parameters.XWINDOW_ROT = int(parameters.XWINDOW_ROT // parameters.CCD_REBIN)
+    parameters.YWINDOW_ROT = int(parameters.YWINDOW_ROT // parameters.CCD_REBIN)
+    parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT = int(parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT // parameters.CCD_REBIN)
+    if reverse:
+        parameters.CCD_REBIN = 1
 
 
 def set_logger(logger):
