@@ -175,6 +175,8 @@ class Spectrum:
             A config file name to load some parameter values for a given instrument (default: "").
         fast_load: bool, optional
             If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
+        config: str, optional
+            If empty, load the config from the spectrum file if it exists, otherwise load the config from the given config file (deftault: '').
 
         Examples
         --------
@@ -865,14 +867,15 @@ class Spectrum:
             self.cov_matrix = np.diag(self.err ** 2)
 
         # set the config parameters first
-        param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
-        parametersDict = shortKeyedDictToLongKeyedDict(param_header)
-        self.my_logger.warning(f"{parametersDict}")
-        for key in parametersDict.keys():
-            setattr(parameters, key, parametersDict[key])
-        update_derived_parameters()
-        if parameters.CCD_REBIN > 1:
-            apply_rebinning_to_parameters()
+        if self.config == "":
+            param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
+            parametersDict = shortKeyedDictToLongKeyedDict(param_header)
+            self.my_logger.warning(f"{parametersDict}")
+            for key in parametersDict.keys():
+                setattr(parameters, key, parametersDict[key])
+            update_derived_parameters()
+            #if parameters.CCD_REBIN > 1:
+            #    apply_rebinning_to_parameters()
 
         # set the simple items from the mappings. More complex items, i.e.
         # those needing function calls, follow
