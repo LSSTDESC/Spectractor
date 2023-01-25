@@ -338,8 +338,7 @@ def multigauss_and_bgd_jacobian(x, *params):
 
 
 # noinspection PyTypeChecker
-def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None,
-                           fix_centroids=False):
+def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None):
     """Fit a multiple Gaussian profile plus a polynomial background to data, using iminuit.
     The mean guess value of the Gaussian must not be far from the truth values.
     Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
@@ -370,6 +369,8 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     Examples
     --------
 
+    >>> from spectractor.config import load_config
+    >>> load_config("default.ini")
     >>> x = np.arange(600.,800.,1)
     >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
@@ -2521,8 +2522,9 @@ def shortKeyedDictToLongKeyedDict(shortKeyedDict):
         try:
             new_item = remapping_reversed[key]
         except KeyError:
-            my_logger.warning(f"\n\tFailed to map hash key {key} with one config parameter from parameters.py. "
-                              f"Associated config parameter is not used anymore ?")
+            # the key can be a derived parameter, not in the dict
+            # my_logger.warning(f"\n\tFailed to map hash key {key} with one config parameter from parameters.py. "
+            #                  f"Associated config parameter is not used anymore ?")
             new_item = key
         parameterDict[new_item] = shortKeyedDict[key]
     return parameterDict

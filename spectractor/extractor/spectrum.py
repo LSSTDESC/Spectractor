@@ -685,7 +685,6 @@ class Spectrum:
         .. doctest::
             :hide:
 
-            >>> assert parameters.DISTANCE2CCD == s.header["D2CCD"]
             >>> assert parameters.OBS_CAMERA_ROTATION == s.header["CAM_ROT"]
             >>> assert parameters.CCD_REBIN == s.header["REBIN"]
             >>> assert s.parallactic_angle == s.header["PARANGLE"]
@@ -706,10 +705,10 @@ class Spectrum:
         else:
             self.my_logger.warning("\n\tNo information about Spectractor software version is given in the header. "
                                    "Use old load function.")
-            self.load_spectrum_older_23(input_file_name, spectrogram_file_name_override=spectrogram_file_name_override,
+            self.load_spectrum_older_24(input_file_name, spectrogram_file_name_override=spectrogram_file_name_override,
                                         psf_file_name_override=psf_file_name_override)
 
-    def load_spectrum_older_23(self, input_file_name, spectrogram_file_name_override=None,
+    def load_spectrum_older_24(self, input_file_name, spectrogram_file_name_override=None,
                                psf_file_name_override=None, fast_load=False):
         """Load the spectrum from a fits file (data, error and wavelengths).
 
@@ -843,7 +842,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(config="./config/ctio.ini")
+        >>> s = Spectrum(config="")
         >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> print(s.units)
         erg/s/cm$^2$/nm
@@ -851,7 +850,6 @@ class Spectrum:
         .. doctest::
             :hide:
 
-            >>> assert parameters.DISTANCE2CCD == s.header["D2CCD"]
             >>> assert parameters.OBS_CAMERA_ROTATION == s.header["CAM_ROT"]
             >>> assert parameters.CCD_REBIN == s.header["REBIN"]
             >>> assert parameters.OBS_OBJECT_TYPE == "STAR"
@@ -870,12 +868,12 @@ class Spectrum:
         if self.config == "":
             param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
             parametersDict = shortKeyedDictToLongKeyedDict(param_header)
-            self.my_logger.warning(f"{parametersDict}")
             for key in parametersDict.keys():
                 setattr(parameters, key, parametersDict[key])
             update_derived_parameters()
-            #if parameters.CCD_REBIN > 1:
-            #    apply_rebinning_to_parameters()
+            # loaded parameters have already been rebinned normally
+            # if parameters.CCD_REBIN > 1:
+            #     apply_rebinning_to_parameters()
 
         # set the simple items from the mappings. More complex items, i.e.
         # those needing function calls, follow
@@ -1523,11 +1521,13 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5):
 
     Examples
     --------
-    >>> spectrum = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+    >>> spectrum = Spectrum('tests/data/reduc_20170530_134_spectrum.fits', config="")
     >>> parameters.LAMBDA_MIN = 550
     >>> parameters.LAMBDA_MAX = 800
     >>> lambdas = calibrate_spectrum(spectrum, with_adr=False)
-    >>> spectrum.plot_spectrum()
+    >>> spectrum.plot_spectrum()  #doctest: +ELLIPSIS
+       Line   Tabulated  Detected    Shift    ...
+
     """
     with_adr = int(with_adr)
     if spectrum.units != "ADU/s":  # go back in ADU/s to remove previous lambda*dlambda normalisation

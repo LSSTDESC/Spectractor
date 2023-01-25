@@ -141,6 +141,8 @@ def get_delta_pix_ortho(deltaX, x0, D=parameters.DISTANCE2CCD):
 
     Examples
     --------
+    >>> from spectractor.config import load_config
+    >>> load_config("default.ini")
     >>> delta, D = 500, 55
     >>> get_delta_pix_ortho(delta, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2], D=D)
     500.0
@@ -490,6 +492,8 @@ class Grating:
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("default.ini")
         >>> disperser = Grating(N=300, D=55)
         >>> x0 = [800,800]
         >>> lambdas = np.arange(300, 900, 100)
@@ -518,6 +522,8 @@ class Grating:
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("default.ini")
         >>> disperser = Grating(N=300, D=55)
         >>> x0 = [800,800]
         >>> deltaX = np.arange(0,1000,1).astype(float)
@@ -547,6 +553,8 @@ class Grating:
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("default.ini")
         >>> disperser = Grating(N=300, D=55)
         >>> x0 = [800,800]
         >>> deltaX = np.arange(0,1000,1).astype(float)

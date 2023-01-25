@@ -28,7 +28,8 @@ def from_config_to_parameters(config):
     --------
 
     >>> config = configparser.ConfigParser()
-    >>> config.read(os.path.join(parameters.CONFIG_DIR,"default.ini"))  # doctest: +ELLIPSIS
+    >>> mypath = os.path.dirname(__file__)
+    >>> config.read(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))  # doctest: +ELLIPSIS
     ['/.../config/default.ini']
     >>> from_config_to_parameters(config)
     >>> assert parameters.OBS_NAME == "DEFAULT"
