@@ -16,10 +16,8 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          python-version: "3.10"
-          mamba-version: "*"
-          channels: conda-forge,defaults
-          channel-priority: strict
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
           show-channel-urls: true
           activate-environment: test
 
