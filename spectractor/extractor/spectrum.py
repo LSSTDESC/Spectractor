@@ -16,7 +16,7 @@ from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
-                               shortKeyedDictToLongKeyedDict, parametersToShortKeyedDict)
+                               shortKeyedDictToLongKeyedDict, parametersToShortKeyedDict, makeRemappingDict)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
@@ -584,7 +584,15 @@ class Spectrum:
                 # HIERARCH and CONTINUE not compatible together in FITS headers
                 # We must use short keys built by parametersToShortKeyedDict and use CONTINUE
                 # waiting for cfitsio upgrade
+                # Store the parameter translation <-> shortkeys
+                remapping = makeRemappingDict(parameters)
+                for longkey in remapping.keys():
+                    fits_longkey = longkey
+                    if len(longkey) > 8:
+                        fits_longkey = "HIERARCH " + longkey
+                    hdus[extname].header[fits_longkey] = remapping[longkey]
                 shortKeyedDict = parametersToShortKeyedDict(parameters)
+                # Store the values in short keys
                 for key in shortKeyedDict.keys():
                     hdus[extname].header[key] = shortKeyedDict[key]
             else:
