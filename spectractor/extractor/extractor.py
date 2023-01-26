@@ -876,7 +876,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.header["AM_FIT"] = w.p[9]
             # Compute order 2 contamination
             w.spectrum.data_order2 = w.p[0] * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
-            w.spectrum.err_order2 = w.p[0] * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+            w.spectrum.err_order2 = np.abs(w.p[0] * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas))
 
             # Calibrate the spectrum
             calibrate_spectrum(w.spectrum, with_adr=True)
