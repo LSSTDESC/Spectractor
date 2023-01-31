@@ -109,7 +109,10 @@ class Image(object):
 
         .. doctest::
 
-            >>> im = Image('tests/data/reduc_20170605_028.fits')
+           >>> im = Image('')
+           >>> im.data
+           None
+           >>> im = Image('tests/data/reduc_20170605_028.fits')
 
         .. doctest::
             :hide:
@@ -124,8 +127,6 @@ class Image(object):
         self.my_logger = set_logger(self.__class__.__name__)
         if config != "":
             load_config(config)
-        if not os.path.isfile(file_name) and parameters.CALLING_CODE != 'LSST_DM':
-            raise FileNotFoundError(f"File {file_name} does not exist.")
         self.file_name = file_name
         self.units = 'ADU'
         self.expo = -1
@@ -155,7 +156,7 @@ class Image(object):
         self.pressure = 0
         self.humidity = 0
 
-        if parameters.CALLING_CODE != 'LSST_DM':
+        if parameters.CALLING_CODE != 'LSST_DM' and file_name != "":
             self.load_image(file_name)
         else:
             # data provided by the LSST shim, just instantiate objects
@@ -222,6 +223,8 @@ class Image(object):
             The fits file name.
 
         """
+        if not os.path.isfile(file_name):
+            raise FileNotFoundError(f"{file_name} not found.")
         if parameters.OBS_NAME == 'CTIO':
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
