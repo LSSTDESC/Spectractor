@@ -984,7 +984,8 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         my_logger.info(f"\n\tNo guess position of order 0 has been given. Assuming the spectrum to extract comes "
                        f"from the brightest object, guess position is set as {image.target_guess}.")
     if parameters.DEBUG:
-        image.plot_image(scale='symlog', title="before rebinning", target_pixcoords=image.target_guess)
+        image.plot_image(scale='symlog', title="before rebinning", target_pixcoords=image.target_guess, cmap='gray', vmax=1e3)
+        #image.plot_image(scale='lin', title="before rebinning", target_pixcoords=image.target_guess, cmap='gray', vmax=0.5e2)
 
     # Use fast mode
     if parameters.CCD_REBIN > 1:
@@ -1001,7 +1002,6 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     output_filename = os.path.join(output_directory, output_filename)
     # Find the exact target position in the raw cut image: several methods
     my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
-
     find_target(image, image.target_guess, widths=(parameters.XWINDOW,
                                                    parameters.YWINDOW))
     # Rotate the image
@@ -1096,8 +1096,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         f'and background from {ws[0]:.0f} to {ws[1]:.0f} pixels')
 
     # Make a data copy
-    data = np.copy(image.data_rotated)[:, 0:right_edge]
-    err = np.copy(image.stat_errors_rotated)[:, 0:right_edge]
+    data = np.copy(image.data_rotated)#[:, 0:right_edge]
+    err = np.copy(image.stat_errors_rotated)#[:, 0:right_edge]
 
     # Lateral bands to remove sky background
     Ny, Nx = data.shape
@@ -1118,6 +1118,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
                                                           x0=image.target_pixcoords,
                                                           order=spectrum.order)
+        print(lambdas, parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)
         xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
         xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
 
@@ -1215,7 +1216,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
     xmin = max(0, int(s.table['Dx'][lambda_min_index] + x0))
     xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
-
+    print(lambdas, parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)
+    print(right_edge, int(s.table['Dx'][lambda_max_index] + x0))
     # Position of the order 0 in the spectrogram coordinates
     target_pixcoords_spectrogram = [image.target_pixcoords[0] - xmin, image.target_pixcoords[1] - ymin]
     s.y0 = target_pixcoords_spectrogram[1]
