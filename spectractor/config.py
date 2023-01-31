@@ -5,6 +5,7 @@ import re
 import numpy as np
 import logging
 import astropy.units as units
+from astropy import constants as const
 
 from spectractor import parameters
 if not parameters.CALLING_CODE:
@@ -27,7 +28,8 @@ def from_config_to_parameters(config):
     --------
 
     >>> config = configparser.ConfigParser()
-    >>> config.read(os.path.join(parameters.CONFIG_DIR,"default.ini"))  # doctest: +ELLIPSIS
+    >>> mypath = os.path.dirname(__file__)
+    >>> config.read(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini"))  # doctest: +ELLIPSIS
     ['/.../config/default.ini']
     >>> from_config_to_parameters(config)
     >>> assert parameters.OBS_NAME == "DEFAULT"
@@ -79,8 +81,8 @@ def load_config(config_filename, rebin=True):
         FileNotFoundError: Config file ./config/unknown_file.ini does not exist.
 
     """
-    my_logger = set_logger(__name__)
-    if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, "default.ini")):
+    mypath = os.path.dirname(__file__)
+    if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini")):
         raise FileNotFoundError('Config file default.ini does not exist.')
     # Load the configuration file
     config = configparser.ConfigParser()
@@ -88,29 +90,19 @@ def load_config(config_filename, rebin=True):
     from_config_to_parameters(config)
 
     if not os.path.isfile(config_filename):
-        if not os.path.isfile(os.path.join(parameters.CONFIG_DIR, config_filename)):
+        if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, config_filename)):
             raise FileNotFoundError(f'Config file {config_filename} does not exist.')
         else:
-            config_filename = os.path.join(parameters.CONFIG_DIR, config_filename)
+            config_filename = os.path.join(mypath, parameters.CONFIG_DIR, config_filename)
     # Load the configuration file
     config = configparser.ConfigParser()
     config.read(config_filename)
     from_config_to_parameters(config)
 
     # Derive other parameters
-    parameters.MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
-    logging.basicConfig(format=parameters.MY_FORMAT, level=logging.WARNING)
-    mypath = os.path.dirname(__file__)
-    parameters.DISPERSER_DIR = os.path.join(mypath, parameters.DISPERSER_DIR)
-    parameters.THROUGHPUT_DIR = os.path.join(mypath, parameters.THROUGHPUT_DIR)
-    parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
-    parameters.OBS_DIAMETER = parameters.OBS_DIAMETER * units.m  # Diameter of the telescope
-    parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4.  # Surface of telescope
-    parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 1)
-    parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * parameters.TIME_UNIT
-                                   * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
-    parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
+    update_derived_parameters()
 
+    # Apply rebinning
     if parameters.CCD_REBIN > 1 and rebin:
         apply_rebinning_to_parameters()
     else:
@@ -129,7 +121,26 @@ def load_config(config_filename, rebin=True):
                 print(f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}")
 
 
-def apply_rebinning_to_parameters():
+def update_derived_parameters():
+    # Derive other parameters
+    parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
+    parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 1)
+    parameters.MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
+    logging.basicConfig(format=parameters.MY_FORMAT, level=logging.WARNING)
+    parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
+    parameters.OBS_DIAMETER = parameters.OBS_DIAMETER * units.m  # Diameter of the telescope
+    parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4.  # Surface of telescope
+    # Conversion factor
+    # Units of SEDs in flam (erg/s/cm2/nm) :
+    parameters.hc = const.h * const.c  # h.c product of fontamental constants c and h
+    parameters.SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
+    parameters.TIME_UNIT = 1 * units.s  # flux for 1 second
+    parameters.wl_dwl_unit = units.nanometer ** 2  # lambda.dlambda  in wavelength in nm
+    parameters.FLAM_TO_ADURATE = ((parameters.OBS_SURFACE * parameters.SED_UNIT * parameters.TIME_UNIT
+                                   * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
+
+
+def apply_rebinning_to_parameters(reverse=False):
     """Divide or multiply original parameters by parameters.CCD_REBIN to set them correctly
     in the case of an image rebinning.
 
@@ -143,21 +154,30 @@ def apply_rebinning_to_parameters():
     20
     >>> parameters.CCD_PIXEL2MM
     20
+    >>> apply_rebinning_to_parameters(reverse=True)
+    >>> parameters.PIXWIDTH_SIGNAL
+    40
+    >>> parameters.CCD_PIXEL2MM
+    10.0
 
     """
+    if reverse:
+        parameters.CCD_REBIN = 1 / parameters.CCD_REBIN
     # Apply rebinning
-    parameters.PIXDIST_BACKGROUND //= parameters.CCD_REBIN
-    parameters.PIXWIDTH_BOXSIZE = max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN)
-    parameters.PIXWIDTH_BACKGROUND //= parameters.CCD_REBIN
-    parameters.PIXWIDTH_SIGNAL //= parameters.CCD_REBIN
-    parameters.CCD_IMSIZE //= parameters.CCD_REBIN
+    parameters.PIXDIST_BACKGROUND = int(parameters.PIXDIST_BACKGROUND // parameters.CCD_REBIN)
+    parameters.PIXWIDTH_BOXSIZE = int(max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN))
+    parameters.PIXWIDTH_BACKGROUND = int(parameters.PIXWIDTH_BACKGROUND // parameters.CCD_REBIN)
+    parameters.PIXWIDTH_SIGNAL = int(parameters.PIXWIDTH_SIGNAL // parameters.CCD_REBIN)
+    parameters.CCD_IMSIZE = int(parameters.CCD_IMSIZE // parameters.CCD_REBIN)
     parameters.CCD_PIXEL2MM *= parameters.CCD_REBIN
     parameters.CCD_PIXEL2ARCSEC *= parameters.CCD_REBIN
-    parameters.XWINDOW //= parameters.CCD_REBIN
-    parameters.YWINDOW //= parameters.CCD_REBIN
-    parameters.XWINDOW_ROT //= parameters.CCD_REBIN
-    parameters.YWINDOW_ROT //= parameters.CCD_REBIN
-    parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT //= parameters.CCD_REBIN
+    parameters.XWINDOW = int(parameters.XWINDOW // parameters.CCD_REBIN)
+    parameters.YWINDOW = int(parameters.YWINDOW // parameters.CCD_REBIN)
+    parameters.XWINDOW_ROT = int(parameters.XWINDOW_ROT // parameters.CCD_REBIN)
+    parameters.YWINDOW_ROT = int(parameters.YWINDOW_ROT // parameters.CCD_REBIN)
+    parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT = int(parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT // parameters.CCD_REBIN)
+    if reverse:
+        parameters.CCD_REBIN = 1
 
 
 def set_logger(logger):

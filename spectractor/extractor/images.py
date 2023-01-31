@@ -729,7 +729,9 @@ def load_AUXTEL_image(image):  # pragma: no cover
         image.target_guess = [parameters.CCD_IMSIZE - float(image.header["OBJECTY"]),
                               parameters.CCD_IMSIZE - float(image.header["OBJECTX"])]
     image.disperser_label = image.header["GRATING"]
-    parameters.DISTANCE2CCD = 113 + float(image.header["LINSPOS"])  # mm
+    parameters.DISTANCE2CCD = 115 + float(image.header["LINSPOS"])  # mm
+    if image.disperser_label == "holo4_003":
+        parameters.DISTANCE2CCD += 4  # hologram is sealed with a 4 mm window
     image.compute_parallactic_angle()
 
 def load_STARDICE_image(image):  # pragma: no cover

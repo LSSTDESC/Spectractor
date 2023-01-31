@@ -181,7 +181,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # create mask
         self.sqrtW = np.sqrt(sparse.diags(self.W))
         self.sparse_indices = None
-        self.set_mask()
+        self.set_mask(fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=2*parameters.PSF_FWHM_CLIP)  # not a narrow mask for first fit
 
         # design matrix
         self.M = np.zeros((self.Nx, self.data.size))
@@ -217,7 +217,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # regularisation matrices
         if amplitude_priors_method == "spectrum":
             # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
-            self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
+            # self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
+            self.U = np.linalg.inv(self.amplitude_priors_cov_matrix)
             L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] \
                 + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
             L.astype(float)
@@ -238,12 +239,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 else:
                     self.p[k] = 0
 
-    def set_mask(self, params=None):
+    def set_mask(self, params=None, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP):
         """
 
         Parameters
         ----------
         params
+        fwhmx_clip
+        fwhmy_clip
 
         Returns
         -------
@@ -260,26 +263,37 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if params is None:
             params = self.p
         A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *psf_poly_params = params
-        psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params,
-                                                                                            apply_bounds=True)
-        self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
-        Dx = np.arange(len(psf_profile_params[:, 0])) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
-        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        psf_profile_params[:, 0] = 1
-        psf_profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + dx0
-        psf_profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + dy0) - self.bgd_width
-        # psf_profile_params[:, 2] -= self.bgd_width
-        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, psf_profile_params,
-                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+        poly_params_order1 = psf_poly_params[:len(psf_poly_params)//2]
+        poly_params_order2 = psf_poly_params[len(psf_poly_params)//2:]
+        profile_params_order1 = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params_order1,
+                                                                                               apply_bounds=True)
+        profile_params_order2 = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params_order2,
+                                                                                               apply_bounds=True)
+        self.spectrum.chromatic_psf.from_profile_params_to_shape_params(profile_params_order1)
+        _, _, dispersion_law, dispersion_law_order2 = self.spectrum.compute_dispersion_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True)
+        profile_params_order1[:, 0] = 1
+        profile_params_order1[:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
+        profile_params_order1[:, 2] += dispersion_law.imag - self.bgd_width
+        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order1,
+                                                              fwhmx_clip=fwhmx_clip,
+                                                              fwhmy_clip=fwhmy_clip, dtype="float32")
+        profile_params_order2[:, 0] = 1
+        profile_params_order2[:, 1] = dispersion_law_order2.real + self.spectrum.spectrogram_x0
+        profile_params_order2[:, 2] += dispersion_law_order2.imag - self.bgd_width
+        psf_cube_order2 = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
+                                                                     fwhmx_clip=fwhmx_clip,
+                                                                     fwhmy_clip=fwhmy_clip, dtype="float32")
+
         self.psf_cube_masked = psf_cube > 0
-        flat_spectrogram = np.sum(self.psf_cube_masked.reshape(len(psf_profile_params), self.pixels[0].size), axis=0)
+        self.psf_cube_masked_order2 = psf_cube_order2 > 0
+        flat_spectrogram = np.sum(self.psf_cube_masked.reshape(len(profile_params_order1), self.pixels[0].size), axis=0)
         mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
         mask = mask.reshape(self.pixels[0].shape)
         kernel = np.ones((3, self.spectrum.spectrogram_Nx//10))  # enlarge a bit more the edges of the mask
         mask = convolve2d(mask, kernel, 'same').astype(bool)
         for k in range(self.psf_cube_masked.shape[0]):
             self.psf_cube_masked[k] *= ~mask
+            self.psf_cube_masked_order2[k] *= ~mask
         mask = mask.reshape((self.pixels[0].size,))
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
@@ -435,7 +449,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             psf_cube_order2 = A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
                                                                               fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
                                                                               fwhmy_clip=parameters.PSF_FWHM_CLIP,
-                                                                              dtype="float32", mask=None)
+                                                                              dtype="float32", mask=self.psf_cube_masked_order2)
             psf_cube += psf_cube_order2
         M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
         if self.sparse_indices is None:
@@ -693,12 +707,17 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         epsilon[epsilon == 0] = 1e-4
         fixed_default = np.copy(self.fixed)
         self.fixed = [True] * len(self.p)
+        # if fixed_default[3] is False and fixed_default[4] is False:
         self.fixed[3:5] = [False, False]  # shift_y and angle
+        # else:
+        #     for k, par in enumerate(self.input_labels):
+        #         if "y_c" in par and "_2" not in par:
+        #             self.fixed[k] = False
         self.sparse_indices = None
-        run_minimisation(self, "newton", epsilon, self.fixed, xtol=1e-4, ftol=100 / self.data.size)
+        run_minimisation(self, "newton", epsilon, self.fixed, xtol=1e-2, ftol=0.01)  # 1000 / self.data.size)
         self.fixed = fixed_default
         self.sparse_indices = None
-        self.set_mask(params=self.p)
+        self.set_mask(params=self.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
         # self.set_y_c()
 
 
@@ -756,7 +775,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             my_logger.info("\n --- before  run_minimisation ---")
             dumpfitparameters(w, my_logger)
 
-        run_minimisation(w, method=method, fix=w.fixed, xtol=1e-4, ftol=100 / (w.data.size - len(w.mask)))
+        run_minimisation(w, method=method, fix=w.fixed, xtol=1e-3, ftol=1e-2)  # 1000 / (w.data.size - len(w.mask)))
 
         if parameters.DEBUG:
             my_logger.info("\n --- after  run_minimisation ---")
@@ -764,6 +783,21 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
         if parameters.DEBUG and parameters.DISPLAY:
             w.plot_fit()
+
+        weighted_mean_fwhm = np.average(w.spectrum.chromatic_psf.table['fwhm'], weights=w.spectrum.chromatic_psf.table['amplitude'])
+        my_logger.info(f"\n\tMean FWHM: {weighted_mean_fwhm} pixels (weighted with spectrum amplitude)")
+        if parameters.DEBUG:
+            fig, ax = plt.subplots(1, 1, figsize=(7, 5), sharex="all")
+            ax.plot(w.spectrum.lambdas, np.array(w.spectrum.chromatic_psf.table['fwhm']), label=f"weighted mean={weighted_mean_fwhm} pix")
+            ax.set_xlabel(r"$\lambda$ [nm]")
+            ax.set_ylabel("Transverse FWHM [pixels]")
+            ax.set_ylim((0.8 * np.min(w.spectrum.chromatic_psf.table['fwhm']), 1.2 * np.max(w.spectrum.chromatic_psf.table['fwhm'])))  # [-10:])))
+            ax.grid()
+            ax.legend()
+            if parameters.DISPLAY:
+                plt.show()
+            if parameters.LSST_SAVEFIGPATH:
+                fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'fwhm_2.pdf'))
 
         my_logger.info("\n --- Start regularization parameter only  ---")
         # Optimize the regularisation parameter only if it was not done before
@@ -793,9 +827,9 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
         my_logger.info("\n --- Start run_minimisation_sigma_clipping  ---")
         for i in range(niter):
-            w.set_mask(params=w.p)
+            w.set_mask(params=w.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
             run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
-                                            ftol=100 / (w.data.size - len(w.mask)), niter_clip=3,
+                                            ftol=1e-3, niter_clip=3,  # ftol=100 / (w.data.size - len(w.mask))
                                             sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP, verbose=True)
             my_logger.info(f"\n\t  niter = {i} : Newton: total computation time: {time.time() - start}s")
 
@@ -842,7 +876,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.header["AM_FIT"] = w.p[9]
             # Compute order 2 contamination
             w.spectrum.data_order2 = w.p[0] * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
-            w.spectrum.err_order2 = w.p[0] * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+            w.spectrum.err_order2 = np.abs(w.p[0] * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas))
 
             # Calibrate the spectrum
             calibrate_spectrum(w.spectrum, with_adr=True)
@@ -910,28 +944,76 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     return w.spectrum
 
 
-def Spectractor(file_name, output_directory, target_label, guess=None, disperser_label="", config='',
-                atmospheric_lines=True):
-    """ Spectractor
-    Main function to extract a spectrum from an image
+def SpectractorInit(file_name, target_label='', disperser_label="", config=''):
+    """ Spectractor initialisation: load the config parameters and build the Image instance.
 
     Parameters
     ----------
     file_name: str
         Input file nam of the image to analyse.
-    output_directory: str
-        Output directory.
-    target_label: str
-        The name of the targeted object.
-    guess: [int,int], optional
-        [x0,y0] list of the guessed pixel positions of the target in the image (must be integers). Mandatory if
-        WCS solution is absent (default: None).
+    target_label: str, optional
+        The name of the targeted object (default: "").
     disperser_label: str, optional
         The name of the disperser (default: "").
     config: str
-        The config file name (default: "./config/ctio.ini").
-    atmospheric_lines: bool, optional
-        If True atmospheric lines are used in the calibration fit.
+        The config file name (default: "").
+
+    Returns
+    -------
+    image: Image
+        The prepared Image instance ready for spectrum extraction.
+
+    Examples
+    --------
+
+    Extract the spectrogram and its characteristics from the image:
+
+    .. doctest::
+
+        >>> import os
+        >>> from spectractor.logbook import LogBook
+        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
+        >>> file_names = ['./tests/data/reduc_20170530_134.fits']
+        >>> for file_name in file_names:
+        ...     tag = file_name.split('/')[-1]
+        ...     disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+        ...     if target_label is None or xpos is None or ypos is None:
+        ...         continue
+        ...     image = SpectractorInit(file_name, target_label=target_label,
+        ...                             disperser_label=disperser_label, config='./config/ctio.ini')
+
+    .. doctest::
+        :hide:
+
+        >>> assert image is not None
+
+    """
+
+    my_logger = set_logger(__name__)
+    my_logger.info('\n\tSpectractor initialisation')
+    # Load config file
+    if config != "":
+        load_config(config)
+    if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+        ensure_dir(parameters.LSST_SAVEFIGPATH)
+
+    # Load reduced image
+    image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
+    return image
+
+
+def SpectractorRun(image, output_directory, guess=None):
+    """ Spectractor main function to extract a spectrum from an image
+
+    Parameters
+    ----------
+    image: Image
+        Input Image instance.
+    output_directory: str
+        Output directory.
+    guess: [int,int], optional
+        [x0,y0] list of the guessed pixel positions of the target in the image (must be integers). Mandatory if
+        WCS solution is absent (default: None).
 
     Returns
     -------
@@ -954,8 +1036,9 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
         ...     disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         ...     if target_label is None or xpos is None or ypos is None:
         ...         continue
-        ...     spectrum = Spectractor(file_name, './tests/data/', guess=[xpos, ypos], target_label=target_label,
-        ...                            disperser_label=disperser_label, config='./config/ctio.ini')
+        ...     image = SpectractorInit(file_name, target_label=target_label,
+        ...                             disperser_label=disperser_label, config='./config/ctio.ini')
+        ...     spectrum = SpectractorRun(image, './tests/data/', guess=[xpos, ypos])
 
     .. doctest::
         :hide:
@@ -966,15 +1049,9 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     """
 
     my_logger = set_logger(__name__)
-    my_logger.info('\n\tStart SPECTRACTOR')
-    # Load config file
-    if config != "":
-        load_config(config)
-    if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-        ensure_dir(parameters.LSST_SAVEFIGPATH)
+    my_logger.info('\n\tRun Spectractor')
 
-    # Load reduced image
-    image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
+    # Guess position of order 0
     if guess is not None and image.target_guess is None:
         image.target_guess = np.asarray(guess)
     if image.target_guess is None:
@@ -996,16 +1073,17 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
 
     # Set output path
     ensure_dir(output_directory)
-    output_filename = file_name.split('/')[-1]
+    output_filename = image.file_name.split('/')[-1]
     output_filename = output_filename.replace('.fits', '_spectrum.fits')
     output_filename = output_filename.replace('.fz', '_spectrum.fits')
     output_filename = os.path.join(output_directory, output_filename)
     # Find the exact target position in the raw cut image: several methods
-    my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
-    find_target(image, image.target_guess, widths=(parameters.XWINDOW,
-                                                   parameters.YWINDOW))
+    my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...') 
+    find_target(image, image.target_guess, widths=(parameters.XWINDOW, parameters.YWINDOW))
+
     # Rotate the image
     turn_image(image)
+
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
 
@@ -1046,13 +1124,68 @@ def Spectractor(file_name, output_directory, target_label, guess=None, disperser
     # Save the spectrum
     my_logger.info('\n\t  ======================= SAVE SPECTRUM =============================')
     spectrum.save_spectrum(output_filename, overwrite=True)
-    spectrum.lines.print_detected_lines(output_file_name=output_filename.replace('_spectrum.fits', '_lines.csv'),
-                                        overwrite=True, amplitude_units=spectrum.units)
+    spectrum.lines.print_detected_lines(amplitude_units=spectrum.units)
 
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
 
+    return spectrum
+
+
+def Spectractor(file_name, output_directory, target_label='', guess=None, disperser_label="", config=''):
+
+    """ Spectractor main function to extract a spectrum from a FITS file.
+
+    Parameters
+    ----------
+    file_name: str
+        Input file nam of the image to analyse.
+    output_directory: str
+        Output directory.
+    target_label: str, optional
+        The name of the targeted object (default: "").
+    guess: [int,int], optional
+        [x0,y0] list of the guessed pixel positions of the target in the image (must be integers). Mandatory if
+        WCS solution is absent (default: None).
+    disperser_label: str, optional
+        The name of the disperser (default: "").
+    config: str
+        The config file name (default: "").
+
+    Returns
+    -------
+    spectrum: Spectrum
+        The extracted spectrum object.
+
+    Examples
+    --------
+
+    Extract the spectrogram and its characteristics from the image:
+
+    .. doctest::
+
+        >>> import os
+        >>> from spectractor.logbook import LogBook
+        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
+        >>> file_names = ['./tests/data/reduc_20170530_134.fits']
+        >>> for file_name in file_names:
+        ...     tag = file_name.split('/')[-1]
+        ...     disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+        ...     if target_label is None or xpos is None or ypos is None:
+        ...         continue
+        ...     spectrum = Spectractor(file_name, './tests/data/', guess=[xpos, ypos], target_label=target_label,
+        ...                            disperser_label=disperser_label, config='./config/ctio.ini')
+
+    .. doctest::
+        :hide:
+
+        >>> assert spectrum is not None
+        >>> assert os.path.isfile('tests/data/reduc_20170530_134_spectrum.fits')
+
+    """
+    image = SpectractorInit(file_name, target_label=target_label, disperser_label=disperser_label, config=config)
+    spectrum = SpectractorRun(image, guess=guess, output_directory=output_directory)
     return spectrum
 
 

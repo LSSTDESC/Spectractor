@@ -33,7 +33,7 @@ def test_extractor_ctio():
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
-    parameters.CCD_REBIN = 2
+    parameters.CCD_REBIN = 2  # rebin=1 to build tests/data spectrum
     apply_rebinning_to_parameters()
 
     for file_name in file_names:
@@ -41,8 +41,7 @@ def test_extractor_ctio():
         disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         if target_label is None or xpos is None or ypos is None:
             continue
-        spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
-                               atmospheric_lines=True, config="")
+        spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label, config="")
         assert spectrum.data is not None
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
                                    f"\n\t\tspectrum.lambdas[0]={spectrum.lambdas[0]}"
@@ -86,8 +85,7 @@ def test_extractor_ctio_planetary_nebula():
         disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         if target_label is None or xpos is None or ypos is None:
             continue
-        spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label,
-                               atmospheric_lines=True)
+        spectrum = Spectractor(file_name, output_directory, target_label, [xpos, ypos], disperser_label)
         assert spectrum.data is not None
         spectrum.my_logger.warning(f"\n\tQuantities to test:"
                                    f"\n\t\tspectrum.lambdas[0]={spectrum.lambdas[0]}"
@@ -131,9 +129,8 @@ def extractor_auxtel():
             # tag = file_name.split('/')[-1]
             # disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
             #spectrum = Spectractor(file_name, './outputs/', target_label=target_label, guess=[xpos, ypos],
-            #                       config=config, atmospheric_lines=True)
-            spectrum = Spectractor(file_name, './outputs/', target_label="", guess=None,
-                                   config=config, atmospheric_lines=True)
+            #                       config=config)
+            spectrum = Spectractor(file_name, './outputs/', target_label="", guess=None, config=config)
             assert spectrum.data is not None
             assert np.sum(spectrum.data) > 1e-14
             # spectrum.my_logger.warning(f"\n\tQuantities to test:"

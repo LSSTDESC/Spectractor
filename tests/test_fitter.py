@@ -36,10 +36,9 @@ class LineFitWorkspace(FitWorkspace):
         return self.x, self.model, self.model_err
 
 
-@unittest.skip('Numerical instability/lack of random seeding is assumed make these tests fail randomly on '
-                 'some np.all() asserts in this package. Attempt to turn back on as part of DM-33747.')
-def test_fitworkspace():
+def test_fitworkspace(seed=42):
     # Create mock data
+    np.random.seed(42)
     N = 100
     a = 5
     b = -1
@@ -87,10 +86,9 @@ def test_fitworkspace():
     assert np.all([np.abs(w.p[i] - truth[i]) / np.sqrt(w.cov[i, i]) < 3 for i in range(w.ndim)])
 
 
-@unittest.skip('Numerical instability/lack of random seeding is assumed make these tests fail randomly on '
-                 'some np.all() asserts in this package. Attempt to turn back on as part of DM-33747.')
-def test_minimisation_sigma_clipping():
+def test_minimisation_sigma_clipping(seed=42):
     # Create mock data
+    np.random.seed(seed)
     N = 100
     a = 5
     b = -1
