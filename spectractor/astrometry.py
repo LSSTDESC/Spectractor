@@ -107,7 +107,7 @@ def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, m
     return sources
 
 
-def load_gaia_catalog(coord, radius=5 * u.arcmin):
+def load_gaia_catalog(coord, radius=5 * u.arcmin, gaia_mag_g_limit=23):
     """Load the Gaia catalog of stars around a given RA,DEC position within a given radius.
 
     Parameters
@@ -116,6 +116,8 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin):
         Central coordinates for the Gaia cone search.
     radius: float
         Radius size for the cone search, with angle units (default: 5u.arcmin).
+    gaia_mag_g_limit: float, optional
+        Maximum g magnitude in the Gaia catalog output (default: 23).
 
     Returns
     -------
@@ -127,7 +129,7 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin):
 
     >>> from astropy.coordinates import SkyCoord
     >>> c = SkyCoord(ra=0*u.deg, dec=0*u.deg)
-    >>> gaia_catalog = load_gaia_catalog(c, radius=1*u.arcmin)  # doctest: +ELLIPSIS
+    >>> gaia_catalog = load_gaia_catalog(c, radius=1*u.arcmin, gaia_mag_g_limit=17)  # doctest: +ELLIPSIS
     INFO: Query finished...
     >>> print(gaia_catalog)  # doctest: +SKIP
             dist        ...
@@ -145,6 +147,7 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin):
     my_logger.debug(f"\n\t{job}")
     gaia_catalog = job.get_results()
     my_logger.debug(f"\n\t{gaia_catalog}")
+    gaia_catalog = gaia_catalog[gaia_catalog["phot_g_mean_mag"]<gaia_mag_g_limit]
     gaia_catalog.fill_value = 0
     gaia_catalog['parallax'].fill_value = np.min(gaia_catalog['parallax'])
     return gaia_catalog
@@ -172,7 +175,7 @@ def get_gaia_coords_after_proper_motion(gaia_catalog, date_obs):
     >>> from astropy.coordinates import SkyCoord
     >>> from astropy.time import Time
     >>> c = SkyCoord(ra=0*u.deg, dec=0*u.deg)
-    >>> gaia_catalog = load_gaia_catalog(c, radius=1*u.arcmin)  # doctest: +ELLIPSIS
+    >>> gaia_catalog = load_gaia_catalog(c, radius=1*u.arcmin, gaia_mag_g_limit=17)  # doctest: +ELLIPSIS
     INFO: Query finished...
     >>> t = Time("2017-01-01T00:00:00.000")
     >>> gaia_coords = get_gaia_coords_after_proper_motion(gaia_catalog, t)
@@ -225,7 +228,7 @@ def plot_shifts_histograms(dra, ddec):  # pragma: no cover
 
 class Astrometry():  # pragma: no cover
 
-    def __init__(self, image, wcs_file_name="", output_directory=""):
+    def __init__(self, image, wcs_file_name="", output_directory="", gaia_mag_g_limit=23):
         """Class to handle astrometric computations.
 
         Parameters
@@ -236,9 +239,12 @@ class Astrometry():  # pragma: no cover
             The path to a WCS fits file. WCS content will be loaded (default: "").
         output_directory: str, optional
             The output directory path. If empty, a directory *_wcs is created next to the analyzed image (default: "").
+        gaia_mag_g_limit: float, optional
+            Maximum g magnitude in the Gaia catalog output (default: 23).
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.image = image
+        self.gaia_mag_g_limit = gaia_mag_g_limit
         # Use fast mode
         if parameters.CCD_REBIN > 1:
             self.image.rebin()
@@ -441,7 +447,7 @@ class Astrometry():  # pragma: no cover
         radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
         self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
                             f"arcsec from {self.image.target.label} {self.image.target.radec_position}...")
-        self.gaia_catalog = load_gaia_catalog(self.image.target.radec_position, radius=radius)
+        self.gaia_catalog = load_gaia_catalog(self.image.target.radec_position, radius=radius, gaia_mag_g_limit=self.gaia_mag_g_limit)
         ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
         return self.gaia_catalog
 
@@ -1152,7 +1158,7 @@ class Astrometry():  # pragma: no cover
                 radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
                 self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
                                     f"arcsec from {self.image.target.label} {self.image.target.radec_position}...")
-                self.gaia_catalog = load_gaia_catalog(self.image.target.radec_position, radius=radius)
+                self.gaia_catalog = load_gaia_catalog(self.image.target.radec_position, radius=radius, gaia_mag_g_limit=self.gaia_mag_g_limit)
                 ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
             self.my_logger.info(f"\n\tGaia catalog loaded.")
 
