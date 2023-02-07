@@ -141,6 +141,8 @@ def get_delta_pix_ortho(deltaX, x0, D=parameters.DISTANCE2CCD):
 
     Examples
     --------
+    >>> from spectractor.config import load_config
+    >>> load_config("default.ini")
     >>> delta, D = 500, 55
     >>> get_delta_pix_ortho(delta, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2], D=D)
     500.0
@@ -282,7 +284,8 @@ class Grating:
         D: float
             The distance between the CCD and the disperser in mm.
         data_dir: str
-            The directory where information about this disperser is stored. Must be in the form data_dir/label/...
+            The directory where information about this disperser is stored. If relative, then the starting point is the
+            installation package directory spectractor/. If absolute, it is taken as it is.
             (default: parameters.DISPERSER_DIR)
         verbose: bool
             Set to True to increase the verbosity of the initialisation (default: False)
@@ -305,7 +308,12 @@ class Grating:
         self.D = D
         self.label = label
         self.full_name = label
-        self.data_dir = data_dir
+        if os.path.isabs(data_dir):
+            self.data_dir = data_dir
+        else:
+            mypath = os.path.dirname(os.path.dirname(__file__))
+            self.data_dir = os.path.join(mypath, parameters.DISPERSER_DIR)
+        self.my_logger.warning(f"{self.data_dir}")
         self.theta_tilt = 0
         self.transmission = None
         self.transmission_err = None
@@ -485,6 +493,8 @@ class Grating:
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("default.ini")
         >>> disperser = Grating(N=300, D=55)
         >>> x0 = [800,800]
         >>> lambdas = np.arange(300, 900, 100)
@@ -513,6 +523,8 @@ class Grating:
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("default.ini")
         >>> disperser = Grating(N=300, D=55)
         >>> x0 = [800,800]
         >>> deltaX = np.arange(0,1000,1).astype(float)
@@ -542,6 +554,8 @@ class Grating:
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("default.ini")
         >>> disperser = Grating(N=300, D=55)
         >>> x0 = [800,800]
         >>> deltaX = np.arange(0,1000,1).astype(float)

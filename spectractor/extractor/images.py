@@ -109,7 +109,10 @@ class Image(object):
 
         .. doctest::
 
-            >>> im = Image('tests/data/reduc_20170605_028.fits')
+           >>> im = Image('')
+           >>> im.data
+           None
+           >>> im = Image('tests/data/reduc_20170605_028.fits')
 
         .. doctest::
             :hide:
@@ -124,8 +127,6 @@ class Image(object):
         self.my_logger = set_logger(self.__class__.__name__)
         if config != "":
             load_config(config)
-        if not os.path.isfile(file_name) and parameters.CALLING_CODE != 'LSST_DM':
-            raise FileNotFoundError(f"File {file_name} does not exist.")
         self.file_name = file_name
         self.units = 'ADU'
         self.expo = -1
@@ -155,7 +156,7 @@ class Image(object):
         self.pressure = 0
         self.humidity = 0
 
-        if parameters.CALLING_CODE != 'LSST_DM':
+        if parameters.CALLING_CODE != 'LSST_DM' and file_name != "":
             self.load_image(file_name)
         else:
             # data provided by the LSST shim, just instantiate objects
@@ -222,6 +223,8 @@ class Image(object):
             The fits file name.
 
         """
+        if not os.path.isfile(file_name):
+            raise FileNotFoundError(f"{file_name} not found.")
         if parameters.OBS_NAME == 'CTIO':
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
@@ -729,7 +732,9 @@ def load_AUXTEL_image(image):  # pragma: no cover
         image.target_guess = [parameters.CCD_IMSIZE - float(image.header["OBJECTY"]),
                               parameters.CCD_IMSIZE - float(image.header["OBJECTX"])]
     image.disperser_label = image.header["GRATING"]
-    parameters.DISTANCE2CCD = 113 + float(image.header["LINSPOS"])  # mm
+    parameters.DISTANCE2CCD = 115 + float(image.header["LINSPOS"])  # mm
+    if image.disperser_label == "holo4_003":
+        parameters.DISTANCE2CCD += 4  # hologram is sealed with a 4 mm window
     image.compute_parallactic_angle()
 
 def load_STARDICE_image(image):  # pragma: no cover
@@ -740,6 +745,7 @@ def load_STARDICE_image(image):  # pragma: no cover
     image: Image
         The Image instance to fill with file data and header.
     """
+
     image.my_logger.info(f'\n\tLoading STARDICE image {image.file_name}...')
     hdu_list = fits.open(image.file_name)
     image.header = hdu_list[0].header
@@ -749,6 +755,14 @@ def load_STARDICE_image(image):  # pragma: no cover
         del image.header["BZERO"]
     if "BSCALE" in image.header:
         del image.header["BSCALE"]
+
+    #Set the flip signs depending on the side of the pillar 
+    if image.header['MOUNTTAU'] < 90:
+        parameters.OBS_CAMERA_ROTATION = 180
+
+    elif image.header['MOUNTTAU'] >= 90:
+        parameters.OBS_CAMERA_ROTATION = 0
+
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['cameraexptime'])
     image.filter_label = 'EMPTY'
@@ -765,21 +779,32 @@ def load_STARDICE_image(image):  # pragma: no cover
     image.ra = Angle(image.header['MOUNTRA'], unit="deg")
     image.dec = Angle(image.header['MOUNTDEC'], unit="deg")
     image.hour_angle = Angle(image.header['MOUNTHA'], unit="deg")
+    if image.header['MOUNTTAU'] >= 90:
+        image.hour_angle = image.hour_angle - 180*units.deg
+        image.dec = 180*units.deg - image.dec
     image.temperature = 10
     image.pressure = 1000
     image.humidity = 87
     image.units = 'ADU'
-    
-    if "CD2_1" in hdu_list[0].header:
-        rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[0].header["CD2_1"], hdu_list[0].header["CD1_1"]) + 90
-        if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
-            image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
-                                    f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degree. "
-                                    f"\nBoth differs by more than 2 degree... bug ?")
+    #print("WCS :", rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360)
+    if "PC2_1" in image.header:
+        #rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[0].header["CD2_1"], hdu_list[0].header["CD1_1"]) + 90        
+        rotation_wcs = 180 / np.pi * np.arctan2(-hdu_list[0].header["PC2_1"]/hdu_list[0].header["CDELT2"], hdu_list[0].header["PC1_1"]/hdu_list[0].header["CDELT1"])
+        atol = 0.02
+        print("RORATION WCS :", rotation_wcs)
+        if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=atol):
+            image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degrees while "
+                                    f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degrees. "
+                                    f"\nBoth differs by more than {atol} degrees... bug ?")
+        #parameters.OBS_CAMERA_ROTATION = rotation_wcs 
+
     
     image.read_out_noise = 8.5 * np.ones_like(image.data)
     #image.target_label = image.header["OBJECT"]  #.replace(" ", "")
     image.compute_parallactic_angle()
+    print(image.parallactic_angle)
+    #image.parallactic_angle = 180 + image.parallactic_angle
+    print(image.parallactic_angle)
 
 
 def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):

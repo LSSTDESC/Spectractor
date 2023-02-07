@@ -1,5 +1,5 @@
 from spectractor import parameters
-from spectractor.config import set_logger
+from spectractor.config import set_logger, load_config
 from spectractor.tools import (pixel_rotation, set_wcs_file_name, set_sources_file_name,
                                set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir,
                                plot_image_simple)
@@ -108,6 +108,7 @@ class StarFieldModel:
         >>> s.plot_model()
 
         """
+        self.my_logger = set_logger(self.__class__.__name__)
         self.image = base_image
         self.target = base_image.target
         self.field = None
@@ -363,7 +364,7 @@ class ImageModel(Image):
 
 
 def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1,
-             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
+             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True, config=""):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -382,7 +383,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger = set_logger(__name__)
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
     # Load reduced image
-    spectrum, telescope, disperser, target = SimulatorInit(spectrum_filename)
+    spectrum, telescope, disperser, target = SimulatorInit(spectrum_filename, config=config)
     image = ImageModel(image_filename, target_label=target.label)
     guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
     if "CCDREBIN" in spectrum.header:
