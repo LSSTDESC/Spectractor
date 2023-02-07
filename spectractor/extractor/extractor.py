@@ -1078,12 +1078,10 @@ def SpectractorRun(image, output_directory, guess=None):
     output_filename = output_filename.replace('.fz', '_spectrum.fits')
     output_filename = os.path.join(output_directory, output_filename)
     # Find the exact target position in the raw cut image: several methods
-    my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...') 
+    my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
     find_target(image, image.target_guess, widths=(parameters.XWINDOW, parameters.YWINDOW))
-
     # Rotate the image
     turn_image(image)
-
     # Find the exact target position in the rotated image: several methods
     my_logger.info('\n\tSearch for the target in the rotated image...')
 
@@ -1251,7 +1249,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         lambdas = image.disperser.grating_pixel_to_lambda(np.arange(Nx) - image.target_pixcoords_rotated[0],
                                                           x0=image.target_pixcoords,
                                                           order=spectrum.order)
-        print(lambdas, parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)
         xmin = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MIN)))
         xmax = int(np.argmin(np.abs(lambdas - parameters.LAMBDA_MAX)))
 
@@ -1349,8 +1346,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
     xmin = max(0, int(s.table['Dx'][lambda_min_index] + x0))
     xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
-    print(lambdas, parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)
-    print(right_edge, int(s.table['Dx'][lambda_max_index] + x0))
     # Position of the order 0 in the spectrogram coordinates
     target_pixcoords_spectrogram = [image.target_pixcoords[0] - xmin, image.target_pixcoords[1] - ymin]
     s.y0 = target_pixcoords_spectrogram[1]
