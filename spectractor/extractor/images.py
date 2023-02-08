@@ -855,7 +855,7 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     theX = -1
     theY = -1
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
-        wcs_file_name = set_wcs_file_name(image.file_name)
+        wcs_file_name = image.wcs_file_name
         if os.path.isfile(wcs_file_name):
             my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
             if rotated:
