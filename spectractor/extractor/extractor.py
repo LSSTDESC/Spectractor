@@ -71,15 +71,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.my_logger = set_logger(self.__class__.__name__)
         self.spectrum = spectrum
 
-        # check the shapes
-        self.Ny, self.Nx = spectrum.spectrogram.shape
-        # if self.Ny != self.spectrum.chromatic_psf.Ny:
-        #     raise AttributeError(f"Data y shape {self.Ny} different from "
-        #                          f"ChromaticPSF input Ny {spectrum.chromatic_psf.Ny}.")
-        # if self.Nx != self.spectrum.chromatic_psf.Nx:
-        #     raise AttributeError(f"Data x shape {self.Nx} different from "
-        #                          f"ChromaticPSF input Nx {spectrum.chromatic_psf.Nx}.")
-
         # crop data to fit faster
         self.lambdas = self.spectrum.lambdas
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
@@ -90,6 +81,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.Ny, self.Nx = self.data.shape
         yy, xx = np.mgrid[:self.Ny, :self.Nx]
         self.pixels = np.asarray([xx, yy])
+
+        # adapt the ChromaticPSF table shape
+        if self.Nx != self.spectrum.chromatic_psf.Nx:
+            self.spectrum.chromatic_psf.resize_table(new_Nx=self.Nx)
 
         # prepare parameters to fit
         self.A2 = 1
@@ -208,12 +203,23 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             raise ValueError(f"Unknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
                              f"Must be either {self.amplitude_priors_list}.")
         self.spectrum.convert_from_flam_to_ADUrate()
+        self.amplitude_priors = np.copy(self.spectrum.data)
         if self.amplitude_priors_method == "spectrum":
-            self.amplitude_priors = np.copy(self.spectrum.data)
             self.amplitude_priors_cov_matrix = np.copy(self.spectrum.cov_matrix)
-        if self.amplitude_priors_method == "fixed":
-            self.amplitude_priors = np.copy(self.spectrum.data)
-
+        if self.spectrum.data.size != self.Nx:  # must rebin the priors
+            old_x = np.linspace(0, 1, self.spectrum.data.size)
+            new_x = np.linspace(0, 1, self.Nx)
+            self.spectrum.lambdas = np.interp(new_x, old_x, self.spectrum.lambdas)
+            self.amplitude_priors = np.interp(new_x, old_x, self.amplitude_priors)
+            if self.amplitude_priors_method == "spectrum":
+                # rebin prior cov matrix with monte-carlo
+                niter = 10000
+                samples = np.random.multivariate_normal(np.zeros_like(old_x), cov=self.amplitude_priors_cov_matrix, size=niter)
+                new_samples = np.zeros((niter, new_x.size))
+                for i in range(niter):
+                    new_samples[i] = np.interp(new_x, old_x, samples[i])
+                self.amplitude_priors_cov_matrix = np.cov(new_samples.T)
+                # self.amplitude_priors_cov_matrix[np.abs(self.amplitude_priors_cov_matrix) < 1e-3 * np.max(self.amplitude_priors_cov_matrix)] = 0
         # regularisation matrices
         if amplitude_priors_method == "spectrum":
             # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
@@ -1434,7 +1440,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                          label='Fitted spectrum centers', marker='o', s=10)
         ax[1, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
         ax[1, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-', label='')
-        ax[1, 0].set_ylim(0.5 * Ny - signal_width, 0.5 * Ny + signal_width)
+        # ax[1, 0].set_ylim(0.5 * Ny - signal_width, 0.5 * Ny + signal_width)
         ax[1, 0].set_xlim(0, xx.size)
         ax[1, 0].legend(loc='best')
         plot_spectrum_simple(ax[0, 0], spectrum.lambdas, spectrum.data, data_err=spectrum.err,

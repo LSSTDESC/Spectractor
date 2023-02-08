@@ -134,6 +134,41 @@ class ChromaticPSF:
             table = Table.read(file_name)
         self.init_table(table, saturation=saturation)
 
+    def resize_table(self, new_Nx):
+        """Resize the table and interpolate existing values to a new length size.
+
+        Parameters
+        ----------
+        new_Nx: int
+            New length of the ChromaticPSF on X axis.
+
+        Examples
+        --------
+
+        >>> psf = Moffat()
+        >>> s = ChromaticPSF(psf, Nx=20, Ny=5, deg=1, saturation=20000)
+        >>> params = s.generate_test_poly_params()
+        >>> s.fill_table_with_profile_params(s.from_poly_params_to_profile_params(params))
+        >>> print(np.sum(s.table["gamma"]))
+        100.0
+        >>> print(s.table["gamma"].size)
+        20
+        >>> s.resize_table(10)
+        >>> print(np.sum(s.table["gamma"]))
+        50.0
+        >>> print(s.table["gamma"].size)
+        10
+
+        """
+        new_chromatic_psf = ChromaticPSF(psf=self.psf, Nx=new_Nx, Ny=self.Ny, x0=self.x0, y0=self.y0,
+                                         deg=self.deg, saturation=self.saturation)
+        old_x = np.linspace(0, 1, self.Nx)
+        new_x = np.linspace(0, 1, new_Nx)
+        for colname in self.table.colnames:
+            new_chromatic_psf.table[colname] = np.interp(new_x, old_x, np.array(self.table[colname]))
+        self.init_table(table=new_chromatic_psf.table, saturation=self.saturation)
+        self.__dict__.update(new_chromatic_psf.__dict__)
+
     def set_polynomial_degrees(self, deg):
         self.deg = deg
         self.degrees = {key: deg for key in self.psf.param_names}
