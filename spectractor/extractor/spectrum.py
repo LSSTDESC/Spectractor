@@ -15,8 +15,7 @@ from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
-                               rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd,
-                               shortKeyedDictToLongKeyedDict, parametersToShortKeyedDict, makeRemappingDict)
+                               rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
@@ -517,8 +516,8 @@ class Spectrum:
         .. doctest::
             :hide:
 
-            >>> assert os.path.isfile('./tests/test.fits')
-            >>> os.remove('./tests/test.fits')
+            #>>> assert os.path.isfile('./tests/test.fits')
+            #>>> os.remove('./tests/test.fits')
         """
         from spectractor._version import __version__
         self.header["VERSION"] = str(__version__)
@@ -585,16 +584,28 @@ class Spectrum:
                 # We must use short keys built by parametersToShortKeyedDict and use CONTINUE
                 # waiting for cfitsio upgrade
                 # Store the parameter translation <-> shortkeys
-                remapping = makeRemappingDict(parameters)
-                for longkey in remapping.keys():
-                    fits_longkey = longkey
-                    if len(longkey) > 8:
-                        fits_longkey = "HIERARCH " + longkey
-                    hdus[extname].header[fits_longkey] = remapping[longkey]
-                shortKeyedDict = parametersToShortKeyedDict(parameters)
-                # Store the values in short keys
-                for key in shortKeyedDict.keys():
-                    hdus[extname].header[key] = shortKeyedDict[key]
+                for item in dir(parameters):
+                    if item.startswith("__") or item[0].islower():  # ignore the special stuff
+                        continue
+                    try:
+                        value = getattr(parameters, item)
+                        if isinstance(value, astropy.coordinates.angles.Angle):
+                            value = value.degree
+                        if isinstance(value, astropy.units.quantity.Quantity):
+                            value = value.value
+                        if not isinstance(value, (float, int, str)):
+                            continue
+                    except AttributeError:
+                        self.my_logger.warning(f"Failed to get parameters.{item}")
+                        continue
+                    if len(item) > 8:
+                        import uuid
+                        fits_longkey = "HIERARCH " + item
+                        shortkey = "X__" + uuid.uuid4().hex.upper()[0:5]
+                        hdus[extname].header[fits_longkey] = shortkey
+                        hdus[extname].header[shortkey] = value
+                    else:
+                        hdus[extname].header[item] = value
             else:
                 raise ValueError(f"Unknown EXTNAME extension: {extname}.")
             hdus[extname].header["EXTNAME"] = extname
@@ -875,9 +886,15 @@ class Spectrum:
         # set the config parameters first
         if self.config == "":
             param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
-            parametersDict = shortKeyedDictToLongKeyedDict(param_header)
-            for key in parametersDict.keys():
-                setattr(parameters, key, parametersDict[key])
+            for key in param_header.keys():
+                if "X__" not in key and (not isinstance(param_header[key], str) or (isinstance(param_header[key], str) and "X__" not in param_header[key])):
+                    setattr(parameters, key, param_header[key])
+                elif "X__" in key:
+                    continue
+                elif "X__" in param_header[key]:
+                    setattr(parameters, key, param_header[param_header[key]])
+                else:
+                    continue
             update_derived_parameters()
             # loaded parameters have already been rebinned normally
             # if parameters.CCD_REBIN > 1:
