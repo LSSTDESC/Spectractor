@@ -16,6 +16,14 @@ from scipy.signal import medfilt2d
 from scipy.interpolate import RegularGridInterpolator
 
 
+def _from_bkgd_interp_to_func(bgd_model_func_interp):
+    def bgd_model_func(x, y):
+        xx, yy = np.meshgrid(x, y, indexing='ij')
+        return bgd_model_func_interp((xx, yy)).T
+
+    return bgd_model_func
+
+
 def remove_image_background_sextractor(data, sigma=3.0, box_size=(50, 50), filter_size=(3, 3), positive=False):
     sigma_clip = SigmaClip(sigma=sigma)
     bkg_estimator = SExtractorBackground()
@@ -103,10 +111,7 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
     bgd_model_func_interp = RegularGridInterpolator((np.arange(Nx), index), bgd_model.T, method='linear',
                                                     bounds_error=False, fill_value=None)
 
-    def bgd_model_func(x, y):
-        xx, yy = np.meshgrid(x, y, indexing='ij')
-        return bgd_model_func_interp((xx, yy)).T
-
+    bgd_model_func = _from_bkgd_interp_to_func(bgd_model_func_interp)
     if parameters.DEBUG:
         fig, ax = plt.subplots(3, 1, figsize=(12, 6), sharex='all')
         bgd_bands = np.copy(data).astype(float)
@@ -223,10 +228,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     bgd_model_func_interp = RegularGridInterpolator((np.arange(Nx), np.arange(Ny)), bkg.background.T, method='linear',
                                                     bounds_error=False, fill_value=None)
 
-    def bgd_model_func(x, y):
-        xx, yy = np.meshgrid(x, y, indexing='ij')
-        return bgd_model_func_interp((xx, yy)).T
-
+    bgd_model_func = _from_bkgd_interp_to_func(bgd_model_func_interp)
     bgd_res = ((data - bkg.background)/err)
     bgd_res[mask] = np.nan
 
@@ -353,9 +355,7 @@ def extract_spectrogram_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1
     bgd_model_func_interp = RegularGridInterpolator((pixel_range, bgd_index), bgd_model_func(xx, yy).T, method='linear',
                                                      bounds_error=False, fill_value=None)
 
-    def bgd_model_func(x, y):
-        xx, yy = np.meshgrid(x, y, indexing='ij')
-        return bgd_model_func_interp((xx, yy)).T
+    bgd_model_func = _from_bkgd_interp_to_func(bgd_model_func_interp)
 
     if parameters.DEBUG:
         fig, ax = plt.subplots(2, 1, figsize=(12, 6), sharex='all')

@@ -7,6 +7,8 @@ from iminuit import Minuit
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import random
+import string
 import astropy
 
 from spectractor import parameters
@@ -158,6 +160,9 @@ class Spectrum:
                  spectrogram_file_name_override=None,
                  psf_file_name_override=None,):
         """ Class used to store information and methods relative to spectra and their extraction.
+        If a file name is provided, for Spectractor software version strictly below 2.4 one must provide
+        a config file also, otherwise do not set a config file (default).
+        Config parameters are loaded from file header since version 2.4.
 
         Parameters
         ----------
@@ -180,13 +185,13 @@ class Spectrum:
         Examples
         --------
         Load a spectrum from a fits file
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits', config="./config/ctio.ini")
+        >>> s = Spectrum(file_name='./tests/data/reduc_20170530_134_spectrum.fits', config="")
         >>> print(s.order)
         1
         >>> print(s.target.label)
-        PNG321.0+3.9
+        HD111980
         >>> print(s.disperser_label)
-        HoloPhAg
+        HoloAmAg
 
         Load a spectrum from a fits image file
         >>> from spectractor.extractor.images import Image
@@ -387,7 +392,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits', config="./config/ctio.ini")
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
         >>> s.plot_spectrum(xlim=[500,900], live_fit=False, force_lines=True)
         """
         if ax is None:
@@ -502,7 +507,7 @@ class Spectrum:
         Examples
         --------
         >>> import os
-        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits', config="./config/ctio.ini")
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
         >>> s.save_spectrum('./tests/test.fits')
 
         .. doctest::
@@ -516,8 +521,8 @@ class Spectrum:
         .. doctest::
             :hide:
 
-            #>>> assert os.path.isfile('./tests/test.fits')
-            #>>> os.remove('./tests/test.fits')
+            >>> assert os.path.isfile('./tests/test.fits')
+            >>> os.remove('./tests/test.fits')
         """
         from spectractor._version import __version__
         self.header["VERSION"] = str(__version__)
@@ -587,21 +592,25 @@ class Spectrum:
                 for item in dir(parameters):
                     if item.startswith("__") or item[0].islower():  # ignore the special stuff
                         continue
+                    if item in parameters.STYLE_PARAMETERS:  # don't save plot or verbosity parameters
+                        continue
                     try:
                         value = getattr(parameters, item)
                         if isinstance(value, astropy.coordinates.angles.Angle):
                             value = value.degree
                         if isinstance(value, astropy.units.quantity.Quantity):
                             value = value.value
-                        if not isinstance(value, (float, int, str)):
+                        if isinstance(value, (np.ndarray, list)):
                             continue
+                        if not isinstance(value, (float, int, str, np.ndarray, list)):
+                            raise ValueError(f"Can't handle {parameters.item} type {type(parameters.item)}.")
                     except AttributeError:
-                        self.my_logger.warning(f"Failed to get parameters.{item}")
-                        continue
+                        raise KeyError(f"Failed to get parameters.{item}.")
                     if len(item) > 8:
-                        import uuid
                         fits_longkey = "HIERARCH " + item
-                        shortkey = "X__" + uuid.uuid4().hex.upper()[0:5]
+                        char_set = string.ascii_uppercase + string.digits
+                        while (shortkey := "X_" + ''.join(random.sample(char_set * 6, 6))) in hdus[extname].header.values():
+                            pass
                         hdus[extname].header[fits_longkey] = shortkey
                         hdus[extname].header[shortkey] = value
                     else:
@@ -682,9 +691,9 @@ class Spectrum:
         Examples
         --------
 
-        # Latest Spectractor output format
+        # Latest Spectractor output format: do not provide a config file (parameters are loaded from file header)
         >>> from spectractor import parameters
-        >>> s = Spectrum(config="./config/ctio.ini")
+        >>> s = Spectrum(config="")
         >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
 
         .. doctest::
@@ -694,7 +703,7 @@ class Spectrum:
             >>> assert parameters.CCD_REBIN == s.header["REBIN"]
             >>> assert s.parallactic_angle == s.header["PARANGLE"]
 
-        # Spectractor output format older than version <=2.3
+        # Spectractor output format older than version <=2.3: must give the config file
         >>> parameters.VERBOSE = False
         >>> s = Spectrum(config="./config/ctio.ini")
         >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
@@ -717,6 +726,9 @@ class Spectrum:
         # check the version of the file
         if "VERSION" in self.header:
             from spectractor._version import __version__
+            if self.config != "":
+                raise AttributeError(f"With Spectractor above 2.4 do not provide a config file in Spectrum(config=...)."
+                                     "Now config parameters are loaded from the file header. Got {self.config=}.")
             if self.header["VERSION"] != str(__version__):
                 self.my_logger.warning(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
                                        f"different from current Spectractor software {__version__}.")
@@ -724,12 +736,15 @@ class Spectrum:
         else:
             self.my_logger.warning("\n\tNo information about Spectractor software version is given in the header. "
                                    "Use old load function.")
+            if self.config == "":
+                raise AttributeError("With old Spectrum files you must provide a config file in Spectrum(config=...).")
             self.load_spectrum_older_24(input_file_name, spectrogram_file_name_override=spectrogram_file_name_override,
                                         psf_file_name_override=psf_file_name_override)
 
     def load_spectrum_older_24(self, input_file_name, spectrogram_file_name_override=None,
                                psf_file_name_override=None, fast_load=False):
-        """Load the spectrum from a fits file (data, error and wavelengths).
+        """Load the spectrum from a FITS file (data, error and wavelengths) from Spectrum files generated
+        with Spectractor software strictly older than 2.4 version. The parameters must be loaded via the config files.
 
         Parameters
         ----------
@@ -745,7 +760,7 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum(config="./config/ctio.ini")
-        >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
         >>> print(s.units)
         erg/s/cm$^2$/nm
         """
@@ -809,8 +824,6 @@ class Spectrum:
             self.fast_load = False
             spectrogram_file_name = spectrogram_file_name_override
             psf_file_name = psf_file_name_override
-            self.my_logger.info(f'\n\tApplying spectrogram filename override {spectrogram_file_name}')
-            self.my_logger.info(f'\n\tApplying psf filename override {psf_file_name}')
 
         if not self.fast_load:
             hdu_list = fits.open(input_file_name)
@@ -852,7 +865,9 @@ class Spectrum:
             hdu_list.close()
 
     def load_spectrum_latest(self, input_file_name):
-        """Load the spectrum from a fits file (data, error and wavelengths).
+        """Load the spectrum from a FITS file (data, error and wavelengths) from Spectrum files generated
+        with Spectractor software above or equal 2.4 version. The parameters are loaded via the FITS file header
+        and overwrites those loaded via the config file.
 
         Parameters
         ----------
@@ -884,21 +899,20 @@ class Spectrum:
             self.cov_matrix = np.diag(self.err ** 2)
 
         # set the config parameters first
-        if self.config == "":
-            param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
-            for key in param_header.keys():
-                if "X__" not in key and (not isinstance(param_header[key], str) or (isinstance(param_header[key], str) and "X__" not in param_header[key])):
-                    setattr(parameters, key, param_header[key])
-                elif "X__" in key:
-                    continue
-                elif "X__" in param_header[key]:
-                    setattr(parameters, key, param_header[param_header[key]])
-                else:
-                    continue
-            update_derived_parameters()
-            # loaded parameters have already been rebinned normally
-            # if parameters.CCD_REBIN > 1:
-            #     apply_rebinning_to_parameters()
+        param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
+        for key, value in param_header.items():
+            if "X_" not in key and (not isinstance(param_header[key], str) or (isinstance(param_header[key], str) and "X_" not in param_header[key])):
+                setattr(parameters, key, value)
+            elif "X_" in key:
+                continue
+            elif "X_" in param_header[key]:
+                setattr(parameters, key, param_header[value])
+            else:
+                continue
+        update_derived_parameters()
+        # loaded parameters have already been rebinned normally
+        # if parameters.CCD_REBIN > 1:
+        #     apply_rebinning_to_parameters()
 
         # set the simple items from the mappings. More complex items, i.e.
         # those needing function calls, follow
@@ -996,8 +1010,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(config="./config/ctio.ini")
-        >>> s.load_spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
         >>> print(s.chromatic_psf.table)  #doctest: +ELLIPSIS
              lambdas               Dx        ...
         """

@@ -120,19 +120,16 @@ def load_config(config_filename, rebin=True):
                 par = getattr(parameters, options.upper())
                 print(f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}")
 
-
 def update_derived_parameters():
     # Derive other parameters
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
-    parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 1)
-    parameters.MY_FORMAT = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
-    logging.basicConfig(format=parameters.MY_FORMAT, level=logging.WARNING)
+    parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, parameters.LAMBDA_STEP)
     parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
     parameters.OBS_DIAMETER = parameters.OBS_DIAMETER * units.m  # Diameter of the telescope
     parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4.  # Surface of telescope
     # Conversion factor
     # Units of SEDs in flam (erg/s/cm2/nm) :
-    parameters.hc = const.h * const.c  # h.c product of fontamental constants c and h
+    parameters.hc = const.h * const.c  # h.c product of fundamental constants c and h
     parameters.SED_UNIT = 1 * units.erg / units.s / units.cm ** 2 / units.nanometer
     parameters.TIME_UNIT = 1 * units.s  # flux for 1 second
     parameters.wl_dwl_unit = units.nanometer ** 2  # lambda.dlambda  in wavelength in nm
@@ -211,21 +208,23 @@ def set_logger(logger):
     
     """
     my_logger = logging.getLogger(logger)
+    my_format = "%(asctime)-20s %(name)-10s %(funcName)-20s %(levelname)-6s %(message)s"
+    logging.basicConfig(format=my_format, level=logging.WARNING)
     if not parameters.CALLING_CODE:
         coloredlogs.DEFAULT_LEVEL_STYLES['warn'] = {'color': 'yellow'}
         coloredlogs.DEFAULT_FIELD_STYLES['levelname'] = {'color': 'white', 'bold': True}
     if parameters.VERBOSE > 0:
         my_logger.setLevel(logging.INFO)
         if not parameters.CALLING_CODE:
-            coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.INFO)
+            coloredlogs.install(fmt=my_format, level=logging.INFO)
     else:
         my_logger.setLevel(logging.WARNING)
         if not parameters.CALLING_CODE:
-            coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.WARNING)
+            coloredlogs.install(fmt=my_format, level=logging.WARNING)
     if parameters.DEBUG_LOGGING:
         my_logger.setLevel(logging.DEBUG)
         if not parameters.CALLING_CODE:
-            coloredlogs.install(fmt=parameters.MY_FORMAT, level=logging.DEBUG)
+            coloredlogs.install(fmt=my_format, level=logging.DEBUG)
     return my_logger
 
 
