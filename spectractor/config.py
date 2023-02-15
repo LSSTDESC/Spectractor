@@ -2,6 +2,8 @@ import configparser
 import os
 import sys
 import re
+
+import astropy.units.quantity
 import numpy as np
 import logging
 import astropy.units as units
@@ -125,7 +127,8 @@ def update_derived_parameters():
     parameters.CALIB_BGD_NPARAMS = parameters.CALIB_BGD_ORDER + 1
     parameters.LAMBDAS = np.arange(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, parameters.LAMBDA_STEP)
     parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
-    parameters.OBS_DIAMETER = parameters.OBS_DIAMETER * units.m  # Diameter of the telescope
+    if not isinstance(parameters.OBS_DIAMETER, astropy.units.quantity.Quantity):
+        parameters.OBS_DIAMETER = parameters.OBS_DIAMETER * units.m  # Diameter of the telescope
     parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4.  # Surface of telescope
     # Conversion factor
     # Units of SEDs in flam (erg/s/cm2/nm) :
@@ -137,7 +140,7 @@ def update_derived_parameters():
                                    * parameters.wl_dwl_unit / parameters.hc / parameters.CCD_GAIN).decompose()).value
 
 
-def apply_rebinning_to_parameters(reverse=False):
+def apply_rebinning_to_parameters():
     """Divide or multiply original parameters by parameters.CCD_REBIN to set them correctly
     in the case of an image rebinning.
 
@@ -151,15 +154,7 @@ def apply_rebinning_to_parameters(reverse=False):
     20
     >>> parameters.CCD_PIXEL2MM
     20
-    >>> apply_rebinning_to_parameters(reverse=True)
-    >>> parameters.PIXWIDTH_SIGNAL
-    40
-    >>> parameters.CCD_PIXEL2MM
-    10.0
-
     """
-    if reverse:
-        parameters.CCD_REBIN = 1 / parameters.CCD_REBIN
     # Apply rebinning
     parameters.PIXDIST_BACKGROUND = int(parameters.PIXDIST_BACKGROUND // parameters.CCD_REBIN)
     parameters.PIXWIDTH_BOXSIZE = int(max(10, parameters.PIXWIDTH_BOXSIZE // parameters.CCD_REBIN))
@@ -173,8 +168,7 @@ def apply_rebinning_to_parameters(reverse=False):
     parameters.XWINDOW_ROT = int(parameters.XWINDOW_ROT // parameters.CCD_REBIN)
     parameters.YWINDOW_ROT = int(parameters.YWINDOW_ROT // parameters.CCD_REBIN)
     parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT = int(parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT // parameters.CCD_REBIN)
-    if reverse:
-        parameters.CCD_REBIN = 1
+    update_derived_parameters()
 
 
 def set_logger(logger):

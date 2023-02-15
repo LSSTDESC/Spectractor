@@ -46,9 +46,9 @@ class SpectrumSimulation(Spectrum):
         for k, v in list(spectrum.__dict__.items()):
             self.__dict__[k] = copy.copy(v)
         self.my_logger = set_logger(self.__class__.__name__)
-        if parameters.CCD_REBIN > 1:
-            self.chromatic_psf.table['Dx'] *= parameters.CCD_REBIN
-            apply_rebinning_to_parameters(reverse=True)
+        # if parameters.CCD_REBIN > 1:
+        #     self.chromatic_psf.table['Dx'] *= parameters.CCD_REBIN
+        #     apply_rebinning_to_parameters(reverse=True)
         self.disperser = disperser
         self.telescope = telescope
         self.atmosphere = atmosphere
