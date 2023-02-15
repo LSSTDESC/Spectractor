@@ -855,32 +855,25 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     theX = -1
     theY = -1
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
-        wcs_file_name = set_wcs_file_name(image.file_name)
-        if os.path.isfile(wcs_file_name):
-            my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
-            if rotated:
-                target_pixcoords = find_target_after_rotation(image)
-                theX, theY = target_pixcoords
-            else:
-                wcs = load_wcs_from_file(wcs_file_name)
-                target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
-                # noinspection PyUnresolvedReferences
-                target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra,
-                                                              target_coord_after_motion.dec, 0))
-                theX, theY = target_pixcoords / parameters.CCD_REBIN
-            sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
-                                                                                rotated=rotated, widths=widths)
-            sub_image_x0 = theX - x0 + Dx
-            sub_image_y0 = theX - y0 + Dy
-            if parameters.DEBUG:
-                plt.figure(figsize=(5, 5))
-                plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
-                                  target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
-                plt.show()
-            if parameters.PdfPages:
-                parameters.PdfPages.savefig()
-        else:
-            my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
+        #my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
+        target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
+        # noinspection PyUnresolvedReferences
+        target_pixcoords = np.array(image.wcs.all_world2pix(target_coord_after_motion.ra,
+                                                        target_coord_after_motion.dec, 0))
+        theX, theY = target_pixcoords / parameters.CCD_REBIN
+        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
+                                                                            rotated=rotated, widths=widths)
+        sub_image_x0 = theX - x0 + Dx
+        sub_image_y0 = theX - y0 + Dy
+        if parameters.DEBUG:
+            plt.figure(figsize=(5, 5))
+            plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
+                                target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
+            plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
+        #else:
+        #    my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
 
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "fit" or rotated:
         if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
