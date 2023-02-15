@@ -2,7 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import special
-from scipy.interpolate import interp2d
+from scipy.interpolate import RegularGridInterpolator
 
 from spectractor.tools import plot_image_simple
 from spectractor import parameters
@@ -931,10 +931,10 @@ class Order0(PSF):
         xx = np.arange(0, target.image.shape[1]) - target.image_x0
         yy = np.arange(0, target.image.shape[0]) - target.image_y0
         data = target.image / np.sum(target.image)
-        tmp_func = interp2d(xx, yy, data, bounds_error=False, fill_value=None)
+        tmp_func = RegularGridInterpolator((xx, yy), data, method="nearest", bounds_error=False, fill_value=None)
 
         def func(x, y, amplitude, x_c, y_c, gamma):
-            return amplitude * tmp_func((x - x_c)/gamma, (y - y_c)/gamma)
+            return amplitude * tmp_func(((y - y_c)/gamma, (x - x_c)/gamma))
 
         return func
 
@@ -1012,7 +1012,8 @@ class Order0(PSF):
         amplitude, x_c, y_c, gamma, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            out = self.psf_func(x[0], y[:, 0], amplitude, x_c, y_c, gamma)
+            #out = self.psf_func(x[0], y[:, 0], amplitude, x_c, y_c, gamma)
+            out = self.psf_func(x, y, amplitude, x_c, y_c, gamma)
             if self.clip:
                 out = np.clip(out, 0, saturation)
             return out

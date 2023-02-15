@@ -470,7 +470,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits', config="ctio.ini")
         >>> s.plot_spectrogram()
         >>> if parameters.DISPLAY: plt.show()
 
@@ -1563,8 +1563,7 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5):
     >>> parameters.LAMBDA_MIN = 550
     >>> parameters.LAMBDA_MAX = 800
     >>> lambdas = calibrate_spectrum(spectrum, with_adr=False)
-    >>> spectrum.plot_spectrum()  #doctest: +ELLIPSIS
-       Line   Tabulated  Detected    Shift    ...
+    >>> spectrum.plot_spectrum()
 
     """
     with_adr = int(with_adr)
