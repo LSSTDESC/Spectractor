@@ -850,14 +850,11 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     >>> find_target(im, guess, widths=(100, 100))
     [820, 580]
     """
-    my_logger = set_logger(__name__)
     target_pixcoords = [-1, -1]
     theX = -1
     theY = -1
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
-        #my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
         target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
-        # noinspection PyUnresolvedReferences
         target_pixcoords = np.array(image.wcs.all_world2pix(target_coord_after_motion.ra,
                                                         target_coord_after_motion.dec, 0))
         theX, theY = target_pixcoords / parameters.CCD_REBIN
@@ -872,8 +869,6 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
             plt.show()
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
-        #else:
-        #    my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
 
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "fit" or rotated:
         if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:

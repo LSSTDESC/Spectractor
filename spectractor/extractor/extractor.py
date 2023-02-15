@@ -63,7 +63,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
+        >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
         >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="spectrum")
         """
         FitWorkspace.__init__(self, spectrum.filename, nwalkers, nsteps, burnin, nbins, verbose, plot,
@@ -259,7 +259,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
+        >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="fixed", verbose=True)
         >>> _ = w.simulate(*w.p)
         >>> w.plot_fit()
@@ -382,7 +382,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         Load data:
 
-        >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
+        >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
 
         Simulate the data with fixed amplitude priors:
 
@@ -401,7 +401,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         .. doctest::
 
-            >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
+            >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
             >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="spectrum", verbose=True)
             >>> y, mod, mod_err = w.simulate(*w.p)
             >>> w.plot_fit()
@@ -638,7 +638,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        >>> spec = Spectrum('tests/data/sim_20170530_134_spectrum.fits', config="config/ctio.ini")
+        >>> spec = Spectrum('tests/data/sim_20170530_134_spectrum.fits')
         >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
         >>> w.plot_fit()
@@ -747,7 +747,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     Examples
     --------
 
-    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
+    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
@@ -1079,7 +1079,7 @@ def SpectractorRun(image, output_directory, guess=None):
 
     # Set output path
     ensure_dir(output_directory)
-    output_filename = image.file_name.split('/')[-1]
+    output_filename = os.path.basename(image.file_name)
     output_filename = output_filename.replace('.fits', '_spectrum.fits')
     output_filename = output_filename.replace('.fz', '_spectrum.fits')
     output_filename = os.path.join(output_directory, output_filename)
