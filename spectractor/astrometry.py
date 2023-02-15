@@ -241,6 +241,13 @@ class Astrometry():  # pragma: no cover
             The output directory path. If empty, a directory *_wcs is created next to the analyzed image (default: "").
         gaia_mag_g_limit: float, optional
             Maximum g magnitude in the Gaia catalog output (default: 23).
+
+        Examples
+        --------
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> a.wcs  # doctest: +ELLIPSIS
+        WCS Keywords...
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.image = image
@@ -305,8 +312,8 @@ class Astrometry():  # pragma: no cover
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> target_x, target_y = a.get_target_pixel_position()
         >>> print(target_x, target_y) # doctest: +ELLIPSIS
         743... 683...
@@ -335,8 +342,8 @@ class Astrometry():  # pragma: no cover
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> gaia_x, gaia_y = a.get_gaia_pixel_positions()
 
         or with selected Gaia index:
@@ -371,8 +378,8 @@ class Astrometry():  # pragma: no cover
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> quad_stars = a.get_quad_stars_pixel_positions()
 
         .. doctest:
@@ -410,8 +417,8 @@ class Astrometry():  # pragma: no cover
 
         Examples
         --------
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_sources_from_file()  # doctest: +ELLIPSIS
         <Table length=...
 
@@ -436,8 +443,8 @@ class Astrometry():  # pragma: no cover
 
         Examples
         --------
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_gaia_catalog_around_target()  #doctest: +ELLIPSIS
         INFO: Query finished...
         <Table length=...>...
@@ -496,8 +503,8 @@ class Astrometry():  # pragma: no cover
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.plot_sources_and_gaia_catalog(sources=a.sources, gaia_coord=a.gaia_radec_positions_after_pm,
         ...                                 quad=a.quad_stars_pixel_positions,
         ...                                 label=a.image.target.label)
@@ -567,8 +574,8 @@ class Astrometry():  # pragma: no cover
 
         Examples
         --------
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.get_sources_radec_positions()  # doctest: +ELLIPSIS
         <SkyCoord (ICRS): (ra, dec) in deg...
 
@@ -599,8 +606,8 @@ class Astrometry():  # pragma: no cover
 
         Examples
         --------
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.get_sources_radec_positions()  # doctest: +ELLIPSIS
         <SkyCoord (ICRS): (ra, dec) in deg...
         >>> gaia_index, dist_2d, dist_ra, dist_dec = a.match_sources_to_gaia_catalog(
@@ -628,8 +635,8 @@ class Astrometry():  # pragma: no cover
 
         Examples
         --------
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.get_sources_radec_positions()  # doctest: +ELLIPSIS
         <SkyCoord (ICRS): (ra, dec) in deg...
         >>> a.gaia_index, a.dist_2d, a.dist_ra, a.dist_dec = a.match_sources_to_gaia_catalog(
@@ -747,8 +754,8 @@ class Astrometry():  # pragma: no cover
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.get_sources_radec_positions()  # doctest: +ELLIPSIS
         <SkyCoord (ICRS): (ra, dec) in deg...
         >>> a.gaia_index, a.dist_2d, a.dist_ra, a.dist_dec = a.match_sources_to_gaia_catalog(
@@ -854,8 +861,8 @@ class Astrometry():  # pragma: no cover
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> residuals = a.compute_gaia_pixel_residuals()
 
         .. doctest:
@@ -889,8 +896,8 @@ class Astrometry():  # pragma: no cover
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_sources_from_file() # doctest: +ELLIPSIS
         <Table length=...
         >>> index = a.find_quad_star_index_in_sources(a.quad_stars_pixel_positions[0])
@@ -911,8 +918,8 @@ class Astrometry():  # pragma: no cover
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_sources_from_file() # doctest: +ELLIPSIS
         <Table length=...
         >>> length = len(a.sources)
@@ -941,8 +948,8 @@ class Astrometry():  # pragma: no cover
         Examples
         --------
 
-        >>> a = Astrometry("./tests/data/reduc_20170530_134.fits", target_label="HD111980",
-        ...                wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> a.load_sources_from_file() # doctest: +ELLIPSIS
         <Table length=...
         >>> a.plot_quad_stars()

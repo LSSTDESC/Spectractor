@@ -33,10 +33,11 @@ def test_astrometry():
         if os.path.isdir(wcs_output_directory):
             subprocess.check_output(f"rm -rf {wcs_output_directory}", shell=True)
         tag = file_name.split('/')[-1].replace('sim', 'reduc')
-        disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
+        disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         if target is None or xpos is None or ypos is None:
             continue
-        a = Astrometry(file_name, target, disperser_label)
+        im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")
+        a = Astrometry(im)
         extent = ((int(max(0, xpos - radius)), int(min(xpos + radius, parameters.CCD_IMSIZE))),
                   (int(max(0, ypos - radius)), int(min(ypos + radius, parameters.CCD_IMSIZE))))
         gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=maxiter)
