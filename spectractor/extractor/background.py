@@ -13,7 +13,15 @@ from photutils import Background2D, SExtractorBackground
 from photutils.segmentation import make_source_mask
 
 from scipy.signal import medfilt2d
-from scipy.interpolate import interp2d
+from scipy.interpolate import RegularGridInterpolator
+
+
+def _from_bkgd_interp_to_func(bgd_model_func_interp):
+    def bgd_model_func(x, y):
+        xx, yy = np.meshgrid(x, y, indexing='ij')
+        return bgd_model_func_interp((xx, yy)).T
+
+    return bgd_model_func
 
 
 def remove_image_background_sextractor(data, sigma=3.0, box_size=(50, 50), filter_size=(3, 3), positive=False):
@@ -100,7 +108,10 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
         bgd_model[:, x] = bgd_fit(index)
     # Filter the background model
     bgd_model = medfilt2d(bgd_model, kernel_size=[3, 9])
-    bgd_model_func = interp2d(np.arange(Nx), index, bgd_model, kind='linear', bounds_error=False, fill_value=None)
+    bgd_model_func_interp = RegularGridInterpolator((np.arange(Nx), index), bgd_model.T, method='linear',
+                                                    bounds_error=False, fill_value=None)
+
+    bgd_model_func = _from_bkgd_interp_to_func(bgd_model_func_interp)
     if parameters.DEBUG:
         fig, ax = plt.subplots(3, 1, figsize=(12, 6), sharex='all')
         bgd_bands = np.copy(data).astype(float)
@@ -172,7 +183,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     >>> from spectractor import parameters
     >>> parameters.DEBUG = True
     >>> psf = MoffatGauss()
-    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
+    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=200, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
     >>> data = s0.build_spectrogram_image(params, mode="1D")
@@ -183,7 +194,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
 
     Fit the transverse profile:
 
-    >>> bgd_model, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+    >>> bgd_model, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[60,100])
 
     """
     Ny, Nx = data.shape
@@ -214,8 +225,10 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
                        filter_size=(filter_size, filter_size),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
-    bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False,
-                              fill_value=None)
+    bgd_model_func_interp = RegularGridInterpolator((np.arange(Nx), np.arange(Ny)), bkg.background.T, method='linear',
+                                                    bounds_error=False, fill_value=None)
+
+    bgd_model_func = _from_bkgd_interp_to_func(bgd_model_func_interp)
     bgd_res = ((data - bkg.background)/err)
     bgd_res[mask] = np.nan
 
@@ -339,8 +352,10 @@ def extract_spectrogram_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1
     # Fit a 1 degree 2D polynomial function with outlier removal
     xx, yy = np.meshgrid(pixel_range, bgd_index)
     bgd_model_func = fit_poly2d_outlier_removal(xx, yy, bgd_bands, order=deg, sigma=sigma, niter=20)
-    bgd_model_func = interp2d(xx, yy, bgd_model_func(xx, yy), kind='linear', bounds_error=False,
-                              fill_value=None)
+    bgd_model_func_interp = RegularGridInterpolator((pixel_range, bgd_index), bgd_model_func(xx, yy).T, method='linear',
+                                                     bounds_error=False, fill_value=None)
+
+    bgd_model_func = _from_bkgd_interp_to_func(bgd_model_func_interp)
 
     if parameters.DEBUG:
         fig, ax = plt.subplots(2, 1, figsize=(12, 6), sharex='all')

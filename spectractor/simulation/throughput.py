@@ -37,7 +37,12 @@ def load_transmission(file_name):
     [0. 0. 0.]
 
     """
-    data = np.loadtxt(file_name).T
+    if os.path.isabs(file_name):
+        path = file_name
+    else:
+        mypath = os.path.dirname(os.path.dirname(__file__))
+        path = os.path.join(mypath, file_name)
+    data = np.loadtxt(path).T
     lambdas = data[0]
     sorted_indices = lambdas.argsort()
     lambdas = lambdas[sorted_indices]

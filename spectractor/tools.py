@@ -1,5 +1,6 @@
 import os
 
+import astropy.io.fits
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting
@@ -337,8 +338,7 @@ def multigauss_and_bgd_jacobian(x, *params):
 
 
 # noinspection PyTypeChecker
-def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None,
-                           fix_centroids=False):
+def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None):
     """Fit a multiple Gaussian profile plus a polynomial background to data, using iminuit.
     The mean guess value of the Gaussian must not be far from the truth values.
     Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
@@ -369,6 +369,8 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     Examples
     --------
 
+    >>> from spectractor.config import load_config
+    >>> load_config("default.ini")
     >>> x = np.arange(600.,800.,1)
     >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
@@ -1889,7 +1891,7 @@ def load_fits(file_name, hdu_index=0):
     ----------
     file_name: str
         The FITS file name.
-    hdu_index: int, optional
+    hdu_index: int, str, optional
         The HDU index in the file (default: 0).
 
     Returns
@@ -1909,7 +1911,7 @@ def load_fits(file_name, hdu_index=0):
 
     """
     hdu_list = fits.open(file_name)
-    header = hdu_list[0].header
+    header = hdu_list[hdu_index].header
     data = hdu_list[hdu_index].data
     hdu_list.close()  # need to free allocation for file description
     return header, data

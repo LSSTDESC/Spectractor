@@ -108,6 +108,7 @@ class StarFieldModel:
         >>> s.plot_model()
 
         """
+        self.my_logger = set_logger(self.__class__.__name__)
         self.image = base_image
         self.target = base_image.target
         self.field = None

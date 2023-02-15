@@ -102,11 +102,9 @@ def test_ctio_fullchain():
     sim_image = "./tests/data/sim_20170530_134.fits"
 
     # load test and make image simulation
-    load_config("./config/ctio.ini")
-    parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     if not os.path.isfile(sim_image):
         make_image()
-    image = Image(sim_image)
+    image = Image(sim_image, config="./config/ctio.ini")
     lambdas_truth = np.fromstring(image.header['LBDAS_T'][1:-1], sep=' ')
     amplitude_truth = np.fromstring(image.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
     parameters.AMPLITUDE_TRUTH = np.copy(amplitude_truth)
@@ -117,6 +115,7 @@ def test_ctio_fullchain():
     tag = tag.replace('sim_', 'reduc_')
     logbook = LogBook(logbook="./tests/data/ctiofulllogbook_jun2017_v5.csv")
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
+    load_config("./config/ctio.ini")
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
                            disperser_label=disperser_label, config="")  # config already loaded, do not overwrite PSF_POLY_ORDER

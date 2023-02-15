@@ -63,7 +63,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
+        >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
         >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="spectrum")
         """
         FitWorkspace.__init__(self, spectrum.filename, nwalkers, nsteps, burnin, nbins, verbose, plot,
@@ -253,7 +253,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
+        >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="fixed", verbose=True)
         >>> _ = w.simulate(*w.p)
         >>> w.plot_fit()
@@ -376,7 +376,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         Load data:
 
-        >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
+        >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
 
         Simulate the data with fixed amplitude priors:
 
@@ -395,7 +395,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         .. doctest::
 
-            >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits", config="./config/ctio.ini")
+            >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
             >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="spectrum", verbose=True)
             >>> y, mod, mod_err = w.simulate(*w.p)
             >>> w.plot_fit()
@@ -632,7 +632,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        >>> spec = Spectrum('tests/data/sim_20170530_134_spectrum.fits', config="config/ctio.ini")
+        >>> spec = Spectrum('tests/data/sim_20170530_134_spectrum.fits')
         >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
         >>> w.plot_fit()
@@ -741,7 +741,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     Examples
     --------
 
-    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
+    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
@@ -876,7 +876,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.header["AM_FIT"] = w.p[9]
             # Compute order 2 contamination
             w.spectrum.data_order2 = w.p[0] * w.amplitude_params * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
-            w.spectrum.err_order2 = w.p[0] * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas)
+            w.spectrum.err_order2 = np.abs(w.p[0] * w.amplitude_params_err * w.spectrum.disperser.ratio_order_2over1(w.lambdas))
 
             # Calibrate the spectrum
             calibrate_spectrum(w.spectrum, with_adr=True)
@@ -944,28 +944,76 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     return w.spectrum
 
 
-def Spectractor(file_name, output_directory, target_label='', guess=None, disperser_label="", config='',
-                atmospheric_lines=True):
-    """ Spectractor
-    Main function to extract a spectrum from an image
+def SpectractorInit(file_name, target_label='', disperser_label="", config=''):
+    """ Spectractor initialisation: load the config parameters and build the Image instance.
 
     Parameters
     ----------
     file_name: str
         Input file nam of the image to analyse.
-    output_directory: str
-        Output directory.
     target_label: str, optional
-        The name of the targeted object.
-    guess: [int,int], optional
-        [x0,y0] list of the guessed pixel positions of the target in the image (must be integers). Mandatory if
-        WCS solution is absent (default: None).
+        The name of the targeted object (default: "").
     disperser_label: str, optional
         The name of the disperser (default: "").
     config: str
-        The config file name (default: "./config/ctio.ini").
-    atmospheric_lines: bool, optional
-        If True atmospheric lines are used in the calibration fit.
+        The config file name (default: "").
+
+    Returns
+    -------
+    image: Image
+        The prepared Image instance ready for spectrum extraction.
+
+    Examples
+    --------
+
+    Extract the spectrogram and its characteristics from the image:
+
+    .. doctest::
+
+        >>> import os
+        >>> from spectractor.logbook import LogBook
+        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
+        >>> file_names = ['./tests/data/reduc_20170530_134.fits']
+        >>> for file_name in file_names:
+        ...     tag = file_name.split('/')[-1]
+        ...     disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+        ...     if target_label is None or xpos is None or ypos is None:
+        ...         continue
+        ...     image = SpectractorInit(file_name, target_label=target_label,
+        ...                             disperser_label=disperser_label, config='./config/ctio.ini')
+
+    .. doctest::
+        :hide:
+
+        >>> assert image is not None
+
+    """
+
+    my_logger = set_logger(__name__)
+    my_logger.info('\n\tSpectractor initialisation')
+    # Load config file
+    if config != "":
+        load_config(config)
+    if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+        ensure_dir(parameters.LSST_SAVEFIGPATH)
+
+    # Load reduced image
+    image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
+    return image
+
+
+def SpectractorRun(image, output_directory, guess=None):
+    """ Spectractor main function to extract a spectrum from an image
+
+    Parameters
+    ----------
+    image: Image
+        Input Image instance.
+    output_directory: str
+        Output directory.
+    guess: [int,int], optional
+        [x0,y0] list of the guessed pixel positions of the target in the image (must be integers). Mandatory if
+        WCS solution is absent (default: None).
 
     Returns
     -------
@@ -988,8 +1036,9 @@ def Spectractor(file_name, output_directory, target_label='', guess=None, disper
         ...     disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         ...     if target_label is None or xpos is None or ypos is None:
         ...         continue
-        ...     spectrum = Spectractor(file_name, './tests/data/', guess=[xpos, ypos], target_label=target_label,
-        ...                            disperser_label=disperser_label, config='./config/ctio.ini')
+        ...     image = SpectractorInit(file_name, target_label=target_label,
+        ...                             disperser_label=disperser_label, config='./config/ctio.ini')
+        ...     spectrum = SpectractorRun(image, './tests/data/', guess=[xpos, ypos])
 
     .. doctest::
         :hide:
@@ -1000,15 +1049,9 @@ def Spectractor(file_name, output_directory, target_label='', guess=None, disper
     """
 
     my_logger = set_logger(__name__)
-    my_logger.info('\n\tStart SPECTRACTOR')
-    # Load config file
-    if config != "":
-        load_config(config)
-    if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-        ensure_dir(parameters.LSST_SAVEFIGPATH)
+    my_logger.info('\n\tRun Spectractor')
 
-    # Load reduced image
-    image = Image(file_name, target_label=target_label, disperser_label=disperser_label)
+    # Guess position of order 0
     if guess is not None and image.target_guess is None:
         image.target_guess = np.asarray(guess)
     if image.target_guess is None:
@@ -1029,15 +1072,15 @@ def Spectractor(file_name, output_directory, target_label='', guess=None, disper
 
     # Set output path
     ensure_dir(output_directory)
-    output_filename = file_name.split('/')[-1]
+    output_filename = os.path.basename(image.file_name)
     output_filename = output_filename.replace('.fits', '_spectrum.fits')
     output_filename = output_filename.replace('.fz', '_spectrum.fits')
     output_filename = os.path.join(output_directory, output_filename)
     # Find the exact target position in the raw cut image: several methods
     my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
 
-    find_target(image, image.target_guess, widths=(parameters.XWINDOW,
-                                                   parameters.YWINDOW))
+    find_target(image, image.target_guess, widths=(parameters.XWINDOW, parameters.YWINDOW))
+
     # Rotate the image
     turn_image(image)
     # Find the exact target position in the rotated image: several methods
@@ -1086,6 +1129,62 @@ def Spectractor(file_name, output_directory, target_label='', guess=None, disper
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
 
+    return spectrum
+
+
+def Spectractor(file_name, output_directory, target_label='', guess=None, disperser_label="", config=''):
+
+    """ Spectractor main function to extract a spectrum from a FITS file.
+
+    Parameters
+    ----------
+    file_name: str
+        Input file nam of the image to analyse.
+    output_directory: str
+        Output directory.
+    target_label: str, optional
+        The name of the targeted object (default: "").
+    guess: [int,int], optional
+        [x0,y0] list of the guessed pixel positions of the target in the image (must be integers). Mandatory if
+        WCS solution is absent (default: None).
+    disperser_label: str, optional
+        The name of the disperser (default: "").
+    config: str
+        The config file name (default: "").
+
+    Returns
+    -------
+    spectrum: Spectrum
+        The extracted spectrum object.
+
+    Examples
+    --------
+
+    Extract the spectrogram and its characteristics from the image:
+
+    .. doctest::
+
+        >>> import os
+        >>> from spectractor.logbook import LogBook
+        >>> logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
+        >>> file_names = ['./tests/data/reduc_20170530_134.fits']
+        >>> for file_name in file_names:
+        ...     tag = file_name.split('/')[-1]
+        ...     disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+        ...     if target_label is None or xpos is None or ypos is None:
+        ...         continue
+        ...     spectrum = Spectractor(file_name, './tests/data/', guess=[xpos, ypos], target_label=target_label,
+        ...                            disperser_label=disperser_label, config='./config/ctio.ini')
+
+    .. doctest::
+        :hide:
+
+        >>> assert spectrum is not None
+        >>> assert os.path.isfile('tests/data/reduc_20170530_134_spectrum.fits')
+
+    """
+    image = SpectractorInit(file_name, target_label=target_label, disperser_label=disperser_label, config=config)
+    spectrum = SpectractorRun(image, guess=guess, output_directory=output_directory)
     return spectrum
 
 
