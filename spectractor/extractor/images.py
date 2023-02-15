@@ -786,9 +786,7 @@ def load_STARDICE_image(image):  # pragma: no cover
     image.pressure = 1000
     image.humidity = 87
     image.units = 'ADU'
-    #print("WCS :", rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360)
     if "PC2_1" in image.header:
-        #rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[0].header["CD2_1"], hdu_list[0].header["CD1_1"]) + 90        
         rotation_wcs = 180 / np.pi * np.arctan2(-hdu_list[0].header["PC2_1"]/hdu_list[0].header["CDELT2"], hdu_list[0].header["PC1_1"]/hdu_list[0].header["CDELT1"])
         atol = 0.02
         print("RORATION WCS :", rotation_wcs)
@@ -796,15 +794,9 @@ def load_STARDICE_image(image):  # pragma: no cover
             image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degrees while "
                                     f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degrees. "
                                     f"\nBoth differs by more than {atol} degrees... bug ?")
-        #parameters.OBS_CAMERA_ROTATION = rotation_wcs 
 
-    
     image.read_out_noise = 8.5 * np.ones_like(image.data)
-    #image.target_label = image.header["OBJECT"]  #.replace(" ", "")
     image.compute_parallactic_angle()
-    print(image.parallactic_angle)
-    #image.parallactic_angle = 180 + image.parallactic_angle
-    print(image.parallactic_angle)
 
 
 def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, parameters.YWINDOW]):
