@@ -460,7 +460,7 @@ class ChromaticPSF:
             >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
         """
         if indices is None :
-            indices = np.full(len(self.table, True))
+            indices = np.full(len(self.table), True)
         poly_params = np.array([])
         amplitude = None
         for k, name in enumerate(self.psf.param_names):
