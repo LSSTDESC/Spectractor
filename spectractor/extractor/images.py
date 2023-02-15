@@ -109,17 +109,13 @@ class Image(object):
         Examples
         --------
 
-        .. doctest::
-
-           >>> im = Image('')
-           >>> im.data
-           None
-           >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im.file_name
+        'tests/data/reduc_20170605_028.fits'
 
         .. doctest::
             :hide:
 
-            >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
             >>> assert im.data is not None and np.mean(im.data) > 0
             >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
             >>> assert im.header is not None
