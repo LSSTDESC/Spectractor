@@ -567,6 +567,11 @@ def load_CTIO_image(image):
     build_CTIO_gain_map(image)
     build_CTIO_read_out_noise_map(image)
     image.compute_parallactic_angle()
+    # WCS
+    wcs_file_name = set_wcs_file_name(image.file_name)
+    if os.path.isfile(wcs_file_name):
+        image.my_logger.info(f"\n\tUse WCS {wcs_file_name}.")
+        image.wcs = load_wcs_from_file(wcs_file_name)
 
 
 def build_CTIO_gain_map(image):
