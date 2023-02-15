@@ -423,6 +423,9 @@ class ChromaticPSF:
         ----------
         profile_params: array
             a Nx * len(self.psf.param_names) numpy array containing the PSF parameters as a function of pixels.
+        indices: array_like, optional
+            Array of integer indices or boolean values that selects values in profile_params for the polynomial fits.
+            If None every profile_params rows are used (default: None)
 
         Returns
         -------
