@@ -85,6 +85,8 @@ class Image(object):
         PSF instance fitted on the current target.
     target_bkgd2D: callable
         Function that models the background behind the current target.
+    wcs: WCS
+        Image World Coordinate System Astropy object.
 
     """
 
@@ -149,6 +151,7 @@ class Image(object):
         self.parallactic_angle = None
         self.saturation = None
 
+        self.wcs = None
         self.ra = None
         self.dec = None
         self.hour_angle = None
