@@ -824,11 +824,11 @@ class Astrometry():  # pragma: no cover
             if not os.path.isdir(parameters.ASTROMETRYNET_DIR):
                 # reset astrometry.net path
                 if 'ASTROMETRYNET_DIR' in os.environ:
-                    self.my_logger.warning(f"Reset parameters.ASTROMETRYNET_DIR={parameters.ASTROMETRYNET_DIR} (not found) "
+                    self.my_logger.warning(f"Reset {parameters.ASTROMETRYNET_DIR=} (not found) "
                                            f"to {os.getenv('ASTROMETRYNET_DIR')}.")
                     parameters.ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
                 else:
-                    self.my_logger.error(f"parameters.ASTROMETRYNET_DIR={parameters.ASTROMETRYNET_DIR} but directory does "
+                    self.my_logger.error(f"{parameters.ASTROMETRYNET_DIR=} but directory does "
                                          f"not exist and ASTROMETRYNET_DIR is not in OS environment.")
                     raise OSError("No new-wcs binary found with parameters.ASTROMETRYNET_DIR or ASTROMETRYNET_DIR environment.")
             exec = os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/new-wcs')

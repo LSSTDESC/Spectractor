@@ -95,9 +95,9 @@ ROT_ANGLE_MAX = 10  # in the Hessian analysis to compute rotation angle, cut all
 # Range for spectrum
 LAMBDA_MIN = 300  # minimum wavelength for spectrum extraction (in nm)
 LAMBDA_MAX = 1100  # maximum wavelength for spectrum extraction (in nm)
-LAMBDA_STEP = 0.2  # step size for the wavelength array (in nm)
+LAMBDA_STEP = 1  # step size for the wavelength array (in nm)
 SPEC_ORDER = 1  # spectrum order to extract
-LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, 1)
+LAMBDAS = np.arange(LAMBDA_MIN, LAMBDA_MAX, LAMBDA_STEP)
 
 # Background subtraction parameters
 PIXWIDTH_SIGNAL = 10  # half transverse width of the signal rectangular window in pixels
@@ -139,3 +139,6 @@ if os.environ.get('DISPLAY', '') == '':
 PLOT_XLABEL = r"$x$ [pixels]"
 PLOT_YLABEL = r"$y$ [pixels]"
 PLOT_ROT_LABEL = r"$\varphi_d$ [degrees]"
+
+STYLE_PARAMETERS = ["VERBOSE", "DEBUG", "PAPER", "LINEWIDTH", "PLOT_DIR", "SAVE", "DEBUG_LOGGING", "DISPLAY",
+                    "PLOT_XLABEL", "PLOT_YLABEL", "PLOT_ROT_LABEL"]
