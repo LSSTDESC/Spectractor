@@ -885,21 +885,6 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
             sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
                                                                                 widths=(Dx, Dy))
             sub_image_x0, sub_image_y0 = x0, y0
-
-            if parameters.DEBUG and  parameters.DISPLAY:
-                fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-                im0 = ax[0].imshow(sub_image_subtracted, origin="lower", norm=LogNorm())
-                fig.colorbar(im0, ax=ax[0])
-                ax[0].set_title("sub_image_subtracted")
-                im1 = ax[1].imshow(sub_errors, origin="lower", norm=LogNorm())
-                ax[1].set_title("sub_image_errors")
-                fig.colorbar(im1, ax=ax[1])
-                if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-                    plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'sub_image_subtracted.pdf'),
-                                      transparent=True)
-                if parameters.DISPLAY:  # pragma: no cover
-                    plt.show()
-
             for i in range(niter):
                 # find the target
                 # try:
