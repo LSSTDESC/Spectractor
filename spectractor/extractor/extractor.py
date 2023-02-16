@@ -71,15 +71,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.my_logger = set_logger(self.__class__.__name__)
         self.spectrum = spectrum
 
-        # check the shapes
-        self.Ny, self.Nx = spectrum.spectrogram.shape
-        # if self.Ny != self.spectrum.chromatic_psf.Ny:
-        #     raise AttributeError(f"Data y shape {self.Ny} different from "
-        #                          f"ChromaticPSF input Ny {spectrum.chromatic_psf.Ny}.")
-        # if self.Nx != self.spectrum.chromatic_psf.Nx:
-        #     raise AttributeError(f"Data x shape {self.Nx} different from "
-        #                          f"ChromaticPSF input Nx {spectrum.chromatic_psf.Nx}.")
-
         # crop data to fit faster
         self.lambdas = self.spectrum.lambdas
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
@@ -90,6 +81,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.Ny, self.Nx = self.data.shape
         yy, xx = np.mgrid[:self.Ny, :self.Nx]
         self.pixels = np.asarray([xx, yy])
+
+        # adapt the ChromaticPSF table shape
+        if self.Nx != self.spectrum.chromatic_psf.Nx:
+            self.spectrum.chromatic_psf.resize_table(new_Nx=self.Nx)
 
         # prepare parameters to fit
         self.A2 = 1
@@ -208,12 +203,23 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             raise ValueError(f"Unknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
                              f"Must be either {self.amplitude_priors_list}.")
         self.spectrum.convert_from_flam_to_ADUrate()
+        self.amplitude_priors = np.copy(self.spectrum.data)
         if self.amplitude_priors_method == "spectrum":
-            self.amplitude_priors = np.copy(self.spectrum.data)
             self.amplitude_priors_cov_matrix = np.copy(self.spectrum.cov_matrix)
-        if self.amplitude_priors_method == "fixed":
-            self.amplitude_priors = np.copy(self.spectrum.data)
-
+        if self.spectrum.data.size != self.Nx:  # must rebin the priors
+            old_x = np.linspace(0, 1, self.spectrum.data.size)
+            new_x = np.linspace(0, 1, self.Nx)
+            self.spectrum.lambdas = np.interp(new_x, old_x, self.spectrum.lambdas)
+            self.amplitude_priors = np.interp(new_x, old_x, self.amplitude_priors)
+            if self.amplitude_priors_method == "spectrum":
+                # rebin prior cov matrix with monte-carlo
+                niter = 10000
+                samples = np.random.multivariate_normal(np.zeros_like(old_x), cov=self.amplitude_priors_cov_matrix, size=niter)
+                new_samples = np.zeros((niter, new_x.size))
+                for i in range(niter):
+                    new_samples[i] = np.interp(new_x, old_x, samples[i])
+                self.amplitude_priors_cov_matrix = np.cov(new_samples.T)
+                # self.amplitude_priors_cov_matrix[np.abs(self.amplitude_priors_cov_matrix) < 1e-3 * np.max(self.amplitude_priors_cov_matrix)] = 0
         # regularisation matrices
         if amplitude_priors_method == "spectrum":
             # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
@@ -1061,7 +1067,8 @@ def SpectractorRun(image, output_directory, guess=None):
         my_logger.info(f"\n\tNo guess position of order 0 has been given. Assuming the spectrum to extract comes "
                        f"from the brightest object, guess position is set as {image.target_guess}.")
     if parameters.DEBUG:
-        image.plot_image(scale='symlog', title="before rebinning", target_pixcoords=image.target_guess)
+        image.plot_image(scale='symlog', title="before rebinning", target_pixcoords=image.target_guess, cmap='gray', vmax=1e3)
+        #image.plot_image(scale='lin', title="before rebinning", target_pixcoords=image.target_guess, cmap='gray', vmax=0.5e2)
 
     # Use fast mode
     if parameters.CCD_REBIN > 1:
@@ -1078,9 +1085,7 @@ def SpectractorRun(image, output_directory, guess=None):
     output_filename = os.path.join(output_directory, output_filename)
     # Find the exact target position in the raw cut image: several methods
     my_logger.info(f'\n\tSearch for the target in the image with guess={image.target_guess}...')
-
     find_target(image, image.target_guess, widths=(parameters.XWINDOW, parameters.YWINDOW))
-
     # Rotate the image
     turn_image(image)
     # Find the exact target position in the rotated image: several methods
@@ -1228,8 +1233,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         f'and background from {ws[0]:.0f} to {ws[1]:.0f} pixels')
 
     # Make a data copy
-    data = np.copy(image.data_rotated)[:, 0:right_edge]
-    err = np.copy(image.stat_errors_rotated)[:, 0:right_edge]
+    data = np.copy(image.data_rotated)#[:, 0:right_edge]
+    err = np.copy(image.stat_errors_rotated)#[:, 0:right_edge]
 
     # Lateral bands to remove sky background
     Ny, Nx = data.shape
@@ -1347,7 +1352,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
     xmin = max(0, int(s.table['Dx'][lambda_min_index] + x0))
     xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
-
     # Position of the order 0 in the spectrogram coordinates
     target_pixcoords_spectrogram = [image.target_pixcoords[0] - xmin, image.target_pixcoords[1] - ymin]
     s.y0 = target_pixcoords_spectrogram[1]
@@ -1436,7 +1440,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                          label='Fitted spectrum centers', marker='o', s=10)
         ax[1, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_inf'], 'k-', label='Fitted FWHM')
         ax[1, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_fwhm_sup'], 'k-', label='')
-        ax[1, 0].set_ylim(0.5 * Ny - signal_width, 0.5 * Ny + signal_width)
+        # ax[1, 0].set_ylim(0.5 * Ny - signal_width, 0.5 * Ny + signal_width)
         ax[1, 0].set_xlim(0, xx.size)
         ax[1, 0].legend(loc='best')
         plot_spectrum_simple(ax[0, 0], spectrum.lambdas, spectrum.data, data_err=spectrum.err,

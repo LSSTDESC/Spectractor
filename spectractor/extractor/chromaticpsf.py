@@ -134,6 +134,41 @@ class ChromaticPSF:
             table = Table.read(file_name)
         self.init_table(table, saturation=saturation)
 
+    def resize_table(self, new_Nx):
+        """Resize the table and interpolate existing values to a new length size.
+
+        Parameters
+        ----------
+        new_Nx: int
+            New length of the ChromaticPSF on X axis.
+
+        Examples
+        --------
+
+        >>> psf = Moffat()
+        >>> s = ChromaticPSF(psf, Nx=20, Ny=5, deg=1, saturation=20000)
+        >>> params = s.generate_test_poly_params()
+        >>> s.fill_table_with_profile_params(s.from_poly_params_to_profile_params(params))
+        >>> print(np.sum(s.table["gamma"]))
+        100.0
+        >>> print(s.table["gamma"].size)
+        20
+        >>> s.resize_table(10)
+        >>> print(np.sum(s.table["gamma"]))
+        50.0
+        >>> print(s.table["gamma"].size)
+        10
+
+        """
+        new_chromatic_psf = ChromaticPSF(psf=self.psf, Nx=new_Nx, Ny=self.Ny, x0=self.x0, y0=self.y0,
+                                         deg=self.deg, saturation=self.saturation)
+        old_x = np.linspace(0, 1, self.Nx)
+        new_x = np.linspace(0, 1, new_Nx)
+        for colname in self.table.colnames:
+            new_chromatic_psf.table[colname] = np.interp(new_x, old_x, np.array(self.table[colname]))
+        self.init_table(table=new_chromatic_psf.table, saturation=self.saturation)
+        self.__dict__.update(new_chromatic_psf.__dict__)
+
     def set_polynomial_degrees(self, deg):
         self.deg = deg
         self.degrees = {key: deg for key in self.psf.param_names}
@@ -378,7 +413,7 @@ class ChromaticPSF:
             self.table[name] = rot_vec.T[1]
         self.table['Dx'] = rot_vec.T[0]
 
-    def from_profile_params_to_poly_params(self, profile_params):
+    def from_profile_params_to_poly_params(self, profile_params, indices=None):
         """
         Transform the profile_params array into a set of parameters for the chromatic PSF parameterisation.
         Fit Legendre polynomial functions across the pixels for each PSF parameters.
@@ -388,6 +423,9 @@ class ChromaticPSF:
         ----------
         profile_params: array
             a Nx * len(self.psf.param_names) numpy array containing the PSF parameters as a function of pixels.
+        indices: array_like, optional
+            Array of integer indices or boolean values that selects values in profile_params for the polynomial fits.
+            If None every profile_params rows are used (default: None)
 
         Returns
         -------
@@ -424,7 +462,8 @@ class ChromaticPSF:
 
             >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
         """
-        pixels = np.linspace(-1, 1, len(self.table))
+        if indices is None :
+            indices = np.full(len(self.table), True)
         poly_params = np.array([])
         amplitude = None
         for k, name in enumerate(self.psf.param_names):
@@ -434,15 +473,17 @@ class ChromaticPSF:
         if amplitude is None:
             self.my_logger.warning('\n\tAmplitude array not initialized. '
                                    'Polynomial fit for shape parameters will be unweighted.')
+            
+        pixels = np.linspace(-1, 1, len(self.table))[indices]
         for k, name in enumerate(self.psf.param_names):
             delta = 0
             if name != 'amplitude':
-                weights = np.copy(amplitude)
+                weights = np.copy(amplitude)[indices]
                 if name == 'x_c':
                     delta = self.x0
                 if name == 'y_c':
                     delta = self.y0
-                fit = np.polynomial.legendre.legfit(pixels, profile_params[:, k] - delta,
+                fit = np.polynomial.legendre.legfit(pixels, profile_params[indices, k] - delta,
                                                     deg=self.degrees[name], w=weights)
                 poly_params = np.concatenate([poly_params, fit])
         return poly_params
@@ -802,11 +843,11 @@ class ChromaticPSF:
             PSF_truth = truth.from_poly_params_to_profile_params(truth.poly_params, apply_bounds=True)
         all_pixels = np.arange(self.profile_params.shape[0])
         for i, name in enumerate(self.psf.param_names):
-            fit, cov, model = fit_poly1d(all_pixels, self.profile_params[:, i], order=self.degrees[name])
+            fit, cov, model = fit_poly1d(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], order=self.degrees[name])
             PSF_models.append(np.polyval(fit, all_pixels))
         for i, name in enumerate(self.psf.param_names):
             p = ax.plot(all_pixels, self.profile_params[:, i], marker='+', linestyle='none')
-            ax.plot(self.fitted_pixels, self.profile_params[self.fitted_pixels, i], label=name,
+            ax.plot(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], label=name,
                        marker='o', linestyle='none', color=p[0].get_color())
             if i > 0:
                 ax.plot(all_pixels, PSF_models[i], color=p[0].get_color())
@@ -941,6 +982,7 @@ class ChromaticPSF:
         if 0 not in pixel_range:
             pixel_range.append(0)
         pixel_range = np.array(pixel_range)
+        self.fitted_pixels = np.full(Nx, False)
         for x in tqdm(pixel_range, disable=not parameters.VERBOSE):
             guess = np.copy(guess)
             if x == xmax_index:
@@ -995,13 +1037,15 @@ class ChromaticPSF:
                 if not np.any(np.isnan(best_fit[0])):
                     w.live_fit = True
                     w.plot_fit()
+            self.fitted_pixels[x] = True
         # interpolate the skipped pixels with splines
         all_pixels = np.arange(Nx)
-        xp = np.array(sorted(set(list(pixel_range))))
-        self.fitted_pixels = xp
+        #xp = np.array(sorted(set(list(pixel_range))))
+        xp = all_pixels[self.fitted_pixels]
+        #self.fitted_pixels = xp
         for i in range(len(self.psf.param_names)):
             yp = self.profile_params[xp, i]
-            self.profile_params[:, i] = interp1d(xp, yp, kind='cubic')(all_pixels)
+            self.profile_params[:, i] = interp1d(xp, yp, kind='cubic', fill_value='extrapolate', bounds_error=False)(all_pixels)
         for x in all_pixels:
             y = data[:, x]
             if bgd_model_func is not None:
@@ -1012,7 +1056,7 @@ class ChromaticPSF:
                 signal -= np.mean(signal[bgd_index])
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
-        self.poly_params = self.from_profile_params_to_poly_params(self.profile_params)
+        self.poly_params = self.from_profile_params_to_poly_params(self.profile_params, indices=self.fitted_pixels)
         self.from_profile_params_to_shape_params(self.profile_params)
         self.cov_matrix = np.diag(1 / np.array(self.table['flux_err']) ** 2)
 

@@ -85,6 +85,8 @@ class Image(object):
         PSF instance fitted on the current target.
     target_bkgd2D: callable
         Function that models the background behind the current target.
+    wcs: WCS
+        Image World Coordinate System Astropy object.
 
     """
 
@@ -107,17 +109,13 @@ class Image(object):
         Examples
         --------
 
-        .. doctest::
-
-           >>> im = Image('')
-           >>> im.data
-           None
-           >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im.file_name
+        'tests/data/reduc_20170605_028.fits'
 
         .. doctest::
             :hide:
 
-            >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
             >>> assert im.data is not None and np.mean(im.data) > 0
             >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
             >>> assert im.header is not None
@@ -149,6 +147,7 @@ class Image(object):
         self.parallactic_angle = None
         self.saturation = None
 
+        self.wcs = None
         self.ra = None
         self.dec = None
         self.hour_angle = None
@@ -567,6 +566,11 @@ def load_CTIO_image(image):
     build_CTIO_gain_map(image)
     build_CTIO_read_out_noise_map(image)
     image.compute_parallactic_angle()
+    # WCS
+    wcs_file_name = set_wcs_file_name(image.file_name)
+    if os.path.isfile(wcs_file_name):
+        image.my_logger.info(f"\n\tUse WCS {wcs_file_name}.")
+        image.wcs = load_wcs_from_file(wcs_file_name)
 
 
 def build_CTIO_gain_map(image):
@@ -745,13 +749,24 @@ def load_STARDICE_image(image):  # pragma: no cover
     image: Image
         The Image instance to fill with file data and header.
     """
+
     image.my_logger.info(f'\n\tLoading STARDICE image {image.file_name}...')
     hdu_list = fits.open(image.file_name)
     image.header = hdu_list[0].header
     image.data = hdu_list[0].data.astype(np.float64)
     hdu_list.close()  # need to free allocation for file descripto
-    del image.header["BZERO"]
-    del image.header["BSCALE"]
+    if "BZERO" in image.header:
+        del image.header["BZERO"]
+    if "BSCALE" in image.header:
+        del image.header["BSCALE"]
+
+    #Set the flip signs depending on the side of the pillar 
+    if image.header['MOUNTTAU'] < 90:
+        parameters.OBS_CAMERA_ROTATION = 180
+
+    elif image.header['MOUNTTAU'] >= 90:
+        parameters.OBS_CAMERA_ROTATION = 0
+
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['cameraexptime'])
     image.filter_label = 'EMPTY'
@@ -768,20 +783,23 @@ def load_STARDICE_image(image):  # pragma: no cover
     image.ra = Angle(image.header['MOUNTRA'], unit="deg")
     image.dec = Angle(image.header['MOUNTDEC'], unit="deg")
     image.hour_angle = Angle(image.header['MOUNTHA'], unit="deg")
+    if image.header['MOUNTTAU'] >= 90:
+        image.hour_angle = image.hour_angle - 180*units.deg
+        image.dec = 180*units.deg - image.dec
     image.temperature = 10
     image.pressure = 1000
     image.humidity = 87
     image.units = 'ADU'
-    
-    if "CD2_1" in hdu_list[0].header:
-        rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[0].header["CD2_1"], hdu_list[0].header["CD1_1"]) + 90
-        if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
-            image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degree while "
-                                    f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degree. "
-                                    f"\nBoth differs by more than 2 degree... bug ?")
-    
+    if "PC2_1" in image.header:
+        rotation_wcs = 180 / np.pi * np.arctan2(-hdu_list[0].header["PC2_1"]/hdu_list[0].header["CDELT2"], hdu_list[0].header["PC1_1"]/hdu_list[0].header["CDELT1"])
+        atol = 0.02
+        print("RORATION WCS :", rotation_wcs)
+        if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=atol):
+            image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degrees while "
+                                    f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degrees. "
+                                    f"\nBoth differs by more than {atol} degrees... bug ?")
+
     image.read_out_noise = 8.5 * np.ones_like(image.data)
-    #image.target_label = image.header["OBJECT"]  #.replace(" ", "")
     image.compute_parallactic_angle()
 
 
@@ -828,37 +846,25 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     >>> find_target(im, guess, widths=(100, 100))
     [820, 580]
     """
-    my_logger = set_logger(__name__)
     target_pixcoords = [-1, -1]
     theX = -1
     theY = -1
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
-        wcs_file_name = set_wcs_file_name(image.file_name)
-        if os.path.isfile(wcs_file_name):
-            my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
-            if rotated:
-                target_pixcoords = find_target_after_rotation(image)
-                theX, theY = target_pixcoords
-            else:
-                wcs = load_wcs_from_file(wcs_file_name)
-                target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
-                # noinspection PyUnresolvedReferences
-                target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra,
-                                                              target_coord_after_motion.dec, 0))
-                theX, theY = target_pixcoords / parameters.CCD_REBIN
-            sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
-                                                                                rotated=rotated, widths=widths)
-            sub_image_x0 = theX - x0 + Dx
-            sub_image_y0 = theX - y0 + Dy
-            if parameters.DEBUG:
-                plt.figure(figsize=(5, 5))
-                plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
-                                  target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
-                plt.show()
-            if parameters.PdfPages:
-                parameters.PdfPages.savefig()
-        else:
-            my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
+        target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
+        target_pixcoords = np.array(image.wcs.all_world2pix(target_coord_after_motion.ra,
+                                                        target_coord_after_motion.dec, 0))
+        theX, theY = target_pixcoords / parameters.CCD_REBIN
+        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
+                                                                            rotated=rotated, widths=widths)
+        sub_image_x0 = theX - x0 + Dx
+        sub_image_y0 = theX - y0 + Dy
+        if parameters.DEBUG:
+            plt.figure(figsize=(5, 5))
+            plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
+                                target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
+            plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
 
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "fit" or rotated:
         if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
@@ -875,21 +881,6 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
             sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=guess, rotated=rotated,
                                                                                 widths=(Dx, Dy))
             sub_image_x0, sub_image_y0 = x0, y0
-
-            if parameters.DEBUG and  parameters.DISPLAY:
-                fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-                im0 = ax[0].imshow(sub_image_subtracted, origin="lower", norm=LogNorm())
-                fig.colorbar(im0, ax=ax[0])
-                ax[0].set_title("sub_image_subtracted")
-                im1 = ax[1].imshow(sub_errors, origin="lower", norm=LogNorm())
-                ax[1].set_title("sub_image_errors")
-                fig.colorbar(im1, ax=ax[1])
-                if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-                    plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'sub_image_subtracted.pdf'),
-                                      transparent=True)
-                if parameters.DISPLAY:  # pragma: no cover
-                    plt.show()
-
             for i in range(niter):
                 # find the target
                 # try:

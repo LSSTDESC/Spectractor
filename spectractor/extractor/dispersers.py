@@ -444,6 +444,8 @@ class Grating:
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("ctio.ini")
         >>> g = Grating(400)
         >>> theta = g.refraction_angle(500, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2])
         >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, parameters.DISTANCE2CCD))
@@ -471,6 +473,8 @@ class Grating:
 
         Examples
         --------
+        >>> from spectractor.config import load_config
+        >>> load_config("ctio.ini")
         >>> g = Grating(400)
         >>> theta = g.refraction_angle(500, [parameters.CCD_IMSIZE/2,  parameters.CCD_IMSIZE/2])
         >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, parameters.DISTANCE2CCD))
@@ -715,10 +719,10 @@ class Hologram(Grating):
         Examples
         --------
         >>> h = Hologram('HoloPhP')
-        >>> h.theta((500,500))
-        -1.3393287109201792
+        >>> h.theta((700,700))
+        -0.8335087452358715
         >>> h.theta((0,0))
-        -2.0936702173289983
+        -1.046
         """
         return float(self.theta_interp(*x))
 
@@ -739,8 +743,8 @@ class Hologram(Grating):
         >>> h = Hologram(label='HoloPhP')
         >>> h.N((500,500))
         345.4794168822986
-        >>> h.theta((500,500))
-        -1.3393287109201792
+        >>> h.theta((700,700))
+        -0.8335087452358715
         >>> h.holo_center
         [856.004, 562.34]
 
@@ -761,7 +765,7 @@ class Hologram(Grating):
             if parameters.CCD_REBIN > 1:
                 self.N_x /= parameters.CCD_REBIN
                 self.N_y /= parameters.CCD_REBIN
-            self.N_interp = interpolate.interp2d(self.N_x, self.N_y, self.N_data, kind='cubic')
+            self.N_interp = interpolate.CloughTocher2DInterpolator((self.N_x, self.N_y), self.N_data)
             self.N_fit = fit_poly2d(self.N_x, self.N_y, self.N_data, order=2)
         else:
             self.is_hologram = False
@@ -791,7 +795,8 @@ class Hologram(Grating):
             if parameters.CCD_REBIN > 1:
                 self.theta_x /= parameters.CCD_REBIN
                 self.theta_y /= parameters.CCD_REBIN
-            self.theta_interp = interpolate.interp2d(self.theta_x, self.theta_y, self.theta_data, kind='cubic')
+            self.theta_interp = interpolate.CloughTocher2DInterpolator((self.theta_x, self.theta_y), self.theta_data,
+                                                                       fill_value=self.theta_tilt)
         else:
             self.theta_interp = self.theta_func
         self.x_lines, self.line1, self.line2 = neutral_lines(self.holo_center[0], self.holo_center[1], self.theta_tilt)
