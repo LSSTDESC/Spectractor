@@ -4,107 +4,21 @@ import subprocess
 import shutil
 import numpy as np
 import matplotlib.pyplot as plt
-from astropy.stats import sigma_clipped_stats
 from astropy.io import fits, ascii
 import astropy.units as u
 from astropy.table import Table
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, Distance
 
-from photutils import IRAFStarFinder
-
 from scipy.spatial import ConvexHull
 
 from spectractor import parameters
 from spectractor.tools import (plot_image_simple, set_wcs_file_name, set_wcs_tag, set_wcs_output_directory,
-                               set_sources_file_name, set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir)
+                               set_sources_file_name, set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir,
+                               iraf_source_detection)
 from spectractor.config import set_logger
 from spectractor.extractor.images import Image
 from spectractor.extractor.background import remove_image_background_sextractor
-
-
-def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, mask=None):
-    """Function to detect point-like sources in a data array.
-
-    This function use the photutils IRAFStarFinder module to search for sources in an image. This finder
-    is better than DAOStarFinder for the astrometry of isolated sources but less good for photometry.
-
-    Parameters
-    ----------
-    data_wo_bkg: array_like
-        The image data array. It works better if the background was subtracted before.
-    sigma: float
-        Standard deviation value for sigma clipping function before finding sources (default: 3.0).
-    fwhm: float
-        Full width half maximum for the source detection algorithm (default: 3.0).
-    threshold_std_factor: float
-        Only sources with a flux above this value times the RMS of the images are kept (default: 5).
-    mask: array_like, optional
-        Boolean array to mask image pixels (default: None).
-
-    Returns
-    -------
-    sources: Table
-        Astropy table containing the source centroids and fluxes, ordered by decreasing magnitudes.
-
-    Examples
-    --------
-
-    >>> N = 100
-    >>> data = np.ones((N, N))
-    >>> yy, xx = np.mgrid[:N, :N]
-    >>> x_center, y_center = 20, 30
-    >>> data += 10*np.exp(-((x_center-xx)**2+(y_center-yy)**2)/10)
-    >>> sources = source_detection(data)
-    >>> print(float(sources["xcentroid"]), float(sources["ycentroid"]))
-    20.0 30.0
-
-    .. doctest:
-        :hide:
-
-        >>> assert len(sources) == 1
-        >>> assert sources["xcentroid"] == x_center
-        >>> assert sources["ycentroid"] == y_center
-
-    .. plot:
-
-        from spectractor.tools import plot_image_simple
-        from spectractor.astrometry import source_detection
-        import numpy as np
-        import matplotlib.pyplot as plt
-
-        N = 100
-        data = np.ones((N, N))
-        yy, xx = np.mgrid[:N, :N]
-        x_center, y_center = 20, 30
-        data += 10*np.exp(-((x_center-xx)**2+(y_center-yy)**2)/10)
-        sources = source_detection(data)
-        fig = plt.figure(figsize=(6,5))
-        plot_image_simple(plt.gca(), data, target_pixcoords=(sources["xcentroid"], sources["ycentroid"]))
-        fig.tight_layout()
-        plt.show()
-
-    """
-    mean, median, std = sigma_clipped_stats(data_wo_bkg, sigma=sigma)
-    if mask is None:
-        mask = np.zeros(data_wo_bkg.shape, dtype=bool)
-    # daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std, exclude_border=True)
-    # sources = daofind(data_wo_bkg - median, mask=mask)
-    iraffind = IRAFStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std, exclude_border=True)
-    sources = iraffind(data_wo_bkg - median, mask=mask)
-    for col in sources.colnames:
-        sources[col].info.format = '%.8g'  # for consistent table output
-    sources.sort('mag')
-    if parameters.DEBUG:
-        positions = np.array((sources['xcentroid'], sources['ycentroid']))
-        plot_image_simple(plt.gca(), data_wo_bkg, scale="symlog", target_pixcoords=positions)
-        if parameters.DISPLAY:
-            # fig.tight_layout()
-            plt.show()
-        if parameters.PdfPages:
-            parameters.PdfPages.savefig()
-
-    return sources
 
 
 def load_gaia_catalog(coord, radius=5 * u.arcmin, gaia_mag_g_limit=23):
@@ -979,7 +893,7 @@ class Astrometry():  # pragma: no cover
 
         The name of the target must be given to get its RA,DEC coordinates via a Simbad query.
         First the background of the exposure is removed using the astropy SExtractorBackground() method.
-        Then photutils source_detection() is used to get the positions in pixels en flux of the objects in the field.
+        Then photutils iraf_source_detection() is used to get the positions in pixels en flux of the objects in the field.
         The results are saved in the {file_name}_sources.fits file and used by the solve_field command from the
         astrometry.net library. The solve_field path must be set using the spectractor.parameters.ASTROMETRYNET_BINDIR
         variable. A new WCS is created and saved as a new FITS file. The WCS file and the intermediate results
@@ -1002,7 +916,7 @@ class Astrometry():  # pragma: no cover
         See Also
         --------
 
-        source_detection()
+        iraf_source_detection()
 
         Examples
         --------
@@ -1042,8 +956,14 @@ class Astrometry():  # pragma: no cover
             data_wo_bkg = remove_image_background_sextractor(data, sigma=3.0, box_size=(50, 50),
                                                              filter_size=(11, 11), positive=True)
             # extract source positions and fluxes
-            self.my_logger.info('\n\tDetect sources using photutils source_detection()...')
-            self.sources = source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, mask=None)
+            self.my_logger.info('\n\tDetect sources using photutils iraf_source_detection()...')
+            self.sources = iraf_source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, mask=None)
+            print("go")
+            fig = plt.figure()
+            plt.imshow(np.log10(data), origin="lower")
+            plt.scatter(self.sources["xcentroid"], self.sources["ycentroid"], marker="+", s=100)
+            plt.show()
+
             if extent is not None:
                 self.sources['xcentroid'] += extent[0][0]
                 self.sources['ycentroid'] += extent[1][0]
