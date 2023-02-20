@@ -1390,6 +1390,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
         # Propagate background uncertainties
         err = np.sqrt(err * err + bgd_rms * bgd_rms)
+        spectrum.spectrogram_bgd = bgd
+        spectrum.spectrogram_bgd_rms = bgd_rms
 
     # First guess for lambdas
 
@@ -1407,9 +1409,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Save results
     spectrum.spectrogram = data
     spectrum.spectrogram_err = err
-    if parameters.SPECTRACTOR_BACKGROUND_SUBTRACTION:
-        spectrum.spectrogram_bgd = bgd
-        spectrum.spectrogram_bgd_rms = bgd_rms
     spectrum.spectrogram_x0 = target_pixcoords_spectrogram[0]
     spectrum.spectrogram_y0 = target_pixcoords_spectrogram[1]
     spectrum.spectrogram_xmin = xmin
