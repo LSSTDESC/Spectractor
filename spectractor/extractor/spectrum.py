@@ -285,7 +285,8 @@ class Spectrum:
 
         t = self.load_filter()
         if self.target is not None and len(self.target.spectra) > 0:
-            lambda_ref = np.sum(self.target.wavelengths[0] * self.target.spectra[0] * t.transmission(self.target.wavelengths[0])) / np.sum(self.target.spectra[0] * t.transmission(self.target.wavelengths[0]))
+            spec = self.target.spectra[0] * t.transmission(self.target.wavelengths[0])
+            lambda_ref = np.sum(self.target.wavelengths[0] * spec) / np.sum(spec)
             self.lambda_ref = lambda_ref
             self.header['LBDA_REF'] = lambda_ref
 
