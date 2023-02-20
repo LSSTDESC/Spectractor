@@ -385,10 +385,11 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
 
         fit_workspace.simulation.fast_sim = False
         # fit_workspace.fixed[0] = True
-        # run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-        #                                 xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
-        #                                 verbose=False)
-        fit_workspace.fixed[0] = False
+        fixed = [True] * len(fit_workspace.p)
+        fixed[0] = False
+        run_minimisation(fit_workspace, method="newton", epsilon=epsilon, fix=fixed,
+                         xtol=1e-3, ftol=100 / fit_workspace.data.size, verbose=False)
+        # fit_workspace.fixed[0] = False
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
                                         xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
                                         verbose=False)
