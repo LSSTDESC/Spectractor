@@ -18,7 +18,6 @@ from spectractor.fit.fit_spectrogram import (SpectrogramFitWorkspace,  # noqa: E
 import os  # noqa: E402
 import numpy as np  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
-import unittest  # noqa: E402
 
 
 # original parameters
@@ -150,11 +149,12 @@ def test_ctio_fullchain():
                    np.array(PSF_POLY_PARAMS_TRUTH)[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1], rtol=0.1, atol=0.1))
     assert np.abs(np.mean(residuals[100:-100])) < 0.25
     assert np.std(residuals[100:-100]) < 3
+
     spectrum_file_name = "./tests/data/sim_20170530_134_spectrum.fits"
     assert os.path.isfile(spectrum_file_name)
     atmgrid_filename = sim_image.replace('sim', 'reduc').replace('.fits', '_atmsim.fits')
     assert os.path.isfile(atmgrid_filename)
-
+    spectrum = Spectrum(spectrum_file_name)
     w = SpectrumFitWorkspace(spectrum_file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                              burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
     run_spectrum_minimisation(w, method="newton")
