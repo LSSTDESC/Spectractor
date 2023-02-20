@@ -571,7 +571,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         # run_minimisation(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
         #                  xtol=1e-2, ftol=10 / fit_workspace.data.size, verbose=False)
 
-        fit_workspace.simulation.fast_sim = True
+        fit_workspace.simulation.fast_sim = False
         fit_workspace.simulation.fix_psf_cube = False
         fit_workspace.fixed = np.copy(fixed)
         # guess = fit_workspace.p

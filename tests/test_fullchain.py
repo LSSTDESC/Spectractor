@@ -137,16 +137,15 @@ def test_ctio_fullchain():
                                f" vs {PSF_POLY_PARAMS_TRUTH[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1]}"
                                f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100]):.5g}, "
                                f"std={np.std(residuals[100:-100]):.5g}")
-    assert np.isclose(float(spectrum.header['X0_T']), spectrum.x0[0], atol=0.2)
-    assert np.isclose(float(spectrum.header['Y0_T']), spectrum.x0[1], atol=1)
-    assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle,
-                      atol=180 / np.pi * 1 / parameters.CCD_IMSIZE)
-    assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), rtol=1e-2)
+    assert np.isclose(float(spectrum.header['X0_T']), spectrum.x0[0], atol=0.1)
+    assert np.isclose(float(spectrum.header['Y0_T']), spectrum.x0[1], atol=0.1)
+    assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle, atol=1e-3)
+    assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), rtol=1e-3)
     assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
-    assert float(spectrum.header['CHI2_FIT']) < 0.65
+    assert float(spectrum.header['CHI2_FIT']) < 1.5e-3
     assert np.all(
         np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1],
-                   np.array(PSF_POLY_PARAMS_TRUTH)[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1], rtol=0.1, atol=0.1))
+                   np.array(PSF_POLY_PARAMS_TRUTH)[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1], rtol=0.01, atol=0.01))
     assert np.abs(np.mean(residuals[100:-100])) < 0.25
     assert np.std(residuals[100:-100]) < 3
 
@@ -158,7 +157,7 @@ def test_ctio_fullchain():
     w = SpectrumFitWorkspace(spectrum_file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                              burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
     run_spectrum_minimisation(w, method="newton")
-    nsigma = 3
+    nsigma = 2
     labels = ["VAOD_T", "OZONE_T", "PWV_T"]
     indices = [2, 3, 4]
     assert w.costs[-1] / w.data.size < 2
@@ -168,7 +167,7 @@ def test_ctio_fullchain():
                                 f"{np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma}")
         assert np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.cov[i, i]) < nsigma
     assert np.abs(w.p[1]) / np.sqrt(w.cov[1, 1]) < 2 * nsigma  # A2
-    assert np.isclose(w.p[6], spectrum.header["D2CCD_T"], atol=parameters.DISTANCE2CCD_ERR)  # D2CCD
+    assert np.isclose(w.p[6], spectrum.header["D2CCD_T"], atol=0.1)  # D2CCD
     assert np.isclose(np.abs(w.p[7]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
     assert np.isclose(np.abs(w.p[8]), 0, atol=1e-3)  # B
 
@@ -176,11 +175,11 @@ def test_ctio_fullchain():
     w = SpectrogramFitWorkspace(spectrum_file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                 burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")
-    nsigma = 5
-    labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T"]
+    nsigma = 2
+    labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T", "D2CCD_T"]
     indices = [0, 1, 2, 3, 4, 5]
     A1, A2, aerosols, ozone, pwv, D, shift_x, shift_y, shift_t, B, *psf_poly_params = w.p
-    assert w.costs[-1] / w.data.size < 0.8
+    assert w.costs[-1] / w.data.size < 1e-3
     for i, l in zip(indices, labels):
         spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.cov[i, i]):.3f} "
                                 f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
@@ -190,7 +189,7 @@ def test_ctio_fullchain():
     assert np.isclose(B, 1, atol=1e-3)  # B
     assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1],
                              np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1],
-                             rtol=0.1, atol=0.15))
+                             rtol=0.01, atol=0.01))
 
 
 if __name__ == "__main__":
