@@ -1,10 +1,12 @@
 import os
 
 import astropy.io.fits
+from matplotlib import pyplot as plt
+from photutils import IRAFStarFinder
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting
-from astropy.stats import sigma_clip
+from astropy.stats import sigma_clip, sigma_clipped_stats
 from astropy.io import fits
 from astropy import wcs as WCS
 
@@ -2429,3 +2431,88 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod()
+
+
+def iraf_source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, mask=None):
+    """Function to detect point-like sources in a data array.
+
+    This function use the photutils IRAFStarFinder module to search for sources in an image. This finder
+    is better than DAOStarFinder for the astrometry of isolated sources but less good for photometry.
+
+    Parameters
+    ----------
+    data_wo_bkg: array_like
+        The image data array. It works better if the background was subtracted before.
+    sigma: float
+        Standard deviation value for sigma clipping function before finding sources (default: 3.0).
+    fwhm: float
+        Full width half maximum for the source detection algorithm (default: 3.0).
+    threshold_std_factor: float
+        Only sources with a flux above this value times the RMS of the images are kept (default: 5).
+    mask: array_like, optional
+        Boolean array to mask image pixels (default: None).
+
+    Returns
+    -------
+    sources: Table
+        Astropy table containing the source centroids and fluxes, ordered by decreasing magnitudes.
+
+    Examples
+    --------
+
+    >>> N = 100
+    >>> data = np.ones((N, N))
+    >>> yy, xx = np.mgrid[:N, :N]
+    >>> x_center, y_center = 20, 30
+    >>> data += 10*np.exp(-((x_center-xx)**2+(y_center-yy)**2)/10)
+    >>> sources = iraf_source_detection(data)
+    >>> print(float(sources["xcentroid"]), float(sources["ycentroid"]))
+    20.0 30.0
+
+    .. doctest:
+        :hide:
+
+        >>> assert len(sources) == 1
+        >>> assert sources["xcentroid"] == x_center
+        >>> assert sources["ycentroid"] == y_center
+
+    .. plot:
+
+        from spectractor.tools import plot_image_simple
+        from spectractor.astrometry import source_detection
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        N = 100
+        data = np.ones((N, N))
+        yy, xx = np.mgrid[:N, :N]
+        x_center, y_center = 20, 30
+        data += 10*np.exp(-((x_center-xx)**2+(y_center-yy)**2)/10)
+        sources = iraf_source_detection(data)
+        fig = plt.figure(figsize=(6,5))
+        plot_image_simple(plt.gca(), data, target_pixcoords=(sources["xcentroid"], sources["ycentroid"]))
+        fig.tight_layout()
+        plt.show()
+
+    """
+    mean, median, std = sigma_clipped_stats(data_wo_bkg, sigma=sigma)
+    #fwhm = 5
+    #threshold_std_factor = 3
+    if mask is None:
+        mask = np.zeros(data_wo_bkg.shape, dtype=bool)
+    # daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std, exclude_border=True)
+    # sources = daofind(data_wo_bkg - median, mask=mask)
+    iraffind = IRAFStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std, exclude_border=True)
+    sources = iraffind(data_wo_bkg - median, mask=mask)
+    for col in sources.colnames:
+        sources[col].info.format = '%.8g'  # for consistent table output
+    sources.sort('mag')
+    if parameters.DEBUG:
+        positions = np.array((sources['xcentroid'], sources['ycentroid']))
+        plot_image_simple(plt.gca(), data_wo_bkg, scale="symlog", target_pixcoords=positions)
+        if parameters.DISPLAY:
+            plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
+
+    return sources

@@ -2,9 +2,9 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.tools import (pixel_rotation, set_wcs_file_name, set_sources_file_name,
                                set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir,
-                               plot_image_simple)
+                               plot_image_simple, iraf_source_detection)
 from spectractor.extractor.images import Image, find_target
-from spectractor.astrometry import get_gaia_coords_after_proper_motion, source_detection
+from spectractor.astrometry import get_gaia_coords_after_proper_motion
 from spectractor.extractor.background import remove_image_background_sextractor
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.simulator import SpectrogramSimulatorCore, SimulatorInit
@@ -171,7 +171,7 @@ class StarFieldModel:
                         mask[y, x] = True
             # remove background and detect sources
             data_wo_bkg = remove_image_background_sextractor(data)
-            sources = source_detection(data_wo_bkg, mask=mask)
+            sources = iraf_source_detection(data_wo_bkg, mask=mask)
             for k, source in enumerate(sources):
                 x, y = sources['xcentroid'][k], sources['ycentroid'][k]
                 A = sources['flux'][k] * self.flux_factor

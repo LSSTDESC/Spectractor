@@ -11,7 +11,7 @@ from spectractor.extractor.dispersers import Grating, Hologram
 from spectractor.extractor.targets import Target
 from spectractor.extractor.psf import load_PSF
 from spectractor.tools import fftconvolve_gaussian, ensure_dir
-from spectractor.config import set_logger, apply_rebinning_to_parameters
+from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 import spectractor.parameters as parameters
@@ -68,7 +68,7 @@ class SpectrumSimulation(Spectrum):
     def simulate_without_atmosphere(self, lambdas):
         """Compute the spectrum of an object and its uncertainties
         after its transmission throught the instrument except the atmosphere.
-        The units remains the ones of the Target instance.
+        The units remain the ones of the Target instance.
 
         Parameters
         ----------
@@ -150,13 +150,12 @@ class SpectrumSimulation(Spectrum):
 
         """
         # find lambdas including ADR effect
-        new_x0 = [self.x0[0] - shift_x, self.x0[1]]
-        self.disperser.D = D
-        distance = self.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=shift_x)
-        lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
+        # must add ADR to get perfect result on atmospheric fit in full chain test with SpectrumSimulation()
+        lambdas = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=0,
+                                                      order=1, with_adr=True, niter=5)
+        lambdas_order2 = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=0,
+                                                             order=2, with_adr=True, niter=5)
         self.lambdas = lambdas
-        self.lambdas_order2 = lambdas_order2
         atmospheric_transmission = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv)
         if self.fast_sim:
             self.data, self.err = self.simulate_without_atmosphere(lambdas)
@@ -389,7 +388,12 @@ class SpectrogramModel(Spectrum):
         import time
         start = time.time()
         self.rotation_angle = angle
-        self.lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.compute_dispersion_in_spectrogram(D, shift_x, shift_y, angle, with_adr=True, niter=5)
+        self.lambdas = self.compute_lambdas_in_spectrogram(D, shift_x, shift_y, angle, niter=5, with_adr=True,
+                                                           order=self.order)
+        dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+                                                                niter=5, with_adr=True, order=self.order)
+        dispersion_law_order2 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle, niter=5, with_adr=True,
+                                                                       order=self.order+np.sign(self.order))
         self.lambdas_binwidths = np.gradient(self.lambdas)
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
@@ -558,6 +562,30 @@ def SimulatorInit(filename, fast_load=False, config=""):
     """ SimulatorInit
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
+
+    Parameters
+    ----------
+    filename: str
+        Spectrum file name.
+    fast_load: bool, optional
+        If True, load spectrograms from spectrum file name (slower) (default: False).
+    config: str, optional
+        Config file name to be loaded (default: "").
+
+    Returns
+    -------
+    spectrum: Spectrum
+        Spectrum instance.
+    telescope: TelescopeTransmission
+        TelescopeTransmission instance.
+    disperser: Disperser
+        Disperser instance.
+    target: Target
+        Target instance.
+
+    Examples
+    --------
+    >>> spectrum, telescope, disperser, target = SimulatorInit("./tests/data/reduc_20170530_134_spectrum.fits")
     """
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SIMULATOR initialisation')
@@ -780,7 +808,7 @@ def SpectrogramSimulator(filename, outputdir="", aerosols=0.05, ozone=300, pwv=5
     spectrogram_simulation.header['ROTANGLE'] = angle
     output_filename = filename.replace('spectrum', 'sim')
     if outputdir != "":
-        base_filename = filename.split('/')[-1]
+        base_filename = os.path.basename(filename)
         output_filename = os.path.join(outputdir, base_filename.replace('spectrum', 'sim'))
     # spectrogram_simulation.save_spectrum(output_filename, overwrite=True)
 

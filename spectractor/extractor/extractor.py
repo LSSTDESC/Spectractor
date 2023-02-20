@@ -276,7 +276,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         profile_params_order2 = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params_order2,
                                                                                                apply_bounds=True)
         self.spectrum.chromatic_psf.from_profile_params_to_shape_params(profile_params_order1)
-        _, _, dispersion_law, dispersion_law_order2 = self.spectrum.compute_dispersion_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True)
+        lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
+                                                               order=self.spectrum.order)
+        dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(lambdas, dx0, dy0, angle,
+                                                                         niter=5, with_adr=True,
+                                                                         order=self.spectrum.order)
+        dispersion_law_order2 = self.spectrum.compute_dispersion_in_spectrogram(lambdas, dx0, dy0, angle, niter=5, with_adr=True,
+                                                                                order=self.spectrum.order+np.sign(self.spectrum.order))
         profile_params_order1[:, 0] = 1
         profile_params_order1[:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
         profile_params_order1[:, 2] += dispersion_law.imag - self.bgd_width
@@ -425,8 +431,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                                                             self.spectrum.spectrogram_y0 + dy0, angle, plot=False)
 
         # Evaluate ADR and compute wavelength arrays
-        self.lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.spectrum.compute_dispersion_in_spectrogram(D2CCD, dx0, dy0, angle, with_adr=True, niter=5)
-
+        self.lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
+                                                                    order=self.spectrum.order)
+        dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, dx0, dy0, angle,
+                                                                         niter=5, with_adr=True,
+                                                                         order=self.spectrum.order)
+        dispersion_law_order2 = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, dx0, dy0, angle, niter=5, with_adr=True,
+                                                                                order=self.spectrum.order+np.sign(self.spectrum.order))
         # Fill spectrogram trace as a function of the pixel column x
         profile_params[:, 0] = 1
         profile_params[:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0

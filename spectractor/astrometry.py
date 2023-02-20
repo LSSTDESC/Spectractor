@@ -4,107 +4,44 @@ import subprocess
 import shutil
 import numpy as np
 import matplotlib.pyplot as plt
-from astropy.stats import sigma_clipped_stats
 from astropy.io import fits, ascii
 import astropy.units as u
 from astropy.table import Table
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, Distance
 
-from photutils import IRAFStarFinder
-
 from scipy.spatial import ConvexHull
 
 from spectractor import parameters
 from spectractor.tools import (plot_image_simple, set_wcs_file_name, set_wcs_tag, set_wcs_output_directory,
-                               set_sources_file_name, set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir)
+                               set_sources_file_name, set_gaia_catalog_file_name, load_wcs_from_file, ensure_dir,
+                               iraf_source_detection)
 from spectractor.config import set_logger
 from spectractor.extractor.images import Image
 from spectractor.extractor.background import remove_image_background_sextractor
 
 
-def source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, mask=None):
-    """Function to detect point-like sources in a data array.
-
-    This function use the photutils IRAFStarFinder module to search for sources in an image. This finder
-    is better than DAOStarFinder for the astrometry of isolated sources but less good for photometry.
-
-    Parameters
-    ----------
-    data_wo_bkg: array_like
-        The image data array. It works better if the background was subtracted before.
-    sigma: float
-        Standard deviation value for sigma clipping function before finding sources (default: 3.0).
-    fwhm: float
-        Full width half maximum for the source detection algorithm (default: 3.0).
-    threshold_std_factor: float
-        Only sources with a flux above this value times the RMS of the images are kept (default: 5).
-    mask: array_like, optional
-        Boolean array to mask image pixels (default: None).
-
-    Returns
-    -------
-    sources: Table
-        Astropy table containing the source centroids and fluxes, ordered by decreasing magnitudes.
-
-    Examples
-    --------
-
-    >>> N = 100
-    >>> data = np.ones((N, N))
-    >>> yy, xx = np.mgrid[:N, :N]
-    >>> x_center, y_center = 20, 30
-    >>> data += 10*np.exp(-((x_center-xx)**2+(y_center-yy)**2)/10)
-    >>> sources = source_detection(data)
-    >>> print(float(sources["xcentroid"]), float(sources["ycentroid"]))
-    20.0 30.0
-
-    .. doctest:
-        :hide:
-
-        >>> assert len(sources) == 1
-        >>> assert sources["xcentroid"] == x_center
-        >>> assert sources["ycentroid"] == y_center
-
-    .. plot:
-
-        from spectractor.tools import plot_image_simple
-        from spectractor.astrometry import source_detection
-        import numpy as np
-        import matplotlib.pyplot as plt
-
-        N = 100
-        data = np.ones((N, N))
-        yy, xx = np.mgrid[:N, :N]
-        x_center, y_center = 20, 30
-        data += 10*np.exp(-((x_center-xx)**2+(y_center-yy)**2)/10)
-        sources = source_detection(data)
-        fig = plt.figure(figsize=(6,5))
-        plot_image_simple(plt.gca(), data, target_pixcoords=(sources["xcentroid"], sources["ycentroid"]))
-        fig.tight_layout()
-        plt.show()
-
-    """
-    mean, median, std = sigma_clipped_stats(data_wo_bkg, sigma=sigma)
-    if mask is None:
-        mask = np.zeros(data_wo_bkg.shape, dtype=bool)
-    # daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std, exclude_border=True)
-    # sources = daofind(data_wo_bkg - median, mask=mask)
-    iraffind = IRAFStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std, exclude_border=True)
-    sources = iraffind(data_wo_bkg - median, mask=mask)
-    for col in sources.colnames:
-        sources[col].info.format = '%.8g'  # for consistent table output
-    sources.sort('mag')
-    if parameters.DEBUG:
-        positions = np.array((sources['xcentroid'], sources['ycentroid']))
-        plot_image_simple(plt.gca(), data_wo_bkg, scale="symlog", target_pixcoords=positions)
-        if parameters.DISPLAY:
-            # fig.tight_layout()
-            plt.show()
-        if parameters.PdfPages:
-            parameters.PdfPages.savefig()
-
-    return sources
+def _get_astrometry_executable_path(executable):
+    my_logger = set_logger("get_astrometry_executable_path")
+    if shutil.which(executable) != "":
+        exec = shutil.which(executable)
+    elif parameters.ASTROMETRYNET_DIR != "":
+        if not os.path.isdir(parameters.ASTROMETRYNET_DIR):
+            # reset astrometry.net path
+            if 'ASTROMETRYNET_DIR' in os.environ:
+                my_logger.warning(f"Reset parameters.ASTROMETRYNET_DIR={parameters.ASTROMETRYNET_DIR} (not found) "
+                                  f"to {os.getenv('ASTROMETRYNET_DIR')}.")
+                parameters.ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
+            else:
+                my_logger.error(f"parameters.ASTROMETRYNET_DIR={parameters.ASTROMETRYNET_DIR} but directory does "
+                                f"not exist and ASTROMETRYNET_DIR is not in OS environment.")
+                raise OSError(f"No {executable} binary found with parameters.ASTROMETRYNET_DIR "
+                              f"or ASTROMETRYNET_DIR environment variable.")
+        exec = os.path.join(parameters.ASTROMETRYNET_DIR, f'bin/{executable}')
+    else:
+        raise OSError(f"{executable} executable not found in $PATH "
+                      f"or {os.path.join(parameters.ASTROMETRYNET_DIR, f'bin/{executable}')}")
+    return exec
 
 
 def load_gaia_catalog(coord, radius=5 * u.arcmin, gaia_mag_g_limit=23):
@@ -228,7 +165,7 @@ def plot_shifts_histograms(dra, ddec):  # pragma: no cover
 
 class Astrometry():  # pragma: no cover
 
-    def __init__(self, image, wcs_file_name="", output_directory="", gaia_mag_g_limit=23):
+    def __init__(self, image, wcs_file_name="", output_directory="", gaia_mag_g_limit=23, source_extractor="iraf"):
         """Class to handle astrometric computations.
 
         Parameters
@@ -241,6 +178,10 @@ class Astrometry():  # pragma: no cover
             The output directory path. If empty, a directory *_wcs is created next to the analyzed image (default: "").
         gaia_mag_g_limit: float, optional
             Maximum g magnitude in the Gaia catalog output (default: 23).
+        source_extractor: str, optional
+            Source extraction algorithm to be used for astrometry solving. Can be either:
+            - iraf: uses the tools.py iraf_source_detection function which wraps the photutils IRAFStarFinder module
+            - astrometrynet: uses the default astrometry.net source extraction library
 
         Examples
         --------
@@ -252,6 +193,10 @@ class Astrometry():  # pragma: no cover
         self.my_logger = set_logger(self.__class__.__name__)
         self.image = image
         self.gaia_mag_g_limit = gaia_mag_g_limit
+        if source_extractor not in ["iraf", "astrometrynet"]:
+            raise ValueError(f"source_extractor argument in Astrometry class must be either 'iraf' or 'astrometrynet'. "
+                             f"Got {source_extractor=}")
+        self.source_extractor = source_extractor
         # Use fast mode
         if parameters.CCD_REBIN > 1:
             self.image.rebin()
@@ -428,6 +373,7 @@ class Astrometry():  # pragma: no cover
         sources['X'].name = "xcentroid"
         sources['Y'].name = "ycentroid"
         sources['FLUX'].name = "flux"
+        sources.sort("flux", reverse=True)
         self.sources = sources
         return sources
 
@@ -825,23 +771,7 @@ class Astrometry():  # pragma: no cover
             Log file to write the output of the merge command.
 
         """
-        if shutil.which('new-wcs') != "":
-            exec = shutil.which('new-wcs')
-        elif parameters.ASTROMETRYNET_DIR != "":
-            if not os.path.isdir(parameters.ASTROMETRYNET_DIR):
-                # reset astrometry.net path
-                if 'ASTROMETRYNET_DIR' in os.environ:
-                    self.my_logger.warning(f"Reset {parameters.ASTROMETRYNET_DIR=} (not found) "
-                                           f"to {os.getenv('ASTROMETRYNET_DIR')}.")
-                    parameters.ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
-                else:
-                    self.my_logger.error(f"{parameters.ASTROMETRYNET_DIR=} but directory does "
-                                         f"not exist and ASTROMETRYNET_DIR is not in OS environment.")
-                    raise OSError("No new-wcs binary found with parameters.ASTROMETRYNET_DIR or ASTROMETRYNET_DIR environment.")
-            exec = os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/new-wcs')
-        else:
-            raise OSError(f"new-wcs executable not found in $PATH "
-                          f"or {os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/new-wcs')}")
+        exec = _get_astrometry_executable_path('new-wcs')
         command = f"{exec} -v -d -i {self.image.file_name} -w {self.wcs_file_name} -o {self.new_file_name}\n"
         self.my_logger.info(f'\n\tSave WCS in original file:\n\t{command}')
         log = subprocess.check_output(command, shell=True)
@@ -978,8 +908,9 @@ class Astrometry():  # pragma: no cover
         """Build a World Coordinate System (WCS) using astrometry.net library given an exposure as a FITS file.
 
         The name of the target must be given to get its RA,DEC coordinates via a Simbad query.
-        First the background of the exposure is removed using the astropy SExtractorBackground() method.
-        Then photutils source_detection() is used to get the positions in pixels en flux of the objects in the field.
+        If 'iraf' source_extractor is chosen, first the background of the exposure is removed using the astropy
+        SExtractorBackground() method, then photutils iraf_source_detection() is used to get the positions in pixels
+        and fluxes of the objects in the field. If 'astrometrynet' is chosen, astrometry.net extractor is used.
         The results are saved in the {file_name}_sources.fits file and used by the solve_field command from the
         astrometry.net library. The solve_field path must be set using the spectractor.parameters.ASTROMETRYNET_BINDIR
         variable. A new WCS is created and saved as a new FITS file. The WCS file and the intermediate results
@@ -1002,7 +933,7 @@ class Astrometry():  # pragma: no cover
         See Also
         --------
 
-        source_detection()
+        iraf_source_detection()
 
         Examples
         --------
@@ -1020,7 +951,7 @@ class Astrometry():  # pragma: no cover
         >>> disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")  # doctest: +ELLIPSIS
         Section:...
-        >>> a = Astrometry(im)
+        >>> a = Astrometry(im, source_extractor="astrometrynet")
         >>> a.run_simple_astrometry(extent=((300,1400),(300,1400)))  # doctest: +ELLIPSIS
         WCS ...
 
@@ -1032,45 +963,59 @@ class Astrometry():  # pragma: no cover
 
         """
         # crop data
-        if extent is not None:
-            data = self.image.data[extent[1][0]:extent[1][1], extent[0][0]:extent[0][1]]
-        else:
-            data = np.copy(self.image.data)
         if sources is None:
-            # remove background
-            self.my_logger.info('\n\tRemove background using astropy SExtractorBackground()...')
-            data_wo_bkg = remove_image_background_sextractor(data, sigma=3.0, box_size=(50, 50),
-                                                             filter_size=(11, 11), positive=True)
-            # extract source positions and fluxes
-            self.my_logger.info('\n\tDetect sources using photutils source_detection()...')
-            self.sources = source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, mask=None)
-            if extent is not None:
-                self.sources['xcentroid'] += extent[0][0]
-                self.sources['ycentroid'] += extent[1][0]
+            if self.source_extractor == "iraf":
+                if extent is not None:
+                    data = self.image.data[extent[1][0]:extent[1][1], extent[0][0]:extent[0][1]]
+                else:
+                    data = np.copy(self.image.data)
+                # remove background
+                self.my_logger.info('\n\tRemove background using astropy SExtractorBackground()...')
+                data_wo_bkg = remove_image_background_sextractor(data, sigma=3.0, box_size=(50, 50),
+                                                                 filter_size=(11, 11), positive=True)
+                # extract source positions and fluxes
+                self.my_logger.info('\n\tDetect sources using photutils iraf_source_detection()...')
+                self.sources = iraf_source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5,
+                                                     mask=None)
+                if extent is not None:
+                    self.sources['xcentroid'] += extent[0][0]
+                    self.sources['ycentroid'] += extent[1][0]
+            elif self.source_extractor == "astrometrynet":
+                # must write a temporary image file with Spectractor flips and rotations
+                tmp_image_file_name = self.wcs_file_name.replace(".wcs", "_tmp.fits")
+                fits.writeto(tmp_image_file_name, self.image.data, header=self.image.header)
+                exec = _get_astrometry_executable_path("augment-xylist")
+                command = f"{exec} --scale-unit arcsecperpix " \
+                          f"--scale-low {0.95 * parameters.CCD_PIXEL2ARCSEC} " \
+                          f"--scale-high {1.05 * parameters.CCD_PIXEL2ARCSEC} " \
+                          f"--ra {self.image.target.radec_position.ra.value} --dec {self.image.target.radec_position.dec.value} " \
+                          f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
+                          f"-o {self.sources_file_name} -s FLUX " \
+                          f"--width {self.image.data.shape[1]} --height {self.image.data.shape[0]} " \
+                          f"--x-column X --y-column Y -i {tmp_image_file_name} "
+                if parameters.VERBOSE or parameters.DEBUG:
+                    command += "-v"
+                self.my_logger.info(f'\n\tRun astrometry.net augmented-xylist command:\n\t{command}')
+                log = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE, encoding='ascii')
+                if parameters.VERBOSE or parameters.DEBUG:
+                    self.my_logger.info(f"\n\t{log.stdout}")
+                self.sources = self.load_sources_from_file()
+                os.remove(tmp_image_file_name)
+            else:
+                raise ValueError(f"Got {self.source_extractor=}. Must be either 'iraf' or 'astrometrynet'.")
+            # fig = plt.figure()
+            # plt.imshow(np.log10(self.image.data), origin="lower")
+            # plt.scatter(self.sources["xcentroid"], self.sources["ycentroid"], marker="+", s=100)
+            # plt.show()
+
             self.my_logger.info(f'\n\t{self.sources}')
         else:
             self.sources = sources
         # write results in fits file
         self.write_sources()
         # run astrometry.net
-        if shutil.which('solve-field') != "":
-            exec = shutil.which('solve-field')
-        elif parameters.ASTROMETRYNET_DIR != "":
-            if not os.path.isdir(parameters.ASTROMETRYNET_DIR):
-                # reset astrometry.net path
-                if 'ASTROMETRYNET_DIR' in os.environ:
-                    self.my_logger.warning(f"Reset parameters.ASTROMETRYNET_DIR={parameters.ASTROMETRYNET_DIR} (not found) "
-                                           f"to {os.getenv('ASTROMETRYNET_DIR')}.")
-                    parameters.ASTROMETRYNET_DIR = os.getenv('ASTROMETRYNET_DIR') + '/'
-                else:
-                    self.my_logger.error(f"parameters.ASTROMETRYNET_DIR={parameters.ASTROMETRYNET_DIR} but directory does "
-                                         f"not exist and ASTROMETRYNET_DIR is not in OS environment.")
-                    raise OSError("No solve-field binary found with parameters.ASTROMETRYNET_DIR or ASTROMETRYNET_DIR environment.")
-            exec = os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')
-        else:
-            raise OSError(f"solve-field executable not found in $PATH "
-                          f"or {os.path.join(parameters.ASTROMETRYNET_DIR, 'bin/solve-field')}")
-
+        exec = _get_astrometry_executable_path('solve-field')
         command = f"{exec} --scale-unit arcsecperpix " \
                   f"--scale-low {0.95 * parameters.CCD_PIXEL2ARCSEC} " \
                   f"--scale-high {1.05 * parameters.CCD_PIXEL2ARCSEC} " \
@@ -1084,8 +1029,6 @@ class Astrometry():  # pragma: no cover
         log_file = open(self.match_file_name.replace(".match", ".log"), "w+")
         log_file.write(command + "\n")
         log_file.write(log.decode("utf-8") + "\n")
-        # save new WCS in original fits file
-        # self.merge_wcs_with_new_exposure(log_file=log_file)
         log_file.close()
 
         # The source file given to solve-field is understood as a FITS file with pixel origin value at 1,
@@ -1191,6 +1134,9 @@ class Astrometry():  # pragma: no cover
         else:
             flux_log10_threshold = np.log10(self.sources['flux'][int(0.8 * len(self.sources))])
         sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold)
+        if np.sum(sep_constraints) == 0:
+            raise ValueError(f"Warning! No source passes the set threshold flux>{10**flux_log10_threshold}. "
+                             f"Check your filters.")
         sources_selection = self.sources_radec_positions[sep_constraints]
         gaia_matches = self.gaia_radec_positions_after_pm[self.gaia_index[sep_constraints]]
         dra, ddec = sources_selection.spherical_offsets_to(gaia_matches)

@@ -317,6 +317,7 @@ class Grating:
         self.transmission = None
         self.transmission_err = None
         self.ratio_order_2over1 = None
+        self.ratio_order_3over2 = None
         self.flat_ratio_order_2over1 = True
         self.load_files(verbose=verbose)
 
@@ -414,6 +415,17 @@ class Grating:
             self.ratio_order_2over1 = interpolate.interp1d(parameters.LAMBDAS, ratio, bounds_error=False, kind="linear",
                                                            fill_value="extrapolate")  # "(0, t[-1]))
             self.flat_ratio_order_2over1 = True
+        filename = os.path.join(self.data_dir, self.label, "ratio_order_3over2.txt")
+        if os.path.isfile(filename):
+            a = np.loadtxt(filename)
+            if a.T.shape[0] == 2:
+                l, t = a.T
+            else:
+                l, t, e = a.T
+            self.ratio_order_3over2 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
+                                                           fill_value="extrapolate")  # "(0, t[-1]))
+        else:
+            self.ratio_order_3over2 = None
         filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
         if os.path.isfile(filename):
             lines = [ll.rstrip('\n') for ll in open(filename)]
@@ -599,12 +611,16 @@ class Grating:
         --------
         >>> g = Grating(400, label='Ron400')
         >>> g.plot_transmission(xlim=(400,800))
+        >>> g = Hologram(label='holo4_003')
+        >>> g.plot_transmission(xlim=(400,800))
         """
         wavelengths = np.linspace(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX, 100)
         if xlim is not None:
             wavelengths = np.linspace(xlim[0], xlim[1], 100)
         plt.plot(wavelengths, self.transmission(wavelengths), 'b-', label=self.label)
         plt.plot(wavelengths, self.ratio_order_2over1(wavelengths), 'r-', label="Ratio 2/1")
+        if self.ratio_order_3over2:
+            plt.plot(wavelengths, self.ratio_order_3over2(wavelengths), 'g-', label="Ratio 3/2")
         plt.xlabel(r"$\lambda$ [nm]")
         plt.ylabel(r"Transmission")
         plt.grid()
