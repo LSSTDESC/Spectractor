@@ -158,7 +158,7 @@ def test_ctio_fullchain():
     w = SpectrumFitWorkspace(spectrum_file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                              burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
     run_spectrum_minimisation(w, method="newton")
-    nsigma = 6
+    nsigma = 3
     labels = ["VAOD_T", "OZONE_T", "PWV_T"]
     indices = [2, 3, 4]
     assert w.costs[-1] / w.data.size < 2

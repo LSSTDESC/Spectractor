@@ -150,13 +150,12 @@ class SpectrumSimulation(Spectrum):
 
         """
         # find lambdas including ADR effect
-        new_x0 = [self.x0[0] - shift_x, self.x0[1]]
-        self.disperser.D = D
-        distance = self.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=shift_x)
-        lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=2)
+        # must add ADR to get perfect result on atmospheric fit in full chain test with SpectrumSimulation()
+        lambdas = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=0,
+                                                      order=1, with_adr=True, niter=5)
+        lambdas_order2 = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=0,
+                                                             order=2, with_adr=True, niter=5)
         self.lambdas = lambdas
-        self.lambdas_order2 = lambdas_order2
         atmospheric_transmission = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv)
         if self.fast_sim:
             self.data, self.err = self.simulate_without_atmosphere(lambdas)
@@ -389,7 +388,12 @@ class SpectrogramModel(Spectrum):
         import time
         start = time.time()
         self.rotation_angle = angle
-        self.lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.compute_dispersion_in_spectrogram(D, shift_x, shift_y, angle, with_adr=True, niter=5)
+        self.lambdas = self.compute_lambdas_in_spectrogram(D, shift_x, shift_y, angle, niter=5, with_adr=True,
+                                                           order=self.order)
+        dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+                                                                niter=5, with_adr=True, order=self.order)
+        dispersion_law_order2 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle, niter=5, with_adr=True,
+                                                                       order=self.order+np.sign(self.order))
         self.lambdas_binwidths = np.gradient(self.lambdas)
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
