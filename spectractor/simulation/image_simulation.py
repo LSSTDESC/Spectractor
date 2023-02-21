@@ -322,10 +322,10 @@ class ImageModel(Image):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
         if spectrogram.full_image:
-            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.data
+            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.spectrogram
         else:
             self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
-                      spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
+                      spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.spectrogram
         # - spectrogram.spectrogram_bgd)
         if starfield is not None:
             self.data += starfield.model(xx, yy)
@@ -472,11 +472,11 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     true_spectrum = np.copy(spectrogram.true_spectrum)
 
     # Saturation effects
-    saturated_pixels = np.where(spectrogram.data > image.saturation)[0]
+    saturated_pixels = np.where(spectrogram.spectrogram > image.saturation)[0]
     if len(saturated_pixels) > 0:
         my_logger.warning(f"\n\t{len(saturated_pixels)} saturated pixels detected above saturation "
                           f"level at {image.saturation} ADU/s in the spectrogram."
-                          f"\n\tSpectrogram maximum is at {np.max(spectrogram.data)} ADU/s.")
+                          f"\n\tSpectrogram maximum is at {np.max(spectrogram.spectrogram)} ADU/s.")
     image.data[image.data > image.saturation] = image.saturation
 
     # Convert data from ADU/s in ADU
