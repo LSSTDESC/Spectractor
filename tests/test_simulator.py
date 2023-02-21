@@ -61,7 +61,7 @@ def test_simulator():
                                                 A1=1, A2=1, reso=2, D=56, shift=-1)
         assert np.sum(spectrum_simulation.data) > 0
         assert np.sum(spectrum_simulation.data) < 1e-10
-        assert np.sum(spectrum_simulation.data_order2) < 1e-10
+        assert np.sum(spectrum_simulation.data_next_order) < 1e-10
 
         SpectrumSimulatorSimGrid(file_name, output_directory, pwv_grid=[0, 10, 2], ozone_grid=[200, 400, 2],
                                  aerosol_grid=[0, 0.1, 2])

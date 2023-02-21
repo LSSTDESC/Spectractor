@@ -145,8 +145,8 @@ class SpectrumSimulation(Spectrum):
             >>> assert np.sum(lambdas) > 0
             >>> assert np.sum(model) > 0
             >>> assert np.sum(model) < 1e-10
-            >>> assert np.sum(sim.data_order2) > 0
-            >>> assert np.sum(sim.data_order2) < 1e-11
+            >>> assert np.sum(sim.data_next_order) > 0
+            >>> assert np.sum(sim.data_next_order) < 1e-11
 
         """
         # find lambdas including ADR effect
