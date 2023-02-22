@@ -158,7 +158,7 @@ class Libradtran:
 
         #   Selection of RTE equation solver
         if self.equation_solver == 'pp':  # parallel plan
-            equation_solver_equations = 'disort'
+            equation_solver_equations = 'twostr'
         elif self.equation_solver == 'ps':  # pseudo spherical
             equation_solver_equations = 'sdisort'
         else:

@@ -89,7 +89,7 @@ class Atmosphere:
 
         Examples
         --------
-        >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5, lambda_min=300, lambda_max=1000)
+        >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5, lambda_min=350, lambda_max=1000)
         >>> transmission = a.simulate(aerosols=0.05, ozone=400, pwv=5)
         >>> a.ozone
         400
@@ -97,6 +97,8 @@ class Atmosphere:
         5
         >>> a.aerosols
         0.05
+        >>> transmission([350, 550, 600, 800, 950])
+        array([0.5035478, 0.8303832, 0.8381782, 0.9382188, 0.7130625])
         >>> a.plot_transmission()
 
         .. doctest::
