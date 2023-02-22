@@ -88,6 +88,7 @@ class Libradtran:
             raise OSError(f"uvspec executable not found in $PATH or {os.path.join(path, 'bin/uvspec')}")
 
         inputstr = '\n'.join([f'{name} {self.settings[name]}' for name in self.settings.keys()])
+        self.my_logger.warning(f"\n\tLibradtran input command:\n{inputstr}")
         try:
             process = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE,
                                      stderr=subprocess.PIPE,
@@ -189,6 +190,9 @@ class Libradtran:
             self.settings["aerosol_default"] = ''
         elif runtype == 'aerosol_special':
             self.settings["aerosol_default"] = ''
+            #alpha = 0.0192  # adjust to be retrieve self.settings["aerosol_set_tau_at_wvl"] = aerosol_string results at the 1e-4 level.
+            #tau = aerosol / 0.04 * (0.5) ** alpha
+            #self.settings["aerosol_angstrom"] = f"{tau} {alpha}"
             self.settings["aerosol_set_tau_at_wvl"] = aerosol_string
 
         if runtype == 'no_scattering':
@@ -219,7 +223,10 @@ class Libradtran:
         self.settings["output_quantity"] = 'reflectivity'  # transmittance
         self.settings["quiet"] = ''
 
+        import time
+        start = time.time()
         wl, atm = self.run(path=self.libradtran_path)
+        self.my_logger.warning(f"{time.time()-start}")
         return wl, atm
 
 
