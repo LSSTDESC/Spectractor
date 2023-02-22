@@ -68,6 +68,31 @@ class Atmosphere:
         """
         self.label = f'PWV={self.pwv:4.2f}mm, OZ={self.ozone:4.2f}DB, VAOD={self.aerosols:4.2f} '
 
+    def set_lambda_range(self, lambdas):
+        """Reset the Atmosphere wavelength range for optimized computations.
+
+        Parameters
+        ----------
+        lambdas: array_like
+            Wavelength array in nm.
+
+        Examples
+        --------
+        >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5, lambda_min=350, lambda_max=1000)
+        >>> a.lambda_min
+        350
+        >>> a.lambda_max
+        1000
+        >>> a.set_lambda_range(np.arange(400, 810, 10))
+        >>> a.lambda_min
+        400
+        >>> a.lambda_max
+        800
+
+        """
+        self.lambda_min = int(np.min(lambdas))
+        self.lambda_max = int(np.ceil(np.max(lambdas)))
+
     def simulate(self, aerosols, ozone, pwv):
         """Simulate the atmosphere transparency with Libradtran given atmospheric composition.
 

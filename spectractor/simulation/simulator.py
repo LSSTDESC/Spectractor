@@ -156,6 +156,7 @@ class SpectrumSimulation(Spectrum):
         lambdas_order2 = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=0,
                                                              order=2, with_adr=True, niter=5)
         self.lambdas = lambdas
+        self.atmosphere.set_lambda_range(lambdas)
         atmospheric_transmission = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv)
         if self.fast_sim:
             self.data, self.err = self.simulate_without_atmosphere(lambdas)
@@ -409,6 +410,7 @@ class SpectrogramModel(Spectrum):
         self.my_logger.debug(f'\n\tAfter psf params: {time.time() - start}')
         start = time.time()
         if self.atmosphere_sim is None or not self.fix_atm_sim:
+            self.atmosphere.set_lambda_range(self.lambdas)
             self.atmosphere_sim = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv)
         spectrum, spectrum_err = self.simulate_spectrum(self.lambdas, self.atmosphere_sim)
         self.my_logger.debug(f'\n\tAfter spectrum: {time.time() - start}')
