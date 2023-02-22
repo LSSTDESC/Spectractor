@@ -99,7 +99,8 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin, gaia_mag_g_limit=23):
     from astroquery.gaia import Gaia
     my_logger = set_logger("load_gaia_catalog")
     Gaia.ROW_LIMIT = -1
-    job = Gaia.cone_search_async(coord, radius=radius, verbose=False)
+    job = Gaia.cone_search_async(coord, radius=radius, verbose=False, columns=['ra', 'dec', 'pmra', 'pmdec', 'ref_epoch',
+                                                                               'parallax', 'phot_g_mean_mag'])
     my_logger.debug(f"\n\t{job}")
     gaia_catalog = job.get_results()
     my_logger.debug(f"\n\t{gaia_catalog}")
@@ -414,8 +415,8 @@ class Astrometry():  # pragma: no cover
         INFO: Query finished...
         <Table length=...>...
         """
-        radius = 0.5*np.sqrt(2) * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
-                                      np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
+        radius = 0.5 * np.sqrt(2) * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
+                                        np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
         radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
         self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
                             f"arcsec from {self.image.target.label} {self.image.target.radec_position}...")
@@ -676,11 +677,11 @@ class Astrometry():  # pragma: no cover
             Minimum number of stars that have to be kept in the selection (default: 100).
         flux_log10_threshold:
             Lower cut on the log10 of the star fluxes (default: 0.1).
-        min_range:
+        min_range: astropy.Quantity
             Minimum distance for sources from image principal target in arcsec (default: 3*u.arcsec).
-        max_range
-            Maximum distance for sources from image principal target in arcsec (default: 3*u.arcsec).
-        max_sep
+        max_range: astropy.Quantity
+            Maximum distance for sources from image principal target in arcsec (default: 5*u.arcsec).
+        max_sep: astropy.Quantity
             Maximum separation between the detected sources and the Gaia stars in arcsec (default: 1*u.arcsec).
 
         Returns
