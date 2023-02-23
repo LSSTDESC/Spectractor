@@ -89,7 +89,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.ozone = 400.
         self.pwv = 5
         self.aerosols = 0.01
-        self.angstrom_exponent_log10 = 0
+        self.angstrom_exponent_log10 = -2
         self.reso = 1
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
@@ -111,7 +111,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone", "PWV", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-2, 2), (100, 700), (0, 10),
+        self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-5, 2), (100, 700), (0, 10),
                        (0.1, 10), bounds_D, (-2, 2), (-np.inf, np.inf)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))

@@ -96,7 +96,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.ozone = 400.
         self.pwv = 5
         self.aerosols = 0.05
-        self.angstrom_exponent_log10 = 0
+        self.angstrom_exponent_log10 = -2
         self.D = self.spectrum.header['D2CCD']
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
         length = len(self.spectrum.chromatic_psf.table)
@@ -125,7 +125,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                            r"$\theta$ [deg]", "$B$"] + \
                           list(self.psf_poly_params_names) + [label+"_2" for label in self.psf_poly_params_names]
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (0, 10),
+        self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-5, 2),
                                                 (100, 700), (0, 10), bounds_D, (-2, 2), (-10, 10), (-90, 90), (0.8, 1.2)]),
                                       list(psf_poly_params_bounds) * 2])
         self.fixed = [False] * self.p.size
