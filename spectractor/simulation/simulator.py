@@ -756,9 +756,9 @@ def SpectrumSimulator(filename, outputdir="", aerosols=0.05, angstrom_exponent=N
     pressure = spectrum.header['OUTPRESS']
     temperature = spectrum.header['OUTTEMP']
 
-    spectrum_simulation = SpectrumSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
-                                                temperature, aerosols, ozone, pwv, A1=A1, A2=A2, reso=reso, D=D,
-                                                shift=shift, angstrom_exponent=angstrom_exponent)
+    spectrum_simulation = SpectrumSimulatorCore(spectrum, telescope, disperser, airmass, pressure, temperature,
+                                                aerosols=aerosols, angstrom_exponent=angstrom_exponent,
+                                                ozone=ozone, pwv=pwv, A1=A1, A2=A2, reso=reso, D=D, shift=shift)
 
     # Save the spectrum
     spectrum_simulation.header['OZONE_T'] = ozone
