@@ -83,20 +83,18 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.data = self.spectrum.data
         self.err = self.spectrum.err
         self.data_cov = self.spectrum.cov_matrix
+        self.fit_angstrom_exponent = fit_angstrom_exponent
         self.A1 = 1.0
         self.A2 = 0
         self.ozone = 400.
         self.pwv = 5
         self.aerosols = 0.01
-        if fit_angstrom_exponent:
-            self.angstrom_exponent = 0.01
-        else:
-            self.angstrom_exponent = -1
+        self.angstrom_exponent_log10 = 0
         self.reso = 1
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.B = 0
-        self.p = np.array([self.A1, self.A2, self.aerosols, self.angstrom_exponent, self.ozone, self.pwv, self.reso, self.D,
+        self.p = np.array([self.A1, self.A2, self.aerosols, self.angstrom_exponent_log10, self.ozone, self.pwv, self.reso, self.D,
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
         # self.fixed[0] = True
@@ -108,18 +106,17 @@ class SpectrumFitWorkspace(FitWorkspace):
         # self.fixed[-1] = True
         if not fit_angstrom_exponent:
             self.fixed[3] = True  # angstrom_exponent
-        self.input_labels = ["A1", "A2", "VAOD", "angstrom_exp", "ozone", "PWV", "reso [pix]", r"D_CCD [mm]",
+        self.input_labels = ["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone", "PWV", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]", "B"]
-        self.axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\"a$', "ozone", "PWV", "reso [pix]", r"$D_{CCD}$ [mm]",
+        self.axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone", "PWV", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (0, 10), (100, 700), (0, 10),
+        self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-2, 2), (100, 700), (0, 10),
                        (0.1, 10), bounds_D, (-2, 2), (-np.inf, np.inf)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
             self.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
-            self.angstrom_exponent = -1
             self.fixed[3] = True  # angstrom exponent
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
@@ -204,7 +201,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax.get_yaxis().set_label_coords(-0.08, 0.6)
         # ax2.get_yaxis().set_label_coords(-0.11, 0.5)
 
-    def simulate(self, A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x, B):
+    def simulate(self, A1, A2, aerosols, angstrom_exponent_log10, ozone, pwv, reso, D, shift_x, B):
         """Interface method to simulate a spectrogram.
 
         Parameters
@@ -215,8 +212,8 @@ class SpectrumFitWorkspace(FitWorkspace):
             Relative amplitude of the order 2 spectrogram.
         aerosols: float
             Vertical Aerosols Optical Depth quantity for Libradtran (no units).
-        angstrom_exponent: float
-            Angstrom exponent for aerosols.
+        angstrom_exponent_log10: float
+            Logarithm base 10 of Angstrom exponent for aerosols.
         ozone: float
             Ozone parameter for Libradtran (in db).
         pwv: float
@@ -251,6 +248,10 @@ class SpectrumFitWorkspace(FitWorkspace):
         >>> w.plot_fit()
 
         """
+        if self.fit_angstrom_exponent:
+            angstrom_exponent = 10 ** angstrom_exponent_log10
+        else:
+            angstrom_exponent = None
         lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x, B)
         self.model = model
         self.model_err = model_err

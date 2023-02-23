@@ -90,15 +90,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.Ny, self.Nx = self.spectrum.spectrogram.shape
         self.data = self.spectrum.spectrogram.flatten()
         self.err = self.spectrum.spectrogram_err.flatten()
+        self.fit_angstrom_exponent = fit_angstrom_exponent
         self.A1 = 1.0
         self.A2 = 1.0
         self.ozone = 400.
         self.pwv = 5
         self.aerosols = 0.05
-        if fit_angstrom_exponent:
-            self.angstrom_exponent = 0.01
-        else:
-            self.angstrom_exponent = -1
+        self.angstrom_exponent_log10 = 0
         self.D = self.spectrum.header['D2CCD']
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
         length = len(self.spectrum.chromatic_psf.table)
@@ -113,16 +111,16 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.angle = self.spectrum.rotation_angle
         self.B = 1
         self.saturation = self.spectrum.spectrogram_saturation
-        self.p = np.array([self.A1, self.A2, self.aerosols, self.angstrom_exponent, self.ozone, self.pwv,
+        self.p = np.array([self.A1, self.A2, self.aerosols, self.angstrom_exponent_log10, self.ozone, self.pwv,
                            self.D, self.shift_x, self.shift_y, self.angle, self.B])
         self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 9])
         self.atm_params_indices = np.array([2, 3, 4, 5])
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params, np.copy(self.psf_poly_params)])
-        self.input_labels = ["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
+        self.input_labels = ["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
                              r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"] + \
                             list(self.psf_poly_params_labels) + [label+"_2" for label in self.psf_poly_params_labels]
-        self.axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
+        self.axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
                            r"$\theta$ [deg]", "$B$"] + \
                           list(self.psf_poly_params_names) + [label+"_2" for label in self.psf_poly_params_names]
@@ -151,7 +149,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
             self.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
-            self.angstrom_exponent = -1
             self.fixed[3] = True  # angstrom exponent
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
@@ -347,7 +344,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[3, 0].legend(fontsize=7)
             ax[3, 0].grid(True)
 
-    def simulate(self, A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params):
+    def simulate(self, A1, A2, aerosols, angstrom_exponent_log10, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params):
         """Interface method to simulate a spectrogram.
 
         Parameters
@@ -358,8 +355,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             Relative amplitude of the order 2 spectrogram.
         aerosols: float
             Vertical Aerosols Optical Depth quantity for Libradtran (no units).
-        angstrom_exponent: float
-            Angstrom exponent for aerosols.
+        angstrom_exponent_log10: float
+            Logarithm base 10 of Angstrom exponent for aerosols.
         ozone: float
             Ozone parameter for Libradtran (in db).
         pwv: float
@@ -399,6 +396,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         """
         global plot_counter
+        if self.fit_angstrom_exponent:
+            angstrom_exponent = 10 ** angstrom_exponent_log10
+        else:
+            angstrom_exponent = None
         lambdas, model, model_err = \
             self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, psf_poly_params)
         self.p = np.array([A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B] + list(psf_poly_params))
