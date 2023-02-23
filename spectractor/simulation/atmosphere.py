@@ -93,7 +93,7 @@ class Atmosphere:
         self.lambda_min = int(np.min(lambdas))
         self.lambda_max = int(np.ceil(np.max(lambdas)))
 
-    def simulate(self, aerosols, ozone, pwv):
+    def simulate(self, aerosols, ozone, pwv, angstrom_exponent=None):
         """Simulate the atmosphere transparency with Libradtran given atmospheric composition.
 
         Values outside the Libradtran simulation range are set to zero.
@@ -101,11 +101,14 @@ class Atmosphere:
         Parameters
         ----------
         aerosols: float
-            VAOD Vertical Aerosols Optical Depth
+            VAOD Vertical Aerosols Optical Depth.
         ozone: float
-            Ozone quantity in Dobson
+            Ozone quantity in Dobson.
         pwv: float
-            Precipitable Water Vapor quantity in mm
+            Precipitable Water Vapor quantity in mm.
+        angstrom_exponent: float, optional
+            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used. If value is 0.0192,
+            atmospheric transmission is very close to the case angstrom_exponent negative (default: None).
 
         Returns
         -------
@@ -115,7 +118,7 @@ class Atmosphere:
         Examples
         --------
         >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5, lambda_min=350, lambda_max=1000)
-        >>> transmission = a.simulate(aerosols=0.05, ozone=400, pwv=5)
+        >>> transmission = a.simulate(aerosols=0.05, ozone=400, pwv=5, angstrom_exponent=-1)
         >>> a.ozone
         400
         >>> a.pwv
@@ -125,11 +128,15 @@ class Atmosphere:
         >>> transmission([350, 550, 600, 800, 950])
         array([0.5035478, 0.8303832, 0.8381782, 0.9382188, 0.7130625])
         >>> a.plot_transmission()
+        >>> transmission_ang_exp = a.simulate(aerosols=0.05, ozone=400, pwv=5, angstrom_exponent=0.02)
+        >>> transmission_ang_exp([350, 550, 600, 800, 950])
+        array([0.5018349, 0.8318764, 0.839858 , 0.938896 , 0.7123196])
 
         .. doctest::
             :hide:
 
             >>> assert transmission is not None
+            >>> assert transmission_ang_exp is not None
             >>> assert a.transmission(500) > 0
             >>> assert a.transmission(1100) == 0
 
@@ -148,7 +155,7 @@ class Atmosphere:
         self.my_logger.debug(f'\n\t{self.title}\n\t\t{self.label}')
 
         lib = libradtran.Libradtran()
-        wl, atm = lib.simulate(self.airmass, aerosols, ozone, pwv, self.pressure,
+        wl, atm = lib.simulate(self.airmass, aerosols, ozone, pwv, self.pressure, angstrom_exponent=angstrom_exponent,
                                lambda_min=self.lambda_min, lambda_max=self.lambda_max)
         self.transmission = interp1d(wl, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
         return self.transmission
@@ -565,7 +572,7 @@ class AtmosphereGrid(Atmosphere):
                                                                NB_OZ_POINTS,
                                                                len(self.lambdas))).T, bounds_error=False, fill_value=0)
 
-    def simulate(self, ozone, pwv, aerosols):
+    def simulate(self, ozone, pwv, aerosols, angstrom_exponent=None):
         """Interpolate from the atmospheric grid to get the atmospheric transmission.
 
         First ozone, second pwv, last aerosols, to respect order of loops when generating the grid
@@ -573,11 +580,14 @@ class AtmosphereGrid(Atmosphere):
         Parameters
         ----------
         ozone: float
-            Ozone quantity in Dobson
+            Ozone quantity in Dobson.
         pwv: float
-            Precipitable Water Vapor quantity in mm
+            Precipitable Water Vapor quantity in mm.
         aerosols: float
-            VAOD Vertical Aerosols Optical Depth
+            VAOD Vertical Aerosols Optical Depth.
+        angstrom_exponent: float, optional
+            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used. If value is 0.0192,
+            atmospheric transmission is very close to the case angstrom_exponent negative (default: None).
 
         Examples
         --------
@@ -598,6 +608,9 @@ class AtmosphereGrid(Atmosphere):
             ...     title=a.title, label=a.label)
             >>> if parameters.DISPLAY: plt.show()
         """
+        if angstrom_exponent is not None and angstrom_exponent > 0:
+            raise ValueError(f"Angstrom exponent not implemented in AtmosphericGrid() yet. "
+                             f"Please provide angstrom_exponent=None. Got {angstrom_exponent=} instead.")
         self.pwv = pwv
         self.ozone = ozone
         self.aerosols = aerosols
