@@ -13,7 +13,7 @@ from spectractor.tools import plot_spectrum_simple
 
 class SpectrumFitWorkspace(FitWorkspace):
 
-    def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+    def __init__(self, file_name, atmgrid_file_name="", fit_angstrom_exponent=False, nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         """Class to fit a spectrum extracted with Spectractor.
 
@@ -29,6 +29,8 @@ class SpectrumFitWorkspace(FitWorkspace):
             Spectrum file name.
         atmgrid_file_name: str, optional
             Atmospheric grid file name (default: "").
+        fit_angstrom_exponent: bool, optional
+            If True, fit angstrom exponent (default: False).
         nwalkers: int, optional
             Number of walkers for MCMC fitting.
         nsteps: int, optional
@@ -62,6 +64,9 @@ class SpectrumFitWorkspace(FitWorkspace):
         FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit, truth=truth)
         if "spectrum" not in file_name:
             raise ValueError("file_name argument must contain spectrum keyword and be an output from Spectractor.")
+        if fit_angstrom_exponent and atmgrid_file_name != '':
+            raise ValueError(f"AtmosphereGrid() do not contains angstrom exponent modelisation yet. "
+                             f"Can't provide atmgrid_file_name and ask for fitting angstrom exponent {fit_angstrom_exponent=}.")
         self.my_logger = set_logger(self.__class__.__name__)
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
         self.airmass = self.spectrum.header['AIRMASS']
@@ -83,31 +88,39 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.ozone = 400.
         self.pwv = 5
         self.aerosols = 0.01
+        if fit_angstrom_exponent:
+            self.angstrom_exponent = 0.01
+        else:
+            self.angstrom_exponent = -1
         self.reso = 1
         self.D = self.spectrum.header['D2CCD']
         self.shift_x = self.spectrum.header['PIXSHIFT']
         self.B = 0
-        self.p = np.array([self.A1, self.A2, self.aerosols, self.ozone, self.pwv, self.reso, self.D,
+        self.p = np.array([self.A1, self.A2, self.aerosols, self.angstrom_exponent, self.ozone, self.pwv, self.reso, self.D,
                            self.shift_x, self.B])
         self.fixed = [False] * self.p.size
         # self.fixed[0] = True
         self.fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
         self.fixed[5] = False
         # self.fixed[6:8] = [True, True]
-        self.fixed[7] = True
         self.fixed[8] = True
+        self.fixed[9] = True
         # self.fixed[-1] = True
-        self.input_labels = ["A1", "A2", "VAOD", "ozone", "PWV", "reso [pix]", r"D_CCD [mm]",
+        if not fit_angstrom_exponent:
+            self.fixed[3] = True  # angstrom_exponent
+        self.input_labels = ["A1", "A2", "VAOD", "angstrom_exp", "ozone", "PWV", "reso [pix]", r"D_CCD [mm]",
                              r"alpha_pix [pix]", "B"]
-        self.axis_names = ["$A_1$", "$A_2$", "VAOD", "ozone", "PWV", "reso [pix]", r"$D_{CCD}$ [mm]",
+        self.axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\"a$', "ozone", "PWV", "reso [pix]", r"$D_{CCD}$ [mm]",
                            r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (100, 700), (0, 10),
+        self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (0, 10), (100, 700), (0, 10),
                        (0.1, 10), bounds_D, (-2, 2), (-np.inf, np.inf)]
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
-            self.bounds[3] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
-            self.bounds[4] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+            self.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
+            self.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+            self.angstrom_exponent = -1
+            self.fixed[3] = True  # angstrom exponent
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
         self.amplitude_truth = None
@@ -191,7 +204,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax.get_yaxis().set_label_coords(-0.08, 0.6)
         # ax2.get_yaxis().set_label_coords(-0.11, 0.5)
 
-    def simulate(self, A1, A2, aerosols, ozone, pwv, reso, D, shift_x, B):
+    def simulate(self, A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x, B):
         """Interface method to simulate a spectrogram.
 
         Parameters
@@ -202,6 +215,8 @@ class SpectrumFitWorkspace(FitWorkspace):
             Relative amplitude of the order 2 spectrogram.
         aerosols: float
             Vertical Aerosols Optical Depth quantity for Libradtran (no units).
+        angstrom_exponent: float
+            Angstrom exponent for aerosols.
         ozone: float
             Ozone parameter for Libradtran (in db).
         pwv: float
@@ -236,7 +251,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         >>> w.plot_fit()
 
         """
-        lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, ozone, pwv, reso, D, shift_x, B)
+        lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x, B)
         self.model = model
         self.model_err = model_err
         return lambdas, model, model_err
@@ -274,7 +289,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax1 = plt.subplot(222)
         ax2 = plt.subplot(224)
         ax3 = plt.subplot(121)
-        A1, A2, aerosols, ozone, pwv, reso, D, shift, B = self.p
+        A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift, B = self.p
         self.title = f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f},\n ' \
                      f'reso={reso:.2f}pix, D={D:.2f}mm, shift={shift:.2f}pix, B={B:.2g}'
         # main plot

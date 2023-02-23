@@ -18,7 +18,7 @@ plot_counter = 0
 
 class SpectrogramFitWorkspace(FitWorkspace):
 
-    def __init__(self, file_name, atmgrid_file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
+    def __init__(self, file_name, atmgrid_file_name="", fit_angstrom_exponent=False, nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         """Class to fit a spectrogram extracted with Spectractor.
 
@@ -33,6 +33,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             Spectrum file name.
         atmgrid_file_name: str, optional
             Atmospheric grid file name (default: "").
+        fit_angstrom_exponent: bool, optional
+            If True, fit angstrom exponent (default: False).
         nwalkers: int, optional
             Number of walkers for MCMC fitting.
         nsteps: int, optional
@@ -67,6 +69,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
                               live_fit, truth=truth)
         if "spectrum" not in file_name:
             raise ValueError("file_name argument must contain spectrum keyword and be an output from Spectractor.")
+        if fit_angstrom_exponent and atmgrid_file_name != '':
+            raise ValueError(f"AtmosphereGrid() do not contains angstrom exponent modelisation yet. "
+                             f"Can't provide atmgrid_file_name and ask for fitting angstrom exponent {fit_angstrom_exponent=}.")
         self.filename = self.filename.replace("spectrum", "spectrogram")
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
         self.airmass = self.spectrum.header['AIRMASS']
@@ -90,6 +95,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.ozone = 400.
         self.pwv = 5
         self.aerosols = 0.05
+        if fit_angstrom_exponent:
+            self.angstrom_exponent = 0.01
+        else:
+            self.angstrom_exponent = -1
         self.D = self.spectrum.header['D2CCD']
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
         length = len(self.spectrum.chromatic_psf.table)
@@ -104,22 +113,22 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.angle = self.spectrum.rotation_angle
         self.B = 1
         self.saturation = self.spectrum.spectrogram_saturation
-        self.p = np.array([self.A1, self.A2, self.aerosols, self.ozone, self.pwv,
+        self.p = np.array([self.A1, self.A2, self.aerosols, self.angstrom_exponent, self.ozone, self.pwv,
                            self.D, self.shift_x, self.shift_y, self.angle, self.B])
-        self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 9])
-        self.atm_params_indices = np.array([2, 3, 4])
+        self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 9])
+        self.atm_params_indices = np.array([2, 3, 4, 5])
         self.psf_params_start_index = self.p.size
         self.p = np.concatenate([self.p, self.psf_poly_params, np.copy(self.psf_poly_params)])
-        self.input_labels = ["A1", "A2", "VAOD", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
+        self.input_labels = ["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
                              r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"] + \
                             list(self.psf_poly_params_labels) + [label+"_2" for label in self.psf_poly_params_labels]
-        self.axis_names = ["$A_1$", "$A_2$", "VAOD", "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
+        self.axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
                            r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
                            r"$\theta$ [deg]", "$B$"] + \
                           list(self.psf_poly_params_names) + [label+"_2" for label in self.psf_poly_params_names]
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (100, 700),
-                                                (0, 10), bounds_D, (-2, 2), (-10, 10), (-90, 90), (0.8, 1.2)]),
+        self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (0, 10),
+                                                (100, 700), (0, 10), bounds_D, (-2, 2), (-10, 10), (-90, 90), (0.8, 1.2)]),
                                       list(psf_poly_params_bounds) * 2])
         self.fixed = [False] * self.p.size
         for k, par in enumerate(self.input_labels):
@@ -132,14 +141,18 @@ class SpectrogramFitWorkspace(FitWorkspace):
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
         self.fixed[1] = "A2_T" not in self.spectrum.header  # not self.spectrum.disperser.flat_ratio_order_2over1
         # self.fixed[5:7] = [True, True]  # DCCD, x0
-        self.fixed[6] = True  # Delta x
-        self.fixed[7] = True  # Delta y
-        self.fixed[8] = True  # angle
-        self.fixed[9] = True  # B
+        self.fixed[7] = True  # Delta x
+        self.fixed[8] = True  # Delta y
+        self.fixed[9] = True  # angle
+        self.fixed[10] = True  # B
+        if not fit_angstrom_exponent:
+            self.fixed[3] = True  # angstrom exponent
         if atmgrid_file_name != "":
             self.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
-            self.bounds[3] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
-            self.bounds[4] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+            self.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
+            self.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+            self.angstrom_exponent = -1
+            self.fixed[3] = True  # angstrom exponent
         self.nwalkers = max(2 * self.ndim, nwalkers)
         self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
                                            with_background=True, fast_sim=False, with_adr=True)
@@ -210,7 +223,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.my_logger.info("\n\tReset spectrogram mask with current parameters.")
         if params is None:
             params = self.p
-        A1, A2, aerosols, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params = params
+        A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params = params
         psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params,
                                                                                             apply_bounds=True)
         self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
@@ -334,7 +347,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[3, 0].legend(fontsize=7)
             ax[3, 0].grid(True)
 
-    def simulate(self, A1, A2, aerosols, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params):
+    def simulate(self, A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params):
         """Interface method to simulate a spectrogram.
 
         Parameters
@@ -345,6 +358,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             Relative amplitude of the order 2 spectrogram.
         aerosols: float
             Vertical Aerosols Optical Depth quantity for Libradtran (no units).
+        angstrom_exponent: float
+            Angstrom exponent for aerosols.
         ozone: float
             Ozone parameter for Libradtran (in db).
         pwv: float
@@ -385,8 +400,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         """
         global plot_counter
         lambdas, model, model_err = \
-            self.simulation.simulate(A1, A2, aerosols, ozone, pwv, D, shift_x, shift_y, angle, B, psf_poly_params)
-        self.p = np.array([A1, A2, aerosols, ozone, pwv, D, shift_x, shift_y, angle, B] + list(psf_poly_params))
+            self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, psf_poly_params)
+        self.p = np.array([A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B] + list(psf_poly_params))
         self.lambdas = lambdas
         self.model = model.flatten()
         self.model_err = model_err.flatten()
