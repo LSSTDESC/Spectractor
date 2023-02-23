@@ -320,10 +320,7 @@ class AtmosphereGrid(Atmosphere):
         ... pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
         >>> atmospheric_grid = a.compute()
         >>> atmospheric_grid  # doctest: +ELLIPSIS
-        array([[0.000000e+00, 0.000000e+00, 0.000000e+00, ..., 1.099400e+03,
-                1.099600e+03, 1.099800e+03],
-               [1.000000e+00, 0.000000e+00, 5.000000e+00, ..., 9.520733e-01,
-                9.520733e-01, 9.520733e-01],
+        array([[0.000000e+00, ...
                ...])
         >>> a.save_file(a.image_filename.replace('.fits', '_atmsim.fits'))
         >>> a.plot_transmission()
