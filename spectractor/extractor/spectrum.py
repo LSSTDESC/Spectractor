@@ -61,7 +61,7 @@ class Spectrum:
     my_logger: logging
         Logging object
     fast_load: bool
-        If True, only load the spectrum but not the spectrogram.
+        If True, only load the spectrum but not the spectrogram for Spectractor versions <2.4 only.
     units: str
         Units of the spectrum.
     lambdas: array
@@ -177,8 +177,8 @@ class Spectrum:
             Target object if provided (default: None)
         config: str, optional
             A config file name to load some parameter values for a given instrument (default: "").
-        fast_load: bool, optional
-            If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
+        fast_load: bool
+            If True, only load the spectrum but not the spectrogram for Spectractor versions <2.4 only (default: False).
         config: str, optional
             If empty, load the config from the spectrum file if it exists, otherwise load the config from the given config file (deftault: '').
 
@@ -892,7 +892,9 @@ class Spectrum:
             >>> assert s.parallactic_angle == s.header["PARANGLE"]
 
         """
-        self.header, raw_data = load_fits(input_file_name)
+        hdu_list = fits.open(input_file_name)
+        self.header = hdu_list[0].header
+        raw_data = hdu_list[1].data
         self.lambdas = raw_data[0]
         self.lambdas_binwidths = np.gradient(self.lambdas)
         self.data = raw_data[1]
@@ -901,7 +903,7 @@ class Spectrum:
             self.cov_matrix = np.diag(self.err ** 2)
 
         # set the config parameters first
-        param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
+        param_header = hdu_list["CONFIG"]
         for key, value in param_header.items():
             if "X_" not in key and (not isinstance(param_header[key], str) or (isinstance(param_header[key], str) and "X_" not in param_header[key])):
                 setattr(parameters, key, value)
@@ -945,24 +947,22 @@ class Spectrum:
         if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
             self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
 
-        if not self.fast_load:
-            hdu_list = fits.open(input_file_name)
-            # load other spectrum info
-            self.cov_matrix = hdu_list["SPEC_COV"].data
-            _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
-            self.target.image = hdu_list["ORDER0"].data
-            self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
-            self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
-            # load spectrogram info
-            self.spectrogram = hdu_list["S_DATA"].data
-            self.spectrogram_err = hdu_list["S_ERR"].data
-            self.spectrogram_bgd = hdu_list["S_BGD"].data
-            self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
-            self.spectrogram_fit = hdu_list["S_FIT"].data
-            self.spectrogram_residuals = hdu_list["S_RES"].data
-            self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]), saturation=self.spectrogram_saturation)
-            self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
-            hdu_list.close()
+        # load other spectrum info
+        self.cov_matrix = hdu_list["SPEC_COV"].data
+        _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+        self.target.image = hdu_list["ORDER0"].data
+        self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+        self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
+        # load spectrogram info
+        self.spectrogram = hdu_list["S_DATA"].data
+        self.spectrogram_err = hdu_list["S_ERR"].data
+        self.spectrogram_bgd = hdu_list["S_BGD"].data
+        self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
+        self.spectrogram_fit = hdu_list["S_FIT"].data
+        self.spectrogram_residuals = hdu_list["S_RES"].data
+        self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]), saturation=self.spectrogram_saturation)
+        self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
+        hdu_list.close()
 
     def load_spectrogram(self, input_file_name):  # pragma: no cover
         """OBSOLETE: Load the spectrum from a fits file (data, error and wavelengths).
