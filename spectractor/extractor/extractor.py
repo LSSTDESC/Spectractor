@@ -1332,10 +1332,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                    f'mode={mode} and amplitude_priors_method={method}...')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
                             amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
-    spectrum.data = np.copy(w.amplitude_params)
-    spectrum.err = np.copy(w.amplitude_params_err)
-    spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
-    spectrum.chromatic_psf = s
 
     Dx_rot = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
     s.table['Dx'] = np.copy(Dx_rot)
@@ -1346,8 +1342,18 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     my_logger.debug(f"\n\tTransverse fit table before derotation:"
                     f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
 
-    # Rotate and save the table
+    # Rotate, crop and save the table
     s.rotate_table(-image.rotation_angle)
+    extra_pixels = int(np.max(s.table['Dx']) + image.target_pixcoords[0] - right_edge + 1)  # spectrum pixels outside CCD in rotated image
+    new_Nx = len(s.table['Dx']) - extra_pixels
+    if extra_pixels > 0:
+        my_logger.info(f"\n\tCrop table of size {len(s.table)=} to {new_Nx=} first values "
+                       f"to remove data fitted outside the CCD region in the rotated image.")
+        s.crop_table(new_Nx=new_Nx)
+    spectrum.data = np.copy(w.amplitude_params[:new_Nx])
+    spectrum.err = np.copy(w.amplitude_params_err[:new_Nx])
+    spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix[:new_Nx, :new_Nx])
+    spectrum.chromatic_psf = s
 
     # Extract the spectrogram edges
     data = np.copy(image.data)[:, 0:right_edge]
