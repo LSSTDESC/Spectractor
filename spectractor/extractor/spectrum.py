@@ -903,7 +903,7 @@ class Spectrum:
             self.cov_matrix = np.diag(self.err ** 2)
 
         # set the config parameters first
-        param_header = hdu_list["CONFIG"]
+        param_header = hdu_list["CONFIG"].header
         for key, value in param_header.items():
             if "X_" not in key and (not isinstance(param_header[key], str) or (isinstance(param_header[key], str) and "X_" not in param_header[key])):
                 setattr(parameters, key, value)
