@@ -1091,13 +1091,14 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
         >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
         >>> lambdas[:4]
-        array([335.29152986, 336.43945983, 337.58750279, 338.73565395])
-        >>> s.order = 2
-        >>> lambdas_order2 = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> lambdas_order2 = s.compute_lambdas_in_spectrogram(58, 0, 0, 0, order=2)
         >>> lambdas_order2[:4]
-        array([175.39978389, 175.81776551, 176.24896331, 176.69090417])
+        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
         """
         # Distance in x and y with respect to the true order 0 position at lambda_ref
         Dx, Dy_disp_axis = self.compute_disp_axis_in_spectrogram(shift_x=shift_x, shift_y=shift_y, angle=angle)
@@ -1148,17 +1149,19 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
         >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
         >>> lambdas[:4]
-        array([335.29152986, 336.43945983, 337.58750279, 338.73565395])
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
         >>> dispersion_law = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=1)
         >>> dispersion_law[:4]
-        array([280.27161545+1.12680257j, 281.27161459+1.11503061j,
-               282.27161378+1.10339238j, 283.271613  +1.09188586j])
+        array([280.0000185 +1.07837872j, 281.00001766+1.06655761j,
+               282.00001686+1.05487099j, 283.0000161 +1.04331681j])
         >>> dispersion_law_order2 = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=2)
         >>> dispersion_law_order2[:4]
-        array([574.36955212+1.12680257j, 576.47574524+1.11503061j,
-               578.58313102+1.10339238j, 580.69171003+1.09188586j])
+        array([573.69582907+1.07837872j, 575.80158761+1.06655761j,
+               577.90853861+1.05487099j, 580.01668263+1.04331681j])
 
         """
         new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
@@ -1214,21 +1217,23 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
         >>> lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = s.old_compute_dispersion_in_spectrogram(58, 0, 0, 0)
         >>> lambdas[:4]
-        array([335.29152986, 336.43945983, 337.58750279, 338.73565395])
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
         >>> lambdas_order2[:4]
-        array([175.39978389, 175.81776551, 176.24896331, 176.69090417])
+        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
         >>> dispersion_law[:4]
-        array([278.30462781+1.12681351j, 279.32517785+1.11504106j,
-               280.34549438+1.10340236j, 281.36558097+1.0918954j ])
+        array([278.11756086+1.07838932j, 279.13819666+1.06656773j,
+               280.15859766+1.05488065j, 281.17876742+1.04332603j])
         >>> dispersion_law[90:95]
-        array([369.51250077+0.43486164j, 370.52100305+0.42999096j,
-               371.52943376+0.42516127j, 372.53779373+0.42037211j,
-               373.54608373+0.41562303j])
+        array([369.3298545 +0.38390497j, 370.338383  +0.37901927j,
+               371.34683964+0.37417473j, 372.35522523+0.36937089j,
+               373.36354058+0.36460729j])
         >>> dispersion_law_order2[:4]
-        array([574.36953302+1.12681351j, 576.475727  +1.11504106j,
-               578.5831136 +1.10340236j, 580.69169339+1.0918954j ])
+        array([573.69581057+1.07838932j, 575.80156994+1.06656773j,
+               577.90852175+1.05488065j, 580.01666653+1.04332603j])
 
         """
         # Distance in x and y with respect to the true order 0 position at lambda_ref
