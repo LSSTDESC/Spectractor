@@ -95,7 +95,7 @@ class SpectrumSimulation(Spectrum):
         self.err[idx] = 1e6 * np.max(self.err)
         return self.data, self.err
 
-    def simulate(self, A1=1.0, A2=0., aerosols=0.05, ozone=300, pwv=5, reso=0.,
+    def simulate(self, A1=1.0, A2=0., aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, reso=0.,
                  D=parameters.DISTANCE2CCD, shift_x=0., B=0.):
         """Simulate the cross spectrum of an object and its uncertainties
         after its transmission throught the instrument and the atmosphere.
@@ -108,6 +108,9 @@ class SpectrumSimulation(Spectrum):
             Relative amplitude of the order 2 spectrum contamination (default: 0).
         aerosols: float
             VAOD Vertical Aerosols Optical Depth
+        angstrom_exponent: float, optional
+            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
+            If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
         ozone: float
             Ozone quantity in Dobson
         pwv: float
@@ -145,8 +148,8 @@ class SpectrumSimulation(Spectrum):
             >>> assert np.sum(lambdas) > 0
             >>> assert np.sum(model) > 0
             >>> assert np.sum(model) < 1e-10
-            >>> assert np.sum(sim.data_order2) > 0
-            >>> assert np.sum(sim.data_order2) < 1e-11
+            >>> assert np.sum(sim.data_next_order) > 0
+            >>> assert np.sum(sim.data_next_order) < 1e-11
 
         """
         # find lambdas including ADR effect
@@ -156,7 +159,8 @@ class SpectrumSimulation(Spectrum):
         lambdas_order2 = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=0,
                                                              order=2, with_adr=True, niter=5)
         self.lambdas = lambdas
-        atmospheric_transmission = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv)
+        self.atmosphere.set_lambda_range(lambdas)
+        atmospheric_transmission = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv, angstrom_exponent=angstrom_exponent)
         if self.fast_sim:
             self.data, self.err = self.simulate_without_atmosphere(lambdas)
             self.data *= A1 * atmospheric_transmission(lambdas)
@@ -246,12 +250,12 @@ class SpectrogramModel(Spectrum):
         self.true_lambdas = None
         self.true_spectrum = None
         self.lambdas = None
-        self.err = None
         self.model = lambda x, y: np.zeros((x.size, y.size))
         self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
         self.profile_params = None
         self.psf_cube = None
         self.psf_cube_order2 = None
+        self.psf_cube_order3 = None
         self.psf_cube_masked = None
         self.fix_psf_cube = False
         self.fix_atm_sim = False
@@ -331,7 +335,7 @@ class SpectrogramModel(Spectrum):
         return spectrum, spectrum_err
 
     # @profile
-    def simulate(self, A1=1.0, A2=0., aerosols=0.05, ozone=300, pwv=5, D=parameters.DISTANCE2CCD,
+    def simulate(self, A1=1.0, A2=0., aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, D=parameters.DISTANCE2CCD,
                  shift_x=0., shift_y=0., angle=0., B=1., psf_poly_params=None):
         """
 
@@ -343,6 +347,9 @@ class SpectrogramModel(Spectrum):
             Relative amplitude of the order 2 spectrum contamination (default: 0).
         aerosols: float
             VAOD Vertical Aerosols Optical Depth.
+        angstrom_exponent: float, optional
+            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
+            If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
         ozone: float
             Ozone quantity in Dobson.
         pwv: float
@@ -373,6 +380,7 @@ class SpectrogramModel(Spectrum):
         -------
 
         >>> spectrum, telescope, disperser, target = SimulatorInit('./tests/data/reduc_20170530_134_spectrum.fits')
+        >>> spectrum.disperser.ratio_order_3over2 = lambda wl: 0.1
         >>> atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
         >>> psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
         >>> sim = SpectrogramModel(spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True)
@@ -392,11 +400,12 @@ class SpectrogramModel(Spectrum):
                                                            order=self.order)
         dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
                                                                 niter=5, with_adr=True, order=self.order)
-        dispersion_law_order2 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle, niter=5, with_adr=True,
-                                                                       order=self.order+np.sign(self.order))
         self.lambdas_binwidths = np.gradient(self.lambdas)
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
+        if len(psf_poly_params) % 2 != 0:
+            raise ValueError(f"Argument psf_poly_params must be even size, to be split in parameters"
+                             f"for order 1 and order 2 spectrograms. Got {len(psf_poly_params)=}.")
         psf_poly_params_order1 = psf_poly_params[:len(psf_poly_params)//2]
         psf_poly_params_order2 = psf_poly_params[len(psf_poly_params)//2:]
         if self.profile_params is None or not self.fix_psf_cube:
@@ -409,7 +418,9 @@ class SpectrogramModel(Spectrum):
         self.my_logger.debug(f'\n\tAfter psf params: {time.time() - start}')
         start = time.time()
         if self.atmosphere_sim is None or not self.fix_atm_sim:
-            self.atmosphere_sim = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv)
+            self.atmosphere.set_lambda_range(self.lambdas)
+            self.atmosphere_sim = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv,
+                                                           angstrom_exponent=angstrom_exponent)
         spectrum, spectrum_err = self.simulate_spectrum(self.lambdas, self.atmosphere_sim)
         self.my_logger.debug(f'\n\tAfter spectrum: {time.time() - start}')
         # Fill the order 1 cube
@@ -431,11 +442,14 @@ class SpectrogramModel(Spectrum):
         self.my_logger.debug(f'\n\tAfter build ima1: {time.time() - start}')
 
         # Add order 2
-        if A2 > 0.:
+        if A2 > 0. and self.disperser.ratio_order_2over1 is not None:
             spectrum_order2 = self.disperser.ratio_order_2over1(self.lambdas) * spectrum
             spectrum_order2_err = self.disperser.ratio_order_2over1(self.lambdas) * spectrum_err
             if np.any(np.isnan(spectrum_order2)):
                 spectrum_order2[np.isnan(spectrum_order2)] = 0.
+            dispersion_law_order2 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+                                                                           niter=5, with_adr=True,
+                                                                           order=self.order + np.sign(self.order))
             nlbda2 = dispersion_law_order2.size
             if self.psf_cube_order2 is None or not self.fix_psf_cube:
                 start = time.time()
@@ -456,19 +470,45 @@ class SpectrogramModel(Spectrum):
                 # here spectrum[i] is in ADU/s
                 ima2 += spectrum_order2[i] * self.psf_cube_order2[i]
                 ima2_err2 += (spectrum_order2_err[i] * self.psf_cube_order2[i]) ** 2
+            if self.disperser.ratio_order_3over2 is not None:
+                spectrum_order3 = self.disperser.ratio_order_3over2(self.lambdas) * spectrum_order2
+                spectrum_order3_err = self.disperser.ratio_order_3over2(self.lambdas) * spectrum_order2_err
+                if np.any(np.isnan(spectrum_order3)):
+                    spectrum_order3[np.isnan(spectrum_order3)] = 0.
+                dispersion_law_order3 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+                                                                               niter=5, with_adr=True,
+                                                                               order=self.order + 2*np.sign(self.order))
+                nlbda3 = dispersion_law_order3.size
+                if self.psf_cube_order3 is None or not self.fix_psf_cube:
+                    start3 = time.time()
+                    profile_params_order3 = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params_order2, apply_bounds=True)
+                    profile_params_order3[:, 0] = 1
+                    profile_params_order3[:nlbda3, 1] = dispersion_law_order3.real + self.r0.real
+                    profile_params_order3[:nlbda3, 2] += dispersion_law_order3.imag
+                    self.psf_cube_order3 = self.chromatic_psf.build_psf_cube(self.pixels, profile_params_order3,
+                                                                             fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                                             fwhmy_clip=parameters.PSF_FWHM_CLIP,
+                                                                             dtype="float32", mask=None)
+                    self.my_logger.debug(f'\n\tAfter psf cube order 3: {time.time() - start3}')
+                for i in range(0, nlbda2, 1):
+                    # here spectrum[i] is in ADU/s
+                    ima2 += spectrum_order3[i] * self.psf_cube_order3[i]
+                    ima2_err2 += (spectrum_order3_err[i] * self.psf_cube_order3[i]) ** 2
+
+            # Assemble all diffraction orders in simulation
             # self.data is in ADU/s units here
-            self.data = A1 * (ima1 + A2 * ima2)
-            self.err = np.sqrt(A1*A1*(ima1_err2 + A2*A2*ima2_err2))
+            self.spectrogram = A1 * (ima1 + A2 * ima2)
+            self.spectrogram_err = np.sqrt(A1*A1*(ima1_err2 + A2*A2*ima2_err2))
             self.my_logger.debug(f'\n\tAfter build ima2: {time.time() - start}')
         else:
-            self.data = A1 * ima1
-            self.err = A1 * np.sqrt(ima1_err2)
+            self.spectrogram = A1 * ima1
+            self.spectrogram_err = A1 * np.sqrt(ima1_err2)
         start = time.time()
         if self.with_background:
-            self.data += B * self.spectrogram_bgd
+            self.spectrogram += B * self.spectrogram_bgd
         self.my_logger.debug(f'\n\tAfter bgd: {time.time() - start}')
 
-        return self.lambdas, self.data, self.err
+        return self.lambdas, self.spectrogram, self.spectrogram_err
 
 
 class SpectrumSimGrid:
@@ -614,7 +654,8 @@ def SimulatorInit(filename, fast_load=False, config=""):
 
 
 def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
-                          aerosols=0.05, ozone=300, pwv=5, A1=1.0, A2=0., reso=0, D=parameters.DISTANCE2CCD, shift=0.):
+                          aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5,
+                          A1=1.0, A2=0., reso=0, D=parameters.DISTANCE2CCD, shift=0.):
     """ SimulatorCore
     Main function to evaluate several spectra
     A grid of spectra will be produced for a given target, airmass and pressure
@@ -637,14 +678,14 @@ def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=
     # SPECTRUM SIMULATION
     # --------------------
     spectrum_simulation = SpectrumSimulation(spectrum, atmosphere, telescope, disperser)
-    spectrum_simulation.simulate(A1, A2, aerosols, ozone, pwv, reso, D, shift)
+    spectrum_simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift)
     if parameters.DEBUG:
         spectrum_simulation.plot_spectrum(force_lines=True)
     return spectrum_simulation
 
 
 def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
-                             aerosols=0.05, ozone=300, pwv=5, A1=1.0, A2=0.,
+                             aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, A1=1.0, A2=0.,
                              D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0.,
                              B=1., psf_poly_params=None, with_background=True, fast_sim=False, full_image=False,
                              with_adr=True):
@@ -674,7 +715,8 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
     spectrogram_simulation = SpectrogramModel(spectrum, atmosphere, telescope, disperser,
                                               with_background=with_background, fast_sim=fast_sim, full_image=full_image,
                                               with_adr=with_adr)
-    spectrogram_simulation.simulate(A1, A2, aerosols, ozone, pwv, D, shift_x, shift_y, angle, B, psf_poly_params)
+    spectrogram_simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv,
+                                    D, shift_x, shift_y, angle, B, psf_poly_params)
     return spectrogram_simulation
 
 
@@ -728,7 +770,7 @@ def SpectrumSimulatorSimGrid(filename, outputdir, pwv_grid=[0, 10, 5], ozone_gri
         spectra.plot_spectra_img()
 
 
-def SpectrumSimulator(filename, outputdir="", aerosols=0.05, ozone=300, pwv=5, A1=1., A2=0.,
+def SpectrumSimulator(filename, outputdir="", aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, A1=1., A2=0.,
                       reso=None, D=parameters.DISTANCE2CCD, shift=0.):
     """ Simulator
     Main function to evaluate several spectra
@@ -745,9 +787,9 @@ def SpectrumSimulator(filename, outputdir="", aerosols=0.05, ozone=300, pwv=5, A
     pressure = spectrum.header['OUTPRESS']
     temperature = spectrum.header['OUTTEMP']
 
-    spectrum_simulation = SpectrumSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
-                                                temperature, aerosols, ozone, pwv, A1=A1, A2=A2, reso=reso, D=D,
-                                                shift=shift)
+    spectrum_simulation = SpectrumSimulatorCore(spectrum, telescope, disperser, airmass, pressure, temperature,
+                                                aerosols=aerosols, angstrom_exponent=angstrom_exponent,
+                                                ozone=ozone, pwv=pwv, A1=A1, A2=A2, reso=reso, D=D, shift=shift)
 
     # Save the spectrum
     spectrum_simulation.header['OZONE_T'] = ozone
@@ -767,7 +809,7 @@ def SpectrumSimulator(filename, outputdir="", aerosols=0.05, ozone=300, pwv=5, A
     return spectrum_simulation
 
 
-def SpectrogramSimulator(filename, outputdir="", aerosols=0.05, ozone=300, pwv=5, A1=1., A2=0.,
+def SpectrogramSimulator(filename, outputdir="", aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, A1=1., A2=0.,
                          D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0., B=1.,
                          psf_poly_params=None):
     """ Simulator
@@ -791,7 +833,7 @@ def SpectrogramSimulator(filename, outputdir="", aerosols=0.05, ozone=300, pwv=5
 
     spectrogram_simulation = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
                                                       temperature, aerosols, ozone, pwv,
-                                                      D=D, shift_x=shift_x,
+                                                      D=D, shift_x=shift_x, angstrom_exponent=angstrom_exponent,
                                                       shift_y=shift_y, shift_t=shift_t, angle=angle, B=B,
                                                       psf_poly_params=psf_poly_params)
 

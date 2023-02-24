@@ -98,7 +98,7 @@ class Libradtran:
             self.my_logger.error(f"\n\t{e.stderr}")
             sys.exit()
 
-    def simulate(self, airmass, aerosol, ozone, pwv, pressure, lambda_min=250, lambda_max=1200):
+    def simulate(self, airmass, aerosol, ozone, pwv, pressure, angstrom_exponent=None, lambda_min=250, lambda_max=1200):
         """Simulate the atmosphere transmission with Libratran.
 
         Parameters
@@ -113,6 +113,9 @@ class Libradtran:
             Precipitable Water Vapor amount in mm.
         pressure: float
             Pressure of the atmosphere at observatory altitude in hPa.
+        angstrom_exponent: float, optional
+            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
+            If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
         lambda_min: float
             Minimum wavelength for simulation in nm.
         lambda_max: float
@@ -127,11 +130,16 @@ class Libradtran:
         --------
         >>> parameters.DEBUG = True
         >>> lib = Libradtran()
-        >>> lambdas, atmosphere = lib.simulate(1.2, 0.07, 400, 2, 800, lambda_max=1200)
+        >>> lambdas, atmosphere = lib.simulate(1.2, 0.07, 400, 2, 800, angstrom_exponent=None, lambda_max=1200)
         >>> print(lambdas[-5:])
         [1196. 1197. 1198. 1199. 1200.]
         >>> print(atmosphere[-5:])
         [0.9617202 0.9617202 0.9529933 0.9529933 0.9512588]
+        >>> lambdas2, atmosphere2 = lib.simulate(1.2, 0.07, 400, 2, 800, angstrom_exponent=0.02, lambda_max=1200)
+        >>> print(lambdas2[-5:])
+        [1196. 1197. 1198. 1199. 1200.]
+        >>> print(atmosphere2[-5:])
+        [0.9659722 0.9659722 0.9571998 0.9571998 0.9554523]
         """
 
         self.my_logger.debug(
@@ -184,12 +192,16 @@ class Libradtran:
         sza = np.arccos(1. / airmass) * 180. / np.pi
 
         # Should be no_absorption
-        aerosol_string = f'500 {aerosol:.20f}'
         if runtype == 'aerosol_default':
             self.settings["aerosol_default"] = ''
         elif runtype == 'aerosol_special':
             self.settings["aerosol_default"] = ''
-            self.settings["aerosol_set_tau_at_wvl"] = aerosol_string
+            if angstrom_exponent is None or angstrom_exponent < 0:
+                self.settings["aerosol_set_tau_at_wvl"] = f'500 {aerosol:.20f}'
+            else:
+                # below formula recover default aerosols models with angstrom_exponent=0.0192
+                tau = aerosol / 0.04 * (0.5 ** angstrom_exponent)
+                self.settings["aerosol_angstrom"] = f"{tau:.10f} {angstrom_exponent:.10f}"
 
         if runtype == 'no_scattering':
             self.settings["no_scattering"] = ''

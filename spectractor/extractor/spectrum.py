@@ -61,7 +61,7 @@ class Spectrum:
     my_logger: logging
         Logging object
     fast_load: bool
-        If True, only load the spectrum but not the spectrogram for Spectractor versions <2.4 only.
+        If True, only load the spectrum but not the spectrogram.
     units: str
         Units of the spectrum.
     lambdas: array
@@ -74,10 +74,10 @@ class Spectrum:
         Spectrum amplitude covariance matrix between wavelengths in self.units units.
     lambdas_binwidths: array
         Bin widths of the wavelength array in nm.
-    data_order2: array
-        Spectrum amplitude array  for order 2 in self.units units.
-    err_order2: array
-        Spectrum amplitude uncertainties  for order 2 in self.units units.
+    data_next_order: array
+        Spectrum amplitude array for next diffraction order in self.units units.
+    err_next_order: array
+        Spectrum amplitude uncertainties for next diffraction order in self.units units.
     lambda_ref: float
         Reference wavelength for ADR computations in nm.
     order: int
@@ -177,8 +177,8 @@ class Spectrum:
             Target object if provided (default: None)
         config: str, optional
             A config file name to load some parameter values for a given instrument (default: "").
-        fast_load: bool
-            If True, only load the spectrum but not the spectrogram for Spectractor versions <2.4 only (default: False).
+        fast_load: bool, optional
+            If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
         config: str, optional
             If empty, load the config from the spectrum file if it exists, otherwise load the config from the given config file (deftault: '').
 
@@ -242,8 +242,8 @@ class Spectrum:
         self.spectrogram_saturation = None
         self.spectrogram_Nx = None
         self.spectrogram_Ny = None
-        self.data_order2 = None
-        self.err_order2 = None
+        self.data_next_order = None
+        self.err_next_order = None
         self.dec = None
         self.hour_angle = None
         self.temperature = None
@@ -317,9 +317,9 @@ class Spectrum:
         if self.cov_matrix is not None:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix /= ldl_mat
-        if self.data_order2 is not None:
-            self.data_order2 /= ldl
-            self.err_order2 /= ldl
+        if self.data_next_order is not None:
+            self.data_next_order /= ldl
+            self.err_next_order /= ldl
         self.units = 'erg/s/cm$^2$/nm'
 
     def convert_from_flam_to_ADUrate(self):
@@ -349,9 +349,9 @@ class Spectrum:
         if self.cov_matrix is not None:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix *= ldl_mat
-        if self.data_order2 is not None:
-            self.data_order2 *= ldl
-            self.err_order2 *= ldl
+        if self.data_next_order is not None:
+            self.data_next_order *= ldl
+            self.err_next_order *= ldl
         self.units = 'ADU/s'
 
     def load_filter(self):
@@ -407,10 +407,10 @@ class Spectrum:
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
-        if self.data_order2 is not None and np.sum(self.data_order2) > 0.05 * np.sum(self.data):
+        if self.data_next_order is not None and np.sum(self.data_next_order) > 0.05 * np.sum(self.data):
             distance = self.disperser.grating_lambda_to_pixel(self.lambdas, self.x0, order=parameters.SPEC_ORDER+1)
             max_index = np.argmin(np.abs(distance + self.x0[0] - parameters.CCD_IMSIZE))
-            plot_spectrum_simple(ax, self.lambdas[:max_index], self.data_order2[:max_index], data_err=self.err_order2[:max_index],
+            plot_spectrum_simple(ax, self.lambdas[:max_index], self.data_next_order[:max_index], data_err=self.err_next_order[:max_index],
                                  xlim=xlim, label=f'Order {parameters.SPEC_ORDER+1} spectrum', linestyle="--", lw=1, color="firebrick")
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title=title, units=self.units, lw=1, linestyle="-")
@@ -563,7 +563,7 @@ class Spectrum:
             if extname == "SPEC_COV":
                 hdus[extname].data = self.cov_matrix
             elif extname == "ORDER2":
-                hdus[extname].data = [self.lambdas, self.data_order2, self.err_order2]
+                hdus[extname].data = [self.lambdas, self.data_next_order, self.err_next_order]
             elif extname == "ORDER0":
                 hdus[extname].data = self.target.image
                 hdus[extname].header["IM_X0"] = self.target.image_x0
@@ -833,7 +833,7 @@ class Spectrum:
             if len(hdu_list) > 1:
                 self.cov_matrix = hdu_list["SPEC_COV"].data
                 if len(hdu_list) > 2:
-                    _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+                    _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
                     if len(hdu_list) > 3:
                         self.target.image = hdu_list["ORDER0"].data
                         self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
@@ -892,9 +892,7 @@ class Spectrum:
             >>> assert s.parallactic_angle == s.header["PARANGLE"]
 
         """
-        hdu_list = fits.open(input_file_name)
-        self.header = hdu_list[0].header
-        raw_data = hdu_list[0].data
+        self.header, raw_data = load_fits(input_file_name)
         self.lambdas = raw_data[0]
         self.lambdas_binwidths = np.gradient(self.lambdas)
         self.data = raw_data[1]
@@ -903,7 +901,7 @@ class Spectrum:
             self.cov_matrix = np.diag(self.err ** 2)
 
         # set the config parameters first
-        param_header = hdu_list["CONFIG"].header
+        param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
         for key, value in param_header.items():
             if "X_" not in key and (not isinstance(param_header[key], str) or (isinstance(param_header[key], str) and "X_" not in param_header[key])):
                 setattr(parameters, key, value)
@@ -947,22 +945,24 @@ class Spectrum:
         if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
             self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
 
-        # load other spectrum info
-        self.cov_matrix = hdu_list["SPEC_COV"].data
-        _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
-        self.target.image = hdu_list["ORDER0"].data
-        self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
-        self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
-        # load spectrogram info
-        self.spectrogram = hdu_list["S_DATA"].data
-        self.spectrogram_err = hdu_list["S_ERR"].data
-        self.spectrogram_bgd = hdu_list["S_BGD"].data
-        self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
-        self.spectrogram_fit = hdu_list["S_FIT"].data
-        self.spectrogram_residuals = hdu_list["S_RES"].data
-        self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]), saturation=self.spectrogram_saturation)
-        self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
-        hdu_list.close()
+        if not self.fast_load:
+            hdu_list = fits.open(input_file_name)
+            # load other spectrum info
+            self.cov_matrix = hdu_list["SPEC_COV"].data
+            _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
+            self.target.image = hdu_list["ORDER0"].data
+            self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+            self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
+            # load spectrogram info
+            self.spectrogram = hdu_list["S_DATA"].data
+            self.spectrogram_err = hdu_list["S_ERR"].data
+            self.spectrogram_bgd = hdu_list["S_BGD"].data
+            self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
+            self.spectrogram_fit = hdu_list["S_FIT"].data
+            self.spectrogram_residuals = hdu_list["S_RES"].data
+            self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]), saturation=self.spectrogram_saturation)
+            self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
+            hdu_list.close()
 
     def load_spectrogram(self, input_file_name):  # pragma: no cover
         """OBSOLETE: Load the spectrum from a fits file (data, error and wavelengths).
@@ -1091,13 +1091,14 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
         >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
         >>> lambdas[:4]
-        array([335.29152986, 336.43945983, 337.58750279, 338.73565395])
-        >>> s.order = 2
-        >>> lambdas_order2 = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> lambdas_order2 = s.compute_lambdas_in_spectrogram(58, 0, 0, 0, order=2)
         >>> lambdas_order2[:4]
-        array([175.39978389, 175.81776551, 176.24896331, 176.69090417])
+        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
         """
         # Distance in x and y with respect to the true order 0 position at lambda_ref
         Dx, Dy_disp_axis = self.compute_disp_axis_in_spectrogram(shift_x=shift_x, shift_y=shift_y, angle=angle)
@@ -1148,17 +1149,19 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
         >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
         >>> lambdas[:4]
-        array([335.29152986, 336.43945983, 337.58750279, 338.73565395])
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
         >>> dispersion_law = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=1)
         >>> dispersion_law[:4]
-        array([280.27161545+1.12680257j, 281.27161459+1.11503061j,
-               282.27161378+1.10339238j, 283.271613  +1.09188586j])
+        array([280.0000185 +1.07837872j, 281.00001766+1.06655761j,
+               282.00001686+1.05487099j, 283.0000161 +1.04331681j])
         >>> dispersion_law_order2 = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=2)
         >>> dispersion_law_order2[:4]
-        array([574.36955212+1.12680257j, 576.47574524+1.11503061j,
-               578.58313102+1.10339238j, 580.69171003+1.09188586j])
+        array([573.69582907+1.07837872j, 575.80158761+1.06655761j,
+               577.90853861+1.05487099j, 580.01668263+1.04331681j])
 
         """
         new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
@@ -1214,21 +1217,23 @@ class Spectrum:
         Examples
         --------
         >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
         >>> lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = s.old_compute_dispersion_in_spectrogram(58, 0, 0, 0)
         >>> lambdas[:4]
-        array([335.29152986, 336.43945983, 337.58750279, 338.73565395])
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
         >>> lambdas_order2[:4]
-        array([175.39978389, 175.81776551, 176.24896331, 176.69090417])
+        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
         >>> dispersion_law[:4]
-        array([278.30462781+1.12681351j, 279.32517785+1.11504106j,
-               280.34549438+1.10340236j, 281.36558097+1.0918954j ])
+        array([278.11756086+1.07838932j, 279.13819666+1.06656773j,
+               280.15859766+1.05488065j, 281.17876742+1.04332603j])
         >>> dispersion_law[90:95]
-        array([369.51250077+0.43486164j, 370.52100305+0.42999096j,
-               371.52943376+0.42516127j, 372.53779373+0.42037211j,
-               373.54608373+0.41562303j])
+        array([369.3298545 +0.38390497j, 370.338383  +0.37901927j,
+               371.34683964+0.37417473j, 372.35522523+0.36937089j,
+               373.36354058+0.36460729j])
         >>> dispersion_law_order2[:4]
-        array([574.36953302+1.12681351j, 576.475727  +1.11504106j,
-               578.5831136 +1.10340236j, 580.69169339+1.0918954j ])
+        array([573.69581057+1.07838932j, 575.80156994+1.06656773j,
+               577.90852175+1.05488065j, 580.01666653+1.04332603j])
 
         """
         # Distance in x and y with respect to the true order 0 position at lambda_ref

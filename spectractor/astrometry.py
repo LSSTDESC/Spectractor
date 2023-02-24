@@ -43,7 +43,7 @@ def _get_astrometry_executable_path(executable):
     """
     my_logger = set_logger("get_astrometry_executable_path")
     if shutil.which(executable) is not None:
-        exec = shutil.which(executable)
+        path = shutil.which(executable)
     elif parameters.ASTROMETRYNET_DIR != "":
         if not os.path.isdir(parameters.ASTROMETRYNET_DIR):
             # reset astrometry.net path
@@ -56,11 +56,11 @@ def _get_astrometry_executable_path(executable):
                                 f"not exist and ASTROMETRYNET_DIR is not in OS environment.")
                 raise OSError(f"No {executable} binary found with parameters.ASTROMETRYNET_DIR "
                               f"or ASTROMETRYNET_DIR environment variable.")
-        exec = os.path.join(parameters.ASTROMETRYNET_DIR, f'bin/{executable}')
+        path = os.path.join(parameters.ASTROMETRYNET_DIR, f'bin/{executable}')
     else:
         raise OSError(f"{executable} executable not found in $PATH "
                       f"or {os.path.join(parameters.ASTROMETRYNET_DIR, f'bin/{executable}')}")
-    return exec
+    return path
 
 
 def load_gaia_catalog(coord, radius=5 * u.arcmin, gaia_mag_g_limit=23):

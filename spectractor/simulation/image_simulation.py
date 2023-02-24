@@ -324,10 +324,10 @@ class ImageModel(Image):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
         if spectrogram.full_image:
-            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.data
+            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.spectrogram
         else:
             self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
-                      spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.data
+                      spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.spectrogram
         # - spectrogram.spectrogram_bgd)
         if starfield is not None:
             self.data += starfield.model(xx, yy)
@@ -365,7 +365,7 @@ class ImageModel(Image):
         # self.true_lambdas, self.true_spectrum = hdu_list[1].data
 
 
-def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1,
+def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, angstrom_exponent=None,
              psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
@@ -453,7 +453,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Simulate spectrogram
     spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
-                                           temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
+                                           temperature, pwv=pwv, ozone=ozone, aerosols=aerosols,
+                                           angstrom_exponent=angstrom_exponent, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0., B=1.,
                                            psf_poly_params=psf_poly_params, angle=rotation_angle, with_background=False,
                                            fast_sim=False, full_image=True, with_adr=with_adr)
@@ -474,11 +475,11 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     true_spectrum = np.copy(spectrogram.true_spectrum)
 
     # Saturation effects
-    saturated_pixels = np.where(spectrogram.data > image.saturation)[0]
+    saturated_pixels = np.where(spectrogram.spectrogram > image.saturation)[0]
     if len(saturated_pixels) > 0:
         my_logger.warning(f"\n\t{len(saturated_pixels)} saturated pixels detected above saturation "
                           f"level at {image.saturation} ADU/s in the spectrogram."
-                          f"\n\tSpectrogram maximum is at {np.max(spectrogram.data)} ADU/s.")
+                          f"\n\tSpectrogram maximum is at {np.max(spectrogram.spectrogram)} ADU/s.")
     image.data[image.data > image.saturation] = image.saturation
 
     # Convert data from ADU/s in ADU
