@@ -209,6 +209,7 @@ def wcs_flip_x(wcs, image):
             new_wcs.sip.bp[k,:] *= -1
     return new_wcs
 
+
 def wcs_flip_y(wcs, image):
     """Compute a flip WCS if image is flip along y axis."""
     new_wcs = deepcopy(wcs)
@@ -223,6 +224,7 @@ def wcs_flip_y(wcs, image):
             new_wcs.sip.b[:,k] *= -1
             new_wcs.sip.bp[:,k] *= -1
     return new_wcs
+
 
 def wcs_transpose(wcs, image):
     """Compute a transposed WCS if image is transposed with np.transpose()."""
