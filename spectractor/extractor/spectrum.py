@@ -74,10 +74,10 @@ class Spectrum:
         Spectrum amplitude covariance matrix between wavelengths in self.units units.
     lambdas_binwidths: array
         Bin widths of the wavelength array in nm.
-    data_order2: array
-        Spectrum amplitude array  for order 2 in self.units units.
-    err_order2: array
-        Spectrum amplitude uncertainties  for order 2 in self.units units.
+    data_next_order: array
+        Spectrum amplitude array for next diffraction order in self.units units.
+    err_next_order: array
+        Spectrum amplitude uncertainties for next diffraction order in self.units units.
     lambda_ref: float
         Reference wavelength for ADR computations in nm.
     order: int
@@ -242,8 +242,8 @@ class Spectrum:
         self.spectrogram_saturation = None
         self.spectrogram_Nx = None
         self.spectrogram_Ny = None
-        self.data_order2 = None
-        self.err_order2 = None
+        self.data_next_order = None
+        self.err_next_order = None
         self.dec = None
         self.hour_angle = None
         self.temperature = None
@@ -317,9 +317,9 @@ class Spectrum:
         if self.cov_matrix is not None:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix /= ldl_mat
-        if self.data_order2 is not None:
-            self.data_order2 /= ldl
-            self.err_order2 /= ldl
+        if self.data_next_order is not None:
+            self.data_next_order /= ldl
+            self.err_next_order /= ldl
         self.units = 'erg/s/cm$^2$/nm'
 
     def convert_from_flam_to_ADUrate(self):
@@ -349,9 +349,9 @@ class Spectrum:
         if self.cov_matrix is not None:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix *= ldl_mat
-        if self.data_order2 is not None:
-            self.data_order2 *= ldl
-            self.err_order2 *= ldl
+        if self.data_next_order is not None:
+            self.data_next_order *= ldl
+            self.err_next_order *= ldl
         self.units = 'ADU/s'
 
     def load_filter(self):
@@ -407,10 +407,10 @@ class Spectrum:
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
-        if self.data_order2 is not None and np.sum(self.data_order2) > 0.05 * np.sum(self.data):
+        if self.data_next_order is not None and np.sum(self.data_next_order) > 0.05 * np.sum(self.data):
             distance = self.disperser.grating_lambda_to_pixel(self.lambdas, self.x0, order=parameters.SPEC_ORDER+1)
             max_index = np.argmin(np.abs(distance + self.x0[0] - parameters.CCD_IMSIZE))
-            plot_spectrum_simple(ax, self.lambdas[:max_index], self.data_order2[:max_index], data_err=self.err_order2[:max_index],
+            plot_spectrum_simple(ax, self.lambdas[:max_index], self.data_next_order[:max_index], data_err=self.err_next_order[:max_index],
                                  xlim=xlim, label=f'Order {parameters.SPEC_ORDER+1} spectrum', linestyle="--", lw=1, color="firebrick")
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title=title, units=self.units, lw=1, linestyle="-")
@@ -563,7 +563,7 @@ class Spectrum:
             if extname == "SPEC_COV":
                 hdus[extname].data = self.cov_matrix
             elif extname == "ORDER2":
-                hdus[extname].data = [self.lambdas, self.data_order2, self.err_order2]
+                hdus[extname].data = [self.lambdas, self.data_next_order, self.err_next_order]
             elif extname == "ORDER0":
                 hdus[extname].data = self.target.image
                 hdus[extname].header["IM_X0"] = self.target.image_x0
@@ -833,7 +833,7 @@ class Spectrum:
             if len(hdu_list) > 1:
                 self.cov_matrix = hdu_list["SPEC_COV"].data
                 if len(hdu_list) > 2:
-                    _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+                    _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
                     if len(hdu_list) > 3:
                         self.target.image = hdu_list["ORDER0"].data
                         self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
@@ -949,7 +949,7 @@ class Spectrum:
             hdu_list = fits.open(input_file_name)
             # load other spectrum info
             self.cov_matrix = hdu_list["SPEC_COV"].data
-            _, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+            _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
             self.target.image = hdu_list["ORDER0"].data
             self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
             self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])

@@ -148,8 +148,8 @@ class SpectrumSimulation(Spectrum):
             >>> assert np.sum(lambdas) > 0
             >>> assert np.sum(model) > 0
             >>> assert np.sum(model) < 1e-10
-            >>> assert np.sum(sim.data_order2) > 0
-            >>> assert np.sum(sim.data_order2) < 1e-11
+            >>> assert np.sum(sim.data_next_order) > 0
+            >>> assert np.sum(sim.data_next_order) < 1e-11
 
         """
         # find lambdas including ADR effect
@@ -250,12 +250,12 @@ class SpectrogramModel(Spectrum):
         self.true_lambdas = None
         self.true_spectrum = None
         self.lambdas = None
-        self.err = None
         self.model = lambda x, y: np.zeros((x.size, y.size))
         self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
         self.profile_params = None
         self.psf_cube = None
         self.psf_cube_order2 = None
+        self.psf_cube_order3 = None
         self.psf_cube_masked = None
         self.fix_psf_cube = False
         self.fix_atm_sim = False
@@ -380,6 +380,7 @@ class SpectrogramModel(Spectrum):
         -------
 
         >>> spectrum, telescope, disperser, target = SimulatorInit('./tests/data/reduc_20170530_134_spectrum.fits')
+        >>> spectrum.disperser.ratio_order_3over2 = lambda wl: 0.1
         >>> atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
         >>> psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
         >>> sim = SpectrogramModel(spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True)
@@ -399,11 +400,12 @@ class SpectrogramModel(Spectrum):
                                                            order=self.order)
         dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
                                                                 niter=5, with_adr=True, order=self.order)
-        dispersion_law_order2 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle, niter=5, with_adr=True,
-                                                                       order=self.order+np.sign(self.order))
         self.lambdas_binwidths = np.gradient(self.lambdas)
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
+        if len(psf_poly_params) % 2 != 0:
+            raise ValueError(f"Argument psf_poly_params must be even size, to be split in parameters"
+                             f"for order 1 and order 2 spectrograms. Got {len(psf_poly_params)=}.")
         psf_poly_params_order1 = psf_poly_params[:len(psf_poly_params)//2]
         psf_poly_params_order2 = psf_poly_params[len(psf_poly_params)//2:]
         if self.profile_params is None or not self.fix_psf_cube:
@@ -440,11 +442,14 @@ class SpectrogramModel(Spectrum):
         self.my_logger.debug(f'\n\tAfter build ima1: {time.time() - start}')
 
         # Add order 2
-        if A2 > 0.:
+        if A2 > 0. and self.disperser.ratio_order_2over1 is not None:
             spectrum_order2 = self.disperser.ratio_order_2over1(self.lambdas) * spectrum
             spectrum_order2_err = self.disperser.ratio_order_2over1(self.lambdas) * spectrum_err
             if np.any(np.isnan(spectrum_order2)):
                 spectrum_order2[np.isnan(spectrum_order2)] = 0.
+            dispersion_law_order2 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+                                                                           niter=5, with_adr=True,
+                                                                           order=self.order + np.sign(self.order))
             nlbda2 = dispersion_law_order2.size
             if self.psf_cube_order2 is None or not self.fix_psf_cube:
                 start = time.time()
@@ -465,19 +470,45 @@ class SpectrogramModel(Spectrum):
                 # here spectrum[i] is in ADU/s
                 ima2 += spectrum_order2[i] * self.psf_cube_order2[i]
                 ima2_err2 += (spectrum_order2_err[i] * self.psf_cube_order2[i]) ** 2
+            if self.disperser.ratio_order_3over2 is not None:
+                spectrum_order3 = self.disperser.ratio_order_3over2(self.lambdas) * spectrum_order2
+                spectrum_order3_err = self.disperser.ratio_order_3over2(self.lambdas) * spectrum_order2_err
+                if np.any(np.isnan(spectrum_order3)):
+                    spectrum_order3[np.isnan(spectrum_order3)] = 0.
+                dispersion_law_order3 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+                                                                               niter=5, with_adr=True,
+                                                                               order=self.order + 2*np.sign(self.order))
+                nlbda3 = dispersion_law_order3.size
+                if self.psf_cube_order3 is None or not self.fix_psf_cube:
+                    start3 = time.time()
+                    profile_params_order3 = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params_order2, apply_bounds=True)
+                    profile_params_order3[:, 0] = 1
+                    profile_params_order3[:nlbda3, 1] = dispersion_law_order3.real + self.r0.real
+                    profile_params_order3[:nlbda3, 2] += dispersion_law_order3.imag
+                    self.psf_cube_order3 = self.chromatic_psf.build_psf_cube(self.pixels, profile_params_order3,
+                                                                             fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                                             fwhmy_clip=parameters.PSF_FWHM_CLIP,
+                                                                             dtype="float32", mask=None)
+                    self.my_logger.debug(f'\n\tAfter psf cube order 3: {time.time() - start3}')
+                for i in range(0, nlbda2, 1):
+                    # here spectrum[i] is in ADU/s
+                    ima2 += spectrum_order3[i] * self.psf_cube_order3[i]
+                    ima2_err2 += (spectrum_order3_err[i] * self.psf_cube_order3[i]) ** 2
+
+            # Assemble all diffraction orders in simulation
             # self.data is in ADU/s units here
-            self.data = A1 * (ima1 + A2 * ima2)
-            self.err = np.sqrt(A1*A1*(ima1_err2 + A2*A2*ima2_err2))
+            self.spectrogram = A1 * (ima1 + A2 * ima2)
+            self.spectrogram_err = np.sqrt(A1*A1*(ima1_err2 + A2*A2*ima2_err2))
             self.my_logger.debug(f'\n\tAfter build ima2: {time.time() - start}')
         else:
-            self.data = A1 * ima1
-            self.err = A1 * np.sqrt(ima1_err2)
+            self.spectrogram = A1 * ima1
+            self.spectrogram_err = A1 * np.sqrt(ima1_err2)
         start = time.time()
         if self.with_background:
-            self.data += B * self.spectrogram_bgd
+            self.spectrogram += B * self.spectrogram_bgd
         self.my_logger.debug(f'\n\tAfter bgd: {time.time() - start}')
 
-        return self.lambdas, self.data, self.err
+        return self.lambdas, self.spectrogram, self.spectrogram_err
 
 
 class SpectrumSimGrid:
