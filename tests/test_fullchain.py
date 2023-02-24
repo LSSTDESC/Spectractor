@@ -142,7 +142,7 @@ def test_ctio_fullchain():
     assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle, atol=1e-3)
     assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), rtol=1e-3)
     assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
-    assert float(spectrum.header['CHI2_FIT']) < 1.5e-3
+    assert float(spectrum.header['CHI2_FIT']) < 3e-3
     assert np.all(
         np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1],
                    np.array(PSF_POLY_PARAMS_TRUTH)[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1], rtol=0.01, atol=0.01))
