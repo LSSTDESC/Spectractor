@@ -183,6 +183,73 @@ def plot_shifts_histograms(dra, ddec):  # pragma: no cover
         parameters.PdfPages.savefig()
 
 
+def wcs_xy_translation(wcs, shift_x, shift_y):
+    """Compute a translated WCS if image is shifted in x or y."""
+    new_wcs = deepcopy(wcs)
+    new_wcs.wcs.crpix[0] += shift_x
+    new_wcs.wcs.crpix[1] += shift_y
+    if wcs.has_distortion:
+        new_wcs.sip.crpix[0] += shift_x
+        new_wcs.sip.crpix[1] += shift_y
+    return new_wcs
+
+
+def wcs_flip_x(wcs, image):
+    """Compute a flip WCS if image is flip along x axis."""
+    new_wcs = deepcopy(wcs)
+    new_wcs.wcs.crpix[0] = image.data.shape[1] - new_wcs.wcs.crpix[0]
+    new_wcs.wcs.cd = new_wcs.wcs.cd @ np.array([[-1, 0], [0, 1]])
+    if new_wcs.has_distortion:
+        new_wcs.sip.crpix[0] = image.data.shape[1] - new_wcs.wcs.crpix[0]
+        for k in range(1, new_wcs.sip.a_order+1, 2):
+            new_wcs.sip.a[k,:] *= -1
+            new_wcs.sip.ap[k,:] *= -1
+        for k in range(1, new_wcs.sip.b_order+1, 2):
+            new_wcs.sip.b[k,:] *= -1
+            new_wcs.sip.bp[k,:] *= -1
+    return new_wcs
+
+def wcs_flip_y(wcs, image):
+    """Compute a flip WCS if image is flip along y axis."""
+    new_wcs = deepcopy(wcs)
+    new_wcs.wcs.crpix[1] = image.data.shape[0] - new_wcs.wcs.crpix[1]
+    new_wcs.wcs.cd = new_wcs.wcs.cd @ np.array([[1, 0], [0, -1]])
+    if new_wcs.has_distortion:
+        new_wcs.sip.crpix[1] = image.data.shape[0] - new_wcs.wcs.crpix[1]
+        for k in range(1, new_wcs.sip.a_order+1, 2):
+            new_wcs.sip.a[:,k] *= -1
+            new_wcs.sip.ap[:,k] *= -1
+        for k in range(1, new_wcs.sip.b_order+1, 2):
+            new_wcs.sip.b[:,k] *= -1
+            new_wcs.sip.bp[:,k] *= -1
+    return new_wcs
+
+def wcs_transpose(wcs, image):
+    """Compute a transposed WCS if image is transposed with np.transpose()."""
+    new_wcs = wcs_flip_y(wcs, image)
+    tmp_crpix = np.copy(wcs.wcs.crpix)
+    new_wcs.wcs.crpix[1] = tmp_crpix[0]
+    new_wcs.wcs.crpix[0] = tmp_crpix[1]
+    new_wcs.wcs.cd = new_wcs.wcs.cd @ np.array([[0, 1], [-1, 0]])
+    if new_wcs.has_distortion:
+        # sip attributes are not writable, must fo the loop
+        new_wcs.sip.crpix[0] = tmp_crpix[1]
+        new_wcs.sip.crpix[1] = tmp_crpix[0]
+        tmp_sip_a = np.copy(new_wcs.sip.a)
+        tmp_sip_b = np.copy(new_wcs.sip.b)
+        tmp_sip_ap = np.copy(new_wcs.sip.ap)
+        tmp_sip_bp = np.copy(new_wcs.sip.bp)
+        for i in range(new_wcs.sip.a_order+1):
+            for j in range(new_wcs.sip.a_order+1):
+                new_wcs.sip.a[i, j] = tmp_sip_a[j, i]
+                new_wcs.sip.ap[i, j] = tmp_sip_ap[j, i]
+        for i in range(new_wcs.sip.b_order+1):
+            for j in range(new_wcs.sip.b_order+1):
+                new_wcs.sip.b[i, j] = tmp_sip_b[j, i]
+                new_wcs.sip.bp[i, j] = tmp_sip_bp[j, i]
+    return new_wcs
+
+
 class Astrometry():  # pragma: no cover
 
     def __init__(self, image, wcs_file_name="", output_directory="", gaia_mag_g_limit=23, source_extractor="iraf"):
@@ -440,7 +507,7 @@ class Astrometry():  # pragma: no cover
         self.my_logger.info(f'\n\tSources positions saved in {self.sources_file_name}')
 
     def plot_sources_and_gaia_catalog(self, ax=None, sources=None, gaia_coord=None, quad=None, label="",
-                                      vmax=None, margin=parameters.CCD_IMSIZE, center=None, scale="log10"):
+                                      vmax=None, margin=parameters.CCD_IMSIZE, center=None, scale="log10", swapaxes=False):
         """Plot the data image with different overlays: detected sources, Gaia stars, quad stars.
 
         Parameters
@@ -491,15 +558,22 @@ class Astrometry():  # pragma: no cover
         if ax is None:
             fig = plt.figure(figsize=(8, 6))
             if self.wcs is not None:
-                fig.add_subplot(111, projection=self.wcs)
+                if swapaxes:
+                    fig.add_subplot(111, projection=self.wcs.swapaxes(0, 1))
+                else:
+                    fig.add_subplot(111, projection=self.wcs)
             ax = plt.gca()
         else:
             no_plot = True
 
         plot_image_simple(ax, self.image.data, scale=scale, vmax=vmax)
         if self.wcs is not None and not no_plot:
-            ax.set_xlabel('RA')
-            ax.set_ylabel('Dec')
+            if swapaxes:
+                ax.set_xlabel('Dec')
+                ax.set_ylabel('RA')
+            else:
+                ax.set_xlabel('RA')
+                ax.set_ylabel('Dec')
         if sources is not None:
             ax.scatter(sources['xcentroid'], sources['ycentroid'], s=300, lw=2,
                        edgecolor='black', facecolor='none', label="Detected sources")
