@@ -2402,19 +2402,19 @@ def flip_and_rotate_radec_to_image_xy_coordinates(ra, dec, camera_angle=0, flip_
 
     Compute North direction in (x, y) frame
 
-    >>> flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=1)
+    >>> flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=1)
     (0.0, 1.0)
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 180, flip_ra_sign=1, flip_dec_sign=1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 180, flip_ra_sign=1, flip_dec_sign=1)
     '-0.0, -1.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=1)
     '-1.0, 0.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=-1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=-1)
     '1.0, -0.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=-1, flip_dec_sign=-1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 90, flip_ra_sign=-1, flip_dec_sign=-1)
     '1.0, -0.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=-1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=-1)
     '0.0, -1.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=-1, flip_dec_sign=1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 0, flip_ra_sign=-1, flip_dec_sign=1)
     '0.0, 1.0'
 
     """
