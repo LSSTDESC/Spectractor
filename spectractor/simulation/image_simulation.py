@@ -188,6 +188,8 @@ class StarFieldModel:
                 right = min(parameters.CCD_IMSIZE, int(self.pixcoords[0][k]) + window)
                 low = max(0, int(self.pixcoords[1][k]) - window)
                 up = min(parameters.CCD_IMSIZE, int(self.pixcoords[1][k]) + window)
+                if up < low or left > right:
+                    continue
                 yy, xx = np.mgrid[low:up, left:right]
                 self.field[low:up, left:right] += self.stars[k].psf.evaluate(np.array([xx, yy]))
         return self.field
