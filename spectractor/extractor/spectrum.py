@@ -894,7 +894,7 @@ class Spectrum:
         """
         hdu_list = fits.open(input_file_name)
         self.header = hdu_list[0].header
-        raw_data = hdu_list[1].data
+        raw_data = hdu_list[0].data
         self.lambdas = raw_data[0]
         self.lambdas_binwidths = np.gradient(self.lambdas)
         self.data = raw_data[1]
