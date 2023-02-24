@@ -225,6 +225,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
                        filter_size=(filter_size, filter_size),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
+    bkg.background[data == 0] = 0
     bgd_model_func_interp = RegularGridInterpolator((np.arange(Nx), np.arange(Ny)), bkg.background.T, method='linear',
                                                     bounds_error=False, fill_value=None)
 

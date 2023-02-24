@@ -1,4 +1,5 @@
 import os
+import sys
 from copy import deepcopy
 import subprocess
 import shutil
@@ -22,9 +23,27 @@ from spectractor.extractor.background import remove_image_background_sextractor
 
 
 def _get_astrometry_executable_path(executable):
+    """Find executable path from astrometry library.
+
+    Parameters
+    ----------
+    executable: str
+        The binary executable name.
+
+    Returns
+    -------
+    path: str
+        The absolute path of the executable.
+
+    Examples
+    --------
+    >>> _get_astrometry_executable_path("solve-field")  # doctest: +ELLIPSIS
+    '.../bin/solve-field'
+
+    """
     my_logger = set_logger("get_astrometry_executable_path")
-    if shutil.which(executable) != "":
-        exec = shutil.which(executable)
+    if shutil.which(executable) is not None:
+        path = shutil.which(executable)
     elif parameters.ASTROMETRYNET_DIR != "":
         if not os.path.isdir(parameters.ASTROMETRYNET_DIR):
             # reset astrometry.net path
@@ -37,11 +56,11 @@ def _get_astrometry_executable_path(executable):
                                 f"not exist and ASTROMETRYNET_DIR is not in OS environment.")
                 raise OSError(f"No {executable} binary found with parameters.ASTROMETRYNET_DIR "
                               f"or ASTROMETRYNET_DIR environment variable.")
-        exec = os.path.join(parameters.ASTROMETRYNET_DIR, f'bin/{executable}')
+        path = os.path.join(parameters.ASTROMETRYNET_DIR, f'bin/{executable}')
     else:
         raise OSError(f"{executable} executable not found in $PATH "
                       f"or {os.path.join(parameters.ASTROMETRYNET_DIR, f'bin/{executable}')}")
-    return exec
+    return path
 
 
 def load_gaia_catalog(coord, radius=5 * u.arcmin, gaia_mag_g_limit=23):
@@ -80,7 +99,8 @@ def load_gaia_catalog(coord, radius=5 * u.arcmin, gaia_mag_g_limit=23):
     from astroquery.gaia import Gaia
     my_logger = set_logger("load_gaia_catalog")
     Gaia.ROW_LIMIT = -1
-    job = Gaia.cone_search_async(coord, radius=radius, verbose=False)
+    job = Gaia.cone_search_async(coord, radius=radius, verbose=False, columns=['ra', 'dec', 'pmra', 'pmdec', 'ref_epoch',
+                                                                               'parallax', 'phot_g_mean_mag'])
     my_logger.debug(f"\n\t{job}")
     gaia_catalog = job.get_results()
     my_logger.debug(f"\n\t{gaia_catalog}")
@@ -161,6 +181,75 @@ def plot_shifts_histograms(dra, ddec):  # pragma: no cover
         plt.show()
     if parameters.PdfPages:
         parameters.PdfPages.savefig()
+
+
+def wcs_xy_translation(wcs, shift_x, shift_y):
+    """Compute a translated WCS if image is shifted in x or y."""
+    new_wcs = deepcopy(wcs)
+    new_wcs.wcs.crpix[0] += shift_x
+    new_wcs.wcs.crpix[1] += shift_y
+    if wcs.has_distortion:
+        new_wcs.sip.crpix[0] += shift_x
+        new_wcs.sip.crpix[1] += shift_y
+    return new_wcs
+
+
+def wcs_flip_x(wcs, image):
+    """Compute a flip WCS if image is flip along x axis."""
+    new_wcs = deepcopy(wcs)
+    new_wcs.wcs.crpix[0] = image.data.shape[1] - new_wcs.wcs.crpix[0]
+    new_wcs.wcs.cd = new_wcs.wcs.cd @ np.array([[-1, 0], [0, 1]])
+    if new_wcs.has_distortion:
+        new_wcs.sip.crpix[0] = image.data.shape[1] - new_wcs.wcs.crpix[0]
+        for k in range(1, new_wcs.sip.a_order+1, 2):
+            new_wcs.sip.a[k,:] *= -1
+            new_wcs.sip.ap[k,:] *= -1
+        for k in range(1, new_wcs.sip.b_order+1, 2):
+            new_wcs.sip.b[k,:] *= -1
+            new_wcs.sip.bp[k,:] *= -1
+    return new_wcs
+
+
+def wcs_flip_y(wcs, image):
+    """Compute a flip WCS if image is flip along y axis."""
+    new_wcs = deepcopy(wcs)
+    new_wcs.wcs.crpix[1] = image.data.shape[0] - new_wcs.wcs.crpix[1]
+    new_wcs.wcs.cd = new_wcs.wcs.cd @ np.array([[1, 0], [0, -1]])
+    if new_wcs.has_distortion:
+        new_wcs.sip.crpix[1] = image.data.shape[0] - new_wcs.wcs.crpix[1]
+        for k in range(1, new_wcs.sip.a_order+1, 2):
+            new_wcs.sip.a[:,k] *= -1
+            new_wcs.sip.ap[:,k] *= -1
+        for k in range(1, new_wcs.sip.b_order+1, 2):
+            new_wcs.sip.b[:,k] *= -1
+            new_wcs.sip.bp[:,k] *= -1
+    return new_wcs
+
+
+def wcs_transpose(wcs, image):
+    """Compute a transposed WCS if image is transposed with np.transpose()."""
+    new_wcs = wcs_flip_y(wcs, image)
+    tmp_crpix = np.copy(wcs.wcs.crpix)
+    new_wcs.wcs.crpix[1] = tmp_crpix[0]
+    new_wcs.wcs.crpix[0] = tmp_crpix[1]
+    new_wcs.wcs.cd = new_wcs.wcs.cd @ np.array([[0, 1], [-1, 0]])
+    if new_wcs.has_distortion:
+        # sip attributes are not writable, must fo the loop
+        new_wcs.sip.crpix[0] = tmp_crpix[1]
+        new_wcs.sip.crpix[1] = tmp_crpix[0]
+        tmp_sip_a = np.copy(new_wcs.sip.a)
+        tmp_sip_b = np.copy(new_wcs.sip.b)
+        tmp_sip_ap = np.copy(new_wcs.sip.ap)
+        tmp_sip_bp = np.copy(new_wcs.sip.bp)
+        for i in range(new_wcs.sip.a_order+1):
+            for j in range(new_wcs.sip.a_order+1):
+                new_wcs.sip.a[i, j] = tmp_sip_a[j, i]
+                new_wcs.sip.ap[i, j] = tmp_sip_ap[j, i]
+        for i in range(new_wcs.sip.b_order+1):
+            for j in range(new_wcs.sip.b_order+1):
+                new_wcs.sip.b[i, j] = tmp_sip_b[j, i]
+                new_wcs.sip.bp[i, j] = tmp_sip_bp[j, i]
+    return new_wcs
 
 
 class Astrometry():  # pragma: no cover
@@ -395,8 +484,8 @@ class Astrometry():  # pragma: no cover
         INFO: Query finished...
         <Table length=...>...
         """
-        radius = 0.5*np.sqrt(2) * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
-                                      np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
+        radius = 0.5 * np.sqrt(2) * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
+                                        np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
         radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
         self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
                             f"arcsec from {self.image.target.label} {self.image.target.radec_position}...")
@@ -420,7 +509,7 @@ class Astrometry():  # pragma: no cover
         self.my_logger.info(f'\n\tSources positions saved in {self.sources_file_name}')
 
     def plot_sources_and_gaia_catalog(self, ax=None, sources=None, gaia_coord=None, quad=None, label="",
-                                      vmax=None, margin=parameters.CCD_IMSIZE, center=None, scale="log10"):
+                                      vmax=None, margin=parameters.CCD_IMSIZE, center=None, scale="log10", swapaxes=False):
         """Plot the data image with different overlays: detected sources, Gaia stars, quad stars.
 
         Parameters
@@ -471,15 +560,22 @@ class Astrometry():  # pragma: no cover
         if ax is None:
             fig = plt.figure(figsize=(8, 6))
             if self.wcs is not None:
-                fig.add_subplot(111, projection=self.wcs)
+                if swapaxes:
+                    fig.add_subplot(111, projection=self.wcs.swapaxes(0, 1))
+                else:
+                    fig.add_subplot(111, projection=self.wcs)
             ax = plt.gca()
         else:
             no_plot = True
 
         plot_image_simple(ax, self.image.data, scale=scale, vmax=vmax)
         if self.wcs is not None and not no_plot:
-            ax.set_xlabel('RA')
-            ax.set_ylabel('Dec')
+            if swapaxes:
+                ax.set_xlabel('Dec')
+                ax.set_ylabel('RA')
+            else:
+                ax.set_xlabel('RA')
+                ax.set_ylabel('Dec')
         if sources is not None:
             ax.scatter(sources['xcentroid'], sources['ycentroid'], s=300, lw=2,
                        edgecolor='black', facecolor='none', label="Detected sources")
@@ -657,11 +753,11 @@ class Astrometry():  # pragma: no cover
             Minimum number of stars that have to be kept in the selection (default: 100).
         flux_log10_threshold:
             Lower cut on the log10 of the star fluxes (default: 0.1).
-        min_range:
+        min_range: astropy.Quantity
             Minimum distance for sources from image principal target in arcsec (default: 3*u.arcsec).
-        max_range
-            Maximum distance for sources from image principal target in arcsec (default: 3*u.arcsec).
-        max_sep
+        max_range: astropy.Quantity
+            Maximum distance for sources from image principal target in arcsec (default: 5*u.arcsec).
+        max_sep: astropy.Quantity
             Maximum separation between the detected sources and the Gaia stars in arcsec (default: 1*u.arcsec).
 
         Returns
@@ -670,10 +766,15 @@ class Astrometry():  # pragma: no cover
             Boolean array of selected sources.
 
         """
+        self.my_logger.info(f"Initial number of sources: {len(self.dist_2d)}")
         sep = self.dist_2d < max_sep
+        self.my_logger.info(f"Number of sources after {max_sep=} constraint: {np.sum(sep)=}")
         sep *= self.sources_radec_positions.separation(self.image.target.radec_position_after_pm) < max_range
+        self.my_logger.info(f"Number of sources after {max_range=} constraint: {np.sum(sep)=}")
         sep *= self.sources_radec_positions.separation(self.image.target.radec_position_after_pm) > min_range
+        self.my_logger.info(f"Number of sources after {min_range=} constraint: {np.sum(sep)=}")
         sep *= np.log10(self.sources['flux']) > flux_log10_threshold
+        self.my_logger.info(f"Number of sources after flux constraint: {np.sum(sep)=}")
         if np.sum(sep) > min_stars:
             for r in np.arange(0, max_range.value, 0.1)[::-1]:
                 range_constraint = self.sources_radec_positions.separation(self.image.target.radec_position_after_pm) \
@@ -682,6 +783,7 @@ class Astrometry():  # pragma: no cover
                     break
                 else:
                     sep *= range_constraint
+        self.my_logger.info(f"Final number of sources: {np.sum(sep)=}")
         return sep
 
     def plot_shifts_profiles(self, matches, dra, ddec):
@@ -911,7 +1013,7 @@ class Astrometry():  # pragma: no cover
         If 'iraf' source_extractor is chosen, first the background of the exposure is removed using the astropy
         SExtractorBackground() method, then photutils iraf_source_detection() is used to get the positions in pixels
         and fluxes of the objects in the field. If 'astrometrynet' is chosen, astrometry.net extractor is used.
-        The results are saved in the {file_name}_sources.fits file and used by the solve_field command from the
+        The results are saved in the {file_name}.axy file and used by the solve_field command from the
         astrometry.net library. The solve_field path must be set using the spectractor.parameters.ASTROMETRYNET_BINDIR
         variable. A new WCS is created and saved as a new FITS file. The WCS file and the intermediate results
         are saved in a new directory named as the FITS file name with a _wcs suffix.
@@ -960,9 +1062,10 @@ class Astrometry():  # pragma: no cover
 
             >>> assert os.path.isdir('./tests/data/reduc_20170530_134_wcs')
             >>> assert os.path.isfile('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
+            >>> assert a.sources is not None
 
         """
-        # crop data
+        tmp_image_file_name = self.wcs_file_name.replace(".wcs", "_tmp.fits")
         if sources is None:
             if self.source_extractor == "iraf":
                 if extent is not None:
@@ -980,40 +1083,22 @@ class Astrometry():  # pragma: no cover
                 if extent is not None:
                     self.sources['xcentroid'] += extent[0][0]
                     self.sources['ycentroid'] += extent[1][0]
+                # write results in fits file
+                self.write_sources()
+                solve_field_input = self.sources_file_name
             elif self.source_extractor == "astrometrynet":
+                self.my_logger.info(f"\n\tSource extraction directly with solve-field.")
                 # must write a temporary image file with Spectractor flips and rotations
-                tmp_image_file_name = self.wcs_file_name.replace(".wcs", "_tmp.fits")
                 fits.writeto(tmp_image_file_name, self.image.data, header=self.image.header)
-                exec = _get_astrometry_executable_path("augment-xylist")
-                command = f"{exec} --scale-unit arcsecperpix " \
-                          f"--scale-low {0.95 * parameters.CCD_PIXEL2ARCSEC} " \
-                          f"--scale-high {1.05 * parameters.CCD_PIXEL2ARCSEC} " \
-                          f"--ra {self.image.target.radec_position.ra.value} --dec {self.image.target.radec_position.dec.value} " \
-                          f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
-                          f"-o {self.sources_file_name} -s FLUX " \
-                          f"--width {self.image.data.shape[1]} --height {self.image.data.shape[0]} " \
-                          f"--x-column X --y-column Y -i {tmp_image_file_name} "
-                if parameters.VERBOSE or parameters.DEBUG:
-                    command += "-v"
-                self.my_logger.info(f'\n\tRun astrometry.net augmented-xylist command:\n\t{command}')
-                log = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE,
-                                     stderr=subprocess.PIPE, encoding='ascii')
-                if parameters.VERBOSE or parameters.DEBUG:
-                    self.my_logger.info(f"\n\t{log.stdout}")
-                self.sources = self.load_sources_from_file()
-                os.remove(tmp_image_file_name)
+                solve_field_input = tmp_image_file_name
             else:
-                raise ValueError(f"Got {self.source_extractor=}. Must be either 'iraf' or 'astrometrynet'.")
-            # fig = plt.figure()
-            # plt.imshow(np.log10(self.image.data), origin="lower")
-            # plt.scatter(self.sources["xcentroid"], self.sources["ycentroid"], marker="+", s=100)
-            # plt.show()
-
-            self.my_logger.info(f'\n\t{self.sources}')
+                raise ValueError(f"Got {self.source_extractor=}. Must be either 'iraf' or 'astrometrynet' "
+                                 f"if sources are not given in argument.")
         else:
             self.sources = sources
-        # write results in fits file
-        self.write_sources()
+            self.write_sources()
+            solve_field_input = self.sources_file_name
+
         # run astrometry.net
         exec = _get_astrometry_executable_path('solve-field')
         command = f"{exec} --scale-unit arcsecperpix " \
@@ -1022,14 +1107,19 @@ class Astrometry():  # pragma: no cover
                   f"--ra {self.image.target.radec_position.ra.value} --dec {self.image.target.radec_position.dec.value} " \
                   f"--radius {parameters.CCD_IMSIZE * parameters.CCD_PIXEL2ARCSEC / 3600.} " \
                   f"--dir {self.output_directory} --out {self.tag} " \
-                  f"--overwrite --x-column X --y-column Y {self.sources_file_name} " \
+                  f"--overwrite --x-column X --y-column Y {solve_field_input} " \
                   f"--width {self.image.data.shape[1]} --height {self.image.data.shape[0]} --no-plots"
         self.my_logger.info(f'\n\tRun astrometry.net solve_field command:\n\t{command}')
-        log = subprocess.check_output(command, shell=True)
-        log_file = open(self.match_file_name.replace(".match", ".log"), "w+")
-        log_file.write(command + "\n")
-        log_file.write(log.decode("utf-8") + "\n")
-        log_file.close()
+        try:
+            subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='ascii')
+        except subprocess.CalledProcessError as e:  # pragma: nocover
+            self.my_logger.warning(f"\n\tAstrometry command:\n{command}")
+            self.my_logger.error(f"\n\t{e.stderr}")
+            sys.exit()
+        if os.path.isfile(tmp_image_file_name):
+            os.remove(tmp_image_file_name)
+        if os.path.isfile(os.path.join(self.output_directory, self.tag.rstrip('/')+".new")):
+            os.remove(os.path.join(self.output_directory, self.tag.rstrip('/')+".new"))
 
         # The source file given to solve-field is understood as a FITS file with pixel origin value at 1,
         # whereas pixel coordinates comes from photutils using a numpy convention with pixel origin value at 0
@@ -1043,12 +1133,16 @@ class Astrometry():  # pragma: no cover
         # load quad stars
         self.quad_stars_pixel_positions = self.get_quad_stars_pixel_positions()
 
+        # load sources
+        if self.sources is None:
+            self.sources = self.load_sources_from_file()
+
         # load WCS
         self.wcs = load_wcs_from_file(self.wcs_file_name)
         return self.wcs
 
     # noinspection PyUnresolvedReferences
-    def run_gaia_astrometry(self):
+    def run_gaia_astrometry(self, min_range=3 * u.arcsec, max_range=5 * u.arcmin, max_sep=1 * u.arcsec):
         """Refine a World Coordinate System (WCS) using Gaia satellite astrometry catalog.
 
         A WCS must be already present in the exposure FITS file.
@@ -1057,6 +1151,15 @@ class Astrometry():  # pragma: no cover
         A matching is performed between the detected sources and the Gaia catalog obtained for the region of the target.
         Then the closest and brightest sources are selected and the WCS is shifted by the median of the distance between
         these stars and the detected sources. The original WCS FITS file is updated.
+
+        Parameters
+        ----------
+        min_range: astropy.Quantity, optional
+            Minimum distance for sources from image principal target in arcsec (default: 3*u.arcsec).
+        max_range: astropy.Quantity, optional
+            Maximum distance for sources from image principal target in arcsec (default: 5*u.arcsec).
+        max_sep: astropy.Quantity, optional
+            Maximum separation between the detected sources and the Gaia stars in arcsec (default: 1*u.arcsec).
 
         Examples
         --------
@@ -1133,10 +1236,11 @@ class Astrometry():  # pragma: no cover
             flux_log10_threshold = np.log10(self.sources['flux'][int(0.5 * len(self.sources))])
         else:
             flux_log10_threshold = np.log10(self.sources['flux'][int(0.8 * len(self.sources))])
-        sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold)
+        sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold, max_sep=max_sep,
+                                               max_range=max_range, min_range=min_range)
         if np.sum(sep_constraints) == 0:
             raise ValueError(f"Warning! No source passes the set threshold flux>{10**flux_log10_threshold}. "
-                             f"Check your filters.")
+                             f"Check your filters. {self.sources=}")
         sources_selection = self.sources_radec_positions[sep_constraints]
         gaia_matches = self.gaia_radec_positions_after_pm[self.gaia_index[sep_constraints]]
         dra, ddec = sources_selection.spherical_offsets_to(gaia_matches)
@@ -1183,7 +1287,8 @@ class Astrometry():  # pragma: no cover
         self.get_sources_radec_positions()
         self.gaia_index, self.dist_2d, self.dist_ra, self.dist_dec = \
             self.match_sources_to_gaia_catalog(self.gaia_radec_positions_after_pm)
-        sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold)
+        sep_constraints = self.set_constraints(flux_log10_threshold=flux_log10_threshold, max_sep=max_sep,
+                                               max_range=max_range, min_range=min_range)
         sources_selection = self.sources_radec_positions[sep_constraints]
         self.gaia_matches = self.gaia_radec_positions_after_pm[self.gaia_index[sep_constraints]]
         dra, ddec = sources_selection.spherical_offsets_to(self.gaia_matches)
@@ -1208,7 +1313,7 @@ class Astrometry():  # pragma: no cover
         #                                        margin=10, label=self.image.target.label)
         return dra, ddec
 
-    def run_full_astrometry(self, extent=None, maxiter=20):
+    def run_full_astrometry(self, extent=None, maxiter=20, min_range=3 * u.arcsec, max_range=5 * u.arcmin, max_sep=1 * u.arcsec):
         """Iterative method to get a precise World Coordinate System (WCS) using Gaia satellite astrometry catalog and
         astrometry.net fitter.
 
@@ -1230,6 +1335,12 @@ class Astrometry():  # pragma: no cover
             A ((xmin,xmax),(ymin,ymax)) to crop the image before any analysis (default: None).
         maxiter: int, optional
             The maximum number of iterations (default: 20).
+        min_range: astropy.Quantity, optional
+            Minimum distance for sources from image principal target in arcsec (default: 3*u.arcsec).
+        max_range: astropy.Quantity, optional
+            Maximum distance for sources from image principal target in arcsec (default: 5*u.arcsec).
+        max_sep: astropy.Quantity, optional
+            Maximum separation between the detected sources and the Gaia stars in arcsec (default: 1*u.arcsec).
 
         Returns
         -------
@@ -1284,10 +1395,10 @@ class Astrometry():  # pragma: no cover
                 self.run_simple_astrometry(extent=extent, sources=self.sources)
                 # refine with Gaia catalog
                 for i in range(maxiter):
-                    dra, ddec = self.run_gaia_astrometry()
+                    dra, ddec = self.run_gaia_astrometry(min_range=min_range, max_range=max_range, max_sep=max_sep)
                     dra_median = np.median(dra.to(u.mas).value)
                     ddec_median = np.median(ddec.to(u.mas).value)
-                    if np.abs(dra_median) < 1 and np.abs(ddec_median) < 1:
+                    if np.abs(dra_median) < 0.5 * parameters.CCD_PIXEL2ARCSEC and np.abs(ddec_median) < 0.5 * parameters.CCD_PIXEL2ARCSEC:
                         break
                 sources_list.append(deepcopy(self.sources))
                 # check the positions of quad stars with their WCS position from Gaia catalog
@@ -1312,7 +1423,7 @@ class Astrometry():  # pragma: no cover
         best_iter = int(np.argmin(t["gaia_residuals_quad_sum"]))
         self.my_logger.info(f'\n\tBest run: iteration #{best_iter}')
         self.run_simple_astrometry(extent=extent, sources=sources_list[best_iter])
-        self.run_gaia_astrometry()
+        self.run_gaia_astrometry(min_range=min_range, max_range=max_range, max_sep=max_sep)
         self.my_logger.info(f'\n\tFinal target position: {self.get_target_pixel_position()}')
         if parameters.DEBUG:
             self.plot_sources_and_gaia_catalog(sources=self.sources, gaia_coord=self.gaia_matches, margin=20,

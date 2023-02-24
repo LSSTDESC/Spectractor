@@ -1853,19 +1853,19 @@ def plot_compass_simple(ax, parallactic_angle=None, arrow_size=0.1, origin=[0.15
     """
     # North arrow
     N_arrow = [0, arrow_size]
-    N_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(N_arrow[0], N_arrow[1],
-                                                                    camera_angle=parameters.OBS_CAMERA_ROTATION,
-                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
-                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+    N_xy = np.asarray(flip_and_rotate_radec_vector_to_xy_vector(N_arrow[0], N_arrow[1],
+                                                                camera_angle=parameters.OBS_CAMERA_ROTATION,
+                                                                flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
     ax.annotate("N", xy=origin, xycoords='axes fraction', xytext=N_xy + origin, textcoords='axes fraction',
                 arrowprops=dict(arrowstyle="<|-", fc="yellow", ec="yellow"), color="yellow",
                 horizontalalignment='center', verticalalignment='center')
     # West arrow
     W_arrow = [arrow_size, 0]
-    W_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(W_arrow[0], W_arrow[1],
-                                                                    camera_angle=parameters.OBS_CAMERA_ROTATION,
-                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
-                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+    W_xy = np.asarray(flip_and_rotate_radec_vector_to_xy_vector(W_arrow[0], W_arrow[1],
+                                                                camera_angle=parameters.OBS_CAMERA_ROTATION,
+                                                                flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
     ax.annotate("W", xy=origin, xycoords='axes fraction', xytext=W_xy + origin, textcoords='axes fraction',
                 arrowprops=dict(arrowstyle="<|-", fc="yellow", ec="yellow"), color="yellow",
                 horizontalalignment='center', verticalalignment='center')
@@ -1877,10 +1877,10 @@ def plot_compass_simple(ax, parallactic_angle=None, arrow_size=0.1, origin=[0.15
     if parallactic_angle is not None:
         p_arrow = [0, arrow_size]  # angle with respect to North in RADEC counterclockwise
         angle = parameters.OBS_CAMERA_ROTATION + parameters.OBS_CAMERA_RA_FLIP_SIGN * parallactic_angle
-        p_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(p_arrow[0], p_arrow[1],
-                                                                        camera_angle=angle,
-                                                                        flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
-                                                                        flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+        p_xy = np.asarray(flip_and_rotate_radec_vector_to_xy_vector(p_arrow[0], p_arrow[1],
+                                                                    camera_angle=angle,
+                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
         ax.annotate("Z", xy=origin, xycoords='axes fraction', xytext=p_xy + origin, textcoords='axes fraction',
                     arrowprops=dict(arrowstyle="<|-", fc="lightgreen", ec="lightgreen"), color="lightgreen",
                     horizontalalignment='center', verticalalignment='center')
@@ -2244,14 +2244,14 @@ def set_sources_file_name(file_name, output_directory=""):
     Examples
     --------
     >>> set_sources_file_name("image.fits", output_directory="")
-    'image_wcs/image_sources.fits'
+    'image_wcs/image.axy'
     >>> set_sources_file_name("image.png", output_directory="outputs")
-    'outputs/image_wcs/image_sources.fits'
+    'outputs/image_wcs/image.axy'
 
     """
     output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
     tag = set_wcs_tag(file_name)
-    return os.path.join(output_directory, f"{tag}_sources.fits")
+    return os.path.join(output_directory, f"{tag}.axy")
 
 
 def set_gaia_catalog_file_name(file_name, output_directory=""):
@@ -2363,7 +2363,7 @@ def resolution_operator(cov, Q, reg):
     return np.eye(N) - reg * cov @ Q
 
 
-def flip_and_rotate_radec_to_image_xy_coordinates(ra, dec, camera_angle=0, flip_ra_sign=1, flip_dec_sign=1):
+def flip_and_rotate_radec_vector_to_xy_vector(ra, dec, camera_angle=0, flip_ra_sign=1, flip_dec_sign=1):
     """Flip and rotate the vectors in pixels along (RA,DEC) directions to (x, y) image coordinates.
     The parity transformations are applied first, then rotation.
 
@@ -2402,19 +2402,19 @@ def flip_and_rotate_radec_to_image_xy_coordinates(ra, dec, camera_angle=0, flip_
 
     Compute North direction in (x, y) frame
 
-    >>> flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=1)
+    >>> flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=1)
     (0.0, 1.0)
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 180, flip_ra_sign=1, flip_dec_sign=1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 180, flip_ra_sign=1, flip_dec_sign=1)
     '-0.0, -1.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=1)
     '-1.0, 0.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=-1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=-1)
     '1.0, -0.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=-1, flip_dec_sign=-1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 90, flip_ra_sign=-1, flip_dec_sign=-1)
     '1.0, -0.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=-1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=-1)
     '0.0, -1.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=-1, flip_dec_sign=1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 0, flip_ra_sign=-1, flip_dec_sign=1)
     '0.0, 1.0'
 
     """
