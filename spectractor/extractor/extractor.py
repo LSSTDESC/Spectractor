@@ -283,6 +283,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if params is None:
             params = self.p
         A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *psf_poly_params = params
+        if len(psf_poly_params) % 2 != 0:
+            raise ValueError(f"Argument psf_poly_params must be even size, to be split in parameters"
+                             f"for first order and next order spectrograms. Got {len(psf_poly_params)=}.")
         poly_params = psf_poly_params[:len(psf_poly_params)//2]
         poly_params_next_order = psf_poly_params[len(psf_poly_params)//2:]
         profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params,
@@ -480,7 +483,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                                                                                  dtype="float32", mask=self.psf_cube_masked_next_order)
             psf_cube += psf_cube_next_order
             if self.tr_ratio_next_next_order is not None:
-                self.my_logger.warning("gogogo")
                 dispersion_law_next_next_order = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, dx0, dy0, angle,
                                                                                                  niter=5, with_adr=True,
                                                                                                  order=self.spectrum.order + 2*np.sign(self.spectrum.order))

@@ -396,6 +396,9 @@ class SpectrogramModel(Spectrum):
         self.lambdas_binwidths = np.gradient(self.lambdas)
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
+        if len(psf_poly_params) % 2 != 0:
+            raise ValueError(f"Argument psf_poly_params must be even size, to be split in parameters"
+                             f"for order 1 and order 2 spectrograms. Got {len(psf_poly_params)=}.")
         psf_poly_params_order1 = psf_poly_params[:len(psf_poly_params)//2]
         psf_poly_params_order2 = psf_poly_params[len(psf_poly_params)//2:]
         if self.profile_params is None or not self.fix_psf_cube:
