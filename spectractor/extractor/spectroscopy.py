@@ -473,22 +473,24 @@ class Lines:
                 popt = line.fit_popt
                 peak_pos = popt[bgd_npar + 3 * j + 1]
                 FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
-                signal_level = popt[bgd_npar + 3 * j]
-                err = np.sqrt(line.fit_pcov[bgd_npar + 3 * j + 1, bgd_npar + 3 * j + 1])
+                amplitude = popt[bgd_npar + 3 * j]
+                detected_err = np.sqrt(line.fit_pcov[bgd_npar + 3 * j + 1, bgd_npar + 3 * j + 1])
+                amplitude_err = np.sqrt(line.fit_pcov[bgd_npar + 3 * j, bgd_npar + 3 * j])
                 if line.high_snr:
-                    rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength, err,
-                                 FWHM, signal_level, line.fit_snr, line.fit_chisq, line.fit_eqwidth_mod,
+                    rows.append((line.label, line.wavelength, peak_pos, peak_pos - line.wavelength, detected_err,
+                                 FWHM, amplitude, amplitude_err, line.fit_snr, line.fit_chisq, line.fit_eqwidth_mod,
                                  line.fit_eqwidth_data))
                 j += 1
         t = Table()
         if len(rows) > 0:
             t = Table(rows=rows, names=(
-                'Line', 'Tabulated', 'Detected', 'Shift', 'Err', 'FWHM', 'Amplitude', 'SNR', 'Chisq', 'Eqwidth_mod',
+                'Line', 'Tabulated', 'Detected', 'Shift', 'Detected_err', 'FWHM', 'Amplitude', 'Amplitude_err', 'SNR', 'Chisq', 'Eqwidth_mod',
                 'Eqwidth_data'),
-                      dtype=('a12', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
+                      dtype=('a12', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'))
             for col in t.colnames[1:6]:
                 t[col].unit = 'nm'
             t[t.colnames[5]].unit = amplitude_units
+            t[t.colnames[6]].unit = amplitude_units
             for col in t.colnames[-2:]:
                 t[col].unit = 'nm'
             t[t.colnames[-3]].unit = 'reduced'
