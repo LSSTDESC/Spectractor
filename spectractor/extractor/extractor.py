@@ -6,6 +6,8 @@ from matplotlib import cm
 from scipy.interpolate import interp1d
 from scipy import sparse
 import time
+import matplotlib.style as style
+style.use('seaborn-colorblind')
 
 from spectractor import parameters
 from spectractor.config import set_logger, load_config
@@ -1322,7 +1324,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     ax[1, 0].errorbar(spectrum.lambdas, res, yerr=np.ones_like(res),
                       label=f"2D: mean={np.mean(res):.2f}, std={np.std(res):.2f}")
     ax[1, 0].grid()
-    ax[1, 0].legend().set_zorder(43)
+    ax[1, 0].legend(ncol=3).set_zorder(43)
     ax[1, 0].set_xlabel(r"$\lambda$ [nm]")
     ax[1, 0].set_ylim(-5, 5)
     ax[1, 0].set_ylabel(r"$(A - A_{\rm truth})/\sigma_A$")

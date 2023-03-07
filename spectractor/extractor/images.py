@@ -1217,7 +1217,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         im = ax1.imshow(theta_mask, origin='lower', cmap=cmap, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
         cb = plt.colorbar(im, ax=ax1)
         cb.set_label(parameters.PLOT_ROT_LABEL, labelpad=-10)
-        ax1.plot(x_new, y_new, 'k-', label=rf"Mean dispersion axis: $\alpha$={theta_median:.2f}°")
+        ax1.plot(x_new, y_new, 'k-', label=rf"Mean dispersion axis: $\alpha={theta_median:.2f}$°")
         ax1.set_ylim(0, theta_mask.shape[0])
         ax1.set_xlim(0, theta_mask.shape[1])
         ax1.legend()
