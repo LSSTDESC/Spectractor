@@ -47,6 +47,7 @@ def test_atmosphere():
     assert np.max(transmission(lambdas)) < 1 and np.min(transmission(lambdas)) >= 0
 
 
+@unittest.skip('Skipping to avoid libradtran dependency')
 def test_simulator():
     file_names = ['tests/data/reduc_20170530_134_spectrum.fits']
 

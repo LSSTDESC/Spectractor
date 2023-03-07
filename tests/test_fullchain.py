@@ -18,6 +18,7 @@ from spectractor.fit.fit_spectrogram import (SpectrogramFitWorkspace,  # noqa: E
 import os  # noqa: E402
 import numpy as np  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
+import unittest  # noqa: E402
 
 
 # original parameters
@@ -95,6 +96,7 @@ def make_image():
              psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=True, with_noise=False)
 
 
+@unittest.skip('Skipping to avoid libradtran dependency')
 def test_ctio_fullchain():
     parameters.VERBOSE = True
     parameters.DEBUG = True
