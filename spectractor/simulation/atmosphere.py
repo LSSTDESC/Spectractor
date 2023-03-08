@@ -14,7 +14,7 @@ from spectractor.simulation.throughput import plot_transmission_simple
 
 class Atmosphere:
 
-    def __init__(self, airmass, pressure, temperature):
+    def __init__(self, airmass, pressure, temperature, lambda_min=250, lambda_max=1200):
         """Class to evaluate an atmospheric transmission using Libradtran.
 
         Parameters
@@ -22,9 +22,13 @@ class Atmosphere:
         airmass: float
             Airmass of the source object.
         pressure: float
-            Pressure of the atmosphere in hPa.
+            Pressure of the atmosphere at observatory altitude in hPa.
         temperature: float
-            Temperature of the atmosphere in Celsius degrees.
+            Temperature of the atmosphere at observatory altitude in Celsius degrees.
+        lambda_min: float
+            Minimum wavelength for simulation in nm.
+        lambda_max: float
+            Maximum wavelength for simulation in nm.
 
         Examples
         --------
@@ -46,6 +50,8 @@ class Atmosphere:
         self.ozone = None
         self.aerosols = None
         self.transmission = lambda x: np.ones_like(x).astype(float)
+        self.lambda_min = lambda_min
+        self.lambda_max = lambda_max
         self.title = ""
         self.label = ""
 
@@ -62,19 +68,47 @@ class Atmosphere:
         """
         self.label = f'PWV={self.pwv:4.2f}mm, OZ={self.ozone:4.2f}DB, VAOD={self.aerosols:4.2f} '
 
-    def simulate(self, ozone, pwv, aerosols):
+    def set_lambda_range(self, lambdas):
+        """Reset the Atmosphere wavelength range for optimized computations.
+
+        Parameters
+        ----------
+        lambdas: array_like
+            Wavelength array in nm.
+
+        Examples
+        --------
+        >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5, lambda_min=350, lambda_max=1000)
+        >>> a.lambda_min
+        350
+        >>> a.lambda_max
+        1000
+        >>> a.set_lambda_range(np.arange(400, 810, 10))
+        >>> a.lambda_min
+        400
+        >>> a.lambda_max
+        800
+
+        """
+        self.lambda_min = int(np.min(lambdas))
+        self.lambda_max = int(np.ceil(np.max(lambdas)))
+
+    def simulate(self, aerosols, ozone, pwv, angstrom_exponent=None):
         """Simulate the atmosphere transparency with Libradtran given atmospheric composition.
 
         Values outside the Libradtran simulation range are set to zero.
 
         Parameters
         ----------
-        ozone: float
-            Ozone quantity in Dobson
-        pwv: float
-            Precipitable Water Vapor quantity in mm
         aerosols: float
-            VAOD Vertical Aerosols Optical Depth
+            VAOD Vertical Aerosols Optical Depth.
+        ozone: float
+            Ozone quantity in Dobson.
+        pwv: float
+            Precipitable Water Vapor quantity in mm.
+        angstrom_exponent: float, optional
+            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
+            If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
 
         Returns
         -------
@@ -83,30 +117,36 @@ class Atmosphere:
 
         Examples
         --------
-        >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
-        >>> transmission = a.simulate(ozone=400, pwv=5, aerosols=0.05)
+        >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5, lambda_min=350, lambda_max=1000)
+        >>> transmission = a.simulate(aerosols=0.05, ozone=400, pwv=5, angstrom_exponent=-1)
         >>> a.ozone
         400
         >>> a.pwv
         5
         >>> a.aerosols
         0.05
+        >>> transmission([350, 550, 600, 800, 950])
+        array([0.5035478, 0.8303832, 0.8381782, 0.9382188, 0.7130625])
         >>> a.plot_transmission()
+        >>> transmission_ang_exp = a.simulate(aerosols=0.05, ozone=400, pwv=5, angstrom_exponent=0.02)
+        >>> transmission_ang_exp([350, 550, 600, 800, 950])
+        array([0.5018349, 0.8318764, 0.839858 , 0.938896 , 0.7123196])
 
         .. doctest::
             :hide:
 
             >>> assert transmission is not None
+            >>> assert transmission_ang_exp is not None
             >>> assert a.transmission(500) > 0
+            >>> assert a.transmission(1100) == 0
 
         .. plot::
 
             from spectractor.simulation.atmosphere import Atmosphere
-            a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
+            a = Atmosphere(airmass=1.2, pressure=800, temperature=5, lambda_min=300, lambda_max=1000)
             transmission = a.simulate(ozone=400, pwv=5, aerosols=0.05)
             a.plot_transmission()
         """
-
         self.pwv = pwv
         self.ozone = ozone
         self.aerosols = aerosols
@@ -115,15 +155,18 @@ class Atmosphere:
         self.my_logger.debug(f'\n\t{self.title}\n\t\t{self.label}')
 
         lib = libradtran.Libradtran()
-        path = lib.simulate(self.airmass, pwv, ozone, aerosols, self.pressure)
-        data = np.loadtxt(path)
-        wl = data[:, 0]
-        atm = data[:, 1]
+        wl, atm = lib.simulate(self.airmass, aerosols, ozone, pwv, self.pressure, angstrom_exponent=angstrom_exponent,
+                               lambda_min=self.lambda_min, lambda_max=self.lambda_max)
         self.transmission = interp1d(wl, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
         return self.transmission
 
-    def plot_transmission(self):
+    def plot_transmission(self, lambdas=parameters.LAMBDAS):
         """Plot the atmospheric transmission computed with Libradtran.
+
+        Parameters
+        ----------
+        lambdas: array_like, optional
+            Array of wavelengths in nm (default: parameters.LAMBDAS).
 
         Examples
         --------
@@ -132,7 +175,7 @@ class Atmosphere:
         >>> a.plot_transmission()
 
         """
-        plot_transmission_simple(plt.gca(), parameters.LAMBDAS, self.transmission(parameters.LAMBDAS),
+        plot_transmission_simple(plt.gca(), lambdas, self.transmission(lambdas),
                                  title=self.title, label=self.label)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
@@ -140,79 +183,85 @@ class Atmosphere:
             plt.close('all')
 
 
-# ----------------------------------------------------------------------------------
 class AtmosphereGrid(Atmosphere):
 
-    def __init__(self, image_filename="", filename="", airmass=1., pressure=800., temperature=10.,
-                 pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
+    def __init__(self, image_filename="", spectrum_filename="", atmgrid_filename="",
+                 airmass=1., pressure=800., temperature=10.,
+                 pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10],
+                 lambdas=parameters.LAMBDAS):
         """Class to load and interpolate grids of atmospheric transmission computed with Libradtran.
 
         Parameters
         ----------
         image_filename: str, optional
             The original image fits file name from which the grid was computed or has to be computed (default: "").
-        filename: str, optional
+        spectrum_filename: str, optional
+            The file name of the spectrum fits file name from which the grid was computed or has to be computed (default: "").
+        atmgrid_filename: str, optional
             The file name of the atmospheric grid if it exists (default: "").
         airmass: float, optional
-            Airmass of the source object (default: 1).
+            Airmass of the source object (default: 1). Overwritten if spectrum_filename is given.
         pressure: float, optional
-            Pressure of the atmosphere in hPa (default: 800).
+            Pressure of the atmosphere at observatory altitude in hPa (default: 800). Overwritten if spectrum_filename is given.
         temperature: float, optional
-            Temperature of the atmosphere in Celsius degrees (default: 10).
-        pwv_grid: list
+            Temperature of the atmosphere at observatory altitude in Celsius degrees (default: 10). Overwritten if spectrum_filename is given.
+        pwv_grid: list, optional
             List of 3 numbers for the PWV quantity: min, max, number of simulations (default: [0, 10, 10]).
-        ozone_grid: list
+        ozone_grid: list, optional
             List of 3 numbers for the ozone quantity: min, max, number of simulations (default: [100, 700, 7]).
-        aerosol_grid: list
+        aerosol_grid: list, optional
             List of 3 numbers for the aerosol quantity: min, max, number of simulations (default: [0, 0.1, 10]).
+        lambdas: array_like, optional
+            Array of wavelengths (default: parameters.LAMBDAS).
 
         Examples
         --------
-        >>> a = AtmosphereGrid(filename='./tests/data/reduc_20170530_134_atmsim.fits')
+        >>> a = AtmosphereGrid(atmgrid_filename='./tests/data/reduc_20170530_134_atmsim.fits')
         >>> a.image_filename.split('/')[-1]
         'reduc_20170530_134_spectrum.fits'
         """
-        Atmosphere.__init__(self, airmass, pressure, temperature)
+        Atmosphere.__init__(self, airmass, pressure, temperature, lambda_min=np.min(lambdas), lambda_max=np.max(lambdas))
         self.my_logger = set_logger(self.__class__.__name__)
         self.image_filename = image_filename
-        self.filename = filename
-        # ------------------------------------------------------------------------
-        # Definition of data format for the atmospheric grid
-        # -----------------------------------------------------------------------------
+        if spectrum_filename != "":
+            self.image_filename = spectrum_filename
+        self.filename = atmgrid_filename
 
-        #  row 0 : count number
-        #  row 1 : aerosol value
-        #  row 2 : pwv value
-        #  row 3 : ozone value
-        #  row 4 : data start
-        self.index_atm_count = 0
-        self.index_atm_aer = 1
-        self.index_atm_pwv = 2
-        self.index_atm_oz = 3
-        self.index_atm_data = 4
+        # Definition of data format for the atmospheric grid
+        self.index_atm_count = 0  # row 0 : count number
+        self.index_atm_aer = 1  # row 1 : aerosol value
+        self.index_atm_pwv = 2  # row 2 : pwv value
+        self.index_atm_oz = 3  # row 3 : ozone value
+        self.index_atm_data = 4  # row 4 : data start
 
         # specify parameters for the atmospheric grid
+        self.lambdas = lambdas
+        self.model = None
         self.atmgrid = None
         self.NB_ATM_HEADER = self.index_atm_data + 1
-        self.NB_ATM_DATA = len(parameters.LAMBDAS) - 1
+        self.NB_ATM_DATA = len(self.lambdas) - 1
         self.NB_ATM_POINTS = 0
         self.AER_Points = np.array([])
         self.OZ_Points = np.array([])
         self.PWV_Points = np.array([])
-        self.set_grid(pwv_grid=pwv_grid, ozone_grid=ozone_grid, aerosol_grid=aerosol_grid)
 
-        # the interpolated grid
-        self.lambdas = parameters.LAMBDAS
-        self.model = None
+        # set the initial grid
+        self.set_grid(pwv_grid=pwv_grid, ozone_grid=ozone_grid, aerosol_grid=aerosol_grid, lambdas=self.lambdas)
 
         self.header = fits.Header()
-        if filename != "":
-            self.load_file(filename)
+        if atmgrid_filename != "":
+            self.load_file(atmgrid_filename)
+        if spectrum_filename != "":
+            hdr = fits.getheader(spectrum_filename)
+            self.pressure = hdr["OUTPRESS"]
+            self.temperature = hdr["OUTTEMP"]
+            self.airmass = hdr["AIRMASS"]
 
-    def set_grid(self, pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10]):
+    def set_grid(self, pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10],
+                 lambdas=parameters.LAMBDAS):
         """Set the size of the simulation grid self.atmgrid before compute it.
 
-        The first column of self.atmgrid will contain the wavelengths set by parameters.LAMBDAS,
+        The first column of self.atmgrid will contain the wavelengths set by lambdas argument,
         the other columns the future simulations.
 
         Parameters
@@ -223,7 +272,11 @@ class AtmosphereGrid(Atmosphere):
             List of 3 numbers for the ozone quantity: min, max, number of simulations (default: [100, 700, 7]).
         aerosol_grid: list
             List of 3 numbers for the aerosol quantity: min, max, number of simulations (default: [0, 0.1, 10]).
+        lambdas: array_like, optional
+            Array of wavelengths (default: parameters.LAMBDAS).
         """
+        self.lambdas = lambdas
+
         # aerosols
         NB_AER_POINTS = int(aerosol_grid[2])
         AER_MIN = float(aerosol_grid[0])
@@ -247,15 +300,14 @@ class AtmosphereGrid(Atmosphere):
         # total number of points
         self.NB_ATM_POINTS = NB_AER_POINTS * NB_OZ_POINTS * NB_PWV_POINTS
 
-        # create the numpy array that will contains the atmospheric grid
+        # create the numpy array that will contain the atmospheric grid
         self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_ATM_HEADER + self.NB_ATM_DATA))
-        self.atmgrid[0, self.index_atm_data:] = parameters.LAMBDAS
-        self.lambdas = parameters.LAMBDAS
+        self.atmgrid[0, self.index_atm_data:] = self.lambdas
 
     def compute(self):
         """Compute atmospheric transmissions and fill self.atmgrid.
 
-        The wavelengths used for the computation are the ones set by parameters.LAMBDAS.
+        The wavelengths used for the computation are the ones set by self.lambdas.
 
         Returns
         -------
@@ -268,10 +320,7 @@ class AtmosphereGrid(Atmosphere):
         ... pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
         >>> atmospheric_grid = a.compute()
         >>> atmospheric_grid  # doctest: +ELLIPSIS
-        array([[0.000000e+00, 0.000000e+00, 0.000000e+00, ..., 1.099400e+03,
-                1.099600e+03, 1.099800e+03],
-               [1.000000e+00, 0.000000e+00, 5.000000e+00, ..., 9.520733e-01,
-                9.520733e-01, 9.520733e-01],
+        array([[0.000000e+00, ...
                ...])
         >>> a.save_file(a.image_filename.replace('.fits', '_atmsim.fits'))
         >>> a.plot_transmission()
@@ -287,6 +336,7 @@ class AtmosphereGrid(Atmosphere):
         .. doctest::
             :hide:
 
+            >>> assert os.path.isfile(a.image_filename.replace('.fits', '_atmsim.fits'))
             >>> assert np.all(np.isclose(a.atmgrid[0, a.index_atm_data:], parameters.LAMBDAS))
             >>> assert not np.any(np.isclose(a.atmgrid[1, a.index_atm_data:],
             ... np.zeros_like(parameters.LAMBDAS), rtol=1e-6))
@@ -305,19 +355,22 @@ class AtmosphereGrid(Atmosphere):
                     self.atmgrid[count, self.index_atm_aer] = aer
                     self.atmgrid[count, self.index_atm_pwv] = pwv
                     self.atmgrid[count, self.index_atm_oz] = oz
-                    transmission = super(AtmosphereGrid, self).simulate(oz, pwv, aer)
-                    transm = transmission(parameters.LAMBDAS)
+                    transmission = super(AtmosphereGrid, self).simulate(aerosols=aer, ozone=oz, pwv=pwv)
+                    transm = transmission(self.lambdas)
                     self.atmgrid[count, self.index_atm_data:] = transm  # each of atmospheric spectrum
         return self.atmgrid
 
-    def plot_transmission(self):
+    def plot_transmission(self, lambdas=parameters.LAMBDAS):
         """Plot the atmospheric transmission contained in the grid.
+
+        Parameters
+        ----------
+        lambdas: array_like, optional
+            Array of wavelengths in nm (default: parameters.LAMBDAS).
 
         Examples
         --------
-        >>> a = AtmosphereGrid(image_filename='tests/data/reduc_20170605_028.fits',
-        ... pwv_grid=[5, 5, 1], ozone_grid=[400, 400, 1], aerosol_grid=[0.0, 0.1, 2])
-        >>> atmospheric_grid = a.compute()
+        >>> a = AtmosphereGrid(atmgrid_filename='tests/data/reduc_20170530_134_atmsim.fits')
         >>> a.plot_transmission()
 
         .. plot::
@@ -335,7 +388,7 @@ class AtmosphereGrid(Atmosphere):
             label = f'PWV={self.atmgrid[int(count), self.index_atm_pwv]} ' \
                     f'OZ={self.atmgrid[int(count), self.index_atm_oz]} ' \
                     f'VAOD={self.atmgrid[int(count), self.index_atm_aer]}'
-            plot_transmission_simple(plt.gca(), self.lambdas, self.atmgrid[int(count), self.index_atm_data:],
+            plot_transmission_simple(plt.gca(), lambdas, np.interp(lambdas, self.lambdas, self.atmgrid[int(count), self.index_atm_data:]),
                                      title="Atmospheric grid", label=label)
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
@@ -347,7 +400,7 @@ class AtmosphereGrid(Atmosphere):
 
         Examples
         --------
-        >>> a = AtmosphereGrid(filename='tests/data/reduc_20170530_134_atmsim.fits')
+        >>> a = AtmosphereGrid(atmgrid_filename='tests/data/reduc_20170530_134_atmsim.fits')
         >>> a.plot_transmission_image()
 
         .. plot::
@@ -422,12 +475,9 @@ class AtmosphereGrid(Atmosphere):
             hdr['OZMIN'] = self.OZ_Points.min()
             hdr['OZMAX'] = self.OZ_Points.max()
 
-            hdr['AER_PTS'] = np.array_str(self.AER_Points)
-            hdr['PWV_PTS'] = np.array_str(self.PWV_Points)
-            hdr['OZ_PTS'] = np.array_str(self.OZ_Points)
-            hdr['NBWLBIN'] = parameters.LAMBDAS.size
-            hdr['WLMIN'] = parameters.LAMBDA_MIN
-            hdr['WLMAX'] = parameters.LAMBDA_MAX
+            hdr['NBWLBIN'] = self.lambdas.size
+            hdr['WLMIN'] = np.min(self.lambdas)
+            hdr['WLMAX'] = np.max(self.lambdas)
 
             hdr['IDX_CNT'] = self.index_atm_count
             hdr['IDX_AER'] = self.index_atm_aer
@@ -474,17 +524,12 @@ class AtmosphereGrid(Atmosphere):
             hdu = fits.open(self.filename)
             hdr = hdu[0].header
             self.header = hdr
-
-            # hdr['ATMSIM'] = "libradtran"
-            # hdr['SIMVERS'] = "2.0.1"
             self.image_filename = hdr['DATAFILE']
-            # hdr['SIMUFILE']=os.path.basename(self.file_name)
 
             self.airmass = hdr['AIRMASS']
             self.pressure = hdr['PRESSURE']
             self.temperature = hdr['TEMPERAT']
 
-            # hope those are the same parameters : TBD !!!!
             self.NB_ATM_POINTS = hdr['NBATMPTS']
 
             NB_AER_POINTS = hdr['NBAERPTS']
@@ -504,8 +549,6 @@ class AtmosphereGrid(Atmosphere):
             self.PWV_Points = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
 
             NBWLBINS = hdr['NBWLBIN']
-            # WLMIN = hdr['WLMIN']
-            # WLMAX = hdr['WLMAX']
 
             self.index_atm_count = hdr['IDX_CNT']
             self.index_atm_aer = hdr['IDX_AER']
@@ -526,7 +569,7 @@ class AtmosphereGrid(Atmosphere):
                                                                NB_OZ_POINTS,
                                                                len(self.lambdas))).T, bounds_error=False, fill_value=0)
 
-    def simulate(self, ozone, pwv, aerosols):
+    def simulate(self, ozone, pwv, aerosols, angstrom_exponent=None):
         """Interpolate from the atmospheric grid to get the atmospheric transmission.
 
         First ozone, second pwv, last aerosols, to respect order of loops when generating the grid
@@ -534,11 +577,14 @@ class AtmosphereGrid(Atmosphere):
         Parameters
         ----------
         ozone: float
-            Ozone quantity in Dobson
+            Ozone quantity in Dobson.
         pwv: float
-            Precipitable Water Vapor quantity in mm
+            Precipitable Water Vapor quantity in mm.
         aerosols: float
-            VAOD Vertical Aerosols Optical Depth
+            VAOD Vertical Aerosols Optical Depth.
+        angstrom_exponent: float, optional
+            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used. If value is 0.0192,
+            atmospheric transmission is very close to the case angstrom_exponent negative (default: None).
 
         Examples
         --------
@@ -550,7 +596,7 @@ class AtmosphereGrid(Atmosphere):
             >>> from spectractor import parameters
             >>> import numpy as np
             >>> import matplotlib.pyplot as plt
-            >>> a = AtmosphereGrid(filename='tests/data/reduc_20170530_134_atmsim.fits')
+            >>> a = AtmosphereGrid(atmgrid_filename='tests/data/reduc_20170530_134_atmsim.fits')
             >>> lambdas = np.arange(200, 1200)
             >>> fig = plt.figure()
             >>> for pwv in np.arange(5):
@@ -559,6 +605,9 @@ class AtmosphereGrid(Atmosphere):
             ...     title=a.title, label=a.label)
             >>> if parameters.DISPLAY: plt.show()
         """
+        if angstrom_exponent is not None and angstrom_exponent > 0:
+            raise ValueError(f"Angstrom exponent not implemented in AtmosphericGrid() yet. "
+                             f"Please provide angstrom_exponent=None. Got {angstrom_exponent=} instead.")
         self.pwv = pwv
         self.ozone = ozone
         self.aerosols = aerosols

@@ -1,27 +1,31 @@
 from scipy.signal import argrelextrema, savgol_filter
 from scipy.interpolate import interp1d
 from astropy.io import fits
+from astropy.table import Table
 from scipy import integrate
 from iminuit import Minuit
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import random
+import string
 import astropy
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config, apply_rebinning_to_parameters
+from spectractor.config import set_logger, load_config, update_derived_parameters, apply_rebinning_to_parameters
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
-                               rescale_x_for_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
+                               rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 from spectractor.simulation.throughput import TelescopeTransmission
 
 
-fits_mappings = {'date_obs': 'DATE-OBS',
+fits_mappings = {'config': 'CONFIG',
+                 'date_obs': 'DATE-OBS',
                  'expo': 'EXPTIME',
                  'airmass': 'AIRMASS',
                  'disperser_label': 'GRATING',
@@ -34,6 +38,18 @@ fits_mappings = {'date_obs': 'DATE-OBS',
                  'humidity': 'OUTHUM',
                  'lambda_ref': 'LBDA_REF',
                  'parallactic_angle': 'PARANGLE',
+                 'filter_label': 'FILTER',
+                 'camera_angle': 'CAM_ROT',
+                 'spectrogram_x0': 'S_X0',
+                 'spectrogram_y0': 'S_Y0',
+                 'spectrogram_xmin': 'S_XMIN',
+                 'spectrogram_xmax': 'S_XMAX',
+                 'spectrogram_ymin': 'S_YMIN',
+                 'spectrogram_ymax': 'S_YMAX',
+                 'spectrogram_Nx': 'S_NX',
+                 'spectrogram_Ny': 'S_NY',
+                 'spectrogram_deg': 'S_DEG',
+                 'spectrogram_saturation': 'S_SAT'
                  }
 
 
@@ -58,12 +74,10 @@ class Spectrum:
         Spectrum amplitude covariance matrix between wavelengths in self.units units.
     lambdas_binwidths: array
         Bin widths of the wavelength array in nm.
-    lambdas_order2: array
-        Spectrum wavelengths for order 2 contamination in nm.
-    data_order2: array
-        Spectrum amplitude array  for order 2 contamination in self.units units.
-    err_order2: array
-        Spectrum amplitude uncertainties  for order 2 contamination in self.units units.
+    data_next_order: array
+        Spectrum amplitude array for next diffraction order in self.units units.
+    err_next_order: array
+        Spectrum amplitude uncertainties for next diffraction order in self.units units.
     lambda_ref: float
         Reference wavelength for ADR computations in nm.
     order: int
@@ -88,6 +102,8 @@ class Spectrum:
         Dispersion axis angle in the image in degrees, positive if anticlockwise.
     parallactic_angle: float
         Parallactic angle in degrees.
+    camera_angle: float
+        The North-West axe angle with respect to the camera horizontal axis in degrees.
     lines: Lines
         Lines instance that contains data on the emission or absorption lines to be searched and fitted in the spectrum.
     header: Fits.Header
@@ -97,9 +113,9 @@ class Spectrum:
     target: Target
         Target instance that describes the current exposure.
     dec: float
-        Declination coordinate of the current exposure.
+        Declination coordinate of the current exposure in degrees.
     hour_angle float
-        Hour angle coordinate of the current exposure.
+        Hour angle coordinate of the current exposure in degrees.
     temperature: float
         Outside temperature in Celsius degrees.
     pressure: float
@@ -144,6 +160,9 @@ class Spectrum:
                  spectrogram_file_name_override=None,
                  psf_file_name_override=None,):
         """ Class used to store information and methods relative to spectra and their extraction.
+        If a file name is provided, for Spectractor software version strictly below 2.4 one must provide
+        a config file also, otherwise do not set a config file (default).
+        Config parameters are loaded from file header since version 2.4.
 
         Parameters
         ----------
@@ -160,27 +179,30 @@ class Spectrum:
             A config file name to load some parameter values for a given instrument (default: "").
         fast_load: bool, optional
             If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
+        config: str, optional
+            If empty, load the config from the spectrum file if it exists, otherwise load the config from the given config file (deftault: '').
 
         Examples
         --------
         Load a spectrum from a fits file
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='./tests/data/reduc_20170530_134_spectrum.fits', config="")
         >>> print(s.order)
         1
         >>> print(s.target.label)
-        PNG321.0+3.9
+        HD111980
         >>> print(s.disperser_label)
-        HoloPhAg
+        HoloAmAg
 
         Load a spectrum from a fits image file
         >>> from spectractor.extractor.images import Image
-        >>> image = Image('tests/data/reduc_20170605_028.fits', target_label='PNG321.0+3.9')
+        >>> image = Image('tests/data/reduc_20170605_028.fits', target_label='PNG321.0+3.9', config="./config/ctio.ini")
         >>> s = Spectrum(image=image)
         >>> print(s.target.label)
         PNG321.0+3.9
         """
         self.fast_load = fast_load
         self.my_logger = set_logger(self.__class__.__name__)
+        self.config = config
         if config != "":
             load_config(config)
         self.target = target
@@ -192,7 +214,7 @@ class Spectrum:
         self.lambdas = None
         self.lambdas_binwidths = None
         self.lambdas_indices = None
-        self.lambda_ref = None
+        self.lambda_ref = 550
         self.order = order
         self.chromatic_psf = None
         self.filter_label = ""
@@ -203,6 +225,7 @@ class Spectrum:
         self.chromatic_psf = ChromaticPSF(self.psf, Nx=1, Ny=1, deg=1, saturation=1)
         self.rotation_angle = 0
         self.parallactic_angle = None
+        self.camera_angle = 0
         self.spectrogram = None
         self.spectrogram_bgd = None
         self.spectrogram_bgd_rms = None
@@ -219,9 +242,8 @@ class Spectrum:
         self.spectrogram_saturation = None
         self.spectrogram_Nx = None
         self.spectrogram_Ny = None
-        self.lambdas_order2 = None
-        self.data_order2 = None
-        self.err_order2 = None
+        self.data_next_order = None
+        self.err_next_order = None
         self.dec = None
         self.hour_angle = None
         self.temperature = None
@@ -232,7 +254,7 @@ class Spectrum:
         if file_name != "":
             self.load_spectrum(file_name,
                                spectrogram_file_name_override=spectrogram_file_name_override,
-                               psf_file_name_override=psf_file_name_override)
+                               psf_file_name_override=psf_file_name_override, fast_load=fast_load)
         if image is not None:
             self.header = image.header
             self.date_obs = image.date_obs
@@ -250,6 +272,7 @@ class Spectrum:
             self.units = image.units
             self.gain = image.gain
             self.rotation_angle = image.rotation_angle
+            self.camera_angle = parameters.OBS_CAMERA_ROTATION
             self.my_logger.info('\n\tSpectrum info copied from image')
             self.dec = image.dec
             self.hour_angle = image.hour_angle
@@ -259,7 +282,13 @@ class Spectrum:
             self.parallactic_angle = image.parallactic_angle
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
                                self.humidity, self.airmass]
-        self.load_filter()
+
+        t = self.load_filter()
+        if self.target is not None and len(self.target.spectra) > 0:
+            spec = self.target.spectra[0] * t.transmission(self.target.wavelengths[0])
+            lambda_ref = np.sum(self.target.wavelengths[0] * spec) / np.sum(spec)
+            self.lambda_ref = lambda_ref
+            self.header['LBDA_REF'] = lambda_ref
 
     def convert_from_ADUrate_to_flam(self):
         """Convert units from ADU/s to erg/s/cm^2/nm.
@@ -267,7 +296,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits', config="./config/ctio.ini")
         >>> s.convert_from_ADUrate_to_flam()
 
         .. doctest::
@@ -288,10 +317,9 @@ class Spectrum:
         if self.cov_matrix is not None:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix /= ldl_mat
-        if self.data_order2 is not None:
-            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.abs(np.gradient(self.lambdas_order2))
-            self.data_order2 /= ldl_2
-            self.err_order2 /= ldl_2
+        if self.data_next_order is not None:
+            self.data_next_order /= ldl
+            self.err_next_order /= ldl
         self.units = 'erg/s/cm$^2$/nm'
 
     def convert_from_flam_to_ADUrate(self):
@@ -300,7 +328,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits', config="./config/ctio.ini")
         >>> s.convert_from_flam_to_ADUrate()
 
         .. doctest::
@@ -321,10 +349,9 @@ class Spectrum:
         if self.cov_matrix is not None:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix *= ldl_mat
-        if self.data_order2 is not None:
-            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.abs(np.gradient(self.lambdas_order2))
-            self.data_order2 *= ldl_2
-            self.err_order2 *= ldl_2
+        if self.data_next_order is not None:
+            self.data_next_order *= ldl
+            self.err_next_order *= ldl
         self.units = 'ADU/s'
 
     def load_filter(self):
@@ -332,20 +359,21 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum()
+        >>> s = Spectrum(config="./config/ctio.ini")
         >>> s.filter_label = 'FGB37'
-        >>> s.load_filter()
+        >>> _ = s.load_filter()
 
         .. doctest::
             :hide:
 
-            >>> assert np.isclose(parameters.LAMBDA_MIN, 300)
-            >>> assert np.isclose(parameters.LAMBDA_MAX, 760)
+            >>> assert np.isclose(parameters.LAMBDA_MIN, 358, atol=1)
+            >>> assert np.isclose(parameters.LAMBDA_MAX, 760, atol=1)
 
         """
+        t = TelescopeTransmission(filter_label=self.filter_label)
         if self.filter_label != "" and "empty" not in self.filter_label.lower():
-            t = TelescopeTransmission(filter_label=self.filter_label)
             t.reset_lambda_range(transmission_threshold=1e-4)
+        return t
 
     def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False):
         """Plot spectrum with emission and absorption lines.
@@ -379,18 +407,13 @@ class Spectrum:
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
-        if self.lambdas_order2 is not None:
-            distance = self.disperser.grating_lambda_to_pixel(self.lambdas_order2, self.x0, order=2)
-            lambdas_order2_contamination = self.disperser.grating_pixel_to_lambda(distance, self.x0, order=1)
-            data_order2_contamination = self.data_order2 * (self.lambdas_order2 * np.gradient(self.lambdas_order2)) \
-                                        / (lambdas_order2_contamination * np.gradient(lambdas_order2_contamination))
-            if np.sum(data_order2_contamination) / np.sum(self.data) > 0.01:
-                data_interp = interp1d(self.lambdas, self.data, kind="linear", fill_value="0", bounds_error=False)
-                plot_spectrum_simple(ax, lambdas_order2_contamination,
-                                     data_interp(lambdas_order2_contamination) + data_order2_contamination,
-                                     data_err=None, xlim=xlim, label='Order 2 contamination', linestyle="--", lw=1)
+        if self.data_next_order is not None and np.sum(self.data_next_order) > 0.05 * np.sum(self.data):
+            distance = self.disperser.grating_lambda_to_pixel(self.lambdas, self.x0, order=parameters.SPEC_ORDER+1)
+            max_index = np.argmin(np.abs(distance + self.x0[0] - parameters.CCD_IMSIZE))
+            plot_spectrum_simple(ax, self.lambdas[:max_index], self.data_next_order[:max_index], data_err=self.err_next_order[:max_index],
+                                 xlim=xlim, label=f'Order {parameters.SPEC_ORDER+1} spectrum', linestyle="--", lw=1, color="firebrick")
         plot_spectrum_simple(ax, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
-                             title=title, units=self.units)
+                             title=title, units=self.units, lw=1, linestyle="-")
         if len(self.target.spectra) > 0:
             for k in range(len(self.target.spectra)):
                 plot_indices = np.logical_and(self.target.wavelengths[k] > np.min(self.lambdas),
@@ -407,7 +430,7 @@ class Spectrum:
         plt.gcf().tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, f'{self.target.label}_spectrum.pdf'))
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             if live_fit:
                 plt.draw()
                 plt.pause(1e-8)
@@ -449,7 +472,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits')
+        >>> s = Spectrum(file_name='tests/data/reduc_20170605_028_spectrum.fits', config="ctio.ini")
         >>> s.plot_spectrogram()
         >>> if parameters.DISPLAY: plt.show()
 
@@ -468,9 +491,9 @@ class Spectrum:
             data = np.copy(self.spectrogram_err)
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
                           target_pixcoords=target_pixcoords, aspect=aspect, vmin=vmin, vmax=vmax, cmap=cmap)
-        if parameters.DISPLAY:
+        if parameters.DISPLAY:  # pragma: no cover
             plt.show()
-        if parameters.PdfPages:
+        if parameters.PdfPages:  # pragma: no cover
             parameters.PdfPages.savefig()
 
     def save_spectrum(self, output_file_name, overwrite=False):
@@ -503,6 +526,8 @@ class Spectrum:
             >>> assert os.path.isfile('./tests/test.fits')
             >>> os.remove('./tests/test.fits')
         """
+        from spectractor._version import __version__
+        self.header["VERSION"] = str(__version__)
         self.header["REBIN"] = parameters.CCD_REBIN
         self.header.comments['REBIN'] = 'original image rebinning factor to get spectrum.'
         self.header['UNIT1'] = "nanometer"
@@ -517,34 +542,91 @@ class Spectrum:
             try:
                 value = getattr(self, attribute)
             except AttributeError:
-                print(f"Failed to get {attribute}")
+                self.my_logger.warning(f"Failed to get {attribute}")
                 continue
             if isinstance(value, astropy.coordinates.angles.Angle):
                 value = value.degree
             hdu1.header[header_key] = value
-            print(f"Set header key {header_key} to {value} from attr {attribute}")
+            # print(f"Set header key {header_key} to {value} from attr {attribute}")
 
-        hdu1.header["EXTNAME"] = "SPECTRUM"
-        hdu2 = fits.ImageHDU()
-        hdu2.header["EXTNAME"] = "SPEC_COV"
-        hdu3 = fits.ImageHDU()
-        hdu3.header["EXTNAME"] = "ORDER2"
-        hdu4 = fits.ImageHDU()
-        hdu4.header["EXTNAME"] = "ORDER0"
-        hdu1.data = [self.lambdas, self.data, self.err]
-        hdu2.data = self.cov_matrix
-        hdu3.data = [self.lambdas_order2, self.data_order2, self.err_order2]
-        hdu4.data = self.target.image
-        hdu4.header["IM_X0"] = self.target.image_x0
-        hdu4.header["IM_Y0"] = self.target.image_y0
-        hdu = fits.HDUList([hdu1, hdu2, hdu3, hdu4])
-        output_directory = '/'.join(output_file_name.split('/')[:-1])
-        ensure_dir(output_directory)
+        extnames = ["SPECTRUM", "SPEC_COV", "ORDER2", "ORDER0"]  # spectrum data
+        extnames += ["S_DATA", "S_ERR", "S_BGD", "S_BGD_ER", "S_FIT", "S_RES"]  # spectrogram data
+        extnames += ["PSF_TAB"]  # PSF parameter table
+        extnames += ["LINES"]  # spectroscopic line table
+        extnames += ["CONFIG"]  # config parameters
+        hdus = {"SPECTRUM": hdu1}
+        for k, extname in enumerate(extnames):
+            if extname == "SPECTRUM":
+                hdus[extname].data = [self.lambdas, self.data, self.err]
+                continue
+            hdus[extname] = fits.ImageHDU()
+            if extname == "SPEC_COV":
+                hdus[extname].data = self.cov_matrix
+            elif extname == "ORDER2":
+                hdus[extname].data = [self.lambdas, self.data_next_order, self.err_next_order]
+            elif extname == "ORDER0":
+                hdus[extname].data = self.target.image
+                hdus[extname].header["IM_X0"] = self.target.image_x0
+                hdus[extname].header["IM_Y0"] = self.target.image_y0
+            elif extname == "S_DATA":
+                hdus[extname].data = self.spectrogram
+                hdus[extname].header['UNIT1'] = self.units
+            elif extname == "S_ERR":
+                hdus[extname].data = self.spectrogram_err
+            elif extname == "S_BGD":
+                hdus[extname].data = self.spectrogram_bgd
+            elif extname == "S_BGD_ER":
+                hdus[extname].data = self.spectrogram_bgd_rms
+            elif extname == "S_FIT":
+                hdus[extname].data = self.spectrogram_fit
+            elif extname == "S_RES":
+                hdus[extname].data = self.spectrogram_residuals
+            elif extname == "PSF_TAB":
+                hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
+            elif extname == "LINES":
+                tab = self.lines.print_detected_lines(amplitude_units=self.units, print_table=False)
+                hdus[extname] = fits.table_to_hdu(tab)
+            elif extname == "CONFIG":
+                # HIERARCH and CONTINUE not compatible together in FITS headers
+                # We must use short keys built by parametersToShortKeyedDict and use CONTINUE
+                # waiting for cfitsio upgrade
+                # Store the parameter translation <-> shortkeys
+                for item in dir(parameters):
+                    if item.startswith("__") or item[0].islower():  # ignore the special stuff
+                        continue
+                    if item in parameters.STYLE_PARAMETERS:  # don't save plot or verbosity parameters
+                        continue
+                    try:
+                        value = getattr(parameters, item)
+                        if isinstance(value, astropy.coordinates.angles.Angle):
+                            value = value.degree
+                        if isinstance(value, astropy.units.quantity.Quantity):
+                            value = value.value
+                        if isinstance(value, (np.ndarray, list)):
+                            continue
+                        if not isinstance(value, (float, int, str, np.ndarray, list)):
+                            raise ValueError(f"Can't handle {parameters.item} type {type(parameters.item)}.")
+                    except AttributeError:
+                        raise KeyError(f"Failed to get parameters.{item}.")
+                    if len(item) > 8:
+                        fits_longkey = "HIERARCH " + item
+                        char_set = string.ascii_uppercase + string.digits
+                        while (shortkey := "X_" + ''.join(random.sample(char_set * 6, 6))) in hdus[extname].header.values():
+                            pass
+                        hdus[extname].header[fits_longkey] = shortkey
+                        hdus[extname].header[shortkey] = value
+                    else:
+                        hdus[extname].header[item] = value
+            else:
+                raise ValueError(f"Unknown EXTNAME extension: {extname}.")
+            hdus[extname].header["EXTNAME"] = extname
+        hdu = fits.HDUList([hdus[extname] for extname in extnames])
+        ensure_dir(os.path.dirname(output_file_name))
         hdu.writeto(output_file_name, overwrite=overwrite)
         self.my_logger.info(f'\n\tSpectrum saved in {output_file_name}')
 
-    def save_spectrogram(self, output_file_name, overwrite=False):
-        """Save the spectrogram into a fits file (data, error and background).
+    def save_spectrogram(self, output_file_name, overwrite=False):  # pragma: no cover
+        """OBOSOLETE: save the spectrogram into a fits file (data, error and background).
 
         Parameters
         ----------
@@ -594,105 +676,200 @@ class Spectrum:
         self.my_logger.info('\n\tSpectrogram saved in %s' % output_file_name)
 
     def load_spectrum(self, input_file_name, spectrogram_file_name_override=None,
-                      psf_file_name_override=None):
+                      psf_file_name_override=None, fast_load=False):
         """Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
         ----------
         input_file_name: str
             Path to the input fits file
-
         spectrogram_file_name_override : str
             Manually specify a path to the spectrogram file.
-
         psf_file_name_override : str
             Manually specify a path to the psf file.
+        fast_load: bool, optional
+            If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
 
         Examples
         --------
-        >>> s = Spectrum()
+
+        # Latest Spectractor output format: do not provide a config file (parameters are loaded from file header)
+        >>> from spectractor import parameters
+        >>> s = Spectrum(config="")
+        >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+
+        .. doctest::
+            :hide:
+
+            >>> assert parameters.OBS_CAMERA_ROTATION == s.header["CAM_ROT"]
+            >>> assert parameters.CCD_REBIN == s.header["REBIN"]
+            >>> assert s.parallactic_angle == s.header["PARANGLE"]
+
+        # Spectractor output format older than version <=2.3: must give the config file
+        >>> parameters.VERBOSE = False
+        >>> s = Spectrum(config="./config/ctio.ini")
+        >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
+        >>> print(s.units)
+        erg/s/cm$^2$/nm
+
+        .. doctest::
+            :hide:
+
+            >>> assert parameters.OBS_CAMERA_ROTATION == s.header["CAM_ROT"]
+            >>> assert parameters.CCD_REBIN == s.header["REBIN"]
+            >>> assert s.parallactic_angle == s.header["PARANGLE"]
+
+        """
+        self.fast_load = fast_load
+        if not os.path.isfile(input_file_name):
+            raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
+
+        self.header, raw_data = load_fits(input_file_name)
+        # check the version of the file
+        if "VERSION" in self.header:
+            from spectractor._version import __version__
+            if self.config != "":
+                raise AttributeError(f"With Spectractor above 2.4 do not provide a config file in Spectrum(config=...)."
+                                     "Now config parameters are loaded from the file header. Got {self.config=}.")
+            if self.header["VERSION"] != str(__version__):
+                self.my_logger.warning(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
+                                       f"different from current Spectractor software {__version__}.")
+            self.load_spectrum_latest(input_file_name)
+        else:
+            self.my_logger.warning("\n\tNo information about Spectractor software version is given in the header. "
+                                   "Use old load function.")
+            if self.config == "":
+                raise AttributeError("With old Spectrum files you must provide a config file in Spectrum(config=...).")
+            self.load_spectrum_older_24(input_file_name, spectrogram_file_name_override=spectrogram_file_name_override,
+                                        psf_file_name_override=psf_file_name_override)
+
+    def load_spectrum_older_24(self, input_file_name, spectrogram_file_name_override=None,
+                               psf_file_name_override=None, fast_load=False):
+        """Load the spectrum from a FITS file (data, error and wavelengths) from Spectrum files generated
+        with Spectractor software strictly older than 2.4 version. The parameters must be loaded via the config files.
+
+        Parameters
+        ----------
+        input_file_name: str
+            Path to the input fits file
+        spectrogram_file_name_override : str
+            Manually specify a path to the spectrogram file.
+        psf_file_name_override : str
+            Manually specify a path to the psf file.
+        fast_load: bool, optional
+            If True, only the spectrum is loaded (not the PSF nor the spectrogram data) (default: False).
+
+        Examples
+        --------
+        >>> s = Spectrum(config="./config/ctio.ini")
         >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
         >>> print(s.units)
         erg/s/cm$^2$/nm
         """
-        if os.path.isfile(input_file_name):
-            self.header, raw_data = load_fits(input_file_name)
-            self.lambdas = raw_data[0]
-            self.lambdas_binwidths = np.gradient(self.lambdas)
-            self.data = raw_data[1]
-            if len(raw_data) > 2:
-                self.err = raw_data[2]
+        self.fast_load = fast_load
+        if not os.path.isfile(input_file_name):
+            raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
 
-            # set the simple items from the mappings. More complex items, i.e.
-            # those needing function calls, follow
-            for attribute, header_key in fits_mappings.items():
-                if (item := self.header.get(header_key)) is not None:
-                    setattr(self, attribute, item)
-                    print(f'set {attribute} to {item}')
-                else:
-                    print(f'Failed to set spectrum attribute {attribute} using header {header_key}')
+        self.header, raw_data = load_fits(input_file_name)
+        self.lambdas = raw_data[0]
+        self.lambdas_binwidths = np.gradient(self.lambdas)
+        self.data = raw_data[1]
+        if len(raw_data) > 2:
+            self.err = raw_data[2]
+            self.cov_matrix = np.diag(self.err ** 2)
 
-            # set the more complex items by hand here
-            if target := self.header.get('TARGET'):
-                self.target = load_target(target, verbose=parameters.VERBOSE)
-                self.lines = self.target.lines
-            if (targetx := self.header.get('TARGETX')) and (targety := self.header.get('TARGETY')):
-                self.x0 = [targetx, targety]  # should be a tuple not a list
-            if rebin := self.header.get('CCDREBIN'):
-                if parameters.CCD_REBIN != rebin:
-                    raise ValueError("Different values of rebinning parameters between config file and header. Choose.")
-                parameters.CCD_REBIN = rebin
-            if dist := self.header.get('D2CCD'):
-                parameters.DISTANCE2CCD = float(dist)
+        # set the config parameters first
+        if "CAM_ROT" in self.header:
+            parameters.OBS_CAMERA_ROTATION = float(self.header["CAM_ROT"])
+        else:
+            self.my_logger.warning("\n\tNo information about camera rotation in Spectrum header.")
+        if self.header.get('CCDREBIN'):
+            if parameters.CCD_REBIN != self.header.get('CCDREBIN'):
+                raise ValueError("Different values of rebinning parameters between config file and header. Choose.")
+            parameters.CCD_REBIN = self.header.get('CCDREBIN')
+        if self.header.get('D2CCD'):
+            parameters.DISTANCE2CCD = float(self.header.get('D2CCD'))
 
-            self.my_logger.info('\n\tLoading disperser %s...' % self.disperser_label)
-            self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
-                                      data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
-            self.my_logger.info('\n\tSpectrum loaded from %s' % input_file_name)
-            if parameters.OBS_OBJECT_TYPE == "STAR":
-                self.adr_params = [self.dec, self.hour_angle, self.temperature,
-                                   self.pressure, self.humidity, self.airmass]
+        # set the simple items from the mappings. More complex items, i.e.
+        # those needing function calls, follow
+        for attribute, header_key in fits_mappings.items():
+            if self.header.get(header_key) is not None:
+                setattr(self, attribute, self.header.get(header_key))
+            else:
+                self.my_logger.warning(f'\n\tFailed to set spectrum attribute {attribute} using header {header_key}')
 
+        # set the more complex items by hand here
+        if self.header.get('TARGET'):
+            self.target = load_target(self.header.get('TARGET'), verbose=parameters.VERBOSE)
+            self.lines = self.target.lines
+        if self.header.get('TARGETX') and self.header.get('TARGETY'):
+            self.x0 = [self.header.get('TARGETX'), self.header.get('TARGETY')]  # should be a tuple not a list
+        self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
+        self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
+                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+        self.my_logger.info(f'\n\tSpectrum loaded from {input_file_name}')
+        if parameters.OBS_OBJECT_TYPE == "STAR":
+            self.adr_params = [self.dec, self.hour_angle, self.temperature,
+                               self.pressure, self.humidity, self.airmass]
+
+        self.psf = load_PSF(psf_type=parameters.PSF_TYPE, target=self.target)
+        self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
+                                          x0=self.spectrogram_x0, y0=self.spectrogram_y0,
+                                          deg=self.spectrogram_deg, saturation=self.spectrogram_saturation)
+        if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
+            self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
+
+        # original, hard-coded spectrogram/table relative paths
+        spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
+        psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
+        if spectrogram_file_name_override and psf_file_name_override:
+            self.fast_load = False
+            spectrogram_file_name = spectrogram_file_name_override
+            psf_file_name = psf_file_name_override
+
+        if not self.fast_load:
             hdu_list = fits.open(input_file_name)
+            # load other spectrum info
             if len(hdu_list) > 1:
                 self.cov_matrix = hdu_list["SPEC_COV"].data
                 if len(hdu_list) > 2:
-                    self.lambdas_order2, self.data_order2, self.err_order2 = hdu_list["ORDER2"].data
+                    _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
                     if len(hdu_list) > 3:
                         self.target.image = hdu_list["ORDER0"].data
                         self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
                         self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
-            else:
-                self.cov_matrix = np.diag(self.err ** 2)
-
-            # original, hard-coded spectrogram/table relative paths
-            spectrogram_file_name = input_file_name.replace('spectrum', 'spectrogram')
-            psf_file_name = input_file_name.replace('spectrum.fits', 'table.csv')
-
-            # for LSST-DM supplied filenames
-            if spectrogram_file_name_override and psf_file_name_override:
-                self.fast_load = False
-                spectrogram_file_name = spectrogram_file_name_override
-                psf_file_name = psf_file_name_override
-                self.my_logger.info(f'Applying spectrogram filename override {spectrogram_file_name}')
-                self.my_logger.info(f'Applying psf filename override {psf_file_name}')
-
-            if not self.fast_load:
+            # load spectrogram info
+            if len(hdu_list) > 4:
+                self.spectrogram = hdu_list["S_DATA"].data
+                self.spectrogram_err = hdu_list["S_ERR"].data
+                self.spectrogram_bgd = hdu_list["S_BGD"].data
+                if len(hdu_list) > 7:
+                    self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
+                    self.spectrogram_fit = hdu_list["S_FIT"].data
+                    self.spectrogram_residuals = hdu_list["S_RES"].data
+            elif os.path.isfile(spectrogram_file_name):
                 self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
-                if os.path.isfile(spectrogram_file_name):
-                    self.load_spectrogram(spectrogram_file_name)
-                else:
-                    raise FileNotFoundError(f"Spectrogram file {spectrogram_file_name} does not exist.")
+                self.load_spectrogram(spectrogram_file_name)
+            else:
+                raise FileNotFoundError(f"\n\tNo spectrogram info in {input_file_name} "
+                                        f"and not even a spectrogram file {spectrogram_file_name}.")
+            if "PSF_TAB" in hdu_list:
+                self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]),
+                                              saturation=self.spectrogram_saturation)
+            elif os.path.isfile(psf_file_name):  # retro-compatibility
                 self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
-                if os.path.isfile(psf_file_name):
-                    self.load_chromatic_psf(psf_file_name)
-                else:
-                    raise FileNotFoundError(f"PSF file {psf_file_name} does not exist.")
-        else:
-            raise FileNotFoundError(f'\n\tSpectrum file {input_file_name} not found')
+                self.load_chromatic_psf(psf_file_name)
+            else:
+                raise FileNotFoundError(f"\n\tNo PSF info in {input_file_name} "
+                                        f"and not even a PSF file {psf_file_name}.")
+            if "LINES" in hdu_list:
+                self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
+            hdu_list.close()
 
-    def load_spectrogram(self, input_file_name):
-        """Load the spectrum from a fits file (data, error and wavelengths).
+    def load_spectrum_latest(self, input_file_name):
+        """Load the spectrum from a FITS file (data, error and wavelengths) from Spectrum files generated
+        with Spectractor software above or equal 2.4 version. The parameters are loaded via the FITS file header
+        and overwrites those loaded via the config file.
 
         Parameters
         ----------
@@ -701,7 +878,103 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum()
+        >>> s = Spectrum(config="")
+        >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> print(s.units)
+        erg/s/cm$^2$/nm
+
+        .. doctest::
+            :hide:
+
+            >>> assert parameters.OBS_CAMERA_ROTATION == s.header["CAM_ROT"]
+            >>> assert parameters.CCD_REBIN == s.header["REBIN"]
+            >>> assert parameters.OBS_OBJECT_TYPE == "STAR"
+            >>> assert s.parallactic_angle == s.header["PARANGLE"]
+
+        """
+        self.header, raw_data = load_fits(input_file_name)
+        self.lambdas = raw_data[0]
+        self.lambdas_binwidths = np.gradient(self.lambdas)
+        self.data = raw_data[1]
+        if len(raw_data) > 2:
+            self.err = raw_data[2]
+            self.cov_matrix = np.diag(self.err ** 2)
+
+        # set the config parameters first
+        param_header, _ = load_fits(input_file_name, hdu_index="CONFIG")
+        for key, value in param_header.items():
+            if "X_" not in key and (not isinstance(param_header[key], str) or (isinstance(param_header[key], str) and "X_" not in param_header[key])):
+                setattr(parameters, key, value)
+            elif "X_" in key:
+                continue
+            elif "X_" in param_header[key]:
+                setattr(parameters, key, param_header[value])
+            else:
+                continue
+        update_derived_parameters()
+        # loaded parameters have already been rebinned normally
+        # if parameters.CCD_REBIN > 1:
+        #     apply_rebinning_to_parameters()
+
+        # set the simple items from the mappings. More complex items, i.e.
+        # those needing function calls, follow
+        for attribute, header_key in fits_mappings.items():
+            if self.header.get(header_key) is not None:
+                setattr(self, attribute, self.header.get(header_key))
+            else:
+                self.my_logger.warning(f'\n\tFailed to set spectrum attribute {attribute} using header {header_key}')
+
+        # set the more complex items by hand here
+        if self.header.get('TARGET'):
+            self.target = load_target(self.header.get('TARGET'), verbose=parameters.VERBOSE)
+            self.lines = self.target.lines
+        if self.header.get('TARGETX') and self.header.get('TARGETY'):
+            self.x0 = [self.header.get('TARGETX'), self.header.get('TARGETY')]  # should be a tuple not a list
+        self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
+        self.disperser = Hologram(self.disperser_label, D=parameters.DISTANCE2CCD,
+                                  data_dir=parameters.DISPERSER_DIR, verbose=parameters.VERBOSE)
+        self.my_logger.info(f'\n\tSpectrum loaded from {input_file_name}')
+        if parameters.OBS_OBJECT_TYPE == "STAR":
+            self.adr_params = [self.dec, self.hour_angle, self.temperature,
+                               self.pressure, self.humidity, self.airmass]
+
+        self.psf = load_PSF(psf_type=parameters.PSF_TYPE, target=self.target)
+        self.chromatic_psf = ChromaticPSF(self.psf, self.spectrogram_Nx, self.spectrogram_Ny,
+                                          x0=self.spectrogram_x0, y0=self.spectrogram_y0,
+                                          deg=self.spectrogram_deg, saturation=self.spectrogram_saturation)
+        if 'PSF_REG' in self.header and float(self.header["PSF_REG"]) > 0:
+            self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
+
+        if not self.fast_load:
+            hdu_list = fits.open(input_file_name)
+            # load other spectrum info
+            self.cov_matrix = hdu_list["SPEC_COV"].data
+            _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
+            self.target.image = hdu_list["ORDER0"].data
+            self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+            self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
+            # load spectrogram info
+            self.spectrogram = hdu_list["S_DATA"].data
+            self.spectrogram_err = hdu_list["S_ERR"].data
+            self.spectrogram_bgd = hdu_list["S_BGD"].data
+            self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
+            self.spectrogram_fit = hdu_list["S_FIT"].data
+            self.spectrogram_residuals = hdu_list["S_RES"].data
+            self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]), saturation=self.spectrogram_saturation)
+            self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
+            hdu_list.close()
+
+    def load_spectrogram(self, input_file_name):  # pragma: no cover
+        """OBSOLETE: Load the spectrum from a fits file (data, error and wavelengths).
+
+        Parameters
+        ----------
+        input_file_name: str
+            Path to the input fits file
+
+        Examples
+        --------
+        >>> s = Spectrum(config="./config/ctio.ini")
         >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
         """
         if os.path.isfile(input_file_name):
@@ -724,13 +997,13 @@ class Spectrum:
             self.spectrogram_saturation = float(header['S_SAT'])
             self.spectrogram_Nx = self.spectrogram_xmax - self.spectrogram_xmin
             self.spectrogram_Ny = self.spectrogram_ymax - self.spectrogram_ymin
-            hdu_list.close()  # need to free allocation for file descripto
+            hdu_list.close()  # need to free allocation for file description
             self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)
 
-    def load_chromatic_psf(self, input_file_name):
-        """Load the spectrum from a fits file (data, error and wavelengths).
+    def load_chromatic_psf(self, input_file_name):  # pragma: no cover
+        """OBSOLETE: Load the spectrum from a fits file (data, error and wavelengths).
 
         Parameters
         ----------
@@ -739,8 +1012,7 @@ class Spectrum:
 
         Examples
         --------
-        >>> s = Spectrum()
-        >>> s.load_spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s = Spectrum('./tests/data/reduc_20170530_134_spectrum.fits')
         >>> print(s.chromatic_psf.table)  #doctest: +ELLIPSIS
              lambdas               Dx        ...
         """
@@ -755,6 +1027,258 @@ class Spectrum:
             self.my_logger.info(f'\n\tSpectrogram loaded from {input_file_name}')
         else:
             self.my_logger.warning(f'\n\tSpectrogram file {input_file_name} not found')
+
+    def compute_disp_axis_in_spectrogram(self, shift_x, shift_y, angle):
+        """Compute the dispersion axis position in a spectrogram.
+        Origin is the order 0 centroid.
+
+        Parameters
+        ----------
+        shift_x: float
+            Shift in the x axis direction for order 0 position in pixel.
+        shift_y: float
+            Shift in the y axis direction for order 0 position in pixel.
+        angle: float
+            Main dispersion axis angle in degrees.
+
+        Returns
+        -------
+        Dx: array_like
+            Position array along x axis of spectrogram
+        Dy_disp_axis: array_like
+            Dispersion axis position along y axis of spectrogram with respect to Dx.
+
+        Examples
+        --------
+        >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> Dx, Dy_disp_axis = s.compute_disp_axis_in_spectrogram(0, 0, 0)
+        >>> Dx[0] == -s.spectrogram_x0
+        True
+        >>> Dy_disp_axis[:4]
+        array([0., 0., 0., 0.])
+        """
+        # Distance in x and y with respect to the TRUE order 0 position at lambda_ref
+        Dx = np.arange(self.spectrogram_Nx) - self.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
+        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx - shift_y  # disp axis height in spectrogram frame for x with respect to order 0
+        return Dx, Dy_disp_axis
+
+    def compute_lambdas_in_spectrogram(self, D, shift_x, shift_y, angle, niter=3, with_adr=True, order=1):
+        """Compute the dispersion relation in a spectrogram, using grating dispersion model and ADR,
+        for a given diffraction order. Origin is the order 0 centroid.
+
+        Parameters
+        ----------
+        D: float
+            The distance between the CCD and the disperser in mm.
+        shift_x: float
+            Shift in the x axis direction for order 0 position in pixel.
+        shift_y: float
+            Shift in the y axis direction for order 0 position in pixel.
+        angle: float
+            Main dispersion axis angle in degrees.
+        niter: int, optional
+            Number of iterations to compute ADR (default: 3).
+        with_adr: bool, optional
+            If True, add ADR effect to grating dispersion model (default: True).
+        order: int, optional
+            Diffraction order (default: 1).
+
+        Returns
+        -------
+        lambdas: array_like
+            Wavelength array for the given diffraction order.
+
+        Examples
+        --------
+        >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
+        >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
+        >>> lambdas[:4]
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> lambdas_order2 = s.compute_lambdas_in_spectrogram(58, 0, 0, 0, order=2)
+        >>> lambdas_order2[:4]
+        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
+        """
+        # Distance in x and y with respect to the true order 0 position at lambda_ref
+        Dx, Dy_disp_axis = self.compute_disp_axis_in_spectrogram(shift_x=shift_x, shift_y=shift_y, angle=angle)
+        distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
+
+        # Wavelengths using the order 0 shifts (ADR has no impact as it shifts order 0 and order p equally)
+        new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
+        # First guess of wavelengths
+        self.disperser.D = np.copy(D)
+        lambdas = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=order)
+        # Evaluate ADR
+        if with_adr:
+            for k in range(niter):
+                adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
+                                            lambda_ref=self.lambda_ref)
+                adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+
+                # Compute lambdas at pixel column x
+                lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=order)
+        return lambdas
+
+    def compute_dispersion_in_spectrogram(self, lambdas, shift_x, shift_y, angle, niter=3, with_adr=True, order=1):
+        """Compute the dispersion relation in a spectrogram, using grating dispersion model and ADR, for a given
+        diffraction order. Origin is the order 0 centroid.
+
+        Parameters
+        ----------
+        lambdas: array_like
+            Wavelength array for the given diffraction order.
+        shift_x: float
+            Shift in the x axis direction for order 0 position in pixel.
+        shift_y: float
+            Shift in the y axis direction for order 0 position in pixel.
+        angle: float
+            Main dispersion axis angle in degrees.
+        niter: int, optional
+            Number of iterations to compute ADR (default: 3).
+        with_adr: bool, optional
+            If True, add ADR effect to grating dispersion model (default: True).
+        order: int, optional
+            Diffraction order (default: 1).
+
+        Returns
+        -------
+        dispersion_law: array_like
+            Complex array coding the 2D dispersion relation in the spectrogram for the given diffraction order.
+
+        Examples
+        --------
+        >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
+        >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
+        >>> lambdas[:4]
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> dispersion_law = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=1)
+        >>> dispersion_law[:4]
+        array([280.0000185 +1.07837872j, 281.00001766+1.06655761j,
+               282.00001686+1.05487099j, 283.0000161 +1.04331681j])
+        >>> dispersion_law_order2 = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=2)
+        >>> dispersion_law_order2[:4]
+        array([573.69582907+1.07837872j, 575.80158761+1.06655761j,
+               577.90853861+1.05487099j, 580.01668263+1.04331681j])
+
+        """
+        new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
+        # Distance (not position) in pixel of wavelength lambda centroid in the (x,y) spectrogram frame
+        # with respect to order 0 centroid
+        distance_along_disp_axis = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=order)
+        Dx = distance_along_disp_axis * np.cos(angle * np.pi / 180)
+        Dy_disp_axis = distance_along_disp_axis * np.sin(angle * np.pi / 180)
+        # Evaluate ADR
+        adr_x = np.zeros_like(Dx)
+        adr_y = np.zeros_like(Dy_disp_axis)
+        if with_adr:
+            for k in range(niter):
+                adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
+                                            lambda_ref=self.lambda_ref)
+                adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+
+        # Position (not distance) in pixel of wavelength lambda centroid in the (x,y) spectrogram frame
+        # with respect to order 0 initial centroid position.
+        dispersion_law = (Dx + shift_x + with_adr * adr_x) + 1j * (Dy_disp_axis + with_adr * adr_y + shift_y)
+        return dispersion_law
+
+    def old_compute_dispersion_in_spectrogram(self, D, shift_x, shift_y, angle, niter=3, with_adr=True):
+        """Compute the dispersion relation in a spectrogram, using grating dispersion model and ADR.
+        Origin is the order 0 centroid.
+
+        Parameters
+        ----------
+        D: float
+            The distance between the CCD and the disperser in mm.
+        shift_x: float
+            Shift in the x axis direction for order 0 position in pixel.
+        shift_y: float
+            Shift in the y axis direction for order 0 position in pixel.
+        angle: float
+            Main dispersion axis angle in degrees.
+        niter: int, optional
+            Number of iterations to compute ADR (default: 3).
+        with_adr: bool, optional
+            If True, add ADR effect to grating dispersion model (default: True).
+
+        Returns
+        -------
+        lambdas: array_like
+            Wavelength array for parameters.SPECTRUM_ORDER diffraction.
+        lambdas_order2: array_like
+            Wavelength array for parameters.SPECTRUM_ORDER+1 diffraction.
+        dispersion_law: array_like
+            Complex array coding the 2D dispersion relation in the spectrogram for parameters.SPECTRUM_ORDER diffraction.
+        dispersion_law_order2: array_like
+            Complex array coding the 2D dispersion relation in the spectrogram for parameters.SPECTRUM_ORDER+1 diffraction.
+
+        Examples
+        --------
+        >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
+        >>> lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = s.old_compute_dispersion_in_spectrogram(58, 0, 0, 0)
+        >>> lambdas[:4]
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> lambdas_order2[:4]
+        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
+        >>> dispersion_law[:4]
+        array([278.11756086+1.07838932j, 279.13819666+1.06656773j,
+               280.15859766+1.05488065j, 281.17876742+1.04332603j])
+        >>> dispersion_law[90:95]
+        array([369.3298545 +0.38390497j, 370.338383  +0.37901927j,
+               371.34683964+0.37417473j, 372.35522523+0.36937089j,
+               373.36354058+0.36460729j])
+        >>> dispersion_law_order2[:4]
+        array([573.69581057+1.07838932j, 575.80156994+1.06656773j,
+               577.90852175+1.05488065j, 580.01666653+1.04332603j])
+
+        """
+        # Distance in x and y with respect to the true order 0 position at lambda_ref
+        Dx = np.arange(self.spectrogram_Nx) - self.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
+        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
+        distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
+
+        # Wavelengths using the order 0 shifts (ADR has no impact as it shifts order 0 and order p equally)
+        new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
+        # First guess of wavelengths
+        self.disperser.D = np.copy(D)
+        lambdas = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=self.order)
+        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=self.order+np.sign(self.order))
+
+        # Evaluate ADR
+        adr_x = np.zeros_like(Dx)
+        adr_y = np.zeros_like(Dy_disp_axis)
+        for k in range(niter):
+            adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
+                                        lambda_ref=self.lambda_ref)
+            adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+            adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+
+            # Evaluate ADR for order 2
+            adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
+                                        lambda_ref=self.lambda_ref)
+            # adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+            adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+
+            # Compute lambdas at pixel column x
+            lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=self.order)
+            lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - adr_u_2, new_x0, order=self.order+np.sign(self.order))
+
+        # Position (not distance) in pixel of wavelength lambda order 1 centroid in the (x,y) spectrogram frame
+        #distance = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=self.order)
+        #Dx = distance * np.cos(angle * np.pi / 180)
+        #Dy_disp_axis = distance * np.sin(angle * np.pi / 180)
+        dispersion_law = (Dx + shift_x + with_adr * adr_x) + 1j * (Dy_disp_axis + with_adr * adr_y + shift_y)
+        # Position (not distance) in pixel of wavelength lambda order 2 centroid in the (x,y) spectrogram frame
+        distance_order2 = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=self.order+np.sign(self.order))
+        Dx_order2 = distance_order2 * np.cos(angle * np.pi / 180)
+        Dy_disp_axis_order2 = distance_order2 * np.sin(angle * np.pi / 180)
+        dispersion_law_order2 = (Dx_order2 + shift_x + with_adr * adr_x) + \
+                                1j * (Dy_disp_axis_order2 + with_adr * adr_y + shift_y)
+        return lambdas, lambdas_order2, dispersion_law, dispersion_law_order2
 
 
 def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func=None, snr_minlevel=3, ax=None,
@@ -1075,16 +1599,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             else:
                 w = np.ones_like(lambdas[index])
             fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index], order=bgd_npar - 1, w=w)
-        # lines.my_logger.warning(f'{bgd_npar} {fit}')
-        # fig = plt.figure()
-        # plt.plot(lambdas[index], spec[index])
-        # plt.plot(lambdas[bgd_index], spec[bgd_index], 'ro')
-        # x_norm = rescale_x_for_legendre(lambdas[index])
-        # lines.my_logger.warning(f'tototot {x_norm}')
-        # plt.plot(lambdas[index], np.polynomial.legendre.legval(x_norm, fit), 'b-')
-        # plt.plot(lambdas[bgd_index], model, 'b--')
-        # plt.title(f"{fit}")
-        # plt.show()
         for n in range(bgd_npar):
             # guess[n] = getattr(bgd, bgd.param_names[parameters.CALIB_BGD_ORDER - n]).value
             guess[n] = fit[n]
@@ -1097,7 +1611,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             bounds[1][n] = guess[n] + b
         for j in range(len(new_lines_list[k])):
             idx = new_peak_index_list[k][j]
-            x_norm = rescale_x_for_legendre(lambdas[idx])
+            x_norm = rescale_x_to_legendre(lambdas[idx])
             guess[bgd_npar + 3 * j] = np.sign(guess[bgd_npar + 3 * j]) * abs(
                 spec_smooth[idx] - np.polynomial.legendre.legval(x_norm, guess[:bgd_npar]))
             if np.sign(guess[bgd_npar + 3 * j]) < 0:  # absorption
@@ -1140,7 +1654,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             line.fit_index = index
             line.fit_lambdas = lambdas[index]
 
-            x_norm = rescale_x_for_legendre(lambdas[index])
+            x_norm = rescale_x_to_legendre(lambdas[index])
 
             x_step = 0.1  # nm
             x_int = np.arange(max(np.min(lambdas), peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2])),
@@ -1201,7 +1715,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
     return global_chisq
 
 
-def calibrate_spectrum(spectrum, with_adr=False):
+def calibrate_spectrum(spectrum, with_adr=False, niter=5):
     """Convert pixels into wavelengths given the position of the order 0,
     the data for the spectrum, the properties of the disperser. Fit the absorption
     (and eventually the emission) lines to perform a second calibration of the
@@ -1217,6 +1731,8 @@ def calibrate_spectrum(spectrum, with_adr=False):
     with_adr: bool, optional
         If True, the ADR longitudinal shift is subtracted to distances.
         Must be False if the spectrum has already been decontaminated from ADR (default: False).
+    niter: int, optional
+        Number of iterations for ADR accurate evaluation (default: 5).
 
     Returns
     -------
@@ -1225,26 +1741,27 @@ def calibrate_spectrum(spectrum, with_adr=False):
 
     Examples
     --------
-    >>> spectrum = Spectrum('tests/data/reduc_20170605_028_spectrum.fits')
+    >>> spectrum = Spectrum('tests/data/reduc_20170530_134_spectrum.fits', config="")
     >>> parameters.LAMBDA_MIN = 550
     >>> parameters.LAMBDA_MAX = 800
     >>> lambdas = calibrate_spectrum(spectrum, with_adr=False)
     >>> spectrum.plot_spectrum()
+
     """
     with_adr = int(with_adr)
+    if spectrum.units != "ADU/s":  # go back in ADU/s to remove previous lambda*dlambda normalisation
+        spectrum.convert_from_flam_to_ADUrate()
     distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis()
     spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=spectrum.order)
-    if spectrum.lambda_ref is None:
-        lambda_ref = np.sum(spectrum.lambdas * spectrum.data) / np.sum(spectrum.data)
-        spectrum.lambda_ref = lambda_ref
-        spectrum.header['LBDA_REF'] = lambda_ref
     # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
     # Must project ADR along dispersion axis
     if with_adr > 0:
-        adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
-                                    lambda_ref=spectrum.lambda_ref)
-        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                               dispersion_axis_angle=spectrum.rotation_angle)
+        for k in range(niter):
+            adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
+                                        lambda_ref=spectrum.lambda_ref)
+            adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                                   dispersion_axis_angle=spectrum.rotation_angle)
+            spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - adr_u, spectrum.x0, order=spectrum.order)
     else:
         adr_u = np.zeros_like(distance)
     x0 = spectrum.x0
@@ -1280,7 +1797,7 @@ def calibrate_spectrum(spectrum, with_adr=False):
         return chisq
 
     # grid exploration of the parameters
-    # necessary because of the the line detection algo
+    # necessary because of the line detection algo
     D = parameters.DISTANCE2CCD
     if spectrum.header['D2CCD'] != '':
         D = spectrum.header['D2CCD']
@@ -1345,8 +1862,6 @@ def calibrate_spectrum(spectrum, with_adr=False):
     distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis(shift_x=pixel_shift)
     lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0, order=spectrum.order)
     spectrum.lambdas = lambdas
-    spectrum.lambdas_order2 = spectrum.disperser.grating_pixel_to_lambda(distance - with_adr * adr_u, x0=x0,
-                                                                         order=spectrum.order + 1)
     spectrum.lambdas_binwidths = np.gradient(lambdas)
     spectrum.convert_from_ADUrate_to_flam()
     spectrum.chromatic_psf.table['Dx'] -= pixel_shift

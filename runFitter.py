@@ -32,7 +32,7 @@ if __name__ == "__main__":
     load_config(args.config)
 
     for file_name in file_names:
-        atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+        atmgrid_filename = '' #file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
         w = SpectrumFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
                                  burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
         run_spectrum_minimisation(w, method="newton")

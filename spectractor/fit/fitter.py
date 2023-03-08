@@ -136,7 +136,7 @@ class FitWorkspace:
         [array([2]), array([3])]
         """
         bad_indices = np.asarray(self.outliers, dtype=int)
-        if self.data.dtype == np.object:
+        if self.data.dtype == object:
             if len(self.outliers) > 0:
                 bad_indices = []
                 start_index = 0
@@ -543,14 +543,49 @@ class FitWorkspace:
             A header to add to the file (default: "").
         """
         output_filename = os.path.splitext(self.filename)[0] + "_bestfit.txt"
+        
+        #print(">>>>> \t fitter.py :: save_parameters_summary ::  output_filename = ",  output_filename)
+        
         f = open(output_filename, 'w')
         txt = self.filename + "\n"
         if header != "":
             txt += header + "\n"
+            
+        #print(">>>>> \t save_parameters_summary :: cov = ",self.cov, " type = ",type(self.cov), " shape = ",self.cov.shape)
+        
+        mycov = np.copy(self.cov)
+        maxk = np.min(mycov.shape)
+        
         for k, ip in enumerate(ipar):
-            txt += "%s: %s +%s -%s\n" % formatting_numbers(self.p[ip], np.sqrt(self.cov[k, k]),
-                                                           np.sqrt(self.cov[k, k]),
-                                                           label=self.input_labels[ip])
+            #print(">>>> \t \t  k = ", k)
+            
+            if k < maxk:
+                
+                covariance_matrix_element = mycov[k, k]
+                #print(">>>>> \t save_parameters_summary ::  k = ", k , 
+                #      " ,  ip = ", ip , 
+                #      " p[ip] = " , self.p[ip],
+                #      " , label = ", self.input_labels[ip] , 
+                #      " , cov = ",covariance_matrix_element)
+            
+                if covariance_matrix_element >= 0:
+                    covariance_matrix_element_sigma = np.sqrt(covariance_matrix_element)
+                else:
+                    #print(">>>>> \t save_parameters_summary ::  k = ", k , " ,  ip = ", ip , " , label = ", self.input_labels[ip] , " , Negative cov = ",covariance_matrix_element)
+                    covariance_matrix_element_sigma = np.sqrt(-covariance_matrix_element)
+                
+                txt += "%s: %s +%s - %s\n" % formatting_numbers(self.p[ip], covariance_matrix_element_sigma,
+                                                               covariance_matrix_element_sigma,
+                                                               label=self.input_labels[ip])
+            else:
+                #print(">>>>> \t save_parameters_summary ::  SKIP k = ", k , ' >=  kmax = ',maxk)
+                pass
+                
+                
+            
+            #txt += "%s: %s +%s - %s\n" % formatting_numbers(self.p[ip], np.sqrt(self.cov[k, k]),
+            #                                               np.sqrt(self.cov[k, k]),
+            #                                               label=self.input_labels[ip])
         for row in self.cov:
             txt += np.array_str(row, max_line_width=20 * self.cov.shape[0]) + '\n'
         self.my_logger.info(f"\n\tSave best fit parameters in {output_filename}.")
@@ -633,15 +668,43 @@ class FitWorkspace:
                     cov = self.data_cov + np.diag(model_err * model_err)
                     L = np.linalg.inv(np.linalg.cholesky(cov))
                 else:
-                    if self.W.ndim == 1 and self.W.dtype != np.object:
+                    if self.W.ndim == 1 and self.W.dtype != object:
                         L = np.sqrt(self.W)
-                    elif self.W.ndim == 2 and self.W.dtype != np.object:
+                    elif self.W.ndim == 2 and self.W.dtype != object:
                         L = np.linalg.cholesky(self.W)
                     else:
                         raise ValueError(f"Case not implemented with self.W.ndim={self.W.ndim} "
                                          f"and self.W.dtype={self.W.dtype}")
                 res = L @ (model - self.data)
         return res
+
+    def compute_W_with_model_error(self, model_err):
+        W = self.W
+        zeros = W == 0
+        if self.W.ndim == 1 and self.W.dtype != object:
+            if np.any(model_err > 0):
+                W = 1 / (self.data_cov + model_err * model_err)
+        elif self.W.dtype == object:
+            K = len(self.W)
+            if self.W[0].ndim == 1:
+                if np.any(model_err > 0):
+                    W = [1 / (self.data_cov[k] + model_err * model_err) for k in range(K)]
+            elif self.W[0].ndim == 2:
+                K = len(self.W)
+                if np.any(model_err > 0):
+                    cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
+                    L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
+                    W = [L[k].T @ L[k] for k in range(K)]
+            else:
+                raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
+                                 f"I get W[0]={self.W[0]}")
+        elif self.W.ndim == 2 and self.W.dtype != object:
+            if np.any(model_err > 0):
+                cov = self.data_cov + np.diag(model_err * model_err)
+                L = np.linalg.inv(np.linalg.cholesky(cov))
+                W = L.T @ L
+        W[zeros] = 0
+        return W
 
     def chisq(self, p, model_output=False):
         """Compute the chi square for a set of model parameters p.
@@ -663,63 +726,34 @@ class FitWorkspace:
 
         """
         # check data format
-        if (self.data.dtype != np.object and self.data.ndim > 1) or (self.err.dtype != np.object and self.err.ndim > 1):
+        if (self.data.dtype != object and self.data.ndim > 1) or (self.err.dtype != object and self.err.ndim > 1):
             raise ValueError("Fitworkspace.data and Fitworkspace.err must be a flat 1D array,"
                              " or an array of flat arrays of unequal lengths.")
         # prepare weight matrices in case they have not been built before
         self.prepare_weight_matrices()
         x, model, model_err = self.simulate(*p)
-        if self.W.ndim == 1 and self.W.dtype != np.object:
-            if np.any(model_err > 0):
-                W = 1 / (self.data_cov + model_err * model_err)
-            else:
-                W = self.W
+        W = self.compute_W_with_model_error(model_err)
+        if W.ndim == 1 and W.dtype != object:
             res = (model - self.data)
             chisq = res @ (W * res)
-            # fit_workspace.my_logger.warning(f"ll {tmp_params}")
-            # fit_workspace.my_logger.warning(f"yyyy {np.sum(residuals)} {np.sum(W)} {np.sum(W*residuals)}")
-            # fit_workspace.my_logger.warning(f"yoooo {np.sum(residuals)} {np.sum(W*residuals)} ")
-            # fit_workspace.my_logger.warning(f"yiiii {np.sum(tmp_model.flatten()[fit_workspace.not_outliers])} {np.sum(fit_workspace.data.flatten()[fit_workspace.not_outliers])} ")
-            # self.my_logger.warning(f"ll {p}")
-            # self.my_logger.warning(f"yyyy {np.sum(res)} {np.sum(W)} {np.sum(W*res)}")
-            # self.my_logger.warning(f"yoooo {np.sum(res[self.not_outliers])} {np.sum(W[self.not_outliers]*res[self.not_outliers])} ")
-            # self.my_logger.warning(f"yiiii {np.sum(model[self.not_outliers])} {np.sum(self.data[self.not_outliers])} ")
-        elif self.W.dtype == np.object:
-            K = len(self.W)
-            if self.W[0].ndim == 1:
-                if np.any(model_err > 0):
-                    W = [1 / (self.data_cov[k] + model_err * model_err) for k in range(K)]
-                else:
-                    W = self.W
-                res = [model[k] - self.data[k] for k in range(K)]
+        elif W.dtype == object:
+            K = len(W)
+            res = [model[k] - self.data[k] for k in range(K)]
+            if W[0].ndim == 1:
                 chisq = np.sum([res[k] @ (W[k] * res[k]) for k in range(K)])
-            elif self.W[0].ndim == 2:
-                K = len(self.W)
-                if np.any(model_err > 0):
-                    cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
-                    L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
-                    W = [L[k].T @ L[k] for k in range(K)]
-                else:
-                    W = self.W
-                res = [model[k] - self.data[k] for k in range(K)]
+            elif W[0].ndim == 2:
                 chisq = np.sum([res[k] @ W[k] @ res[k] for k in range(K)])
             else:
                 raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
-                                 f"I get W[0]={self.W[0]}")
-        elif self.W.ndim == 2 and self.W.dtype != np.object:
-            if np.any(model_err > 0):
-                cov = self.data_cov + np.diag(model_err * model_err)
-                L = np.linalg.inv(np.linalg.cholesky(cov))
-                W = L.T @ L
-            else:
-                W = self.W
+                                 f"I get W[0]={W[0]}")
+        elif W.ndim == 2 and W.dtype != object:
             res = (model - self.data)
             chisq = res @ W @ res
         else:
             raise ValueError(
                 f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
                 f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
-                f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
+                f"\nHere W type is {type(W)}, shape is {W.shape} and W is {W}.")
         if model_output:
             return chisq, x, model, model_err
         else:
@@ -731,12 +765,12 @@ class FitWorkspace:
             self.data_cov = np.asarray(self.err.flatten() ** 2)
         # Prepare inverse covariance matrix for data
         if self.W is None:
-            if self.data_cov.ndim == 1 and self.data_cov.dtype != np.object:
+            if self.data_cov.ndim == 1 and self.data_cov.dtype != object:
                 self.W = 1 / self.data_cov
-            elif self.data_cov.ndim == 2 and self.data_cov.dtype != np.object:
+            elif self.data_cov.ndim == 2 and self.data_cov.dtype != object:
                 L = np.linalg.inv(np.linalg.cholesky(self.data_cov))
                 self.W = L.T @ L
-            elif self.data_cov.dtype is np.object:
+            elif self.data_cov.dtype is object:
                 if self.data_cov[0].ndim == 1:
                     self.W = np.array([1 / self.data_cov[k] for k in range(self.data_cov.shape[0])])
                 else:
@@ -747,12 +781,12 @@ class FitWorkspace:
                     self.W = np.asarray(self.W)
         if len(self.outliers) > 0:
             bad_indices = self.get_bad_indices()
-            if self.W.ndim == 1 and self.W.dtype != np.object:
+            if self.W.ndim == 1 and self.W.dtype != object:
                 self.W[bad_indices] = 0
-            elif self.W.ndim == 2 and self.W.dtype != np.object:
+            elif self.W.ndim == 2 and self.W.dtype != object:
                 self.W[:, bad_indices] = 0
                 self.W[bad_indices, :] = 0
-            elif self.W.dtype == np.object:
+            elif self.W.dtype == object:
                 if self.data_cov[0].ndim == 1:
                     for k in range(len(self.W)):
                         self.W[k][bad_indices[k]] = 0
@@ -832,7 +866,7 @@ class FitWorkspace:
             x, model, model_err = model_input
         else:
             x, model, model_err = self.simulate(*params)
-        if self.W.dtype == np.object and self.W[0].ndim == 2:
+        if self.W.dtype == object and self.W[0].ndim == 2:
             J = [[] for _ in range(params.size)]
         else:
             model = model.flatten()
@@ -845,7 +879,7 @@ class FitWorkspace:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            if self.W.dtype == np.object and self.W[0].ndim == 2:
+            if self.W.dtype == object and self.W[0].ndim == 2:
                 for k in range(model.shape[0]):
                     J[ip].append((tmp_model[k] - model[k]) / epsilon[ip])
             else:
@@ -934,7 +968,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     my_logger = set_logger(__name__)
     tmp_params = np.copy(params)
     fit_workspace.prepare_weight_matrices()
-    W = fit_workspace.W
+    n_data_masked = len(fit_workspace.mask) + len(fit_workspace.outliers)
     ipar = np.arange(params.size)
     if fixed_params is not None:
         ipar = np.array(np.where(np.array(fixed_params).astype(int) == 0)[0])
@@ -944,12 +978,15 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
     for i in range(niter):
         start = time.time()
         cost, tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.chisq(tmp_params, model_output=True)
-        if isinstance(fit_workspace.W, np.ndarray) and fit_workspace.W.dtype != np.object:
+        # W matrix
+        W = fit_workspace.compute_W_with_model_error(tmp_model_err)
+        # residuals
+        if isinstance(W, np.ndarray) and W.dtype != object:
             residuals = (tmp_model - fit_workspace.data).flatten()
-        elif isinstance(fit_workspace.W, np.ndarray) and fit_workspace.W.dtype == np.object:
-            residuals = [(tmp_model[k] - fit_workspace.data[k]) for k in range(len(fit_workspace.W))]
+        elif isinstance(W, np.ndarray) and W.dtype == object:
+            residuals = [(tmp_model[k] - fit_workspace.data[k]) for k in range(len(W))]
         else:
-            raise TypeError(f"Type of fit_workspace.W is {type(fit_workspace.W)}. It must be a np.ndarray.")
+            raise TypeError(f"Type of fit_workspace.W is {type(W)}. It must be a np.ndarray.")
         # Jacobian
         J = fit_workspace.jacobian(tmp_params, epsilon, fixed_params=fixed_params,
                                    model_input=[tmp_lambdas, tmp_model, tmp_model_err])
@@ -966,15 +1003,14 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                     f"at its last known current value ({tmp_params[ip]}).")
         # remove fixed parameters
         J = J[ipar].T
-        # algebra
-        if fit_workspace.W.ndim == 1 and fit_workspace.W.dtype != np.object:
+        if W.ndim == 1 and W.dtype != object:
             JT_W = J.T * W
             JT_W_J = JT_W @ J
-        elif fit_workspace.W.ndim == 2 and fit_workspace.W.dtype != np.object:
+        elif W.ndim == 2 and W.dtype != object:
             JT_W = J.T @ W
             JT_W_J = JT_W @ J
         else:
-            if fit_workspace.W[0].ndim == 1:
+            if W[0].ndim == 1:
                 JT_W = J.T * np.concatenate(W).ravel()
                 JT_W_J = JT_W @ J
             else:
@@ -982,7 +1018,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                 # because W inverse covariance is block diagonal and blocks can have different sizes
                 # the philosophy is to temporarily flatten the data arrays
                 JT_W = [np.concatenate([J[ip][k].T @ W[k]
-                                        for k in range(fit_workspace.W.shape[0])]).ravel()
+                                        for k in range(W.shape[0])]).ravel()
                         for ip in range(len(J))]
                 JT_W_J = np.array([[JT_W[ip2] @ np.concatenate(J[ip1][:]).ravel() for ip1 in range(len(J))]
                                    for ip2 in range(len(J))])
@@ -991,7 +1027,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
             inv_JT_W_J = L.T @ L
         except np.linalg.LinAlgError:
             inv_JT_W_J = np.linalg.inv(JT_W_J)
-        if fit_workspace.W.dtype != np.object:
+        if fit_workspace.W.dtype != object:
             JT_W_R0 = JT_W @ residuals
         else:
             JT_W_R0 = JT_W @ np.concatenate(residuals).ravel()
@@ -1029,11 +1065,11 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
         params_table.append(np.copy(tmp_params))
         fit_workspace.p = tmp_params
         if fit_workspace.verbose:
-            my_logger.info(f"\n\tIteration={i}: initial cost={cost:.5g} initial chisq_red={cost / (tmp_model.size - len(fit_workspace.mask)):.5g}"
+            my_logger.info(f"\n\tIteration={i}: initial cost={cost:.5g} initial chisq_red={cost / (tmp_model.size - n_data_masked):.5g}"
                            f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
                            f"\n\tParameter shifts: {alpha_min * dparams}"
                            f"\n\tNew parameters: {tmp_params[ipar]}"
-                           f"\n\tFinal cost={fval:.5g} final chisq_red={fval / (tmp_model.size - len(fit_workspace.mask)):.5g} "
+                           f"\n\tFinal cost={fval:.5g} final chisq_red={fval / (tmp_model.size - n_data_masked):.5g} "
                            f"computed in {time.time() - start:.2f}s")
         if fit_workspace.live_fit:  # pragma: no cover
             fit_workspace.simulate(*tmp_params)
@@ -1187,6 +1223,8 @@ def print_parameter_summary(params, cov, labels):
     """
     my_logger = set_logger(__name__)
     txt = ""
+    # print("\t >>>>> cov = ",cov,">>>>  cov.shape = ",cov.shape)
+
     for ip in np.arange(0, cov.shape[0]).astype(int):
         txt += "%s: %s +%s -%s\n\t" % formatting_numbers(params[ip], np.sqrt(cov[ip, ip]), np.sqrt(cov[ip, ip]),
                                                          label=labels[ip])
@@ -1299,7 +1337,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
-            fit_workspace.plot_fit()
+            if parameters.DEBUG:
+                fit_workspace.plot_fit()
     elif method == 'basinhopping':
         start = time.time()
         minimizer_kwargs = dict(method=minimizer_method, bounds=bounds)
@@ -1308,7 +1347,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
-            fit_workspace.plot_fit()
+            if parameters.DEBUG:
+                fit_workspace.plot_fit()
     elif method == "least_squares":  # pragma: no cover
         fit_workspace.my_logger.warning("least_squares might not work, use with caution... "
                                         "or repair carefully the function weighted_residuals()")
@@ -1321,7 +1361,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\t{p}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
-            fit_workspace.plot_fit()
+            if parameters.DEBUG:
+                fit_workspace.plot_fit()
     elif method == "minuit":
         start = time.time()
         # fit_workspace.simulation.fix_psf_cube = False
@@ -1345,7 +1386,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
         if verbose:
             my_logger.debug(f"\n\t{m}")
             my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
-            fit_workspace.plot_fit()
+            if parameters.DEBUG:
+                fit_workspace.plot_fit()
     elif method == "newton":
         if fit_workspace.costs.size == 0:
             costs = np.array([fit_workspace.chisq(guess)])
@@ -1382,7 +1424,7 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
             my_logger.info(f"\n\tSigma-clipping step {step}/{niter_clip} (sigma={sigma_clip})")
         run_minimisation(fit_workspace, method=method, epsilon=epsilon, fix=fix, xtol=xtol, ftol=ftol, niter=niter)
         # remove outliers
-        if fit_workspace.data.dtype == np.object:
+        if fit_workspace.data.dtype == object:
             # indices_no_nan = ~np.isnan(np.concatenate(fit_workspace.data).ravel())
             data = np.concatenate(fit_workspace.data).ravel()  # [indices_no_nan]
             model = np.concatenate(fit_workspace.model).ravel()  # [indices_no_nan]
@@ -1398,8 +1440,8 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         outliers.sort()
         if len(outliers) > 0:
             my_logger.debug(f'\n\tOutliers flat index list: {outliers}')
-            my_logger.info(f'\n\tOutliers: {len(outliers)} / {data.size} data points '
-                           f'({100 * len(outliers) / data.size:.2f}%) '
+            my_logger.info(f'\n\tOutliers: {len(outliers)} / {data.size - len(fit_workspace.mask)} data points '
+                           f'({100 * len(outliers) / (data.size - len(fit_workspace.mask)):.2f}%) '
                            f'at more than {sigma_clip}-sigma from best-fit model.')
             if np.all(fit_workspace.outliers == outliers):
                 my_logger.info(f'\n\tOutliers flat index list unchanged since last iteration: '

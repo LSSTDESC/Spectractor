@@ -2,7 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import special
-from scipy.interpolate import interp2d
+from scipy.interpolate import RegularGridInterpolator
 
 from spectractor.tools import plot_image_simple
 from spectractor import parameters
@@ -672,7 +672,22 @@ class Moffat(PSF):
         >>> p = [2,20,30,4,2,10]
         >>> psf = Moffat(p, clip=True)
         >>> yy, xx = np.mgrid[:50, :60]
-        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+        >>> output = psf.evaluate(pixels=np.array([xx, yy]))
+
+        ..  doctest::
+            :hide:
+
+            >>> assert np.sum(output) > 0
+
+        >>> p = [2,20,30,4,2,10]
+        >>> psf = Moffat(p, clip=True)
+        >>> xx = np.arange(0, 50, 1)
+        >>> output = psf.evaluate(pixels=xx)
+
+        ..  doctest::
+            :hide:
+
+            >>> assert np.sum(output) > 0
 
         .. plot::
 
@@ -688,8 +703,6 @@ class Moffat(PSF):
             plt.xlabel("X [pixels]")
             plt.ylabel("Y [pixels]")
             plt.show()
-        if parameters.PdfPages:
-            parameters.PdfPages.savefig()
 
         """
         if p is not None:
@@ -704,7 +717,11 @@ class Moffat(PSF):
         elif pixels.ndim == 1:
             y = np.array(pixels)
             norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
-            out = evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha) / norm
+            if norm > 0:
+                out = evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha)
+                out /= norm
+            else:
+                out = np.zeros_like(y)
             if self.clip:
                 out = np.clip(out, 0, saturation)
             return out
@@ -914,10 +931,10 @@ class Order0(PSF):
         xx = np.arange(0, target.image.shape[1]) - target.image_x0
         yy = np.arange(0, target.image.shape[0]) - target.image_y0
         data = target.image / np.sum(target.image)
-        tmp_func = interp2d(xx, yy, data, bounds_error=False, fill_value=None)
+        tmp_func = RegularGridInterpolator((xx, yy), data, method="nearest", bounds_error=False, fill_value=None)
 
         def func(x, y, amplitude, x_c, y_c, gamma):
-            return amplitude * tmp_func((x - x_c)/gamma, (y - y_c)/gamma)
+            return amplitude * tmp_func(((y - y_c)/gamma, (x - x_c)/gamma))
 
         return func
 
@@ -995,7 +1012,8 @@ class Order0(PSF):
         amplitude, x_c, y_c, gamma, saturation = self.p
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            out = self.psf_func(x[0], y[:, 0], amplitude, x_c, y_c, gamma)
+            #out = self.psf_func(x[0], y[:, 0], amplitude, x_c, y_c, gamma)
+            out = self.psf_func(x, y, amplitude, x_c, y_c, gamma)
             if self.clip:
                 out = np.clip(out, 0, saturation)
             return out
@@ -1305,11 +1323,17 @@ def load_PSF(psf_type=parameters.PSF_TYPE, target=None, clip=False):
 
     Examples
     --------
-
+    >>> parameters.VERBOSE = False
+    >>> load_PSF(psf_type="Gauss", clip=True)  # doctest: +ELLIPSIS
+    <....Gauss object at ...>
     >>> load_PSF(psf_type="Moffat", clip=True)  # doctest: +ELLIPSIS
     <....Moffat object at ...>
     >>> load_PSF(psf_type="MoffatGauss", clip=False)  # doctest: +ELLIPSIS
     <....MoffatGauss object at ...>
+    >>> from spectractor.extractor.spectrum import Spectrum
+    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")  # doctest: +ELLIPSIS
+    >>> load_PSF(psf_type="Order0", clip=True, target=spec.target)  # doctest: +ELLIPSIS
+    <....Order0 object at ...>
 
     """
     if psf_type == "Moffat":

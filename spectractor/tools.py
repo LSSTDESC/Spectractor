@@ -1,9 +1,12 @@
 import os
 
+import astropy.io.fits
+from matplotlib import pyplot as plt
+from photutils import IRAFStarFinder
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting
-from astropy.stats import sigma_clip
+from astropy.stats import sigma_clip, sigma_clipped_stats
 from astropy.io import fits
 from astropy import wcs as WCS
 
@@ -146,7 +149,7 @@ def fit_gauss(x, y, guess=[10, 1000, 1], bounds=(-np.inf, np.inf), sigma=None):
     def gauss_jacobian_wrapper(*params):
         return np.array(gauss_jacobian(*params)).T
     popt, pcov = curve_fit(gauss, x, y, p0=guess, bounds=bounds, tr_solver='exact', jac=gauss_jacobian_wrapper,
-                           sigma=sigma, method='dogbox', verbose=0, xtol=1e-20, ftol=1e-20)
+                           sigma=sigma, method='dogbox', verbose=0, xtol=1e-15, ftol=1e-15)
     return popt, pcov
 
 
@@ -224,13 +227,18 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
     return popt, pcov
 
 
-def rescale_x_for_legendre(x):
+def rescale_x_to_legendre(x):
     middle = 0.5 * (np.max(x) + np.min(x))
     x_norm = x - middle
     if np.max(x_norm) != 0:
         return x_norm / np.max(x_norm)
     else:
         return x_norm
+
+
+def rescale_x_from_legendre(x, Xmax, Xmin):
+    X = 0.5 * x * (Xmax - Xmin) + 0.5 * (Xmax + Xmin)
+    return X
 
 
 # noinspection PyTypeChecker
@@ -277,7 +285,7 @@ def multigauss_and_bgd(x, *params):
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
     # out = np.polyval(params[0:bgd_nparams], x)
-    x_norm = rescale_x_for_legendre(x)
+    x_norm = rescale_x_to_legendre(x)
     out = np.polynomial.legendre.legval(x_norm, params[0:bgd_nparams])
     for k in range((len(params) - bgd_nparams) // 3):
         out += gauss(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
@@ -317,7 +325,7 @@ def multigauss_and_bgd_jacobian(x, *params):
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
     out = []
-    x_norm = rescale_x_for_legendre(x)
+    x_norm = rescale_x_to_legendre(x)
     for k in range(bgd_nparams):
         # out.append(params[k]*(parameters.CALIB_BGD_ORDER-k)*x**(parameters.CALIB_BGD_ORDER-(k+1)))
         # out.append(x ** (bgd_nparams - 1 - k))
@@ -332,8 +340,7 @@ def multigauss_and_bgd_jacobian(x, *params):
 
 
 # noinspection PyTypeChecker
-def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None,
-                           fix_centroids=False):
+def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, np.inf), sigma=None):
     """Fit a multiple Gaussian profile plus a polynomial background to data, using iminuit.
     The mean guess value of the Gaussian must not be far from the truth values.
     Boundaries helps a lot also. The degree of the polynomial background is fixed by parameters.CALIB_BGD_NPARAMS.
@@ -364,6 +371,8 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     Examples
     --------
 
+    >>> from spectractor.config import load_config
+    >>> load_config("default.ini")
     >>> x = np.arange(600.,800.,1)
     >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
     >>> y = multigauss_and_bgd(x, *p)
@@ -559,7 +568,7 @@ def fit_poly1d_legendre(x, y, order, w=None):
         plt.show()
     """
     cov = -1
-    x_norm = rescale_x_for_legendre(x)
+    x_norm = rescale_x_to_legendre(x)
     if len(x) > order:
         fit, cov = np.polynomial.legendre.legfit(x_norm, y, deg=order, full=True, w=w)
         model = np.polynomial.legendre.legval(x_norm, fit)
@@ -1740,7 +1749,7 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
 
 
 def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r', linestyle='none', lw=2, label='',
-                         title='', units=''):
+                         title='', units='', marker='o'):
     """Simple function to plot a spectrum with error bars and labels.
 
     Parameters
@@ -1761,6 +1770,8 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
         String for the linestyle of the spectrum (default: 'none').
     lw: int, optional
         Integer for line width (default: 2).
+    marker: str, optional
+        Character for marker style (default: 'o').
     label: str, optional
         String label for the plot legend (default: '').
     title: str, optional
@@ -1788,7 +1799,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
     if xs is None:
         xs = np.arange(data.size)
     if data_err is not None:
-        ax.errorbar(xs, data, yerr=data_err, fmt=f'{color}o', lw=lw, label=label,
+        ax.errorbar(xs, data, yerr=data_err, color=color, marker=marker, lw=lw, label=label,
                     zorder=0, markersize=2, linestyle=linestyle)
     else:
         ax.plot(xs, data, color=color, lw=lw, label=label, linestyle=linestyle)
@@ -1842,19 +1853,19 @@ def plot_compass_simple(ax, parallactic_angle=None, arrow_size=0.1, origin=[0.15
     """
     # North arrow
     N_arrow = [0, arrow_size]
-    N_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(N_arrow[0], N_arrow[1],
-                                                                    camera_angle=parameters.OBS_CAMERA_ROTATION,
-                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
-                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+    N_xy = np.asarray(flip_and_rotate_radec_vector_to_xy_vector(N_arrow[0], N_arrow[1],
+                                                                camera_angle=parameters.OBS_CAMERA_ROTATION,
+                                                                flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
     ax.annotate("N", xy=origin, xycoords='axes fraction', xytext=N_xy + origin, textcoords='axes fraction',
                 arrowprops=dict(arrowstyle="<|-", fc="yellow", ec="yellow"), color="yellow",
                 horizontalalignment='center', verticalalignment='center')
     # West arrow
     W_arrow = [arrow_size, 0]
-    W_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(W_arrow[0], W_arrow[1],
-                                                                    camera_angle=parameters.OBS_CAMERA_ROTATION,
-                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
-                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+    W_xy = np.asarray(flip_and_rotate_radec_vector_to_xy_vector(W_arrow[0], W_arrow[1],
+                                                                camera_angle=parameters.OBS_CAMERA_ROTATION,
+                                                                flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
     ax.annotate("W", xy=origin, xycoords='axes fraction', xytext=W_xy + origin, textcoords='axes fraction',
                 arrowprops=dict(arrowstyle="<|-", fc="yellow", ec="yellow"), color="yellow",
                 horizontalalignment='center', verticalalignment='center')
@@ -1866,10 +1877,10 @@ def plot_compass_simple(ax, parallactic_angle=None, arrow_size=0.1, origin=[0.15
     if parallactic_angle is not None:
         p_arrow = [0, arrow_size]  # angle with respect to North in RADEC counterclockwise
         angle = parameters.OBS_CAMERA_ROTATION + parameters.OBS_CAMERA_RA_FLIP_SIGN * parallactic_angle
-        p_xy = np.asarray(flip_and_rotate_radec_to_image_xy_coordinates(p_arrow[0], p_arrow[1],
-                                                                        camera_angle=angle,
-                                                                        flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
-                                                                        flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
+        p_xy = np.asarray(flip_and_rotate_radec_vector_to_xy_vector(p_arrow[0], p_arrow[1],
+                                                                    camera_angle=angle,
+                                                                    flip_ra_sign=parameters.OBS_CAMERA_RA_FLIP_SIGN,
+                                                                    flip_dec_sign=parameters.OBS_CAMERA_DEC_FLIP_SIGN))
         ax.annotate("Z", xy=origin, xycoords='axes fraction', xytext=p_xy + origin, textcoords='axes fraction',
                     arrowprops=dict(arrowstyle="<|-", fc="lightgreen", ec="lightgreen"), color="lightgreen",
                     horizontalalignment='center', verticalalignment='center')
@@ -1882,7 +1893,7 @@ def load_fits(file_name, hdu_index=0):
     ----------
     file_name: str
         The FITS file name.
-    hdu_index: int, optional
+    hdu_index: int, str, optional
         The HDU index in the file (default: 0).
 
     Returns
@@ -1902,7 +1913,7 @@ def load_fits(file_name, hdu_index=0):
 
     """
     hdu_list = fits.open(file_name)
-    header = hdu_list[0].header
+    header = hdu_list[hdu_index].header
     data = hdu_list[hdu_index].data
     hdu_list.close()  # need to free allocation for file description
     return header, data
@@ -2083,7 +2094,7 @@ def from_lambda_to_colormap(lambdas):
     return spectralmap
 
 
-def rebin(arr, new_shape):
+def rebin(arr, new_shape, FLAG_MAKESUM=True):
     """Rebin and reshape a numpy array.
 
     Parameters
@@ -2109,13 +2120,23 @@ def rebin(arr, new_shape):
            [4., 4., 4., 4., 4.],
            [4., 4., 4., 4., 4.]])
     """
+
+
+
     if np.any(new_shape * parameters.CCD_REBIN != arr.shape):
         shape_cropped = new_shape * parameters.CCD_REBIN
         margins = np.asarray(arr.shape) - shape_cropped
         arr = arr[:-margins[0], :-margins[1]]
     shape = (new_shape[0], arr.shape[0] // new_shape[0],
              new_shape[1], arr.shape[1] // new_shape[1])
-    return arr.reshape(shape).mean(-1).mean(1)
+
+    if FLAG_MAKESUM:
+        # SDC : conservation of energy
+        return arr.reshape(shape).sum(-1).sum(1)
+
+    else:
+        # SDC : sure of conservation of energy
+        return arr.reshape(shape).mean(-1).mean(1)
 
 
 def set_wcs_output_directory(file_name, output_directory=""):
@@ -2223,14 +2244,14 @@ def set_sources_file_name(file_name, output_directory=""):
     Examples
     --------
     >>> set_sources_file_name("image.fits", output_directory="")
-    'image_wcs/image_sources.fits'
+    'image_wcs/image.axy'
     >>> set_sources_file_name("image.png", output_directory="outputs")
-    'outputs/image_wcs/image_sources.fits'
+    'outputs/image_wcs/image.axy'
 
     """
     output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
     tag = set_wcs_tag(file_name)
-    return os.path.join(output_directory, f"{tag}_sources.fits")
+    return os.path.join(output_directory, f"{tag}.axy")
 
 
 def set_gaia_catalog_file_name(file_name, output_directory=""):
@@ -2330,10 +2351,10 @@ def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):
     ax.set_title("Correlation matrix")
     if axis_names is not None:
         names = [axis_names[ip] for ip in ipar]
-        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=9)
-        plt.yticks(np.arange(ipar.size), names, fontsize=7)
+        plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=15)
+        plt.yticks(np.arange(ipar.size), names, fontsize=15)
     cbar = plt.colorbar(im)
-    cbar.ax.tick_params(labelsize=7)
+    cbar.ax.tick_params(labelsize=15)
     plt.gcf().tight_layout()
 
 
@@ -2342,7 +2363,7 @@ def resolution_operator(cov, Q, reg):
     return np.eye(N) - reg * cov @ Q
 
 
-def flip_and_rotate_radec_to_image_xy_coordinates(ra, dec, camera_angle=0, flip_ra_sign=1, flip_dec_sign=1):
+def flip_and_rotate_radec_vector_to_xy_vector(ra, dec, camera_angle=0, flip_ra_sign=1, flip_dec_sign=1):
     """Flip and rotate the vectors in pixels along (RA,DEC) directions to (x, y) image coordinates.
     The parity transformations are applied first, then rotation.
 
@@ -2381,19 +2402,19 @@ def flip_and_rotate_radec_to_image_xy_coordinates(ra, dec, camera_angle=0, flip_
 
     Compute North direction in (x, y) frame
 
-    >>> flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=1)
+    >>> flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=1)
     (0.0, 1.0)
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 180, flip_ra_sign=1, flip_dec_sign=1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 180, flip_ra_sign=1, flip_dec_sign=1)
     '-0.0, -1.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=1)
     '-1.0, 0.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=-1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 90, flip_ra_sign=1, flip_dec_sign=-1)
     '1.0, -0.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 90, flip_ra_sign=-1, flip_dec_sign=-1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 90, flip_ra_sign=-1, flip_dec_sign=-1)
     '1.0, -0.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=-1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 0, flip_ra_sign=1, flip_dec_sign=-1)
     '0.0, -1.0'
-    >>> "%.1f, %.1f" % flip_and_rotate_radec_to_image_xy_coordinates(N_ra, N_dec, 0, flip_ra_sign=-1, flip_dec_sign=1)
+    >>> "%.1f, %.1f" % flip_and_rotate_radec_vector_to_xy_vector(N_ra, N_dec, 0, flip_ra_sign=-1, flip_dec_sign=1)
     '0.0, 1.0'
 
     """
@@ -2410,3 +2431,88 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod()
+
+
+def iraf_source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor=5, mask=None):
+    """Function to detect point-like sources in a data array.
+
+    This function use the photutils IRAFStarFinder module to search for sources in an image. This finder
+    is better than DAOStarFinder for the astrometry of isolated sources but less good for photometry.
+
+    Parameters
+    ----------
+    data_wo_bkg: array_like
+        The image data array. It works better if the background was subtracted before.
+    sigma: float
+        Standard deviation value for sigma clipping function before finding sources (default: 3.0).
+    fwhm: float
+        Full width half maximum for the source detection algorithm (default: 3.0).
+    threshold_std_factor: float
+        Only sources with a flux above this value times the RMS of the images are kept (default: 5).
+    mask: array_like, optional
+        Boolean array to mask image pixels (default: None).
+
+    Returns
+    -------
+    sources: Table
+        Astropy table containing the source centroids and fluxes, ordered by decreasing magnitudes.
+
+    Examples
+    --------
+
+    >>> N = 100
+    >>> data = np.ones((N, N))
+    >>> yy, xx = np.mgrid[:N, :N]
+    >>> x_center, y_center = 20, 30
+    >>> data += 10*np.exp(-((x_center-xx)**2+(y_center-yy)**2)/10)
+    >>> sources = iraf_source_detection(data)
+    >>> print(float(sources["xcentroid"]), float(sources["ycentroid"]))
+    20.0 30.0
+
+    .. doctest:
+        :hide:
+
+        >>> assert len(sources) == 1
+        >>> assert sources["xcentroid"] == x_center
+        >>> assert sources["ycentroid"] == y_center
+
+    .. plot:
+
+        from spectractor.tools import plot_image_simple
+        from spectractor.astrometry import source_detection
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        N = 100
+        data = np.ones((N, N))
+        yy, xx = np.mgrid[:N, :N]
+        x_center, y_center = 20, 30
+        data += 10*np.exp(-((x_center-xx)**2+(y_center-yy)**2)/10)
+        sources = iraf_source_detection(data)
+        fig = plt.figure(figsize=(6,5))
+        plot_image_simple(plt.gca(), data, target_pixcoords=(sources["xcentroid"], sources["ycentroid"]))
+        fig.tight_layout()
+        plt.show()
+
+    """
+    mean, median, std = sigma_clipped_stats(data_wo_bkg, sigma=sigma)
+    #fwhm = 5
+    #threshold_std_factor = 3
+    if mask is None:
+        mask = np.zeros(data_wo_bkg.shape, dtype=bool)
+    # daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std, exclude_border=True)
+    # sources = daofind(data_wo_bkg - median, mask=mask)
+    iraffind = IRAFStarFinder(fwhm=fwhm, threshold=threshold_std_factor * std, exclude_border=True)
+    sources = iraffind(data_wo_bkg - median, mask=mask)
+    for col in sources.colnames:
+        sources[col].info.format = '%.8g'  # for consistent table output
+    sources.sort('mag')
+    if parameters.DEBUG:
+        positions = np.array((sources['xcentroid'], sources['ycentroid']))
+        plot_image_simple(plt.gca(), data_wo_bkg, scale="symlog", target_pixcoords=positions)
+        if parameters.DISPLAY:
+            plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
+
+    return sources

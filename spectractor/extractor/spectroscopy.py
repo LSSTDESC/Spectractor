@@ -7,7 +7,7 @@ import os
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_for_legendre, plot_spectrum_simple
+from spectractor.tools import gauss, multigauss_and_bgd, rescale_x_to_legendre, plot_spectrum_simple
 
 
 class Line:
@@ -192,6 +192,7 @@ class Lines:
             self.my_logger.error(f'\n\tRedshift must small in absolute value (|z|<0.01) or be positive or null. '
                                  f'Got redshift={redshift}.')
         self.lines = []
+        self.table = Table()
         self.orders = orders
         for order in orders:
             for line in lines:
@@ -398,11 +399,11 @@ class Lines:
                     lambdas = np.copy(line.fit_lambdas)
                     if ax is not None:
                         ax.plot(lambdas, multigauss_and_bgd(lambdas, *line.fit_popt), lw=2, color='b')
-                        x_norm = rescale_x_for_legendre(lambdas)
+                        x_norm = rescale_x_to_legendre(lambdas)
                         bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
                         ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
         if print_table:
-            self.print_detected_lines(print_table=True)
+            self.table = self.print_detected_lines(print_table=True)
 
     def print_detected_lines(self, output_file_name="", overwrite=False, print_table=False, amplitude_units=""):
         """Print the detected line on screen as an Astropy table, and write it in a file.
@@ -479,7 +480,7 @@ class Lines:
                                  FWHM, signal_level, line.fit_snr, line.fit_chisq, line.fit_eqwidth_mod,
                                  line.fit_eqwidth_data))
                 j += 1
-        t = None
+        t = Table()
         if len(rows) > 0:
             t = Table(rows=rows, names=(
                 'Line', 'Tabulated', 'Detected', 'Shift', 'Err', 'FWHM', 'Amplitude', 'SNR', 'Chisq', 'Eqwidth_mod',
@@ -495,8 +496,6 @@ class Lines:
                 t.write(output_file_name, overwrite=overwrite)
             if print_table:
                 print(t)
-            if parameters.LSST_SAVEFIGPATH:
-                t.write(os.path.join(parameters.LSST_SAVEFIGPATH, 'extractedLines.fits'), overwrite=True)
         return t
 
 

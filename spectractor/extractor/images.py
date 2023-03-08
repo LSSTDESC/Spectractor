@@ -3,6 +3,7 @@ from astropy.io import fits
 import astropy.units as units
 from scipy import ndimage
 from matplotlib import cm
+from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -84,6 +85,8 @@ class Image(object):
         PSF instance fitted on the current target.
     target_bkgd2D: callable
         Function that models the background behind the current target.
+    wcs: WCS
+        Image World Coordinate System Astropy object.
 
     """
 
@@ -106,14 +109,13 @@ class Image(object):
         Examples
         --------
 
-        .. doctest::
-
-            >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im = Image('tests/data/reduc_20170605_028.fits')
+        >>> im.file_name
+        'tests/data/reduc_20170605_028.fits'
 
         .. doctest::
             :hide:
 
-            >>> assert im.file_name == 'tests/data/reduc_20170605_028.fits'
             >>> assert im.data is not None and np.mean(im.data) > 0
             >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
             >>> assert im.header is not None
@@ -123,8 +125,6 @@ class Image(object):
         self.my_logger = set_logger(self.__class__.__name__)
         if config != "":
             load_config(config)
-        if not os.path.isfile(file_name) and parameters.CALLING_CODE != 'LSST_DM':
-            raise FileNotFoundError(f"File {file_name} does not exist.")
         self.file_name = file_name
         self.units = 'ADU'
         self.expo = -1
@@ -147,6 +147,7 @@ class Image(object):
         self.parallactic_angle = None
         self.saturation = None
 
+        self.wcs = None
         self.ra = None
         self.dec = None
         self.hour_angle = None
@@ -154,7 +155,7 @@ class Image(object):
         self.pressure = 0
         self.humidity = 0
 
-        if parameters.CALLING_CODE != 'LSST_DM':
+        if parameters.CALLING_CODE != 'LSST_DM' and file_name != "":
             self.load_image(file_name)
         else:
             # data provided by the LSST shim, just instantiate objects
@@ -180,11 +181,11 @@ class Image(object):
 
         if self.filter_label != "" and "empty" not in self.filter_label.lower():
             t = TelescopeTransmission(filter_label=self.filter_label)
-            t.reset_lambda_range(transmission_threshold=1e-4)
+            t.reset_lambda_range(transmission_threshold=1e-5)
 
         if self.target_label != "":
             self.target = load_target(self.target_label, verbose=parameters.VERBOSE)
-            self.header['REDSHIFT'] = str(self.target.redshift)
+            self.header['REDSHIFT'] = self.target.redshift
 
     def rebin(self):
         """Rebin the image and reset some related parameters.
@@ -221,12 +222,16 @@ class Image(object):
             The fits file name.
 
         """
+        if not os.path.isfile(file_name):
+            raise FileNotFoundError(f"{file_name} not found.")
         if parameters.OBS_NAME == 'CTIO':
             load_CTIO_image(self)
         elif parameters.OBS_NAME == 'LPNHE':
             load_LPNHE_image(self)
-        if parameters.OBS_NAME == "AUXTEL":
+        elif parameters.OBS_NAME == "AUXTEL":
             load_AUXTEL_image(self)
+        elif parameters.OBS_NAME == "STARDICE":
+            load_STARDICE_image(self)
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.header["GRATING"] = self.disperser_label
@@ -316,7 +321,7 @@ class Image(object):
         --------
         .. doctest::
 
-            >>> im = Image('tests/data/reduc_20170530_134.fits')
+            >>> im = Image('tests/data/reduc_20170530_134.fits', config="./config/ctio.ini")
             >>> im.convert_to_ADU_units()
             >>> im.compute_statistical_error()
             >>> im.plot_statistical_error()
@@ -397,13 +402,13 @@ class Image(object):
         fit, cov, model = fit_poly1d(x, y, order=1)
         gain = 1 / fit[0]
         read_out = np.sqrt(fit[1]) * gain
-        if not np.isclose(gain, np.mean(self.gain), rtol=1e-2):
+        if not np.isclose(gain, np.nanmean(self.gain), rtol=1e-2):
             self.my_logger.warning(f"\n\tFitted gain seems to be different than input gain. "
-                                   f"Fit={gain} but average of self.gain is {np.mean(self.gain)}.")
-        if not np.isclose(read_out, np.mean(self.read_out_noise), rtol=1e-2):
+                                   f"Fit={gain} but average of self.gain is {np.nanmean(self.gain)}.")
+        if not np.isclose(read_out / parameters.CCD_REBIN, np.nanmean(self.read_out_noise), rtol=1e-2):
             self.my_logger.warning(f"\n\tFitted read out noise seems to be different than input readout noise. "
-                                   f"Fit={read_out} but average of self.read_out_noise is "
-                                   f"{np.mean(self.read_out_noise)}.")
+                                   f"Fit={read_out / parameters.CCD_REBIN} but average of self.read_out_noise is "
+                                   f"{np.nanmean(self.read_out_noise)}.")
         return fit, x, y, model
 
     def plot_statistical_error(self):
@@ -522,6 +527,7 @@ class Image(object):
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
 
+
 def load_CTIO_image(image):
     """Specific routine to load CTIO fits files and load their data and properties for Spectractor.
 
@@ -548,10 +554,11 @@ def load_CTIO_image(image):
     image.humidity = image.header['OUTHUM']
 
     parameters.CCD_IMSIZE = int(image.header['XLENGTH'])
-    parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE'])
+    parameters.CCD_PIXEL2ARCSEC = float(image.header['XPIXSIZE']) * parameters.CCD_REBIN
     if image.header['YLENGTH'] != parameters.CCD_IMSIZE:
         image.my_logger.warning(
             f'\n\tImage rectangular: X={parameters.CCD_IMSIZE:d} pix, Y={image.header["YLENGTH"]:d} pix')
+    parameters.CCD_IMSIZE //= parameters.CCD_REBIN
     image.coord = SkyCoord(image.header['RA'] + ' ' + image.header['DEC'], unit=(units.hourangle, units.deg),
                            obstime=image.header['DATE-OBS'])
     image.my_logger.info(f'\n\tImage {image.file_name} loaded.')
@@ -559,6 +566,11 @@ def load_CTIO_image(image):
     build_CTIO_gain_map(image)
     build_CTIO_read_out_noise_map(image)
     image.compute_parallactic_angle()
+    # WCS
+    wcs_file_name = set_wcs_file_name(image.file_name)
+    if os.path.isfile(wcs_file_name):
+        image.my_logger.info(f"\n\tUse WCS {wcs_file_name}.")
+        image.wcs = load_wcs_from_file(wcs_file_name)
 
 
 def build_CTIO_gain_map(image):
@@ -569,16 +581,16 @@ def build_CTIO_gain_map(image):
     image: Image
         The Image instance to fill with file data and header.
     """
-    size = parameters.CCD_IMSIZE
-    image.gain = np.zeros_like(image.data)
+    sizey, sizex = image.data.shape
+    image.gain = parameters.CCD_GAIN * np.ones_like(image.data)
     # ampli 11
-    image.gain[0:size // 2, 0:size // 2] = image.header['GTGAIN11']
+    image.gain[0:sizey // 2, 0:sizex // 2] = image.header['GTGAIN11']
     # ampli 12
-    image.gain[0:size // 2, size // 2:size] = image.header['GTGAIN12']
+    image.gain[0:sizey // 2, sizex // 2:sizex] = image.header['GTGAIN12']
     # ampli 21
-    image.gain[size // 2:size, 0:size] = image.header['GTGAIN21']
+    image.gain[sizey // 2:sizey, 0:sizex] = image.header['GTGAIN21']
     # ampli 22
-    image.gain[size // 2:size, size // 2:size] = image.header['GTGAIN22']
+    image.gain[sizey // 2:sizey, sizex // 2:sizex] = image.header['GTGAIN22']
 
 
 def build_CTIO_read_out_noise_map(image):
@@ -644,7 +656,7 @@ def load_LPNHE_image(image):  # pragma: no cover
     # compute CCD gain map
     image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
     image.read_out_noise = float(image.header['CCDNOISE']) * np.ones_like(image.data)
-    parameters.CCD_IMSIZE = image.data.shape[1]
+    parameters.CCD_IMSIZE = image.data.shape[1] // parameters.CCD_REBIN
     # save xys platform position into main header
     image.header["XPOS"] = hdus["XYZ"].header["XPOS"]
     image.header.comments["XPOS"] = hdus["XYZ"].header.comments["XPOS"]
@@ -682,7 +694,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
     image.my_logger.info('\n\tImage loaded')
     # compute CCD gain map
     image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
-    parameters.CCD_IMSIZE = image.data.shape[1]
+    parameters.CCD_IMSIZE = image.data.shape[1] // parameters.CCD_REBIN
     image.disperser_label = image.header['GRATING']
     image.ra = Angle(image.header['RA'], unit="deg")
     image.dec = Angle(image.header['DEC'], unit="deg")
@@ -709,6 +721,7 @@ def load_AUXTEL_image(image):  # pragma: no cover
         parameters.OBS_CAMERA_ROTATION -= 360
     if parameters.OBS_CAMERA_ROTATION < -360:
         parameters.OBS_CAMERA_ROTATION += 360
+    image.header["CAM_ROT"] = parameters.OBS_CAMERA_ROTATION
     if "CD2_1" in hdu_list[1].header:
         rotation_wcs = 180 / np.pi * np.arctan2(hdu_list[1].header["CD2_1"], hdu_list[1].header["CD1_1"]) + 90
         if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=2):
@@ -718,12 +731,75 @@ def load_AUXTEL_image(image):  # pragma: no cover
     parameters.OBS_ALTITUDE = float(image.header['OBS-ELEV']) / 1000
     parameters.OBS_LATITUDE = image.header['OBS-LAT']
     image.read_out_noise = 8.5 * np.ones_like(image.data)
-    image.target_label = image.header["OBJECT"].replace(" ", "")
+    image.target_label = image.header["OBJECT"]  #.replace(" ", "")
     if "OBJECTX" in image.header:
         image.target_guess = [parameters.CCD_IMSIZE - float(image.header["OBJECTY"]),
                               parameters.CCD_IMSIZE - float(image.header["OBJECTX"])]
     image.disperser_label = image.header["GRATING"]
-    parameters.DISTANCE2CCD = 113 + float(image.header["LINSPOS"])  # mm
+    parameters.DISTANCE2CCD = 115 + float(image.header["LINSPOS"])  # mm
+    if image.disperser_label == "holo4_003":
+        parameters.DISTANCE2CCD += 4  # hologram is sealed with a 4 mm window
+    image.compute_parallactic_angle()
+
+def load_STARDICE_image(image):  # pragma: no cover
+    """Specific routine to load STARDICE fits files and load their data and properties for Spectractor.
+
+    Parameters
+    ----------
+    image: Image
+        The Image instance to fill with file data and header.
+    """
+
+    image.my_logger.info(f'\n\tLoading STARDICE image {image.file_name}...')
+    hdu_list = fits.open(image.file_name)
+    image.header = hdu_list[0].header
+    image.data = hdu_list[0].data.astype(np.float64)
+    hdu_list.close()  # need to free allocation for file descripto
+    if "BZERO" in image.header:
+        del image.header["BZERO"]
+    if "BSCALE" in image.header:
+        del image.header["BSCALE"]
+
+    #Set the flip signs depending on the side of the pillar 
+    if image.header['MOUNTTAU'] < 90:
+        parameters.OBS_CAMERA_ROTATION = 180
+
+    elif image.header['MOUNTTAU'] >= 90:
+        parameters.OBS_CAMERA_ROTATION = 0
+
+    image.date_obs = image.header['DATE-OBS']
+    image.expo = float(image.header['cameraexptime'])
+    image.filter_label = 'EMPTY'
+    # transformations so that stars are like in Stellarium up to a rotation
+    # with spectrogram nearly horizontal and on the right of central star
+    image.data = image.data[::-1, ::-1]
+    image.airmass = 1/np.cos(np.radians(90-image.header['MOUNTALT']))
+       
+    image.my_logger.info('\n\tImage loaded')
+    # compute CCD gain map
+    image.gain = float(parameters.CCD_GAIN) * np.ones_like(image.data)
+    parameters.CCD_IMSIZE = image.data.shape[1] // parameters.CCD_REBIN
+    image.disperser_label = "star_analyzer_200"
+    image.ra = Angle(image.header['MOUNTRA'], unit="deg")
+    image.dec = Angle(image.header['MOUNTDEC'], unit="deg")
+    image.hour_angle = Angle(image.header['MOUNTHA'], unit="deg")
+    if image.header['MOUNTTAU'] >= 90:
+        image.hour_angle = image.hour_angle - 180*units.deg
+        image.dec = 180*units.deg - image.dec
+    image.temperature = 10
+    image.pressure = 1000
+    image.humidity = 87
+    image.units = 'ADU'
+    if "PC2_1" in image.header:
+        rotation_wcs = 180 / np.pi * np.arctan2(-hdu_list[0].header["PC2_1"]/hdu_list[0].header["CDELT2"], hdu_list[0].header["PC1_1"]/hdu_list[0].header["CDELT1"])
+        atol = 0.02
+        print("RORATION WCS :", rotation_wcs)
+        if not np.isclose(rotation_wcs % 360, parameters.OBS_CAMERA_ROTATION % 360, atol=atol):
+            image.my_logger.warning(f"\n\tWCS rotation angle is {rotation_wcs} degrees while "
+                                    f"parameters.OBS_CAMERA_ROTATION={parameters.OBS_CAMERA_ROTATION} degrees. "
+                                    f"\nBoth differs by more than {atol} degrees... bug ?")
+
+    image.read_out_noise = 8.5 * np.ones_like(image.data)
     image.compute_parallactic_angle()
 
 
@@ -754,7 +830,8 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
 
     Examples
     --------
-    >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9")
+    >>> parameters.CCD_REBIN = 1
+    >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9", config="./config/ctio.ini")
     >>> im.plot_image()
     >>> guess = [820, 580]
     >>> parameters.VERBOSE = True
@@ -766,40 +843,29 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     >>> find_target(im, guess)  #doctest: +ELLIPSIS
     [816.9... 587.1...]
     >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "guess"
-    >>> find_target(im, guess)
+    >>> find_target(im, guess, widths=(100, 100))
     [820, 580]
     """
-    my_logger = set_logger(__name__)
     target_pixcoords = [-1, -1]
     theX = -1
     theY = -1
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "WCS" and not rotated:
-        wcs_file_name = set_wcs_file_name(image.file_name)
-        if os.path.isfile(wcs_file_name):
-            my_logger.info(f"\n\tUse WCS {wcs_file_name} to find target pixel position.")
-            if rotated:
-                target_pixcoords = find_target_after_rotation(image)
-                theX, theY = target_pixcoords
-            else:
-                wcs = load_wcs_from_file(wcs_file_name)
-                target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
-                # noinspection PyUnresolvedReferences
-                target_pixcoords = np.array(wcs.all_world2pix(target_coord_after_motion.ra,
-                                                              target_coord_after_motion.dec, 0))
-                theX, theY = target_pixcoords / parameters.CCD_REBIN
-            sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
-                                                                                rotated=rotated, widths=widths)
-            sub_image_x0 = theX - x0 + Dx
-            sub_image_y0 = theX - y0 + Dy
-            if parameters.DEBUG:
-                plt.figure(figsize=(5, 5))
-                plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
-                                  target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
-                plt.show()
-            if parameters.PdfPages:
-                parameters.PdfPages.savefig()
-        else:
-            my_logger.info(f"\n\tNo WCS {wcs_file_name} available, use 2D fit to find target pixel position.")
+        target_coord_after_motion = image.target.get_radec_position_after_pm(image.date_obs)
+        target_pixcoords = np.array(image.wcs.all_world2pix(target_coord_after_motion.ra,
+                                                        target_coord_after_motion.dec, 0))
+        theX, theY = target_pixcoords / parameters.CCD_REBIN
+        sub_image_subtracted, x0, y0, Dx, Dy, sub_errors = find_target_init(image=image, guess=[theX, theY],
+                                                                            rotated=rotated, widths=widths)
+        sub_image_x0 = theX - x0 + Dx
+        sub_image_y0 = theX - y0 + Dy
+        if parameters.DEBUG:
+            plt.figure(figsize=(5, 5))
+            plot_image_simple(plt.gca(), data=sub_image_subtracted, scale="lin", title="", units=image.units,
+                                target_pixcoords=[theX - x0 + Dx, theX - x0 + Dx])
+            plt.show()
+        if parameters.PdfPages:
+            parameters.PdfPages.savefig()
+
     if parameters.SPECTRACTOR_FIT_TARGET_CENTROID == "fit" or rotated:
         if target_pixcoords[0] == -1 and target_pixcoords[1] == -1:
             if guess is None:
@@ -922,12 +988,21 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     else:
         sub_image = np.copy(image.data[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
         sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-    image.saturation = parameters.CCD_MAXADU / image.expo
+
+    # usually one rebin by adding pixel contents
+    image.saturation = parameters.CCD_MAXADU / image.expo *parameters.CCD_REBIN**2
+
     NY, NX = sub_image.shape
     Y, X = np.mgrid[:NY, :NX]
+
     bkgd_2D = fit_poly2d_outlier_removal(X, Y, sub_image, order=1, sigma=3)
     image.target_bkgd2D = bkgd_2D
+
     sub_image_subtracted = sub_image - bkgd_2D(X, Y)
+
+    # SDC : very important clipping negative signal, avoiding crash later
+    sub_image_subtracted = np.where(sub_image_subtracted < 0, 0, sub_image_subtracted)
+
     saturated_pixels = np.where(sub_image >= image.saturation)
     if len(saturated_pixels[0]) > 0:
         image.my_logger.debug(
@@ -1338,13 +1413,11 @@ def turn_image(image):
     image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
     image.data_rotated = np.copy(image.data)
     if not np.isnan(image.rotation_angle):
-        image.data_rotated = ndimage.interpolation.rotate(image.data, image.rotation_angle,
-                                                          prefilter=parameters.ROT_PREFILTER,
-                                                          order=parameters.ROT_ORDER)
+        image.data_rotated = ndimage.rotate(image.data, image.rotation_angle,
+                                            prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
         image.stat_errors_rotated = np.sqrt(
-            np.abs(ndimage.interpolation.rotate(image.stat_errors ** 2, image.rotation_angle,
-                                                prefilter=parameters.ROT_PREFILTER,
-                                                order=parameters.ROT_ORDER)))
+            np.abs(ndimage.rotate(image.stat_errors ** 2, image.rotation_angle,
+                                  prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)))
         min_noz = np.min(image.stat_errors_rotated[image.stat_errors_rotated > 0])
         image.stat_errors_rotated[image.stat_errors_rotated <= 0] = min_noz
     if parameters.DEBUG:

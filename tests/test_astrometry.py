@@ -1,5 +1,5 @@
-import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
-mpl.use('Agg')
+import matplotlib as mpl
+mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
 from numpy.testing import run_module_suite  # noqa: E402
 
@@ -21,7 +21,7 @@ def test_astrometry():
     file_names = ['tests/data/reduc_20170530_134.fits']  # 'tests/data/reduc_20170605_028.fits']
 
     load_config('./config/ctio.ini')
-    logbook = LogBook(logbook='./ctiofulllogbook_jun2017_v5.csv')
+    logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
     parameters.VERBOSE = True
     parameters.DEBUG = True
 
@@ -33,10 +33,11 @@ def test_astrometry():
         if os.path.isdir(wcs_output_directory):
             subprocess.check_output(f"rm -rf {wcs_output_directory}", shell=True)
         tag = file_name.split('/')[-1].replace('sim', 'reduc')
-        disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
-        if target is None or xpos is None or ypos is None:
+        disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
+        if target_label is None or xpos is None or ypos is None:
             continue
-        a = Astrometry(file_name, target, disperser_label)
+        im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")
+        a = Astrometry(im)
         extent = ((int(max(0, xpos - radius)), int(min(xpos + radius, parameters.CCD_IMSIZE))),
                   (int(max(0, ypos - radius)), int(min(ypos + radius, parameters.CCD_IMSIZE))))
         gaia_min_residuals = a.run_full_astrometry(extent=extent, maxiter=maxiter)
@@ -55,15 +56,15 @@ def test_astrometry():
             assert np.isclose(a.wcs.wcs.crval[0], 224.9718998, atol=0.03)
             assert np.isclose(a.wcs.wcs.crval[1], -54.28912925, atol=0.03)
         if file_name == 'tests/data/sim_20170530_134.fits':
-            im = Image(file_name, target_label=target)
+            im = Image(file_name, target_label=target_label)
             parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "WCS"
             x0_wcs, y0_wcs = find_target(im, guess=[xpos, ypos], rotated=False)
             parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "fit"
             x0, y0 = find_target(im, guess=[xpos, ypos], rotated=False)
-            im.my_logger.warning(f"\n\tTrue {target} position: "
+            im.my_logger.warning(f"\n\tTrue {target_label} position: "
                                  f"{np.array([float(im.header['X0_T']), float(im.header['Y0_T'])])}"
-                                 f"\n\tFound {target} position with WCS: {np.array([x0_wcs, y0_wcs])}"
-                                 f"\n\tFound {target} position with 2D fit: {np.array([x0, y0])}")
+                                 f"\n\tFound {target_label} position with WCS: {np.array([x0_wcs, y0_wcs])}"
+                                 f"\n\tFound {target_label} position with 2D fit: {np.array([x0, y0])}")
             assert np.abs(x0_wcs - float(im.header['X0_T'])) < 0.5
             assert np.abs(y0_wcs - float(im.header['Y0_T'])) < 1
 
