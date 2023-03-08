@@ -21,4 +21,4 @@ coveralls
 deprecated
 pyyaml
 nose
-getCalspec>=0.1.5
+getCalspec>=2.0.0
