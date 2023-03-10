@@ -14,7 +14,7 @@ from spectractor.simulation.throughput import plot_transmission_simple
 
 class Atmosphere:
 
-    def __init__(self, airmass, pressure, temperature):
+    def __init__(self, airmass, pressure, temperature, lambda_min=250, lambda_max=1200):
         """Class to evaluate an atmospheric transmission using Libradtran.
 
         Parameters
@@ -25,6 +25,10 @@ class Atmosphere:
             Pressure of the atmosphere in hPa.
         temperature: float
             Temperature of the atmosphere in Celsius degrees.
+        lambda_min: float
+            Minimum wavelength for simulation in nm.
+        lambda_max: float
+            Maximum wavelength for simulation in nm.
 
         Examples
         --------
@@ -46,6 +50,8 @@ class Atmosphere:
         self.ozone = None
         self.aerosols = None
         self.transmission = lambda x: np.ones_like(x).astype(float)
+        self.lambda_min = lambda_min
+        self.lambda_max = lambda_max
         self.title = ""
         self.label = ""
 
@@ -115,10 +121,8 @@ class Atmosphere:
         self.my_logger.debug(f'\n\t{self.title}\n\t\t{self.label}')
 
         lib = libradtran.Libradtran()
-        path = lib.simulate(self.airmass, pwv, ozone, aerosols, self.pressure)
-        data = np.loadtxt(path)
-        wl = data[:, 0]
-        atm = data[:, 1]
+        wl, atm = lib.simulate(self.airmass, aerosols, ozone, pwv, self.pressure,
+                               lambda_min=self.lambda_min, lambda_max=self.lambda_max)
         self.transmission = interp1d(wl, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
         return self.transmission
 
