@@ -173,7 +173,7 @@ class Spectrum:
         self.lambdas = None
         self.lambdas_binwidths = None
         self.lambdas_indices = None
-        self.lambda_ref = None
+        self.lambda_ref = 550
         self.order = order
         self.chromatic_psf = None
         self.filter_label = ""
@@ -232,7 +232,12 @@ class Spectrum:
             self.parallactic_angle = image.parallactic_angle
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
                                self.humidity, self.airmass]
-        self.load_filter()
+        t = self.load_filter()
+        if self.target is not None and len(self.target.spectra) > 0:
+            spec = self.target.spectra[0] * t.transmission(self.target.wavelengths[0])
+            lambda_ref = np.sum(self.target.wavelengths[0] * spec) / np.sum(spec)
+            self.lambda_ref = lambda_ref
+            self.header['LBDA_REF'] = lambda_ref
 
     def convert_from_ADUrate_to_flam(self):
         """Convert units from ADU/s to erg/s/cm^2/nm.
@@ -316,9 +321,10 @@ class Spectrum:
             >>> assert np.isclose(parameters.LAMBDA_MAX, 760)
 
         """
+        t = TelescopeTransmission(filter_label=self.filter_label)
         if self.filter_label != "" and "empty" not in self.filter_label.lower():
-            t = TelescopeTransmission(filter_label=self.filter_label)
             t.reset_lambda_range(transmission_threshold=1e-4)
+        return t
 
     def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False):
         """Plot spectrum with emission and absorption lines.
