@@ -632,6 +632,10 @@ class ChromaticPSF:
         bounds = [[], []]
         for k, name in enumerate(self.psf.param_names):
             tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
+            if self.degrees[name] < 2:  # if deg<2, apply directly PSF bounds to _0 ChromaticPSF parameter
+                i_psf_par = self.psf.param_names.index(name)
+                tmp_bounds[0][0] = self.psf.bounds[i_psf_par][0]
+                tmp_bounds[1][0] = self.psf.bounds[i_psf_par][1]
             if name == "saturation":
                 tmp_bounds = [[0], [2 * self.saturation]]
             elif name == "amplitude":
