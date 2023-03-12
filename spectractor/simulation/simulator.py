@@ -484,14 +484,23 @@ class SpectrogramModel(Spectrum):
             self.profile_params = self.simulate_psf(psf_poly_params)
         self.my_logger.debug(f'\n\tAfter psf params: {time.time() - start}')
         start = time.time()
-        lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y)
+        self.lambdas = self.compute_lambdas_in_spectrogram(D, shift_x, shift_y, angle, niter=5, with_adr=True,
+                                                           order=self.order)
+        dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+                                                                niter=5, with_adr=True, order=self.order)
+        dispersion_law += self.r0
+        dispersion_law_order2 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+                                                                       niter=5, with_adr=True,
+                                                                       order=self.order + np.sign(self.order))
+        dispersion_law_order2 += self.r0
+        # lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y)
         self.chromatic_psf.table["Dx"] = dispersion_law.real - self.r0.real
         self.chromatic_psf.table["Dy"] = dispersion_law.imag - self.r0.imag
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
         if self.atmosphere_sim is None or not self.fix_atm_sim:
             self.atmosphere_sim = self.atmosphere.simulate(ozone, pwv, aerosols)
-        spectrum, spectrum_err = self.simulate_spectrum(lambdas, self.atmosphere_sim)
+        spectrum, spectrum_err = self.simulate_spectrum(self.lambdas, self.atmosphere_sim)
         self.my_logger.debug(f'\n\tAfter spectrum: {time.time() - start}')
         # Fill the order 1 cube
         nlbda = dispersion_law.size
@@ -513,8 +522,8 @@ class SpectrogramModel(Spectrum):
 
         # Add order 2
         if A2 > 0.:
-            spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(lambdas_order2) * \
-                                                   self.simulate_spectrum(lambdas_order2, self.atmosphere_sim)
+            spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(self.lambdas) * \
+                                                   self.simulate_spectrum(self.lambdas, self.atmosphere_sim)
             if np.any(np.isnan(spectrum_order2)):
                 spectrum_order2[np.isnan(spectrum_order2)] = 0.
             nlbda2 = dispersion_law_order2.size
@@ -525,8 +534,8 @@ class SpectrogramModel(Spectrum):
                 # same PSF as for the order 1 but at the same position
                 profile_params_order2 = np.copy(self.profile_params)
                 profile_params_order2[:, 0] = 1
-                profile_params_order2[:nlbda2, 1] = dispersion_law_order2.real
-                profile_params_order2[:nlbda2, 2] = dispersion_law_order2.imag
+                profile_params_order2[:nlbda2, 1] = dispersion_law_order2.real #+ self.r0.real
+                profile_params_order2[:nlbda2, 2] = dispersion_law_order2.imag #+ self.r0.imag
                 distance = np.abs(dispersion_law)
                 distance_order2 = np.abs(dispersion_law_order2)
                 for k in range(3, self.profile_params.shape[1]):

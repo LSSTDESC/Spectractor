@@ -717,6 +717,152 @@ class Spectrum:
         else:
             self.my_logger.warning(f'\n\tSpectrogram file {input_file_name} not found')
 
+    def compute_disp_axis_in_spectrogram(self, shift_x, shift_y, angle):
+        """Compute the dispersion axis position in a spectrogram.
+        Origin is the order 0 centroid.
+        Parameters
+        ----------
+        shift_x: float
+            Shift in the x axis direction for order 0 position in pixel.
+        shift_y: float
+            Shift in the y axis direction for order 0 position in pixel.
+        angle: float
+            Main dispersion axis angle in degrees.
+        Returns
+        -------
+        Dx: array_like
+            Position array along x axis of spectrogram
+        Dy_disp_axis: array_like
+            Dispersion axis position along y axis of spectrogram with respect to Dx.
+        Examples
+        --------
+        >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> Dx, Dy_disp_axis = s.compute_disp_axis_in_spectrogram(0, 0, 0)
+        >>> Dx[0] == -s.spectrogram_x0
+        True
+        >>> Dy_disp_axis[:4]
+        array([0., 0., 0., 0.])
+        """
+        # Distance in x and y with respect to the TRUE order 0 position at lambda_ref
+        Dx = np.arange(self.spectrogram_Nx) - self.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
+        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx - shift_y  # disp axis height in spectrogram frame for x with respect to order 0
+        return Dx, Dy_disp_axis
+
+    def compute_lambdas_in_spectrogram(self, D, shift_x, shift_y, angle, niter=3, with_adr=True, order=1):
+        """Compute the dispersion relation in a spectrogram, using grating dispersion model and ADR,
+        for a given diffraction order. Origin is the order 0 centroid.
+        Parameters
+        ----------
+        D: float
+            The distance between the CCD and the disperser in mm.
+        shift_x: float
+            Shift in the x axis direction for order 0 position in pixel.
+        shift_y: float
+            Shift in the y axis direction for order 0 position in pixel.
+        angle: float
+            Main dispersion axis angle in degrees.
+        niter: int, optional
+            Number of iterations to compute ADR (default: 3).
+        with_adr: bool, optional
+            If True, add ADR effect to grating dispersion model (default: True).
+        order: int, optional
+            Diffraction order (default: 1).
+        Returns
+        -------
+        lambdas: array_like
+            Wavelength array for the given diffraction order.
+        Examples
+        --------
+        >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
+        >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
+        >>> lambdas[:4]
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> lambdas_order2 = s.compute_lambdas_in_spectrogram(58, 0, 0, 0, order=2)
+        >>> lambdas_order2[:4]
+        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
+        """
+        # Distance in x and y with respect to the true order 0 position at lambda_ref
+        Dx, Dy_disp_axis = self.compute_disp_axis_in_spectrogram(shift_x=shift_x, shift_y=shift_y, angle=angle)
+        distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
+
+        # Wavelengths using the order 0 shifts (ADR has no impact as it shifts order 0 and order p equally)
+        new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
+        # First guess of wavelengths
+        self.disperser.D = float(np.copy(D))
+        lambdas = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=order)
+        # Evaluate ADR
+        if with_adr:
+            for k in range(niter):
+                adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
+                                            lambda_ref=self.lambda_ref)
+                adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+
+                # Compute lambdas at pixel column x
+                lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=order)
+        return lambdas
+
+    def compute_dispersion_in_spectrogram(self, lambdas, shift_x, shift_y, angle, niter=3, with_adr=True, order=1):
+        """Compute the dispersion relation in a spectrogram, using grating dispersion model and ADR, for a given
+        diffraction order. Origin is the order 0 centroid.
+        Parameters
+        ----------
+        lambdas: array_like
+            Wavelength array for the given diffraction order.
+        shift_x: float
+            Shift in the x axis direction for order 0 position in pixel.
+        shift_y: float
+            Shift in the y axis direction for order 0 position in pixel.
+        angle: float
+            Main dispersion axis angle in degrees.
+        niter: int, optional
+            Number of iterations to compute ADR (default: 3).
+        with_adr: bool, optional
+            If True, add ADR effect to grating dispersion model (default: True).
+        order: int, optional
+            Diffraction order (default: 1).
+        Returns
+        -------
+        dispersion_law: array_like
+            Complex array coding the 2D dispersion relation in the spectrogram for the given diffraction order.
+        Examples
+        --------
+        >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> s.x0 = [743, 683]
+        >>> s.spectrogram_x0 = -280
+        >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
+        >>> lambdas[:4]
+        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> dispersion_law = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=1)
+        >>> dispersion_law[:4]
+        array([280.0000185 +1.07837872j, 281.00001766+1.06655761j,
+               282.00001686+1.05487099j, 283.0000161 +1.04331681j])
+        >>> dispersion_law_order2 = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=2)
+        >>> dispersion_law_order2[:4]
+        array([573.69582907+1.07837872j, 575.80158761+1.06655761j,
+               577.90853861+1.05487099j, 580.01668263+1.04331681j])
+        """
+        new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
+        # Distance (not position) in pixel of wavelength lambda centroid in the (x,y) spectrogram frame
+        # with respect to order 0 centroid
+        distance_along_disp_axis = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=order)
+        Dx = distance_along_disp_axis * np.cos(angle * np.pi / 180)
+        Dy_disp_axis = distance_along_disp_axis * np.sin(angle * np.pi / 180)
+        # Evaluate ADR
+        adr_x = np.zeros_like(Dx)
+        adr_y = np.zeros_like(Dy_disp_axis)
+        if with_adr:
+            for k in range(niter):
+                adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
+                                            lambda_ref=self.lambda_ref)
+                adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+
+        # Position (not distance) in pixel of wavelength lambda centroid in the (x,y) spectrogram frame
+        # with respect to order 0 initial centroid position.
+        dispersion_law = (Dx + shift_x + with_adr * adr_x) + 1j * (Dy_disp_axis + with_adr * adr_y + shift_y)
+        return dispersion_law
+
 
 def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func=None, snr_minlevel=3, ax=None,
                  calibration_lines_only=False,
@@ -1160,7 +1306,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
     return global_chisq
 
 
-def calibrate_spectrum(spectrum, with_adr=False):
+def calibrate_spectrum(spectrum, with_adr=False, niter=5):
     """Convert pixels into wavelengths given the position of the order 0,
     the data for the spectrum, the properties of the disperser. Fit the absorption
     (and eventually the emission) lines to perform a second calibration of the
@@ -1176,6 +1322,8 @@ def calibrate_spectrum(spectrum, with_adr=False):
     with_adr: bool, optional
         If True, the ADR longitudinal shift is subtracted to distances.
         Must be False if the spectrum has already been decontaminated from ADR (default: False).
+    niter: int, optional
+        Number of iterations for ADR accurate evaluation (default: 5).
 
     Returns
     -------
@@ -1200,10 +1348,12 @@ def calibrate_spectrum(spectrum, with_adr=False):
     # ADR is x>0 westward and y>0 northward while CTIO images are x>0 westward and y>0 southward
     # Must project ADR along dispersion axis
     if with_adr > 0:
-        adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
-                                    lambda_ref=spectrum.lambda_ref)
-        adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-                                                               dispersion_axis_angle=spectrum.rotation_angle)
+        for k in range(niter):
+            adr_ra, adr_dec = adr_calib(spectrum.lambdas, spectrum.adr_params, parameters.OBS_LATITUDE,
+                                        lambda_ref=spectrum.lambda_ref)
+            adr_u, _ = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
+                                                                   dispersion_axis_angle=spectrum.rotation_angle)
+            spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance - adr_u, spectrum.x0, order=spectrum.order)
     else:
         adr_u = np.zeros_like(distance)
     x0 = spectrum.x0

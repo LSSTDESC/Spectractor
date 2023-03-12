@@ -309,65 +309,86 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.p = np.asarray(params)
         W_dot_data = self.W * (self.data + (1 - B) * self.bgd_flat)
         profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
-        profile_params[:, 0] = 1
-        profile_params[:, 1] = np.arange(self.Nx)
-        self.spectrum.chromatic_psf.fill_table_with_profile_params(profile_params)
 
+        # Evaluate ADR and compute wavelength arrays
+        self.lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
+                                                                    order=self.spectrum.order)
+        dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, dx0, dy0, angle,
+                                                                         niter=5, with_adr=True,
+                                                                         order=self.spectrum.order)
         # Distance in x and y with respect to the true order 0 position at lambda_ref
-        Dx = np.arange(self.Nx) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
-        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
+        #Dx = np.arange(self.Nx) - self.spectrum.spectrogram_x0 - dx0  # distance in (x,y) spectrogram frame for column x
+        #Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx - dy0  # disp axis height in spectrogram frame for x
+        #distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
+        Dx, Dy_disp_axis = self.spectrum.compute_disp_axis_in_spectrogram(shift_x=dx0, shift_y=dy0, angle=angle)
+        distance = np.abs(dispersion_law)  # np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
         self.spectrum.chromatic_psf.table["Dy_disp_axis"] = Dy_disp_axis
         self.spectrum.chromatic_psf.table["Dx"] = Dx
 
         # First guess of wavelengths
-        self.spectrum.disperser.D = np.copy(D2CCD)
-        self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
-                                                                       self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                       order=self.spectrum.order)
-        self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
-                                                                              self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                              order=self.spectrum.order+np.sign(self.spectrum.order))
+        #self.spectrum.disperser.D = np.copy(D2CCD)
+        #self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance,
+        #                                                               self.spectrum.x0 + np.asarray([dx0, dy0]),
+        #                                                               order=self.spectrum.order)
 
         # Evaluate ADR
-        adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
-                                    lambda_ref=self.spectrum.lambda_ref)
-        adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-        adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
-        # Compute lambdas at pixel column x
+        # niter = 5
+        # for k in range(niter):
+        #     adr_ra, adr_dec = adr_calib(self.lambdas, self.spectrum.adr_params, parameters.OBS_LATITUDE,
+        #                                 lambda_ref=self.spectrum.lambda_ref)
+        #     adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+        #     adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+        #     # Compute lambdas at pixel column x
+        #     # Compute lambdas at pixel column x
+        #     self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u,
+        #                                                                   self.spectrum.x0 + np.asarray([dx0, dy0]),
+        #                                                                   order=self.spectrum.order)
         # self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u,
         #                                                                self.spectrum.x0 + np.asarray([dx0, dy0]),
         #                                                                order=1)
-
-        # Evaluate ADR for order 2
-        adr_ra, adr_dec = adr_calib(self.lambdas_order2, self.spectrum.adr_params, parameters.OBS_LATITUDE,
-                                    lambda_ref=self.spectrum.lambda_ref)
-        adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-        # adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+        # self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance,
+        #                                                                       self.spectrum.x0 + np.asarray([dx0, dy0]),
+        #                                                                       order=self.spectrum.order+np.sign(self.spectrum.order))
+        #
+        # # Evaluate ADR for order 2
+        # for k in range(niter):
+        #     adr_ra, adr_dec = adr_calib(self.lambdas_order2, self.spectrum.adr_params, parameters.OBS_LATITUDE,
+        #                                 lambda_ref=self.spectrum.lambda_ref)
+        #     adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
+        #     adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
+        #     self.lambdas = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u_2,
+        #                                                                    self.spectrum.x0 + np.asarray([dx0, dy0]),
+        #                                                                    order=self.spectrum.order+np.sign(self.spectrum.order))
         # Compute lambdas at pixel column x for order 2
         # self.lambdas_order2 = self.spectrum.disperser.grating_pixel_to_lambda(distance - adr_u_2,
         #                                                                    self.spectrum.x0 + np.asarray([dx0, dy0]),
         #                                                                    order=2)
 
         # Fill spectrogram trace as a function of the pixel column x
-        profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + adr_x + dx0
-        profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y + dy0) - self.bgd_width
+        profile_params[:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0  # Dx + self.spectrum.spectrogram_x0 + adr_x + dx0
+        profile_params[:, 2] = dispersion_law.imag + self.spectrum.spectrogram_y0 - self.bgd_width  #  Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y + dy0) - self.bgd_width
+        self.spectrum.chromatic_psf.fill_table_with_profile_params(profile_params)
+
         # Dy_disp_axis = np.copy(profile_params[:, 2])
         # profile_params[:, 2] += adr_y + dy0 - self.bgd_width
 
         # Prepare order 2 profile params indexed by the pixel column x
+        dispersion_law_order2 = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, dx0, dy0, angle,
+                                                                                niter=5, with_adr=True,
+                                                                                order=self.spectrum.order + np.sign(self.spectrum.order))
         profile_params_order2 = np.copy(profile_params)
         profile_params_order2[:, 0] = self.spectrum.disperser.ratio_order_2over1(self.lambdas)
-        profile_params_order2[:, 1] = np.arange(self.Nx) + adr_x_2 + dx0
-        profile_params_order2[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y_2 + dy0) - self.bgd_width
+        profile_params_order2[:, 1] = dispersion_law_order2.real + self.spectrum.spectrogram_x0  #   np.arange(self.Nx) + adr_x_2 + dx0
+        profile_params_order2[:, 2] = dispersion_law_order2.imag + self.spectrum.spectrogram_y0 - self.bgd_width  # Dy_disp_axis + (self.spectrum.spectrogram_y0 + adr_y_2 + dy0) - self.bgd_width
         # profile_params_order2[:, 2] = Dy_disp_axis + adr_y_2 + dy0 - self.bgd_width
 
         # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
         # same PSF as for the order 1 but at the same position
-        distance_order2 = self.spectrum.disperser.grating_lambda_to_pixel(self.lambdas - adr_u,
-                                                                          self.spectrum.x0 + np.asarray([dx0, dy0]),
-                                                                          order=self.spectrum.order+np.sign(self.spectrum.order))
-        for k in range(1, profile_params.shape[1]):
+        # distance_order2 = self.spectrum.disperser.grating_lambda_to_pixel(self.lambdas,
+        #                                                                   self.spectrum.x0 + np.asarray([dx0, dy0]),
+        #                                                                   order=self.spectrum.order+np.sign(self.spectrum.order))
+        distance_order2 = np.abs(dispersion_law_order2)
+        for k in range(3, profile_params.shape[1]):
             # profile_params_order2[:, k] = interp1d(self.lambdas_order2, profile_params_order2[:, k],
             #                                       kind="cubic", fill_value="extrapolate")(self.lambdas)
             profile_params_order2[:, k] = interp1d(distance, profile_params_order2[:, k],
@@ -1130,6 +1151,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     spectrum.spectrogram_xmax = xmax
     spectrum.spectrogram_ymin = ymin
     spectrum.spectrogram_ymax = ymax
+    spectrum.spectrogram_Nx = Nx
+    spectrum.spectrogram_Ny = Ny
     spectrum.spectrogram_deg = spectrum.chromatic_psf.deg
     spectrum.spectrogram_saturation = spectrum.chromatic_psf.saturation
 
