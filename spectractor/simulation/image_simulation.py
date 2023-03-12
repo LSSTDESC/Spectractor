@@ -462,7 +462,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Recover true spectrum
     spectrogram.set_true_spectrum(spectrogram.lambdas, ozone, pwv, aerosols, shift_t=0)
     true_lambdas = np.copy(spectrogram.true_lambdas)
-    true_spectrum = np.copy(spectrogram.true_spectrum)
+    true_spectrum = A1 * np.copy(spectrogram.true_spectrum)
 
     # Saturation effects
     saturated_pixels = np.where(spectrogram.data > image.saturation)[0]
