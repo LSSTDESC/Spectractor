@@ -787,7 +787,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.header["ROTANGLE"] = w.p[4]
 
             # Calibrate the spectrum
-            calibrate_spectrum(w.spectrum, with_adr=False)
+            calibrate_spectrum(w.spectrum, with_adr=True)
             w.p[1] = w.spectrum.disperser.D
             w.p[2] = w.spectrum.header['PIXSHIFT']
             w.spectrum.convert_from_flam_to_ADUrate()
