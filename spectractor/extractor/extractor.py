@@ -755,6 +755,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
                 w.amplitude_cov_matrix *= r
                 w.amplitude_params_err = np.array(
                     [np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
+            w.spectrum.header['PSF_REG'] = w.opt_reg
+            w.spectrum.header['TRACE_R'] = np.trace(w_reg.resolution)
 
         for i in range(niter):
             w.set_mask(params=w.p)
