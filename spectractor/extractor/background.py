@@ -185,7 +185,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
 
     # mask sources
     mask = make_source_mask(data, nsigma=3, npixels=5, dilate_size=11)
-
+    mask += data == 0
     # Estimate the background in the two lateral bands together
     sigma_clip = SigmaClip(sigma=3.)
     bkg_estimator = SExtractorBackground()
@@ -203,6 +203,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
                        filter_size=(parameters.PIXWIDTH_BOXSIZE // 2, parameters.PIXWIDTH_BOXSIZE // 2),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
+    bkg.background[data == 0] = 0
     bgd_model_func = interp2d(np.arange(Nx), np.arange(Ny), bkg.background, kind='linear', bounds_error=False,
                               fill_value=None)
     bgd_res = ((data - bkg.background)/err)
