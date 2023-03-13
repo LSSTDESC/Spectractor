@@ -267,9 +267,9 @@ class Spectrum:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix /= ldl_mat
         if self.data_order2 is not None:
-            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.abs(np.gradient(self.lambdas_order2))
-            self.data_order2 /= ldl_2
-            self.err_order2 /= ldl_2
+            # ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.abs(np.gradient(self.lambdas_order2))
+            self.data_order2 /= ldl  # _2
+            self.err_order2 /= ldl  # _2
         self.units = 'erg/s/cm$^2$/nm'
 
     def convert_from_flam_to_ADUrate(self):
@@ -300,9 +300,9 @@ class Spectrum:
             ldl_mat = np.outer(ldl, ldl)
             self.cov_matrix *= ldl_mat
         if self.data_order2 is not None:
-            ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.abs(np.gradient(self.lambdas_order2))
-            self.data_order2 *= ldl_2
-            self.err_order2 *= ldl_2
+            # ldl_2 = parameters.FLAM_TO_ADURATE * self.lambdas_order2 * np.abs(np.gradient(self.lambdas_order2))
+            self.data_order2 *= ldl  # _2
+            self.err_order2 *= ldl  # _2
         self.units = 'ADU/s'
 
     def load_filter(self):

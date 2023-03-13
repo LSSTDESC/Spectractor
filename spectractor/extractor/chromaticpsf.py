@@ -81,20 +81,18 @@ class ChromaticPSF:
         self.y0 = y0
         self.profile_params = np.zeros((Nx, len(self.psf.param_names)))
         self.pixels = np.mgrid[:Nx, :Ny]
-        self.init_table(file_name=file_name, saturation=saturation)
+        self.load_table(file_name=file_name, saturation=saturation)
         self.opt_reg = parameters.PSF_FIT_REG_PARAM
         self.cov_matrix = np.zeros((Nx, Nx))
         if file_name != "":
             self.poly_params = self.from_table_to_poly_params()
 
-    def init_table(self, file_name='', saturation=None):
-        if file_name == '':
+    def init_table(self, table=None, saturation=None):
+        if table is None:
             arr = np.zeros((self.Nx, len(self.psf.param_names) + 10))
-            self.table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
-                                           'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(
-                self.psf.param_names))
-        else:
-            self.table = Table.read(file_name)
+            table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
+                                      'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(self.psf.param_names))
+        self.table = table
         self.psf_param_start_index = 10
         self.n_poly_params = len(self.table)
         self.fitted_pixels = np.arange(len(self.table)).astype(int)
@@ -119,6 +117,75 @@ class ChromaticPSF:
                     self.poly_params_labels.append(f"{p}_{k}")
                     self.poly_params_names.append("$" + self.psf.axis_names[ip].replace("$", "")
                                                   + "^{(" + str(k) + ")}$")
+
+    def load_table(self, file_name='', saturation=None):
+        if file_name == '':
+            arr = np.zeros((self.Nx, len(self.psf.param_names) + 10))
+            table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
+                                      'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(self.psf.param_names))
+        else:
+            table = Table.read(file_name)
+        self.init_table(table, saturation=saturation)
+
+    def resize_table(self, new_Nx):
+        """Resize the table and interpolate existing values to a new length size.
+        Parameters
+        ----------
+        new_Nx: int
+            New length of the ChromaticPSF on X axis.
+        Examples
+        --------
+        >>> psf = Moffat()
+        >>> s = ChromaticPSF(psf, Nx=20, Ny=5, deg=1, saturation=20000)
+        >>> params = s.generate_test_poly_params()
+        >>> s.fill_table_with_profile_params(s.from_poly_params_to_profile_params(params))
+        >>> print(np.sum(s.table["gamma"]))
+        100.0
+        >>> print(s.table["gamma"].size)
+        20
+        >>> s.resize_table(10)
+        >>> print(np.sum(s.table["gamma"]))
+        50.0
+        >>> print(s.table["gamma"].size)
+        10
+        """
+        new_chromatic_psf = ChromaticPSF(psf=self.psf, Nx=new_Nx, Ny=self.Ny, x0=self.x0, y0=self.y0,
+                                         deg=self.deg, saturation=self.saturation)
+        old_x = np.linspace(0, 1, self.Nx)
+        new_x = np.linspace(0, 1, new_Nx)
+        for colname in self.table.colnames:
+            new_chromatic_psf.table[colname] = np.interp(new_x, old_x, np.array(self.table[colname]))
+        self.init_table(table=new_chromatic_psf.table, saturation=self.saturation)
+        self.__dict__.update(new_chromatic_psf.__dict__)
+
+    def crop_table(self, new_Nx):
+        """Crop the table to a new length size.
+        Parameters
+        ----------
+        new_Nx: int
+            New length of the ChromaticPSF on X axis.
+        Examples
+        --------
+        >>> psf = Moffat()
+        >>> s = ChromaticPSF(psf, Nx=20, Ny=5, deg=1, saturation=20000)
+        >>> params = s.generate_test_poly_params()
+        >>> s.fill_table_with_profile_params(s.from_poly_params_to_profile_params(params))
+        >>> print(np.sum(s.table["gamma"]))
+        100.0
+        >>> print(s.table["gamma"].size)
+        20
+        >>> s.crop_table(10)
+        >>> print(np.sum(s.table["gamma"]))
+        50.0
+        >>> print(s.table["gamma"].size)
+        10
+        """
+        new_chromatic_psf = ChromaticPSF(psf=self.psf, Nx=new_Nx, Ny=self.Ny, x0=self.x0, y0=self.y0,
+                                         deg=self.deg, saturation=self.saturation)
+        for colname in self.table.colnames:
+            new_chromatic_psf.table[colname] = self.table[colname][:new_Nx]
+        self.init_table(table=new_chromatic_psf.table, saturation=self.saturation)
+        self.__dict__.update(new_chromatic_psf.__dict__)
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg
