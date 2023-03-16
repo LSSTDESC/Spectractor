@@ -132,10 +132,9 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
     return bgd_model_func
 
 
-def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signal_region=True):
+def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signal_region=True, Dy_disp_axis=None):
     """
     Use photutils library median filter to estimate background behgin the sources.
-
     Parameters
     ----------
     data: array
@@ -146,7 +145,8 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
     mask_signal_region: bool
         If True, the signal region is masked with np.nan values (default: True)
-
+    Dy_disp_axis: array, optional
+       Vertical position of the dispersion axis (default: None). If None, use the middle of the spectrogram instead.
     Returns
     -------
     bgd_model_func: callable
@@ -155,18 +155,15 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         The background residuals normalized with their uncertainties.
     bgd_rms: array_like
         The background RMS.
-
     Examples
     --------
-
     Build a mock spectrogram with random Poisson noise:
-
     >>> from spectractor.extractor.psf import MoffatGauss
     >>> from spectractor.extractor.chromaticpsf import ChromaticPSF
     >>> from spectractor import parameters
     >>> parameters.DEBUG = True
     >>> psf = MoffatGauss()
-    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
+    >>> s0 = ChromaticPSF(psf, Nx=100, Ny=200, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
     >>> data = s0.build_spectrogram_image(params, mode="1D")
@@ -174,14 +171,12 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     >>> data += bgd
     >>> data = np.random.poisson(data)
     >>> data_errors = np.sqrt(data+1)
-
     Fit the transverse profile:
-
-    >>> bgd_model, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
-
+    >>> bgd_model, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[60,100])
     """
     Ny, Nx = data.shape
-    middle = Ny // 2
+    if Dy_disp_axis is None:
+        Dy_disp_axis = np.ones(Nx) * (Ny // 2)
 
     # mask sources
     mask = make_source_mask(data, nsigma=3, npixels=5, dilate_size=11)
@@ -189,10 +184,11 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     # Estimate the background in the two lateral bands together
     sigma_clip = SigmaClip(sigma=3.)
     bkg_estimator = SExtractorBackground()
+    bgd_bands = np.copy(data).astype(float)
     if mask_signal_region:
-        bgd_bands = np.copy(data).astype(float)
-        bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
-        mask += (np.isnan(bgd_bands))
+        for dx in range(Nx):
+            bgd_bands[int(Dy_disp_axis[dx] - ws[0]):int(Dy_disp_axis[dx] + ws[0]), dx] = np.nan
+            mask += (np.isnan(bgd_bands))
     # windows size in x is set to only 6 pixels to be able to estimate rapid variations of the background on real data
     # filter window size is set to window // 2 so 3
     # bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
@@ -218,7 +214,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         ax2 = plt.subplot(gs[2, 0])
         ax3 = plt.subplot(gs[:, 1])
         bgd_bands = np.copy(data).astype(float)
-        bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
+        # bgd_bands[middle - ws[0]:middle + ws[0], :] = np.nan
         bgd_bands[mask] = np.nan
         mean = np.nanmean(bgd_bands)
         std = np.nanstd(bgd_bands)
