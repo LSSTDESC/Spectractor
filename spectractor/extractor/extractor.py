@@ -175,7 +175,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             old_x = np.linspace(0, 1, self.spectrum.data.size)
             new_x = np.linspace(0, 1, self.Nx)
             self.spectrum.lambdas = np.interp(new_x, old_x, self.spectrum.lambdas)
-            self.spectrum.my_logger.warning(f"init {self.spectrum.lambdas.shape=}")
             self.amplitude_priors = np.interp(new_x, old_x, self.amplitude_priors)
             if self.amplitude_priors_method == "spectrum":
                 # rebin prior cov matrix with monte-carlo
@@ -1166,7 +1165,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     my_logger.info(f'\n\tExtract spectrogram: crop raw image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Extract the non rotated background
-    bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
+    bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws, Dy_disp_axis=s.table['y_c'])
     bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
     my_logger.info(f"\n\tBackground statistics: mean={np.nanmean(bgd):.3f} {image.units}, "
                    f"RMS={np.nanmean(bgd_rms):.3f} {image.units}.")

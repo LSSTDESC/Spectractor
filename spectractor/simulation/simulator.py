@@ -280,6 +280,36 @@ class SpectrogramModel(Spectrum):
         self.yy, self.xx = np.mgrid[:self.Ny, :self.Nx]
         self.pixels = np.asarray([self.xx, self.yy])
 
+    def resize_with_lambdas(self, lambdas, angle):
+        # Resize the spectrogram
+        distance = self.disperser.grating_lambda_to_pixel(lambdas, self.x0, order=self.order)
+        distance_order2 = self.disperser.grating_lambda_to_pixel(lambdas, self.x0, order=self.order + np.sign(self.order))
+        Dx = distance * np.cos(angle * np.pi / 180)
+        Dy_disp_axis = distance * np.sin(angle * np.pi / 180)
+        Dx_order2 = distance_order2 * np.cos(angle * np.pi / 180)
+        Dy_disp_axis_order2 = distance_order2 * np.sin(angle * np.pi / 180)
+        if np.abs(Dy_disp_axis_order2[-1] - Dy_disp_axis[0]) > self.Ny:  # spectrogram does not fit in simulation range
+            if angle < 0:
+                self.spectrogram_ymin = max(0, int(Dy_disp_axis_order2[-1] + self.x0[1] - parameters.PIXWIDTH_SIGNAL))
+                self.spectrogram_y0 = self.x0[1] - self.spectrogram_ymin
+                self.spectrogram_ymax = min(parameters.CCD_IMSIZE, int(np.ceil(Dy_disp_axis[0] + self.x0[1] + parameters.PIXWIDTH_SIGNAL)))
+            else:
+                self.spectrogram_ymin = max(0, int(Dy_disp_axis[0] + self.x0[1] - parameters.PIXWIDTH_SIGNAL))
+                self.spectrogram_y0 = self.x0[1] - self.spectrogram_ymin
+                self.spectrogram_ymax = min(parameters.CCD_IMSIZE, int(np.ceil(Dy_disp_axis_order2[-1] + self.x0[1] + parameters.PIXWIDTH_SIGNAL)))
+            self.Ny = self.spectrogram_ymax - self.spectrogram_ymin
+        if np.abs(Dx_order2[-1] - Dx[0]) > self.Nx and not self.full_image:  # spectrogram does not fit in simulation range
+            self.spectrogram_xmin = max(0, int(Dx[0] + self.x0[0]))
+            self.spectrogram_x0 = self.x0[0] - self.spectrogram_xmin
+            self.spectrogram_xmax = min(parameters.CCD_IMSIZE, int(np.ceil(Dx_order2[-1] + self.x0[0])))
+            self.Nx = self.spectrogram_xmax - self.spectrogram_xmin
+        self.yy, self.xx = np.mgrid[:self.Ny,:self.Nx]
+        self.pixels = np.asarray([self.xx, self.yy])
+        if not self.full_image:
+            self.r0 = self.spectrogram_x0 + 1j * self.spectrogram_y0
+        else:
+            self.r0 = self.x0[0] + 1j * self.spectrogram_y0
+
     def set_true_spectrum(self, lambdas, ozone, pwv, aerosols, shift_t=0.):
         atmosphere = self.atmosphere.simulate(ozone, pwv, aerosols)
         spectrum = self.target.sed(lambdas)
@@ -494,8 +524,13 @@ class SpectrogramModel(Spectrum):
                                                                        order=self.order + np.sign(self.order))
         dispersion_law_order2 += self.r0
         # lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = self.simulate_dispersion(D, shift_x, shift_y)
-        self.chromatic_psf.table["Dx"] = dispersion_law.real - self.r0.real
-        self.chromatic_psf.table["Dy"] = dispersion_law.imag - self.r0.imag
+        if self.profile_params is None or not self.fix_psf_cube:
+            self.profile_params = self.chromatic_psf.update(psf_poly_params, x0=self.r0.real + shift_x,
+                                                            y0=self.r0.imag + shift_y, angle=angle, plot=False)
+            self.profile_params[:, 1] = dispersion_law.real
+            self.profile_params[:, 2] = dispersion_law.imag
+        self.chromatic_psf.table["Dx"] = self.profile_params[:, 1] - self.r0.real
+        self.chromatic_psf.table["Dy"] = self.profile_params[:, 2] - self.r0.imag
         self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
         start = time.time()
         if self.atmosphere_sim is None or not self.fix_atm_sim:
@@ -506,10 +541,9 @@ class SpectrogramModel(Spectrum):
         nlbda = dispersion_law.size
         if self.psf_cube is None or not self.fix_psf_cube:
             start = time.time()
-            self.psf_cube = np.zeros((nlbda, self.Ny, self.Nx))
-            for i in range(0, nlbda, 1):
-                p = np.array([1, dispersion_law[i].real, dispersion_law[i].imag] + list(self.profile_params[i, 3:]))
-                self.psf_cube[i] = self.psf.evaluate(self.pixels, p=p)
+            self.psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, self.profile_params,
+                                                              fwhmx_clip=2 * 3 * parameters.PSF_FWHM_CLIP,
+                                                              fwhmy_clip=2 * parameters.PSF_FWHM_CLIP, dtype="float32")
             self.my_logger.debug(f'\n\tAfter psf cube: {time.time() - start}')
         start = time.time()
         ima1 = np.zeros((self.Ny, self.Nx))
@@ -529,7 +563,7 @@ class SpectrogramModel(Spectrum):
             nlbda2 = dispersion_law_order2.size
             if self.psf_cube_order2 is None or not self.fix_psf_cube:
                 start = time.time()
-                self.psf_cube_order2 = np.zeros((nlbda2, self.Ny, self.Nx))
+                # self.psf_cube_order2 = np.zeros((nlbda2, self.Ny, self.Nx))
                 # For each A(lambda)=A_x, affect an order 2 PSF with correct position and
                 # same PSF as for the order 1 but at the same position
                 profile_params_order2 = np.copy(self.profile_params)
@@ -541,8 +575,10 @@ class SpectrogramModel(Spectrum):
                 for k in range(3, self.profile_params.shape[1]):
                     profile_params_order2[:nlbda2, k] = interp1d(distance, profile_params_order2[:, k], kind="cubic",
                                                                  fill_value="extrapolate")(distance_order2)
-                for i in range(0, nlbda2, 1):
-                    self.psf_cube_order2[i] = self.psf.evaluate(self.pixels, p=profile_params_order2[i, :])
+                self.psf_cube_order2 = self.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
+                                                                         fwhmx_clip=2 * 3 * parameters.PSF_FWHM_CLIP,
+                                                                         fwhmy_clip=2 * parameters.PSF_FWHM_CLIP,
+                                                                         dtype="float32")
                 self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')
             start = time.time()
             ima2 = np.zeros_like(ima1)
@@ -748,6 +784,7 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
     spectrogram_simulation = SpectrogramModel(spectrum, atmosphere, telescope, disperser,
                                               with_background=with_background, fast_sim=fast_sim, full_image=full_image,
                                               with_adr=with_adr)
+    spectrogram_simulation.resize_with_lambdas(spectrum.lambdas, angle=angle)
     spectrogram_simulation.simulate(A1, A2, ozone, pwv, aerosols, D, shift_x, shift_y, angle, B, psf_poly_params)
     return spectrogram_simulation
 

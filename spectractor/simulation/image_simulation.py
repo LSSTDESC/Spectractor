@@ -357,7 +357,7 @@ class ImageModel(Image):
 
 
 def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1,
-             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True):
+             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True, full_image=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -447,7 +447,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
                                            temperature, pwv=pwv, ozone=ozone, aerosols=aerosols, A1=A1, A2=A2,
                                            D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0., B=1.,
                                            psf_poly_params=psf_poly_params, angle=rotation_angle, with_background=False,
-                                           fast_sim=False, full_image=True, with_adr=with_adr)
+                                           fast_sim=False, full_image=full_image, with_adr=with_adr)
 
     # now we include effects related to the wrong extraction of the spectrum:
     # wrong estimation of the order 0 position and wrong DISTANCE2CCD
