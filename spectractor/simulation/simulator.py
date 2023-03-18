@@ -372,92 +372,6 @@ class SpectrogramModel(Spectrum):
         # spectrum_err[idx] = 1e6 * np.max(spectrum_err)
         return spectrum, spectrum_err
 
-    def simulate_psf(self, psf_poly_params):
-        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params, apply_bounds=True)
-        self.chromatic_psf.fill_table_with_profile_params(profile_params)
-        self.chromatic_psf.table['Dy_disp_axis'] = \
-            np.tan(self.rotation_angle * np.pi / 180) * self.chromatic_psf.table['Dx']
-        self.chromatic_psf.table['Dy'] = np.copy(self.chromatic_psf.table['y_c']) - self.r0.imag
-        self.chromatic_psf.profile_params = self.chromatic_psf.from_table_to_profile_params()
-        if False:
-            self.chromatic_psf.plot_summary()
-        return self.chromatic_psf.profile_params
-
-    def simulate_dispersion(self, D, shift_x, shift_y):
-        # Distance in x and y with respect to the true order 0 position at lambda_ref
-        Dx = np.arange(self.spectrogram_Nx) - self.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
-        Dy_disp_axis = np.tan(self.rotation_angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        distance = np.sqrt(Dx**2 + Dy_disp_axis**2)
-
-        # Wavelengths using the order 0 shifts (ADR has no impact as it shifts order 0 and order p equally)
-        new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
-        self.disperser.D = D
-        self.lambdas = self.disperser.grating_pixel_to_lambda(distance, x0=new_x0, order=1)
-        distance_order2 = self.disperser.grating_lambda_to_pixel(self.lambdas, x0=new_x0, order=2)
-        distance_order2 = distance_order2[distance_order2 + self.r0.real < self.Nx + 100]  # little margin of 100 pixels
-        Dx_order2 = distance_order2 * np.cos(self.rotation_angle * np.pi / 180)
-        Dy_disp_axis_order2 = distance_order2 * np.sin(self.rotation_angle * np.pi / 180)
-        self.lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance_order2, x0=new_x0, order=2)
-        self.lambdas_binwidths = np.gradient(self.lambdas)
-
-        # ADR for order 1
-        adr_ra, adr_dec = adr_calib(self.lambdas, self.adr_params, parameters.OBS_LATITUDE, lambda_ref=self.lambda_ref)
-        adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-        # adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-        #                                                            dispersion_axis_angle=self.rotation_angle)
-
-        # Compute lambdas at pixel column x
-        # lambdas = self.disperser.grating_pixel_to_lambda(distance - 0*adr_u, new_x0, order=1)
-        # Position (not distance) in pixel of wavelength lambda order 1 centroid in the (x,y) spectrogram frame
-        dispersion_law = self.r0 + (Dx + shift_x + self.with_adr * adr_x) + \
-                         1j * (Dy_disp_axis + self.with_adr * adr_y + shift_y)
-
-        # ADR for order 2
-        adr_ra, adr_dec = adr_calib(self.lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
-                                    lambda_ref=self.lambda_ref)
-        adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-        # adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec,
-        #                                                            dispersion_axis_angle=self.rotation_angle)
-
-        # Compute lambdas at pixel column x
-        # lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - 0*adr_u, new_x0, order=2)
-        # Position (not distance) in pixel of wavelength lambda order 2 centroid in the (x,y) spectrogram frame
-        dispersion_law_order2 = self.r0 + (Dx_order2 + shift_x + self.with_adr * adr_x) + \
-                                1j * (Dy_disp_axis_order2 + self.with_adr * adr_y + shift_y)
-
-        # Dx_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
-        # Dy_mean_func=interp1d(lambdas/2,self.chromatic_psf.table['Dy_disp_axis'],bounds_error=False,fill_value=(0,0))
-        # dy_func = interp1d(lambdas / 2, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_disp_axis'],
-        #                    bounds_error=False, fill_value=(0, 0))
-        # dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) + 1j * (
-        #             self.chromatic_psf.table['Dy'] - shift_y)
-        # dispersion_law_order2 = r0 + (Dx_func(lambdas_order2) - shift_x) + 1j * (
-        #             Dy_mean_func(lambdas_order2) + dy_func(lambdas_order2) - shift_y)
-        # Dx_func = interp1d(lambdas, self.chromatic_psf.table['Dx'], bounds_error=False, fill_value=(0, 0))
-        # Dy_mean_func=interp1d(lambdas,self.chromatic_psf.table['Dy_dips_axis'],bounds_error=False, fill_value=(0, 0))
-
-        # dispersion laws from the PSF table
-        # dy_func = interp1d(lambdas, self.chromatic_psf.table['Dy'] - self.chromatic_psf.table['Dy_disp_axis'],
-        #                    bounds_error=False, fill_value="extrapolate")
-        # dispersion_law = r0 + (self.chromatic_psf.table['Dx'] - shift_x) \
-        #                  + 1j * (self.chromatic_psf.table['Dy'] - shift_y)
-        # dispersion_law_order2 = dispersion_law + 1j * (dy_func(lambdas_order2) - self.chromatic_psf.table['Dy']
-        #                                                + self.chromatic_psf.table['Dy_disp_axis'])
-
-        if False:
-            from spectractor.tools import from_lambda_to_colormap
-            plt.plot(self.chromatic_psf.table['Dx'], self.chromatic_psf.table['Dy_disp_axis'], 'k-', label="mean")
-            plt.scatter(dispersion_law.real-self.r0.real, -self.r0.imag + dispersion_law.imag, label="dispersion_law",
-                        cmap=from_lambda_to_colormap(self.lambdas), c=self.lambdas)
-            plt.scatter(dispersion_law_order2.real-self.r0.real, -self.r0.imag + dispersion_law_order2.imag,
-                        label="dispersion_law_order2",
-                        cmap=from_lambda_to_colormap(self.lambdas_order2), c=self.lambdas_order2)
-            plt.title(f"x0={new_x0}")
-            plt.legend()
-            plt.show()
-
-        return self.lambdas, self.lambdas_order2, dispersion_law, dispersion_law_order2
-
     # @profile
     def simulate(self, A1=1.0, A2=0., ozone=300, pwv=5, aerosols=0.05, D=parameters.DISTANCE2CCD,
                  shift_x=0., shift_y=0., angle=0., B=1., psf_poly_params=None):
@@ -516,10 +430,6 @@ class SpectrogramModel(Spectrum):
         import time
         start = time.time()
         self.rotation_angle = angle
-        if self.profile_params is None or not self.fix_psf_cube:
-            self.profile_params = self.simulate_psf(psf_poly_params)
-        self.my_logger.debug(f'\n\tAfter psf params: {time.time() - start}')
-        start = time.time()
         self.lambdas = self.compute_lambdas_in_spectrogram(D, shift_x, shift_y, angle, niter=5, with_adr=True,
                                                            order=self.order)
         dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
@@ -548,8 +458,8 @@ class SpectrogramModel(Spectrum):
         if self.psf_cube is None or not self.fix_psf_cube:
             start = time.time()
             self.psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, self.profile_params,
-                                                              fwhmx_clip=2 * 3 * parameters.PSF_FWHM_CLIP,
-                                                              fwhmy_clip=2 * parameters.PSF_FWHM_CLIP, dtype="float32")
+                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
             self.my_logger.debug(f'\n\tAfter psf cube: {time.time() - start}')
         start = time.time()
         ima1 = np.zeros((self.Ny, self.Nx))
@@ -562,8 +472,8 @@ class SpectrogramModel(Spectrum):
 
         # Add order 2
         if A2 > 0.:
-            spectrum_order2, spectrum_order2_err = self.disperser.ratio_order_2over1(self.lambdas) * \
-                                                   self.simulate_spectrum(self.lambdas, self.atmosphere_sim)
+            spectrum_order2 = self.disperser.ratio_order_2over1(self.lambdas) * spectrum
+            spectrum_order2_err = self.disperser.ratio_order_2over1(self.lambdas) * spectrum_err
             if np.any(np.isnan(spectrum_order2)):
                 spectrum_order2[np.isnan(spectrum_order2)] = 0.
             nlbda2 = dispersion_law_order2.size
@@ -582,8 +492,8 @@ class SpectrogramModel(Spectrum):
                     profile_params_order2[:nlbda2, k] = interp1d(distance, profile_params_order2[:, k], kind="cubic",
                                                                  fill_value="extrapolate")(distance_order2)
                 self.psf_cube_order2 = self.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
-                                                                         fwhmx_clip=2 * 3 * parameters.PSF_FWHM_CLIP,
-                                                                         fwhmy_clip=2 * parameters.PSF_FWHM_CLIP,
+                                                                         fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                                         fwhmy_clip=parameters.PSF_FWHM_CLIP,
                                                                          dtype="float32")
                 self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')
             start = time.time()

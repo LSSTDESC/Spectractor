@@ -3,7 +3,7 @@ import numpy as np
 
 from spectractor import parameters
 from spectractor.simulation.simulator import (SpectrumSimulatorSimGrid, SpectrumSimulator,
-                                              Atmosphere, AtmosphereGrid, SpectrogramSimulator)
+                                              Atmosphere, AtmosphereGrid)
 from spectractor.simulation.image_simulation import ImageSim
 from spectractor.config import load_config
 import os
