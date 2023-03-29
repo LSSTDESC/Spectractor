@@ -64,6 +64,7 @@ OBS_NAME = 'CTIO'
 OBS_ALTITUDE = 2.200  # CTIO altitude in k meters from astropy package (Cerro Pachon)
 OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
 OBS_DIAMETER = 0.9  # Diameter of the telescope in meter
+OBS_SECONDARY_DIAMETER = 0  # Diameter of the secondary mirror in meter
 OBS_EPOCH = "J2000.0"
 OBS_TRANSMISSION_SYSTEMATICS = 0.005
 OBS_OBJECT_TYPE = 'STAR'  # To choose between STAR, HG-AR, MONOCHROMATOR
