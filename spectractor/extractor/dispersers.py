@@ -366,16 +366,12 @@ class Grating:
             a = np.loadtxt(filename)
             self.N_input = a[0]
             self.N_err = a[1]
-        else:
-            raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
 
         filename = os.path.join(self.data_dir, self.label, "full_name.txt")
         if os.path.isfile(filename):
             with open(filename, 'r') as f:
                 for line in f:  # MFL: you really just want the last line of the file?
                     self.full_name = line.rstrip('\n')
-        else:
-            raise FileNotFoundError(f"Failed to load {filename} for {self.label}")
 
         filename = os.path.join(self.data_dir, self.label, "transmission.txt")
         if os.path.isfile(filename):

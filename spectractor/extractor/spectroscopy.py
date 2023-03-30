@@ -600,13 +600,16 @@ AR3 = Line(714.704, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR4 = Line(727.294, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR5 = Line(738.393, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR6 = Line(750.387, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
+AR6_2 = Line(751.465, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR7 = Line(763.511, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR8 = Line(772.376, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR9 = Line(794.818, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR10 = Line(800.616, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
+AR10_2 = Line(801.479, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR11 = Line(811.531, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR12 = Line(826.452, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR13 = Line(842.465, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
+AR13_2 = Line(840.621, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR14 = Line(852.144, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR15 = Line(866.794, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 AR16 = Line(912.297, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
@@ -616,7 +619,7 @@ AR19 = Line(978.4503, atmospheric=False, label=r'$Ar$', label_pos=[0.007, 0.02])
 HG13 = Line(1013.976, atmospheric=False, label=r'$Hg$', label_pos=[0.007, 0.02])
 
 HGAR_LINES = [HG1, HG2, HG3, HG4, HG5, HG6, HG7, HG8, HG9, HG10, HG11, HG12,
-              AR1, AR2, AR3, AR4, AR5, AR6, AR7, AR8, AR9, AR10, AR11, AR12, AR13, AR14, AR15, AR16, AR17, AR18, AR19, HG13]
+              AR1, AR2, AR3, AR4, AR5, AR6, AR6_2, AR7, AR8, AR9, AR10, AR10_2, AR11, AR12, AR13_2, AR13, AR14, AR15, AR16, AR17, AR18, AR19, HG13]
 
 if __name__ == "__main__":
     import doctest
