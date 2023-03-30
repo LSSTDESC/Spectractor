@@ -1031,7 +1031,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                            f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
                            f"\n\tParameter shifts: {alpha_min * dparams}"
                            f"\n\tNew parameters: {tmp_params[ipar]}"
-                           f"\n\tFinal cost={fval:.5g} final chisq_red={fval / (tmp_model.size - len(fit_workspace.mask)):.5g} "
+                           f"\n\tFinal cost={fval:.5g} final chisq_red={fval / (tmp_model.size - len(fit_workspace.mask)):.5g} {tmp_model.size=} {len(fit_workspace.mask)=}"
                            f"computed in {time.time() - start:.2f}s")
         if fit_workspace.live_fit:  # pragma: no cover
             fit_workspace.simulate(*tmp_params)

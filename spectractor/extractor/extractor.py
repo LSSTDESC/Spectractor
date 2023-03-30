@@ -99,7 +99,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]",
                              r"angle [deg]", "B", "R"] + list(self.psf_poly_params_labels)
         self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^(\mathrm{fit})$ [pix]",
-                           r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]",
+                           r"$\delta_{\mathrm{y}}^{(\mathrm{fit})}$ [pix]",
                            r"$\alpha$ [deg]", "$B$", "R"] + list(self.psf_poly_params_names)
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
@@ -1371,7 +1371,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     s0.set_polynomial_degrees(s0.deg)
     s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
     s0.from_profile_params_to_shape_params(s0.profile_params)
-    gs_kw = dict(width_ratios=[2, 1], height_ratios=[2, 1])
+    gs_kw = dict(width_ratios=[2.5, 1], height_ratios=[2, 1])
     fig, ax = plt.subplots(2, 2, figsize=(11, 5), sharex="all", gridspec_kw=gs_kw)
     ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth", zorder=42, lw=2)
     amplitude_priors_err = [np.sqrt(w.amplitude_priors_cov_matrix[x, x]) for x in range(w.Nx)]
