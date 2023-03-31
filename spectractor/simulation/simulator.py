@@ -154,9 +154,9 @@ class SpectrumSimulation(Spectrum):
         """
         # find lambdas including ADR effect
         # must add ADR to get perfect result on atmospheric fit in full chain test with SpectrumSimulation()
-        lambdas = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=0,
+        lambdas = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=self.rotation_angle,
                                                       order=1, with_adr=True, niter=5)
-        lambdas_order2 = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=0,
+        lambdas_order2 = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=self.rotation_angle,
                                                              order=2, with_adr=True, niter=5)
         self.lambdas = lambdas
         self.atmosphere.set_lambda_range(lambdas)
