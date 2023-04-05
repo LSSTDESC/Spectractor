@@ -29,6 +29,9 @@ from math import floor
 from numba import njit
 
 
+_SCIKIT_IMAGE_NEW_HESSIAN = None
+
+
 @njit(fastmath=True, cache=True)
 def gauss(x, A, x0, sigma):
     """Evaluate the Gaussian function.
@@ -1401,8 +1404,24 @@ def weighted_avg_and_std(values, weights):
 
 
 def hessian_and_theta(data, margin_cut=1):
+    # Check for unannounced API change on hessian_matrix in scikit-image>=0.20
+    # See https://github.com/scikit-image/scikit-image/pull/6624
+    global _SCIKIT_IMAGE_NEW_HESSIAN
+
+    if _SCIKIT_IMAGE_NEW_HESSIAN is None:
+        from importlib import metadata
+        import packaging
+
+        vers = packaging.version.parse(metadata.version("scikit-image"))
+        if vers < packaging.version.parse("0.20.0"):
+            _SCIKIT_IMAGE_NEW_HESSIAN = False
+        else:
+            _SCIKIT_IMAGE_NEW_HESSIAN = True
+
     # compute hessian matrices on the image
-    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order='rc')
+    order = "xy" if _SCIKIT_IMAGE_NEW_HESSIAN else "rc"
+    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order=order)
+
     lambda_plus = 0.5 * ((Hxx + Hyy) + np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     lambda_minus = 0.5 * ((Hxx + Hyy) - np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     theta = 0.5 * np.arctan2(2 * Hxy, Hxx - Hyy) * 180 / np.pi
