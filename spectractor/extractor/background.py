@@ -10,7 +10,7 @@ from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_rem
 
 from astropy.stats import SigmaClip
 from photutils import Background2D, SExtractorBackground
-from photutils.segmentation import detect_threshold, detect_sources
+from photutils.segmentation import SegmentationImage, detect_threshold, detect_sources
 
 from scipy import ndimage
 from scipy.signal import medfilt2d
@@ -91,8 +91,8 @@ def make_source_mask(data, nsigma, npixels, mask=None, sigclip_sigma=3.0,
     if segm is None:
         return np.zeros(data.shape, dtype=bool)
 
-    footprint = np.ones((dilate_size, dilate_size))
-    return ndimage.binary_dilation(segm.data.astype(bool), footprint)
+    size = (dilate_size, dilate_size)
+    return segm.make_source_mask(size=size)
 
 
 def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
