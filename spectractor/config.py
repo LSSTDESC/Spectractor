@@ -129,7 +129,9 @@ def update_derived_parameters():
     parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
     if not isinstance(parameters.OBS_DIAMETER, astropy.units.quantity.Quantity):
         parameters.OBS_DIAMETER = parameters.OBS_DIAMETER * units.m  # Diameter of the telescope
-    parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4.  # Surface of telescope
+    if not isinstance(parameters.OBS_SECONDARY_DIAMETER, astropy.units.quantity.Quantity):
+        parameters.OBS_SECONDARY_DIAMETER = parameters.OBS_SECONDARY_DIAMETER * units.m  # Diameter of the telescope
+    parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4. - np.pi * parameters.OBS_SECONDARY_DIAMETER ** 2 / 4.  # Surface of telescope
     # Conversion factor
     # Units of SEDs in flam (erg/s/cm2/nm) :
     parameters.hc = const.h * const.c  # h.c product of fundamental constants c and h

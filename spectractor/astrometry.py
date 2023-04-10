@@ -1089,7 +1089,7 @@ class Astrometry():  # pragma: no cover
             elif self.source_extractor == "astrometrynet":
                 self.my_logger.info(f"\n\tSource extraction directly with solve-field.")
                 # must write a temporary image file with Spectractor flips and rotations
-                fits.writeto(tmp_image_file_name, self.image.data, header=self.image.header)
+                fits.writeto(tmp_image_file_name, self.image.data, header=self.image.header, overwrite=True)
                 solve_field_input = tmp_image_file_name
             else:
                 raise ValueError(f"Got {self.source_extractor=}. Must be either 'iraf' or 'astrometrynet' "
