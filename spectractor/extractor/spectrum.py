@@ -49,7 +49,8 @@ fits_mappings = {'config': 'CONFIG',
                  'spectrogram_Nx': 'S_NX',
                  'spectrogram_Ny': 'S_NY',
                  'spectrogram_deg': 'S_DEG',
-                 'spectrogram_saturation': 'S_SAT'
+                 'spectrogram_saturation': 'S_SAT',
+                 'order': 'SPEC_ORDER'
                  }
 
 
@@ -407,7 +408,7 @@ class Spectrum:
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
-        if self.data_next_order is not None and np.sum(self.data_next_order) > 0.05 * np.sum(self.data):
+        if self.data_next_order is not None and np.sum(np.abs(self.data_next_order)) > 0.05 * np.sum(np.abs(self.data)):
             distance = self.disperser.grating_lambda_to_pixel(self.lambdas, self.x0, order=parameters.SPEC_ORDER+1)
             max_index = np.argmin(np.abs(distance + self.x0[0] - parameters.CCD_IMSIZE))
             plot_spectrum_simple(ax, self.lambdas[:max_index], self.data_next_order[:max_index], data_err=self.err_next_order[:max_index],
