@@ -703,10 +703,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             gs_kw = dict(width_ratios=[1, 0.15], height_ratios=[1, 1, 1, 1])
             fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(8, 10), gridspec_kw=gs_kw)
         elif 800 < np.max(self.lambdas) < 950:
-            gs_kw = dict(width_ratios=[3, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
+            gs_kw = dict(width_ratios=[3, 0.15, 1, 0.15], height_ratios=[1, 1, 1, 1])
             fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(14, 10), gridspec_kw=gs_kw)
         else:
-            gs_kw = dict(width_ratios=[3, 0.01, 1, 0.01, 1, 0.15], height_ratios=[1, 1, 1, 1])
+            gs_kw = dict(width_ratios=[3, 0.15, 1, 0.15, 1, 0.15], height_ratios=[1, 1, 1, 1])
             fig, ax = plt.subplots(nrows=4, ncols=6, figsize=(18, 10), gridspec_kw=gs_kw)
 
         # A2, D2CCD, dx0, dy0, angle, B, rot, *poly_params = self.p
@@ -720,9 +720,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # zoom H2O
         if np.max(self.lambdas) > 950:
             self.plot_spectrogram_comparison_simple(ax[:, 4:6], extent=[870, min(1000, int(np.max(self.lambdas)))], title='Zoom $H_2 O$', dispersion=True)
-        for i in range(ax.shape[0]-1):  # clear middle colorbars
-            for j in range(ax.shape[1]//2-1):
-                plt.delaxes(ax[i, 2 * j + 1])
+        # for i in range(ax.shape[0]-1):  # clear middle colorbars
+        #     for j in range(ax.shape[1]//2-1):
+        #         plt.delaxes(ax[i, 2 * j + 1])
         for i in range(ax.shape[0]):  # clear middle y axis labels
             for j in range(1, ax.shape[1]//2):
                 ax[i, 2 * j].set_ylabel("")
