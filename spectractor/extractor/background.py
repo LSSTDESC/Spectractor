@@ -91,8 +91,9 @@ def make_source_mask(data, nsigma, npixels, mask=None, sigclip_sigma=3.0,
     if segm is None:
         return np.zeros(data.shape, dtype=bool)
 
-    size = (dilate_size, dilate_size)
-    return segm.make_source_mask(size=size)
+    footprint = np.ones((dilate_size, dilate_size))
+    # Replace with size= when photutils>=1.7 is enforced in rubin-env
+    return segm.make_source_mask(footprint=footprint)
 
 
 def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
