@@ -1266,7 +1266,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         x, y = np.atleast_1d(x), np.atleast_1d(y)
         return np.zeros((y.size, x.size))
     if parameters.SPECTRACTOR_BACKGROUND_SUBTRACTION:
-        bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
+        bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws, mask_signal_region=True)
         # while np.nanmean(bgd_res)/np.nanstd(bgd_res) < -0.2 and parameters.PIXWIDTH_BOXSIZE >= 5:
         while (np.abs(np.nanmean(bgd_res)) > 0.5 or np.nanstd(bgd_res) > 1.3) and parameters.PIXWIDTH_BOXSIZE > 5:
             parameters.PIXWIDTH_BOXSIZE = max(5, parameters.PIXWIDTH_BOXSIZE // 2)
@@ -1275,7 +1275,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                             f"\n\tThese value should be smaller in absolute value than 0.5 and 1.3. "
                             f"\n\tTo do so, parameters.PIXWIDTH_BOXSIZE is divided "
                             f"by 2 from {parameters.PIXWIDTH_BOXSIZE * 2} -> {parameters.PIXWIDTH_BOXSIZE}.")
-            bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws)
+            bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws, mask_signal_region=True)
 
         # Propagate background uncertainties
         err = np.sqrt(err * err + bgd_rms * bgd_rms)
