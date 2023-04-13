@@ -25,24 +25,6 @@ def dumpParameters():
             print(item, getattr(parameters, item))
 
 
-def dumpfitparameters(params, thelogger):
-    N1 = len(params.input_labels)
-    N2 = len(params.p)
-    assert N1 == N2
-
-    list_of_strings = ["\n"]
-    for idx in range(N1):
-        tag = params.input_labels[idx]
-        val = params.p[idx]
-        fixed = params.fixed[idx]
-        b1 = params.bounds[idx][0]
-        b2 = params.bounds[idx][1]
-        line = "- fit param #{} :: {} = {} \t fixed = {} \t bounds {:.3f} - {:.3f}".format(idx, tag, val, fixed, b1, b2)
-        list_of_strings.append(line)
-    txt = "\n".join(list_of_strings)
-    thelogger.info(txt)
-
-
 class FullForwardModelFitWorkspace(FitWorkspace):
 
     def __init__(self, spectrum, amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
@@ -804,16 +786,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         epsilon = 1e-4 * w.params.p
         epsilon[epsilon == 0] = 1e-4
 
-        if parameters.DEBUG:
-            my_logger.info("\n --- before  run_minimisation ---")
-            dumpfitparameters(w.params, my_logger)
-
         run_minimisation(w, method=method, xtol=1e-3, ftol=1e-2)  # 1000 / (w.data.size - len(w.mask)))
-
-        if parameters.DEBUG:
-            my_logger.info("\n --- after  run_minimisation ---")
-            dumpfitparameters(w.params, my_logger)
-
         if parameters.DEBUG and parameters.DISPLAY:
             w.plot_fit()
 
@@ -865,11 +838,6 @@ def run_ffm_minimisation(w, method="newton", niter=2):
                                             ftol=1e-3, niter_clip=3,  # ftol=100 / (w.data.size - len(w.mask))
                                             sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP, verbose=True)
             my_logger.info(f"\n\t  niter = {i} : Newton: total computation time: {time.time() - start}s")
-
-            if parameters.DEBUG:
-                my_logger.info("\n --- after  run_minimisation_sigma_clipping ---")
-                dumpfitparameters(w.params, my_logger)
-
             if parameters.DEBUG and parameters.DISPLAY:
                 w.plot_fit()
 
