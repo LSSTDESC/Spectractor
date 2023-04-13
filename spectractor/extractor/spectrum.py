@@ -731,7 +731,7 @@ class Spectrum:
             from spectractor._version import __version__
             if self.config != "":
                 raise AttributeError(f"With Spectractor above 2.4 do not provide a config file in Spectrum(config=...)."
-                                     "Now config parameters are loaded from the file header. Got {self.config=}.")
+                                     f"Now config parameters are loaded from the file header. Got {self.config=}.")
             if self.header["VERSION"] != str(__version__):
                 self.my_logger.warning(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
                                        f"different from current Spectractor software {__version__}.")
