@@ -155,44 +155,44 @@ def test_ctio_fullchain():
     assert os.path.isfile(atmgrid_filename)
     spectrum = Spectrum(spectrum_file_name)
     w = SpectrumFitWorkspace(spectrum_file_name, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
-                             nsteps=1000, burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
+                             verbose=True, plot=True, live_fit=False)
     run_spectrum_minimisation(w, method="newton")
     nsigma = 2
     labels = ["VAOD_T", "OZONE_T", "PWV_T"]
     indices = [2, 4, 5]
-    ipar = np.array(np.where(np.array(w.fixed).astype(int) == 0)[0])  # non fixed param indices
+    ipar = w.params.get_free_parameters()  # non fixed param indices
     cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
     assert w.costs[-1] / w.data.size < 0.5
     k = 0
     for i, l in zip(indices, labels):
         icov = cov_indices[k]
-        spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.cov[icov, icov]):.3f} "
+        spectrum.my_logger.info(f"Test {l} best-fit {w.params.p[i]:.3f}+/-{np.sqrt(w.params.cov[icov, icov]):.3f} "
                                 f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
-                                f"{np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.cov[icov, icov]) < nsigma}")
-        assert np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.cov[icov, icov]) < nsigma
+                                f"{np.abs(w.params.p[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
+        assert np.abs(w.params.p[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
         k += 1
-    assert np.abs(w.p[1]) / np.sqrt(w.cov[1, 1]) < 2 * nsigma  # A2
-    assert np.isclose(np.abs(w.p[8]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
-    assert np.isclose(np.abs(w.p[9]), 0, atol=1e-3)  # B
+    assert np.abs(w.params.p[1]) / np.sqrt(w.params.cov[1, 1]) < 2 * nsigma  # A2
+    assert np.isclose(np.abs(w.params.p[8]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
+    assert np.isclose(np.abs(w.params.p[9]), 0, atol=1e-3)  # B
 
     parameters.DEBUG = False
     w = SpectrogramFitWorkspace(spectrum_file_name, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
-                                nsteps=1000, burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
+                                verbose=True, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")
     nsigma = 2
     labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T"]
     indices = [0, 1, 2, 4, 5]
     A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, shift_t, B, *psf_poly_params = w.p
-    ipar = np.array(np.where(np.array(w.fixed).astype(int) == 0)[0])  # non fixed param indices
+    ipar = w.params.get_free_parameters()  # non fixed param indices
     cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
     assert w.costs[-1] / w.data.size < 1e-3
     k = 0
     for i, l in zip(indices, labels):
         icov = cov_indices[k]
-        spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.cov[icov, icov]):.3f} "
+        spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.params.cov[icov, icov]):.3f} "
                                 f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
-                                f"{np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.cov[icov, icov]) < nsigma}")
-        assert np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.cov[icov, icov]) < nsigma
+                                f"{np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
+        assert np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
         k += 1
     assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
     assert np.isclose(D, spectrum.header["D2CCD_T"], atol=0.1)  # D2CCD
