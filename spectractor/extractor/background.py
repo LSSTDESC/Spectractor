@@ -13,10 +13,11 @@ from astropy.visualization import SqrtStretch
 from astropy.visualization.mpl_normalize import ImageNormalize
 from photutils import Background2D, SExtractorBackground
 from photutils.utils import circular_footprint
-from photutils.segmentation import detect_sources
 from photutils.background import Background2D, MedianBackground
+from photutils.segmentation import detect_threshold, detect_sources
 
 from scipy.signal import medfilt2d
+from scipy import ndimage
 from scipy.interpolate import RegularGridInterpolator
 
 
@@ -150,6 +151,53 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
             parameters.PdfPages.savefig()
     return bgd_model_func
 
+def make_source_mask(data, nsigma, npixels, mask=None, sigclip_sigma=3.0,
+                     sigclip_iters=5, dilate_size=11):
+    """
+    Make a source mask using source segmentation and binary dilation.
+    This is a slight stripped down version of the method which was removed from
+    photutils in 1.7.0.
+    Parameters
+    ----------
+    data : 2D `~numpy.ndarray`
+        The 2D array of the image.
+    nsigma : float
+        The number of standard deviations per pixel above the ``background``
+        for which to consider a pixel as possibly being part of a source.
+    npixels : int
+        The minimum number of connected pixels, each greater than
+        ``threshold``, that an object must have to be detected. ``npixels``
+        must be a positive integer.
+    mask : 2D bool `~numpy.ndarray`, optional
+        A boolean mask with the same shape as ``data``, where a `True` value
+        indicates the corresponding element of ``data`` is masked. Masked
+        pixels are ignored when computing the image background statistics.
+    sigclip_sigma : float, optional
+        The number of standard deviations to use as the clipping limit when
+        calculating the image background statistics.
+    sigclip_iters : int, optional
+        The maximum number of iterations to perform sigma clipping, or `None`
+        to clip until convergence is achieved (i.e., continue until the last
+        iteration clips nothing) when calculating the image background
+        statistics.
+    dilate_size : int, optional
+        The size of the square array used to dilate the segmentation image.
+    Returns
+    -------
+    mask : 2D bool `~numpy.ndarray`
+        A 2D boolean image containing the source mask.
+    """
+    sigma_clip = SigmaClip(sigma=sigclip_sigma, maxiters=sigclip_iters)
+    threshold = detect_threshold(data, nsigma, background=None, error=None,
+                                 mask=mask, sigma_clip=sigma_clip)
+
+    segm = detect_sources(data, threshold, npixels)
+    if segm is None:
+        return np.zeros(data.shape, dtype=bool)
+
+    footprint = np.ones((dilate_size, dilate_size))
+    return ndimage.binary_dilation(segm.data.astype(bool), footprint)
+
 
 def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signal_region=True, Dy_disp_axis=None):
     """
@@ -215,9 +263,10 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
 
     # mask sources
     data_to_mask =  data - bkg.background  # subtract the background
-    segment_map = detect_sources(data_to_mask, threshold=1.5*bkg.background_rms, npixels=5)
-    footprint = circular_footprint(radius=3)
-    mask = segment_map.make_source_mask(footprint=footprint)
+    #segment_map = detect_sources(data_to_mask, threshold=1.5*bkg.background_rms, npixels=5)
+    #footprint = circular_footprint(radius=3)
+    #mask = segment_map.make_source_mask(footprint=footprint)
+    mask = make_source_mask(data, nsigma=3, npixels=5, dilate_size=11)
 
     # mask null edges on rotated maps
     mask += data == 0
@@ -256,7 +305,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         cmap.set_bad(color='lightgrey')
         bgd_bands[mask] = np.nan
         data_to_plot = np.copy(data).astype(float)
-        data_to_plot[segment_map.make_source_mask(footprint=footprint)] = np.nan
+        data_to_plot[mask] = np.nan
         im = ax0.imshow(data_to_plot, origin='lower', aspect="auto", vmin=mean - 3 * std, vmax=mean + 3 * std, cmap=cmap)
         # ax0.imshow(segment_map, origin='lower', cmap=segment_map.cmap, interpolation='nearest', aspect="auto", alpha=0.5)
         v1 = np.linspace(mean - 3 * std, mean + 3 * std, 5, endpoint=True)
