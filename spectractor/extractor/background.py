@@ -262,10 +262,6 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
                        filter_size=(filter_size, filter_size), bkg_estimator=bkg_estimator)
 
     # mask sources
-    data_to_mask =  data - bkg.background  # subtract the background
-    #segment_map = detect_sources(data_to_mask, threshold=1.5*bkg.background_rms, npixels=5)
-    #footprint = circular_footprint(radius=3)
-    #mask = segment_map.make_source_mask(footprint=footprint)
     mask = make_source_mask(data, nsigma=3, npixels=5, dilate_size=11)
 
     # mask null edges on rotated maps
