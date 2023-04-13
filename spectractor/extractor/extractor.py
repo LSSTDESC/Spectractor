@@ -15,7 +15,8 @@ from spectractor.extractor.background import extract_spectrogram_background_sext
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
 from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple
-from spectractor.fit.fitter import run_minimisation, run_minimisation_sigma_clipping, RegFitWorkspace, FitWorkspace
+from spectractor.fit.fitter import (run_minimisation, run_minimisation_sigma_clipping,
+                                    RegFitWorkspace, FitWorkspace, FitParameters)
 
 
 def dumpParameters():
@@ -24,18 +25,18 @@ def dumpParameters():
             print(item, getattr(parameters, item))
 
 
-def dumpfitparameters(w, thelogger):
-    N1 = len(w.input_labels)
-    N2 = len(w.p)
+def dumpfitparameters(params, thelogger):
+    N1 = len(params.input_labels)
+    N2 = len(params.p)
     assert N1 == N2
 
     list_of_strings = ["\n"]
     for idx in range(N1):
-        tag = w.input_labels[idx]
-        val = w.p[idx]
-        fixed = w.fixed[idx]
-        b1 = w.bounds[idx][0]
-        b2 = w.bounds[idx][1]
+        tag = params.input_labels[idx]
+        val = params.p[idx]
+        fixed = params.fixed[idx]
+        b1 = params.bounds[idx][0]
+        b2 = params.bounds[idx][1]
         line = "- fit param #{} :: {} = {} \t fixed = {} \t bounds {:.3f} - {:.3f}".format(idx, tag, val, fixed, b1, b2)
         list_of_strings.append(line)
     txt = "\n".join(list_of_strings)
@@ -44,18 +45,13 @@ def dumpfitparameters(w, thelogger):
 
 class FullForwardModelFitWorkspace(FitWorkspace):
 
-    def __init__(self, spectrum, amplitude_priors_method="noprior", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False, truth=None):
+    def __init__(self, spectrum, amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
         """Class to fit a full forward model on data to extract a spectrum, with ADR prediction and order 2 subtraction.
 
         Parameters
         ----------
         spectrum: Spectrum
         amplitude_priors_method
-        nwalkers
-        nsteps
-        burnin
-        nbins
         verbose
         plot
         live_fit
@@ -66,8 +62,64 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
         >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="spectrum")
         """
-        FitWorkspace.__init__(self, spectrum.filename, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                              live_fit, truth=truth)
+        # prepare parameters to fit
+        length = len(spectrum.chromatic_psf.table)
+        self.psf_poly_params = np.copy(spectrum.chromatic_psf.from_table_to_poly_params())
+        self.psf_profile_params = np.copy(spectrum.chromatic_psf.from_table_to_profile_params())
+        self.psf_poly_params = self.psf_poly_params[length:]
+        psf_poly_params_labels = np.copy(spectrum.chromatic_psf.poly_params_labels[length:])
+        psf_poly_params_names = np.copy(spectrum.chromatic_psf.poly_params_names[length:])
+        spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=spectrum.spectrogram_Ny)
+        psf_poly_params_bounds = spectrum.chromatic_psf.set_bounds()
+        p = np.array([1, np.copy(spectrum.header['D2CCD']), np.copy(spectrum.header['PIXSHIFT']), 0,
+                      np.copy(spectrum.rotation_angle), 1, parameters.OBS_CAMERA_ROTATION,
+                      np.copy(spectrum.pressure),  np.copy(spectrum.temperature),  np.copy(spectrum.airmass)])
+        self.psf_params_start_index = p.size
+        self.psf_params_index = np.arange(0, self.psf_params_start_index+len(self.psf_poly_params))
+        self.psf_params_index_next_order = np.concatenate([np.arange(0, self.psf_params_start_index), np.arange(np.max(self.psf_params_index) + 1, len(p))])
+        self.psf_params_start_index_next_order = np.max(self.psf_params_index) + 1
+        self.saturation = spectrum.spectrogram_saturation
+        p = np.concatenate([p, self.psf_poly_params, self.psf_poly_params])
+        input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]",
+                             r"angle [deg]", "B", "R", "P [hPa]", "T [Celsius]", "z"] + \
+                            list(psf_poly_params_labels) + [label+"_2" for label in psf_poly_params_labels]
+        axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^(\mathrm{fit})$ [pix]",
+                           r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]",
+                           r"$\alpha$ [deg]", "$B$", "R", r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]",
+                           "$z$"] + list(psf_poly_params_names) + [label+"_2" for label in psf_poly_params_names]
+        bounds_D = (p[1] - 3 * parameters.DISTANCE2CCD_ERR, p[1] + 3 * parameters.DISTANCE2CCD_ERR)
+        bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
+                                                (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
+                                                (-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR),
+                                                (-90, 90), (0.2, 5), (-360, 360), (300, 1100), (-100, 100), (1.001, 3)]),
+                                      list(psf_poly_params_bounds) * 2])
+        fixed = [False] * p.size
+        for k, par in enumerate(input_labels):
+            if "x_c" in par or "saturation" in par:  # or "y_c" in par:
+                fixed[k] = True
+        for k, par in enumerate(input_labels):
+            if "y_c" in par:
+                fixed[k] = False
+                p[k] = 0
+        # self.set_y_c()
+        # This set of fixed parameters was determined so that the reconstructed spectrum has a ZERO bias
+        # with respect to the true spectrum injected in the simulation
+        # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
+        fixed[0] = (not spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in spectrum.header))
+        fixed[1] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_spectrum
+        fixed[2] = True  # delta x: if False, extracted spectrum is biased compared with truth
+        fixed[3] = True  # delta y
+        fixed[4] = True  # angle
+        fixed[5] = True  # B: not needed in simulations, to check with data
+        fixed[6] = True  # camera rot
+        fixed[7] = True  # pressure
+        fixed[8] = True  # temperature
+        fixed[9] = True  # airmass
+        fixed[-1] = True  # saturation
+
+        params = FitParameters(p, input_labels=input_labels, axis_names=axis_names, fixed=fixed, bounds=bounds,
+                               truth=truth, filename=spectrum.filename)
+        FitWorkspace.__init__(self, params, spectrum.filename, verbose, plot, live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.spectrum = spectrum
 
@@ -100,77 +152,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             raise ValueError(f"{abs(self.spectrum.order)=}: must be 1, 2 or 3. "
                              f"Higher diffraction orders not implemented yet in full forward model.")
 
-        # prepare parameters to fit
-        self.A2 = 1
-        self.D = np.copy(self.spectrum.header['D2CCD'])
-        self.shift_x = np.copy(self.spectrum.header['PIXSHIFT'])
-        self.shift_y = 0.
-        self.angle = np.copy(self.spectrum.rotation_angle)
-        self.B = 1
-        self.rotation = parameters.OBS_CAMERA_ROTATION
-        self.pressure = np.copy(self.spectrum.pressure)
-        self.temperature = np.copy(self.spectrum.temperature)
-        self.airmass = np.copy(self.spectrum.airmass)
-        self.psf_poly_params = np.copy(self.spectrum.chromatic_psf.from_table_to_poly_params())
-        self.psf_profile_params = np.copy(self.spectrum.chromatic_psf.from_table_to_profile_params())
-        length = len(self.spectrum.chromatic_psf.table)
-        self.psf_poly_params = self.psf_poly_params[length:]
-        self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:])
-        self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:])
-        self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
-        self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
-        psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
-        self.saturation = self.spectrum.spectrogram_saturation
-        self.p = np.array([self.A2, self.D, self.shift_x, self.shift_y, self.angle, self.B, self.rotation, self.pressure, self.temperature, self.airmass])
-        self.psf_params_start_index = self.p.size
-        self.p = np.concatenate([self.p, self.psf_poly_params, self.psf_poly_params])
-        self.input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]",
-                             r"angle [deg]", "B", "R", "P [hPa]", "T [Celsius]", "z"] + \
-                            list(self.psf_poly_params_labels) + [label+"_2" for label in self.psf_poly_params_labels]
-        self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^(\mathrm{fit})$ [pix]",
-                           r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]",
-                           r"$\alpha$ [deg]", "$B$", "R", r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]",
-                           "$z$"] + list(self.psf_poly_params_names) + [label+"_2" for label in self.psf_poly_params_names]
-        bounds_D = (self.D - 3 * parameters.DISTANCE2CCD_ERR, self.D + 3 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
-                                                (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
-                                                (-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR),
-                                                (-90, 90), (0.2, 5), (-360, 360), (300, 1100), (-100, 100), (1.001, 3)]),
-                                      list(psf_poly_params_bounds) * 2])
-        self.fixed = [False] * self.p.size
-        for k, par in enumerate(self.input_labels):
-            if "x_c" in par or "saturation" in par:  # or "y_c" in par:
-                self.fixed[k] = True
-        for k, par in enumerate(self.input_labels):
-            if "y_c" in par:
-                self.fixed[k] = False
-                self.p[k] = 0
-        # self.set_y_c()
-        # This set of fixed parameters was determined so that the reconstructed spectrum has a ZERO bias
-        # with respect to the true spectrum injected in the simulation
-        # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        self.fixed[0] = (not self.spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in self.spectrum.header))
-        self.fixed[1] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_spectrum
-        self.fixed[2] = True  # delta x: if False, extracted spectrum is biased compared with truth
-        self.fixed[3] = True  # delta y
-        self.fixed[4] = True  # angle
-        self.fixed[5] = True  # B: not needed in simulations, to check with data
-        self.fixed[6] = True  # camera rot
-        self.fixed[7] = True  # pressure
-        self.fixed[8] = True  # temperature
-        self.fixed[9] = True  # airmass
-        self.fixed[-1] = True  # saturation
-        self.nwalkers = max(2 * self.ndim, nwalkers)
-
         # PSF cube computation
         self.psf_cube_masked = None
         self.psf_cube = None
         self.psf_cube_next_order = None
         self.fix_psf_cube = False
         self.fix_psf_cube_next_order = False
-        self.psf_params_index = np.arange(0, self.psf_params_start_index+len(self.psf_poly_params))
-        self.psf_params_index_next_order = np.concatenate([np.arange(0, self.psf_params_start_index), np.arange(np.max(self.psf_params_index) + 1, len(self.p))])
-        self.psf_params_start_index_next_order = np.max(self.psf_params_index) + 1
 
         # prepare the background, data and errors
         self.bgd_std = float(np.std(np.random.poisson(np.abs(self.bgd))))
@@ -250,14 +237,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
 
     def set_y_c(self):
-        for k, par in enumerate(self.input_labels):
+        for k, par in enumerate(self.params.input_labels):
             if "y_c" in par:
                 if par == "y_c_0":
-                    self.p[k] = self.p[3]
+                    self.params.p[k] = self.params.p[3]
                 elif par == "y_c_1":
-                    self.p[k] = np.tan(self.p[4] * np.pi / 180)
+                    self.params.p[k] = np.tan(self.params.p[4] * np.pi / 180)
                 else:
-                    self.p[k] = 0
+                    self.params.p[k] = 0
 
     def set_mask(self, params=None, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP):
         """
@@ -275,19 +262,19 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         --------
         >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="fixed", verbose=True)
-        >>> _ = w.simulate(*w.p)
+        >>> _ = w.simulate(*w.params.p)
         >>> w.plot_fit()
 
         """
         self.my_logger.info("\n\tReset spectrogram mask with current parameters.")
         if params is None:
-            params = self.p
+            params = self.params.p
         A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *psf_poly_params = params
         if len(psf_poly_params) % 2 != 0:
             raise ValueError(f"Argument psf_poly_params must be even size, to be split in parameters"
                              f"for first order and next order spectrograms. Got {len(psf_poly_params)=}.")
-        poly_params = psf_poly_params[:len(psf_poly_params)//2]
-        poly_params_next_order = psf_poly_params[len(psf_poly_params)//2:]
+        poly_params = params[self.psf_params_start_index:self.psf_params_start_index_next_order]
+        poly_params_next_order = params[self.psf_params_start_index_next_order:]
         profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params,
                                                                                         apply_bounds=True)
         profile_params_next_order = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params_next_order,
@@ -412,7 +399,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         .. doctest::
 
             >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="fixed", verbose=True)
-            >>> y, mod, mod_err = w.simulate(*w.p)
+            >>> y, mod, mod_err = w.simulate(*w.params.p)
             >>> w.plot_fit()
 
         .. doctest::
@@ -426,16 +413,16 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
             >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
             >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="spectrum", verbose=True)
-            >>> y, mod, mod_err = w.simulate(*w.p)
+            >>> y, mod, mod_err = w.simulate(*w.params.p)
             >>> w.plot_fit()
 
         """
         # linear regression for the amplitude parameters
         # prepare the vectors
-        self.p = np.asarray(params)
+        self.params.p = np.asarray(params)
         A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *poly_params_all = params
-        poly_params = poly_params_all[:len(poly_params_all)//2]
-        poly_params_next_order = poly_params_all[len(poly_params_all)//2:]
+        poly_params = params[self.psf_params_start_index:self.psf_params_start_index_next_order]
+        poly_params_next_order = params[self.psf_params_start_index_next_order:]
         self.spectrum.adr_params[2] = temperature
         self.spectrum.adr_params[3] = pressure
         self.spectrum.adr_params[-1] = airmass
@@ -625,7 +612,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         sub = np.where(sub < self.spectrum.spectrogram.shape[1])[0]
         data = (data + self.bgd_flat).reshape((self.Ny, self.Nx))
         err = self.err.reshape((self.Ny, self.Nx))
-        model = (self.model + self.p[5] * self.bgd_flat).reshape((self.Ny, self.Nx))
+        model = (self.model + self.params.p[5] * self.bgd_flat).reshape((self.Ny, self.Nx))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
@@ -679,8 +666,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         --------
 
         >>> spec = Spectrum('tests/data/sim_20170530_134_spectrum.fits')
-        >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> w = FullForwardModelFitWorkspace(spec, verbose=True, plot=True, live_fit=False)
+        >>> lambdas, model, model_err = w.simulate(*w.params.p)
         >>> w.plot_fit()
 
         .. plot::
@@ -749,21 +736,21 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
     def adjust_spectrogram_position_parameters(self):
         # fit the spectrogram trace
-        epsilon = 1e-4 * self.p
+        epsilon = 1e-4 * self.params.p
         epsilon[epsilon == 0] = 1e-4
-        fixed_default = np.copy(self.fixed)
-        self.fixed = [True] * len(self.p)
+        fixed_default = np.copy(self.params.fixed)
+        self.params.fixed = [True] * len(self.params.p)
         # if fixed_default[3] is False and fixed_default[4] is False:
-        self.fixed[3:5] = [False, False]  # shift_y and angle
+        self.params.fixed[3:5] = [False, False]  # shift_y and angle
         # else:
         #     for k, par in enumerate(self.input_labels):
         #         if "y_c" in par and "_2" not in par:
         #             self.fixed[k] = False
         self.sparse_indices = None
-        run_minimisation(self, "newton", epsilon, self.fixed, xtol=1e-2, ftol=0.01)  # 1000 / self.data.size)
-        self.fixed = fixed_default
+        run_minimisation(self, "newton", epsilon, xtol=1e-2, ftol=0.01)  # 1000 / self.data.size)
+        self.params.fixed = fixed_default
         self.sparse_indices = None
-        self.set_mask(params=self.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
+        self.set_mask(params=self.params.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
         # self.set_y_c()
 
 
@@ -789,7 +776,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
     >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
     >>> parameters.VERBOSE = True
-    >>> w = FullForwardModelFitWorkspace(spec, verbose=1, plot=True, live_fit=True, amplitude_priors_method="spectrum")
+    >>> w = FullForwardModelFitWorkspace(spec, verbose=True, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
     >>> if 'LBDAS_T' in spec.header: plot_comparison_truth(spec, w)
        Line   Tabulated  Detected ...
@@ -798,8 +785,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         :hide:
 
         >>> assert w.costs[-1] / w.data.size < 1.22  # reduced chisq
-        >>> assert np.isclose(w.p[4], -1.56, rtol=0.05)  # angle
-        >>> assert np.isclose(w.p[5], 1, rtol=0.05)  # B
+        >>> assert np.isclose(w.params.p[4], -1.56, rtol=0.05)  # angle
+        >>> assert np.isclose(w.params.p[5], 1, rtol=0.05)  # B
 
     """
     my_logger = set_logger(__name__)
@@ -809,23 +796,23 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     if method != "newton":
         run_minimisation(w, method=method)
     else:
-        costs = np.array([w.chisq(w.p)])
+        costs = np.array([w.chisq(w.params.p)])
         if parameters.DISPLAY and (parameters.DEBUG or w.live_fit):
             w.plot_fit()
         start = time.time()
-        my_logger.info(f"\n\tStart guess: {w.p}\n\twith {w.input_labels}")
-        epsilon = 1e-4 * w.p
+        my_logger.info(f"\n\tStart guess: {w.params.p}\n\twith {w.params.input_labels}")
+        epsilon = 1e-4 * w.params.p
         epsilon[epsilon == 0] = 1e-4
 
         if parameters.DEBUG:
             my_logger.info("\n --- before  run_minimisation ---")
-            dumpfitparameters(w, my_logger)
+            dumpfitparameters(w.params, my_logger)
 
-        run_minimisation(w, method=method, fix=w.fixed, xtol=1e-3, ftol=1e-2)  # 1000 / (w.data.size - len(w.mask)))
+        run_minimisation(w, method=method, xtol=1e-3, ftol=1e-2)  # 1000 / (w.data.size - len(w.mask)))
 
         if parameters.DEBUG:
             my_logger.info("\n --- after  run_minimisation ---")
-            dumpfitparameters(w, my_logger)
+            dumpfitparameters(w.params, my_logger)
 
         if parameters.DEBUG and parameters.DISPLAY:
             w.plot_fit()
@@ -852,7 +839,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w_reg.run_regularisation()
             w.opt_reg = w_reg.opt_reg
             w.reg = np.copy(w_reg.opt_reg)
-            w.simulate(*w.p)
+            w.simulate(*w.params.p)
             if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
                 w.my_logger.warning(
                     f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
@@ -873,15 +860,15 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
         my_logger.info("\n --- Start run_minimisation_sigma_clipping  ---")
         for i in range(niter):
-            w.set_mask(params=w.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
-            run_minimisation_sigma_clipping(w, "newton", epsilon, w.fixed, xtol=1e-5,
+            w.set_mask(params=w.params.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
+            run_minimisation_sigma_clipping(w, "newton", epsilon, xtol=1e-5,
                                             ftol=1e-3, niter_clip=3,  # ftol=100 / (w.data.size - len(w.mask))
                                             sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP, verbose=True)
             my_logger.info(f"\n\t  niter = {i} : Newton: total computation time: {time.time() - start}s")
 
             if parameters.DEBUG:
                 my_logger.info("\n --- after  run_minimisation_sigma_clipping ---")
-                dumpfitparameters(w, my_logger)
+                dumpfitparameters(w.params, my_logger)
 
             if parameters.DEBUG and parameters.DISPLAY:
                 w.plot_fit()
@@ -915,28 +902,27 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.spectrogram_fit = w.model
             w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
             w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
-            w.spectrum.header['PIXSHIFT'] = w.p[2]
-            w.spectrum.header['D2CCD'] = w.p[1]
-            w.spectrum.header['A2_FIT'] = w.p[0]
-            w.spectrum.header["ROTANGLE"] = w.p[4]
-            w.spectrum.header["AM_FIT"] = w.p[9]
+            w.spectrum.header['PIXSHIFT'] = w.params.p[2]
+            w.spectrum.header['D2CCD'] = w.params.p[1]
+            w.spectrum.header['A2_FIT'] = w.params.p[0]
+            w.spectrum.header["ROTANGLE"] = w.params.p[4]
+            w.spectrum.header["AM_FIT"] = w.params.p[9]
             # Compute next order contamination
             if w.tr_ratio_next_order:
-                w.spectrum.data_next_order = w.p[0] * w.amplitude_params * w.tr_ratio_next_order(w.lambdas)
-                w.spectrum.err_next_order = np.abs(w.p[0] * w.amplitude_params_err * w.tr_ratio_next_order(w.lambdas))
+                w.spectrum.data_next_order = w.params.p[0] * w.amplitude_params * w.tr_ratio_next_order(w.lambdas)
+                w.spectrum.err_next_order = np.abs(w.params.p[0] * w.amplitude_params_err * w.tr_ratio_next_order(w.lambdas))
 
             # Calibrate the spectrum
             calibrate_spectrum(w.spectrum, with_adr=True)
-            w.p[1] = w.spectrum.disperser.D
-            w.p[2] = w.spectrum.header['PIXSHIFT']
+            w.params.p[1] = w.spectrum.disperser.D
+            w.params.p[2] = w.spectrum.header['PIXSHIFT']
             w.spectrum.convert_from_flam_to_ADUrate()
 
         if w.filename != "":
             parameters.SAVE = True
-            ipar = np.array(np.where(np.array(w.fixed).astype(int) == 0)[0])
-            w.plot_correlation_matrix(ipar)
-            w.save_parameters_summary(ipar, header=f"{w.spectrum.date_obs}\n"
-                                                   f"chi2: {costs[-1] / (w.data.size - len(w.outliers) - len(w.mask))}")
+            w.params.plot_correlation_matrix()
+            w.params.save_parameters_summary(header=f"{w.spectrum.date_obs}\n"
+                                                    f"chi2: {costs[-1] / (w.data.size - len(w.outliers) - len(w.mask))}")
             w.plot_fit()
             parameters.SAVE = False
 
@@ -969,7 +955,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     # w.amplitude_cov_matrix = full_cov_matrix[start:, start:]
 
     # Propagate parameters
-    A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.p
+    A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.params.p
     w.spectrum.rotation_angle = angle
     w.spectrum.spectrogram_bgd *= B
     w.spectrum.spectrogram_bgd_rms *= B
