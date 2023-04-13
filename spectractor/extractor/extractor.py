@@ -44,6 +44,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
         >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="spectrum")
         """
+        self.my_logger = set_logger(self.__class__.__name__)
         # prepare parameters to fit
         length = len(spectrum.chromatic_psf.table)
         self.psf_poly_params = np.copy(spectrum.chromatic_psf.from_table_to_poly_params())
@@ -62,19 +63,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.psf_params_start_index_next_order = np.max(self.psf_params_index) + 1
         self.saturation = spectrum.spectrogram_saturation
         p = np.concatenate([p, self.psf_poly_params, self.psf_poly_params])
-        input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]",
-                             r"angle [deg]", "B", "R", "P [hPa]", "T [Celsius]", "z"] + \
-                            list(psf_poly_params_labels) + [label+"_2" for label in psf_poly_params_labels]
+        input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B", "R", "P [hPa]",
+                        "T [Celsius]", "z"] + list(psf_poly_params_labels) + [label+"_2" for label in psf_poly_params_labels]
         axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^(\mathrm{fit})$ [pix]",
-                           r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]",
-                           r"$\alpha$ [deg]", "$B$", "R", r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]",
-                           "$z$"] + list(psf_poly_params_names) + [label+"_2" for label in psf_poly_params_names]
+                      r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]", r"$\alpha$ [deg]", "$B$", "R",
+                      r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]", "$z$"] + \
+                     list(psf_poly_params_names) + [label+r"$\!_2$" for label in psf_poly_params_names]
         bounds_D = (p[1] - 3 * parameters.DISTANCE2CCD_ERR, p[1] + 3 * parameters.DISTANCE2CCD_ERR)
         bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
-                                                (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
-                                                (-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR),
-                                                (-90, 90), (0.2, 5), (-360, 360), (300, 1100), (-100, 100), (1.001, 3)]),
-                                      list(psf_poly_params_bounds) * 2])
+                                           (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
+                                           (-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR),
+                                           (-90, 90), (0.2, 5), (-360, 360), (300, 1100), (-100, 100), (1.001, 3)]),
+                                 list(psf_poly_params_bounds) * 2])
         fixed = [False] * p.size
         for k, par in enumerate(input_labels):
             if "x_c" in par or "saturation" in par:  # or "y_c" in par:
@@ -102,7 +102,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         params = FitParameters(p, input_labels=input_labels, axis_names=axis_names, fixed=fixed, bounds=bounds,
                                truth=truth, filename=spectrum.filename)
         FitWorkspace.__init__(self, params, spectrum.filename, verbose, plot, live_fit, truth=truth)
-        self.my_logger = set_logger(self.__class__.__name__)
         self.spectrum = spectrum
 
         # crop data to fit faster
@@ -756,12 +755,11 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     Examples
     --------
 
-    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+    >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
     >>> parameters.VERBOSE = True
     >>> w = FullForwardModelFitWorkspace(spec, verbose=True, plot=True, live_fit=True, amplitude_priors_method="spectrum")
     >>> spec = run_ffm_minimisation(w, method="newton")  # doctest: +ELLIPSIS
     >>> if 'LBDAS_T' in spec.header: plot_comparison_truth(spec, w)
-       Line   Tabulated  Detected ...
 
     .. doctest:
         :hide:
@@ -772,7 +770,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
     """
     my_logger = set_logger(__name__)
-    my_logger.info(f"\n --- Start FFM with adjust_spectrogram_position_parameters --- ")
+    my_logger.info(f"\n\tStart FFM with adjust_spectrogram_position_parameters.")
     w.adjust_spectrogram_position_parameters()
 
     if method != "newton":
@@ -805,7 +803,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             if parameters.LSST_SAVEFIGPATH:
                 fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'fwhm_2.pdf'))
 
-        my_logger.info("\n --- Start regularization parameter only  ---")
+        my_logger.info("\n\tStart regularization parameter only.")
         # Optimize the regularisation parameter only if it was not done before
         if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
@@ -831,7 +829,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         if parameters.DEBUG and parameters.DISPLAY:
             w.plot_fit()
 
-        my_logger.info("\n --- Start run_minimisation_sigma_clipping  ---")
+        my_logger.info(f"\n\tStart run_minimisation_sigma_clipping "
+                       f"with sigma={parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP}.")
         for i in range(niter):
             w.set_mask(params=w.params.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
             run_minimisation_sigma_clipping(w, "newton", epsilon, xtol=1e-5,
