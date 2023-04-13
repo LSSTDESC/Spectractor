@@ -257,9 +257,6 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     filter_size = parameters.PIXWIDTH_BOXSIZE // 2
     if filter_size % 2 == 0:  # must be odd since photutils 1.5.0
         filter_size += 1
-    bkg_estimator = MedianBackground()
-    bkg = Background2D(data, (parameters.PIXWIDTH_BOXSIZE, parameters.PIXWIDTH_BOXSIZE),
-                       filter_size=(filter_size, filter_size), bkg_estimator=bkg_estimator)
 
     # mask sources
     mask = make_source_mask(data, nsigma=3, npixels=5, dilate_size=11)
