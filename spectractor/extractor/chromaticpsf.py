@@ -16,7 +16,8 @@ from spectractor.extractor.background import extract_spectrogram_background_sext
 from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss, Moffat
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping, RegFitWorkspace
+from spectractor.fit.fitter import (FitParameters, FitWorkspace, run_minimisation, run_minimisation_sigma_clipping,
+                                    RegFitWorkspace)
 
 
 class ChromaticPSF:
@@ -1053,11 +1054,10 @@ class ChromaticPSF:
             w = PSFFitWorkspace(psf, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False)
             try:
-                run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=1, verbose=False,
-                                                fix=w.fixed)
+                run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=1, verbose=False)
             except:
                 pass
-            best_fit = w.psf.p
+            best_fit = w.params.p
             # It is better not to propagate the guess to further pixel columns
             # otherwise fit_chromatic_psf1D is more likely to get trapped in a local minimum
             # Randomness of the slice fit is better :
@@ -1140,7 +1140,7 @@ class ChromaticPSF:
         >>> bgd = 10*np.ones_like(data)
         >>> data += bgd
         >>> data = np.random.poisson(data)
-        >>> data_errors = np.sqrt(data)
+        >>> data_errors = np.sqrt(np.abs(data))
 
         Extract the background:
 
@@ -1207,21 +1207,20 @@ class ChromaticPSF:
             w = ChromaticPSF1DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                            live_fit=live_fit)
-            run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, fix=w.fixed)
+            run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50)
         elif mode == "2D":
             # first shot to set the mask
             w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                            live_fit=live_fit)
-            run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, fix=w.fixed,
-                             verbose=verbose)
+            run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, verbose=verbose)
             if amplitude_priors_method == "psf1d":
                 w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
                 w_reg.run_regularisation()
                 w.reg = np.copy(w_reg.opt_reg)
                 w.trace_r = np.trace(w_reg.resolution)
                 self.opt_reg = w_reg.opt_reg
-                w.simulate(*w.p)
+                w.simulate(*w.params.p)
                 if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
                     self.my_logger.warning(
                         f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
@@ -1237,13 +1236,13 @@ class ChromaticPSF:
             w.set_mask(poly_params=w.poly_params)
             # precise fit with sigma clipping
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
-                                            fix=w.fixed, sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP,
+                                            sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP,
                                             niter_clip=3, verbose=verbose)
         else:
             raise ValueError(f"Unknown fitting mode={mode}. Must be '1D' or '2D'.")
 
         # recompute and save params in class attributes
-        w.simulate(*w.p)
+        w.simulate(*w.params.p)
         self.poly_params = w.poly_params
         self.cov_matrix = np.copy(w.amplitude_cov_matrix)
 
@@ -1268,31 +1267,27 @@ class ChromaticPSF:
 class ChromaticPSFFitWorkspace(FitWorkspace):
 
     def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="",
-                 amplitude_priors_method="noprior",
-                 nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False, truth=None):
-        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                              live_fit, truth=truth)
+                 amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
+        length = len(chromatic_psf.table)
+        params = FitParameters(np.copy(chromatic_psf.poly_params[length:]),
+                               input_labels=list(np.copy(chromatic_psf.poly_params_labels[length:])),
+                               axis_names=list(np.copy(chromatic_psf.poly_params_names[length:])), fixed=None,
+                               truth=truth, filename=file_name)
+        for k, par in enumerate(params.input_labels):
+            if "x_c" in par or "saturation" in par:
+                params.fixed[k] = True
+        FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot, live_fit=live_fit)
         self.my_logger = set_logger(self.__class__.__name__)
         self.chromatic_psf = chromatic_psf
         self.data = data
         self.err = data_errors
         self.bgd_model_func = bgd_model_func
-        length = len(self.chromatic_psf.table)
-        self.p = np.copy(self.chromatic_psf.poly_params[length:])  # remove saturation (fixed parameter))
         self.poly_params = np.copy(self.chromatic_psf.poly_params)
-        self.input_labels = list(np.copy(self.chromatic_psf.poly_params_labels[length:]))
-        self.axis_names = list(np.copy(self.chromatic_psf.poly_params_names[length:]))
-        self.fixed = [False] * self.p.size
-        for k, par in enumerate(self.input_labels):
-            if "x_c" in par or "saturation" in par:
-                self.fixed[k] = True
         self.y_c_0_index = -1
-        for k, par in enumerate(self.input_labels):
+        for k, par in enumerate(params.input_labels):
             if par == "y_c_0":
                 self.y_c_0_index = k
                 break
-        self.nwalkers = max(2 * self.ndim, nwalkers)
 
         # prepare the fit
         self.Ny, self.Nx = self.data.shape
@@ -1434,12 +1429,9 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
 class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
 
     def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="",
-                 amplitude_priors_method="noprior",
-                 nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False, truth=None):
+                 amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
         ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                          file_name, amplitude_priors_method, nwalkers, nsteps, burnin, nbins, verbose,
-                                          plot, live_fit, truth=truth)
+                                          file_name, amplitude_priors_method, verbose, plot, live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.pixels = np.arange(self.Ny)
 
@@ -1624,12 +1616,9 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
 class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
     def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, amplitude_priors_method="noprior",
-                 file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False, truth=None):
+                 file_name="", verbose=False, plot=False, live_fit=False, truth=None):
         ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                          file_name, amplitude_priors_method, nwalkers, nsteps, burnin, nbins, verbose,
-                                          plot,
-                                          live_fit, truth=truth)
+                                          file_name, amplitude_priors_method, verbose, plot, live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         yy, xx = np.mgrid[:self.Ny, :self.Nx]
         self.pixels = np.asarray([xx, yy])

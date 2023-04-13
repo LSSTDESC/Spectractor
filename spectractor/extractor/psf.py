@@ -7,7 +7,7 @@ from scipy.interpolate import RegularGridInterpolator
 from spectractor.tools import plot_image_simple
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.fit.fitter import FitWorkspace, run_minimisation
+from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation
 
 from numba import njit
 
@@ -619,7 +619,7 @@ class PSF:
         """
         w = PSFFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func,
                             verbose=False, live_fit=False)
-        run_minimisation(w, method="newton", ftol=1 / w.pixels.size, xtol=1e-6, niter=50, fix=w.fixed)
+        run_minimisation(w, method="newton", ftol=1 / w.pixels.size, xtol=1e-6, niter=50)
         self.p = np.copy(w.p)
         return w
 
@@ -1034,22 +1034,18 @@ class PSFFitWorkspace(FitWorkspace):
     """
 
     def __init__(self, psf, data, data_errors, bgd_model_func=None, file_name="",
-                 nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False, truth=None):
+                 verbose=False, plot=False, live_fit=False, truth=None):
         """
 
         Parameters
         ----------
-        psf
+        psf: PSF
+            PSF model instance.
         data: array_like
             The data array (background subtracted) of dimension 1 or 2.
         data_errors
         bgd_model_func
         file_name
-        nwalkers
-        nsteps
-        burnin
-        nbins
         verbose
         plot
         live_fit
@@ -1070,7 +1066,10 @@ class PSFFitWorkspace(FitWorkspace):
         >>> w = PSFFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
 
         """
-        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose=verbose, plot=plot,
+        params = FitParameters(np.copy(psf.p), input_labels=list(np.copy(psf.param_names)),
+                               axis_names=list(np.copy(psf.axis_names)), bounds=psf.bounds,
+                               fixed=[False] * (len(psf.p)-1) + [True], truth=truth, filename=file_name)
+        FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot,
                               live_fit=live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         if data.shape != data_errors.shape:
@@ -1080,15 +1079,8 @@ class PSFFitWorkspace(FitWorkspace):
         self.data = data
         self.err = data_errors
         self.bgd_model_func = bgd_model_func
-        self.p = np.copy(self.psf.p)  # [1:])
-        self.guess = np.copy(self.psf.p)
         self.saturation = self.psf.p[-1]
-        self.fixed = [False] * len(self.p)
-        self.fixed[-1] = True  # fix saturation parameter
-        self.input_labels = list(np.copy(self.psf.param_names))  # [1:]))
-        self.axis_names = list(np.copy(self.psf.axis_names))  # [1:]))
-        self.bounds = self.psf.bounds  # [1:]
-        self.nwalkers = max(2 * self.ndim, nwalkers)
+        self.guess = np.copy(self.psf.p)
 
         # prepare the fit
         if data.ndim == 2:
@@ -1104,14 +1096,14 @@ class PSFFitWorkspace(FitWorkspace):
             self.Nx = 1
             self.psf.apply_max_width_to_bounds(self.Ny)
             self.pixels = np.arange(self.Ny)
-            self.fixed[1] = True
+            self.params.fixed[1] = True
         else:
             raise ValueError(f"Data array must have dimension 1 or 2. Here pixels.ndim={data.ndim}.")
 
         # update bounds
-        self.bounds = self.psf.bounds  # [1:]
+        self.params.bounds = self.psf.bounds  # [1:]
         total_flux = np.sum(data)
-        self.bounds[0] = (0.1 * total_flux, 2 * total_flux)
+        self.params.bounds[0] = (0.1 * total_flux, 2 * total_flux)
 
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
@@ -1230,7 +1222,7 @@ class PSFFitWorkspace(FitWorkspace):
             ax[0].legend(loc=2, numpoints=1)
             ax[0].grid(True)
             txt = ""
-            for ip, p in enumerate(self.input_labels):
+            for ip, p in enumerate(self.params.input_labels):
                 txt += f'{p}: {self.p[ip]:.4g}\n'
             ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
             # residuals

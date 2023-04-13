@@ -7,14 +7,14 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.simulation.simulator import SimulatorInit, SpectrumSimulation
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping, run_minimisation
+from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation_sigma_clipping, run_minimisation
 from spectractor.tools import plot_spectrum_simple
 
 
 class SpectrumFitWorkspace(FitWorkspace):
 
-    def __init__(self, file_name, atmgrid_file_name="", fit_angstrom_exponent=False, nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False, truth=None):
+    def __init__(self, file_name, atmgrid_file_name="", fit_angstrom_exponent=False,
+                 verbose=False, plot=False, live_fit=False, truth=None):
         """Class to fit a spectrum extracted with Spectractor.
 
         The spectrum is supposed to be the product of the star SED, the instrument throughput and the atmospheric
@@ -31,16 +31,8 @@ class SpectrumFitWorkspace(FitWorkspace):
             Atmospheric grid file name (default: "").
         fit_angstrom_exponent: bool, optional
             If True, fit angstrom exponent (default: False).
-        nwalkers: int, optional
-            Number of walkers for MCMC fitting.
-        nsteps: int, optional
-            Number of steps for MCMC fitting.
-        burnin: int, optional
-            Number of burn-in steps for MCMC fitting.
-        nbins: int, optional
-            Number of bins for MCMC chains analysis.
-        verbose: int, optional
-            Verbosity level (default: 0).
+        verbose: bool, optional
+            Verbosity level (default: False).
         plot: bool, optional
             If True, many plots are produced (default: False).
         live_fit: bool, optional
@@ -57,11 +49,10 @@ class SpectrumFitWorkspace(FitWorkspace):
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
         ... burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> lambdas, model, model_err = w.simulate(*w.params.p)
         >>> w.plot_fit()
 
         """
-        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit, truth=truth)
         if "spectrum" not in file_name:
             raise ValueError("file_name argument must contain spectrum keyword and be an output from Spectractor.")
         if fit_angstrom_exponent and atmgrid_file_name != '':
@@ -69,6 +60,26 @@ class SpectrumFitWorkspace(FitWorkspace):
                              f"Can't provide atmgrid_file_name and ask for fitting angstrom exponent {fit_angstrom_exponent=}.")
         self.my_logger = set_logger(self.__class__.__name__)
         self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
+        p = np.array([1, 0, 0.01, -2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
+        fixed = [False] * p.size
+        # fixed[0] = True
+        fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
+        fixed[5] = False
+        # fixed[6:8] = [True, True]
+        fixed[8] = True
+        fixed[9] = True
+        # fixed[-1] = True
+        if not fit_angstrom_exponent:
+            fixed[3] = True  # angstrom_exponent
+        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-5, 2), (100, 700), (0, 10),
+                       (0.1, 10),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
+                  (-2, 2), (-np.inf, np.inf)]
+        params = FitParameters(p, input_labels=["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone", "PWV",
+                                                "reso [pix]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
+                               axis_names=["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone", "PWV",
+                                           "reso [pix]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
+                               bounds=bounds, fixed=fixed, truth=truth, filename=file_name)
+        FitWorkspace.__init__(self, params, file_name, verbose, plot, live_fit)
         self.airmass = self.spectrum.header['AIRMASS']
         self.pressure = self.spectrum.header['OUTPRESS']
         self.temperature = self.spectrum.header['OUTTEMP']
@@ -84,41 +95,11 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.err = self.spectrum.err
         self.data_cov = self.spectrum.cov_matrix
         self.fit_angstrom_exponent = fit_angstrom_exponent
-        self.A1 = 1.0
-        self.A2 = 0
-        self.ozone = 400.
-        self.pwv = 5
-        self.aerosols = 0.01
-        self.angstrom_exponent_log10 = -2
-        self.reso = 1
-        self.D = self.spectrum.header['D2CCD']
-        self.shift_x = self.spectrum.header['PIXSHIFT']
-        self.B = 0
-        self.p = np.array([self.A1, self.A2, self.aerosols, self.angstrom_exponent_log10, self.ozone, self.pwv, self.reso, self.D,
-                           self.shift_x, self.B])
-        self.fixed = [False] * self.p.size
-        # self.fixed[0] = True
-        self.fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
-        self.fixed[5] = False
-        # self.fixed[6:8] = [True, True]
-        self.fixed[8] = True
-        self.fixed[9] = True
-        # self.fixed[-1] = True
-        if not fit_angstrom_exponent:
-            self.fixed[3] = True  # angstrom_exponent
-        self.input_labels = ["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone", "PWV", "reso [pix]", r"D_CCD [mm]",
-                             r"alpha_pix [pix]", "B"]
-        self.axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone", "PWV", "reso [pix]", r"$D_{CCD}$ [mm]",
-                           r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"]
-        bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-5, 2), (100, 700), (0, 10),
-                       (0.1, 10), bounds_D, (-2, 2), (-np.inf, np.inf)]
         if atmgrid_file_name != "":
-            self.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
-            self.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
-            self.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
-            self.fixed[3] = True  # angstrom exponent
-        self.nwalkers = max(2 * self.ndim, nwalkers)
+            self.params.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
+            self.params.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
+            self.params.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+            self.params.fixed[3] = True  # angstrom exponent
         self.simulation = SpectrumSimulation(self.spectrum, self.atmosphere, self.telescope, self.disperser)
         self.amplitude_truth = None
         self.lambdas_truth = None
@@ -243,8 +224,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         >>> load_config("config/ctio.ini")
         >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> w = SpectrumFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> w = SpectrumFitWorkspace(filename, atmgrid_filename, verbose=True, plot=True, live_fit=False)
+        >>> lambdas, model, model_err = w.simulate(*w.params.p)
         >>> w.plot_fit()
 
         """
@@ -267,8 +248,8 @@ class SpectrumFitWorkspace(FitWorkspace):
         >>> load_config("config/ctio.ini")
         >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
         >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> w = SpectrumFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> w = SpectrumFitWorkspace(filename, atmgrid_filename, verbose=True, plot=True, live_fit=False)
+        >>> lambdas, model, model_err = w.simulate(*w.params.p)
         >>> w.plot_fit()
 
         .. plot::
@@ -290,7 +271,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax1 = plt.subplot(222)
         ax2 = plt.subplot(224)
         ax3 = plt.subplot(121)
-        A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift, B = self.p
+        A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift, B = self.params.p
         self.title = f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f},\n ' \
                      f'reso={reso:.2f}pix, D={D:.2f}mm, shift={shift:.2f}pix, B={B:.2g}'
         # main plot
@@ -317,7 +298,7 @@ class SpectrumFitWorkspace(FitWorkspace):
     def decontaminate_order2(self):  # pragma: no cover
         lambdas = self.spectrum.lambdas
         lambdas_order2 = self.simulation.lambdas_order2
-        A1, A2, aerosols, ozone, pwv, reso, D, shift, B = self.p
+        A1, A2, aerosols, ozone, pwv, reso, D, shift, B = self.params.p
         lambdas_binwidths_order2 = np.gradient(lambdas_order2)
         lambdas_binwidths = np.gradient(lambdas)
         sim_conv = interp1d(lambdas, self.model * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
@@ -326,12 +307,6 @@ class SpectrumFitWorkspace(FitWorkspace):
         err_order2 = err_conv(lambdas_order2) * lambdas_binwidths_order2 / lambdas_binwidths
         self.model = (sim_conv(lambdas) - A2 * spectrum_order2) / lambdas
         self.model_err = (err_conv(lambdas) - A2 * err_order2) / lambdas
-
-    def get_truth_without_order2(self):  # pragma: no cover
-        lambdas, model, model_err = self.simulation.simulate(1., 0., self.aerosols, self.ozone, self.pwv, self.reso,
-                                                             self.D, self.shift_x)
-        self.lambdas_truth = lambdas
-        self.amplitude_truth = model
 
 
 def lnprob_spectrum(p):  # pragma: no cover
@@ -372,13 +347,13 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
     >>> load_config("config/ctio.ini")
     >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
     >>> atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-    >>> w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, verbose=1, plot=True, live_fit=False)
+    >>> w = SpectrumFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
     >>> parameters.VERBOSE = True
     >>> run_spectrum_minimisation(w, method="newton")
 
     """
     my_logger = set_logger(__name__)
-    guess = np.asarray(fit_workspace.p)
+    guess = np.asarray(fit_workspace.params.p)
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
@@ -388,7 +363,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
             fit_workspace.plot_fit()
 
         # params_table = np.array([guess])
-        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
+        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.input_labels}")
         epsilon = 1e-4 * guess
         epsilon[epsilon == 0] = 1e-4
         epsilon[-1] = 0.001 * np.max(fit_workspace.data)
@@ -401,22 +376,20 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
 
         fit_workspace.simulation.fast_sim = False
         # fit_workspace.fixed[0] = True
-        fixed = [True] * len(fit_workspace.p)
+        fixed = [True] * len(fit_workspace.params.p)
         fixed[0] = False
-        run_minimisation(fit_workspace, method="newton", epsilon=epsilon, fix=fixed,
-                         xtol=1e-3, ftol=100 / fit_workspace.data.size, verbose=False)
+        run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
+                         verbose=False)
         # fit_workspace.fixed[0] = False
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3,
-                                        verbose=False)
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-6,
+                                        ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
 
         parameters.SAVE = True
-        ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
-        fit_workspace.plot_correlation_matrix(ipar)
+        fit_workspace.params.plot_correlation_matrix()
         fit_workspace.plot_fit()
         if fit_workspace.filename != "":
             header = f"{fit_workspace.spectrum.date_obs}\nchi2: {fit_workspace.costs[-1] / fit_workspace.data.size}"
-            fit_workspace.save_parameters_summary(ipar, header=header)
+            fit_workspace.params.save_parameters_summary(header=header)
             # save_gradient_descent(fit_workspace, costs, params_table)
         parameters.SAVE = False
 
