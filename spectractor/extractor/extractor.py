@@ -69,12 +69,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                       r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]", r"$\alpha$ [deg]", "$B$", "R",
                       r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]", "$z$"] + \
                      list(psf_poly_params_names) + [label+r"$\!_2$" for label in psf_poly_params_names]
-        bounds_D = (p[1] - 3 * parameters.DISTANCE2CCD_ERR, p[1] + 3 * parameters.DISTANCE2CCD_ERR)
-        bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
-                                           (-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR),
-                                           (-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR),
-                                           (-90, 90), (0.2, 5), (-360, 360), (300, 1100), (-100, 100), (1.001, 3)]),
-                                 list(psf_poly_params_bounds) * 2])
+        bounds = [[0, 2 / parameters.GRATING_ORDER_2OVER1],
+                  [p[1] - 3 * parameters.DISTANCE2CCD_ERR, p[1] + 3 * parameters.DISTANCE2CCD_ERR],
+                  [-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR],
+                  [-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR],
+                  [-90, 90], [0.2, 5], [-360, 360], [300, 1100], [-100, 100], [1.001, 3]] + list(psf_poly_params_bounds) * 2
         fixed = [False] * p.size
         for k, par in enumerate(input_labels):
             if "x_c" in par or "saturation" in par:  # or "y_c" in par:

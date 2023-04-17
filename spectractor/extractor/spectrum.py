@@ -12,7 +12,7 @@ import string
 import astropy
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config, update_derived_parameters, apply_rebinning_to_parameters
+from spectractor.config import set_logger, load_config, update_derived_parameters
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,

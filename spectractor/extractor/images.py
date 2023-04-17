@@ -3,7 +3,6 @@ from astropy.io import fits
 import astropy.units as units
 from scipy import ndimage
 from matplotlib import cm
-from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -1290,7 +1289,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         gs_kw = dict(width_ratios=[3, 1], height_ratios=[1])
         f, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(6.5, 3), gridspec_kw=gs_kw)
         xindex = np.arange(data.shape[1])
-        x_new = np.linspace(xindex.min(), xindex.max(), 50)
+        x_new = np.linspace(np.min(xindex), np.max(xindex), 50)
         y_new = width_cut - margin_cut - 3 + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
         cmap = copy.copy(cm.get_cmap('bwr'))
         cmap.set_bad(color='lightgrey')
