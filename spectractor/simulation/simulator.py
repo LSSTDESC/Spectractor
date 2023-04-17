@@ -19,27 +19,27 @@ import spectractor.parameters as parameters
 
 class SpectrumSimulation(Spectrum):
 
-    def __init__(self, spectrum, atmosphere, telescope, disperser, fast_sim=True):
+    def __init__(self, spectrum, target=None, disperser=None, throughput=None, atmosphere=None, fast_sim=True):
         """Class to simulate cross spectrum.
 
         Parameters
         ----------
-        spectrum: Spectrum
-            Spectrum instance to load main properties before simulation.
-        atmosphere: Atmosphere
-            Atmosphere or AtmosphereGrid instance to make the atmospheric simulation.
-        telescope: TelescopeTransmission
-            Telescope transmission.
-        disperser: Grating
-            Disperser instance.
+        target: Target
+            Target instance.
+        throughput: TelescopeTransmission, optional
+            Telescope throughput (default: None).
+        disperser: Grating, optional
+            Disperser instance (default: None).
+        atmosphere: Atmosphere, optional
+            Atmosphere or AtmosphereGrid instance to make the atmospheric simulation (default: None).
         fast_sim: bool, optional
             If True, do a fast simulation without integrating within the wavelength bins (default: True).
 
         Examples
         --------
-        >>> spectrum, telescope, disperser, target = SimulatorInit("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> spectrum = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
-        >>> sim = SpectrumSimulation(spectrum, atmosphere, telescope, disperser, fast_sim=True)
+        >>> sim = SpectrumSimulation(spectrum, atmosphere=atmosphere, fast_sim=True)
 
         """
         Spectrum.__init__(self)
@@ -49,8 +49,12 @@ class SpectrumSimulation(Spectrum):
         # if parameters.CCD_REBIN > 1:
         #     self.chromatic_psf.table['Dx'] *= parameters.CCD_REBIN
         #     apply_rebinning_to_parameters(reverse=True)
-        self.disperser = disperser
-        self.telescope = telescope
+        if target is not None:
+            self.target = target
+        if disperser is not None:
+            self.disperser = disperser
+        if throughput is not None:
+            self.throughput = throughput
         self.atmosphere = atmosphere
         self.fast_sim = fast_sim
         # save original pixel distances to zero order
@@ -85,13 +89,13 @@ class SpectrumSimulation(Spectrum):
         self.lambdas = lambdas
         self.lambdas_binwidths = np.gradient(lambdas)
         self.data = self.disperser.transmission(lambdas)
-        self.data *= self.telescope.transmission(lambdas)
+        self.data *= self.throughput.transmission(lambdas)
         self.data *= self.target.sed(lambdas)
         self.err = np.zeros_like(self.data)
-        idx = np.where(self.telescope.transmission(lambdas) > 0)[0]
-        self.err[idx] = self.telescope.transmission_err(lambdas)[idx] / self.telescope.transmission(lambdas)[idx]
+        idx = np.where(self.throughput.transmission(lambdas) > 0)[0]
+        self.err[idx] = self.throughput.transmission_err(lambdas)[idx] / self.throughput.transmission(lambdas)[idx]
         self.err[idx] *= self.data[idx]
-        idx = np.where(self.telescope.transmission(lambdas) <= 0)[0]
+        idx = np.where(self.throughput.transmission(lambdas) <= 0)[0]
         self.err[idx] = 1e6 * np.max(self.err)
         return self.data, self.err
 
@@ -135,9 +139,9 @@ class SpectrumSimulation(Spectrum):
 
         Examples
         --------
-        >>> spectrum, telescope, disperser, target = SimulatorInit("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> spectrum = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
-        >>> sim = SpectrumSimulation(spectrum, atmosphere, telescope, disperser, fast_sim=True)
+        >>> sim = SpectrumSimulation(spectrum, atmosphere=atmosphere, fast_sim=True)
         >>> lambdas, model, model_err = sim.simulate(A1=1, A2=1, ozone=300, pwv=5, aerosols=0.05, reso=0.,
         ... D=parameters.DISTANCE2CCD, shift_x=0., B=0.)
         >>> sim.plot_spectrum()
@@ -159,15 +163,19 @@ class SpectrumSimulation(Spectrum):
         lambdas_order2 = self.compute_lambdas_in_spectrogram(D, shift_x=shift_x, shift_y=0, angle=self.rotation_angle,
                                                              order=2, with_adr=True, niter=5)
         self.lambdas = lambdas
-        self.atmosphere.set_lambda_range(lambdas)
-        atmospheric_transmission = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv, angstrom_exponent=angstrom_exponent)
+        if self.atmosphere is not None:
+            self.atmosphere.set_lambda_range(lambdas)
+            atmospheric_transmission = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv, angstrom_exponent=angstrom_exponent)
+        else:
+            def atmospheric_transmission(lbda):
+                return 1
         if self.fast_sim:
             self.data, self.err = self.simulate_without_atmosphere(lambdas)
             self.data *= A1 * atmospheric_transmission(lambdas)
             self.err *= A1 * atmospheric_transmission(lambdas)
         else:
             def integrand(lbda):
-                return self.target.sed(lbda) * self.telescope.transmission(lbda) \
+                return self.target.sed(lbda) * self.throughput.transmission(lbda) \
                        * self.disperser.transmission(lbda) * atmospheric_transmission(lbda)
 
             self.data = np.zeros_like(lambdas)
@@ -178,9 +186,9 @@ class SpectrumSimulation(Spectrum):
                 # self.data[i] = A1 * quad(integrand, lambdas[i], lambdas[i + 1])[0]
             self.data[-1] = self.data[-2]
             # self.data /= np.gradient(lambdas)
-            telescope_transmission = self.telescope.transmission(lambdas)
+            telescope_transmission = self.throughput.transmission(lambdas)
             idx = telescope_transmission > 0
-            self.err[idx] = self.data[idx] * self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx]
+            self.err[idx] = self.data[idx] * self.throughput.transmission_err(lambdas)[idx] / telescope_transmission[idx]
             idx = telescope_transmission <= 0
             self.err[idx] = 1e6 * np.max(self.err)
         # Now add the systematics
@@ -202,6 +210,15 @@ class SpectrumSimulation(Spectrum):
         if np.any(self.err <= 0):
             min_positive = np.min(self.err[self.err > 0])
             self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
+        # Save the truth parameters
+        self.header['OZONE_T'] = ozone
+        self.header['PWV_T'] = pwv
+        self.header['VAOD_T'] = aerosols
+        self.header['A1_T'] = A1
+        self.header['A2_T'] = A2
+        self.header['RESO_T'] = reso
+        self.header['D2CCD_T'] = D
+        self.header['X0_T'] = shift_x
         return self.lambdas, self.data, self.err
 
 
@@ -234,7 +251,7 @@ class SpectrogramModel(Spectrum):
 
         Examples
         --------
-        >>> spectrum, telescope, disperser, target = SimulatorInit("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> spectrum = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
         >>> sim = SpectrogramModel(spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True)
         """
@@ -566,37 +583,6 @@ def SimulatorInit(filename, fast_load=False, config=""):
     return spectrum, telescope, disperser, target
 
 
-def SpectrumSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
-                          aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5,
-                          A1=1.0, A2=0., reso=0, D=parameters.DISTANCE2CCD, shift=0.):
-    """ SimulatorCore
-    Main function to evaluate several spectra
-    A grid of spectra will be produced for a given target, airmass and pressure
-    """
-    my_logger = set_logger(__name__)
-    my_logger.info('\n\tStart SPECTRUMSIMULATOR core program')
-    # SIMULATE ATMOSPHERE
-    # -------------------
-    if parameters.LIBRADTRAN_DIR != '':
-        atmosphere = Atmosphere(airmass, pressure, temperature)
-    else:
-        atmgrid_filename = spectrum.filename.replace('sim', 'reduc').replace('_spectrum.fits', '_atmsim.fits')
-        if os.path.isfile(atmgrid_filename):
-            spectrum.my_logger.debug(f"\n\tUse {atmgrid_filename} for atmosphere simulation.")
-            atmosphere = AtmosphereGrid(atmgrid_filename=atmgrid_filename)
-        else:
-            raise ValueError("No parameters.LIBRADTRAN_DIR set and no atmgrid file associated to the spectrum. "
-                             "I can't simulate atmosphere transmission.")
-
-    # SPECTRUM SIMULATION
-    # --------------------
-    spectrum_simulation = SpectrumSimulation(spectrum, atmosphere, telescope, disperser)
-    spectrum_simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift)
-    if parameters.DEBUG:
-        spectrum_simulation.plot_spectrum(force_lines=True)
-    return spectrum_simulation
-
-
 def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
                              aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, A1=1.0, A2=0.,
                              D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0.,
@@ -633,45 +619,6 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
     return spectrogram_simulation
 
 
-def SpectrumSimulator(filename, outputdir="", aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, A1=1., A2=0.,
-                      reso=None, D=parameters.DISTANCE2CCD, shift=0.):
-    """ Simulator
-    Main function to evaluate several spectra
-    A grid of spectra will be produced for a given target, airmass and pressure
-    """
-    my_logger = set_logger(__name__)
-    my_logger.info('\n\tStart SPECTRACTORSIM')
-    # Initialisation
-    spectrum, telescope, disperser, target = SimulatorInit(filename)
-
-    # SIMULATE SPECTRUM
-    # -------------------
-    airmass = spectrum.header['AIRMASS']
-    pressure = spectrum.header['OUTPRESS']
-    temperature = spectrum.header['OUTTEMP']
-
-    spectrum_simulation = SpectrumSimulatorCore(spectrum, telescope, disperser, airmass, pressure, temperature,
-                                                aerosols=aerosols, angstrom_exponent=angstrom_exponent,
-                                                ozone=ozone, pwv=pwv, A1=A1, A2=A2, reso=reso, D=D, shift=shift)
-
-    # Save the spectrum
-    spectrum_simulation.header['OZONE_T'] = ozone
-    spectrum_simulation.header['PWV_T'] = pwv
-    spectrum_simulation.header['VAOD_T'] = aerosols
-    spectrum_simulation.header['A1_T'] = A1
-    spectrum_simulation.header['A2_T'] = A2
-    spectrum_simulation.header['RESO_T'] = reso
-    spectrum_simulation.header['D2CCD_T'] = D
-    spectrum_simulation.header['X0_T'] = shift
-    output_filename = filename.replace('spectrum', 'sim')
-    if outputdir != "":
-        base_filename = filename.split('/')[-1]
-        output_filename = os.path.join(outputdir, base_filename.replace('spectrum', 'sim'))
-    spectrum_simulation.save_spectrum(output_filename, overwrite=True)
-
-    return spectrum_simulation
-
-
 def SpectrogramSimulator(filename, outputdir="", aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, A1=1., A2=0.,
                          D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0., B=1.,
                          psf_poly_params=None):
@@ -682,7 +629,7 @@ def SpectrogramSimulator(filename, outputdir="", aerosols=0.05, angstrom_exponen
     my_logger = set_logger(__name__)
     my_logger.info('\n\tStart SPECTRACTORSIM')
     # Initialisation
-    spectrum, telescope, disperser, target = SimulatorInit(filename)
+    spectrum = Spectrum(filename)
 
     if psf_poly_params is None:
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')

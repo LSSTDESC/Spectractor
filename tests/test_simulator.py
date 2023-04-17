@@ -5,8 +5,8 @@ from numpy.testing import run_module_suite  # noqa: E402
 import numpy as np  # noqa: E402
 
 from spectractor import parameters  # noqa: E402
-from spectractor.simulation.simulator import (SpectrumSimulator,  # noqa: E402
-                                              Atmosphere, AtmosphereGrid)  # noqa: E402
+from spectractor.extractor.spectrum import Spectrum  # noqa: E402
+from spectractor.simulation.simulator import (SpectrumSimulation, Atmosphere, AtmosphereGrid)  # noqa: E402
 from spectractor.config import load_config  # noqa: E402
 import os  # noqa: E402
 import unittest  # noqa: E402
@@ -54,11 +54,13 @@ def test_simulator():
     parameters.DEBUG = True
     load_config('config/ctio.ini')
 
-    output_directory = './outputs/'
-
     for file_name in file_names:
-        spectrum_simulation = SpectrumSimulator(file_name, output_directory, pwv=5, ozone=300, aerosols=0.03, angstrom_exponent=None,
-                                                A1=1, A2=1, reso=2, D=56, shift=-1)
+        spectrum = Spectrum(file_name)
+        atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
+        spectrum_simulation = SpectrumSimulation(spectrum, atmosphere=atmosphere, fast_sim=True)
+        spectrum_simulation.simulate(A1=1, A2=1, ozone=300, pwv=5, aerosols=0.05, angstrom_exponent=None,
+                                     reso=0., D=56, shift_x=0., B=0.)
+
         assert np.sum(spectrum_simulation.data) > 0
         assert np.sum(spectrum_simulation.data) < 1e-10
         assert np.sum(spectrum_simulation.data_next_order) < 1e-10

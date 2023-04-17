@@ -7,7 +7,8 @@ from spectractor.extractor.images import Image, find_target
 from spectractor.astrometry import get_gaia_coords_after_proper_motion
 from spectractor.extractor.background import remove_image_background_sextractor
 from spectractor.simulation.throughput import TelescopeTransmission
-from spectractor.simulation.simulator import SpectrogramSimulatorCore, SimulatorInit
+from spectractor.simulation.simulator import SpectrogramSimulatorCore
+from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.psf import PSF
 
 from astropy.io import fits, ascii
