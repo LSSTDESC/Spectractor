@@ -1231,6 +1231,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
 
     Create a mock spectrogram:
 
+    >>> from scipy.ndimage import gaussian_filter
     >>> N = parameters.CCD_IMSIZE
     >>> im.data = np.ones((N, N))
     >>> slope = -0.1
@@ -1238,6 +1239,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
     >>> for x in np.arange(N):
     ...     im.data[int(y(x)), x] = 100
     ...     im.data[int(y(x))+1, x] = 100
+    >>> im.data = gaussian_filter(im.data, sigma=5)
     >>> im.target_pixcoords=(N//2, N//2)
     >>> parameters.DEBUG = True
     >>> theta = compute_rotation_angle_hessian(im)
@@ -1264,7 +1266,6 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         mask = np.where(lambda_minus > lambda_threshold)
         theta_mask = np.copy(theta)
         theta_mask[mask] = np.nan
-        # print len(theta_mask[~np.isnan(theta_mask)]), lambda_threshold
     theta_guess = float(image.disperser.theta(image.target_pixcoords))
     mask2 = np.logical_or(angle_range[0] > theta - theta_guess, theta - theta_guess > angle_range[1])
     theta_mask[mask2] = np.nan
