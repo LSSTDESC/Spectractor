@@ -183,7 +183,7 @@ def plot_shifts_histograms(dra, ddec):  # pragma: no cover
         parameters.PdfPages.savefig()
 
 
-def wcs_xy_translation(wcs, shift_x, shift_y):
+def wcs_xy_translation(wcs, shift_x, shift_y):  # pragma: no cover
     """Compute a translated WCS if image is shifted in x or y."""
     new_wcs = deepcopy(wcs)
     new_wcs.wcs.crpix[0] += shift_x
@@ -194,7 +194,7 @@ def wcs_xy_translation(wcs, shift_x, shift_y):
     return new_wcs
 
 
-def wcs_flip_x(wcs, image):
+def wcs_flip_x(wcs, image):  # pragma: no cover
     """Compute a flip WCS if image is flip along x axis."""
     new_wcs = deepcopy(wcs)
     new_wcs.wcs.crpix[0] = image.data.shape[1] - new_wcs.wcs.crpix[0]
@@ -210,7 +210,7 @@ def wcs_flip_x(wcs, image):
     return new_wcs
 
 
-def wcs_flip_y(wcs, image):
+def wcs_flip_y(wcs, image):  # pragma: no cover
     """Compute a flip WCS if image is flip along y axis."""
     new_wcs = deepcopy(wcs)
     new_wcs.wcs.crpix[1] = image.data.shape[0] - new_wcs.wcs.crpix[1]
@@ -226,7 +226,7 @@ def wcs_flip_y(wcs, image):
     return new_wcs
 
 
-def wcs_transpose(wcs, image):
+def wcs_transpose(wcs, image):  # pragma: no cover
     """Compute a transposed WCS if image is transposed with np.transpose()."""
     new_wcs = wcs_flip_y(wcs, image)
     tmp_crpix = np.copy(wcs.wcs.crpix)
@@ -422,6 +422,7 @@ class Astrometry():  # pragma: no cover
             >>> assert quad_stars.shape == (4, 2)
 
         """
+        u.set_enabled_aliases({'DEG': u.deg})
         coords = []
         hdu = fits.open(self.match_file_name)
         table = Table.read(hdu)

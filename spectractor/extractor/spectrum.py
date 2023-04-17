@@ -2,6 +2,7 @@ from scipy.signal import argrelextrema, savgol_filter
 from scipy.interpolate import interp1d
 from astropy.io import fits
 from astropy.table import Table
+import astropy.units as u
 from scipy import integrate
 from iminuit import Minuit
 import matplotlib.pyplot as plt
@@ -10,6 +11,8 @@ import os
 import random
 import string
 import astropy
+import warnings
+warnings.filterwarnings('ignore', category=astropy.io.fits.card.VerifyWarning, append=True)
 
 from spectractor import parameters
 from spectractor.config import set_logger, load_config, update_derived_parameters
@@ -587,7 +590,9 @@ class Spectrum:
             elif extname == "PSF_TAB":
                 hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
             elif extname == "LINES":
-                tab = self.lines.print_detected_lines(amplitude_units=self.units, print_table=False)
+                u.set_enabled_aliases({'flam': u.erg / u.s / u.cm**2 / u.nm,
+                                       'reduced': u.dimensionless_unscaled})
+                tab = self.lines.print_detected_lines(amplitude_units=self.units.replace("erg/s/cm$^2$/nm", "flam"), print_table=False)
                 hdus[extname] = fits.table_to_hdu(tab)
             elif extname == "CONFIG":
                 # HIERARCH and CONTINUE not compatible together in FITS headers
