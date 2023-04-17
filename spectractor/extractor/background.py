@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from matplotlib import cm
+import matplotlib as mpl
 import os
 import copy
 
@@ -9,11 +9,7 @@ from spectractor import parameters
 from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal, plot_image_simple
 
 from astropy.stats import SigmaClip
-from astropy.visualization import SqrtStretch
-from astropy.visualization.mpl_normalize import ImageNormalize
-from photutils import Background2D, SExtractorBackground
-from photutils.utils import circular_footprint
-from photutils.background import Background2D, MedianBackground
+from photutils.background import Background2D, SExtractorBackground
 from photutils.segmentation import detect_threshold, detect_sources
 
 from scipy.signal import medfilt2d
@@ -294,7 +290,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         ax3 = plt.subplot(gs[:, 1])
         mean = np.nanmean(bgd_bands)
         std = np.nanstd(bgd_bands)
-        cmap = copy.copy(cm.get_cmap())
+        cmap = copy.copy(mpl.colormaps["viridis"])
         cmap.set_bad(color='lightgrey')
         bgd_bands[mask] = np.nan
         data_to_plot = np.copy(data).astype(float)

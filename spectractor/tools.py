@@ -1,6 +1,6 @@
 import os
 
-from photutils import IRAFStarFinder
+from photutils.detection import IRAFStarFinder
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting
@@ -15,8 +15,7 @@ from matplotlib.ticker import MaxNLocator
 import json
 import warnings
 from scipy.signal import fftconvolve, gaussian
-from scipy.ndimage.filters import maximum_filter
-from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
+from scipy.ndimage import maximum_filter, generate_binary_structure, binary_erosion
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
 

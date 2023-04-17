@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-from matplotlib import cm
+import matplotlib as mpl
 from tqdm import tqdm
 import copy
 
@@ -1356,9 +1356,9 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             self.amplitude_priors = np.copy(self.chromatic_psf.poly_params[:self.Nx])
 
     def plot_fit(self):
-        cmap_bwr = copy.copy(cm.get_cmap('bwr'))
+        cmap_bwr = copy.copy(mpl.colormaps["bwr"])
         cmap_bwr.set_bad(color='lightgrey')
-        cmap_viridis = copy.copy(cm.get_cmap('viridis'))
+        cmap_viridis = copy.copy(mpl.colormaps["viridis"])
         cmap_viridis.set_bad(color='lightgrey')
 
         data = np.copy(self.data_before_mask)
