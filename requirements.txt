@@ -8,7 +8,7 @@ astropy>=3.2
 photutils>=1.6
 astroquery
 coloredlogs
-scikit-image
+scikit-image>=0.20
 h5py #==2.8.0
 emcee #==3.0rc2
 tqdm
