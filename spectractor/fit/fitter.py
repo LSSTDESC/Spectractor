@@ -432,7 +432,7 @@ class FitWorkspace:
 
         Examples
         --------
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1])
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1])
         >>> w = FitWorkspace(params)
         >>> w.params.ndim
         5
@@ -930,7 +930,7 @@ class MCMCFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1])
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1])
         >>> w = MCMCFitWorkspace(params)
         >>> w.nwalkers
         18

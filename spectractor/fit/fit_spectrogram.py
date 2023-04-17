@@ -1,7 +1,7 @@
 import time
 import os
 import matplotlib.pyplot as plt
-from matplotlib import cm
+import matplotlib as mpl
 import numpy as np
 from scipy.signal import convolve2d
 import copy
@@ -50,7 +50,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrogramFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> lambdas, model, model_err = w.simulate(*w.params.p)
         >>> w.plot_fit()
 
         """
@@ -249,9 +249,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         dispersion: bool, optional
             If True, plot a colored bar to see the associated wavelength color along the x axis (default: False).
         """
-        cmap_bwr = copy.copy(cm.get_cmap('bwr'))
+        cmap_bwr = copy.copy(mpl.colormaps["bwr"])
         cmap_bwr.set_bad(color='lightgrey')
-        cmap_viridis = copy.copy(cm.get_cmap('viridis'))
+        cmap_viridis = copy.copy(mpl.colormaps["viridis"])
         cmap_viridis.set_bad(color='lightgrey')
 
         data = np.copy(self.data_before_mask)
