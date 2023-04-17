@@ -888,7 +888,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         if w.filename != "":
             parameters.SAVE = True
             w.params.plot_correlation_matrix()
-            w.params.save_parameters_summary(header=f"{w.spectrum.date_obs}\n"
+            w.params.write_text(header=f"{w.spectrum.date_obs}\n"
                                                     f"chi2: {costs[-1] / (w.data.size - len(w.outliers) - len(w.mask))}")
             w.plot_fit()
             parameters.SAVE = False

@@ -8,75 +8,138 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 import sys
 import os
+import json
 import multiprocessing
+from dataclasses import dataclass
+from typing import Optional, Union
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.tools import formatting_numbers, compute_correlation_matrix, plot_correlation_matrix_simple
+from spectractor.tools import (formatting_numbers, compute_correlation_matrix, plot_correlation_matrix_simple,
+                               NumpyArrayEncoder)
 from spectractor.fit.statistics import Likelihood
 
 
+@dataclass()
 class FitParameters:
+    """Container for the parameters to fit on data with FitWorkspace.
 
-    def __init__(self, values, input_labels=None, axis_names=None, bounds=None, fixed=None, truth=None, filename=""):
-        """Container for the parameters to fit on data with FitWorkspace.
+    Attributes
+    ----------
+    p: np.ndarray
+        Array containing the parameter values.
+    input_labels: list, optional
+        List of the parameter labels for screen print.
+        If None, make a default list with parameters labelled par (default: None).
+    axis_names: list, optional
+        List of the parameter labels for plot print.
+        If None, make a default list with parameters labelled par (default: None).
+    bounds: list, optional
+        List of 2-element list giving the (lower, upper) bounds for every parameter.
+        If None, make a default list with np.infinity boundaries (default: None).
+    fixed: list, optional
+        List of boolean: True to fix a parameter, False to let it free.
+        If None, make a default list with False values: all parameters are free (default: None).
+    truth: np.ndarray, optional
+        Array of truth parameters (default: None).
+    filename: str, optional
+        File name associated to the fitted parameters (usually _spectrum.fits file name) (default: '').
 
-        Parameters
-        ----------
-        values: array_like
-            List or np.array of parameter values.
-        input_labels: list, optional
-            List of parameter labels (default: None).
-        axis_names: list, optional
-            List of parameter Latex names (default: None).
-        bounds: list, optional
-            List of length self.ndim containing tuples for lower and upper parameter bounds (default: None).
-        fixed: list, optional
-            Boolean list of fixed parameters (default: None).
-        truth: list, optional
-            List of truth parameters (default: None).
-        filename: string, optional
-            Base file name to save outputs (default: "").
+    Examples
+    --------
+    >>> from spectractor.fit.fitter import FitParameters
+    >>> params = FitParameters(p=[1, 1, 1, 1, 1])
+    >>> params.ndim
+    5
+    >>> params.p
+    array([1, 1, 1, 1, 1])
+    >>> params.input_labels
+    ['par0', 'par1', 'par2', 'par3', 'par4']
+    """
+    p: Union[np.ndarray, list]
+    input_labels: Optional[list] = None
+    axis_names: Optional[list] = None
+    bounds: Optional[list] = None
+    fixed: Optional[list] = None
+    truth: Optional[list] = None
+    filename: Optional[str] = ""
+
+    def __post_init__(self):
+        if type(self.p) is list:
+            self.p = np.array(self.p)
+        if not self.input_labels:
+            self.input_labels = [f"par{k}" for k in range(self.ndim)]
+        else:
+            if len(self.input_labels) != self.ndim:
+                raise ValueError("input_labels argument must have same size as values argument.")
+        if not self.axis_names:
+            self.axis_names = [f"$p_{k}$" for k in range(self.ndim)]
+        else:
+            if len(self.axis_names) != self.ndim:
+                raise ValueError("input_labels argument must have same size as values argument.")
+        if self.bounds is None:
+           self.bounds = [[-np.inf, np.inf] for k in range(self.ndim)]
+        else:
+           if np.array(self.bounds).shape != (self.ndim, 2):
+               raise ValueError(f"bounds argument size {np.array(self.bounds).shape} must be same as values argument {(self.ndim, 2)}.")
+        if not self.fixed:
+            self.fixed = [False] * self.ndim
+        else:
+            if len(list(self.fixed)) != self.ndim:
+                raise ValueError("fixed argument must have same size as values argument.")
+        self.cov = np.zeros((self.nfree, self.nfree))
+
+    @property
+    def rho(self):
+        """Correlation matrix computed from the covariance matrix
+
+        Returns
+        -------
+        rho: np.ndarray
+            The correlation matrix array.
 
         Examples
         --------
         >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1])
-        >>> params.ndim
-        5
-        >>> params.input_labels
-        ['par0', 'par1', 'par2', 'par3', 'par4']
+        >>> params = FitParameters(p=[1, 1, 1], axis_names=["x", "y", "z"])
+        >>> params.cov = np.array([[2,-0.5,0],[-0.5,2,-1],[0,-1,2]])
+        >>> params.rho
+        array([[ 1.  , -0.25,  0.  ],
+               [-0.25,  1.  , -0.5 ],
+               [ 0.  , -0.5 ,  1.  ]])
+
         """
-        self.my_logger = set_logger(self.__class__.__name__)
-        self.p = np.array(values)
-        if not input_labels:
-            self.input_labels = [f"par{k}" for k in range(self.ndim)]
-        else:
-            if len(list(input_labels)) != self.ndim:
-                raise ValueError("input_labels argument must have same size as values argument.")
-            self.input_labels = input_labels
-        if not axis_names:
-            self.axis_names = [f"$p_{k}$" for k in range(self.ndim)]
-        else:
-            if len(list(axis_names)) != self.ndim:
-                raise ValueError("input_labels argument must have same size as values argument.")
-            self.axis_names = axis_names
-        if bounds is None:
-            self.bounds = [(-np.inf, np.inf) for k in range(self.ndim)]
-        else:
-            if np.array(bounds).shape != (self.ndim, 2):
-                raise ValueError(f"bounds argument size {np.array(bounds).shape} must be same as values argument {(self.ndim, 2)}.")
-            self.bounds = list(bounds)
-        if not fixed:
-            self.fixed = [False] * self.ndim
-        else:
-            if len(list(fixed)) != self.ndim:
-                raise ValueError("fixed argument must have same size as values argument.")
-            self.fixed = list(fixed)
-        self.truth = truth
-        self.filename = filename
-        self.cov = np.zeros((self.nfree, self.nfree))
-        self.rho = np.zeros((self.nfree, self.nfree))
+        return compute_correlation_matrix(self.cov)
+
+    @property
+    def err(self):
+        """Uncertainties on fitted parameters, as the square root of the covariance matrix diagonal.
+
+        Returns
+        -------
+        err: np.ndarray
+            The uncertainty array.
+
+        Examples
+        -------
+        >>> from spectractor.fit.fitter import FitParameters
+        >>> params = FitParameters(p=[1, 1, 1], axis_names=["x", "y", "z"])
+        >>> params.cov = np.array([[4,-0.5,0],[-0.5,4,-1],[0,-1,4]])
+        >>> params.err
+        array([2., 2., 2.])
+        """
+        return np.sqrt(np.diag(self.cov))
+
+    def __eq__(self, other):
+        if not isinstance(other, FitParameters):
+            return NotImplemented
+        out = True
+        for key in self.__dict__.keys():
+            if isinstance(getattr(self, key), np.ndarray):
+                out *= np.all(np.equal(getattr(self, key).flatten(), getattr(other, key).flatten()))
+            else:
+                out *= getattr(self, key) == getattr(other, key)
+        return out
 
     @property
     def ndim(self):
@@ -89,7 +152,7 @@ class FitParameters:
         Examples
         --------
         >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1])
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1])
         >>> params.ndim
         5
         """
@@ -106,7 +169,7 @@ class FitParameters:
         Examples
         --------
         >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
         >>> params.nfree
         2
         """
@@ -123,7 +186,7 @@ class FitParameters:
         Examples
         --------
         >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
         >>> params.nfixed
         3
         """
@@ -134,12 +197,12 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=None)
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=None)
         >>> params.fixed
         [False, False, False, False, False]
         >>> params.get_free_parameters()
         array([0, 1, 2, 3, 4])
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
         >>> params.fixed
         [True, False, True, False, True]
         >>> params.get_free_parameters()
@@ -153,12 +216,12 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=None)
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=None)
         >>> params.fixed
         [False, False, False, False, False]
         >>> params.get_fixed_parameters()
         array([], dtype=int64)
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
         >>> params.fixed
         [True, False, True, False, True]
         >>> params.get_fixed_parameters()
@@ -179,7 +242,7 @@ class FitParameters:
         Examples
         --------
         >>> parameters.VERBOSE = True
-        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> params.cov = np.array([[1, -0.5], [-0.5, 4]])
         >>> _ = params.print_parameters_summary()
         """
@@ -196,7 +259,50 @@ class FitParameters:
                 txt += f"{self.input_labels[ip]}: {self.p[ip]} (fixed)\n\t"
         return txt
 
-    def save_parameters_summary(self, header=""):
+    def plot_correlation_matrix(self, live_fit=False):
+        """Compute and plot a correlation matrix.
+
+        Save the plot if parameters.SAVE is True. The output file name is build from self.file_name,
+        adding the suffix _correlation.pdf.
+
+        Parameters
+        ----------
+        live_fit: bool, optional, optional
+            If True, model, data and residuals plots are made along the fitting procedure (default: False).
+
+        Examples
+        --------
+        >>> from spectractor.fit.fitter import FitParameters
+        >>> params = FitParameters(p=[1, 1, 1], axis_names=["x", "y", "z"])
+        >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
+        >>> params.plot_correlation_matrix()
+        """
+        ipar = self.get_free_parameters()
+        fig = plt.figure()
+        plot_correlation_matrix_simple(plt.gca(), self.rho, axis_names=[self.axis_names[i] for i in ipar])
+        fig.tight_layout()
+        if (parameters.SAVE or parameters.LSST_SAVEFIGPATH) and self.filename != "":  # pragma: no cover
+            figname = os.path.splitext(self.filename)[0] + "_correlation.pdf"
+            fig.savefig(figname, dpi=100, bbox_inches='tight')
+        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+            figname = os.path.join(parameters.LSST_SAVEFIGPATH, "parameters_correlation.pdf")
+            fig.savefig(figname, dpi=100, bbox_inches='tight')
+        if parameters.DISPLAY:  # pragma: no cover
+            if live_fit:
+                plt.draw()
+                plt.pause(1e-8)
+            else:
+                plt.show()
+
+    @property
+    def txt_filename(self):
+        return os.path.splitext(self.filename)[0] + "_bestfit.txt"
+
+    @property
+    def json_filename(self):
+        return os.path.splitext(self.filename)[0] + "_bestfit.json"
+
+    def write_text(self, header=""):
         """Save the best fitting parameter summary in a text file.
 
         The file name is build from self.file_name, adding the suffix _bestfit.txt.
@@ -213,48 +319,60 @@ class FitParameters:
         for row in self.cov:
             txt += np.array_str(row, max_line_width=20 * self.cov.shape[0]) + '\n'
         output_filename = os.path.splitext(self.filename)[0] + "_bestfit.txt"
-        self.my_logger.info(f"\n\tSave best fit parameters in {output_filename}.")
         f = open(output_filename, 'w')
         f.write(txt)
         f.close()
 
-    def plot_correlation_matrix(self, live_fit=False):
-        """Compute and plot a correlation matrix.
-
-        Save the plot if parameters.SAVE is True. The output file name is build from self.file_name,
-        adding the suffix _correlation.pdf.
-
-        Parameters
-        ----------
-        live_fit: bool, optional, optional
-            If True, model, data and residuals plots are made along the fitting procedure (default: False).
+    def write_json(self):
+        """
 
         Examples
         --------
-        >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(values=[1, 1, 1], axis_names=["x", "y", "z"])
+        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
         >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
-        >>> params.plot_correlation_matrix()
+        >>> params.write_json()
+
+        .. doctest::
+            :hide:
+
+            >>> assert os.path.isfile(params.json_filename)
+            >>> os.remove(params.json_filename)
         """
-        ipar = self.get_free_parameters()
-        fig = plt.figure()
-        self.rho = compute_correlation_matrix(self.cov)
-        plot_correlation_matrix_simple(plt.gca(), self.rho, axis_names=[self.axis_names[i] for i in ipar])
-        fig.tight_layout()
-        if (parameters.SAVE or parameters.LSST_SAVEFIGPATH) and self.filename != "":  # pragma: no cover
-            figname = os.path.splitext(self.filename)[0] + "_correlation.pdf"
-            self.my_logger.info(f"Save figure {figname}.")
-            fig.savefig(figname, dpi=100, bbox_inches='tight')
-        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            figname = os.path.join(parameters.LSST_SAVEFIGPATH, "parameters_correlation.pdf")
-            self.my_logger.info(f"Save figure {figname}.")
-            fig.savefig(figname, dpi=100, bbox_inches='tight')
-        if parameters.DISPLAY:  # pragma: no cover
-            if live_fit:
-                plt.draw()
-                plt.pause(1e-8)
-            else:
-                plt.show()
+        if self.filename == "":
+            raise ValueError("Must provide attribute self.filename to use write_json.")
+        jsontxt = json.dumps(self.__dict__, cls=NumpyArrayEncoder)
+        with open(self.json_filename, 'w') as output_json:
+            output_json.write(jsontxt)
+
+
+def read_fitparameter_json(json_filename):
+    """
+
+    Examples
+    --------
+    >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
+    >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
+    >>> params.write_json()
+    >>> new_params = read_fitparameter_json(params.json_filename)
+    >>> new_params.p
+    array([1, 2, 3, 4])
+
+    .. doctest::
+        :hide:
+
+        >>> assert os.path.isfile(params.json_filename)
+        >>> assert params == new_params
+        >>> os.remove(params.json_filename)
+
+    """
+    params = FitParameters(p=[0])
+    with open(json_filename, 'r') as f:
+        data = json.load(f)
+    for key in ["p", "cov"]:
+        data[key] = np.asarray(data[key])
+    for key in data:
+        setattr(params, key, data[key])
+    return params
 
 
 class FitWorkspace:
@@ -1485,7 +1603,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         if verbose:
             my_logger.debug(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
-            fit_workspace.params.save_parameters_summary()
+            fit_workspace.params.write_text()
             fit_workspace.save_gradient_descent()
 
 

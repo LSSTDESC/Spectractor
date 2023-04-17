@@ -1,7 +1,5 @@
 import os
 
-import astropy.io.fits
-from matplotlib import pyplot as plt
 from photutils import IRAFStarFinder
 from scipy.optimize import curve_fit
 import numpy as np
@@ -14,6 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 from matplotlib.ticker import MaxNLocator
 
+import json
 import warnings
 from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
@@ -2517,3 +2516,10 @@ def iraf_source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor
             parameters.PdfPages.savefig()
 
     return sources
+
+
+class NumpyArrayEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)

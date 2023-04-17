@@ -576,7 +576,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         if fit_workspace.filename != "":
             parameters.SAVE = True
             fit_workspace.params.plot_correlation_matrix()
-            fit_workspace.params.save_parameters_summary(header=f"{fit_workspace.spectrum.date_obs}\n"
+            fit_workspace.params.write_text(header=f"{fit_workspace.spectrum.date_obs}\n"
                                                                 f"chi2: "
                                                                 f"{fit_workspace.costs[-1] / fit_workspace.data.size}")
             # save_gradient_descent(fit_workspace, costs, params_table)
