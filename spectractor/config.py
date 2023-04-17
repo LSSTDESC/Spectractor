@@ -97,6 +97,7 @@ def load_config(config_filename, rebin=True):
         else:
             config_filename = os.path.join(mypath, parameters.CONFIG_DIR, config_filename)
     # Load the configuration file
+    print(f"Loading {config_filename} with {parameters.VERBOSE=}")
     config = configparser.ConfigParser()
     config.read(config_filename)
     from_config_to_parameters(config)
@@ -114,6 +115,7 @@ def load_config(config_filename, rebin=True):
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
         sys.exit(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
 
+    print(f"Loaded {config_filename} with {parameters.VERBOSE=}")
     if parameters.VERBOSE:
         for section in config.sections():
             print(f"Section: {section}")
