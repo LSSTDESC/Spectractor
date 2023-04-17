@@ -373,8 +373,8 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         fit_workspace.params.plot_correlation_matrix()
         fit_workspace.plot_fit()
         if fit_workspace.filename != "":
-            header = f"{fit_workspace.spectrum.date_obs}\nchi2: {fit_workspace.costs[-1] / fit_workspace.data.size}"
-            fit_workspace.params.write_text(header=header)
+            fit_workspace.params.write_json(extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
+                                                   "date-obs": fit_workspace.spectrum.date_obs})
             # save_gradient_descent(fit_workspace, costs, params_table)
         parameters.SAVE = False
 

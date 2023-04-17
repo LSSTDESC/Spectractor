@@ -65,6 +65,7 @@ class FitParameters:
     fixed: Optional[list] = None
     truth: Optional[list] = None
     filename: Optional[str] = ""
+    extra: Optional[dict] = None
 
     def __post_init__(self):
         if type(self.p) is list:
@@ -325,14 +326,18 @@ class FitParameters:
         f.write(txt)
         f.close()
 
-    def write_json(self):
+    def write_json(self, extra=None):
         """
+        extra: dict, optional
+            Extra information to write in the JSON file.
 
         Examples
         --------
         >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
         >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
-        >>> params.write_json()
+        >>> jsonstr = params.write_json(extra={"chi2": 1})
+        >>> jsonstr  # doctest: +ELLIPSIS
+        '{"p": [1, 2, 3, 4], "input_labels": ["x", "y", "z", "t"],..."extra": {"chi2": 1}...
 
         .. doctest::
             :hide:
@@ -342,9 +347,12 @@ class FitParameters:
         """
         if self.filename == "":
             raise ValueError("Must provide attribute self.filename to use write_json.")
+        if extra:
+            self.extra = extra
         jsontxt = json.dumps(self.__dict__, cls=NumpyArrayEncoder)
         with open(self.json_filename, 'w') as output_json:
             output_json.write(jsontxt)
+        return jsontxt
 
 
 def read_fitparameter_json(json_filename):
@@ -354,7 +362,7 @@ def read_fitparameter_json(json_filename):
     --------
     >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
     >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
-    >>> params.write_json()
+    >>> _ = params.write_json(extra={"chi2": 1})
     >>> new_params = read_fitparameter_json(params.json_filename)
     >>> new_params.p
     array([1, 2, 3, 4])
@@ -1605,7 +1613,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         if verbose:
             my_logger.debug(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
-            fit_workspace.params.write_text()
+            fit_workspace.params.write_json()
             fit_workspace.save_gradient_descent()
 
 

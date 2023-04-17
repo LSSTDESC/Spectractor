@@ -881,8 +881,8 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False)
         if fit_workspace.filename != "":
             parameters.SAVE = True
             fit_workspace.params.plot_correlation_matrix()
-            header = f"{fit_workspace.spectrum.date_obs}\nchi2: {fit_workspace.costs[-1] / fit_workspace.data.size}"
-            fit_workspace.params.write_text(header=header)
+            fit_workspace.params.write_json(extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
+                                                   "date-obs": fit_workspace.spectrum.date_obs})
             fit_workspace.plot_fit()
             fit_workspace.plot_transmissions()
             fit_workspace.plot_A1s()
