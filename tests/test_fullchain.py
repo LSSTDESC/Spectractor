@@ -154,7 +154,7 @@ def test_ctio_fullchain():
     atmgrid_filename = sim_image.replace('sim', 'reduc').replace('.fits', '_atmsim.fits')
     assert os.path.isfile(atmgrid_filename)
     spectrum = Spectrum(spectrum_file_name)
-    w = SpectrumFitWorkspace(spectrum_file_name, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
+    w = SpectrumFitWorkspace(spectrum, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
                              verbose=True, plot=True, live_fit=False)
     run_spectrum_minimisation(w, method="newton")
     nsigma = 2
@@ -176,7 +176,7 @@ def test_ctio_fullchain():
     assert np.isclose(np.abs(w.params.p[9]), 0, atol=1e-3)  # B
 
     parameters.DEBUG = False
-    w = SpectrogramFitWorkspace(spectrum_file_name, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
+    w = SpectrogramFitWorkspace(spectrum, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
                                 verbose=True, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")
     nsigma = 2

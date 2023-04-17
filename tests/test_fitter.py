@@ -9,8 +9,6 @@ from spectractor.config import set_logger  # noqa: E402
 from spectractor import parameters  # noqa: E402
 
 import os  # noqa: E402
-import sys  # noqa: E402
-import unittest  # noqa: E402
 
 
 class LineFitWorkspace(MCMCFitWorkspace):
@@ -18,7 +16,7 @@ class LineFitWorkspace(MCMCFitWorkspace):
     def __init__(self, x, y, yerr, file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
         params = FitParameters(np.array([1, 1]), input_labels=["a", "b"], axis_names=["$a$", "$b$"],
-                               bounds=np.array([(-100, 100), (-100, 100)]), truth=truth, filename=file_name)
+                               bounds=[[-100, 100], [-100, 100]], truth=truth, filename=file_name)
         MCMCFitWorkspace.__init__(self, params, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit)
         self.my_logger = set_logger(self.__class__.__name__)
         self.x = x
