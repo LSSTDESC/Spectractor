@@ -5,8 +5,8 @@ from numpy.testing import run_module_suite  # noqa: E402
 import numpy as np  # noqa: E402
 
 from spectractor import parameters  # noqa: E402
-from spectractor.simulation.simulator import (SpectrumSimulatorSimGrid, SpectrumSimulator,  # noqa: E402
-                                              Atmosphere, AtmosphereGrid, SpectrogramSimulator)  # noqa: E402
+from spectractor.simulation.simulator import (SpectrumSimulator,  # noqa: E402
+                                              Atmosphere, AtmosphereGrid)  # noqa: E402
 from spectractor.config import load_config  # noqa: E402
 import os  # noqa: E402
 import unittest  # noqa: E402
@@ -62,9 +62,6 @@ def test_simulator():
         assert np.sum(spectrum_simulation.data) > 0
         assert np.sum(spectrum_simulation.data) < 1e-10
         assert np.sum(spectrum_simulation.data_next_order) < 1e-10
-
-        SpectrumSimulatorSimGrid(file_name, output_directory, pwv_grid=[0, 10, 2], ozone_grid=[200, 400, 2],
-                                 aerosol_grid=[0, 0.1, 2])
 
 
 if __name__ == "__main__":
