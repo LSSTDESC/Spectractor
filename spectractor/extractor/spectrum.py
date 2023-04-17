@@ -50,7 +50,7 @@ fits_mappings = {'config': 'CONFIG',
                  'spectrogram_Ny': 'S_NY',
                  'spectrogram_deg': 'S_DEG',
                  'spectrogram_saturation': 'S_SAT',
-                 'order': 'SPEC_ORDER'
+                 'order': 'S_ORDER'
                  }
 
 
