@@ -55,6 +55,8 @@ class FitParameters:
     array([1, 1, 1, 1, 1])
     >>> params.input_labels
     ['par0', 'par1', 'par2', 'par3', 'par4']
+    >>> params.bounds
+    [[-inf, inf], [-inf, inf], [-inf, inf], [-inf, inf], [-inf, inf]]
     """
     p: Union[np.ndarray, list]
     input_labels: Optional[list] = None
@@ -78,10 +80,10 @@ class FitParameters:
             if len(self.axis_names) != self.ndim:
                 raise ValueError("input_labels argument must have same size as values argument.")
         if self.bounds is None:
-           self.bounds = [[-np.inf, np.inf] for k in range(self.ndim)]
+            self.bounds = [[-np.inf, np.inf]] * self.ndim
         else:
-           if np.array(self.bounds).shape != (self.ndim, 2):
-               raise ValueError(f"bounds argument size {np.array(self.bounds).shape} must be same as values argument {(self.ndim, 2)}.")
+            if np.array(self.bounds).shape != (self.ndim, 2):
+                raise ValueError(f"bounds argument size {np.array(self.bounds).shape} must be same as values argument {(self.ndim, 2)}.")
         if not self.fixed:
             self.fixed = [False] * self.ndim
         else:
@@ -580,7 +582,7 @@ class FitWorkspace:
             K = len(self.W)
             if self.W[0].ndim == 1:
                 if np.any(model_err > 0):
-                    W = [1 / (self.data_cov[k] + model_err * model_err) for k in range(K)]
+                    W = [1 / (self.data_cov[k] + model_err[k] * model_err[k]) for k in range(K)]
             elif self.W[0].ndim == 2:
                 K = len(self.W)
                 if np.any(model_err > 0):
@@ -1304,8 +1306,8 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             JT_W_J = JT_W @ J
         else:
             if W[0].ndim == 1:
-                JT_W = J.T * np.concatenate(W).ravel()
-                JT_W_J = JT_W @ J
+                JT_W = np.array([j for j in J]).T * np.concatenate(W).ravel()
+                JT_W_J = JT_W @ np.array([j for j in J])
             else:
                 # warning ! here the data arrays indexed by k can have different lengths because outliers
                 # because W inverse covariance is block diagonal and blocks can have different sizes
