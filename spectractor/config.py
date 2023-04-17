@@ -68,7 +68,7 @@ def load_config(config_filename, rebin=True):
 
     Examples
     --------
-
+    >>> parameters.VERBOSE = True
     >>> load_config("./config/ctio.ini")
     >>> assert parameters.OBS_NAME == "CTIO"
 
@@ -98,7 +98,7 @@ def load_config(config_filename, rebin=True):
         else:
             config_filename = os.path.join(mypath, parameters.CONFIG_DIR, config_filename)
     # Load the configuration file
-    my_logger.info(f"Loading {config_filename} with {parameters.VERBOSE=}")
+    my_logger.info(f"\n\tLoading {config_filename} with {parameters.VERBOSE=}...")
     config = configparser.ConfigParser()
     config.read(config_filename)
     from_config_to_parameters(config)
@@ -116,14 +116,15 @@ def load_config(config_filename, rebin=True):
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
         sys.exit(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
 
-    my_logger.info(f"Loaded {config_filename} with {parameters.VERBOSE=}")
-    if parameters.VERBOSE:
+    if parameters.VERBOSE or parameters.DEBUG:
+        txt = ""
         for section in config.sections():
-            print(f"Section: {section}")
+            txt += f"Section: {section}\n"
             for options in config.options(section):
                 value = config.get(section, options)
                 par = getattr(parameters, options.upper())
-                print(f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}")
+                txt += f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}\n"
+        my_logger.info(f"Loaded {config_filename} with\n{txt}")
 
 def update_derived_parameters():
     # Derive other parameters
