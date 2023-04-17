@@ -1013,7 +1013,6 @@ class MCMCFitWorkspace(FitWorkspace):
         self.build_flat_chains()
         self.likelihood = self.chain2likelihood()
         self.params.cov = self.likelihood.cov_matrix
-        self.params.rho = self.likelihood.rho_matrix
         self.params.p = self.likelihood.mean_vec
         self.simulate(*self.params.p)
         self.plot_fit()
