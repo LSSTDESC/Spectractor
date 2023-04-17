@@ -1,16 +1,13 @@
-import os
 import copy
 import numpy as np
-import matplotlib.pyplot as plt
-from astropy.io import fits
 
 from scipy.interpolate import interp1d
 
 from spectractor.extractor.spectrum import Spectrum
-from spectractor.extractor.dispersers import Grating, Hologram
+from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import Target
 from spectractor.extractor.psf import load_PSF
-from spectractor.tools import fftconvolve_gaussian, ensure_dir
+from spectractor.tools import fftconvolve_gaussian
 from spectractor.config import set_logger
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
@@ -24,6 +21,8 @@ class SpectrumSimulation(Spectrum):
 
         Parameters
         ----------
+        spectrum: Spectrum
+            Spectrum instance.
         target: Target
             Target instance.
         throughput: TelescopeTransmission, optional
@@ -224,20 +223,22 @@ class SpectrumSimulation(Spectrum):
 
 class SpectrogramModel(Spectrum):
 
-    def __init__(self, spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True,
-                 full_image=False, with_adr=True):
+    def __init__(self, spectrum, target=None, disperser=None, throughput=None, atmosphere=None, with_background=True,
+                 fast_sim=True, full_image=False, with_adr=True):
         """Class to simulate a spectrogram.
 
         Parameters
         ----------
         spectrum: Spectrum
             Spectrum instance to load main properties before simulation.
-        atmosphere: Atmosphere
-            Atmosphere or AtmosphereGrid instance to make the atmospheric simulation.
-        telescope: TelescopeTransmission
-            Telescope transmission.
-        disperser: Grating
-            Disperser instance.
+        target: Target
+            Target instance.
+        throughput: TelescopeTransmission, optional
+            Telescope throughput (default: None).
+        disperser: Grating, optional
+            Disperser instance (default: None).
+        atmosphere: Atmosphere, optional
+            Atmosphere or AtmosphereGrid instance to make the atmospheric simulation (default: None).
         with_background: bool, optional
             If True, add the background model to the simulated spectrogram (default: True).
         fast_sim: bool, optional
@@ -253,7 +254,7 @@ class SpectrogramModel(Spectrum):
         --------
         >>> spectrum = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
-        >>> sim = SpectrogramModel(spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True)
+        >>> sim = SpectrogramModel(spectrum, atmosphere=atmosphere, with_background=True, fast_sim=True)
         """
         Spectrum.__init__(self)
         for k, v in list(spectrum.__dict__.items()):
@@ -261,8 +262,12 @@ class SpectrogramModel(Spectrum):
         if parameters.CCD_REBIN > 1:
             raise ValueError("Simulation from a rebinned Spectractor output is not implemented. "
                              "Feed the simulation pipeline with a non-rebinned spectrum.")
-        self.disperser = disperser
-        self.telescope = telescope
+        if target is not None:
+            self.target = target
+        if disperser is not None:
+            self.disperser = disperser
+        if throughput is not None:
+            self.throughput = throughput
         self.atmosphere = atmosphere
         self.true_lambdas = None
         self.true_spectrum = None
@@ -299,7 +304,7 @@ class SpectrogramModel(Spectrum):
         atmosphere = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv)
         spectrum = self.target.sed(lambdas)
         spectrum *= self.disperser.transmission(lambdas - shift_t)
-        spectrum *= self.telescope.transmission(lambdas - shift_t)
+        spectrum *= self.throughput.transmission(lambdas - shift_t)
         spectrum *= atmosphere(lambdas)
         self.true_spectrum = spectrum
         self.true_lambdas = lambdas
@@ -327,7 +332,7 @@ class SpectrogramModel(Spectrum):
 
         """
         spectrum = np.zeros_like(lambdas)
-        telescope_transmission = self.telescope.transmission(lambdas - shift_t)
+        telescope_transmission = self.throughput.transmission(lambdas - shift_t)
         if self.fast_sim:
             spectrum = self.target.sed(lambdas)
             spectrum *= self.disperser.transmission(lambdas - shift_t)
@@ -336,7 +341,7 @@ class SpectrogramModel(Spectrum):
             spectrum *= parameters.FLAM_TO_ADURATE * lambdas * np.gradient(lambdas)
         else:
             def integrand(lbda):
-                return lbda * self.target.sed(lbda) * self.telescope.transmission(lbda - shift_t) \
+                return lbda * self.target.sed(lbda) * self.throughput.transmission(lbda - shift_t) \
                        * self.disperser.transmission(lbda - shift_t) * atmosphere(lbda)
 
             for i in range(len(lambdas) - 1):
@@ -346,7 +351,7 @@ class SpectrogramModel(Spectrum):
             spectrum[-1] = spectrum[-2]
         spectrum_err = np.zeros_like(spectrum)
         idx = telescope_transmission > 0
-        spectrum_err[idx] = self.telescope.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[idx]
+        spectrum_err[idx] = self.throughput.transmission_err(lambdas)[idx] / telescope_transmission[idx] * spectrum[idx]
         # idx = telescope_transmission <= 0: not ready yet to be implemented
         # spectrum_err[idx] = 1e6 * np.max(spectrum_err)
         return spectrum, spectrum_err
@@ -395,12 +400,10 @@ class SpectrogramModel(Spectrum):
 
         Example
         -------
-
-        >>> spectrum, telescope, disperser, target = SimulatorInit('./tests/data/reduc_20170530_134_spectrum.fits')
-        >>> spectrum.disperser.ratio_order_3over2 = lambda wl: 0.1
-        >>> atmosphere = AtmosphereGrid(atmgrid_filename="./tests/data/reduc_20170530_134_atmsim.fits")
+        >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
+        >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
+        >>> sim = SpectrogramModel(spec, atmosphere=atmosphere, with_background=True, fast_sim=True)
         >>> psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
-        >>> sim = SpectrogramModel(spectrum, atmosphere, telescope, disperser, with_background=True, fast_sim=True)
         >>> lambdas, model, model_err = sim.simulate(A2=1, angle=-1.5, psf_poly_params=psf_poly_params)
         >>> sim.plot_spectrogram()
 
@@ -524,99 +527,18 @@ class SpectrogramModel(Spectrum):
         if self.with_background:
             self.spectrogram += B * self.spectrogram_bgd
         self.my_logger.debug(f'\n\tAfter bgd: {time.time() - start}')
+        # Save the simulation parameters
+        self.header['OZONE_T'] = ozone
+        self.header['PWV_T'] = pwv
+        self.header['VAOD_T'] = aerosols
+        self.header['A1_T'] = A1
+        self.header['A2_T'] = A2
+        self.header['D2CCD_T'] = D
+        self.header['X0_T'] = shift_x
+        self.header['Y0_T'] = shift_y
+        self.header['ROTANGLE'] = angle
 
         return self.lambdas, self.spectrogram, self.spectrogram_err
-
-
-def SimulatorInit(filename, fast_load=False, config=""):
-    """ SimulatorInit
-    Main function to evaluate several spectra
-    A grid of spectra will be produced for a given target, airmass and pressure
-
-    Parameters
-    ----------
-    filename: str
-        Spectrum file name.
-    fast_load: bool, optional
-        If True, load spectrograms from spectrum file name (slower) (default: False).
-    config: str, optional
-        Config file name to be loaded (default: "").
-
-    Returns
-    -------
-    spectrum: Spectrum
-        Spectrum instance.
-    telescope: TelescopeTransmission
-        TelescopeTransmission instance.
-    disperser: Disperser
-        Disperser instance.
-    target: Target
-        Target instance.
-
-    Examples
-    --------
-    >>> spectrum, telescope, disperser, target = SimulatorInit("./tests/data/reduc_20170530_134_spectrum.fits")
-    """
-    my_logger = set_logger(__name__)
-    my_logger.info('\n\tStart SIMULATOR initialisation')
-    # Load data spectrum
-    spectrum = Spectrum(filename, fast_load=fast_load, config=config)
-
-    # TELESCOPE TRANSMISSION
-    # ------------------------
-    telescope = TelescopeTransmission(spectrum.filter_label)
-
-    # DISPERSER TRANSMISSION
-    # ------------------------
-    if not isinstance(spectrum.disperser, str):
-        disperser = spectrum.disperser
-    else:
-        disperser = Hologram(spectrum.disperser)
-
-    # STAR SPECTRUM
-    # ------------------------
-    if not isinstance(spectrum.target, str):
-        target = spectrum.target
-    else:
-        target = Target(spectrum.target)
-
-    return spectrum, telescope, disperser, target
-
-
-def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressure=800, temperature=10,
-                             aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, A1=1.0, A2=0.,
-                             D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0.,
-                             B=1., psf_poly_params=None, with_background=True, fast_sim=False, full_image=False,
-                             with_adr=True):
-    """ SimulatorCore
-    Main function to evaluate several spectra
-    A grid of spectra will be produced for a given target, airmass and pressure
-    """
-    my_logger = set_logger(__name__)
-    my_logger.info('\n\tStart SPECTROGRAMSIMULATOR core program')
-    # SIMULATE ATMOSPHERE
-    # -------------------
-    if parameters.LIBRADTRAN_DIR != '':
-        atmosphere = Atmosphere(airmass, pressure, temperature)
-    else:
-        atmgrid_filename = spectrum.filename.replace('sim', 'reduc').replace('_spectrum.fits', '_atmsim.fits')
-        if os.path.isfile(atmgrid_filename):
-            spectrum.my_logger.debug(f"\n\tUse {atmgrid_filename} for atmosphere simulation.")
-            atmosphere = AtmosphereGrid(atmgrid_filename=atmgrid_filename)
-        else:
-            raise ValueError("No parameters.LIBRADTRAN_DIR set and no atmgrid file associated to the spectrum. "
-                             "I can't simulate atmosphere transmission.")
-
-    spectrum.rotation_angle = angle
-
-    # SPECTRUM SIMULATION
-    # --------------------
-    spectrogram_simulation = SpectrogramModel(spectrum, atmosphere, telescope, disperser,
-                                              with_background=with_background, fast_sim=fast_sim, full_image=full_image,
-                                              with_adr=with_adr)
-    spectrogram_simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv,
-                                    D, shift_x, shift_y, angle, B, psf_poly_params)
-    return spectrogram_simulation
 
 
 if __name__ == "__main__":

@@ -9,7 +9,8 @@ import copy
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
-from spectractor.simulation.simulator import SimulatorInit, SpectrogramModel
+from spectractor.extractor.spectrum import Spectrum
+from spectractor.simulation.simulator import SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation, run_minimisation_sigma_clipping
 
@@ -18,7 +19,7 @@ plot_counter = 0
 
 class SpectrogramFitWorkspace(FitWorkspace):
 
-    def __init__(self, file_name, atmgrid_file_name="", fit_angstrom_exponent=False,
+    def __init__(self, spectrum, atmgrid_file_name="", fit_angstrom_exponent=False,
                  verbose=False, plot=False, live_fit=False, truth=None):
         """Class to fit a spectrogram extracted with Spectractor.
 
@@ -29,8 +30,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         Parameters
         ----------
-        file_name: str
-            Spectrum file name.
+        spectrum: Spectrum
+            Spectrum object.
         atmgrid_file_name: str, optional
             Atmospheric grid file name (default: "").
         fit_angstrom_exponent: bool, optional
@@ -46,24 +47,15 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         Examples
         --------
-
-        >>> from spectractor.config import load_config
-        >>> load_config("config/ctio.ini")
-        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
-        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-        ... burnin=2, nbins=10, verbose=True, plot=True, live_fit=False)
+        >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
+        >>> w = SpectrogramFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.p)
         >>> w.plot_fit()
 
         """
-        if "spectrum" not in file_name:
-            raise ValueError("file_name argument must contain spectrum keyword and be an output from Spectractor.")
-        if fit_angstrom_exponent and atmgrid_file_name != '':
-            raise ValueError(f"AtmosphereGrid() do not contains angstrom exponent modelisation yet. "
-                             f"Can't provide atmgrid_file_name and ask for fitting angstrom exponent {fit_angstrom_exponent=}.")
-        self.filename = file_name.replace("spectrum", "spectrogram")
-        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
+        self.spectrum = spectrum
+        self.filename = spectrum.filename.replace("spectrum", "spectrogram")
         length = len(self.spectrum.chromatic_psf.table)
         psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
@@ -84,10 +76,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
                       r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]",
                       "$B$"] + list(psf_poly_params_names) + [label+"_2" for label in psf_poly_params_names]
-        bounds_D = (p[6] - 5 * parameters.DISTANCE2CCD_ERR, p[6] + 5 * parameters.DISTANCE2CCD_ERR)
-        bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-5, 2),
-                                           (100, 700), (0, 10), bounds_D, (-2, 2), (-10, 10), (-90, 90), (0.8, 1.2)]),
-                                 list(psf_poly_params_bounds) * 2])
+        bounds = [[0, 2], [0, 2/parameters.GRATING_ORDER_2OVER1], [0, 0.1], [-5, 2], [100, 700], [0, 10],
+                  [p[6] - 5 * parameters.DISTANCE2CCD_ERR, p[6] + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
+                  [-10, 10], [-90, 90], [0.8, 1.2]] + list(psf_poly_params_bounds) * 2
         fixed = [False] * p.size
         for k, par in enumerate(input_labels):
             if "x_c" in par or "saturation" in par:
@@ -107,7 +98,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             fixed[3] = True  # angstrom exponent
         params = FitParameters(p, input_labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed,
                                truth=truth, filename=self.filename)
-        FitWorkspace.__init__(self, params, file_name, verbose, plot, live_fit)
+        FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
         self.airmass = self.spectrum.header['AIRMASS']
         self.pressure = self.spectrum.header['OUTPRESS']
         self.temperature = self.spectrum.header['OUTTEMP']
@@ -116,7 +107,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
         else:
             self.use_grid = True
-            self.atmosphere = AtmosphereGrid(spectrum_filename=file_name, atmgrid_filename=atmgrid_file_name)
+            self.atmosphere = AtmosphereGrid(spectrum_filename=spectrum.filename, atmgrid_filename=atmgrid_file_name)
             self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
         self.crop_spectrogram()
         self.lambdas = self.spectrum.lambdas
@@ -131,7 +122,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.params.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
             self.params.fixed[3] = True  # angstrom exponent
 
-        self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
+        self.simulation = SpectrogramModel(self.spectrum, atmosphere=self.atmosphere,
                                            with_background=True, fast_sim=False, with_adr=True)
         self.lambdas_truth = None
         self.amplitude_truth = None
@@ -186,11 +177,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> from spectractor.config import load_config
-        >>> load_config("config/ctio.ini")
-        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
-        >>> w = SpectrogramFitWorkspace(filename, verbose=True)
-        >>> _ = w.simulate(*w.p)
+        >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> w = SpectrogramFitWorkspace(spec, verbose=True)
+        >>> _ = w.simulate(*w.params.p)
         >>> w.plot_fit()
 
         """
@@ -362,12 +351,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        >>> from spectractor.config import load_config
-        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
-        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> load_config("config/ctio.ini")
-        >>> w = SpectrogramFitWorkspace(filename, atmgrid_filename, verbose=True, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> w = SpectrogramFitWorkspace(spec, verbose=True)
+        >>> lambdas, model, model_err = w.simulate(*w.params.p)
         >>> w.plot_fit()
 
         """
@@ -427,12 +413,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        >>> from spectractor.config import load_config
-        >>> load_config("config/ctio.ini")
-        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
-        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> w = SpectrogramFitWorkspace(filename, atmgrid_filename, verbose=True, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> w = SpectrogramFitWorkspace(spec, verbose=True)
+        >>> lambdas, model, model_err = w.simulate(*w.params.p)
         >>> w.plot_fit()
 
         .. plot::
@@ -518,12 +501,8 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
 
     Examples
     --------
-
-    >>> from spectractor.config import load_config
-    >>> load_config("config/ctio.ini")
-    >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
-    >>> atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-    >>> w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
+    >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+    >>> w = SpectrogramFitWorkspace(spec, verbose=True)
     >>> parameters.VERBOSE = True
     >>> run_spectrogram_minimisation(w, method="newton")
 
