@@ -453,8 +453,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
 
     # Simulate spectrogram
     atmosphere = Atmosphere(airmass, pressure, temperature)
-    spectrogram = SpectrogramModel(spectrum, atmosphere, spectrum.throughput, spectrum.disperser,
-                                   with_background=False, fast_sim=False, full_image=True, with_adr=with_adr)
+    spectrogram = SpectrogramModel(spectrum, atmosphere=atmosphere, with_background=False, fast_sim=False,
+                                   full_image=True, with_adr=with_adr)
     spectrogram.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv,
                          spectrum.disperser.D, 0, 0, rotation_angle, 1, psf_poly_params)
 

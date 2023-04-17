@@ -12,7 +12,6 @@ from scipy.integrate import quad
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.simulation.simulator import SimulatorInit
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping, run_minimisation, FitParameters
 from spectractor.tools import from_lambda_to_colormap, fftconvolve_gaussian
@@ -67,7 +66,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 raise ValueError(f"ALl file names must contain spectrum keyword and be an output from Spectractor. "
                                  f"I found {name} in file_names list.")
         self.my_logger = set_logger(self.__class__.__name__)
-        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_names[0], fast_load=True)
+        self.spectrum = Spectrum(file_names[0])
         self.spectra = []
         self.atmospheres = []
         self.file_names = file_names
@@ -404,7 +403,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         else:
             self.truth = None
         self.true_instrumental_transmission = []
-        tinst = lambda lbda: self.disperser.transmission(lbda) * self.telescope.transmission(lbda)
+        tinst = lambda lbda: self.spectrum.disperser.transmission(lbda) * self.spectrum.throughput.transmission(lbda)
         if self.bin_widths > 0:
             for i in range(1, self.lambdas_bin_edges.size):
                 self.true_instrumental_transmission.append(quad(tinst, self.lambdas_bin_edges[i - 1],
@@ -756,8 +755,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             tatm_binned.append(quad(tatm, self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i])[0] /
                                (self.lambdas_bin_edges[i] - self.lambdas_bin_edges[i - 1]))
 
-        throughput = self.amplitude_params / self.disperser.transmission(self.lambdas[0])
-        throughput_err = self.amplitude_params_err / self.disperser.transmission(self.lambdas[0])
+        throughput = self.amplitude_params / self.spectrum.disperser.transmission(self.lambdas[0])
+        throughput_err = self.amplitude_params_err / self.spectrum.disperser.transmission(self.lambdas[0])
         if "sim" in self.file_names[0]:
             file_name = self.output_file_name + f"_sim_transmissions.txt"
         else:
