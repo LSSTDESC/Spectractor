@@ -1410,7 +1410,7 @@ def turn_image(image):
         raise ValueError(f"Unknown method for rotation angle computation: choose among False, disperser, hessian. "
                          f"Got {parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE}")
     image.header['ROTANGLE'] = image.rotation_angle
-    image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
+    image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree from method {parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE}.')
     image.data_rotated = np.copy(image.data)
     if not np.isnan(image.rotation_angle):
         image.data_rotated = ndimage.rotate(image.data, image.rotation_angle,
