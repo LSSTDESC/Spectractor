@@ -619,54 +619,6 @@ def SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass=1.0, pressu
     return spectrogram_simulation
 
 
-def SpectrogramSimulator(filename, outputdir="", aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, A1=1., A2=0.,
-                         D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., shift_t=0., angle=0., B=1.,
-                         psf_poly_params=None):
-    """ Simulator
-    Main function to evaluate several spectra
-    A grid of spectra will be produced for a given target, airmass and pressure
-    """
-    my_logger = set_logger(__name__)
-    my_logger.info('\n\tStart SPECTRACTORSIM')
-    # Initialisation
-    spectrum = Spectrum(filename)
-
-    if psf_poly_params is None:
-        my_logger.info('\n\tUse PSF parameters from _table.csv file.')
-        psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
-
-    # SIMULATE SPECTRUM
-    # -------------------
-    airmass = spectrum.header['AIRMASS']
-    pressure = spectrum.header['OUTPRESS']
-    temperature = spectrum.header['OUTTEMP']
-
-    spectrogram_simulation = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
-                                                      temperature, aerosols, ozone, pwv,
-                                                      D=D, shift_x=shift_x, angstrom_exponent=angstrom_exponent,
-                                                      shift_y=shift_y, shift_t=shift_t, angle=angle, B=B,
-                                                      psf_poly_params=psf_poly_params)
-
-    # Save the spectrum
-    spectrogram_simulation.header['OZONE_T'] = ozone
-    spectrogram_simulation.header['PWV_T'] = pwv
-    spectrogram_simulation.header['VAOD_T'] = aerosols
-    spectrogram_simulation.header['A1_T'] = A1
-    spectrogram_simulation.header['A2_T'] = A2
-    spectrogram_simulation.header['D2CCD_T'] = D
-    spectrogram_simulation.header['X0_T'] = shift_x
-    spectrogram_simulation.header['Y0_T'] = shift_y
-    spectrogram_simulation.header['TSHIFT_T'] = shift_t
-    spectrogram_simulation.header['ROTANGLE'] = angle
-    output_filename = filename.replace('spectrum', 'sim')
-    if outputdir != "":
-        base_filename = os.path.basename(filename)
-        output_filename = os.path.join(outputdir, base_filename.replace('spectrum', 'sim'))
-    # spectrogram_simulation.save_spectrum(output_filename, overwrite=True)
-
-    return spectrogram_simulation
-
-
 if __name__ == "__main__":
     import doctest
 

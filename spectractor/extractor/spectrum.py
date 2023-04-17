@@ -123,6 +123,8 @@ class Spectrum:
         Outside pressure in hPa.
     humidity: float
         Outside relative humidity in fraction of one.
+    throughput: callable
+        Instrumental throughput of the telescope.
     spectrogram: array
         Spectrogram 2D image in image units.
     spectrogram_bgd: array
@@ -284,9 +286,9 @@ class Spectrum:
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
                                self.humidity, self.airmass]
 
-        t = self.load_filter()
+        self.throughput = self.load_filter()
         if self.target is not None and len(self.target.spectra) > 0:
-            spec = self.target.spectra[0] * t.transmission(self.target.wavelengths[0])
+            spec = self.target.spectra[0] * self.throughput.transmission(self.target.wavelengths[0])
             lambda_ref = np.sum(self.target.wavelengths[0] * spec) / np.sum(spec)
             self.lambda_ref = lambda_ref
             self.header['LBDA_REF'] = lambda_ref

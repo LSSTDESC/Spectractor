@@ -6,8 +6,8 @@ from spectractor.tools import (pixel_rotation, set_wcs_file_name, set_sources_fi
 from spectractor.extractor.images import Image, find_target
 from spectractor.astrometry import get_gaia_coords_after_proper_motion
 from spectractor.extractor.background import remove_image_background_sextractor
-from spectractor.simulation.throughput import TelescopeTransmission
-from spectractor.simulation.simulator import SpectrogramSimulatorCore
+from spectractor.simulation.simulator import SpectrogramModel
+from spectractor.simulation.atmosphere import Atmosphere
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.psf import PSF
 
@@ -386,8 +386,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger = set_logger(__name__)
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
     # Load reduced image
-    spectrum, telescope, disperser, target = SimulatorInit(spectrum_filename)
-    image = ImageModel(image_filename, target_label=target.label)
+    spectrum = Spectrum(spectrum_filename)
+    image = ImageModel(image_filename, target_label=spectrum.target.label)
     guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
     if "CCDREBIN" in spectrum.header:
         guess *= spectrum.header["CCDREBIN"]
@@ -424,7 +424,6 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     airmass = image.header['AIRMASS']
     pressure = image.header['OUTPRESS']
     temperature = image.header['OUTTEMP']
-    telescope = TelescopeTransmission(image.filter_label)
 
     # Rotation: useful only to fill the Dy_disp_axis column in PSF table
     if not with_rotation:
@@ -453,18 +452,11 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         spectrum.chromatic_psf.init_table()
 
     # Simulate spectrogram
-    spectrogram = SpectrogramSimulatorCore(spectrum, telescope, disperser, airmass, pressure,
-                                           temperature, pwv=pwv, ozone=ozone, aerosols=aerosols,
-                                           angstrom_exponent=angstrom_exponent, A1=A1, A2=A2,
-                                           D=spectrum.disperser.D, shift_x=0., shift_y=0., shift_t=0., B=1.,
-                                           psf_poly_params=psf_poly_params, angle=rotation_angle, with_background=False,
-                                           fast_sim=False, full_image=True, with_adr=with_adr)
-
-    # now we include effects related to the wrong extraction of the spectrum:
-    # wrong estimation of the order 0 position and wrong DISTANCE2CCD
-    # distance = spectrum.chromatic_psf.get_algebraic_distance_along_dispersion_axis()
-    # spectrum.disperser.D = parameters.DISTANCE2CCD
-    # spectrum.lambdas = spectrum.disperser.grating_pixel_to_lambda(distance, spectrum.x0, order=1)
+    atmosphere = Atmosphere(airmass, pressure, temperature)
+    spectrogram = SpectrogramModel(spectrum, atmosphere, spectrum.throughput, spectrum.disperser,
+                                   with_background=False, fast_sim=False, full_image=True, with_adr=with_adr)
+    spectrogram.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv,
+                         spectrum.disperser.D, 0, 0, rotation_angle, 1, psf_poly_params)
 
     # Image model
     my_logger.info('\n\tImage model...')
