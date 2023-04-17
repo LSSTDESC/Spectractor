@@ -314,6 +314,18 @@ class FitParameters:
         ----------
         header: str, optional
             A header to add to the file (default: "").
+
+        Examples
+        --------
+        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
+        >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
+        >>> params.write_text(header="chi2: 1")
+
+        .. doctest::
+            :hide:
+
+            >>> assert os.path.isfile(params.txt_filename)
+            >>> os.remove(params.txt_filename)
         """
         txt = self.filename + "\n"
         if header != "":
@@ -327,9 +339,17 @@ class FitParameters:
         f.close()
 
     def write_json(self, extra=None):
-        """
+        """Save FitParameters attributes as a JSON file.
+
+        Parameters
+        ----------
         extra: dict, optional
             Extra information to write in the JSON file.
+
+        Returns
+        -------
+        jsontxt: str
+            The JSON dictionnary as string.
 
         Examples
         --------
@@ -356,7 +376,12 @@ class FitParameters:
 
 
 def read_fitparameter_json(json_filename):
-    """
+    """Read JSON file and store data in FitParameters instance.
+
+    Parameters
+    ----------
+    json_filename: str
+        The JSON file name.
 
     Examples
     --------
