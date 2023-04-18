@@ -206,7 +206,7 @@ class SpectrumSimulation(Spectrum):
             self.err = (err_conv(lambdas) + A2 * err_order2) / lambdas
         if B != 0:
             self.data += B / (lambdas * np.gradient(lambdas))
-        if np.any(self.err <= 0):
+        if np.any(self.err <= 0) and not np.all(self.err<=0):
             min_positive = np.min(self.err[self.err > 0])
             self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
         # Save the truth parameters

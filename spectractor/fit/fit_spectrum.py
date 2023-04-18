@@ -75,11 +75,8 @@ class SpectrumFitWorkspace(FitWorkspace):
                                            "reso [pix]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
                                bounds=bounds, fixed=fixed, truth=truth, filename=spectrum.filename)
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=spectrum.filename)
-        self.airmass = self.spectrum.header['AIRMASS']
-        self.pressure = self.spectrum.header['OUTPRESS']
-        self.temperature = self.spectrum.header['OUTTEMP']
         if atmgrid_file_name == "":
-            self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
+            self.atmosphere = Atmosphere(self.spectrum.airmass, self.spectrum.pressure, self.spectrum.temperature)
         else:
             self.use_grid = True
             self.atmosphere = AtmosphereGrid(spectrum_filename=spectrum.filename, atmgrid_filename=atmgrid_file_name)
