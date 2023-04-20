@@ -13,7 +13,8 @@ from scipy.integrate import quad
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_minimisation_sigma_clipping, run_minimisation, FitParameters
+from spectractor.fit.fitter import (FitWorkspace, run_minimisation_sigma_clipping, run_minimisation, FitParameters,
+                                    write_fitparameter_json)
 from spectractor.tools import from_lambda_to_colormap, fftconvolve_gaussian
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.extractor.spectroscopy import HALPHA, HBETA, HGAMMA, HDELTA, O2_1, O2_2, O2B
@@ -881,8 +882,9 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False)
         if fit_workspace.filename != "":
             parameters.SAVE = True
             fit_workspace.params.plot_correlation_matrix()
-            fit_workspace.params.write_json(extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
-                                                   "date-obs": fit_workspace.spectrum.date_obs})
+            write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
+                                    extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
+                                           "date-obs": fit_workspace.spectrum.date_obs})
             fit_workspace.plot_fit()
             fit_workspace.plot_transmissions()
             fit_workspace.plot_A1s()

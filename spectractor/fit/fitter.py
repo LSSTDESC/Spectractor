@@ -338,41 +338,49 @@ class FitParameters:
         f.write(txt)
         f.close()
 
-    def write_json(self, extra=None):
-        """Save FitParameters attributes as a JSON file.
+    def write_json(self):
+        pass
 
-        Parameters
-        ----------
-        extra: dict, optional
-            Extra information to write in the JSON file.
 
-        Returns
-        -------
-        jsontxt: str
-            The JSON dictionnary as string.
+def write_fitparameter_json(json_filename, params, extra=None):
+    """Save FitParameters attributes as a JSON file.
 
-        Examples
-        --------
-        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
-        >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
-        >>> jsonstr = params.write_json(extra={"chi2": 1})
-        >>> jsonstr  # doctest: +ELLIPSIS
-        '{"p": [1, 2, 3, 4], "input_labels": ["x", "y", "z", "t"],..."extra": {"chi2": 1}...
+    Parameters
+    ----------
+    json_filename: str
+        JSON file name.
+    params: FitParameters
+        A FitParameters instance to save in JSON json_filename.
+    extra: dict, optional
+        Extra information to write in the JSON file.
 
-        .. doctest::
-            :hide:
+    Returns
+    -------
+    jsontxt: str
+        The JSON dictionnary as string.
 
-            >>> assert os.path.isfile(params.json_filename)
-            >>> os.remove(params.json_filename)
-        """
-        if self.filename == "":
-            raise ValueError("Must provide attribute self.filename to use write_json.")
-        if extra:
-            self.extra = extra
-        jsontxt = json.dumps(self.__dict__, cls=NumpyArrayEncoder)
-        with open(self.json_filename, 'w') as output_json:
-            output_json.write(jsontxt)
-        return jsontxt
+    Examples
+    --------
+    >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
+    >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
+    >>> jsonstr = write_fitparameter_json(params.json_filename, params, extra={"chi2": 1})
+    >>> jsonstr  # doctest: +ELLIPSIS
+    '{"p": [1, 2, 3, 4], "input_labels": ["x", "y", "z", "t"],..."extra": {"chi2": 1}...
+
+    .. doctest::
+        :hide:
+
+        >>> assert os.path.isfile(params.json_filename)
+        >>> os.remove(params.json_filename)
+    """
+    if json_filename == "":
+        raise ValueError("Must provide attribute a JSON filename.")
+    if extra:
+        params.extra = extra
+    jsontxt = json.dumps(params.__dict__, cls=NumpyArrayEncoder)
+    with open(json_filename, 'w') as output_json:
+        output_json.write(jsontxt)
+    return jsontxt
 
 
 def read_fitparameter_json(json_filename):
@@ -383,11 +391,16 @@ def read_fitparameter_json(json_filename):
     json_filename: str
         The JSON file name.
 
+    Returns
+    -------
+    params: FitParameters
+        A FitParameters instance to loaded from JSON json_filename.
+
     Examples
     --------
     >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
     >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
-    >>> _ = params.write_json(extra={"chi2": 1})
+    >>> _ = write_fitparameter_json(params.json_filename, params, extra={"chi2": 1})
     >>> new_params = read_fitparameter_json(params.json_filename)
     >>> new_params.p
     array([1, 2, 3, 4])
@@ -1637,7 +1650,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         if verbose:
             my_logger.debug(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
-            fit_workspace.params.write_json()
+            write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params)
             fit_workspace.save_gradient_descent()
 
 

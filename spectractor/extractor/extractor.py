@@ -15,7 +15,7 @@ from spectractor.extractor.background import extract_spectrogram_background_sext
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.extractor.psf import load_PSF
 from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colormap, plot_spectrum_simple
-from spectractor.fit.fitter import (run_minimisation, run_minimisation_sigma_clipping,
+from spectractor.fit.fitter import (run_minimisation, run_minimisation_sigma_clipping, write_fitparameter_json,
                                     RegFitWorkspace, FitWorkspace, FitParameters)
 
 
@@ -887,8 +887,9 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         if w.filename != "":
             parameters.SAVE = True
             w.params.plot_correlation_matrix()
-            w.params.write_json(extra={"chi2": costs[-1] / (w.data.size - len(w.outliers) - len(w.mask)),
-                                       "date-obs": w.spectrum.date_obs})
+            write_fitparameter_json(w.params.json_filename, w.params,
+                                    extra={"chi2": costs[-1] / (w.data.size - len(w.outliers) - len(w.mask)),
+                                           "date-obs": w.spectrum.date_obs})
             w.plot_fit()
             parameters.SAVE = False
 

@@ -8,7 +8,8 @@ from spectractor.config import set_logger
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.simulation.simulator import SpectrumSimulation
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation_sigma_clipping, run_minimisation
+from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisation_sigma_clipping, run_minimisation,
+                                    write_fitparameter_json)
 from spectractor.tools import plot_spectrum_simple
 
 
@@ -373,8 +374,9 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         fit_workspace.params.plot_correlation_matrix()
         fit_workspace.plot_fit()
         if fit_workspace.filename != "":
-            fit_workspace.params.write_json(extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
-                                                   "date-obs": fit_workspace.spectrum.date_obs})
+            write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
+                                    extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
+                                           "date-obs": fit_workspace.spectrum.date_obs})
             # save_gradient_descent(fit_workspace, costs, params_table)
         parameters.SAVE = False
 

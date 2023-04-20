@@ -12,7 +12,8 @@ from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.simulation.simulator import SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation, run_minimisation_sigma_clipping
+from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisation, run_minimisation_sigma_clipping,
+                                    write_fitparameter_json)
 
 plot_counter = 0
 
@@ -555,8 +556,9 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         if fit_workspace.filename != "":
             parameters.SAVE = True
             fit_workspace.params.plot_correlation_matrix()
-            fit_workspace.params.write_json(extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
-                                                   "date-obs": fit_workspace.spectrum.date_obs})
+            write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
+                                    extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
+                                           "date-obs": fit_workspace.spectrum.date_obs})
             # save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
             parameters.SAVE = False
