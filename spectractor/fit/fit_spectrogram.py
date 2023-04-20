@@ -100,12 +100,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         params = FitParameters(p, input_labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed,
                                truth=truth, filename=self.filename)
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
-        self.airmass = self.spectrum.header['AIRMASS']
-        self.pressure = self.spectrum.header['OUTPRESS']
-        self.temperature = self.spectrum.header['OUTTEMP']
         self.my_logger = set_logger(self.__class__.__name__)
         if atmgrid_file_name == "":
-            self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
+            self.atmosphere = Atmosphere(self.spectrum.airmass, self.spectrum.pressure, self.spectrum.temperature)
         else:
             self.use_grid = True
             self.atmosphere = AtmosphereGrid(spectrum_filename=spectrum.filename, atmgrid_filename=atmgrid_file_name)
