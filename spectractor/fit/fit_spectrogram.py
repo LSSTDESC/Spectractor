@@ -500,7 +500,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
     Examples
     --------
     >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
-    >>> w = SpectrogramFitWorkspace(spec, verbose=True)
+    >>> w = SpectrogramFitWorkspace(spec, verbose=True, atmgrid_file_name='tests/data/reduc_20170530_134_atmsim.fits')
     >>> parameters.VERBOSE = True
     >>> run_spectrogram_minimisation(w, method="newton")
 
