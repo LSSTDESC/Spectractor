@@ -5,7 +5,7 @@ pandas
 llvmlite #==0.29.0
 numba #==0.44.1
 astropy>=3.2
-photutils>=1.6
+photutils>=1.7.0
 astroquery
 coloredlogs
 scikit-image>=0.20

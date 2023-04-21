@@ -1,5 +1,5 @@
 import os
-
+import shutil
 from photutils.detection import IRAFStarFinder
 from scipy.optimize import curve_fit
 import numpy as np
@@ -25,6 +25,9 @@ from spectractor import parameters
 from math import floor
 
 from numba import njit
+
+
+_SCIKIT_IMAGE_NEW_HESSIAN = None
 
 
 @njit(fastmath=True, cache=True)
@@ -1383,15 +1386,15 @@ def weighted_avg_and_std(values, weights):
     Return the weighted average and standard deviation.
 
     values, weights -- Numpy ndarrays with the same shape.
-    
+
     For example for the PSF
-    
+
     x=pixel number
     y=Intensity in pixel
-    
+
     values-x
     weights=y=f(x)
-    
+
     """
     average = np.average(values, weights=weights)
     variance = np.average((values - average) ** 2, weights=weights)  # Fast and numerically precise
@@ -1399,9 +1402,23 @@ def weighted_avg_and_std(values, weights):
 
 
 def hessian_and_theta(data, margin_cut=1):
+    # Check for unannounced API change on hessian_matrix in scikit-image>=0.20
+    # See https://github.com/scikit-image/scikit-image/pull/6624
+    global _SCIKIT_IMAGE_NEW_HESSIAN
+
+    if _SCIKIT_IMAGE_NEW_HESSIAN is None:
+        from importlib import metadata
+        import packaging
+
+        vers = packaging.version.parse(metadata.version("scikit-image"))
+        if vers < packaging.version.parse("0.20.0"):
+            _SCIKIT_IMAGE_NEW_HESSIAN = False
+        else:
+            _SCIKIT_IMAGE_NEW_HESSIAN = True
+
     # compute hessian matrices on the image
-    # WARNING: with scikit-image<0.20, must use order='rc' and remove use_gaussian_derivatives
-    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order='xy', use_gaussian_derivatives=False)
+    order = "xy" if _SCIKIT_IMAGE_NEW_HESSIAN else "rc"
+    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order=order)
     lambda_plus = 0.5 * ((Hxx + Hyy) + np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     lambda_minus = 0.5 * ((Hxx + Hyy) - np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     theta = 0.5 * np.arctan2(2 * Hxy, Hxx - Hyy) * 180 / np.pi
@@ -2424,6 +2441,28 @@ def flip_and_rotate_radec_vector_to_xy_vector(ra, dec, camera_angle=0, flip_ra_s
     transformation = flip @ rotation
     x, y = (np.asarray([ra, dec]).T @ transformation).T
     return x, y
+
+
+def get_uvspec_binary():
+    """Get the path to the libradtran uvspec binary if available.
+
+    Returns
+    -------
+    uvspec_binary : `str`
+        Path to the uvspec binary if available, else ``None``.
+    """
+    return shutil.which('uvspec')
+
+
+def uvspec_available():
+    """Check if the uvspec binary is available.
+
+    Returns
+    -------
+    is_available : `bool`
+        Is the binary available?
+    """
+    return get_uvspec_binary() is not None
 
 
 if __name__ == "__main__":

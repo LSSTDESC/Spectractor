@@ -1,5 +1,5 @@
-#import matplotlib as mpl  # must be run first! But therefore requires noqa E02 on all other imports
-#mpl.use('Agg')
+import matplotlib as mpl
+mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
 from numpy.testing import run_module_suite  # noqa: E402
 import numpy as np  # noqa: E402
@@ -7,13 +7,15 @@ import numpy as np  # noqa: E402
 from spectractor import parameters  # noqa: E402
 from spectractor.extractor.spectrum import Spectrum  # noqa: E402
 from spectractor.simulation.simulator import (SpectrumSimulation, Atmosphere, AtmosphereGrid)  # noqa: E402
+from spectractor.tools import uvspec_available  # noqa: E402
+from spectractor.simulation.simulator import (Atmosphere, AtmosphereGrid)  # noqa: E402
 from spectractor.config import load_config  # noqa: E402
 import os  # noqa: E402
 import unittest  # noqa: E402
 
 
 # TODO: DM-33441 Fix broken spectractor tests
-@unittest.skip('Skipping to avoid libradtran dependency')
+@unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
 def test_atmosphere():
     a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
     transmission = a.simulate(ozone=400, pwv=5, aerosols=0.05)
@@ -47,6 +49,7 @@ def test_atmosphere():
     assert np.max(transmission(lambdas)) < 1 and np.min(transmission(lambdas)) >= 0
 
 
+@unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
 def test_simulator():
     file_names = ['tests/data/reduc_20170530_134_spectrum.fits']
 
