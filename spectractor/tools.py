@@ -1,6 +1,7 @@
 import os
 
 import astropy.io.fits
+import shutil
 from matplotlib import pyplot as plt
 from photutils import IRAFStarFinder
 from scipy.optimize import curve_fit
@@ -1388,15 +1389,15 @@ def weighted_avg_and_std(values, weights):
     Return the weighted average and standard deviation.
 
     values, weights -- Numpy ndarrays with the same shape.
-    
+
     For example for the PSF
-    
+
     x=pixel number
     y=Intensity in pixel
-    
+
     values-x
     weights=y=f(x)
-    
+
     """
     average = np.average(values, weights=weights)
     variance = np.average((values - average) ** 2, weights=weights)  # Fast and numerically precise
@@ -2444,6 +2445,28 @@ def flip_and_rotate_radec_vector_to_xy_vector(ra, dec, camera_angle=0, flip_ra_s
     transformation = flip @ rotation
     x, y = (np.asarray([ra, dec]).T @ transformation).T
     return x, y
+
+
+def get_uvspec_binary():
+    """Get the path to the libradtran uvspec binary if available.
+
+    Returns
+    -------
+    uvspec_binary : `str`
+        Path to the uvspec binary if available, else ``None``.
+    """
+    return shutil.which('uvspec')
+
+
+def uvspec_available():
+    """Check if the uvspec binary is available.
+
+    Returns
+    -------
+    is_available : `bool`
+        Is the binary available?
+    """
+    return get_uvspec_binary() is not None
 
 
 if __name__ == "__main__":
