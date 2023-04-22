@@ -52,7 +52,7 @@ class FitParameters:
     >>> params.ndim
     5
     >>> params.p
-    array([1, 1, 1, 1, 1])
+    array([1., 1., 1., 1., 1.])
     >>> params.input_labels
     ['par0', 'par1', 'par2', 'par3', 'par4']
     >>> params.bounds
@@ -69,7 +69,8 @@ class FitParameters:
 
     def __post_init__(self):
         if type(self.p) is list:
-            self.p = np.array(self.p)
+            self.p = np.array(self.p, dtype=float)
+        self.p = np.asarray(self.p, dtype=float)
         if not self.input_labels:
             self.input_labels = [f"par{k}" for k in range(self.ndim)]
         else:
@@ -126,12 +127,15 @@ class FitParameters:
         Examples
         -------
         >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(p=[1, 1, 1], axis_names=["x", "y", "z"])
-        >>> params.cov = np.array([[4,-0.5,0],[-0.5,4,-1],[0,-1,4]])
+        >>> import numpy as np
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
+        >>> params.cov = np.array([[1,-0.5,0],[-0.5,4,-1],[0,-1,9]])
         >>> params.err
-        array([2., 2., 2.])
+        array([1., 0., 2., 0., 3.])
         """
-        return np.sqrt(np.diag(self.cov))
+        err = np.zeros_like(self.p, dtype=float)
+        err[self.fixed] = np.sqrt(np.diag(self.cov))
+        return err
 
     def __eq__(self, other):
         if not isinstance(other, FitParameters):
