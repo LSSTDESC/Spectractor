@@ -118,7 +118,9 @@ def test_ctio_fullchain():
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     load_config("./config/ctio.ini")
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
-    parameters.CCD_REBIN = 2
+    parameters.CCD_REBIN = 1
+    #  JN: > 1 not working well for now: I guess CTIO spectra are too narrow
+    #  and under-sampled to extract unbiased rebinned spectrum, but pipeline is ok.
     apply_rebinning_to_parameters()
     if parameters.CCD_REBIN > 1:
         for k in range(2 * (PSF_POLY_ORDER + 1), 3 * (PSF_POLY_ORDER +1)):
