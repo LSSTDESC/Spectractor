@@ -9,7 +9,7 @@ from spectractor.extractor.images import Image  # noqa: E402
 from spectractor.extractor.spectrum import Spectrum  # noqa: E402
 from spectractor.extractor.extractor import Spectractor  # noqa: E402
 from spectractor.logbook import LogBook  # noqa: E402
-from spectractor.config import load_config  # noqa: E402
+from spectractor.config import load_config, apply_rebinning_to_parameters  # noqa: E402
 from spectractor.simulation.image_simulation import ImageSim  # noqa: E402
 from spectractor.tools import plot_spectrum_simple, uvspec_available  # noqa: E402
 from spectractor.fit.fit_spectrum import SpectrumFitWorkspace, run_spectrum_minimisation  # noqa: E402
@@ -118,17 +118,22 @@ def test_ctio_fullchain():
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     load_config("./config/ctio.ini")
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
+    parameters.CCD_REBIN = 2
+    apply_rebinning_to_parameters()
+    if parameters.CCD_REBIN > 1:
+        for k in range(2 * (PSF_POLY_ORDER + 1), 3 * (PSF_POLY_ORDER +1)):
+            PSF_POLY_PARAMS_TRUTH[k] /= parameters.CCD_REBIN
     spectrum = Spectractor(sim_image, "./tests/data", guess=[xpos, ypos], target_label=target,
                            disperser_label=disperser_label, config="")  # config already loaded, do not overwrite PSF_POLY_ORDER
     # tests
     residuals = plot_residuals(spectrum, lambdas_truth, amplitude_truth)
 
-    spectrum.my_logger.warning(f"\n\tQuantities to test:"
-                               f"\n\t\tspectrum.header['X0_T']={spectrum.header['X0_T']:.5g} vs {spectrum.x0[0]:.5g}"
-                               f"\n\t\tspectrum.header['Y0_T']={spectrum.header['Y0_T']:.5g} vs {spectrum.x0[1]:.5g}"
+    spectrum.my_logger.warning(f"\n\tQuantities to test with {parameters.CCD_REBIN=}:"
+                               f"\n\t\tspectrum.header['X0_T']={spectrum.header['X0_T'] / parameters.CCD_REBIN:.5g} vs {spectrum.x0[0]:.5g}"
+                               f"\n\t\tspectrum.header['Y0_T']={spectrum.header['Y0_T'] / parameters.CCD_REBIN:.5g} vs {spectrum.x0[1]:.5g}"
                                f"\n\t\tspectrum.header['ROT_T']={spectrum.header['ROT_T']:.5g} "
                                f"vs {spectrum.rotation_angle:.5g}"
-                               f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV']:.5g} "
+                               f"\n\t\tspectrum.header['BKGD_LEV']={spectrum.header['BKGD_LEV'] * parameters.CCD_REBIN**2:.5g} "
                                f"vs {np.mean(spectrum.spectrogram_bgd):.5g}"
                                f"\n\t\tspectrum.header['D2CCD_T']={spectrum.header['D2CCD_T']:.5g} "
                                f"vs {spectrum.disperser.D:.5g}"
@@ -139,12 +144,15 @@ def test_ctio_fullchain():
                                f" vs {PSF_POLY_PARAMS_TRUTH[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1]}"
                                f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100]):.5g}, "
                                f"std={np.std(residuals[100:-100]):.5g}")
-    assert np.isclose(float(spectrum.header['X0_T']), spectrum.x0[0], atol=0.1)
-    assert np.isclose(float(spectrum.header['Y0_T']), spectrum.x0[1], atol=0.1)
+    assert np.isclose(float(spectrum.header['X0_T'] / parameters.CCD_REBIN), spectrum.x0[0], atol=0.2 * parameters.CCD_REBIN)
+    assert np.isclose(float(spectrum.header['Y0_T'] / parameters.CCD_REBIN), spectrum.x0[1], atol=0.2 * parameters.CCD_REBIN)
     assert np.isclose(float(spectrum.header['ROT_T']), spectrum.rotation_angle, atol=1e-3)
-    assert np.isclose(float(spectrum.header['BKGD_LEV']), np.mean(spectrum.spectrogram_bgd), rtol=1e-3)
+    assert np.isclose(float(spectrum.header['BKGD_LEV'] * parameters.CCD_REBIN**2), np.mean(spectrum.spectrogram_bgd), rtol=1e-3)
     assert np.isclose(float(spectrum.header['D2CCD_T']), spectrum.disperser.D, atol=0.1)
-    assert float(spectrum.header['CHI2_FIT']) < 1.5e-3
+    if parameters.CCD_REBIN == 1:
+        assert float(spectrum.header['CHI2_FIT']) < 1.5e-3
+    else:
+        assert float(spectrum.header['CHI2_FIT']) < 1.5e-1
     assert np.all(
         np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1],
                    np.array(PSF_POLY_PARAMS_TRUTH)[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1], rtol=0.01, atol=0.01))

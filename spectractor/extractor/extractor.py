@@ -1562,7 +1562,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     deg_truth = int(spectrum.header["PSF_DEG"])
     psf_poly_truth[-1] = spectrum.spectrogram_saturation
     amplitude_truth = np.fromstring(spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
-    amplitude_truth *= parameters.FLAM_TO_ADURATE * lambdas_truth * np.gradient(lambdas_truth)
+    amplitude_truth *= parameters.FLAM_TO_ADURATE * lambdas_truth * np.gradient(lambdas_truth) * parameters.CCD_REBIN
     s0 = ChromaticPSF(s.psf, lambdas_truth.size, s.Ny, deg=deg_truth,
                       saturation=spectrum.spectrogram_saturation)
     s0.poly_params = np.asarray(list(amplitude_truth) + list(psf_poly_truth))
@@ -1595,7 +1595,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     ax[1, 0].set_ylim(-5, 5)
     ax[1, 0].set_ylabel(r"$(A - A_{\rm truth})/\sigma_A$")
 
-    fwhm_truth = np.interp(spectrum.lambdas, lambdas_truth, s0.table["fwhm"])
+    fwhm_truth = np.interp(spectrum.lambdas, lambdas_truth, s0.table["fwhm"]) / parameters.CCD_REBIN
     # fwhm_prior = np.interp(spectrum.lambdas, np.arange(w.amplitude_priors.size), w.fwhm_priors)
     # fwhm_1d = np.interp(np.arange(len(s.table)), np.arange(w.fwhm_1d.size), w.fwhm_1d)
     # fwhm_2d = np.interp(np.arange(len(s.table)), np.arange(s.Nx), fwhm_1d)
