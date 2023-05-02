@@ -367,7 +367,6 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
 
-        parameters.SAVE = True
         fit_workspace.params.plot_correlation_matrix()
         fit_workspace.plot_fit()
         if fit_workspace.filename != "":
@@ -375,7 +374,6 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
                                     extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
                                            "date-obs": fit_workspace.spectrum.date_obs})
             # save_gradient_descent(fit_workspace, costs, params_table)
-        parameters.SAVE = False
 
 
 if __name__ == "__main__":
