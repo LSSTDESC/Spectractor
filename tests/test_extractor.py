@@ -7,10 +7,37 @@ from spectractor import parameters  # noqa: E402
 from spectractor.extractor.extractor import Spectractor  # noqa: E402
 from spectractor.logbook import LogBook  # noqa: E402
 from spectractor.config import load_config, apply_rebinning_to_parameters  # noqa: E402
+from getCalspec import getCalspec  # noqa: E402
 import os  # noqa: E402
 import sys  # noqa: E402
 import numpy as np  # noqa: E402
 import unittest  # noqa: E402
+import requests  # noqa: E402
+
+
+def _test_getCalspec_connectivity():
+    """Test getting the necessary external files for running the tests.
+
+    Because the files can move/be unavailable, and/or the remote server might
+    just be inaccessible for some reason, we don't want to fail the tests if
+    this happens.
+
+    Note that this will also populate the file in the cache if it succeeds, so
+    even if the server is unavailable by the time the test codes goes to the
+    file, it should take the cached copy, and the test should pass.
+
+
+    Returns
+    -------
+    success : `bool`
+        Were the necessary file(s) successfully obtained?
+    """
+    try:
+        calspec = getCalspec.Calspec('HD111980')
+        calspec.get_spectrum_numpy()
+        return True
+    except (RuntimeError, requests.exceptions.HTTPError):
+        return False
 
 
 def test_logbook():
@@ -25,6 +52,8 @@ def test_logbook():
     # logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
 
 
+@unittest.skipIf(not _test_getCalspec_connectivity(),
+                 "Could not connect to remote server to get the necessary files.")
 def test_extractor_ctio():
     file_names = ['tests/data/reduc_20170530_134.fits']
     output_directory = "./outputs"
