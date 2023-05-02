@@ -65,8 +65,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         p = np.concatenate([p, self.psf_poly_params, self.psf_poly_params])
         input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B", "R", "P [hPa]",
                         "T [Celsius]", "z"] + list(psf_poly_params_labels) + [label+"_2" for label in psf_poly_params_labels]
-        axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^(\mathrm{fit})$ [pix]",
-                      r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]", r"$\alpha$ [deg]", "$B$", "R",
+        axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^{(\mathrm{fit})}$ [pix]",
+                      r"$\delta_{\mathrm{y}}^{(\mathrm{fit})}$ [pix]", r"$\alpha$ [deg]", "$B$", "R",
                       r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]", "$z$"] + \
                      list(psf_poly_params_names) + [label+r"$\!_2$" for label in psf_poly_params_names]
         bounds = [[0, 2 / parameters.GRATING_ORDER_2OVER1],
@@ -1062,7 +1062,6 @@ def SpectractorRun(image, output_directory, guess=None):
                        f"from the brightest object, guess position is set as {image.target_guess}.")
     if parameters.DEBUG:
         image.plot_image(scale='symlog', title="before rebinning", target_pixcoords=image.target_guess, cmap='gray', vmax=1e3)
-        #image.plot_image(scale='lin', title="before rebinning", target_pixcoords=image.target_guess, cmap='gray', vmax=0.5e2)
 
     # Use fast mode
     if parameters.CCD_REBIN > 1:
@@ -1091,7 +1090,7 @@ def SpectractorRun(image, output_directory, guess=None):
     spectrum = Spectrum(image=image, order=parameters.SPEC_ORDER)
     # First 1D spectrum extraction and background extraction
 
-    my_logger.info('\n\t  ======================= PSF1D Extraction ====================================')
+    my_logger.info('\n\t ======================== PSF1D Extraction ====================================')
     w_psf1d, bgd_model_func = extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
                                                           ws=(parameters.PIXDIST_BACKGROUND,
                                                               parameters.PIXDIST_BACKGROUND
@@ -1100,7 +1099,7 @@ def SpectractorRun(image, output_directory, guess=None):
 
     # PSF2D deconvolution
     if parameters.SPECTRACTOR_DECONVOLUTION_PSF2D:
-        my_logger.info('\n\t == ======================= PSF2D DECONVOLUTION  ===============================')
+        my_logger.info('\n\t ========================== PSF2D DECONVOLUTION  ===============================')
         run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func=bgd_model_func)
 
     # Calibrate the spectrum
