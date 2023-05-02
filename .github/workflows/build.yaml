@@ -62,7 +62,7 @@ jobs:
       - name: Run doctests and coverage
         shell: bash -l {0}
         run: |
-          ./coverage_and_test.sh
+          .github/workflows/coverage_and_test.sh
 
       - name: Coveralls
         env:
