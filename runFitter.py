@@ -1,4 +1,5 @@
 from spectractor import parameters
+from spectractor.extractor.spectrum import Spectrum
 from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace, run_spectrogram_minimisation
 from spectractor.fit.fit_spectrum import SpectrumFitWorkspace, run_spectrum_minimisation
 from spectractor.config import load_config
@@ -32,10 +33,9 @@ if __name__ == "__main__":
     load_config(args.config)
 
     for file_name in file_names:
-        atmgrid_filename = '' #file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-        w = SpectrumFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                                 burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
+        atmgrid_filename = file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+        spec = Spectrum(file_name)
+        w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         run_spectrum_minimisation(w, method="newton")
-        w = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=2000,
-                                    burnin=1000, nbins=10, verbose=1, plot=True, live_fit=False)
+        w = SpectrogramFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
         run_spectrogram_minimisation(w, method="newton")
