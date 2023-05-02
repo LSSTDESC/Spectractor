@@ -259,9 +259,6 @@ class SpectrogramModel(Spectrum):
         Spectrum.__init__(self)
         for k, v in list(spectrum.__dict__.items()):
             self.__dict__[k] = copy.copy(v)
-        if parameters.CCD_REBIN > 1:
-            raise ValueError("Simulation from a rebinned Spectractor output is not implemented. "
-                             "Feed the simulation pipeline with a non-rebinned spectrum.")
         if target is not None:
             self.target = target
         if disperser is not None:
