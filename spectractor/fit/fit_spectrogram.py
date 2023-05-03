@@ -107,7 +107,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.use_grid = True
             self.atmosphere = AtmosphereGrid(spectrum_filename=spectrum.filename, atmgrid_filename=atmgrid_file_name)
             self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
-        self.crop_spectrogram()
+        if self.spectrum.spectrogram_Ny > 2 * parameters.PIXDIST_BACKGROUND:
+            self.crop_spectrogram()
         self.lambdas = self.spectrum.lambdas
         self.Ny, self.Nx = self.spectrum.spectrogram.shape
         self.data = self.spectrum.spectrogram.flatten()
