@@ -10,12 +10,14 @@ from astropy.modeling import models, fitting
 from astropy.stats import sigma_clip, sigma_clipped_stats
 from astropy.io import fits
 from astropy import wcs as WCS
+from getCalspec import getCalspec
 
 import matplotlib.pyplot as plt
 import matplotlib.colors
 from matplotlib.ticker import MaxNLocator
 
 import warnings
+import requests
 from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
@@ -2467,6 +2469,33 @@ def uvspec_available():
         Is the binary available?
     """
     return get_uvspec_binary() is not None
+
+
+def test_getCalspec_connectivity():
+    """Test getting all necessary external files for running the tests.
+
+    Any calspec standards which require data should be added to the list.
+
+    Because the files can move/be unavailable, and/or the remote server might
+    just be inaccessible for some reason, we don't want to fail the tests if
+    this happens.
+
+    Note that this will also populate the file in the cache if it succeeds, so
+    even if the server is unavailable by the time the test codes goes to the
+    file, it should take the cached copy, and the test should pass.
+
+    Returns
+    -------
+    success : `bool`
+        Were the necessary file(s) successfully obtained?
+    """
+    for target in ['HD 111980']:
+        try:
+            calspec = getCalspec.Calspec(target)
+            calspec.get_spectrum_numpy()
+        except (RuntimeError, requests.exceptions.HTTPError):
+            return False
+    return True
 
 
 if __name__ == "__main__":

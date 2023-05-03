@@ -11,7 +11,10 @@ from spectractor.extractor.extractor import Spectractor  # noqa: E402
 from spectractor.logbook import LogBook  # noqa: E402
 from spectractor.config import load_config  # noqa: E402
 from spectractor.simulation.image_simulation import ImageSim  # noqa: E402
-from spectractor.tools import plot_spectrum_simple, uvspec_available  # noqa: E402
+from spectractor.tools import (plot_spectrum_simple,  # noqa: E402
+                               uvspec_available,  # noqa: E402
+                               test_getCalspec_connectivity,  # noqa: E402
+                               )
 from spectractor.fit.fit_spectrum import SpectrumFitWorkspace, run_spectrum_minimisation  # noqa: E402
 from spectractor.fit.fit_spectrogram import (SpectrogramFitWorkspace,  # noqa: E402
                                              run_spectrogram_minimisation)  # noqa: E402
@@ -97,6 +100,8 @@ def make_image():
 
 
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
+@unittest.skipIf(not test_getCalspec_connectivity(),
+                 "Could not connect to remote server to get the necessary files.")
 def test_ctio_fullchain():
     parameters.VERBOSE = True
     parameters.DEBUG = True
