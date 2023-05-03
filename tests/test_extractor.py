@@ -1,6 +1,10 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
+# This must be run before any astropy importing.
+import os  # noqa: E402
+os.environ["XDG_CACHE_HOME"] = os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache")
+
 from numpy.testing import run_module_suite  # noqa: E402
 
 from spectractor import parameters  # noqa: E402
