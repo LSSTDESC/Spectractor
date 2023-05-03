@@ -128,13 +128,13 @@ class FitParameters:
         -------
         >>> from spectractor.fit.fitter import FitParameters
         >>> import numpy as np
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
+        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[False, True, False, True, False])
         >>> params.cov = np.array([[1,-0.5,0],[-0.5,4,-1],[0,-1,9]])
         >>> params.err
         array([1., 0., 2., 0., 3.])
         """
         err = np.zeros_like(self.p, dtype=float)
-        err[self.fixed] = np.sqrt(np.diag(self.cov))
+        err[~np.asarray(self.fixed)] = np.sqrt(np.diag(self.cov))
         return err
 
     def __eq__(self, other):
