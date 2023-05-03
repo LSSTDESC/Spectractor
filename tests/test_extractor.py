@@ -11,6 +11,7 @@ import os  # noqa: E402
 import sys  # noqa: E402
 import numpy as np  # noqa: E402
 import unittest  # noqa: E402
+import astropy.config  # noqa: E402
 
 
 def test_logbook():
@@ -25,6 +26,7 @@ def test_logbook():
     # logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
 
 
+@astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
 def test_extractor_ctio():
     file_names = ['tests/data/reduc_20170530_134.fits']
     output_directory = "./outputs"

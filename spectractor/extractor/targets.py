@@ -185,9 +185,11 @@ class Led(Target):
 
 def patchSimbadURL(simbad):
     """Monkeypatch the URL that Simbad is using to force it to use https.
+
+    This is necessary to make the tests on github actions work, because
+    for some reason it wasn't automatically upgrading to https otherwise.
     """
-    simbad.SIMBAD_URL = (simbad.SIMBAD_URL.replace('http', 'https')
-                         if 'https' not in simbad.SIMBAD_URL else simbad.SIMBAD_URL)
+    simbad.SIMBAD_URL = simbad.SIMBAD_URL.replace("http:", "https:")
 
 
 class Star(Target):
