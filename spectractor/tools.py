@@ -11,6 +11,7 @@ from astropy.stats import sigma_clip, sigma_clipped_stats
 from astropy.io import fits
 from astropy import wcs as WCS
 from getCalspec import getCalspec
+from astroquery.simbad import SimbadClass
 
 import matplotlib.pyplot as plt
 import matplotlib.colors
@@ -2471,7 +2472,7 @@ def uvspec_available():
     return get_uvspec_binary() is not None
 
 
-def test_getCalspec_connectivity():
+def test_connectivity():
     """Test getting all necessary external files for running the tests.
 
     Any calspec standards which require data should be added to the list.
@@ -2489,12 +2490,29 @@ def test_getCalspec_connectivity():
     success : `bool`
         Were the necessary file(s) successfully obtained?
     """
+
+    def patchSimbadURL(simbad):
+        """Monkeypatch the URL that Simbad is using to force it to use https.
+        """
+        simbad.SIMBAD_URL = (simbad.SIMBAD_URL.replace('http', 'https')
+                             if 'https' not in simbad.SIMBAD_URL else simbad.SIMBAD_URL)
+
     for target in ['HD 111980']:
         try:
             calspec = getCalspec.Calspec(target)
             calspec.get_spectrum_numpy()
         except (RuntimeError, requests.exceptions.HTTPError):
             return False
+
+        try:
+            simbadQuerier = SimbadClass()
+            patchSimbadURL(simbadQuerier)
+
+            astroquery_label = calspec.Astroquery_Name
+            simbad_table = simbadQuerier.query_object(astroquery_label)
+        except (RuntimeError, requests.exceptions.HTTPError):
+            return False
+
     return True
 
 
