@@ -134,7 +134,8 @@ class FitParameters:
         array([1., 0., 2., 0., 3.])
         """
         err = np.zeros_like(self.p, dtype=float)
-        err[~np.asarray(self.fixed)] = np.sqrt(np.diag(self.cov))
+        if np.sum(self.fixed) != len(self.fixed):
+            err[~np.asarray(self.fixed)] = np.sqrt(np.diag(self.cov))
         return err
 
     def __eq__(self, other):
