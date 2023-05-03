@@ -16,7 +16,6 @@ import matplotlib.colors
 from matplotlib.ticker import MaxNLocator
 
 import warnings
-import requests
 from scipy.signal import fftconvolve, gaussian
 from scipy.ndimage.filters import maximum_filter
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
