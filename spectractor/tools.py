@@ -10,8 +10,6 @@ from astropy.modeling import models, fitting
 from astropy.stats import sigma_clip, sigma_clipped_stats
 from astropy.io import fits
 from astropy import wcs as WCS
-from getCalspec import getCalspec
-from astroquery.simbad import SimbadClass
 
 import matplotlib.pyplot as plt
 import matplotlib.colors
@@ -2470,50 +2468,6 @@ def uvspec_available():
         Is the binary available?
     """
     return get_uvspec_binary() is not None
-
-
-def test_connectivity():
-    """Test getting all necessary external files for running the tests.
-
-    Any calspec standards which require data should be added to the list.
-
-    Because the files can move/be unavailable, and/or the remote server might
-    just be inaccessible for some reason, we don't want to fail the tests if
-    this happens.
-
-    Note that this will also populate the file in the cache if it succeeds, so
-    even if the server is unavailable by the time the test codes goes to the
-    file, it should take the cached copy, and the test should pass.
-
-    Returns
-    -------
-    success : `bool`
-        Were the necessary file(s) successfully obtained?
-    """
-
-    def patchSimbadURL(simbad):
-        """Monkeypatch the URL that Simbad is using to force it to use https.
-        """
-        simbad.SIMBAD_URL = (simbad.SIMBAD_URL.replace('http', 'https')
-                             if 'https' not in simbad.SIMBAD_URL else simbad.SIMBAD_URL)
-
-    for target in ['HD 111980']:
-        try:
-            calspec = getCalspec.Calspec(target)
-            calspec.get_spectrum_numpy()
-        except (RuntimeError, requests.exceptions.HTTPError):
-            return False
-
-        try:
-            simbadQuerier = SimbadClass()
-            patchSimbadURL(simbadQuerier)
-
-            astroquery_label = calspec.Astroquery_Name
-            simbad_table = simbadQuerier.query_object(astroquery_label)
-        except (RuntimeError, requests.exceptions.HTTPError):
-            return False
-
-    return True
 
 
 if __name__ == "__main__":

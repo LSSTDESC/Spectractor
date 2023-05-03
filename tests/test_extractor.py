@@ -11,7 +11,6 @@ from spectractor import parameters  # noqa: E402
 from spectractor.extractor.extractor import Spectractor  # noqa: E402
 from spectractor.logbook import LogBook  # noqa: E402
 from spectractor.config import load_config, apply_rebinning_to_parameters  # noqa: E402
-from spectractor.tools import test_connectivity  # noqa: E402
 import os  # noqa: E402
 import sys  # noqa: E402
 import numpy as np  # noqa: E402
@@ -30,8 +29,6 @@ def test_logbook():
     # logbook.plot_columns_vs_date(['T', 'seeing', 'W'])
 
 
-@unittest.skipIf(not test_connectivity(),
-                 "Could not connect to remote server to get the necessary files.")
 def test_extractor_ctio():
     file_names = ['tests/data/reduc_20170530_134.fits']
     output_directory = "./outputs"
