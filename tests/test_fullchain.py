@@ -1,10 +1,6 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-# This must be run before any astropy importing.
-import os  # noqa: E402
-os.environ["XDG_CACHE_HOME"] = os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache")
-
 from numpy.testing import run_module_suite  # noqa: E402
 from scipy.interpolate import interp1d  # noqa: E402
 
@@ -25,6 +21,7 @@ import os  # noqa: E402
 import numpy as np  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import unittest  # noqa: E402
+import astropy.config  # noqa: E402
 
 
 # original parameters
@@ -103,6 +100,7 @@ def make_image():
 
 
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
+@astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
 def test_ctio_fullchain():
     parameters.VERBOSE = True
     parameters.DEBUG = True
