@@ -72,7 +72,7 @@ class SpectrumFitWorkspace(FitWorkspace):
                   (-2, 2), (-np.inf, np.inf)]
         params = FitParameters(p, input_labels=["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]",
                                                 "reso [pix]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
-                               axis_names=["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone", "PWV",
+                               axis_names=["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]",
                                            "reso [pix]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
                                bounds=bounds, fixed=fixed, truth=truth, filename=spectrum.filename)
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=spectrum.filename)
