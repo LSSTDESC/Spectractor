@@ -1136,12 +1136,12 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
     psf = Moffat(clip=True)
     total_flux = np.sum(sub_image_subtracted)
-    psf.p[:3] = [total_flux, avX, avY]
-    psf.p[-1] = image.saturation
+    psf.values[:3] = [total_flux, avX, avY]
+    psf.values[-1] = image.saturation
     if image.target_star2D is not None:
-        psf.p = image.target_star2D.p
-        psf.p[1] = avX
-        psf.p[2] = avY
+        psf.values = image.target_star2D.values
+        psf.values[1] = avX
+        psf.values[2] = avY
     mean_prior = 10  # in pixels
     # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf],
     # [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] #for Moffat2D
@@ -1156,8 +1156,8 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     # star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     # star2D = fit_PSF2D_minuit(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     psf.fit_psf(sub_image_subtracted, data_errors=sub_errors, bgd_model_func=image.target_bkgd2D)
-    new_avX = psf.p[1]
-    new_avY = psf.p[2]
+    new_avX = psf.values[1]
+    new_avY = psf.values[2]
     image.target_star2D = psf
     # check target positions
     dist = np.sqrt((new_avY - avY) ** 2 + (new_avX - avX) ** 2)

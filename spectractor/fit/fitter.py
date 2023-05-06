@@ -21,12 +21,73 @@ from spectractor.fit.statistics import Likelihood
 
 
 @dataclass()
+class FitParameter:
+    """Container for a parameter to fit on data with FitWorkspace.
+
+    Attributes
+    ----------
+    value: float
+        Array containing the parameter values.
+    input_label: str
+        Parameter labels for screen print.
+    axis_name: str
+        Parameter labels for plot print.
+    bounds: list
+        2-element list giving the (lower, upper) bounds for the parameter.
+    fixed: bool
+        Boolean indicating whether the parameter is fixed.
+    err: float
+        Uncertainty on parameter value.
+    truth: float, optional
+        Truth value.
+
+    Examples
+    --------
+    >>> from spectractor.fit.fitter import FitParameter
+    >>> p = FitParameter(value=1, input_label="x", axis_name="$x$", bounds=[0, 1], fixed=False, err=0.1, truth=1)
+    >>> p
+    x: 1.0 +/- 0.1 (truth=1)
+    >>> p = FitParameter(value=0.01234, input_label="t", axis_name="$t$", bounds=[-1, 1], fixed=False, err=0.02)
+    >>> p
+    t: 0.01 +/- 0.02
+    >>> p = FitParameter(value=1, input_label="x", axis_name="$x$", bounds=[0, 1], fixed=True, err=0)
+    >>> p
+    x: 1 (fixed)
+
+    """
+    value: float
+    input_label: str
+    axis_name: str
+    bounds: list
+    fixed: bool
+    err: float
+    truth: Optional[float] = None
+
+    def __repr__(self):
+        """Print the parameter on screen.
+
+        """
+        txt = ""
+        if self.fixed:
+            txt += f"{self.input_label}: {self.value} (fixed)"
+        else:
+            if self.err != 0:
+                val, err, _ = formatting_numbers(self.value, self.err, self.err)
+                txt += f"{self.input_label}: {val} +/- {err}"
+            else:
+                txt += f"{self.input_label}: {self.value} +/- {self.err}"
+        if self.truth:
+            txt += f" (truth={self.truth})"
+        return txt
+
+
+@dataclass()
 class FitParameters:
     """Container for the parameters to fit on data with FitWorkspace.
 
     Attributes
     ----------
-    p: np.ndarray
+    values: np.ndarray
         Array containing the parameter values.
     input_labels: list, optional
         List of the parameter labels for screen print.
@@ -48,17 +109,17 @@ class FitParameters:
     Examples
     --------
     >>> from spectractor.fit.fitter import FitParameters
-    >>> params = FitParameters(p=[1, 1, 1, 1, 1])
+    >>> params = FitParameters(values=[1, 1, 1, 1, 1])
     >>> params.ndim
     5
-    >>> params.p
+    >>> params.values
     array([1., 1., 1., 1., 1.])
     >>> params.input_labels
     ['par0', 'par1', 'par2', 'par3', 'par4']
     >>> params.bounds
     [[-inf, inf], [-inf, inf], [-inf, inf], [-inf, inf], [-inf, inf]]
     """
-    p: Union[np.ndarray, list]
+    values: Union[np.ndarray, list]
     input_labels: Optional[list] = None
     axis_names: Optional[list] = None
     bounds: Optional[list] = None
@@ -68,9 +129,9 @@ class FitParameters:
     extra: Optional[dict] = None
 
     def __post_init__(self):
-        if type(self.p) is list:
-            self.p = np.array(self.p, dtype=float)
-        self.p = np.asarray(self.p, dtype=float)
+        if type(self.values) is list:
+            self.values = np.array(self.values, dtype=float)
+        self.values = np.asarray(self.values, dtype=float)
         if not self.input_labels:
             self.input_labels = [f"par{k}" for k in range(self.ndim)]
         else:
@@ -108,39 +169,39 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> params["z"]
         3.0
         """
         index = self.get_index(label=label)
-        return self.p[index]
+        return self.values[index]
 
     def __len__(self):
         """Length of the parameter array, equivalent to self.ndim.
 
         Examples
         --------
-        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> len(params)
         4
         >>> len(params) == params.ndim
         True
         """
-        return len(self.p)
+        return len(self.values)
 
     def __eq__(self, other):
         """Test parameter instances equality.
 
         Examples
         --------
-        >>> p1 = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
-        >>> p2 = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> p1 = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> p2 = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> p1 == p2
         True
-        >>> p3 = FitParameters(p=[1, 2, 3, 4.1], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> p3 = FitParameters(values=[1, 2, 3, 4.1], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> p1 == p3
         False
-        >>> p4 = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[False, False, True, False])
+        >>> p4 = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[False, False, True, False])
         >>> p1 == p4
         False
         """
@@ -175,7 +236,7 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> params.get_index("z")
         2
         """
@@ -197,7 +258,7 @@ class FitParameters:
         Examples
         --------
         >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(p=[1, 1, 1], axis_names=["x", "y", "z"])
+        >>> params = FitParameters(values=[1, 1, 1], axis_names=["x", "y", "z"])
         >>> params.cov = np.array([[2,-0.5,0],[-0.5,2,-1],[0,-1,2]])
         >>> params.rho
         array([[ 1.  , -0.25,  0.  ],
@@ -220,12 +281,12 @@ class FitParameters:
         -------
         >>> from spectractor.fit.fitter import FitParameters
         >>> import numpy as np
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[False, True, False, True, False])
+        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=[False, True, False, True, False])
         >>> params.cov = np.array([[1,-0.5,0],[-0.5,4,-1],[0,-1,9]])
         >>> params.err
         array([1., 0., 2., 0., 3.])
         """
-        err = np.zeros_like(self.p, dtype=float)
+        err = np.zeros_like(self.values, dtype=float)
         if np.sum(self.fixed) != len(self.fixed):
             err[~np.asarray(self.fixed)] = np.sqrt(np.diag(self.cov))
         return err
@@ -241,11 +302,11 @@ class FitParameters:
         Examples
         --------
         >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1])
+        >>> params = FitParameters(values=[1, 1, 1, 1, 1])
         >>> params.ndim
         5
         """
-        return len(self.p)
+        return len(self.values)
 
     @property
     def nfree(self):
@@ -258,7 +319,7 @@ class FitParameters:
         Examples
         --------
         >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
+        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
         >>> params.nfree
         2
         """
@@ -275,7 +336,7 @@ class FitParameters:
         Examples
         --------
         >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
+        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
         >>> params.nfixed
         3
         """
@@ -286,12 +347,12 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=None)
+        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=None)
         >>> params.fixed
         [False, False, False, False, False]
         >>> params.get_free_parameters()
         array([0, 1, 2, 3, 4])
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
+        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
         >>> params.fixed
         [True, False, True, False, True]
         >>> params.get_free_parameters()
@@ -305,12 +366,12 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=None)
+        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=None)
         >>> params.fixed
         [False, False, False, False, False]
         >>> params.get_fixed_parameters()
         array([], dtype=int64)
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
+        >>> params = FitParameters(values=[1, 1, 1, 1, 1], fixed=[True, False, True, False, True])
         >>> params.fixed
         [True, False, True, False, True]
         >>> params.get_fixed_parameters()
@@ -331,7 +392,7 @@ class FitParameters:
         Examples
         --------
         >>> parameters.VERBOSE = True
-        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> params.cov = np.array([[1, -0.5], [-0.5, 4]])
         >>> _ = params.print_parameters_summary()
         """
@@ -340,13 +401,50 @@ class FitParameters:
         icov = 0
         for ip in range(self.ndim):
             if ip in ifree:
-                txt += "%s: %s +%s -%s\n\t" % formatting_numbers(self.p[ip], np.sqrt(self.cov[icov, icov]),
+                txt += "%s: %s +%s -%s\n\t" % formatting_numbers(self.values[ip], np.sqrt(self.cov[icov, icov]),
                                                                  np.sqrt(self.cov[icov, icov]),
                                                                  label=self.input_labels[ip])
                 icov += 1
             else:
-                txt += f"{self.input_labels[ip]}: {self.p[ip]} (fixed)\n\t"
+                txt += f"{self.input_labels[ip]}: {self.values[ip]} (fixed)\n\t"
         return txt
+
+    def get_parameter(self, key):
+        """Return a FitParameter instance. key argument can be the parameter label or its index value.
+
+        Parameters
+        ----------
+        key: str, int
+            The parameter key.
+
+        Returns
+        -------
+        param: FitParameter
+            A FitParameter instance containing all information about a parameter.
+
+        Examples
+        --------
+        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params.cov = np.array([[1, -0.5], [-0.5, 4]])
+        >>> p3 = params.get_parameter("t")
+        >>> p3
+        t: 4 +/- 2
+        >>> p0 = params.get_parameter(0)
+        >>> p0
+        x: 1.0 (fixed)
+        """
+        if type(key) is str:
+            index = self.get_index(key)
+        else:
+            index = key
+        if self.truth is None:
+            truth = None
+        else:
+            truth = self.truth[index]
+        p = FitParameter(value=self.values[index], input_label=self.input_labels[index],
+                         axis_name=self.axis_names[index], bounds=self.bounds[index],
+                         fixed=self.fixed[index], err=self.err[index], truth=truth)
+        return p
 
     def plot_correlation_matrix(self, live_fit=False):
         """Compute and plot a correlation matrix.
@@ -362,7 +460,7 @@ class FitParameters:
         Examples
         --------
         >>> from spectractor.fit.fitter import FitParameters
-        >>> params = FitParameters(p=[1, 1, 1], axis_names=["x", "y", "z"])
+        >>> params = FitParameters(values=[1, 1, 1], axis_names=["x", "y", "z"])
         >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
         >>> params.plot_correlation_matrix()
         """
@@ -403,7 +501,7 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
+        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
         >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
         >>> params.write_text(header="chi2: 1")
 
@@ -447,7 +545,7 @@ def write_fitparameter_json(json_filename, params, extra=None):
 
     Examples
     --------
-    >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
+    >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
     >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
     >>> jsonstr = write_fitparameter_json(params.json_filename, params, extra={"chi2": 1})
     >>> jsonstr  # doctest: +ELLIPSIS
@@ -484,11 +582,11 @@ def read_fitparameter_json(json_filename):
 
     Examples
     --------
-    >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
+    >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
     >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
     >>> _ = write_fitparameter_json(params.json_filename, params, extra={"chi2": 1})
     >>> new_params = read_fitparameter_json(params.json_filename)
-    >>> new_params.p
+    >>> new_params.values
     array([1, 2, 3, 4])
 
     .. doctest::
@@ -499,7 +597,7 @@ def read_fitparameter_json(json_filename):
         >>> os.remove(params.json_filename)
 
     """
-    params = FitParameters(p=[0])
+    params = FitParameters(values=[0])
     with open(json_filename, 'r') as f:
         data = json.load(f)
     for key in ["p", "cov"]:
@@ -531,7 +629,7 @@ class FitWorkspace:
 
         Examples
         --------
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1])
+        >>> params = FitParameters(values=[1, 1, 1, 1, 1])
         >>> w = FitWorkspace(params)
         >>> w.params.ndim
         5
@@ -643,11 +741,11 @@ class FitWorkspace:
         for i, label in enumerate(self.params.input_labels):
             if self.params.cov.size > 0:
                 err = np.sqrt(self.params.cov[i, i])
-                formatting_numbers(self.params.p[i], err, err)
-                _, par, err, _ = formatting_numbers(self.params.p[i], err, err, label=label)
+                formatting_numbers(self.params.values[i], err, err)
+                _, par, err, _ = formatting_numbers(self.params.values[i], err, err, label=label)
                 title += rf"{label} = {par} $\pm$ {err}"
             else:
-                title += f"{label} = {self.params.p[i]:.3g}"
+                title += f"{label} = {self.params.values[i]:.3g}"
             if i < self.params.ndim - 1:
                 title += ", "
         plt.title(title)
@@ -982,7 +1080,7 @@ class FitWorkspace:
         if parameters.PdfPages:  # args from the above? MFL
             parameters.PdfPages.savefig()
 
-        self.simulate(*self.params.p)
+        self.simulate(*self.params.values)
         self.live_fit = False
         self.plot_fit()
 
@@ -1029,7 +1127,7 @@ class MCMCFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> params = FitParameters(p=[1, 1, 1, 1, 1])
+        >>> params = FitParameters(values=[1, 1, 1, 1, 1])
         >>> w = MCMCFitWorkspace(params)
         >>> w.nwalkers
         18
@@ -1078,8 +1176,8 @@ class MCMCFitWorkspace(FitWorkspace):
             Array of starting points of shape (ndim, nwalkers).
 
         """
-        self.start = np.array([np.random.uniform(self.params.p[i] - percent * self.params.p[i],
-                                                 self.params.p[i] + percent * self.params.p[i],
+        self.start = np.array([np.random.uniform(self.params.values[i] - percent * self.params.values[i],
+                                                 self.params.values[i] + percent * self.params.values[i],
                                                  self.nwalkers) for i in range(self.params.ndim)]).T
         self.start[self.start == 0] = a_random * np.random.uniform(-1, 1)
         return self.start
@@ -1137,8 +1235,8 @@ class MCMCFitWorkspace(FitWorkspace):
         self.build_flat_chains()
         self.likelihood = self.chain2likelihood()
         self.params.cov = self.likelihood.cov_matrix
-        self.params.p = self.likelihood.mean_vec
-        self.simulate(*self.params.p)
+        self.params.values = self.likelihood.mean_vec
+        self.simulate(*self.params.values)
         self.plot_fit()
         figure_name = os.path.splitext(self.emcee_filename)[0] + '_triangle.pdf'
         self.likelihood.triangle_plots(output_filename=figure_name)
@@ -1396,7 +1494,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
 
     """
     my_logger = set_logger(__name__)
-    tmp_params = np.copy(fit_workspace.params.p)
+    tmp_params = np.copy(fit_workspace.params.values)
     fit_workspace.prepare_weight_matrices()
     n_data_masked = len(fit_workspace.mask) + len(fit_workspace.outliers)
     ipar = fit_workspace.params.get_free_parameters()
@@ -1531,7 +1629,7 @@ def simple_newton_minimisation(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol
 
     """
     my_logger = set_logger(__name__)
-    tmp_params = np.copy(fit_workspace.params.p)
+    tmp_params = np.copy(fit_workspace.params.values)
     ipar = fit_workspace.params.get_free_parameters()
     funcs = []
     params_table = []
@@ -1629,11 +1727,11 @@ def simple_newton_minimisation(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol
 
 def run_gradient_descent(fit_workspace, epsilon, xtol, ftol, niter, verbose=False, with_line_search=True):
     if fit_workspace.costs.size == 0:
-        fit_workspace.costs = np.array([fit_workspace.chisq(fit_workspace.params.p)])
-        fit_workspace.params_table = np.array([fit_workspace.params.p])
+        fit_workspace.costs = np.array([fit_workspace.chisq(fit_workspace.params.values)])
+        fit_workspace.params_table = np.array([fit_workspace.params.values])
     p, cov, tmp_costs, tmp_params_table = gradient_descent(fit_workspace, epsilon, niter=niter, xtol=xtol, ftol=ftol,
                                                            with_line_search=with_line_search)
-    fit_workspace.params.p, fit_workspace.params.cov = p, cov
+    fit_workspace.params.values, fit_workspace.params.cov = p, cov
     fit_workspace.params_table = np.concatenate([fit_workspace.params_table, tmp_params_table])
     fit_workspace.costs = np.concatenate([fit_workspace.costs, tmp_costs])
     if verbose or fit_workspace.verbose:
@@ -1645,9 +1743,9 @@ def run_gradient_descent(fit_workspace, epsilon, xtol, ftol, niter, verbose=Fals
 
 
 def run_simple_newton_minimisation(fit_workspace, epsilon, xtol=1e-8, ftol=1e-8, niter=50, verbose=False):  # pragma: no cover
-    fit_workspace.p, fit_workspace.cov, funcs, params_table = simple_newton_minimisation(fit_workspace,
-                                                                                         epsilon, niter=niter,
-                                                                                         xtol=xtol, ftol=ftol)
+    fit_workspace.values, fit_workspace.cov, funcs, params_table = simple_newton_minimisation(fit_workspace,
+                                                                                              epsilon, niter=niter,
+                                                                                              xtol=xtol, ftol=ftol)
     if verbose or fit_workspace.verbose:
         fit_workspace.my_logger.info(f"\n\t{fit_workspace.params.print_parameters_summary()}")
     if parameters.DEBUG and (verbose or fit_workspace.verbose):
@@ -1665,15 +1763,15 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
 
     nll = lambda params: -fit_workspace.lnlike(params)
 
-    guess = fit_workspace.params.p.astype('float64')
+    guess = fit_workspace.params.values.astype('float64')
     if verbose:
         my_logger.debug(f"\n\tStart guess: {guess}")
 
     if method == "minimize":
         start = time.time()
-        result = optimize.minimize(nll, fit_workspace.params.p, method=minimizer_method,
+        result = optimize.minimize(nll, fit_workspace.params.values, method=minimizer_method,
                                    options={'ftol': ftol, 'maxiter': 100000}, bounds=bounds)
-        fit_workspace.params.p = result['x']
+        fit_workspace.params.values = result['x']
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tMinimize: total computation time: {time.time() - start}s")
@@ -1683,7 +1781,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         start = time.time()
         minimizer_kwargs = dict(method=minimizer_method, bounds=bounds)
         result = optimize.basinhopping(nll, guess, minimizer_kwargs=minimizer_kwargs)
-        fit_workspace.params.p = result['x']
+        fit_workspace.params.values = result['x']
         if verbose:
             my_logger.debug(f"\n\t{result}")
             my_logger.debug(f"\n\tBasin-hopping: total computation time: {time.time() - start}s")
@@ -1697,7 +1795,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         x_scale[x_scale == 0] = 0.1
         p = optimize.least_squares(fit_workspace.weighted_residuals, guess, verbose=2, ftol=1e-6, x_scale=x_scale,
                                    diff_step=0.001, bounds=bounds.T)
-        fit_workspace.params.p = p.x  # m.np_values()
+        fit_workspace.params.values = p.x  # m.np_values()
         if verbose:
             my_logger.debug(f"\n\t{p}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
@@ -1719,7 +1817,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         m.limits = bounds
         m.tol = 10
         m.migrad()
-        fit_workspace.p = np.array(m.values[:])
+        fit_workspace.values = np.array(m.values[:])
         if verbose:
             my_logger.debug(f"\n\t{m}")
             my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
@@ -1875,7 +1973,7 @@ class RegFitWorkspace(FitWorkspace):
         return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
     def plot_fit(self):
-        log10_opt_reg = self.params.p[0]
+        log10_opt_reg = self.params.values[0]
         opt_reg = 10 ** log10_opt_reg
         regs = 10 ** np.linspace(min(-10, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
         Gs = []
@@ -1937,7 +2035,7 @@ class RegFitWorkspace(FitWorkspace):
     def run_regularisation(self):
         run_minimisation(self, method="minimize", ftol=1e-4, xtol=1e-2, verbose=self.verbose, epsilon=[1e-1],
                          minimizer_method="Nelder-Mead")
-        self.opt_reg = 10 ** self.params.p[0]
+        self.opt_reg = 10 ** self.params.values[0]
         self.simulate(np.log10(self.opt_reg))
         self.print_regularisation_summary()
 

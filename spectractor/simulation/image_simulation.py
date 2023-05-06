@@ -71,11 +71,11 @@ class StarModel:
         self.amplitude = amplitude
         # self.target = target
         self.psf = copy.deepcopy(psf)
-        self.psf.p[1] = self.x0
-        self.psf.p[2] = self.y0
-        self.psf.p[0] = amplitude
+        self.psf.values[1] = self.x0
+        self.psf.values[2] = self.y0
+        self.psf.values[0] = amplitude
         # to be realistic, usually fitted fwhm is too big, divide gamma by 2
-        self.fwhm = self.psf.p[3]
+        self.fwhm = self.psf.values[3]
         # self.sigma = self.model.stddev / 2
 
     def plot_model(self):
@@ -115,7 +115,7 @@ class StarFieldModel:
         self.field = None
         self.stars = []
         self.pixcoords = []
-        self.fwhm = base_image.target_star2D.p[3]
+        self.fwhm = base_image.target_star2D.values[3]
         self.flux_factor = flux_factor
         self.set_star_list()
 
@@ -406,7 +406,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Target model
     my_logger.info('\n\tStar model...')
     # Spectrogram is simulated with spectrum.x0 target position: must be this position to simualte the target.
-    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.p[0])
+    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.values[0])
     # reso = star.fwhm
     if parameters.DEBUG:
         star.plot_model()
@@ -442,7 +442,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
     else:
-        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.param_names) - 2) - 1) // 2
+        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.input_labels) - 2) - 1) // 2
         spectrum.chromatic_psf.set_polynomial_degrees(spectrum.chromatic_psf.deg)
         if spectrum.chromatic_psf.deg == 0:  # x_c must have deg >= 1
             psf_poly_params.insert(1, 0)

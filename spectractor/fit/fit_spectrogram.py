@@ -51,7 +51,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrogramFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.params.p)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         """
@@ -178,13 +178,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
         --------
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> w = SpectrogramFitWorkspace(spec, verbose=True)
-        >>> _ = w.simulate(*w.params.p)
+        >>> _ = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         """
         self.my_logger.info("\n\tReset spectrogram mask with current parameters.")
         if params is None:
-            params = self.params.p
+            params = self.params.values
         A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params = params
         psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params,
                                                                                             apply_bounds=True)
@@ -352,7 +352,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> w = SpectrogramFitWorkspace(spec, verbose=True)
-        >>> lambdas, model, model_err = w.simulate(*w.params.p)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         """
@@ -414,7 +414,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> w = SpectrogramFitWorkspace(spec, verbose=True)
-        >>> lambdas, model, model_err = w.simulate(*w.params.p)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         .. plot::
@@ -507,7 +507,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
 
     """
     my_logger = set_logger(__name__)
-    guess = np.asarray(fit_workspace.params.p)
+    guess = np.asarray(fit_workspace.params.values)
     fit_workspace.simulate(*guess)
     fit_workspace.plot_fit()
     if method != "newton":

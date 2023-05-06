@@ -220,11 +220,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         for k, par in enumerate(self.params.input_labels):
             if "y_c" in par:
                 if par == "y_c_0":
-                    self.params.p[k] = self.params.p[3]
+                    self.params.values[k] = self.params.values[3]
                 elif par == "y_c_1":
-                    self.params.p[k] = np.tan(self.params.p[4] * np.pi / 180)
+                    self.params.values[k] = np.tan(self.params.values[4] * np.pi / 180)
                 else:
-                    self.params.p[k] = 0
+                    self.params.values[k] = 0
 
     def set_mask(self, params=None, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP):
         """
@@ -242,13 +242,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         --------
         >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="fixed", verbose=True)
-        >>> _ = w.simulate(*w.params.p)
+        >>> _ = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         """
         self.my_logger.info("\n\tReset spectrogram mask with current parameters.")
         if params is None:
-            params = self.params.p
+            params = self.params.values
         A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *psf_poly_params = params
         if len(psf_poly_params) % 2 != 0:
             raise ValueError(f"Argument psf_poly_params must be even size, to be split in parameters"
@@ -379,7 +379,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         .. doctest::
 
             >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="fixed", verbose=True)
-            >>> y, mod, mod_err = w.simulate(*w.params.p)
+            >>> y, mod, mod_err = w.simulate(*w.params.values)
             >>> w.plot_fit()
 
         .. doctest::
@@ -393,13 +393,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
             >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
             >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="spectrum", verbose=True)
-            >>> y, mod, mod_err = w.simulate(*w.params.p)
+            >>> y, mod, mod_err = w.simulate(*w.params.values)
             >>> w.plot_fit()
 
         """
         # linear regression for the amplitude parameters
         # prepare the vectors
-        self.params.p = np.asarray(params)
+        self.params.values = np.asarray(params)
         A2, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *poly_params_all = params
         poly_params = params[self.psf_params_start_index:self.psf_params_start_index_next_order]
         poly_params_next_order = params[self.psf_params_start_index_next_order:]
@@ -592,7 +592,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         sub = np.where(sub < self.spectrum.spectrogram.shape[1])[0]
         data = (data + self.bgd_flat).reshape((self.Ny, self.Nx))
         err = self.err.reshape((self.Ny, self.Nx))
-        model = (self.model + self.params.p[5] * self.bgd_flat).reshape((self.Ny, self.Nx))
+        model = (self.model + self.params.values[5] * self.bgd_flat).reshape((self.Ny, self.Nx))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
@@ -647,7 +647,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         >>> spec = Spectrum('tests/data/sim_20170530_134_spectrum.fits')
         >>> w = FullForwardModelFitWorkspace(spec, verbose=True, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.params.p)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         .. plot::
@@ -716,10 +716,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
     def adjust_spectrogram_position_parameters(self):
         # fit the spectrogram trace
-        epsilon = 1e-4 * self.params.p
+        epsilon = 1e-4 * self.params.values
         epsilon[epsilon == 0] = 1e-4
         fixed_default = np.copy(self.params.fixed)
-        self.params.fixed = [True] * len(self.params.p)
+        self.params.fixed = [True] * len(self.params.values)
         # if fixed_default[3] is False and fixed_default[4] is False:
         self.params.fixed[3:5] = [False, False]  # shift_y and angle
         # else:
@@ -730,7 +730,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         run_minimisation(self, "newton", epsilon, xtol=1e-2, ftol=0.01)  # 1000 / self.data.size)
         self.params.fixed = fixed_default
         self.sparse_indices = None
-        self.set_mask(params=self.params.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
+        self.set_mask(params=self.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
         # self.set_y_c()
 
 
@@ -764,8 +764,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         :hide:
 
         >>> assert w.costs[-1] / w.data.size < 1.22  # reduced chisq
-        >>> assert np.isclose(w.params.p[4], -1.56, rtol=0.05)  # angle
-        >>> assert np.isclose(w.params.p[5], 1, rtol=0.05)  # B
+        >>> assert np.isclose(w.params.values[4], -1.56, rtol=0.05)  # angle
+        >>> assert np.isclose(w.params.values[5], 1, rtol=0.05)  # B
 
     """
     my_logger = set_logger(__name__)
@@ -775,12 +775,12 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     if method != "newton":
         run_minimisation(w, method=method)
     else:
-        costs = np.array([w.chisq(w.params.p)])
+        costs = np.array([w.chisq(w.params.values)])
         if parameters.DISPLAY and (parameters.DEBUG or w.live_fit):
             w.plot_fit()
         start = time.time()
-        my_logger.info(f"\n\tStart guess: {w.params.p}\n\twith {w.params.input_labels}")
-        epsilon = 1e-4 * w.params.p
+        my_logger.info(f"\n\tStart guess: {w.params.values}\n\twith {w.params.input_labels}")
+        epsilon = 1e-4 * w.params.values
         epsilon[epsilon == 0] = 1e-4
 
         run_minimisation(w, method=method, xtol=1e-3, ftol=1e-2)  # 1000 / (w.data.size - len(w.mask)))
@@ -809,7 +809,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w_reg.run_regularisation()
             w.opt_reg = w_reg.opt_reg
             w.reg = np.copy(w_reg.opt_reg)
-            w.simulate(*w.params.p)
+            w.simulate(*w.params.values)
             if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
                 w.my_logger.warning(
                     f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
@@ -831,7 +831,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         my_logger.info(f"\n\tStart run_minimisation_sigma_clipping "
                        f"with sigma={parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP}.")
         for i in range(niter):
-            w.set_mask(params=w.params.p, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
+            w.set_mask(params=w.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
             run_minimisation_sigma_clipping(w, "newton", epsilon, xtol=1e-5,
                                             ftol=1e-3, niter_clip=3,  # ftol=100 / (w.data.size - len(w.mask))
                                             sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP, verbose=True)
@@ -868,20 +868,20 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.spectrogram_fit = w.model
             w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
             w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
-            w.spectrum.header['PIXSHIFT'] = w.params.p[2]
-            w.spectrum.header['D2CCD'] = w.params.p[1]
-            w.spectrum.header['A2_FIT'] = w.params.p[0]
-            w.spectrum.header["ROTANGLE"] = w.params.p[4]
-            w.spectrum.header["AM_FIT"] = w.params.p[9]
+            w.spectrum.header['PIXSHIFT'] = w.params.values[2]
+            w.spectrum.header['D2CCD'] = w.params.values[1]
+            w.spectrum.header['A2_FIT'] = w.params.values[0]
+            w.spectrum.header["ROTANGLE"] = w.params.values[4]
+            w.spectrum.header["AM_FIT"] = w.params.values[9]
             # Compute next order contamination
             if w.tr_ratio_next_order:
-                w.spectrum.data_next_order = w.params.p[0] * w.amplitude_params * w.tr_ratio_next_order(w.lambdas)
-                w.spectrum.err_next_order = np.abs(w.params.p[0] * w.amplitude_params_err * w.tr_ratio_next_order(w.lambdas))
+                w.spectrum.data_next_order = w.params.values[0] * w.amplitude_params * w.tr_ratio_next_order(w.lambdas)
+                w.spectrum.err_next_order = np.abs(w.params.values[0] * w.amplitude_params_err * w.tr_ratio_next_order(w.lambdas))
 
             # Calibrate the spectrum
             calibrate_spectrum(w.spectrum, with_adr=True)
-            w.params.p[1] = w.spectrum.disperser.D
-            w.params.p[2] = w.spectrum.header['PIXSHIFT']
+            w.params.values[1] = w.spectrum.disperser.D
+            w.params.values[2] = w.spectrum.header['PIXSHIFT']
             w.spectrum.convert_from_flam_to_ADUrate()
 
         if w.filename != "":
@@ -922,7 +922,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
     # w.amplitude_cov_matrix = full_cov_matrix[start:, start:]
 
     # Propagate parameters
-    A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.params.p
+    A2, D2CCD, dx0, dy0, angle, B, *poly_params = w.params.values
     w.spectrum.rotation_angle = angle
     w.spectrum.spectrogram_bgd *= B
     w.spectrum.spectrogram_bgd_rms *= B

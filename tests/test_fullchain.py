@@ -178,14 +178,14 @@ def test_ctio_fullchain():
     k = 0
     for i, l in zip(indices, labels):
         icov = cov_indices[k]
-        spectrum.my_logger.info(f"Test {l} best-fit {w.params.p[i]:.3f}+/-{np.sqrt(w.params.cov[icov, icov]):.3f} "
+        spectrum.my_logger.info(f"Test {l} best-fit {w.params.values[i]:.3f}+/-{np.sqrt(w.params.cov[icov, icov]):.3f} "
                                 f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
-                                f"{np.abs(w.params.p[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
-        assert np.abs(w.params.p[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
+                                f"{np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
+        assert np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
         k += 1
-    assert np.abs(w.params.p[1]) / np.sqrt(w.params.cov[1, 1]) < 2 * nsigma  # A2
-    assert np.isclose(np.abs(w.params.p[8]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
-    assert np.isclose(np.abs(w.params.p[9]), 0, atol=1e-3)  # B
+    assert np.abs(w.params.values[1]) / np.sqrt(w.params.cov[1, 1]) < 2 * nsigma  # A2
+    assert np.isclose(np.abs(w.params.values[8]), 0, atol=parameters.PIXSHIFT_PRIOR)  # pixshift
+    assert np.isclose(np.abs(w.params.values[9]), 0, atol=1e-3)  # B
 
     parameters.DEBUG = False
     w = SpectrogramFitWorkspace(spectrum, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,

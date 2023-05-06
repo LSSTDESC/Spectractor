@@ -158,7 +158,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
     @property
     def A1s(self):
-        return self.params.p[self.A1_first_index:]
+        return self.params.values[self.A1_first_index:]
 
     def _prepare_data(self):
         # rebin wavelengths
@@ -442,7 +442,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         >>> load_config("./config/ctio.ini")
         >>> file_names = ["./tests/data/reduc_20170530_134_spectrum.fits"]
         >>> w = MultiSpectraFitWorkspace("./outputs/test", file_names, bin_width=5, verbose=True)
-        >>> lambdas, model, model_err = w.simulate(*w.params.p)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> assert np.sum(model) > 0
         >>> assert np.all(lambdas == w.lambdas)
         >>> assert np.sum(w.amplitude_params) > 0
@@ -454,7 +454,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         if A1s.size > 1:
             m = 1
             A1s[0] = m * A1s.size - np.sum(A1s[1:])
-            self.params.p[self.A1_first_index] = A1s[0]
+            self.params.values[self.A1_first_index] = A1s[0]
         # Matrix M filling: hereafter a fast integration is used
         M = []
         for k in range(self.nspectra):
@@ -552,7 +552,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         >>> load_config("./config/ctio.ini")
         >>> file_names = 3 * ["./tests/data/reduc_20170530_134_spectrum.fits"]
         >>> w = MultiSpectraFitWorkspace("./outputs/test", file_names, bin_width=5, verbose=True)
-        >>> w.simulate(*w.params.p)  #doctest: +ELLIPSIS
+        >>> w.simulate(*w.params.values)  #doctest: +ELLIPSIS
         (array(...
         >>> w.plot_fit()
         """
@@ -640,7 +640,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         """
         gs_kw = dict(width_ratios=[1, 1], height_ratios=[1, 0.15])
         fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(9, 6), gridspec_kw=gs_kw, sharex="all")
-        aerosols, ozone, pwv, reso, *A1s = self.params.p
+        aerosols, ozone, pwv, reso, *A1s = self.params.values
         plt.suptitle(f'VAOD={aerosols:.3f}, ozone={ozone:.0f}db, PWV={pwv:.2f}mm', y=1)
         masked = self.amplitude_params_err > 1e6
         transmission = np.copy(self.amplitude_params)
@@ -716,7 +716,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         >>> w.plot_A1s()
 
         """
-        aerosols, ozone, pwv, reso, *A1s = self.params.p
+        aerosols, ozone, pwv, reso, *A1s = self.params.values
         zs = [self.spectra[k].header["AIRMASS"] for k in range(self.nspectra)]
         err = np.sqrt([0] + [self.params.cov[ip, ip] for ip in range(self.A1_first_index, self.params.cov.shape[0])])
         spectra_index = np.arange(self.nspectra)
@@ -749,7 +749,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         plt.show()
 
     def save_transmissions(self):
-        aerosols, ozone, pwv, reso, *A1s = self.params.p
+        aerosols, ozone, pwv, reso, *A1s = self.params.values
         tatm = self.atmosphere.simulate(ozone=ozone, pwv=pwv, aerosols=aerosols)
         tatm_binned = []
         for i in range(1, self.lambdas_bin_edges.size):
@@ -834,7 +834,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False)
 
     """
     my_logger = set_logger(__name__)
-    guess = np.asarray(fit_workspace.params.p)
+    guess = np.asarray(fit_workspace.params.values)
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
@@ -860,10 +860,10 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False)
         # fit_workspace.reg = np.copy(w_reg.opt_reg)
         # fit_workspace.opt_reg = w_reg.opt_reg
         # Recompute and save params in class attributes
-        fit_workspace.simulate(*fit_workspace.params.p)
+        fit_workspace.simulate(*fit_workspace.params.values)
 
         # Renormalize A1s and instrumental transmission
-        aerosols, ozone, pwv, reso, *A1s = fit_workspace.params.p
+        aerosols, ozone, pwv, reso, *A1s = fit_workspace.params.values
         mean_A1 = np.mean(A1s)
         fit_workspace.amplitude_params /= mean_A1
         fit_workspace.amplitude_params_err /= mean_A1

@@ -47,20 +47,20 @@ def test_fitworkspace(seed=42):
     file_name = "./outputs/test_linefitworkspace.txt"
     w = LineFitWorkspace(x, y, yerr, file_name, truth=truth, nwalkers=20, nsteps=5000, burnin=1000, nbins=20)
     run_minimisation(w, method="minimize")
-    assert np.all([np.abs(w.params.p[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     w.p = np.array([1, 1])
     run_minimisation(w, method="basinhopping")
-    assert np.all([np.abs(w.params.p[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     # w.p = np.array([4, -0.5])
     # run_minimisation(w, method="least_squares")
     # w.my_logger.warning(f"{w.p} {w.ndim} {sigma} {truth}")
     # assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     w.p = np.array([1, 1])
     run_minimisation(w, method="minuit")
-    assert np.all([np.abs(w.params.p[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     w.p = np.array([1, 1])
     run_minimisation(w, method="newton")
-    assert np.all([np.abs(w.params.p[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
 
     def lnprob(p):
         lp = w.lnprior(p)
@@ -76,7 +76,7 @@ def test_fitworkspace(seed=42):
     assert os.path.exists(file_name.replace(".txt", "_emcee.h5"))
     assert os.path.exists(file_name.replace(".txt", "_emcee_convergence.pdf"))
     assert os.path.exists(file_name.replace(".txt", "_emcee_triangle.pdf"))
-    assert np.all([np.abs(w.params.p[i] - truth[i]) / np.sqrt(w.params.cov[i, i]) < 3 for i in range(w.params.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / np.sqrt(w.params.cov[i, i]) < 3 for i in range(w.params.ndim)])
 
 
 def test_minimisation_sigma_clipping(seed=42):
@@ -103,12 +103,12 @@ def test_minimisation_sigma_clipping(seed=42):
     clip_niter = 4
     w = LineFitWorkspace(x, y, yerr, file_name="", truth=truth, nwalkers=20, nsteps=5000, burnin=1000, nbins=20)
     run_minimisation_sigma_clipping(w, method="minimize", sigma_clip=sigma, niter_clip=clip_niter)
-    assert np.all([np.abs(w.params.p[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     assert np.all(outliers == w.outliers)
     w.p = np.array([1, 1])
     w.outliers = []
     run_minimisation_sigma_clipping(w, method="basinhopping", sigma_clip=sigma, niter_clip=clip_niter)
-    assert np.all([np.abs(w.params.p[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     assert np.all(outliers == w.outliers)
     # w.p = np.array([1, 1])
     # w.outliers = []
@@ -118,12 +118,12 @@ def test_minimisation_sigma_clipping(seed=42):
     w.p = np.array([1, 1])
     w.outliers = []
     run_minimisation_sigma_clipping(w, method="minuit", sigma_clip=sigma, niter_clip=clip_niter)
-    assert np.all([np.abs(w.params.p[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     assert np.all(outliers == w.outliers)
     w.p = np.array([1, 1])
     w.outliers = []
     run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma, niter_clip=clip_niter)
-    assert np.all([np.abs(w.params.p[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     assert np.all(outliers == w.outliers)
 
 

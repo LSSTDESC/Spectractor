@@ -50,7 +50,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.params.p)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         """
@@ -215,7 +215,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.params.p)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         """
@@ -237,7 +237,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
         >>> w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.params.p)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         .. plot::
@@ -256,7 +256,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax1 = plt.subplot(222)
         ax2 = plt.subplot(224)
         ax3 = plt.subplot(121)
-        A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift, B = self.params.p
+        A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift, B = self.params.values
         self.title = f'A1={A1:.3f}, A2={A2:.3f}, PWV={pwv:.3f}, OZ={ozone:.3g}, VAOD={aerosols:.3f},\n ' \
                      f'reso={reso:.2f}pix, D={D:.2f}mm, shift={shift:.2f}pix, B={B:.2g}'
         # main plot
@@ -283,7 +283,7 @@ class SpectrumFitWorkspace(FitWorkspace):
     def decontaminate_order2(self):  # pragma: no cover
         lambdas = self.spectrum.lambdas
         lambdas_order2 = self.simulation.lambdas_order2
-        A1, A2, aerosols, ozone, pwv, reso, D, shift, B = self.params.p
+        A1, A2, aerosols, ozone, pwv, reso, D, shift, B = self.params.values
         lambdas_binwidths_order2 = np.gradient(lambdas_order2)
         lambdas_binwidths = np.gradient(lambdas)
         sim_conv = interp1d(lambdas, self.model * lambdas, kind="linear", bounds_error=False, fill_value=(0, 0))
@@ -336,7 +336,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
 
     """
     my_logger = set_logger(__name__)
-    guess = np.asarray(fit_workspace.params.p)
+    guess = np.asarray(fit_workspace.params.values)
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
@@ -359,7 +359,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
 
         fit_workspace.simulation.fast_sim = False
         # fit_workspace.fixed[0] = True
-        fixed = [True] * len(fit_workspace.params.p)
+        fixed = [True] * len(fit_workspace.params.values)
         fixed[0] = False
         run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
                          verbose=False)

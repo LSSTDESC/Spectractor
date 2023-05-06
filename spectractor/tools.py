@@ -801,7 +801,7 @@ def fit_gauss2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds=
     >>> guess = (45, 20, 20, 7, 7, 0)
     >>> bounds = ((1, 10, 10, 1, 1, -90), (100, 40, 40, 10, 10, 90))
     >>> fit = fit_gauss2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, circular=True)
-    >>> res = [getattr(fit, p).value for p in fit.param_names]
+    >>> res = [getattr(fit, p).value for p in fit.input_labels]
     >>> print(res)
     [50.0, 25.0, 25.0, 5.0, 5.0, 0.0]
 
@@ -899,7 +899,7 @@ def fit_moffat2d_outlier_removal(x, y, z, sigma=3.0, niter=3, guess=None, bounds
     >>> guess = (45, 48, 52, 4, 2)
     >>> bounds = ((1, 10, 10, 1, 1), (100, 90, 90, 10, 10))
     >>> fit = fit_moffat2d_outlier_removal(X, Y, Z, guess=guess, bounds=bounds, niter=3)
-    >>> res = [getattr(fit, p).value for p in fit.param_names]
+    >>> res = [getattr(fit, p).value for p in fit.input_labels]
 
     .. doctest::
         :hide:
@@ -994,7 +994,7 @@ def fit_moffat1d_outlier_removal(x, y, sigma=3.0, niter=3, guess=None, bounds=No
     >>> guess = (45, 48, 4, 2)
     >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
     >>> fit = fit_moffat1d_outlier_removal(X, Y, guess=guess, bounds=bounds, niter=3)
-    >>> res = [getattr(fit, p).value for p in fit.param_names]
+    >>> res = [getattr(fit, p).value for p in fit.input_labels]
 
     .. doctest::
         :hide:
@@ -1084,7 +1084,7 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
     >>> guess = (45, 48, 4, 2)
     >>> bounds = ((1, 10, 1, 1), (100, 90, 10, 10))
     >>> fit = fit_moffat1d(X, Y, guess=guess, bounds=bounds)
-    >>> res = [getattr(fit, p).value for p in fit.param_names]
+    >>> res = [getattr(fit, p).value for p in fit.input_labels]
     >>> assert(np.all(np.isclose(p, res, 1e-6)))
 
     .. plot::
