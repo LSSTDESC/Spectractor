@@ -406,7 +406,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Target model
     my_logger.info('\n\tStar model...')
     # Spectrogram is simulated with spectrum.x0 target position: must be this position to simualte the target.
-    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.values[0])
+    star = StarModel(image.target_pixcoords, image.target_star2D, image.target_star2D.params.values[0])
     # reso = star.fwhm
     if parameters.DEBUG:
         star.plot_model()
@@ -442,7 +442,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
     else:
-        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.params.input_labels) - 2) - 1) // 2
+        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.params.labels) - 2) - 1) // 2
         spectrum.chromatic_psf.set_polynomial_degrees(spectrum.chromatic_psf.deg)
         if spectrum.chromatic_psf.deg == 0:  # x_c must have deg >= 1
             psf_poly_params.insert(1, 0)
