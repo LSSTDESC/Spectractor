@@ -1136,12 +1136,12 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
     psf = Moffat(clip=True)
     total_flux = np.sum(sub_image_subtracted)
-    psf.values[:3] = [total_flux, avX, avY]
-    psf.values[-1] = image.saturation
+    psf.params.values[:3] = [total_flux, avX, avY]
+    psf.params.values[-1] = image.saturation
     if image.target_star2D is not None:
-        psf.values = image.target_star2D.values
-        psf.values[1] = avX
-        psf.values[2] = avY
+        psf.params.values = image.target_star2D.params.values
+        psf.params.values[1] = avX
+        psf.params.values[2] = avY
     mean_prior = 10  # in pixels
     # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf],
     # [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] #for Moffat2D
@@ -1149,15 +1149,15 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     # [100*image.saturation,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] #for Gauss2D
     # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation],
     # [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
-    psf.bounds[:3] = [[0.1 * total_flux, 4 * total_flux],
-                      [avX - mean_prior, avX + mean_prior],
-                      [avY - mean_prior, avY + mean_prior]]
+    psf.params.bounds[:3] = [[0.1 * total_flux, 4 * total_flux],
+                             [avX - mean_prior, avX + mean_prior],
+                             [avY - mean_prior, avY + mean_prior]]
     # fit
     # star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     # star2D = fit_PSF2D_minuit(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     psf.fit_psf(sub_image_subtracted, data_errors=sub_errors, bgd_model_func=image.target_bkgd2D)
-    new_avX = psf.values[1]
-    new_avY = psf.values[2]
+    new_avX = psf.params.values[1]
+    new_avY = psf.params.values[2]
     image.target_star2D = psf
     # check target positions
     dist = np.sqrt((new_avY - avY) ** 2 + (new_avX - avX) ** 2)
