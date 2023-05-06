@@ -1589,12 +1589,12 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         params_table.append(np.copy(tmp_params))
         fit_workspace.p = tmp_params
         if fit_workspace.verbose:
-            my_logger.info(f"\n\tIteration={i}: initial cost={cost:.5g} initial chisq_red={cost / (tmp_model.size - n_data_masked):.5g}"
-                           f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
-                           f"\n\tParameter shifts: {alpha_min * dparams}"
-                           f"\n\tNew parameters: {tmp_params[ipar]}"
-                           f"\n\tFinal cost={fval:.5g} final chisq_red={fval / (tmp_model.size - n_data_masked):.5g} "
-                           f"computed in {time.time() - start:.2f}s")
+            my_logger.info(f"\n\tIteration={i}:\tinitial cost={cost:.5g}\tinitial chisq_red={cost / (tmp_model.size - n_data_masked):.5g}"
+                           f"\n\t              \tfinal cost={fval:.5g}\tfinal chisq_red={fval / (tmp_model.size - n_data_masked):.5g} "
+                           f"\tcomputed in {time.time() - start:.2f}s")
+            my_logger.debug(f"\n\t Parameter shifts: {alpha_min * dparams}\n"
+                            f"\n\t New parameters: {tmp_params[ipar]}"
+                            f"\n\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}")
         if fit_workspace.live_fit:  # pragma: no cover
             fit_workspace.simulate(*tmp_params)
             fit_workspace.plot_fit()
