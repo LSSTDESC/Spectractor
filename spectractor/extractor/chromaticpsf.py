@@ -993,7 +993,7 @@ class ChromaticPSF:
         #           (0.1, min(Ny // 2, fwhm)),
         #           (0, 2 * saturation)]
         psf.apply_max_width_to_bounds(max_half_width=Ny)
-        bounds = np.copy(psf.bounds)
+        bounds = np.copy(psf.params.bounds)
         bounds[0] = (0.1 * signal_sum, 2 * signal_sum)
         bounds[2] = (middle - w, middle + w)
         bounds[-1] = (0, 2 * saturation)
@@ -1049,8 +1049,8 @@ class ChromaticPSF:
             #     guess[0] = float(0.9 * np.abs(np.nanmax(signal)))
             # if guess[0] * (1 + 0*guess[4]) > 1.2 * maxi:
             #     guess[0] = 0.9 * maxi
-            psf.values = guess
-            psf.bounds = bounds
+            psf.params.values = guess
+            psf.params.bounds = bounds
             w = PSFFitWorkspace(psf, signal, data_errors=err[:, x], bgd_model_func=None,
                                 live_fit=False, verbose=False)
             try:
