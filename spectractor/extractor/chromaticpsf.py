@@ -80,7 +80,7 @@ class ChromaticPSF:
         if y0 is None:
             y0 = Ny / 2
         self.y0 = y0
-        self.profile_params = np.zeros((Nx, len(self.psf.params.input_labels)))
+        self.profile_params = np.zeros((Nx, len(self.psf.params.labels)))
         self.pixels = np.mgrid[:Nx, :Ny]
         self.table = Table()
         self.saturation = 1e20
@@ -97,9 +97,9 @@ class ChromaticPSF:
 
     def init_table(self, table=None, saturation=None):
         if table is None:
-            arr = np.zeros((self.Nx, len(self.psf.params.input_labels) + 10))
+            arr = np.zeros((self.Nx, len(self.psf.params.labels) + 10))
             table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral',
-                                      'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(self.psf.params.input_labels))
+                                      'flux_err', 'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(self.psf.params.labels))
         self.table = table
         self.psf_param_start_index = 10
         self.n_poly_params = len(self.table)
@@ -109,12 +109,12 @@ class ChromaticPSF:
             self.saturation = 1e20
             self.my_logger.warning(f"\n\tSaturation level should be given to instanciate the ChromaticPSF "
                                    f"object. self.saturation is set arbitrarily to 1e20. Good luck.")
-        for name in self.psf.params.input_labels:
+        for name in self.psf.params.labels:
             self.n_poly_params += self.degrees[name] + 1
         self.poly_params = np.zeros(self.n_poly_params)
         self.poly_params_labels = []  # [f"a{k}" for k in range(self.poly_params.size)]
         self.poly_params_names = []  # "$a_{" + str(k) + "}$" for k in range(self.poly_params.size)]
-        for ip, p in enumerate(self.psf.params.input_labels):
+        for ip, p in enumerate(self.psf.params.labels):
             if ip == 0:
                 self.poly_params_labels += [f"{p}^{k}" for k in range(len(self.table))]
                 self.poly_params_names += \
@@ -128,9 +128,9 @@ class ChromaticPSF:
 
     def load_table(self, file_name='', saturation=None):
         if file_name == '':
-            arr = np.zeros((self.Nx, len(self.psf.params.input_labels) + 10))
+            arr = np.zeros((self.Nx, len(self.psf.params.labels) + 10))
             table = Table(arr, names=['lambdas', 'Dx', 'Dy', 'Dy_disp_axis', 'flux_sum', 'flux_integral', 'flux_err',
-                                      'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(self.psf.params.input_labels))
+                                      'fwhm', 'Dy_fwhm_sup', 'Dy_fwhm_inf'] + list(self.psf.params.labels))
         else:
             table = Table.read(file_name)
         self.init_table(table, saturation=saturation)
@@ -205,7 +205,7 @@ class ChromaticPSF:
 
     def set_polynomial_degrees(self, deg):
         self.deg = deg
-        self.degrees = {key: deg for key in self.psf.params.input_labels}
+        self.degrees = {key: deg for key in self.psf.params.labels}
         self.degrees["x_c"] = max(self.degrees["x_c"], 1)
         self.degrees['saturation'] = 0
 
@@ -251,7 +251,7 @@ class ChromaticPSF:
         poly_params = np.zeros_like(params)
         poly_params[:self.Nx] = params[:self.Nx]
         index = self.Nx - 1
-        for name in self.psf.params.input_labels:
+        for name in self.psf.params.labels:
             if name == 'amplitude':
                 continue
             else:
@@ -409,7 +409,7 @@ class ChromaticPSF:
             >>> assert(np.all(np.isclose(s.table['stddev'], 1*np.ones(100))))
 
         """
-        for k, name in enumerate(self.psf.params.input_labels):
+        for k, name in enumerate(self.psf.params.labels):
             self.table[name] = profile_params[:, k]
 
     def rotate_table(self, angle_degree):
@@ -500,7 +500,7 @@ class ChromaticPSF:
             indices = np.full(len(self.table), True)
         poly_params = np.array([])
         amplitude = None
-        for k, name in enumerate(self.psf.params.input_labels):
+        for k, name in enumerate(self.psf.params.labels):
             if name == 'amplitude':
                 amplitude = profile_params[:, k]
                 poly_params = np.concatenate([poly_params, amplitude])
@@ -509,7 +509,7 @@ class ChromaticPSF:
                                    'Polynomial fit for shape parameters will be unweighted.')
             
         pixels = np.linspace(-1, 1, len(self.table))[indices]
-        for k, name in enumerate(self.psf.params.input_labels):
+        for k, name in enumerate(self.psf.params.labels):
             delta = 0
             if name != 'amplitude':
                 weights = np.copy(amplitude)[indices]
@@ -544,11 +544,11 @@ class ChromaticPSF:
         ..  doctest::
             :hide:
 
-            >>> assert(profile_params.shape == (s.chromatic_psf.Nx, len(s.chromatic_psf.psf.input_labels)))
+            >>> assert(profile_params.shape == (s.chromatic_psf.Nx, len(s.chromatic_psf.psf.labels)))
             >>> assert not np.all(np.isclose(profile_params, np.zeros_like(profile_params)))
         """
-        profile_params = np.zeros((len(self.table), len(self.psf.params.input_labels)))
-        for k, name in enumerate(self.psf.params.input_labels):
+        profile_params = np.zeros((len(self.table), len(self.psf.params.labels)))
+        for k, name in enumerate(self.psf.params.labels):
             profile_params[:, k] = self.table[name]
         return profile_params
 
@@ -645,9 +645,9 @@ class ChromaticPSF:
         """
         length = len(self.table)
         pixels = np.linspace(-1, 1, length)
-        profile_params = np.zeros((length, len(self.psf.params.input_labels)))
+        profile_params = np.zeros((length, len(self.psf.params.labels)))
         shift = 0
-        for k, name in enumerate(self.psf.params.input_labels):
+        for k, name in enumerate(self.psf.params.labels):
             if name == 'amplitude':
                 if len(poly_params) > length:
                     profile_params[:, k] = poly_params[:length]
@@ -669,7 +669,7 @@ class ChromaticPSF:
                 if name == 'y_c':
                     profile_params[:, k] += self.y0
         if apply_bounds:
-            for k, name in enumerate(self.psf.params.input_labels):
+            for k, name in enumerate(self.psf.params.labels):
                 profile_params[profile_params[:, k] <= self.psf.params.bounds[k][0], k] = self.psf.params.bounds[k][0]
                 profile_params[profile_params[:, k] > self.psf.params.bounds[k][1], k] = self.psf.params.bounds[k][1]
         return profile_params
@@ -728,7 +728,7 @@ class ChromaticPSF:
 
         """
         bounds = [[], []]
-        for k, name in enumerate(self.psf.params.input_labels):
+        for k, name in enumerate(self.psf.params.labels):
             tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
             if name == "saturation":
                 tmp_bounds = [[0], [2 * self.saturation]]
@@ -761,7 +761,7 @@ class ChromaticPSF:
             bounds = [[0.1 * np.max(data[:, x]) for x in range(Nx)], [100.0 * np.max(data[:, x]) for x in range(Nx)]]
         else:
             bounds = [[], []]
-        for k, name in enumerate(self.psf.params.input_labels):
+        for k, name in enumerate(self.psf.params.labels):
             tmp_bounds = [[-np.inf] * (1 + self.degrees[name]), [np.inf] * (1 + self.degrees[name])]
             if name == "saturation":
                 if data is not None:
@@ -822,7 +822,7 @@ class ChromaticPSF:
         penalty = 0
         outbound_parameter_name = ""
         profile_params = self.from_poly_params_to_profile_params(poly_params)
-        for k, name in enumerate(self.psf.params.input_labels):
+        for k, name in enumerate(self.psf.params.labels):
             p = profile_params[:, k]
             if name == 'amplitude':
                 if np.any(p < -noise_level):
@@ -876,10 +876,10 @@ class ChromaticPSF:
         if truth is not None:
             PSF_truth = truth.from_poly_params_to_profile_params(truth.poly_params, apply_bounds=True)
         all_pixels = np.arange(self.profile_params.shape[0])
-        for i, name in enumerate(self.psf.params.input_labels):
+        for i, name in enumerate(self.psf.params.labels):
             fit, cov, model = fit_poly1d(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], order=self.degrees[name])
             PSF_models.append(np.polyval(fit, all_pixels))
-        for i, name in enumerate(self.psf.params.input_labels):
+        for i, name in enumerate(self.psf.params.labels):
             p = ax.plot(all_pixels, self.profile_params[:, i], marker='+', linestyle='none')
             ax.plot(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], label=name,
                        marker='o', linestyle='none', color=p[0].get_color())
@@ -1076,7 +1076,7 @@ class ChromaticPSF:
         # xp = np.array(sorted(set(list(pixel_range))))
         xp = all_pixels[self.fitted_pixels]
         # self.fitted_pixels = xp
-        for i in range(len(self.psf.params.input_labels)):
+        for i in range(len(self.psf.params.labels)):
             yp = self.profile_params[xp, i]
             self.profile_params[:, i] = interp1d(xp, yp, kind='cubic', fill_value='extrapolate', bounds_error=False)(all_pixels)
         for x in all_pixels:
@@ -1270,10 +1270,10 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                  amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
         length = len(chromatic_psf.table)
         params = FitParameters(np.copy(chromatic_psf.poly_params[length:]),
-                               input_labels=list(np.copy(chromatic_psf.poly_params_labels[length:])),
+                               labels=list(np.copy(chromatic_psf.poly_params_labels[length:])),
                                axis_names=list(np.copy(chromatic_psf.poly_params_names[length:])), fixed=None,
                                truth=truth, filename=file_name)
-        for k, par in enumerate(params.input_labels):
+        for k, par in enumerate(params.labels):
             if "x_c" in par or "saturation" in par:
                 params.fixed[k] = True
         FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot, live_fit=live_fit)
@@ -1284,7 +1284,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.bgd_model_func = bgd_model_func
         self.poly_params = np.copy(self.chromatic_psf.poly_params)
         self.y_c_0_index = -1
-        for k, par in enumerate(params.input_labels):
+        for k, par in enumerate(params.labels):
             if par == "y_c_0":
                 self.y_c_0_index = k
                 break

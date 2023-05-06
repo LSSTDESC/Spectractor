@@ -97,7 +97,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         fixed[10] = True  # B
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom exponent
-        params = FitParameters(p, input_labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed,
+        params = FitParameters(p, labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed,
                                truth=truth, filename=self.filename)
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
         self.my_logger = set_logger(self.__class__.__name__)
@@ -518,7 +518,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         #     fit_workspace.plot_fit()
         # params_table = np.array([guess])
         start = time.time()
-        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.input_labels}")
+        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
         epsilon = 1e-4 * guess
         epsilon[epsilon == 0] = 1e-4
         fixed = np.copy(fit_workspace.params.fixed)

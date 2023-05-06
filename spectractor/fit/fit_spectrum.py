@@ -70,7 +70,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-5, 2), (100, 700), (0, 10),
                        (0.1, 10),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
                   (-2, 2), (-np.inf, np.inf)]
-        params = FitParameters(p, input_labels=["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]",
+        params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]",
                                                 "reso [pix]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
                                axis_names=["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]",
                                            "reso [pix]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
@@ -346,7 +346,7 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
             fit_workspace.plot_fit()
 
         # params_table = np.array([guess])
-        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.input_labels}")
+        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
         epsilon = 1e-4 * guess
         epsilon[epsilon == 0] = 1e-4
         epsilon[-1] = 0.001 * np.max(fit_workspace.data)

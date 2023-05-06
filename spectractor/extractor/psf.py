@@ -514,7 +514,7 @@ class PSF:
         """
         self.my_logger = set_logger(self.__class__.__name__)
         self.values_default = np.array([1, 0, 0, 1])
-        self.params = FitParameters(values=self.values_default, input_labels=["amplitude", "x_c", "y_c", "saturation"],
+        self.params = FitParameters(values=self.values_default, labels=["amplitude", "x_c", "y_c", "saturation"],
                                     axis_names=["$A$", r"$x_c$", r"$y_c$", "saturation"])
         self.max_half_width = np.inf
         self.clip = clip
@@ -634,7 +634,7 @@ class Moffat(PSF):
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf),
                                 (1.1, 100), (0, np.inf)]
-        self.params = FitParameters(values=values, input_labels=input_labels, axis_names=axis_names, bounds=bounds)
+        self.params = FitParameters(values=values, labels=input_labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
@@ -737,7 +737,7 @@ class Gauss(PSF):
         input_labels = ["amplitude", "x_c", "y_c", "sigma", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\sigma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (0, np.inf)]
-        self.params = FitParameters(values=values, input_labels=input_labels, axis_names=axis_names, bounds=bounds)
+        self.params = FitParameters(values=values, labels=input_labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
@@ -819,7 +819,7 @@ class MoffatGauss(PSF):
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 100),
                   (-1, 0), (0.1, np.inf), (0, np.inf)]
-        self.params = FitParameters(values=values, input_labels=input_labels, axis_names=axis_names, bounds=bounds)
+        self.params = FitParameters(values=values, labels=input_labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
@@ -904,7 +904,7 @@ class Order0(PSF):
         input_labels = ["amplitude", "x_c", "y_c", "gamma", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.5, 5), (0, np.inf)]
-        self.params = FitParameters(values=values, input_labels=input_labels, axis_names=axis_names, bounds=bounds)
+        self.params = FitParameters(values=values, labels=input_labels, axis_names=axis_names, bounds=bounds)
         self.psf_func = self.build_interpolated_functions(target=target)
 
     def build_interpolated_functions(self, target):
@@ -1211,7 +1211,7 @@ class PSFFitWorkspace(FitWorkspace):
             ax[0].legend(loc=2, numpoints=1)
             ax[0].grid(True)
             txt = ""
-            for ip, p in enumerate(self.params.input_labels):
+            for ip, p in enumerate(self.params.labels):
                 txt += f'{p}: {self.params.values[ip]:.4g}\n'
             ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
             # residuals

@@ -98,7 +98,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         fixed[9] = True  # airmass
         fixed[-1] = True  # saturation
 
-        params = FitParameters(p, input_labels=input_labels, axis_names=axis_names, fixed=fixed, bounds=bounds,
+        params = FitParameters(p, labels=input_labels, axis_names=axis_names, fixed=fixed, bounds=bounds,
                                truth=truth, filename=spectrum.filename)
         FitWorkspace.__init__(self, params, spectrum.filename, verbose, plot, live_fit, truth=truth)
         self.spectrum = spectrum
@@ -217,7 +217,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
 
     def set_y_c(self):
-        for k, par in enumerate(self.params.input_labels):
+        for k, par in enumerate(self.params.labels):
             if "y_c" in par:
                 if par == "y_c_0":
                     self.params.values[k] = self.params.values[3]
@@ -779,7 +779,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         if parameters.DISPLAY and (parameters.DEBUG or w.live_fit):
             w.plot_fit()
         start = time.time()
-        my_logger.info(f"\n\tStart guess: {w.params.values}\n\twith {w.params.input_labels}")
+        my_logger.info(f"\n\tStart guess: {w.params.values}\n\twith {w.params.labels}")
         epsilon = 1e-4 * w.params.values
         epsilon[epsilon == 0] = 1e-4
 

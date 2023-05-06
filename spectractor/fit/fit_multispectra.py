@@ -88,7 +88,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         input_labels = ["VAOD", "ozone", "PWV", "reso"] + [f"A1_{k}" for k in range(self.nspectra)]
         axis_names = ["VAOD", "ozone", "PWV", "reso"] + ["$A_1^{(" + str(k) + ")}$" for k in range(self.nspectra)]
         bounds = [(0, 0.01), (100, 700), (0, 10), (0.1, 100)] + [(1e-3, 2)] * self.nspectra
-        params = FitParameters(p, input_labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed)
+        params = FitParameters(p, labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed)
         FitWorkspace.__init__(self, params, output_file_name, verbose, plot, live_fit)
         self.output_file_name = output_file_name
         self.bin_widths = bin_width
@@ -838,7 +838,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False)
     if method != "newton":
         run_minimisation(fit_workspace, method=method)
     else:
-        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.input_labels}")
+        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
         epsilon = 1e-2 * guess
         epsilon[epsilon == 0] = 1e-2
         if isinstance(fit_workspace.atmospheres[0], AtmosphereGrid):

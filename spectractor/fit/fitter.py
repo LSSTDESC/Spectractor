@@ -28,7 +28,7 @@ class FitParameter:
     ----------
     value: float
         Array containing the parameter values.
-    input_label: str
+    label: str
         Parameter labels for screen print.
     axis_name: str
         Parameter labels for plot print.
@@ -44,19 +44,19 @@ class FitParameter:
     Examples
     --------
     >>> from spectractor.fit.fitter import FitParameter
-    >>> p = FitParameter(value=1, input_label="x", axis_name="$x$", bounds=[0, 1], fixed=False, err=0.1, truth=1)
+    >>> p = FitParameter(value=1, label="x", axis_name="$x$", bounds=[0, 1], fixed=False, err=0.1, truth=1)
     >>> p
     x: 1.0 +/- 0.1 (truth=1)
-    >>> p = FitParameter(value=0.01234, input_label="t", axis_name="$t$", bounds=[-1, 1], fixed=False, err=0.02)
+    >>> p = FitParameter(value=0.01234, label="t", axis_name="$t$", bounds=[-1, 1], fixed=False, err=0.02)
     >>> p
     t: 0.01 +/- 0.02
-    >>> p = FitParameter(value=1, input_label="x", axis_name="$x$", bounds=[0, 1], fixed=True, err=0)
+    >>> p = FitParameter(value=1, label="x", axis_name="$x$", bounds=[0, 1], fixed=True, err=0)
     >>> p
     x: 1 (fixed)
 
     """
     value: float
-    input_label: str
+    label: str
     axis_name: str
     bounds: list
     fixed: bool
@@ -69,13 +69,13 @@ class FitParameter:
         """
         txt = ""
         if self.fixed:
-            txt += f"{self.input_label}: {self.value} (fixed)"
+            txt += f"{self.label}: {self.value} (fixed)"
         else:
             if self.err != 0:
                 val, err, _ = formatting_numbers(self.value, self.err, self.err)
-                txt += f"{self.input_label}: {val} +/- {err}"
+                txt += f"{self.label}: {val} +/- {err}"
             else:
-                txt += f"{self.input_label}: {self.value} +/- {self.err}"
+                txt += f"{self.label}: {self.value} +/- {self.err}"
         if self.truth:
             txt += f" (truth={self.truth})"
         return txt
@@ -114,13 +114,13 @@ class FitParameters:
     5
     >>> params.values
     array([1., 1., 1., 1., 1.])
-    >>> params.input_labels
+    >>> params.labels
     ['par0', 'par1', 'par2', 'par3', 'par4']
     >>> params.bounds
     [[-inf, inf], [-inf, inf], [-inf, inf], [-inf, inf], [-inf, inf]]
     """
     values: Union[np.ndarray, list]
-    input_labels: Optional[list] = None
+    labels: Optional[list] = None
     axis_names: Optional[list] = None
     bounds: Optional[list] = None
     fixed: Optional[list] = None
@@ -132,10 +132,10 @@ class FitParameters:
         if type(self.values) is list:
             self.values = np.array(self.values, dtype=float)
         self.values = np.asarray(self.values, dtype=float)
-        if not self.input_labels:
-            self.input_labels = [f"par{k}" for k in range(self.ndim)]
+        if not self.labels:
+            self.labels = [f"par{k}" for k in range(self.ndim)]
         else:
-            if len(self.input_labels) != self.ndim:
+            if len(self.labels) != self.ndim:
                 raise ValueError("input_labels argument must have same size as values argument.")
         if not self.axis_names:
             self.axis_names = [f"$p_{k}$" for k in range(self.ndim)]
@@ -169,7 +169,7 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> params["z"]
         3.0
         """
@@ -181,7 +181,7 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> len(params)
         4
         >>> len(params) == params.ndim
@@ -194,14 +194,14 @@ class FitParameters:
 
         Examples
         --------
-        >>> p1 = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
-        >>> p2 = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> p1 = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> p2 = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> p1 == p2
         True
-        >>> p3 = FitParameters(values=[1, 2, 3, 4.1], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> p3 = FitParameters(values=[1, 2, 3, 4.1], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> p1 == p3
         False
-        >>> p4 = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[False, False, True, False])
+        >>> p4 = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[False, False, True, False])
         >>> p1 == p4
         False
         """
@@ -236,15 +236,15 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> params.get_index("z")
         2
         """
-        if label in self.input_labels:
-            index = self.input_labels.index(label)
+        if label in self.labels:
+            index = self.labels.index(label)
             return index
         else:
-            raise KeyError(f"{label=} not in FitParameters.input_labels ({self.input_labels=}).")
+            raise KeyError(f"{label=} not in FitParameters.input_labels ({self.labels=}).")
 
     @property
     def rho(self):
@@ -392,7 +392,7 @@ class FitParameters:
         Examples
         --------
         >>> parameters.VERBOSE = True
-        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> params.cov = np.array([[1, -0.5], [-0.5, 4]])
         >>> _ = params.print_parameters_summary()
         """
@@ -403,10 +403,10 @@ class FitParameters:
             if ip in ifree:
                 txt += "%s: %s +%s -%s\n\t" % formatting_numbers(self.values[ip], np.sqrt(self.cov[icov, icov]),
                                                                  np.sqrt(self.cov[icov, icov]),
-                                                                 label=self.input_labels[ip])
+                                                                 label=self.labels[ip])
                 icov += 1
             else:
-                txt += f"{self.input_labels[ip]}: {self.values[ip]} (fixed)\n\t"
+                txt += f"{self.labels[ip]}: {self.values[ip]} (fixed)\n\t"
         return txt
 
     def get_parameter(self, key):
@@ -424,7 +424,7 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
         >>> params.cov = np.array([[1, -0.5], [-0.5, 4]])
         >>> p3 = params.get_parameter("t")
         >>> p3
@@ -441,7 +441,7 @@ class FitParameters:
             truth = None
         else:
             truth = self.truth[index]
-        p = FitParameter(value=self.values[index], input_label=self.input_labels[index],
+        p = FitParameter(value=self.values[index], label=self.labels[index],
                          axis_name=self.axis_names[index], bounds=self.bounds[index],
                          fixed=self.fixed[index], err=self.err[index], truth=truth)
         return p
@@ -501,7 +501,7 @@ class FitParameters:
 
         Examples
         --------
-        >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
         >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
         >>> params.write_text(header="chi2: 1")
 
@@ -545,7 +545,7 @@ def write_fitparameter_json(json_filename, params, extra=None):
 
     Examples
     --------
-    >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
+    >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
     >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
     >>> jsonstr = write_fitparameter_json(params.json_filename, params, extra={"chi2": 1})
     >>> jsonstr  # doctest: +ELLIPSIS
@@ -582,7 +582,7 @@ def read_fitparameter_json(json_filename):
 
     Examples
     --------
-    >>> params = FitParameters(values=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
+    >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"],  fixed=[True, False, True, False], filename="test_spectrum.fits")
     >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
     >>> _ = write_fitparameter_json(params.json_filename, params, extra={"chi2": 1})
     >>> new_params = read_fitparameter_json(params.json_filename)
@@ -738,7 +738,7 @@ class FitWorkspace:
         plt.xlabel('$x$')
         plt.ylabel('$y$')
         title = ""
-        for i, label in enumerate(self.params.input_labels):
+        for i, label in enumerate(self.params.labels):
             if self.params.cov.size > 0:
                 err = np.sqrt(self.params.cov[i, i])
                 formatting_numbers(self.params.values[i], err, err)
@@ -1090,7 +1090,7 @@ class FitWorkspace:
         t[0] = iterations
         t[1] = self.costs
         t[2:] = self.params_table.T
-        h = 'iter,costs,' + ','.join(self.params.input_labels)
+        h = 'iter,costs,' + ','.join(self.params.labels)
         output_filename = os.path.splitext(self.filename)[0] + "_fitting.txt"
         np.savetxt(output_filename, t.T, header=h, delimiter=",")
         self.my_logger.info(f"\n\tSave gradient descent log {output_filename}.")
@@ -1265,7 +1265,7 @@ class MCMCFitWorkspace(FitWorkspace):
         centers = []
         for i in rangedim:
             centers.append(np.linspace(np.min(chains[:, i]), np.max(chains[:, i]), self.nbins - 1))
-        likelihood = Likelihood(centers, labels=self.params.input_labels, axis_names=self.params.axis_names, truth=self.params.truth)
+        likelihood = Likelihood(centers, labels=self.params.labels, axis_names=self.params.axis_names, truth=self.params.truth)
         if walker_index < 0:
             for i in rangedim:
                 likelihood.pdfs[i].fill_histogram(chains[:, i], weights=None)
@@ -1437,7 +1437,7 @@ class MCMCFitWorkspace(FitWorkspace):
                     R = (W * pos / (pos + 1) + B / (pos + 1) * (len(chain_averages) + 1) / len(chain_averages)) / W
                     Rs.append(R - 1)
                     lens.append(pos)
-                print(f'\t{self.params.input_labels[i]}: R-1 = {Rs[-1]:.3f} (l = {lens[-1] - 1:d})')
+                print(f'\t{self.params.labels[i]}: R-1 = {Rs[-1]:.3f} (l = {lens[-1] - 1:d})')
                 self.gelmans.append(Rs[-1])
                 ax[i, 1].plot(lens, Rs, lw=1, label=self.params.axis_names[i])
                 ax[i, 1].axhline(0.03, c='k', linestyle='--')
@@ -1523,7 +1523,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
                 ipar = np.delete(ipar, list(ipar).index(ip))
                 fit_workspace.params.fixed[ip] = True
                 my_logger.warning(
-                    f"\n\tStep {i}: {fit_workspace.params.input_labels[ip]} has a null Jacobian; parameter is fixed "
+                    f"\n\tStep {i}: {fit_workspace.params.labels[ip]} has a null Jacobian; parameter is fixed "
                     f"at its last known current value ({tmp_params[ip]}).")
         # remove fixed parameters
         J = J[ipar].T
@@ -1648,7 +1648,7 @@ def simple_newton_minimisation(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol
                 ipar = np.delete(ipar, list(ipar).index(ip))
                 # tmp_params[ip] = 0
                 my_logger.warning(
-                    f"\n\tStep {i}: {fit_workspace.params.input_labels[ip]} has a null Jacobian; parameter is fixed "
+                    f"\n\tStep {i}: {fit_workspace.params.labels[ip]} has a null Jacobian; parameter is fixed "
                     f"at its last known current value ({tmp_params[ip]}).")
         # remove fixed parameters
         J = J[ipar].T
@@ -1926,7 +1926,7 @@ class RegFitWorkspace(FitWorkspace):
             If True, model, data and residuals plots are made along the fitting procedure (default: False).
 
         """
-        params = FitParameters(np.asarray([np.log10(opt_reg)]), input_labels=["log10_reg"],
+        params = FitParameters(np.asarray([np.log10(opt_reg)]), labels=["log10_reg"],
                                axis_names=[r"$\log_{10} r$"], fixed=None,
                                bounds=[(-20, np.log10(w.amplitude_priors.size) + 2)])
         FitWorkspace.__init__(self, params, verbose=verbose, live_fit=live_fit)
