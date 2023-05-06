@@ -93,6 +93,66 @@ class FitParameters:
                 raise ValueError("fixed argument must have same size as values argument.")
         self.cov = np.zeros((self.nfree, self.nfree))
 
+    def __getitem__(self, label):
+        """Get parameter value given its label.
+
+        Parameters
+        ----------
+        label: str
+            The parameter label.
+
+        Returns
+        -------
+        value: float
+            The parameter value.
+
+        Examples
+        --------
+        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params["z"]
+        3.0
+        """
+        index = self.get_index(label=label)
+        return self.p[index]
+
+    def __len__(self):
+        """Length of the parameter array, equivalent to self.ndim.
+
+        Examples
+        --------
+        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params.ndim
+        4
+        >>> len(params)
+        4
+        """
+        return len(self.p)
+
+    def get_index(self, label):
+        """Get parameter index given its label.
+
+        Parameters
+        ----------
+        label: str
+            The parameter label.
+
+        Returns
+        -------
+        index: int
+            The parameter index.
+
+        Examples
+        --------
+        >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params.get_index("z")
+        2
+        """
+        if label in self.input_labels:
+            index = self.input_labels.index(label)
+            return index
+        else:
+            raise KeyError(f"{label=} not in FitParameters.input_labels ({self.input_labels=}).")
+
     @property
     def rho(self):
         """Correlation matrix computed from the covariance matrix
