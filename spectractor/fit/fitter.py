@@ -121,12 +121,44 @@ class FitParameters:
         Examples
         --------
         >>> params = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
-        >>> params.ndim
-        4
         >>> len(params)
         4
+        >>> len(params) == params.ndim
+        True
         """
         return len(self.p)
+
+    def __eq__(self, other):
+        """Test parameter instances equality.
+
+        Examples
+        --------
+        >>> p1 = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> p2 = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> p1 == p2
+        True
+        >>> p3 = FitParameters(p=[1, 2, 3, 4.1], input_labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> p1 == p3
+        False
+        >>> p4 = FitParameters(p=[1, 2, 3, 4], input_labels=["x", "y", "z", "t"], fixed=[False, False, True, False])
+        >>> p1 == p4
+        False
+        """
+
+        if not isinstance(other, FitParameters):
+            return NotImplemented
+        out = True
+        for key in self.__dict__.keys():
+            if isinstance(getattr(self, key), np.ndarray):
+                if len(getattr(self, key).flatten()) == len(getattr(other, key).flatten()):
+                    out *= np.all(np.equal(getattr(self, key).flatten(), getattr(other, key).flatten()))
+                else:
+                    # if fixed parameters are not equal, covariance matrices have not the same shape
+                    # and multiplication above is forbidden
+                    out = False
+            else:
+                out *= getattr(self, key) == getattr(other, key)
+        return out
 
     def get_index(self, label):
         """Get parameter index given its label.
@@ -197,17 +229,6 @@ class FitParameters:
         if np.sum(self.fixed) != len(self.fixed):
             err[~np.asarray(self.fixed)] = np.sqrt(np.diag(self.cov))
         return err
-
-    def __eq__(self, other):
-        if not isinstance(other, FitParameters):
-            return NotImplemented
-        out = True
-        for key in self.__dict__.keys():
-            if isinstance(getattr(self, key), np.ndarray):
-                out *= np.all(np.equal(getattr(self, key).flatten(), getattr(other, key).flatten()))
-            else:
-                out *= getattr(self, key) == getattr(other, key)
-        return out
 
     @property
     def ndim(self):
