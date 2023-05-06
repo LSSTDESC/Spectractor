@@ -71,11 +71,11 @@ class StarModel:
         self.amplitude = amplitude
         # self.target = target
         self.psf = copy.deepcopy(psf)
-        self.psf.values[1] = self.x0
-        self.psf.values[2] = self.y0
-        self.psf.values[0] = amplitude
+        self.psf.params.values[1] = self.x0
+        self.psf.params.values[2] = self.y0
+        self.psf.params.values[0] = amplitude
         # to be realistic, usually fitted fwhm is too big, divide gamma by 2
-        self.fwhm = self.psf.values[3]
+        self.fwhm = self.psf.params.values[3]
         # self.sigma = self.model.stddev / 2
 
     def plot_model(self):
@@ -442,7 +442,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
     else:
-        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.input_labels) - 2) - 1) // 2
+        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.params.input_labels) - 2) - 1) // 2
         spectrum.chromatic_psf.set_polynomial_degrees(spectrum.chromatic_psf.deg)
         if spectrum.chromatic_psf.deg == 0:  # x_c must have deg >= 1
             psf_poly_params.insert(1, 0)
