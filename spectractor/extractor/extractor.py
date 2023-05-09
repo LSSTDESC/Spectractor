@@ -779,7 +779,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         if parameters.DISPLAY and (parameters.DEBUG or w.live_fit):
             w.plot_fit()
         start = time.time()
-        my_logger.info(f"\n\tStart guess: {w.params.values}\n\twith {w.params.labels}")
+        my_logger.info(f"\tStart guess:\n\t" + '\n\t'.join([f'{w.params.labels[k]}: {w.params.values[k]} (fixed={w.params.fixed[k]})' for k in range(w.params.ndim)]))
         epsilon = 1e-4 * w.params.values
         epsilon[epsilon == 0] = 1e-4
 

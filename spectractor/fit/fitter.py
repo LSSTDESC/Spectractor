@@ -1504,7 +1504,8 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
     for i in range(niter):
         start = time.time()
         cost, tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.chisq(tmp_params, model_output=True)
-        # W matrix
+        if i == 0 and fit_workspace.verbose:
+            my_logger.info(f"\n\tIteration={i}:\tinitial cost={cost:.5g}\tinitial chisq_red={cost / (tmp_model.size - n_data_masked):.5g}")
         W = fit_workspace.compute_W_with_model_error(tmp_model_err)
         # residuals
         if isinstance(W, np.ndarray) and W.dtype != object:
@@ -1589,8 +1590,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         params_table.append(np.copy(tmp_params))
         fit_workspace.p = tmp_params
         if fit_workspace.verbose:
-            my_logger.info(f"\n\tIteration={i}:\tinitial cost={cost:.5g}\tinitial chisq_red={cost / (tmp_model.size - n_data_masked):.5g}"
-                           f"\n\t              \tfinal cost={fval:.5g}\tfinal chisq_red={fval / (tmp_model.size - n_data_masked):.5g} "
+            my_logger.info(f"\n\tIteration={i}:\tfinal cost={fval:.5g}\tfinal chisq_red={fval / (tmp_model.size - n_data_masked):.5g} "
                            f"\tcomputed in {time.time() - start:.2f}s")
             my_logger.debug(f"\n\t Parameter shifts: {alpha_min * dparams}\n"
                             f"\n\t New parameters: {tmp_params[ipar]}"
