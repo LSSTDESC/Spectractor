@@ -536,7 +536,7 @@ class ChromaticPSF:
         ..  doctest::
             :hide:
 
-            >>> assert(profile_params.shape == (s.chromatic_psf.Nx, len(s.chromatic_psf.psf.labels)))
+            >>> assert(profile_params.shape == (s.chromatic_psf.Nx, len(s.chromatic_psf.psf.params.labels)))
             >>> assert not np.all(np.isclose(profile_params, np.zeros_like(profile_params)))
         """
         profile_params = np.zeros((len(self.table), len(self.psf.params.labels)))
