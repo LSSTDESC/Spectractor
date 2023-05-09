@@ -449,7 +449,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info(f'\n\tUse PSF parameters {psf_poly_params} as polynoms of '
                        f'degree {spectrum.chromatic_psf.degrees}')
     if psf_type is not None and psf_poly_params is not None:
-        spectrum.chromatic_psf.init_table()
+        spectrum.chromatic_psf.init_from_table()
 
     # Simulate spectrogram
     atmosphere = Atmosphere(airmass, pressure, temperature)

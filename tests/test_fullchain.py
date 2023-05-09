@@ -142,7 +142,7 @@ def test_ctio_fullchain():
                                f"\n\t\tspectrum.header['A2_FIT']={spectrum.header['A2_FIT']:.5g} vs {A2_T:.5g}"
                                f"\n\t\tspectrum.header['CHI2_FIT']={spectrum.header['CHI2_FIT']:.4g}"
                                f"\n\t\tspectrum.chromatic_psf.poly_params="
-                               f"{spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1]}"
+                               f"{spectrum.chromatic_psf.params.values[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1]}"
                                f" vs {PSF_POLY_PARAMS_TRUTH[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1]}"
                                f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100]):.5g}, "
                                f"std={np.std(residuals[100:-100]):.5g}")
@@ -156,7 +156,7 @@ def test_ctio_fullchain():
     else:
         assert float(spectrum.header['CHI2_FIT']) < 1.5e-1
     assert np.all(
-        np.isclose(spectrum.chromatic_psf.poly_params[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1],
+        np.isclose(spectrum.chromatic_psf.params.values[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1],
                    np.array(PSF_POLY_PARAMS_TRUTH)[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1], rtol=0.01, atol=0.01))
     assert np.abs(np.mean(residuals[100:-100])) < 0.25
     assert np.std(residuals[100:-100]) < 3

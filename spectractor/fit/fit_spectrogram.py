@@ -67,8 +67,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.atm_params_indices = np.array([2, 3, 4, 5])
         self.psf_params_start_index = p.size
         self.psf_poly_params = psf_poly_params[length:]
-        psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:])
-        psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:])
+        psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.params.labels[length:])
+        psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.params.axis_names[length:])
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
         p = np.concatenate([p, self.psf_poly_params, np.copy(self.psf_poly_params)])
         input_labels = ["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",

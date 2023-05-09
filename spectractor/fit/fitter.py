@@ -89,7 +89,7 @@ class FitParameters:
     ----------
     values: np.ndarray
         Array containing the parameter values.
-    input_labels: list, optional
+    labels: list, optional
         List of the parameter labels for screen print.
         If None, make a default list with parameters labelled par (default: None).
     axis_names: list, optional
@@ -136,12 +136,12 @@ class FitParameters:
             self.labels = [f"par{k}" for k in range(self.ndim)]
         else:
             if len(self.labels) != self.ndim:
-                raise ValueError("input_labels argument must have same size as values argument.")
+                raise ValueError("labels argument must have same size as values argument.")
         if not self.axis_names:
             self.axis_names = [f"$p_{k}$" for k in range(self.ndim)]
         else:
             if len(self.axis_names) != self.ndim:
-                raise ValueError("input_labels argument must have same size as values argument.")
+                raise ValueError("labels argument must have same size as values argument.")
         if self.bounds is None:
             self.bounds = [[-np.inf, np.inf]] * self.ndim
         else:
@@ -244,7 +244,7 @@ class FitParameters:
             index = self.labels.index(label)
             return index
         else:
-            raise KeyError(f"{label=} not in FitParameters.input_labels ({self.labels=}).")
+            raise KeyError(f"{label=} not in FitParameters.labels ({self.labels=}).")
 
     @property
     def rho(self):
@@ -382,7 +382,7 @@ class FitParameters:
 
     def print_parameters_summary(self):
         """Print the best fitting parameters on screen.
-        Labels are from self.input_labels.
+        Labels are from self.labels.
 
         Returns
         -------
@@ -549,7 +549,7 @@ def write_fitparameter_json(json_filename, params, extra=None):
     >>> params.cov = np.array([[1,-0.5,0],[-0.5,1,-1],[0,-1,1]])
     >>> jsonstr = write_fitparameter_json(params.json_filename, params, extra={"chi2": 1})
     >>> jsonstr  # doctest: +ELLIPSIS
-    '{"p": [1, 2, 3, 4], "input_labels": ["x", "y", "z", "t"],..."extra": {"chi2": 1}...
+    '{"values": [1.0, 2.0, 3.0, 4.0], "labels": ["x", "y", "z", "t"],..."extra": {"chi2": 1}...
 
     .. doctest::
         :hide:
@@ -587,7 +587,7 @@ def read_fitparameter_json(json_filename):
     >>> _ = write_fitparameter_json(params.json_filename, params, extra={"chi2": 1})
     >>> new_params = read_fitparameter_json(params.json_filename)
     >>> new_params.values
-    array([1, 2, 3, 4])
+    array([1., 2., 3., 4.])
 
     .. doctest::
         :hide:
@@ -600,7 +600,7 @@ def read_fitparameter_json(json_filename):
     params = FitParameters(values=[0])
     with open(json_filename, 'r') as f:
         data = json.load(f)
-    for key in ["p", "cov"]:
+    for key in ["values", "cov"]:
         data[key] = np.asarray(data[key])
     for key in data:
         setattr(params, key, data[key])

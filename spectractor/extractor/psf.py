@@ -630,11 +630,11 @@ class Moffat(PSF):
         self.values_default = np.array([1, 0, 0, 3, 2, 1]).astype(float)
         if values is None:
             values = np.copy(self.values_default)
-        input_labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
+        labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf),
                                 (1.1, 100), (0, np.inf)]
-        self.params = FitParameters(values=values, labels=input_labels, axis_names=axis_names, bounds=bounds)
+        self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
@@ -734,10 +734,10 @@ class Gauss(PSF):
         self.values_default = np.array([1, 0, 0, 1, 1]).astype(float)
         if values is None:
             values = np.copy(self.values_default)
-        input_labels = ["amplitude", "x_c", "y_c", "sigma", "saturation"]
+        labels = ["amplitude", "x_c", "y_c", "sigma", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\sigma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (0, np.inf)]
-        self.params = FitParameters(values=values, labels=input_labels, axis_names=axis_names, bounds=bounds)
+        self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
@@ -815,11 +815,11 @@ class MoffatGauss(PSF):
         self.values_default = np.array([1, 0, 0, 3, 2, 0, 1, 1]).astype(float)
         if values is None:
             values = np.copy(self.values_default)
-        input_labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
+        labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 100),
                   (-1, 0), (0.1, np.inf), (0, np.inf)]
-        self.params = FitParameters(values=values, labels=input_labels, axis_names=axis_names, bounds=bounds)
+        self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
@@ -901,10 +901,10 @@ class Order0(PSF):
         self.values_default = np.array([1, 0, 0, 1, 1]).astype(float)
         if values is None:
             values = np.copy(self.values_default)
-        input_labels = ["amplitude", "x_c", "y_c", "gamma", "saturation"]
+        labels = ["amplitude", "x_c", "y_c", "gamma", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.5, 5), (0, np.inf)]
-        self.params = FitParameters(values=values, labels=input_labels, axis_names=axis_names, bounds=bounds)
+        self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
         self.psf_func = self.build_interpolated_functions(target=target)
 
     def build_interpolated_functions(self, target):
@@ -1059,6 +1059,7 @@ class PSFFitWorkspace(FitWorkspace):
 
         """
         params = copy.deepcopy(psf.params)
+        params.fixed[-1] = True  # saturation
         FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot,
                               live_fit=live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)

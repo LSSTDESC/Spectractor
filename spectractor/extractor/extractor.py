@@ -50,8 +50,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.psf_poly_params = np.copy(spectrum.chromatic_psf.from_table_to_poly_params())
         self.psf_profile_params = np.copy(spectrum.chromatic_psf.from_table_to_profile_params())
         self.psf_poly_params = self.psf_poly_params[length:]
-        psf_poly_params_labels = np.copy(spectrum.chromatic_psf.poly_params_labels[length:])
-        psf_poly_params_names = np.copy(spectrum.chromatic_psf.poly_params_names[length:])
+        psf_poly_params_labels = np.copy(spectrum.chromatic_psf.params.labels[length:])
+        psf_poly_params_names = np.copy(spectrum.chromatic_psf.params.axis_names[length:])
         spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=spectrum.spectrogram_Ny)
         psf_poly_params_bounds = spectrum.chromatic_psf.set_bounds()
         p = np.array([1, np.copy(spectrum.header['D2CCD']), np.copy(spectrum.header['PIXSHIFT']), 0,
@@ -864,7 +864,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.chromatic_psf.fill_table_with_profile_params(w.psf_profile_params)
             w.spectrum.chromatic_psf.table["amplitude"] = np.copy(w.amplitude_params)
             w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params)
-            w.spectrum.chromatic_psf.poly_params = w.spectrum.chromatic_psf.from_table_to_poly_params()
+            w.spectrum.chromatic_psf.params.values = w.spectrum.chromatic_psf.from_table_to_poly_params()
             w.spectrum.spectrogram_fit = w.model
             w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
             w.spectrum.header['CHI2_FIT'] = w.costs[-1] / (w.data.size - len(w.mask))
@@ -1495,9 +1495,9 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
     s.table["flux_sum"] = np.interp(s.table['Dx'], Dx_rot, amplitude_priors)
     s.table["flux_err"] = np.interp(s.table['Dx'], Dx_rot, amplitude_priors_err)
     s.table['Dy_disp_axis'] = np.interp(s.table['Dx'], Dx_rot, Dy_disp_axis)
-    s.poly_params = np.concatenate((s.table["amplitude"], psf_poly_priors))
+    s.params.values = np.concatenate((s.table["amplitude"], psf_poly_priors))
     s.cov_matrix = np.copy(spectrum.cov_matrix)
-    s.profile_params = s.from_poly_params_to_profile_params(s.poly_params, apply_bounds=True)
+    s.profile_params = s.from_poly_params_to_profile_params(s.params.values, apply_bounds=True)
     s.fill_table_with_profile_params(s.profile_params)
     s.from_profile_params_to_shape_params(s.profile_params)
     s.table['Dy'] = s.table['y_c'] - spectrum.spectrogram_y0
@@ -1515,7 +1515,7 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
                             amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
 
     # save results
-    spectrum.spectrogram_fit = s.build_spectrogram_image(s.poly_params, mode=mode)
+    spectrum.spectrogram_fit = s.evaluate(s.params.values, mode=mode)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
     lambdas = spectrum.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
@@ -1565,10 +1565,10 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     amplitude_truth *= parameters.FLAM_TO_ADURATE * lambdas_truth * np.gradient(lambdas_truth) * parameters.CCD_REBIN
     s0 = ChromaticPSF(s.psf, lambdas_truth.size, s.Ny, deg=deg_truth,
                       saturation=spectrum.spectrogram_saturation)
-    s0.poly_params = np.asarray(list(amplitude_truth) + list(psf_poly_truth))
+    s0.params.values = np.asarray(list(amplitude_truth) + list(psf_poly_truth))
     # s0.deg = (len(s0.poly_params[s0.Nx:]) - 1) // ((len(s0.psf.param_names) - 2) - 1) // 2
     # s0.set_polynomial_degrees(s0.deg)
-    s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
+    s0.profile_params = s0.from_poly_params_to_profile_params(s0.params.values)
     s0.from_profile_params_to_shape_params(s0.profile_params)
 
     gs_kw = dict(width_ratios=[2, 1], height_ratios=[2, 1])
