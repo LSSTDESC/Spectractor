@@ -115,7 +115,7 @@ class StarFieldModel:
         self.field = None
         self.stars = []
         self.pixcoords = []
-        self.fwhm = base_image.target_star2D.values[3]
+        self.fwhm = base_image.target_star2D.params.values[3]
         self.flux_factor = flux_factor
         self.set_star_list()
 
