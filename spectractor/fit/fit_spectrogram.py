@@ -5,6 +5,7 @@ import matplotlib as mpl
 import numpy as np
 from scipy.signal import convolve2d
 import copy
+import getCalspec
 
 from spectractor import parameters
 from spectractor.config import set_logger
