@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 from scipy.interpolate import interp1d
+import getCalspec
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -55,6 +56,8 @@ class SpectrumFitWorkspace(FitWorkspace):
 
         """
         self.my_logger = set_logger(self.__class__.__name__)
+        if not getCalspec.is_calspec(spectrum.target.label):
+            raise NotImplementedError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
         p = np.array([1, 0, 0.01, -2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size

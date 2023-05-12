@@ -55,6 +55,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         >>> w.plot_fit()
 
         """
+        if not getCalspec.is_calspec(spectrum.target.label):
+            raise NotImplementedError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
         self.filename = spectrum.filename.replace("spectrum", "spectrogram")
         length = len(self.spectrum.chromatic_psf.table)
