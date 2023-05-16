@@ -254,7 +254,8 @@ def wcs_transpose(wcs, image):  # pragma: no cover
 
 class Astrometry():  # pragma: no cover
 
-    def __init__(self, image, wcs_file_name="", output_directory="", gaia_mag_g_limit=23, source_extractor="iraf"):
+    def __init__(self, image, wcs_file_name="", gaia_file_name="", output_directory="",
+                 gaia_mag_g_limit=23, source_extractor="iraf"):
         """Class to handle astrometric computations.
 
         Parameters
@@ -263,6 +264,8 @@ class Astrometry():  # pragma: no cover
             Input Spectractor Image.
         wcs_file_name: str, optional
             The path to a WCS fits file. WCS content will be loaded (default: "").
+        gaia_file_name: str, optional
+            The path to a Gaia caralog ecsv file (default: "").
         output_directory: str, optional
             The output directory path. If empty, a directory *_wcs is created next to the analyzed image (default: "").
         gaia_mag_g_limit: float, optional
@@ -309,7 +312,10 @@ class Astrometry():  # pragma: no cover
             self.wcs_file_name = set_wcs_file_name(self.image.file_name, output_directory=output_directory)
             if os.path.isfile(self.wcs_file_name):
                 self.wcs = load_wcs_from_file(self.wcs_file_name)
-        self.gaia_file_name = set_gaia_catalog_file_name(self.image.file_name, output_directory=output_directory)
+        if gaia_file_name != "":
+            self.gaia_file_name = gaia_file_name
+        else:
+            self.gaia_file_name = set_gaia_catalog_file_name(self.image.file_name, output_directory=output_directory)
         self.gaia_catalog = None
         self.gaia_index = None
         self.gaia_matches = None
