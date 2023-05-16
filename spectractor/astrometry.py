@@ -183,7 +183,7 @@ def plot_shifts_histograms(dra, ddec):  # pragma: no cover
         parameters.PdfPages.savefig()
 
 
-def wcs_xy_translation(wcs, shift_x, shift_y):
+def wcs_xy_translation(wcs, shift_x, shift_y):  # pragma: no cover
     """Compute a translated WCS if image is shifted in x or y."""
     new_wcs = deepcopy(wcs)
     new_wcs.wcs.crpix[0] += shift_x
@@ -194,7 +194,7 @@ def wcs_xy_translation(wcs, shift_x, shift_y):
     return new_wcs
 
 
-def wcs_flip_x(wcs, image):
+def wcs_flip_x(wcs, image):  # pragma: no cover
     """Compute a flip WCS if image is flip along x axis."""
     new_wcs = deepcopy(wcs)
     new_wcs.wcs.crpix[0] = image.data.shape[1] - new_wcs.wcs.crpix[0]
@@ -210,7 +210,7 @@ def wcs_flip_x(wcs, image):
     return new_wcs
 
 
-def wcs_flip_y(wcs, image):
+def wcs_flip_y(wcs, image):  # pragma: no cover
     """Compute a flip WCS if image is flip along y axis."""
     new_wcs = deepcopy(wcs)
     new_wcs.wcs.crpix[1] = image.data.shape[0] - new_wcs.wcs.crpix[1]
@@ -226,7 +226,7 @@ def wcs_flip_y(wcs, image):
     return new_wcs
 
 
-def wcs_transpose(wcs, image):
+def wcs_transpose(wcs, image):  # pragma: no cover
     """Compute a transposed WCS if image is transposed with np.transpose()."""
     new_wcs = wcs_flip_y(wcs, image)
     tmp_crpix = np.copy(wcs.wcs.crpix)
@@ -254,7 +254,8 @@ def wcs_transpose(wcs, image):
 
 class Astrometry():  # pragma: no cover
 
-    def __init__(self, image, wcs_file_name="", output_directory="", gaia_mag_g_limit=23, source_extractor="iraf"):
+    def __init__(self, image, wcs_file_name="", gaia_file_name="", output_directory="",
+                 gaia_mag_g_limit=23, source_extractor="iraf"):
         """Class to handle astrometric computations.
 
         Parameters
@@ -263,6 +264,8 @@ class Astrometry():  # pragma: no cover
             Input Spectractor Image.
         wcs_file_name: str, optional
             The path to a WCS fits file. WCS content will be loaded (default: "").
+        gaia_file_name: str, optional
+            The path to a Gaia caralog ecsv file (default: "").
         output_directory: str, optional
             The output directory path. If empty, a directory *_wcs is created next to the analyzed image (default: "").
         gaia_mag_g_limit: float, optional
@@ -309,7 +312,10 @@ class Astrometry():  # pragma: no cover
             self.wcs_file_name = set_wcs_file_name(self.image.file_name, output_directory=output_directory)
             if os.path.isfile(self.wcs_file_name):
                 self.wcs = load_wcs_from_file(self.wcs_file_name)
-        self.gaia_file_name = set_gaia_catalog_file_name(self.image.file_name, output_directory=output_directory)
+        if gaia_file_name != "":
+            self.gaia_file_name = gaia_file_name
+        else:
+            self.gaia_file_name = set_gaia_catalog_file_name(self.image.file_name, output_directory=output_directory)
         self.gaia_catalog = None
         self.gaia_index = None
         self.gaia_matches = None
@@ -422,6 +428,7 @@ class Astrometry():  # pragma: no cover
             >>> assert quad_stars.shape == (4, 2)
 
         """
+        u.set_enabled_aliases({'DEG': u.deg})
         coords = []
         hdu = fits.open(self.match_file_name)
         table = Table.read(hdu)
@@ -1089,7 +1096,7 @@ class Astrometry():  # pragma: no cover
             elif self.source_extractor == "astrometrynet":
                 self.my_logger.info(f"\n\tSource extraction directly with solve-field.")
                 # must write a temporary image file with Spectractor flips and rotations
-                fits.writeto(tmp_image_file_name, self.image.data, header=self.image.header)
+                fits.writeto(tmp_image_file_name, self.image.data, header=self.image.header, overwrite=True)
                 solve_field_input = tmp_image_file_name
             else:
                 raise ValueError(f"Got {self.source_extractor=}. Must be either 'iraf' or 'astrometrynet' "

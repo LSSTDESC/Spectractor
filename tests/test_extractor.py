@@ -30,7 +30,8 @@ def test_extractor_ctio():
     output_directory = "./outputs"
 
     logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
-    load_config("./config/ctio.ini")
+    parameters.VERBOSE = True
+    load_config("ctio.ini")
     parameters.VERBOSE = True
     parameters.DEBUG = True
     parameters.CCD_REBIN = 2  # rebin=1 to build tests/data spectrum

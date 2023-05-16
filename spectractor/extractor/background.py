@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from matplotlib import cm
+import matplotlib as mpl
 import os
 import copy
 
@@ -9,11 +9,11 @@ from spectractor import parameters
 from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal, plot_image_simple
 
 from astropy.stats import SigmaClip
-from photutils import Background2D, SExtractorBackground
-from photutils.segmentation import SegmentationImage, detect_threshold, detect_sources
+from photutils.background import Background2D, SExtractorBackground
+from photutils.segmentation import detect_threshold, detect_sources
 
-from scipy import ndimage
 from scipy.signal import medfilt2d
+from scipy import ndimage
 from scipy.interpolate import RegularGridInterpolator
 
 
@@ -135,7 +135,7 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
     >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
-    >>> data = s0.build_spectrogram_image(params, mode="1D")
+    >>> data = s0.evaluate(params, mode="1D")
     >>> bgd = 10*np.ones_like(data)
     >>> data += bgd
     >>> data = np.random.poisson(data)
@@ -239,7 +239,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     >>> s0 = ChromaticPSF(psf, Nx=100, Ny=200, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
-    >>> data = s0.build_spectrogram_image(params, mode="1D")
+    >>> data = s0.evaluate(params, mode="1D")
     >>> bgd = 10*np.ones_like(data)
     >>> data += bgd
     >>> data = np.random.poisson(data)
@@ -247,15 +247,22 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
 
     Fit the transverse profile:
 
-    >>> bgd_model, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[60,100])
+    >>> bgd_model, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[60,100], mask_signal_region=True)
 
     """
     Ny, Nx = data.shape
     if Dy_disp_axis is None:
         Dy_disp_axis = np.ones(Nx) * (Ny // 2)
 
+    # first estimate of median background
+    filter_size = parameters.PIXWIDTH_BOXSIZE // 2
+    if filter_size % 2 == 0:  # must be odd since photutils 1.5.0
+        filter_size += 1
+
     # mask sources
     mask = make_source_mask(data, nsigma=3, npixels=5, dilate_size=11)
+
+    # mask null edges on rotated maps
     mask += data == 0
     # Estimate the background in the two lateral bands together
     sigma_clip = SigmaClip(sigma=3.)
@@ -265,19 +272,11 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         for dx in range(Nx):
             bgd_bands[int(Dy_disp_axis[dx] - ws[0]):int(Dy_disp_axis[dx] + ws[0]), dx] = np.nan
             mask += (np.isnan(bgd_bands))
-    # windows size in x is set to only 6 pixels to be able to estimate rapid variations of the background on real data
-    # filter window size is set to window // 2 so 3
-    # bkg = Background2D(data, ((ws[1] - ws[0]), (ws[1] - ws[0])),
-    #                    filter_size=((ws[1] - ws[0]) // 2, (ws[1] - ws[0]) // 2),
-    #                    sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
-    #                    mask=mask)
-    filter_size = parameters.PIXWIDTH_BOXSIZE // 2
-    if filter_size % 2 == 0:  # must be odd since photutils 1.5.0
-        filter_size += 1
     bkg = Background2D(data, (parameters.PIXWIDTH_BOXSIZE, parameters.PIXWIDTH_BOXSIZE),
                        filter_size=(filter_size, filter_size),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
+    # reset at zero the edges
     bkg.background[data == 0] = 0
     bgd_model_func_interp = RegularGridInterpolator((np.arange(Nx), np.arange(Ny)), bkg.background.T, method='linear',
                                                     bounds_error=False, fill_value=None)
@@ -296,9 +295,13 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         ax3 = plt.subplot(gs[:, 1])
         mean = np.nanmean(bgd_bands)
         std = np.nanstd(bgd_bands)
-        cmap = copy.copy(cm.get_cmap())
+        cmap = copy.copy(mpl.colormaps["viridis"])
         cmap.set_bad(color='lightgrey')
-        im = ax0.imshow(bgd_bands, origin='lower', aspect="auto", vmin=mean - 3 * std, vmax=mean + 3 * std)
+        bgd_bands[mask] = np.nan
+        data_to_plot = np.copy(data).astype(float)
+        data_to_plot[mask] = np.nan
+        im = ax0.imshow(data_to_plot, origin='lower', aspect="auto", vmin=mean - 3 * std, vmax=mean + 3 * std, cmap=cmap)
+        # ax0.imshow(segment_map, origin='lower', cmap=segment_map.cmap, interpolation='nearest', aspect="auto", alpha=0.5)
         v1 = np.linspace(mean - 3 * std, mean + 3 * std, 5, endpoint=True)
         cb = plt.colorbar(im, ticks=v1, ax=ax0, label=f'Data units')
         cb.ax.set_yticklabels(["{:2.0f}".format(i) for i in v1])
@@ -308,18 +311,17 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         ax0.set_ylabel(parameters.PLOT_YLABEL)
         ax0.set_xticks([])
         ax1.set_xticks([])
-        bkg.plot_meshes(outlines=True, color='red', axes=ax1, linewidth=0.5)
+        bkg.plot_meshes(outlines=True, color='red', ax=ax1, linewidth=0.5)
         b = bkg.background
-        im = ax1.imshow(b, origin='lower', aspect="auto")
+        im = ax1.imshow(b, origin='lower', aspect="auto", vmin=mean - 3 * std, vmax=mean + 3 * std, cmap=cmap)
         ax1.set_xlabel(parameters.PLOT_XLABEL)
         ax1.set_ylabel(parameters.PLOT_YLABEL)
-        v1 = np.linspace(np.nanmin(b), np.nanmax(b), 5, endpoint=True)
         cb1 = plt.colorbar(im, ticks=v1, ax=ax1, label=f'Data units')
         cb1.ax.set_yticklabels(["{:2.0f}".format(i) for i in v1])
         ax1.text(0.05, 0.95, f'Fitted background', color="white",
                  horizontalalignment='left', verticalalignment='top', transform=ax1.transAxes)  # : mean={np.mean(b):.3f}, std={np.std(b):.3f}')
-        res = (bgd_bands - b) / err
-        im = ax2.imshow(res, origin='lower', aspect="auto", vmin=-5, vmax=5)
+        res = (data_to_plot - b) / err
+        im = ax2.imshow(res, origin='lower', aspect="auto", vmin=-5, vmax=5, cmap=cmap)
         ax2.set_xlabel(parameters.PLOT_XLABEL)
         ax2.set_ylabel(parameters.PLOT_YLABEL)
         ax2.text(0.05, 0.95, f'Pull: mean={np.nanmean(res):.3f}, std={np.nanstd(res):.3f}', color="white",
@@ -381,7 +383,7 @@ def extract_spectrogram_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1
     >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
-    >>> data = s0.build_spectrogram_image(params, mode="1D")
+    >>> data = s0.evaluate(params, mode="1D")
     >>> bgd = 10.*np.ones_like(data)
     >>> xx, yy = np.meshgrid(np.arange(s0.Nx), np.arange(s0.Ny))
     >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))

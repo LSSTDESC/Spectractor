@@ -2,6 +2,7 @@ from scipy.signal import argrelextrema, savgol_filter
 from scipy.interpolate import interp1d
 from astropy.io import fits
 from astropy.table import Table
+import astropy.units as u
 from scipy import integrate
 from iminuit import Minuit
 import matplotlib.pyplot as plt
@@ -10,9 +11,11 @@ import os
 import random
 import string
 import astropy
+import warnings
+warnings.filterwarnings('ignore', category=astropy.io.fits.card.VerifyWarning, append=True)
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config, update_derived_parameters, apply_rebinning_to_parameters
+from spectractor.config import set_logger, load_config, update_derived_parameters
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
@@ -49,7 +52,8 @@ fits_mappings = {'config': 'CONFIG',
                  'spectrogram_Nx': 'S_NX',
                  'spectrogram_Ny': 'S_NY',
                  'spectrogram_deg': 'S_DEG',
-                 'spectrogram_saturation': 'S_SAT'
+                 'spectrogram_saturation': 'S_SAT',
+                 'order': 'S_ORDER'
                  }
 
 
@@ -122,6 +126,8 @@ class Spectrum:
         Outside pressure in hPa.
     humidity: float
         Outside relative humidity in fraction of one.
+    throughput: callable
+        Instrumental throughput of the telescope.
     spectrogram: array
         Spectrogram 2D image in image units.
     spectrogram_bgd: array
@@ -283,9 +289,9 @@ class Spectrum:
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
                                self.humidity, self.airmass]
 
-        t = self.load_filter()
+        self.throughput = self.load_filter()
         if self.target is not None and len(self.target.spectra) > 0:
-            spec = self.target.spectra[0] * t.transmission(self.target.wavelengths[0])
+            spec = self.target.spectra[0] * self.throughput.transmission(self.target.wavelengths[0])
             lambda_ref = np.sum(self.target.wavelengths[0] * spec) / np.sum(spec)
             self.lambda_ref = lambda_ref
             self.header['LBDA_REF'] = lambda_ref
@@ -407,7 +413,7 @@ class Spectrum:
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
-        if self.data_next_order is not None and np.sum(self.data_next_order) > 0.05 * np.sum(self.data):
+        if self.data_next_order is not None and np.sum(np.abs(self.data_next_order)) > 0.05 * np.sum(np.abs(self.data)):
             distance = self.disperser.grating_lambda_to_pixel(self.lambdas, self.x0, order=parameters.SPEC_ORDER+1)
             max_index = np.argmin(np.abs(distance + self.x0[0] - parameters.CCD_IMSIZE))
             plot_spectrum_simple(ax, self.lambdas[:max_index], self.data_next_order[:max_index], data_err=self.err_next_order[:max_index],
@@ -584,7 +590,9 @@ class Spectrum:
             elif extname == "PSF_TAB":
                 hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
             elif extname == "LINES":
-                tab = self.lines.print_detected_lines(amplitude_units=self.units, print_table=False)
+                u.set_enabled_aliases({'flam': u.erg / u.s / u.cm**2 / u.nm,
+                                       'reduced': u.dimensionless_unscaled})
+                tab = self.lines.print_detected_lines(amplitude_units=self.units.replace("erg/s/cm$^2$/nm", "flam"), print_table=False)
                 hdus[extname] = fits.table_to_hdu(tab)
             elif extname == "CONFIG":
                 # HIERARCH and CONTINUE not compatible together in FITS headers
@@ -730,7 +738,7 @@ class Spectrum:
             from spectractor._version import __version__
             if self.config != "":
                 raise AttributeError(f"With Spectractor above 2.4 do not provide a config file in Spectrum(config=...)."
-                                     "Now config parameters are loaded from the file header. Got {self.config=}.")
+                                     f"Now config parameters are loaded from the file header. Got {self.config=}.")
             if self.header["VERSION"] != str(__version__):
                 self.my_logger.warning(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
                                        f"different from current Spectractor software {__version__}.")
@@ -854,8 +862,8 @@ class Spectrum:
                 raise FileNotFoundError(f"\n\tNo spectrogram info in {input_file_name} "
                                         f"and not even a spectrogram file {spectrogram_file_name}.")
             if "PSF_TAB" in hdu_list:
-                self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]),
-                                              saturation=self.spectrogram_saturation)
+                self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
+                                                   saturation=self.spectrogram_saturation)
             elif os.path.isfile(psf_file_name):  # retro-compatibility
                 self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
                 self.load_chromatic_psf(psf_file_name)
@@ -960,7 +968,7 @@ class Spectrum:
             self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
             self.spectrogram_fit = hdu_list["S_FIT"].data
             self.spectrogram_residuals = hdu_list["S_RES"].data
-            self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]), saturation=self.spectrogram_saturation)
+            self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]), saturation=self.spectrogram_saturation)
             self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
             hdu_list.close()
 
@@ -1625,7 +1633,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             sigma = spec_err[index]
         if cov_matrix is not None:
             sigma = cov_matrix[index, index]
-        # my_logger.warning(f'\n{guess} {np.mean(spec[bgd_index])} {np.std(spec[bgd_index])}')
         popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma)
         # noise level defined as the std of the residuals if no error
         noise_level = np.std(spec[index] - multigauss_and_bgd(lambdas[index], *popt))

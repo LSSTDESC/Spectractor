@@ -1,9 +1,6 @@
 import os
-
-import astropy.io.fits
 import shutil
-from matplotlib import pyplot as plt
-from photutils import IRAFStarFinder
+from photutils.detection import IRAFStarFinder
 from scipy.optimize import curve_fit
 import numpy as np
 from astropy.modeling import models, fitting
@@ -15,10 +12,10 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 from matplotlib.ticker import MaxNLocator
 
+import json
 import warnings
 from scipy.signal import fftconvolve, gaussian
-from scipy.ndimage.filters import maximum_filter
-from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
+from scipy.ndimage import maximum_filter, generate_binary_structure, binary_erosion
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
 
@@ -1422,7 +1419,6 @@ def hessian_and_theta(data, margin_cut=1):
     # compute hessian matrices on the image
     order = "xy" if _SCIKIT_IMAGE_NEW_HESSIAN else "rc"
     Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order=order)
-
     lambda_plus = 0.5 * ((Hxx + Hyy) + np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     lambda_minus = 0.5 * ((Hxx + Hyy) - np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     theta = 0.5 * np.arctan2(2 * Hxy, Hxx - Hyy) * 180 / np.pi
@@ -2558,3 +2554,10 @@ def iraf_source_detection(data_wo_bkg, sigma=3.0, fwhm=3.0, threshold_std_factor
             parameters.PdfPages.savefig()
 
     return sources
+
+
+class NumpyArrayEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)

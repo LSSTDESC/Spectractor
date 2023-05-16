@@ -1,25 +1,28 @@
 import time
 import os
 import matplotlib.pyplot as plt
-from matplotlib import cm
+import matplotlib as mpl
 import numpy as np
 from scipy.signal import convolve2d
 import copy
+import getCalspec
 
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
-from spectractor.simulation.simulator import SimulatorInit, SpectrogramModel
+from spectractor.extractor.spectrum import Spectrum
+from spectractor.simulation.simulator import SpectrogramModel
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
-from spectractor.fit.fitter import FitWorkspace, run_minimisation, run_minimisation_sigma_clipping
+from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisation, run_minimisation_sigma_clipping,
+                                    write_fitparameter_json)
 
 plot_counter = 0
 
 
 class SpectrogramFitWorkspace(FitWorkspace):
 
-    def __init__(self, file_name, atmgrid_file_name="", fit_angstrom_exponent=False, nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False, truth=None):
+    def __init__(self, spectrum, atmgrid_file_name="", fit_angstrom_exponent=False,
+                 verbose=False, plot=False, live_fit=False, truth=None):
         """Class to fit a spectrogram extracted with Spectractor.
 
         First the spectrogram is cropped using the parameters.PIXWIDTH_SIGNAL parameter to increase speedness.
@@ -29,22 +32,14 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         Parameters
         ----------
-        file_name: str
-            Spectrum file name.
+        spectrum: Spectrum
+            Spectrum object.
         atmgrid_file_name: str, optional
             Atmospheric grid file name (default: "").
         fit_angstrom_exponent: bool, optional
             If True, fit angstrom exponent (default: False).
-        nwalkers: int, optional
-            Number of walkers for MCMC fitting.
-        nsteps: int, optional
-            Number of steps for MCMC fitting.
-        burnin: int, optional
-            Number of burn-in steps for MCMC fitting.
-        nbins: int, optional
-            Number of bins for MCMC chains analysis.
-        verbose: int, optional
-            Verbosity level (default: 0).
+        verbose: bool, optional
+            Verbosity level (default: False).
         plot: bool, optional
             If True, many plots are produced (default: False).
         live_fit: bool, optional
@@ -54,104 +49,82 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         Examples
         --------
-
-        >>> from spectractor.config import load_config
-        >>> load_config("config/ctio.ini")
-        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
-        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-        ... burnin=2, nbins=10, verbose=1, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> atmgrid_filename = spec.filename.replace('spectrum', 'atmsim')
+        >>> w = SpectrogramFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         """
-        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot,
-                              live_fit, truth=truth)
-        if "spectrum" not in file_name:
-            raise ValueError("file_name argument must contain spectrum keyword and be an output from Spectractor.")
-        if fit_angstrom_exponent and atmgrid_file_name != '':
-            raise ValueError(f"AtmosphereGrid() do not contains angstrom exponent modelisation yet. "
-                             f"Can't provide atmgrid_file_name and ask for fitting angstrom exponent {fit_angstrom_exponent=}.")
-        self.filename = self.filename.replace("spectrum", "spectrogram")
-        self.spectrum, self.telescope, self.disperser, self.target = SimulatorInit(file_name)
-        self.airmass = self.spectrum.header['AIRMASS']
-        self.pressure = self.spectrum.header['OUTPRESS']
-        self.temperature = self.spectrum.header['OUTTEMP']
+        if not getCalspec.is_calspec(spectrum.target.label):
+            raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
+        self.spectrum = spectrum
+        self.filename = spectrum.filename.replace("spectrum", "spectrogram")
+        length = len(self.spectrum.chromatic_psf.table)
+        psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
+        self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
+        self.saturation = self.spectrum.spectrogram_saturation
+        p = np.array([1, 1, 0.05, -2, 400, 5, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'],
+                      0, self.spectrum.rotation_angle, 1])
+        self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 9])
+        self.atm_params_indices = np.array([2, 3, 4, 5])
+        self.psf_params_start_index = p.size
+        self.psf_poly_params = psf_poly_params[length:]
+        psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.params.labels[length:])
+        psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.params.axis_names[length:])
+        psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
+        p = np.concatenate([p, self.psf_poly_params, np.copy(self.psf_poly_params)])
+        input_labels = ["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
+                        r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"] + \
+                       list(psf_poly_params_labels) + [label+"_2" for label in psf_poly_params_labels]
+        axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
+                      r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]",
+                      "$B$"] + list(psf_poly_params_names) + [label+"_2" for label in psf_poly_params_names]
+        bounds = [[0, 2], [0, 2/parameters.GRATING_ORDER_2OVER1], [0, 0.1], [-5, 2], [100, 700], [0, 10],
+                  [p[6] - 5 * parameters.DISTANCE2CCD_ERR, p[6] + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
+                  [-10, 10], [-90, 90], [0.8, 1.2]] + list(psf_poly_params_bounds) * 2
+        fixed = [False] * p.size
+        for k, par in enumerate(input_labels):
+            if "x_c" in par or "saturation" in par:
+                fixed[k] = True
+        for k, par in enumerate(input_labels):
+            if "y_c" in par:
+                fixed[k] = False
+                p[k] = 0
+        # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
+        fixed[1] = "A2_T" not in self.spectrum.header  # not self.spectrum.disperser.flat_ratio_order_2over1
+        # fixed[5:7] = [True, True]  # DCCD, x0
+        fixed[7] = True  # Delta x
+        fixed[8] = True  # Delta y
+        fixed[9] = True  # angle
+        fixed[10] = True  # B
+        if not fit_angstrom_exponent:
+            fixed[3] = True  # angstrom exponent
+        params = FitParameters(p, labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed,
+                               truth=truth, filename=self.filename)
+        FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
         self.my_logger = set_logger(self.__class__.__name__)
         if atmgrid_file_name == "":
-            self.atmosphere = Atmosphere(self.airmass, self.pressure, self.temperature)
+            self.atmosphere = Atmosphere(self.spectrum.airmass, self.spectrum.pressure, self.spectrum.temperature)
         else:
             self.use_grid = True
-            self.atmosphere = AtmosphereGrid(spectrum_filename=file_name, atmgrid_filename=atmgrid_file_name)
-            if parameters.VERBOSE:
-                self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
-        self.crop_spectrogram()
+            self.atmosphere = AtmosphereGrid(spectrum_filename=spectrum.filename, atmgrid_filename=atmgrid_file_name)
+            self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
+        if self.spectrum.spectrogram_Ny > 2 * parameters.PIXDIST_BACKGROUND:
+            self.crop_spectrogram()
         self.lambdas = self.spectrum.lambdas
         self.Ny, self.Nx = self.spectrum.spectrogram.shape
         self.data = self.spectrum.spectrogram.flatten()
         self.err = self.spectrum.spectrogram_err.flatten()
         self.fit_angstrom_exponent = fit_angstrom_exponent
-        self.A1 = 1.0
-        self.A2 = 1.0
-        self.ozone = 400.
-        self.pwv = 5
-        self.aerosols = 0.05
-        self.angstrom_exponent_log10 = -2
-        self.D = self.spectrum.header['D2CCD']
-        self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
-        length = len(self.spectrum.chromatic_psf.table)
-        self.psf_poly_params = self.psf_poly_params[length:]
-        self.psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.poly_params_labels[length:])
-        self.psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.poly_params_names[length:])
-        self.psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
-        self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
-        psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
-        self.shift_x = self.spectrum.header['PIXSHIFT']
-        self.shift_y = 0.
-        self.angle = self.spectrum.rotation_angle
-        self.B = 1
-        self.saturation = self.spectrum.spectrogram_saturation
-        self.p = np.array([self.A1, self.A2, self.aerosols, self.angstrom_exponent_log10, self.ozone, self.pwv,
-                           self.D, self.shift_x, self.shift_y, self.angle, self.B])
-        self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 9])
-        self.atm_params_indices = np.array([2, 3, 4, 5])
-        self.psf_params_start_index = self.p.size
-        self.p = np.concatenate([self.p, self.psf_poly_params, np.copy(self.psf_poly_params)])
-        self.input_labels = ["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
-                             r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"] + \
-                            list(self.psf_poly_params_labels) + [label+"_2" for label in self.psf_poly_params_labels]
-        self.axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
-                           r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]",
-                           r"$\theta$ [deg]", "$B$"] + \
-                          list(self.psf_poly_params_names) + [label+"_2" for label in self.psf_poly_params_names]
-        bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
-        self.bounds = np.concatenate([np.array([(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-5, 2),
-                                                (100, 700), (0, 10), bounds_D, (-2, 2), (-10, 10), (-90, 90), (0.8, 1.2)]),
-                                      list(psf_poly_params_bounds) * 2])
-        self.fixed = [False] * self.p.size
-        for k, par in enumerate(self.input_labels):
-            if "x_c" in par or "saturation" in par: # or "y_c" in par:
-                self.fixed[k] = True
-        for k, par in enumerate(self.input_labels):
-            if "y_c" in par:
-                self.fixed[k] = False
-                self.p[k] = 0
-        # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        self.fixed[1] = "A2_T" not in self.spectrum.header  # not self.spectrum.disperser.flat_ratio_order_2over1
-        # self.fixed[5:7] = [True, True]  # DCCD, x0
-        self.fixed[7] = True  # Delta x
-        self.fixed[8] = True  # Delta y
-        self.fixed[9] = True  # angle
-        self.fixed[10] = True  # B
-        if not fit_angstrom_exponent:
-            self.fixed[3] = True  # angstrom exponent
+
         if atmgrid_file_name != "":
-            self.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
-            self.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
-            self.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
-            self.fixed[3] = True  # angstrom exponent
-        self.nwalkers = max(2 * self.ndim, nwalkers)
-        self.simulation = SpectrogramModel(self.spectrum, self.atmosphere, self.telescope, self.disperser,
+            self.params.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
+            self.params.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
+            self.params.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+            self.params.fixed[3] = True  # angstrom exponent
+
+        self.simulation = SpectrogramModel(self.spectrum, atmosphere=self.atmosphere,
                                            with_background=True, fast_sim=False, with_adr=True)
         self.lambdas_truth = None
         self.amplitude_truth = None
@@ -163,9 +136,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.psf_cube_order2 = None
         self.fix_psf_cube = False
         self.fix_psf_cube_order2 = False
-        self.psf_params_index = np.arange(0, self.psf_params_start_index+len(self.psf_poly_params))
-        self.psf_params_index_order2 = np.concatenate([np.arange(0, self.psf_params_start_index), np.arange(np.max(self.psf_params_index)+1, len(self.p))])
-        self.psf_params_start_index_order2 = np.max(self.psf_params_index)+1
 
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
@@ -209,23 +179,20 @@ class SpectrogramFitWorkspace(FitWorkspace):
 
         Examples
         --------
-        >>> from spectractor.config import load_config
-        >>> load_config("config/ctio.ini")
-        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
-        >>> w = SpectrogramFitWorkspace(filename, verbose=True)
-        >>> _ = w.simulate(*w.p)
+        >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> w = SpectrogramFitWorkspace(spec, verbose=True)
+        >>> _ = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         """
         self.my_logger.info("\n\tReset spectrogram mask with current parameters.")
         if params is None:
-            params = self.p
+            params = self.params.values
         A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params = params
         psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params,
                                                                                             apply_bounds=True)
         self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
-        Dx = np.arange(len(psf_profile_params[:,
-                           0])) - self.spectrum.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
+        Dx = np.arange(len(psf_profile_params[:, 0])) - self.spectrum.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
         Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
         psf_profile_params[:, 0] = 1
         psf_profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + shift_x
@@ -284,9 +251,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         dispersion: bool, optional
             If True, plot a colored bar to see the associated wavelength color along the x axis (default: False).
         """
-        cmap_bwr = copy.copy(cm.get_cmap('bwr'))
+        cmap_bwr = copy.copy(mpl.colormaps["bwr"])
         cmap_bwr.set_bad(color='lightgrey')
-        cmap_viridis = copy.copy(cm.get_cmap('viridis'))
+        cmap_viridis = copy.copy(mpl.colormaps["viridis"])
         cmap_viridis.set_bad(color='lightgrey')
 
         data = np.copy(self.data_before_mask)
@@ -386,12 +353,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        >>> from spectractor.config import load_config
-        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
-        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> load_config("config/ctio.ini")
-        >>> w = SpectrogramFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> w = SpectrogramFitWorkspace(spec, verbose=True)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         """
@@ -411,7 +375,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         plot_counter += 1
         return self.lambdas, self.model, self.model_err
 
-    def jacobian(self, params, epsilon, fixed_params=None, model_input=None):
+    def jacobian(self, params, epsilon, model_input=None):
         start = time.time()
         if model_input is not None:
             lambdas, model, model_err = model_input
@@ -422,7 +386,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         strategy = copy.copy(self.simulation.fix_psf_cube)
         atmosphere = copy.copy(self.simulation.atmosphere_sim)
         for ip, p in enumerate(params):
-            if fixed_params[ip]:
+            if self.params.fixed[ip]:
                 continue
             if ip in self.fixed_psf_params:
                 self.simulation.fix_psf_cube = True
@@ -433,7 +397,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             else:
                 self.simulation.fix_atm_sim = True
             tmp_p = np.copy(params)
-            if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
+            if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
@@ -451,12 +415,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        >>> from spectractor.config import load_config
-        >>> load_config("config/ctio.ini")
-        >>> filename = 'tests/data/reduc_20170530_134_spectrum.fits'
-        >>> atmgrid_filename = filename.replace('spectrum', 'atmsim')
-        >>> w = SpectrogramFitWorkspace(filename, atmgrid_filename, verbose=1, plot=True, live_fit=False)
-        >>> lambdas, model, model_err = w.simulate(*w.p)
+        >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+        >>> w = SpectrogramFitWorkspace(spec, verbose=True)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()
 
         .. plot::
@@ -542,18 +503,14 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
 
     Examples
     --------
-
-    >>> from spectractor.config import load_config
-    >>> load_config("config/ctio.ini")
-    >>> filename = 'tests/data/sim_20170530_134_spectrum.fits'
-    >>> atmgrid_filename = filename.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-    >>> w = SpectrogramFitWorkspace(filename, atmgrid_file_name=atmgrid_filename, verbose=1, plot=True, live_fit=False)
+    >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
+    >>> w = SpectrogramFitWorkspace(spec, verbose=True, atmgrid_file_name='tests/data/reduc_20170530_134_atmsim.fits')
     >>> parameters.VERBOSE = True
     >>> run_spectrogram_minimisation(w, method="newton")
 
     """
     my_logger = set_logger(__name__)
-    guess = np.asarray(fit_workspace.p)
+    guess = np.asarray(fit_workspace.params.values)
     fit_workspace.simulate(*guess)
     fit_workspace.plot_fit()
     if method != "newton":
@@ -564,10 +521,10 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         #     fit_workspace.plot_fit()
         # params_table = np.array([guess])
         start = time.time()
-        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.input_labels}")
+        my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
         epsilon = 1e-4 * guess
         epsilon[epsilon == 0] = 1e-4
-        fixed = np.copy(fit_workspace.fixed)
+        fixed = np.copy(fit_workspace.params.fixed)
 
         # fit_workspace.simulation.fast_sim = True
         # fit_workspace.simulation.fix_psf_cube = False
@@ -589,25 +546,21 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
 
         fit_workspace.simulation.fast_sim = False
         fit_workspace.simulation.fix_psf_cube = False
-        fit_workspace.fixed = np.copy(fixed)
+        fit_workspace.params.fixed = np.copy(fixed)
         # guess = fit_workspace.p
         # params_table, costs = run_gradient_descent(fit_workspace, guess, epsilon, params_table, costs,
         #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
         #                                            niter=40)
-        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, fix=fit_workspace.fixed,
-                                        xtol=1e-6, ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3,
-                                        verbose=False)
+        run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon,  xtol=1e-6,
+                                        ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=False)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
-            parameters.SAVE = True
-            ipar = np.array(np.where(np.array(fit_workspace.fixed).astype(int) == 0)[0])
-            fit_workspace.plot_correlation_matrix(ipar)
-            fit_workspace.save_parameters_summary(ipar, header=f"{fit_workspace.spectrum.date_obs}\n"
-                                                               f"chi2: "
-                                                               f"{fit_workspace.costs[-1] / fit_workspace.data.size}")
+            fit_workspace.params.plot_correlation_matrix()
+            write_fitparameter_json(fit_workspace.params.json_filename, fit_workspace.params,
+                                    extra={"chi2": fit_workspace.costs[-1] / fit_workspace.data.size,
+                                           "date-obs": fit_workspace.spectrum.date_obs})
             # save_gradient_descent(fit_workspace, costs, params_table)
             fit_workspace.plot_fit()
-            parameters.SAVE = False
 
 
 if __name__ == "__main__":
