@@ -1426,6 +1426,8 @@ class Astrometry():  # pragma: no cover
                 k -= 1
                 break
         t.pprint_all()
+        if len(t) == 0:
+            raise IndexError(f"Astrometry has failed at every iteration, empty table {t=}.")
         best_iter = int(np.argmin(t["gaia_residuals_quad_sum"]))
         self.my_logger.info(f'\n\tBest run: iteration #{best_iter}')
         self.run_simple_astrometry(extent=extent, sources=sources_list[best_iter])
