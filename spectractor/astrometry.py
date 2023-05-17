@@ -1058,8 +1058,7 @@ class Astrometry():  # pragma: no cover
         ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
         >>> tag = file_name.split('/')[-1]
         >>> disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
-        >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")  # doctest: +ELLIPSIS
-        Section:...
+        >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")
         >>> a = Astrometry(im, source_extractor="astrometrynet")
         >>> a.run_simple_astrometry(extent=((300,1400),(300,1400)))  # doctest: +ELLIPSIS
         WCS ...
