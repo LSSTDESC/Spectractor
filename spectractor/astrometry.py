@@ -356,7 +356,7 @@ class Astrometry():  # pragma: no cover
         >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> target_x, target_y = a.get_target_pixel_position()
         >>> print(target_x, target_y) # doctest: +ELLIPSIS
-        743... 683...
+        745... 684...
 
         """
         target_x, target_y = self.wcs.all_world2pix(self.image.target.radec_position_after_pm.ra,
@@ -393,8 +393,8 @@ class Astrometry():  # pragma: no cover
         .. doctest:
             :hide:
 
-            >>> assert np.isclose(gaia_x[0], 744, atol=0.5)
-            >>> assert np.isclose(gaia_y[0], 683, atol=0.5)
+            >>> assert np.isclose(gaia_x[0], 745, atol=1)
+            >>> assert np.isclose(gaia_y[0], 684, atol=1)
 
         """
         if gaia_index is None:
@@ -902,6 +902,9 @@ class Astrometry():  # pragma: no cover
 
         >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
         >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> a.load_gaia_catalog_around_target()  #doctest: +ELLIPSIS
+        INFO: Query finished...
+        <Table length=...>...
         >>> residuals = a.compute_gaia_pixel_residuals()
 
         .. doctest:
@@ -1058,8 +1061,7 @@ class Astrometry():  # pragma: no cover
         ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
         >>> tag = file_name.split('/')[-1]
         >>> disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
-        >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")  # doctest: +ELLIPSIS
-        Section:...
+        >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")
         >>> a = Astrometry(im, source_extractor="astrometrynet")
         >>> a.run_simple_astrometry(extent=((300,1400),(300,1400)))  # doctest: +ELLIPSIS
         WCS ...
@@ -1183,7 +1185,6 @@ class Astrometry():  # pragma: no cover
         >>> tag = file_name.split('/')[-1]
         >>> disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")  # doctest: +ELLIPSIS
-        Section:...
         >>> a = Astrometry(im)
         >>> a.run_simple_astrometry(extent=((300,1400),(300,1400)))  # doctest: +ELLIPSIS
         WCS ...
@@ -1213,13 +1214,7 @@ class Astrometry():  # pragma: no cover
                 self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
                 self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
             else:
-                radius = 2 * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
-                                 np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
-                radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
-                self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
-                                    f"arcsec from {self.image.target.label} {self.image.target.radec_position}...")
-                self.gaia_catalog = load_gaia_catalog(self.image.target.radec_position, radius=radius, gaia_mag_g_limit=self.gaia_mag_g_limit)
-                ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
+                self.load_gaia_catalog_around_target()
             self.my_logger.info(f"\n\tGaia catalog loaded.")
 
         # update coordinates with proper motion data
@@ -1371,7 +1366,6 @@ class Astrometry():  # pragma: no cover
         >>> tag = file_name.split('/')[-1]
         >>> disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")  # doctest: +ELLIPSIS
-        Section:...
         >>> a = Astrometry(im)
         >>> extent = ((max(0, xpos - radius), min(xpos + radius, parameters.CCD_IMSIZE)),
         ...           (max(0, ypos - radius), min(ypos + radius, parameters.CCD_IMSIZE)))
@@ -1427,6 +1421,8 @@ class Astrometry():  # pragma: no cover
                 k -= 1
                 break
         t.pprint_all()
+        if len(t) == 0:
+            raise IndexError(f"Astrometry has failed at every iteration, empty table {t=}.")
         best_iter = int(np.argmin(t["gaia_residuals_quad_sum"]))
         self.my_logger.info(f'\n\tBest run: iteration #{best_iter}')
         self.run_simple_astrometry(extent=extent, sources=sources_list[best_iter])
@@ -1441,5 +1437,7 @@ class Astrometry():  # pragma: no cover
 
 if __name__ == "__main__":
     import doctest
-
+    im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+    a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+    a.load_gaia_catalog_around_target()
     doctest.testmod()

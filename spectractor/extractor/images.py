@@ -830,20 +830,20 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     Examples
     --------
     >>> parameters.CCD_REBIN = 1
-    >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9", config="./config/ctio.ini")
-    >>> im.plot_image()
-    >>> guess = [820, 580]
+    >>> im = Image('tests/data/reduc_20170530_134.fits', target_label="HD111980", config="./config/ctio.ini")
+    >>> im.plot_image(scale="symlog")
+    >>> guess = [750, 680]
     >>> parameters.VERBOSE = True
     >>> parameters.DEBUG = True
     >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "fit"
     >>> find_target(im, guess)  #doctest: +ELLIPSIS
-    [816.8... 587.3...]
+    [743.7... 683.1...]
     >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "WCS"
     >>> find_target(im, guess)  #doctest: +ELLIPSIS
-    [816.9... 587.1...]
+    [745... 684...]
     >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "guess"
     >>> find_target(im, guess, widths=(100, 100))
-    [820, 580]
+    [750, 680]
     """
     target_pixcoords = [-1, -1]
     theX = -1
