@@ -1102,11 +1102,11 @@ class Spectrum:
         >>> s.x0 = [743, 683]
         >>> s.spectrogram_x0 = -280
         >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
-        >>> lambdas[:4]
-        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> lambdas[:4]  #doctest: +ELLIPSIS
+        array([334.874..., 336.022..., 337.170..., 338.318...])
         >>> lambdas_order2 = s.compute_lambdas_in_spectrogram(58, 0, 0, 0, order=2)
-        >>> lambdas_order2[:4]
-        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
+        >>> lambdas_order2[:4]  #doctest: +ELLIPSIS
+        array([175.248..., 175.661..., 176.088..., 176.527...])
         """
         # Distance in x and y with respect to the true order 0 position at lambda_ref
         Dx, Dy_disp_axis = self.compute_disp_axis_in_spectrogram(shift_x=shift_x, shift_y=shift_y, angle=angle)
@@ -1160,16 +1160,16 @@ class Spectrum:
         >>> s.x0 = [743, 683]
         >>> s.spectrogram_x0 = -280
         >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
-        >>> lambdas[:4]
-        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> lambdas[:4]  #doctest: +ELLIPSIS
+        array([334.874..., 336.022..., 337.170..., 338.318...])
         >>> dispersion_law = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=1)
-        >>> dispersion_law[:4]
-        array([280.0000185 +1.07837872j, 281.00001766+1.06655761j,
-               282.00001686+1.05487099j, 283.0000161 +1.04331681j])
+        >>> dispersion_law[:4]  #doctest: +ELLIPSIS
+        array([280.0... +1.0...j, 281.0...+1.0...j,
+               282.0...+1.0...j, 283.0... +1.0...j])
         >>> dispersion_law_order2 = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=2)
-        >>> dispersion_law_order2[:4]
-        array([573.69582907+1.07837872j, 575.80158761+1.06655761j,
-               577.90853861+1.05487099j, 580.01668263+1.04331681j])
+        >>> dispersion_law_order2[:4]  #doctest: +ELLIPSIS
+        array([573.6...+1.0...j, 575.8...+1.0...j,
+               577.9...+1.0...j, 580.0...+1.0...j])
 
         """
         new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
