@@ -3,6 +3,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 from scipy.interpolate import interp1d
 import getCalspec
+import copy
 
 from spectractor import parameters
 from spectractor.config import set_logger
@@ -362,11 +363,13 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
 
         fit_workspace.simulation.fast_sim = False
         # fit_workspace.fixed[0] = True
-        fixed = [True] * len(fit_workspace.params.values)
-        fixed[0] = False
+        fixed = copy.copy(fit_workspace.params.fixed)
+        fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
+        fit_workspace.params.fixed[0] = False
         run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
                          verbose=False)
         # fit_workspace.fixed[0] = False
+        fit_workspace.params.fixed = fixed
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
 
