@@ -165,7 +165,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ylim = ax2.get_ylim()
         residuals_model = self.model_err[sub][idx] / self.err[sub][idx]
         ax2.fill_between(lambdas[sub][idx], -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
-        std = np.std(residuals)  # max(np.std(residuals), np.std(residuals_model))
+        std = np.nanstd(residuals)  # max(np.std(residuals), np.std(residuals_model))
         ax2.set_ylim(-5*std, 5*std)
         ax2.set_xlabel(ax.get_xlabel())
         # ax2.set_ylabel('(Data-Model)/Err', fontsize=10)
