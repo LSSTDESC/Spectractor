@@ -124,7 +124,7 @@ class PDF(Grid):
         return pdf
 
     def fill_histogram(self, data, weights=None):
-        self.grid = np.histogram(data, bins=self.axe.bins, normed=False, weights=weights)[0]
+        self.grid = np.histogram(data, bins=self.axe.bins, weights=weights)[0]
         self.normalize()
 
     def plot(self, truth=None):
@@ -242,7 +242,7 @@ class Contours(Grid):
         self.rho = 0
 
     def fill_histogram(self, data1, data2, weights=None):
-        self.grid = (np.histogram2d(data1, data2, bins=[list(self.axes[1].bins), list(self.axes[0].bins)], normed=False,
+        self.grid = (np.histogram2d(data1, data2, bins=[list(self.axes[1].bins), list(self.axes[0].bins)],
                                     weights=weights)[0]).T
         self.normalize()
 
