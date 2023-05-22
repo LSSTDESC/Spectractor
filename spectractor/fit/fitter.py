@@ -1838,14 +1838,14 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
             fit_workspace.save_gradient_descent()
 
 
-def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ftol=1e-4,
+def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ftol=1e-4, with_line_search=True,
                                     niter=50, sigma_clip=5.0, niter_clip=3, verbose=False):
     my_logger = set_logger(__name__)
     fit_workspace.sigma_clip = sigma_clip
     for step in range(niter_clip):
         if verbose:
             my_logger.info(f"\n\tSigma-clipping step {step}/{niter_clip} (sigma={sigma_clip})")
-        run_minimisation(fit_workspace, method=method, epsilon=epsilon, xtol=xtol, ftol=ftol, niter=niter)
+        run_minimisation(fit_workspace, method=method, epsilon=epsilon, xtol=xtol, ftol=ftol, niter=niter, with_line_search=with_line_search)
         # remove outliers
         if fit_workspace.data.dtype == object:
             # indices_no_nan = ~np.isnan(np.concatenate(fit_workspace.data).ravel())
