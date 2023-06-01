@@ -308,7 +308,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         ax0.set_ylabel(parameters.PLOT_YLABEL)
         ax0.set_xticks([])
         ax1.set_xticks([])
-        bkg.plot_meshes(outlines=True, color='red', axes=ax1, linewidth=0.5)
+        bkg.plot_meshes(outlines=True, color='red', ax=ax1, linewidth=0.5)
         b = bkg.background
         im = ax1.imshow(b, origin='lower', aspect="auto")
         ax1.set_xlabel(parameters.PLOT_XLABEL)
