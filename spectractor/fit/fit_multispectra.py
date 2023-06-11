@@ -850,34 +850,23 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 for s in range(model.shape[0]):
                     J[ip].append((tmp_model[s] - model[s]) / epsilon[ip])
             else:
-                # tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-                # if self.W.dtype == object and self.W[0].ndim == 2:
-                #     for k in range(model.shape[0]):
-                #         J[ip].append((tmp_model[k] - model[k]) / epsilon[ip])
-                # else:
-                #     J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
-                # print(tmp_p[ip], np.sum(J[ip]))
                 k = int(self.params.labels[ip].split("_")[-1]) - 1
                 dM_dA1k = np.zeros_like(M)
                 dM_dA1k[k] = np.copy(M[k]) / p
                 for s in range(self.nspectra):
                     dcov_dA1s = - 2 * inv_M_dot_W_dot_M @ (dM_dA1k[s].T @ self.W[s] @ M[s]) @ inv_M_dot_W_dot_M
-                    # dcov_dA1k = dM_dA1k[s].T @ self.W[s] @ M[s]
                     dTinst_dA1s = dcov_dA1s @ M_dot_W_dot_D + inv_M_dot_W_dot_M @ (dM_dA1k[s].T @ self.W[s] @ self.data[s])
-                    # print(s, np.linalg.norm(M[s] @ dTinst_dA1s), np.linalg.norm(dM_dA1k[s] @ Tinst))
                     J[ip].append((M[s] @ dTinst_dA1s) + dM_dA1k[s] @ Tinst)
-                # print("JA1", time.time()-start, np.sum(test))
-                # print(ip, self.input_labels[ip], tmp_p[ip], np.linalg.norm(J[ip]), np.max(J[ip]))
         self.fix_atm_sim = False
         return np.asarray(J, dtype=object)
 
     def chisq(self, p, model_output=False):
-        aerosols, ozone, pwv, reso, *A1s = p
+        # aerosols, ozone, pwv, reso, *A1s = p
         # tatm = self.atmosphere.simulate(ozone=ozone, pwv=pwv, aerosols=aerosols)(self.lambdas[0])
         # penalty = 10000*np.linalg.norm((self.L.T @ self.amplitude_params)*savgol_filter(tatm, 5, 2, deriv=2)/self.amplitude_params_err)**2
         # penalty = np.linalg.norm((self.L.T @ self.amplitude_params))**2 #/self.amplitude_params_err)**2
-        from scipy.signal import savgol_filter
-        penalty = 0 * 1e5 * np.linalg.norm(savgol_filter(self.amplitude_params, 5, 2, deriv=2)[5:-5]) ** 2
+        # from scipy.signal import savgol_filter
+        penalty = 0  # 1e5 * np.linalg.norm(savgol_filter(self.amplitude_params, 5, 2, deriv=2)[5:-5]) ** 2
         if model_output:
             chisq, x, model, model_err = super().chisq(p, model_output=model_output)
             return chisq + penalty, x, model, model_err
