@@ -124,7 +124,7 @@ class PDF(Grid):
         return pdf
 
     def fill_histogram(self, data, weights=None):
-        self.grid = np.histogram(data, bins=self.axe.bins, normed=False, weights=weights)[0]
+        self.grid = np.histogram(data, bins=self.axe.bins, density=False, weights=weights)[0]
         self.normalize()
 
     def plot(self, truth=None):
