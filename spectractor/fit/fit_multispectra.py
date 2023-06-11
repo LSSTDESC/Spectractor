@@ -19,12 +19,22 @@ from spectractor.extractor.spectroscopy import HALPHA, HBETA, HGAMMA, HDELTA, O2
 from spectractor.extractor.targets import load_target
 
 
-def _build_test_sample(nspectra=3):
+def _build_test_sample(nspectra=3, aerosols=0.05, ozone=300, pwv=5):
     """
 
     Parameters
     ----------
-    nspectra
+    nspectra: int
+        Number of spectra to simulate.
+    aerosols: float
+        VAOD Vertical Aerosols Optical Depth
+    angstrom_exponent: float, optional
+        Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
+        If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
+    ozone: float
+        Ozone quantity in Dobson
+    pwv: float
+        Precipitable Water Vapor quantity in mm
 
     Examples
     --------
@@ -47,7 +57,7 @@ def _build_test_sample(nspectra=3):
         s.pressure = pressure
         s.temperature = temperature
         s.adr_params = [s.dec, s.hour_angle, temperature, pressure, s.humidity, airmass]
-        s.simulate(A1=1, A2=0, aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5,
+        s.simulate(A1=1, A2=0, aerosols=aerosols, angstrom_exponent=None, ozone=ozone, pwv=pwv,
                    reso=-1, D=parameters.DISTANCE2CCD, shift_x=0, B=0)
         spectra.append(s)
     return spectra
