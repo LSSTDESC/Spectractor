@@ -204,7 +204,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 self.lambdas.append(np.asarray(lbdas))
             self.lambdas = np.asarray(self.lambdas)
         else:
-            self.my_logger.warning(f'Multispectra fit code works without rebinning but must be tested on a simulation to trust outputs.')
+            self.my_logger.warning(f'\n\tMultispectra fit code works without rebinning '
+                                   f'but must be tested on a simulation to trust outputs.')
             self.lambdas = np.copy(self.spectrum_lambdas)
             dlbda = self.lambdas[0, -1] - self.lambdas[0, -2]
             lambdas_bin_edges = list(self.lambdas[0]) + [self.lambdas[0, -1] + dlbda]
@@ -858,7 +859,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
-            if "A_" not in self.params.labels[ip]:
+            if "XXXX_" not in self.params.labels[ip]:
                 tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
                 for s in range(model.shape[0]):
                     J[ip].append((tmp_model[s] - model[s]) / epsilon[ip])
