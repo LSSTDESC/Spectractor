@@ -839,8 +839,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # inv_M_dot_W_dot_M = np.copy(self.amplitude_cov_matrix)
         # M_dot_W_dot_D = np.copy(self.M_dot_W_dot_D)
         # Tinst = np.copy(self.amplitude_params)
-        model = model.flatten()
-        J = np.zeros((params.size, model.size))
+        J = [[] for _ in range(params.size)]
         for ip, p in enumerate(params):
             if self.params.fixed[ip]:
                 continue
@@ -852,7 +851,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
-            if "A1_" not in self.params.labels[ip]:
+            if "A_" not in self.params.labels[ip]:
                 tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
                 for s in range(model.shape[0]):
                     J[ip].append((tmp_model[s] - model[s]) / epsilon[ip])
