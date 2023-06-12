@@ -835,15 +835,12 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             x, model, model_err = model_input
         else:
             x, model, model_err = self.simulate(*params)
-        M = np.copy(self.M)
-        inv_M_dot_W_dot_M = np.copy(self.amplitude_cov_matrix)
-        M_dot_W_dot_D = np.copy(self.M_dot_W_dot_D)
-        Tinst = np.copy(self.amplitude_params)
-        if self.W.dtype == object and self.W[0].ndim == 2:
-            J = [[] for _ in range(params.size)]
-        else:
-            model = model.flatten()
-            J = np.zeros((params.size, model.size))
+        # M = np.copy(self.M)
+        # inv_M_dot_W_dot_M = np.copy(self.amplitude_cov_matrix)
+        # M_dot_W_dot_D = np.copy(self.M_dot_W_dot_D)
+        # Tinst = np.copy(self.amplitude_params)
+        model = model.flatten()
+        J = np.zeros((params.size, model.size))
         for ip, p in enumerate(params):
             if self.params.fixed[ip]:
                 continue
@@ -855,18 +852,18 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
-            if "A_" not in self.params.labels[ip]:
+            if "A1_" not in self.params.labels[ip]:
                 tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
                 for s in range(model.shape[0]):
                     J[ip].append((tmp_model[s] - model[s]) / epsilon[ip])
-            else:
-                k = int(self.params.labels[ip].split("_")[-1]) - 1
-                dM_dA1k = np.zeros_like(M)
-                dM_dA1k[k] = np.copy(M[k]) / p
-                for s in range(self.nspectra):
-                    dcov_dA1s = - 2 * inv_M_dot_W_dot_M @ (dM_dA1k[s].T @ self.W[s] @ M[s]) @ inv_M_dot_W_dot_M
-                    dTinst_dA1s = dcov_dA1s @ M_dot_W_dot_D + inv_M_dot_W_dot_M @ (dM_dA1k[s].T @ self.W[s] @ self.data[s])
-                    J[ip].append((M[s] @ dTinst_dA1s) + dM_dA1k[s] @ Tinst)
+            # else:  # don't work
+            #     k = int(self.params.labels[ip].split("_")[-1]) - 1
+            #     dM_dA1k = np.zeros_like(M)
+            #     dM_dA1k[k] = np.copy(M[k]) / p
+            #     for s in range(self.nspectra):
+            #         dcov_dA1s = - 2 * inv_M_dot_W_dot_M @ (dM_dA1k[s].T @ self.W[s] @ M[s]) @ inv_M_dot_W_dot_M
+            #         dTinst_dA1s = dcov_dA1s @ M_dot_W_dot_D + inv_M_dot_W_dot_M @ (dM_dA1k[s].T @ self.W[s] @ self.data[s])
+            #         J[ip].append((M[s] @ dTinst_dA1s) + dM_dA1k[s] @ Tinst)
         self.fix_atm_sim = False
         return np.asarray(J, dtype=object)
 
