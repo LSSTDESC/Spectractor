@@ -204,11 +204,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 self.lambdas.append(np.asarray(lbdas))
             self.lambdas = np.asarray(self.lambdas)
         else:
-            for k in range(1, len(self.spectrum_lambdas)):
-                if self.spectrum_lambdas[k].size != self.spectrum_lambdas[0].size or \
-                        not np.all(np.isclose(self.spectrum_lambdas[k], self.spectrum_lambdas[0])):
-                    raise ValueError("\nIf you don't rebin your spectra, "
-                                     "they must share the same wavelength arrays (in length and values).")
+            self.my_logger.warning(f'Multispectra fit code works without rebinning but must be tested on a simulation to trust outputs.')
             self.lambdas = np.copy(self.spectrum_lambdas)
             dlbda = self.lambdas[0, -1] - self.lambdas[0, -2]
             lambdas_bin_edges = list(self.lambdas[0]) + [self.lambdas[0, -1] + dlbda]
@@ -289,7 +285,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         else:
             for k in range(self.nspectra):
                 ref = interp1d(self.spectra[k].target.wavelengths[0], self.spectra[k].target.spectra[0],
-                               kind="cubic", fill_value="extrapolate", bounds_error=None)(self.lambdas[k])
+                               kind="cubic", fill_value="extrapolate", bounds_error=None)(self.spectrum_lambdas[k])
                 self.ref_spectrum_cube.append(np.copy(ref))
         self.ref_spectrum_cube = np.asarray(self.ref_spectrum_cube)
         # rebin errors
@@ -399,6 +395,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 invcov_matrix[lambdas_to_mask_indices[k], :] = 0
                 invcov_matrix[:, lambdas_to_mask_indices[k]] = 0
                 self.W[k] = invcov_matrix
+                self.data_cov[k] = np.copy(self.spectrum_data_cov[k])
 
     def inject_random_A1s(self):  # pragma: no cover
         random_A1s = np.random.uniform(0.5, 1, size=self.nspectra)
@@ -477,6 +474,13 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         >>> assert np.all(lambdas == w.lambdas)
         >>> assert np.sum(w.amplitude_params) > 0
 
+        # Test without rebinning
+        >>> w = MultiSpectraFitWorkspace("./outputs/test", spectra, bin_width=-1, verbose=True)
+        >>> lambdas, model, model_err = w.simulate(*w.params.values)
+        >>> assert np.sum(model) > 0
+        >>> assert np.all(lambdas == w.lambdas)
+        >>> assert np.sum(w.amplitude_params) > 0
+
         """
         # linear regression for the instrumental transmission parameters T
         # first: force the grey terms to have an average of 1
@@ -498,15 +502,18 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             for k in range(self.nspectra):
                 atm = []
                 a = self.atmospheres[k].simulate(aerosols=aerosols, ozone=ozone, pwv=pwv)
-                for i in range(1, self.lambdas_bin_edges.size):
-                    delta = self.lambdas_bin_edges[i] - self.lambdas_bin_edges[i-1]
-                    if delta > 0:
-                        # atm.append(quad(a, self.lambdas_bin_edges[i-1] + deltas[k], self.lambdas_bin_edges[i] + deltas[k])[0] / delta)
-                        lbdas = np.arange(self.lambdas_bin_edges[i-1] + deltas[k], self.lambdas_bin_edges[i] + deltas[k] + 1, 1)
-                        atm.append(np.trapz(a(lbdas), x=lbdas)/delta)
-                    else:
-                        atm.append(1)
-                self.atmospheres_curr.append(np.array(atm))
+                if self.bin_widths > 0:
+                    for i in range(1, self.lambdas_bin_edges.size):
+                        delta = self.lambdas_bin_edges[i] - self.lambdas_bin_edges[i-1]
+                        if delta > 0:
+                            # atm.append(quad(a, self.lambdas_bin_edges[i-1] + deltas[k], self.lambdas_bin_edges[i] + deltas[k])[0] / delta)
+                            lbdas = np.arange(self.lambdas_bin_edges[i-1] + deltas[k], self.lambdas_bin_edges[i] + deltas[k] + 1, 1)
+                            atm.append(np.trapz(a(lbdas), x=lbdas)/delta)
+                        else:
+                            atm.append(1)
+                else:
+                    atm = a(self.spectrum_lambdas[k])
+                self.atmospheres_curr.append(np.asarray(atm))
                 # fig = plt.figure()
                 # lbdas = np.arange(300, 1100, 1)
                 # plt.plot(self.lambdas_bin_edges[:-1], a(self.lambdas_bin_edges[:-1])-np.array(atm))
