@@ -1591,9 +1591,9 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         fit_workspace.params.values = tmp_params
         if fit_workspace.verbose:
             my_logger.info(f"\n\tIteration={i}:\tfinal cost={fval:.5g}\tfinal chisq_red={fval / (tmp_model.size - n_data_masked):.5g} "
-                           f"\tcomputed in {time.time() - start:.2f}s")
+                           f"\tcomputed in {time.time() - start:.2f}s"
+                           f"\n\tNew parameters: {tmp_params[ipar]}")
             my_logger.debug(f"\n\t Parameter shifts: {alpha_min * dparams}\n"
-                            f"\n\t New parameters: {tmp_params[ipar]}"
                             f"\n\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}")
         if fit_workspace.live_fit:  # pragma: no cover
             fit_workspace.simulate(*tmp_params)
