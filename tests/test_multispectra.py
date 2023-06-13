@@ -11,18 +11,19 @@ NSPECTRA = 3
 OZONE = 300
 PWV = 5
 AEROSOLS = 0.05
+LOG10A = -2
 
 def test_multispectra():
-    spectra = _build_test_sample(NSPECTRA, aerosols=AEROSOLS, ozone=OZONE, pwv=PWV)
+    spectra = _build_test_sample(NSPECTRA, aerosols=AEROSOLS, ozone=OZONE, pwv=PWV, angstrom_exponent=10**LOG10A)
     parameters.VERBOSE = True
 
     nsigma = 2
-    labels = ["VAOD_T", "OZONE", "PWV"]
-    truth = [AEROSOLS, OZONE, PWV]
-    indices = [0, 1, 2]
+    labels = ["VAOD", "LOG10A", "OZONE", "PWV"]
+    truth = [AEROSOLS, LOG10A, OZONE, PWV]
+    indices = [0, 1, 2, 3]
     for method in ["noprior", "spectrum"]:
         w = MultiSpectraFitWorkspace("./tests/data/", spectra, bin_width=5, verbose=True, fixed_deltas=True,
-                                     fixed_A1s=False, amplitude_priors_method=method)
+                                     fixed_A1s=False, amplitude_priors_method=method, fit_angstrom_exponent=True)
         run_multispectra_minimisation(w, method="newton", verbose=True, sigma_clip=10)
 
         ipar = w.params.get_free_parameters()  # non fixed param indices

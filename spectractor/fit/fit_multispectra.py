@@ -19,6 +19,39 @@ from spectractor.extractor.spectroscopy import HALPHA, HBETA, HGAMMA, HDELTA, O2
 from spectractor.extractor.targets import load_target
 
 
+def _build_sim_sample(spectra, aerosols=0.05, ozone=300, pwv=5, angstrom_exponent=None):
+    """
+
+    Parameters
+    ----------
+    spectra: list[Spectrum]
+        List of spectra to copy as simulations.
+    aerosols: float
+        VAOD Vertical Aerosols Optical Depth
+    angstrom_exponent: float, optional
+        Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
+        If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
+    ozone: float
+        Ozone quantity in Dobson
+    pwv: float
+        Precipitable Water Vapor quantity in mm
+
+    Examples
+    --------
+    >>> _build_sim_sample([Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")])
+    """
+    sim_spectra = []
+    for spec in spectra:
+        atm = Atmosphere(airmass=spec.airmass, pressure=spec.pressure, temperature=spec.temperature,
+                         lambda_min=np.min(spec.lambdas), lambda_max=np.max(spec.lambdas))
+        # fast_sim must be True to avoid biases (the rebinning is done after in _prepare_data())
+        s = SpectrumSimulation(spec, atmosphere=atm, fast_sim=True, with_adr=True)
+        s.simulate(A1=1, A2=0, aerosols=aerosols, angstrom_exponent=angstrom_exponent, ozone=ozone, pwv=pwv,
+                   reso=-1, D=parameters.DISTANCE2CCD, shift_x=0, B=0)
+        sim_spectra.append(s)
+    return sim_spectra
+
+
 def _build_test_sample(nspectra=3, aerosols=0.05, ozone=300, pwv=5, angstrom_exponent=None):
     """
 
@@ -919,7 +952,6 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False,
     Examples
     --------
     >>> spectra = _build_test_sample(3, aerosols=0.05, angstrom_exponent=0.02, ozone=300, pwv=5)
-    >>> spectra = [Spectrum(f"/Users/jneveu/Downloads/test_{k}.fits") for k in range(2,5)]
     >>> parameters.VERBOSE = True
     >>> w = MultiSpectraFitWorkspace("./outputs/test", spectra, bin_width=5, verbose=True,
     ... fixed_deltas=True, fixed_A1s=False, fit_angstrom_exponent=True)
