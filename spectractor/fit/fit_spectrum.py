@@ -9,7 +9,7 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.simulation.simulator import SpectrumSimulation
-from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid, angstrom_exponent_default
 from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisation_sigma_clipping, run_minimisation,
                                     write_fitparameter_json)
 from spectractor.tools import plot_spectrum_simple
@@ -60,7 +60,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         if not getCalspec.is_calspec(spectrum.target.label):
             raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
-        p = np.array([1, 0, 0.01, -2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
+        p = np.array([1, 0, 0.05, np.log10(angstrom_exponent_default), 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
         # fixed[0] = True
         fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases

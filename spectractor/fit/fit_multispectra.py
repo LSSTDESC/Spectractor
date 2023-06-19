@@ -10,7 +10,7 @@ from scipy.interpolate import interp1d
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid, angstrom_exponent_default
 from spectractor.simulation.simulator import SpectrumSimulation
 from spectractor.fit.fitter import (FitWorkspace, run_minimisation_sigma_clipping, run_minimisation, FitParameters)
 from spectractor.tools import from_lambda_to_colormap, fftconvolve_gaussian
@@ -147,7 +147,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                                                lambda_max=np.max(spectrum.lambdas) + 1))
         self.fix_atm_sim = False
         self.atmospheres_curr = []
-        p = np.array([0.03, -2, 400, 3, -1, *np.zeros(self.nspectra), *np.ones(self.nspectra)])
+        p = np.array([0.05, np.log10(angstrom_exponent_default), 400, 5, -1, *np.zeros(self.nspectra), *np.ones(self.nspectra)])
         self.deltas_first_index = 5
         self.A1_first_index = self.deltas_first_index + self.nspectra
         fixed = [False] * p.size
@@ -455,11 +455,12 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             ozone_truth = self.spectra[0].header['OZONE_T']
             pwv_truth = self.spectra[0].header['PWV_T']
             aerosols_truth = self.spectra[0].header['VAOD_T']
-            if "LOG10A_T" in self.spectra[0].header:
-                angstrom_exponent_truth = self.spectra[0].header["LOG10A_T"]
+            if "LOG10A_T" in self.spectra[0].header and self.spectra[0].header["LOG10A_T"] is not None:
+                angstrom_exponent_truth = 10 ** self.spectra[0].header["LOG10A_T"]
+                self.truth = (aerosols_truth, np.log10(angstrom_exponent_truth), ozone_truth, pwv_truth)
             else:
                 angstrom_exponent_truth = None
-            self.truth = (aerosols_truth, angstrom_exponent_truth, ozone_truth, pwv_truth)
+                self.truth = (aerosols_truth, None, ozone_truth, pwv_truth)
             self.true_atmospheric_transmission = []
             tatm = self.atmosphere.simulate(ozone=ozone_truth, pwv=pwv_truth, aerosols=aerosols_truth, 
                                             angstrom_exponent=angstrom_exponent_truth)
@@ -694,7 +695,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                          edgecolors='None', c=self.lambdas[0][1:-1], label='', marker='o', s=20)
         # residuals
         res_mean = float(np.max([np.nanmean(list(res)) for res in residuals]))
-        res_std = float(np.min([np.nanstd(list(res)) for res in residuals]))
+        res_std = max(1., float(np.min([np.nanstd(list(res)) for res in residuals])))
         im = ax[2, 0].pcolormesh(xx, yy, residuals, vmin=-3 * res_std, vmax=3 * res_std, cmap=cmap_bwr, shading="auto")
         plt.colorbar(im, cax=ax[2, 1], label='(Data-Model)/Err', format="%.0f")
         # ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, color='black', x=0.84, y=0.76)

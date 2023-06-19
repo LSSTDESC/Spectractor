@@ -12,7 +12,7 @@ from spectractor.config import set_logger
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.simulation.simulator import SpectrogramModel
-from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid, angstrom_exponent_default
 from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisation, run_minimisation_sigma_clipping,
                                     write_fitparameter_json)
 
@@ -64,7 +64,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         self.saturation = self.spectrum.spectrogram_saturation
-        p = np.array([1, 1, 0.05, -2, 400, 5, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'],
+        p = np.array([1, 1, 0.05, np.log10(angstrom_exponent_default), 400, 5, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'],
                       0, self.spectrum.rotation_angle, 1])
         self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 9])
         self.atm_params_indices = np.array([2, 3, 4, 5])
