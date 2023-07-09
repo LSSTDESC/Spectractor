@@ -18,6 +18,7 @@ from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colo
 from spectractor.fit.fitter import (run_minimisation, run_minimisation_sigma_clipping, write_fitparameter_json,
                                     RegFitWorkspace, FitWorkspace, FitParameters)
 
+import sparse_dot_mkl
 
 def dumpParameters():
     for item in dir(parameters):
@@ -213,6 +214,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             L[-1, -1] = -1
             self.L = L
             self.Q = L.T @ np.linalg.inv(self.amplitude_priors_cov_matrix) @ L
+            # sparse_indices = np.where(self.Q > 0)
+            # self.Q = sparse.csr_matrix((self.Q[sparse_indices].ravel(), sparse_indices), shape=self.Q.shape, dtype="float32")
             # self.Q = L.T @ U.T @ U @ L
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
 
@@ -293,7 +296,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         mask = mask.reshape((self.pixels[0].size,))
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
-        self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.sqrtW = np.sqrt(self.W) # sparse.diags(self.W))
         self.sparse_indices = None
         self.mask = list(np.where(mask)[0])
 
@@ -472,6 +475,22 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if self.amplitude_priors_method != "fixed":
             M_dot_W = M.T * self.sqrtW
             M_dot_W_dot_M = M_dot_W @ M_dot_W.T
+            #print(type(M_dot_W))
+            #M_dot_W_dot_M = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
+            #rows, cols = M_dot_W_dot_M.nonzero()
+            #M_dot_W_dot_M[cols, rows] = M_dot_W_dot_M[rows, cols]
+            ###############
+            #tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
+            #dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
+            #M_dot_W_dot_M = tri + tri.T - dia
+            ###############
+            #print(type(M_dot_W_dot_M))
+            #fig, ax = plt.subplots(1, 2)
+            #ax[0].imshow(np.log10(M_dot_W_dot_M.todense()))
+            # ax[1].imshow(np.log10(M_dot_W_dot_M_tmp.todense()))
+            # ax[2].imshow(np.log10(toto.todense()))
+            #plt.show()
+            #print(M_dot_W_dot_M != M_dot_W_dot_M_tmp)
             if self.amplitude_priors_method != "spectrum":
                 # try:  # slower
                 #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
@@ -500,7 +519,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             else:
                 M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
                 # try:  # slower
-                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
+                #     L = sparse.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
                 #     cov_matrix = L.T @ L
                 # except np.linalg.LinAlgError:
                 cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
