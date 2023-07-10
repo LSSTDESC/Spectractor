@@ -1806,43 +1806,47 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5):
     # grid exploration of the parameters
     # necessary because of the line detection algo
     D = parameters.DISTANCE2CCD
-    if spectrum.header['D2CCD'] != '':
+    pixel_shift = 0
+    if 'D2CCD' in spectrum.header:
         D = spectrum.header['D2CCD']
+    if 'PIXSHIFT' in spectrum.header:
+        pixel_shift = spectrum.header['PIXSHIFT']
     D_err = parameters.DISTANCE2CCD_ERR
     D_step = D_err / 2
     pixel_shift_step = parameters.PIXSHIFT_PRIOR / 5
     pixel_shift_prior = parameters.PIXSHIFT_PRIOR
-    Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
-    pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
-    # pixel_shifts = np.array([0])
-    chisq_grid = np.zeros((len(Ds), len(pixel_shifts)))
-    for i, D in enumerate(Ds):
-        for j, pixel_shift in enumerate(pixel_shifts):
-            chisq_grid[i, j] = shift_minimizer([D, pixel_shift])
-    imin, jmin = np.unravel_index(chisq_grid.argmin(), chisq_grid.shape)
-    D = Ds[imin]
-    pixel_shift = pixel_shifts[jmin]
+    if grid_search:
+        Ds = np.arange(D - 5 * D_err, D + 6 * D_err, D_step)
+        pixel_shifts = np.arange(-pixel_shift_prior, pixel_shift_prior + pixel_shift_step, pixel_shift_step)
+        chisq_grid = np.zeros((len(Ds), len(pixel_shifts)))
+        for i, D in enumerate(Ds):
+            for j, pixel_shift in enumerate(pixel_shifts):
+                chisq_grid[i, j] = shift_minimizer([D, pixel_shift])
+        imin, jmin = np.unravel_index(chisq_grid.argmin(), chisq_grid.shape)
+        D = Ds[imin]
+        pixel_shift = pixel_shifts[jmin]
+        if imin == 0 or imin == Ds.size or jmin == 0 or jmin == pixel_shifts.size:
+            spectrum.my_logger.warning('\n\tMinimum chisq is on the edge of the exploration grid.')
+        if parameters.DEBUG:
+            fig = plt.figure(figsize=(7, 4))
+            im = plt.imshow(np.log10(chisq_grid), origin='lower', aspect='auto',
+                            extent=(
+                                np.min(pixel_shifts) - pixel_shift_step / 2, np.max(pixel_shifts) + pixel_shift_step / 2,
+                                np.min(Ds) - D_step / 2, np.max(Ds) + D_step / 2))
+            plt.gca().scatter(pixel_shift, D, marker='o', s=100, edgecolors='k', facecolors='none',
+                              label='Minimum', linewidth=2)
+            c = plt.colorbar(im)
+            c.set_label('Log10(chisq)')
+            plt.xlabel(r'Pixel shift $\delta u_0$ [pix]')
+            plt.ylabel(r'$D_\mathrm{CCD}$ [mm]')
+            plt.legend()
+            fig.tight_layout()
+            if parameters.DISPLAY:  # pragma: no cover
+                plt.show()
+            if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+                fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'D2CCD_x0_fit.pdf'))
     start = np.array([D, pixel_shift])
-    if imin == 0 or imin == Ds.size or jmin == 0 or jmin == pixel_shifts.size:
-        spectrum.my_logger.warning('\n\tMinimum chisq is on the edge of the exploration grid.')
-    if parameters.DEBUG:
-        fig = plt.figure(figsize=(7, 4))
-        im = plt.imshow(np.log10(chisq_grid), origin='lower', aspect='auto',
-                        extent=(
-                            np.min(pixel_shifts) - pixel_shift_step / 2, np.max(pixel_shifts) + pixel_shift_step / 2,
-                            np.min(Ds) - D_step / 2, np.max(Ds) + D_step / 2))
-        plt.gca().scatter(pixel_shift, D, marker='o', s=100, edgecolors='k', facecolors='none',
-                          label='Minimum', linewidth=2)
-        c = plt.colorbar(im)
-        c.set_label('Log10(chisq)')
-        plt.xlabel(r'Pixel shift $\delta u_0$ [pix]')
-        plt.ylabel(r'$D_\mathrm{CCD}$ [mm]')
-        plt.legend()
-        fig.tight_layout()
-        if parameters.DISPLAY:  # pragma: no cover
-            plt.show()
-        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
-            fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'D2CCD_x0_fit.pdf'))
+
     # now minimize around the global minimum found previously
     # res = opt.minimize(shift_minimizer, start, args=(), method='L-BFGS-B',
     #                    options={'maxiter': 200, 'ftol': 1e-3},

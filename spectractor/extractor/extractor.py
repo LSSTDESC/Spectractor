@@ -898,7 +898,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
                 w.spectrum.err_next_order = np.abs(w.params.values[0] * w.amplitude_params_err * w.tr_ratio_next_order(w.lambdas))
 
             # Calibrate the spectrum
-            calibrate_spectrum(w.spectrum, with_adr=True)
+            calibrate_spectrum(w.spectrum, with_adr=True, grid_search=False)
             w.params.values[1] = w.spectrum.disperser.D
             w.params.values[2] = w.spectrum.header['PIXSHIFT']
             w.spectrum.convert_from_flam_to_ADUrate()
@@ -1126,7 +1126,7 @@ def SpectractorRun(image, output_directory, guess=None):
     with_adr = True
     if parameters.OBS_OBJECT_TYPE != "STAR":
         with_adr = False
-    calibrate_spectrum(spectrum, with_adr=with_adr)
+    calibrate_spectrum(spectrum, with_adr=with_adr, grid_search=True)
     spectrum.data_next_order = np.zeros_like(spectrum.lambdas)
     spectrum.err_next_order = np.zeros_like(spectrum.lambdas)
 
