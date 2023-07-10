@@ -1607,14 +1607,16 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             else:
                 w = np.ones_like(lambdas[index])
             fit, cov, model = fit_poly1d_legendre(lambdas[index], spec[index], order=bgd_npar - 1, w=w)
+        # bgd_mean = float(np.mean(spec_smooth[bgd_index]))
+        # bgd_std = float(np.std(spec_smooth[bgd_index]))
         for n in range(bgd_npar):
-            # guess[n] = getattr(bgd, bgd.param_names[parameters.CALIB_BGD_ORDER - n]).value
             guess[n] = fit[n]
             b = abs(baseline_prior * guess[n])
-            if np.isclose(b, 0, rtol=1e-2 * float(np.mean(spec_smooth[bgd_index]))):
-                b = baseline_prior * np.std(spec_smooth[bgd_index])
-                if np.isclose(b, 0, rtol=1e-2 * float(np.mean(spec_smooth[bgd_index]))):
-                    b = np.inf
+            # CHECK: following is completely inefficient as rtol has no effect when second argument is 0...
+            # if np.isclose(b, 0, rtol=1e-2 * bgd_mean):
+            #     b = baseline_prior * bgd_std
+            #     if np.isclose(b, 0, rtol=1e-2 * bgd_mean):
+            #         b = np.inf
             bounds[0][n] = guess[n] - b
             bounds[1][n] = guess[n] + b
         for j in range(len(new_lines_list[k])):
