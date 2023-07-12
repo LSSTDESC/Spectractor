@@ -254,7 +254,9 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocov
         plt.show()
 
     """
-    rr_gg = ((x - x_c) * (x - x_c) / (gamma * gamma) + (y - y_c) * (y - y_c) / (gamma * gamma))
+    xc = x - x_c
+    yc = y - y_c
+    rr_gg = (xc * xc + yc * yc) / (gamma * gamma)
     a = (1 + rr_gg) ** -alpha
     norm = (np.pi * gamma * gamma) / (alpha - 1)
     a *= amplitude / norm
@@ -340,7 +342,9 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
         plt.show()
 
     """
-    rr = ((x - x_c) * (x - x_c) + (y - y_c) * (y - y_c))
+    xc = x - x_c
+    yc = y - y_c
+    rr = xc * xc + yc * yc
     rr_gg = rr / (gamma * gamma)
     a = (1 + rr_gg) ** -alpha + eta_gauss * np.exp(-(rr / (2. * sigma * sigma)))
     norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * sigma * sigma
