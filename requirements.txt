@@ -21,3 +21,4 @@ deprecated
 pyyaml
 nose
 getCalspec>=2.0.0
+sparse_dot_mkl
