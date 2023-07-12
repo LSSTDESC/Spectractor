@@ -382,16 +382,17 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     >>> from spectractor.config import load_config
     >>> load_config("default.ini")
     >>> x = np.arange(600.,800.,1)
-    >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
-    >>> y = multigauss_and_bgd(x, *p)
+    >>> x_norm = rescale_x_to_legendre(x)
+    >>> p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd(np.array([x_norm, x]), *p)
     >>> print(f'{y[0]:.2f}')
-    19.00
+    20.00
     >>> err = 0.1 * np.sqrt(y)
-    >>> guess = (15,0,0,0,10,640,2,20,750,7)
+    >>> guess = (10,0,0,0.1,10,640,2,20,750,7)
     >>> bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
     >>> popt, pcov = fit_multigauss_and_bgd(x, y, guess=guess, bounds=bounds, sigma=err)
-    >>> assert np.all(np.isclose(p,popt,rtol=1e-4))
-    >>> fit = multigauss_and_bgd(x, *popt)
+    >>> assert np.allclose(p,popt,rtol=1e-4, atol=1e-5)
+    >>> fit = multigauss_and_bgd(np.array([x_norm, x]), *popt)
 
     .. plot::
 
@@ -399,21 +400,24 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
         import numpy as np
         from spectractor.tools import multigauss_and_bgd, fit_multigauss_and_bgd
         x = np.arange(600.,800.,1)
-        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
-        y = multigauss_and_bgd(x, *p)
+        x_norm = rescale_x_to_legendre(x)
+        p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+        y = multigauss_and_bgd(np.array([x_norm, x]), *p)
         err = 0.1 * np.sqrt(y)
-        guess = (15,0,0,0,10,640,2,20,750,7)
+        guess = (10,0,0,0.1,10,640,2,20,750,7)
         bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
         popt, pcov = fit_multigauss_and_bgd(x, y, guess=guess, bounds=bounds, sigma=err)
-        fit = multigauss_and_bgd(x, *popt)
+        fit = multigauss_and_bgd(np.array([x_norm, x]), *popt)
         fig = plt.figure()
-        plt.errorbar(x,y,yerr=err,linestyle='None')
-        plt.plot(x,fit,'r-')
-        plt.plot(x,multigauss_and_bgd(x, *guess),'k--')
+        plt.errorbar(x,y,yerr=err,linestyle='None',label="data")
+        plt.plot(x,fit,'r-',label="best fit")
+        plt.plot(x,multigauss_and_bgd(np.array([x_norm, x]), *guess),'k--',label="guess")
+        plt.legend()
         plt.show()
     """
     maxfev = 10000
-    popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma,
+    x_norm = rescale_x_to_legendre(x)
+    popt, pcov = curve_fit(multigauss_and_bgd, np.array([x_norm, x]), y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma,
                            absolute_sigma=True, method='trf', xtol=1e-4, ftol=1e-4, verbose=0,
                            jac=multigauss_and_bgd_jacobian, x_scale='jac')
     # error = 0.1 * np.abs(guess) * np.ones_like(guess)
