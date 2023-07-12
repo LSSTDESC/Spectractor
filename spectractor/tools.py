@@ -30,7 +30,8 @@ from numba import njit
 _SCIKIT_IMAGE_NEW_HESSIAN = None
 
 
-@njit(fastmath=True, cache=True)
+# do not increase speed:
+# @njit(fastmath=True, cache=True)
 def gauss(x, A, x0, sigma):
     """Evaluate the Gaussian function.
 
@@ -63,7 +64,8 @@ def gauss(x, A, x0, sigma):
     return A * np.exp(-(x - x0) * (x - x0) / (2 * sigma * sigma))
 
 
-@njit(fastmath=True, cache=True)
+# do not increase speed:
+# @njit(fastmath=True, cache=True)
 def gauss_jacobian(x, A, x0, sigma):
     """Compute the Jacobian matrix of the Gaussian function.
 
