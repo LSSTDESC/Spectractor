@@ -134,6 +134,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                              f"Higher diffraction orders not implemented yet in full forward model.")
 
         # PSF cube computation
+        self.boundaries = None
+        self.boundaries_next_order = None
+        self.psf_cube = None
+        self.psf_cube_next_order = None
         self.psf_cube_masked = None
         self.psf_cube = None
         self.psf_cube_next_order = None
@@ -296,9 +300,25 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         mask = mask.reshape((self.pixels[0].size,))
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
-        self.sqrtW = np.sqrt(self.W) # sparse.diags(self.W))
+        self.sqrtW = np.sqrt(sparse.diags(self.W))
         self.sparse_indices = None
         self.mask = list(np.where(mask)[0])
+        self.boundaries = {"xmin": [], "xmax": [], "ymin": [], "ymax": []}
+        self.boundaries_next_order = {"xmin": [], "xmax": [], "ymin": [], "ymax": []}
+        for x in range(self.psf_cube_masked.shape[0]):
+            maskx = np.any(self.psf_cube_masked[x], axis=0)
+            masky = np.any(self.psf_cube_masked[x], axis=1)
+            self.boundaries["xmin"].append(np.argmax(maskx))
+            self.boundaries["xmax"].append(len(maskx) - np.argmax(maskx[::-1]))
+            self.boundaries["ymin"].append(np.argmax(masky))
+            self.boundaries["ymax"].append(len(masky) - np.argmax(masky[::-1]))
+        for x in range(self.psf_cube_masked_next_order.shape[0]):
+            maskx = np.any(self.psf_cube_masked_next_order[x], axis=0)
+            masky = np.any(self.psf_cube_masked_next_order[x], axis=1)
+            self.boundaries_next_order["xmin"].append(np.argmax(maskx))
+            self.boundaries_next_order["xmax"].append(len(maskx) - np.argmax(maskx[::-1]))
+            self.boundaries_next_order["ymin"].append(np.argmax(masky))
+            self.boundaries_next_order["ymax"].append(len(masky) - np.argmax(masky[::-1]))
 
     def simulate(self, *params):
         r"""
@@ -433,7 +453,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params,
                                                               fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
                                                               fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32",
-                                                              mask=self.psf_cube_masked)
+                                                              mask=self.psf_cube_masked, boundaries=self.boundaries)
         if A2 > 0 and self.tr_ratio_next_order is not None:
             dispersion_law_next_order = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, dx0, dy0, angle,
                                                                                         niter=5, with_adr=True,
@@ -448,9 +468,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             profile_params_next_order[:, 2] += dispersion_law_next_order.imag - self.bgd_width
 
             psf_cube_next_order = A2 * self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params_next_order,
-                                                                                 fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                                                 fwhmy_clip=parameters.PSF_FWHM_CLIP,
-                                                                                 dtype="float32", mask=self.psf_cube_masked_next_order)
+                                                                                  fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                                                  fwhmy_clip=parameters.PSF_FWHM_CLIP,
+                                                                                  boundaries=self.boundaries_next_order,
+                                                                                  dtype="float32", mask=self.psf_cube_masked_next_order)
             psf_cube += psf_cube_next_order
             if self.tr_ratio_next_next_order is not None:
                 dispersion_law_next_next_order = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, dx0, dy0, angle,

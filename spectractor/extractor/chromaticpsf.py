@@ -351,7 +351,7 @@ class ChromaticPSF:
         return np.clip(output, 0, self.saturation)
 
     def build_psf_cube(self, pixels, profile_params, fwhmx_clip=parameters.PSF_FWHM_CLIP,
-                       fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float64", mask=None):
+                       fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float64", mask=None, boundaries=None):
         Ny_pix, Nx_pix = pixels[0].shape
         psf_cube = np.zeros((len(profile_params), Ny_pix, Nx_pix), dtype=dtype)
         fwhms = self.table["fwhm"]
@@ -361,7 +361,7 @@ class ChromaticPSF:
                 continue
             if xc > Nx_pix + fwhmx_clip * fwhms[x]:
                 break
-            if mask is None:
+            if mask is None and boundaries is None:
                 xmin = max(0, int(xc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
                 xmax = min(Nx_pix, int(xc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
                 ymin = max(0, int(yc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
@@ -369,6 +369,12 @@ class ChromaticPSF:
                 # print(x, xc, yc, xmin, xmax, ymin, ymax, fwhms[x])
                 psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax],
                                                                       values=profile_params[x, :])
+            elif boundaries:
+                xmin = boundaries["xmin"][x]
+                xmax = boundaries["xmax"][x]
+                ymin = boundaries["ymin"][x]
+                ymax = boundaries["ymax"][x]
+                psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], values=profile_params[x, :])
             else:
                 maskx = np.any(mask[x], axis=0)
                 masky = np.any(mask[x], axis=1)
