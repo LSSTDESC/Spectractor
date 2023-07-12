@@ -19,6 +19,8 @@ from spectractor.config import set_logger
 from spectractor.fit.fitter import (FitParameters, FitWorkspace, run_minimisation, run_minimisation_sigma_clipping,
                                     RegFitWorkspace)
 
+import sparse_dot_mkl
+
 
 class ChromaticPSF:
     """Class to store a PSF evolving with wavelength.
@@ -1747,10 +1749,13 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                                                          fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cube_masked)
             M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
             self.sparse_indices = np.where(M > 0)
-            M = sparse.csr_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
+            M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
             M_dot_W = M.T * self.sqrtW
             # Compute the minimizing amplitudes
-            M_dot_W_dot_M = M_dot_W @ M_dot_W.T
+            # M_dot_W_dot_M = M_dot_W @ M_dot_W.T
+            tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
+            dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
+            M_dot_W_dot_M = tri + tri.T - dia
             if self.amplitude_priors_method != "psf1d":
                 # try:
                 #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))

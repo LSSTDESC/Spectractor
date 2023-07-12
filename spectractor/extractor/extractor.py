@@ -470,27 +470,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
         if self.sparse_indices is None:
             self.sparse_indices = np.where(M > 0)
-        M = sparse.csr_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
+        M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
             M_dot_W = M.T * self.sqrtW
-            M_dot_W_dot_M = M_dot_W @ M_dot_W.T
-            #print(type(M_dot_W))
-            #M_dot_W_dot_M = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
-            #rows, cols = M_dot_W_dot_M.nonzero()
-            #M_dot_W_dot_M[cols, rows] = M_dot_W_dot_M[rows, cols]
-            ###############
-            #tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
-            #dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
-            #M_dot_W_dot_M = tri + tri.T - dia
-            ###############
-            #print(type(M_dot_W_dot_M))
-            #fig, ax = plt.subplots(1, 2)
-            #ax[0].imshow(np.log10(M_dot_W_dot_M.todense()))
-            # ax[1].imshow(np.log10(M_dot_W_dot_M_tmp.todense()))
-            # ax[2].imshow(np.log10(toto.todense()))
-            #plt.show()
-            #print(M_dot_W_dot_M != M_dot_W_dot_M_tmp)
+            # M_dot_W_dot_M = M_dot_W @ M_dot_W.T
+            tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
+            dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
+            M_dot_W_dot_M = tri + tri.T - dia
             if self.amplitude_priors_method != "spectrum":
                 # try:  # slower
                 #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
