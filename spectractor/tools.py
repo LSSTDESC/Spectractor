@@ -266,10 +266,15 @@ def multigauss_and_bgd(x, *params):
     --------
     >>> parameters.CALIB_BGD_NPARAMS = 4
     >>> x = np.arange(600., 800., 1)
-    >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
-    >>> y = multigauss_and_bgd(x, *p)
+    >>> x_norm = rescale_x_to_legendre(x)
+    >>> p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd(np.array([x_norm, x]), *p)
     >>> print(f'{y[0]:.2f}')
-    19.00
+    20.00
+    >>> print(f'{np.max(y):.2f}')
+    60.00
+    >>> print(f'{np.argmax(y)}')
+    150
 
     .. plot::
 
@@ -278,18 +283,20 @@ def multigauss_and_bgd(x, *params):
         import numpy as np
         parameters.CALIB_BGD_NPARAMS = 4
         x = np.arange(600., 800., 1)
-        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
-        y = multigauss_and_bgd(x, *p)
+        x_norm = rescale_x_to_legendre(x)
+        p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+        y = multigauss_and_bgd(np.array([x_norm, x]), *p)
         plt.plot(x,y,'r-')
         plt.show()
 
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
-    # out = np.polyval(params[0:bgd_nparams], x)
-    x_norm = rescale_x_to_legendre(x)
+    x_norm, x_gauss = x
+    # x_norm = rescale_x_to_legendre(x)
     out = np.polynomial.legendre.legval(x_norm, params[0:bgd_nparams])
+    # out = np.polyval(params[0:bgd_nparams], x)
     for k in range((len(params) - bgd_nparams) // 3):
-        out += gauss(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
+        out += gauss(x_gauss, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
     return out
 
 
@@ -318,26 +325,26 @@ def multigauss_and_bgd_jacobian(x, *params):
     >>> import spectractor.parameters as parameters
     >>> parameters.CALIB_BGD_NPARAMS = 4
     >>> x = np.arange(600.,800.,1)
-    >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
-    >>> y = multigauss_and_bgd_jacobian(x, *p)
-    >>> assert(np.all(np.isclose(y.T[0],np.ones_like(x))))
-    >>> print(y.shape)
+    >>> x_norm = rescale_x_to_legendre(x)
+    >>> p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+    >>> jac = multigauss_and_bgd_jacobian(np.array([x_norm, x]), *p)
+    >>> assert(np.all(np.isclose(jac.T[0],np.ones_like(x))))
+    >>> print(jac.shape)
     (200, 10)
+    >>> jac
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
-    out = []
-    x_norm = rescale_x_to_legendre(x)
-    for k in range(bgd_nparams):
-        # out.append(params[k]*(parameters.CALIB_BGD_ORDER-k)*x**(parameters.CALIB_BGD_ORDER-(k+1)))
-        # out.append(x ** (bgd_nparams - 1 - k))
+    x_norm, x_gauss = x
+    out = np.zeros((len(params), len(x_norm)))
+    # x_norm = rescale_x_to_legendre(x)
+    for k in range(0, bgd_nparams):
+        # out[k] = x ** (bgd_nparams - 1 - k)
         c = np.zeros(bgd_nparams)
         c[k] = 1
-        out.append(np.polynomial.legendre.legval(x_norm, c))
-    for k in range((len(params) - bgd_nparams) // 3):
-        jac = np.array(gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]))
-        for j in jac:
-            out.append(list(j))
-    return np.array(out).T
+        out[k] = np.polynomial.legendre.legval(x_norm, c)  # np.eye(1, bgd_nparams, k)[0])
+    for ngauss in range((len(params) - bgd_nparams) // 3):
+        out[bgd_nparams + 3 * ngauss:bgd_nparams + 3 * ngauss + 3] = gauss_jacobian(x_gauss, *params[bgd_nparams + 3 * ngauss:bgd_nparams + 3 * ngauss + 3])
+    return out.T
 
 
 # noinspection PyTypeChecker

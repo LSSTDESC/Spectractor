@@ -1612,6 +1612,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
         for n in range(bgd_npar):
             guess[n] = fit[n]
             b = abs(baseline_prior * guess[n])
+            # b = abs(baseline_prior * np.sqrt(cov[n,n]))
             # CHECK: following is completely inefficient as rtol has no effect when second argument is 0...
             # if np.isclose(b, 0, rtol=1e-2 * bgd_mean):
             #     b = baseline_prior * bgd_std
@@ -1622,8 +1623,8 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
         for j in range(len(new_lines_list[k])):
             idx = new_peak_index_list[k][j]
             x_norm = rescale_x_to_legendre(lambdas[idx])
-            guess[bgd_npar + 3 * j] = np.sign(guess[bgd_npar + 3 * j]) * abs(
-                spec_smooth[idx] - np.polynomial.legendre.legval(x_norm, guess[:bgd_npar]))
+            guess[bgd_npar + 3 * j] = np.sign(guess[bgd_npar + 3 * j]) * abs(spec_smooth[idx] - np.polynomial.legendre.legval(x_norm, guess[:bgd_npar]))
+            # guess[bgd_npar + 3 * j] = np.sign(guess[bgd_npar + 3 * j]) * abs(spec_smooth[idx] - np.polyval(guess[:bgd_npar], lambdas[idx]))
             if np.sign(guess[bgd_npar + 3 * j]) < 0:  # absorption
                 bounds[0][bgd_npar + 3 * j] = 2 * guess[bgd_npar + 3 * j]
             else:  # emission
@@ -1637,12 +1638,14 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             sigma = cov_matrix[index, index]
         popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma)
         # noise level defined as the std of the residuals if no error
-        noise_level = np.std(spec[index] - multigauss_and_bgd(lambdas[index], *popt))
+        x_norm = rescale_x_to_legendre(lambdas[index])
+        best_fit_model = multigauss_and_bgd(np.array([x_norm, lambdas[index]]), *popt)
+        noise_level = np.std(spec[index] - best_fit_model)
         # otherwise mean of error bars of bgd lateral bands
         if sigma is not None:
-            chisq = np.sum((multigauss_and_bgd(lambdas[index], *popt) - spec[index]) ** 2 / (sigma * sigma))
+            chisq = np.sum((best_fit_model - spec[index]) ** 2 / (sigma * sigma))
         else:
-            chisq = np.sum((multigauss_and_bgd(lambdas[index], *popt) - spec[index]) ** 2)
+            chisq = np.sum((best_fit_model - spec[index]) ** 2)
         chisq /= len(index)
         global_chisq += chisq
         if spec_err is not None:
@@ -1655,8 +1658,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             FWHM = np.abs(popt[bgd_npar + 3 * j + 2]) * 2.355
             # SNR computation
             # signal_level = popt[bgd_npar+3*j]
-            signal_level = popt[
-                bgd_npar + 3 * j]  # multigauss_and_bgd(peak_pos, *popt) - np.polyval(popt[:bgd_npar], peak_pos)
+            signal_level = popt[bgd_npar + 3 * j]  # multigauss_and_bgd(peak_pos, *popt) - np.polyval(popt[:bgd_npar], peak_pos)
             snr = np.abs(signal_level / noise_level)
             # save fit results
             line.fitted = True
@@ -1668,10 +1670,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             x_step = 0.1  # nm
             x_int = np.arange(max(np.min(lambdas), peak_pos - 5 * np.abs(popt[bgd_npar + 3 * j + 2])),
                               min(np.max(lambdas), peak_pos + 5 * np.abs(popt[bgd_npar + 3 * j + 2])), x_step)
-            middle = 0.5 * (np.max(lambdas[index]) + np.min(lambdas[index]))
-            x_int_norm = x_int - middle
-            if np.max(lambdas[index] - middle) != 0:
-                x_int_norm = x_int_norm / np.max(lambdas[index] - middle)
+            x_int_norm = rescale_x_to_legendre(x_int)
 
             # jmin and jmax a bit larger than x_int to avoid extrapolation
             jmin = max(0, int(np.argmin(np.abs(lambdas - (x_int[0] - x_step))) - 2))
@@ -1682,6 +1681,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
                                    bounds_error=False, fill_value="extrapolate")(x_int)
 
             Continuum = np.polynomial.legendre.legval(x_int_norm, popt[:bgd_npar])
+            # Continuum = np.polyval(popt[:bgd_npar], x_int)
             Gauss = gauss(x_int, *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
 
             Y = -Gauss / Continuum
@@ -1697,6 +1697,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             line.fit_gauss = gauss(lambdas[index], *popt[bgd_npar + 3 * j:bgd_npar + 3 * j + 3])
 
             line.fit_bgd = np.polynomial.legendre.legval(x_norm, popt[:bgd_npar])
+            # line.fit_bgd = np.polyval(popt[:bgd_npar], x_int)
             line.fit_snr = snr
             line.fit_chisq = chisq
             line.fit_fwhm = FWHM
@@ -1724,7 +1725,7 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
     return global_chisq
 
 
-def calibrate_spectrum(spectrum, with_adr=False, niter=5):
+def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
     """Convert pixels into wavelengths given the position of the order 0,
     the data for the spectrum, the properties of the disperser. Fit the absorption
     (and eventually the emission) lines to perform a second calibration of the
