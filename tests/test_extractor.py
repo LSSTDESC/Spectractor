@@ -76,7 +76,7 @@ def test_extractor_ctio_planetary_nebula():
     logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
     load_config("./config/ctio.ini")
     parameters.VERBOSE = True
-    parameters.DEBUG = True
+    parameters.DEBUG = False
     parameters.CCD_REBIN = 1  # do not work with other values
     parameters.LAMBDA_MIN = 450
     parameters.LAMBDA_MAX = 1000

@@ -99,7 +99,7 @@ def make_image():
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
 def test_ctio_fullchain():
     parameters.VERBOSE = True
-    parameters.DEBUG = True
+    parameters.DEBUG = False
     sim_image = "./tests/data/sim_20170530_134.fits"
 
     # load test and make image simulation

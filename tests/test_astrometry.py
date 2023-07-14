@@ -23,7 +23,7 @@ def test_astrometry():
     load_config('./config/ctio.ini')
     logbook = LogBook(logbook='./tests/data/ctiofulllogbook_jun2017_v5.csv')
     parameters.VERBOSE = True
-    parameters.DEBUG = True
+    parameters.DEBUG = False
 
     radius = 500
     maxiter = 10
