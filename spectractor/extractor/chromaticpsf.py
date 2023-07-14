@@ -385,6 +385,16 @@ class ChromaticPSF:
                 psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], values=profile_params[x, :])
         return psf_cube
 
+    def build_sparse_M(self, pixels, profile_params, sparse_indices, boundaries, dtype="float32"):
+        sparse_psf_cube = np.zeros(sparse_indices.size, dtype=dtype)
+        indptr = np.zeros(len(profile_params)+1, dtype=int)
+        for x in range(len(profile_params)):
+            indptr[x+1] = (boundaries["xmax"][x]-boundaries["xmin"][x])*(boundaries["ymax"][x]-boundaries["ymin"][x]) + indptr[x]
+            sparse_psf_cube[indptr[x]:indptr[x+1]] = self.psf.evaluate(pixels[:, boundaries["ymin"][x]:boundaries["ymax"][x],
+                                                                                 boundaries["xmin"][x]:boundaries["xmax"][x]],
+                                                                       values=profile_params[x, :]).ravel()
+        return sparse.csr_matrix((sparse_psf_cube, sparse_indices, indptr), shape=(len(profile_params), pixels[0].size), dtype=dtype)
+
     def fill_table_with_profile_params(self, profile_params):
         """
         Fill the table with the profile parameters.
