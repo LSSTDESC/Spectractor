@@ -59,9 +59,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                       np.copy(spectrum.rotation_angle), 1, parameters.OBS_CAMERA_ROTATION,
                       np.copy(spectrum.pressure),  np.copy(spectrum.temperature),  np.copy(spectrum.airmass)])
         self.psf_params_start_index = p.size
-        self.psf_params_index = np.arange(0, self.psf_params_start_index+len(self.psf_poly_params))
-        self.psf_params_index_next_order = np.concatenate([np.arange(0, self.psf_params_start_index), np.arange(np.max(self.psf_params_index) + 1, len(p))])
+        self.psf_params_index = np.arange(self.psf_params_start_index, self.psf_params_start_index+len(self.psf_poly_params))
         self.psf_params_start_index_next_order = np.max(self.psf_params_index) + 1
+        self.psf_params_index_next_order = np.arange(self.psf_params_start_index_next_order, self.psf_params_start_index_next_order+len(self.psf_poly_params))
         self.saturation = spectrum.spectrogram_saturation
         p = np.concatenate([p, self.psf_poly_params, self.psf_poly_params])
         input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B", "R", "P [hPa]",
