@@ -390,6 +390,8 @@ class ChromaticPSF:
         indptr = np.zeros(len(profile_params)+1, dtype=int)
         for x in range(len(profile_params)):
             indptr[x+1] = (boundaries["xmax"][x]-boundaries["xmin"][x])*(boundaries["ymax"][x]-boundaries["ymin"][x]) + indptr[x]
+            if boundaries["xmin"][x] < 0:
+                continue
             sparse_psf_cube[indptr[x]:indptr[x+1]] = self.psf.evaluate(pixels[:, boundaries["ymin"][x]:boundaries["ymax"][x],
                                                                                  boundaries["xmin"][x]:boundaries["xmax"][x]],
                                                                        values=profile_params[x, :]).ravel()
@@ -1566,6 +1568,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W_before_mask = np.copy(self.W)
         self.sqrtW = np.sqrt(sparse.diags(self.W))
         self.psf_cube_masked = None
+        self.boundaries = None
+        self.M_sparse_indices = None
         self.set_mask()
 
         # regularisation matrices
@@ -1605,6 +1609,24 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.sqrtW = np.sqrt(sparse.diags(self.W))
         self.sparse_indices = None
         self.mask = list(np.where(mask)[0])
+        wl_size = len(profile_params)
+        self.boundaries = {"xmin": np.zeros(wl_size, dtype=int), "xmax": np.zeros(wl_size, dtype=int),
+                           "ymin": np.zeros(wl_size, dtype=int), "ymax": np.zeros(wl_size, dtype=int)}
+        for k in range(wl_size):
+            maskx = np.any(self.psf_cube_masked[k], axis=0)
+            masky = np.any(self.psf_cube_masked[k], axis=1)
+            if np.sum(maskx) > 0 and np.sum(masky) > 0:
+                xmin, xmax = int(np.argmax(maskx)), int(len(maskx) - np.argmax(maskx[::-1]))
+                ymin, ymax = int(np.argmax(masky)), int(len(masky) - np.argmax(masky[::-1]))
+            else:
+                xmin, xmax = -1, -1
+                ymin, ymax = -1, -1
+            self.boundaries["xmin"][k] = xmin
+            self.boundaries["xmax"][k] = xmax
+            self.boundaries["ymin"][k] = ymin
+            self.boundaries["ymax"][k] = ymax
+            self.psf_cube_masked[k, ymin:ymax, xmin:xmax] = True
+        self.M_sparse_indices = np.concatenate([np.where(self.psf_cube_masked[k].ravel() > 0)[0] for k in range(wl_size)])
 
     def simulate(self, *shape_params):
         r"""
@@ -1760,12 +1782,14 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # profile_params[:self.Nx, 2] -= self.bgd_width
         if self.amplitude_priors_method != "fixed":
             # Matrix filling
-            psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
-                                                         fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                         fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cube_masked)
-            M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
-            self.sparse_indices = np.where(M > 0)
-            M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
+            # psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
+            #                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+            #                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cube_masked)
+            # M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
+            # self.sparse_indices = np.where(M > 0)
+            # M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
+            M = self.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32", sparse_indices=self.M_sparse_indices, boundaries=self.boundaries).T
+
             M_dot_W = M.T * self.sqrtW
             # Compute the minimizing amplitudes
             # M_dot_W_dot_M = M_dot_W @ M_dot_W.T

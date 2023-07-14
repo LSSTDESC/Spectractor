@@ -170,11 +170,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # create mask
         self.sqrtW = np.sqrt(sparse.diags(self.W))
-        self.sparse_indices = None
-        self.set_mask(fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=2*parameters.PSF_FWHM_CLIP)  # not a narrow mask for first fit
 
         # design matrix
-        self.M = np.zeros((self.Nx, self.data.size))
+        self.M = None
+        self.M_sparse_indices = {}
+        for order in self.diffraction_orders:
+            self.M_sparse_indices[order] = None
+        self.set_mask(fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=2*parameters.PSF_FWHM_CLIP)  # not a narrow mask for first fit
         self.M_dot_W_dot_M = np.zeros((self.Nx, self.Nx))
 
         # prepare results
@@ -288,7 +290,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
         self.sqrtW = np.sqrt(sparse.diags(self.W))
-        self.sparse_indices = None
         self.mask = list(np.where(mask)[0])
         # make rectangular mask per wavelength
         for order in self.diffraction_orders:
@@ -297,13 +298,20 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             for k in range(wl_size):
                 maskx = np.any(self.psf_cubes_masked[order][k], axis=0)
                 masky = np.any(self.psf_cubes_masked[order][k], axis=1)
-                xmin, xmax = int(np.argmax(maskx)), int(len(maskx) - np.argmax(maskx[::-1]))
-                ymin, ymax = int(np.argmax(masky)), int(len(masky) - np.argmax(masky[::-1]))
+                if np.sum(maskx) > 0 and np.sum(masky) > 0:
+                    xmin, xmax = int(np.argmax(maskx)), int(len(maskx) - np.argmax(maskx[::-1]))
+                    ymin, ymax = int(np.argmax(masky)), int(len(masky) - np.argmax(masky[::-1]))
+                else:
+                    xmin, xmax = -1, -1
+                    ymin, ymax = -1, -1
                 self.boundaries[order]["xmin"][k] = xmin
                 self.boundaries[order]["xmax"][k] = xmax
                 self.boundaries[order]["ymin"][k] = ymin
                 self.boundaries[order]["ymax"][k] = ymax
                 self.psf_cubes_masked[order][k, ymin:ymax, xmin:xmax] = True
+        self.M_sparse_indices = {}
+        for order in self.diffraction_orders:
+            self.M_sparse_indices[order] = np.concatenate([np.where(self.psf_cubes_masked[order][k].ravel() > 0)[0] for k in range(wl_size)])
 
     def simulate(self, *params):
         r"""
@@ -420,8 +428,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Evaluate ADR and compute wavelength arrays
         self.lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
                                                                     order=self.spectrum.order)
-        psf_cube = None
         profile_params = []
+        M = None
         for k, order in enumerate(self.diffraction_orders):
             if self.tr[k] is None:  # diffraction order undefined
                 continue
@@ -439,30 +447,23 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             profile_params[-1][:, 2] += dispersion_law.imag - self.bgd_width
 
             # Matrix filling
-            # if self.psf_cube is None or not self.fix_psf_cube:  # slower
-            #import time
-            #start = time.time()
-            psf_cube_order = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params[-1],
-                                                                  fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                                  fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32",
-                                                                  mask=self.psf_cubes_masked[order], boundaries=self.boundaries[order])
-            if psf_cube is None:
-                psf_cube = psf_cube_order
+            # psf_cube_order = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params[-1], fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cubes_masked[order], boundaries=self.boundaries[order])
+            # if self.sparse_indices is None:
+            #    self.sparse_indices = np.concatenate([np.where(self.psf_cube_masked[k].ravel() > 0)[0] for k in range(len(profile_params))])
+            # if psf_cube is None:
+            #     psf_cube = psf_cube_order
+            # else:
+            #     psf_cube += psf_cube_order
+            M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, profile_params[-1], dtype="float32", sparse_indices=self.M_sparse_indices[order], boundaries=self.boundaries[order])
+            if M is None:
+                M = M_order.T
             else:
-                psf_cube += psf_cube_order
-        #self.my_logger.warning(f"psf cube {time.time()-start}")
-        #if self.sparse_indices is None:
-        #self.sparse_indices = np.concatenate([np.where(self.psf_cube_masked[k].ravel() > 0)[0] for k in range(len(profile_params))])
-        #start = time.time()
-        #MM = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32",
-        #                                                sparse_indices=self.sparse_indices, boundaries=self.boundaries)
-        #self.my_logger.warning(f"sparse M {time.time()-start}")
-        #start = time.time()
+                M += M_order.T
 
-        M = psf_cube.reshape(len(profile_params[0]), self.pixels[0].size).T  # flattening
-        #if self.sparse_indices is None:
-        self.sparse_indices = np.where(M > 0)
-        M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
+        #M = psf_cube.reshape(len(profile_params[0]), self.pixels[0].size).T  # flattening
+        # if self.sparse_indices is None:
+        #     self.sparse_indices = np.where(M > 0)
+        # M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
             M_dot_W = M.T * self.sqrtW
