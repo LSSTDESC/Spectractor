@@ -907,8 +907,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
             # Calibrate the spectrum
             calibrate_spectrum(w.spectrum, with_adr=True, grid_search=False)
-            w.params.values[1] = w.spectrum.disperser.D
-            w.params.values[2] = w.spectrum.header['PIXSHIFT']
+            w.params.set(r"D_CCD [mm]", w.spectrum.disperser.D)
+            w.params.set(r"shift_x [pix]", w.spectrum.header['PIXSHIFT'])
             w.spectrum.convert_from_flam_to_ADUrate()
 
         if w.filename != "":

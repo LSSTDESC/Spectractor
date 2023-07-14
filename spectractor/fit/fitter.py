@@ -246,6 +246,28 @@ class FitParameters:
         else:
             raise KeyError(f"{label=} not in FitParameters.labels ({self.labels=}).")
 
+    def set(self, label, value):
+        """Set value parameter given its label.
+
+        Parameters
+        ----------
+        label: str
+            The parameter label.
+        value: float
+            The new parameter value.
+
+        Examples
+        --------
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params["z"]
+        3.0
+        >>> params.set("z", 0)
+        >>> params["z"]
+        0.0
+        """
+        key = self.get_index(label)
+        self.values[key] = value
+
     @property
     def rho(self):
         """Correlation matrix computed from the covariance matrix
