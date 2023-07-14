@@ -182,7 +182,7 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gau
     return a
 
 
-@njit(fastmath=True, cache=True)
+@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
 def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocover
     r"""Compute a 2D Moffat function, whose integral is normalised to unity.
 
@@ -228,8 +228,8 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocov
     >>> yy, xx = np.mgrid[:Ny, :Nx]
     >>> amplitude = 10
     >>> a = evaluate_moffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2)
-    >>> print(f"{np.sum(a):.6f}")
-    9.683129
+    >>> print(f"{np.sum(a):.4f}")
+    9.6831
 
     .. doctest::
         :hide:
@@ -256,7 +256,7 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: nocov
     """
     xc = x - x_c
     yc = y - y_c
-    rr_gg = (xc * xc + yc * yc) / (gamma * gamma)
+    rr_gg = ((xc * xc + yc * yc) / (gamma * gamma)).astype("float32")
     a = (1 + rr_gg) ** -alpha
     norm = (np.pi * gamma * gamma) / (alpha - 1)
     a *= amplitude / norm
@@ -344,7 +344,7 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
     """
     xc = x - x_c
     yc = y - y_c
-    rr = xc * xc + yc * yc
+    rr = (xc * xc + yc * yc).astype("float32")
     rr_gg = rr / (gamma * gamma)
     a = (1 + rr_gg) ** -alpha + eta_gauss * np.exp(-(rr / (2. * sigma * sigma)))
     norm = (np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * sigma * sigma
