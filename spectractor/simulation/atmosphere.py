@@ -14,7 +14,7 @@ from spectractor.simulation.throughput import plot_transmission_simple
 
 class Atmosphere:
 
-    def __init__(self, airmass, pressure, temperature, lambda_min=250, lambda_max=1200):
+    def __init__(self, airmass, pressure, temperature, lambda_min=250, lambda_max=1200, altitude=parameters.OBS_ALTITUDE):
         """Class to evaluate an atmospheric transmission using Libradtran.
 
         Parameters
@@ -26,9 +26,11 @@ class Atmosphere:
         temperature: float
             Temperature of the atmosphere at observatory altitude in Celsius degrees.
         lambda_min: float
-            Minimum wavelength for simulation in nm.
+            Minimum wavelength for simulation in nm (default: 250).
         lambda_max: float
-            Maximum wavelength for simulation in nm.
+            Maximum wavelength for simulation in nm (default: 1200).
+        altitude: float
+            Observatory altitude in km (default: parameters.OBS_ALTITUDE).
 
         Examples
         --------
@@ -46,6 +48,7 @@ class Atmosphere:
         self.airmass = airmass
         self.pressure = pressure
         self.temperature = temperature
+        self.altitude = altitude
         self.pwv = None
         self.ozone = None
         self.aerosols = None
@@ -156,7 +159,7 @@ class Atmosphere:
 
         lib = libradtran.Libradtran()
         wl, atm = lib.simulate(self.airmass, aerosols, ozone, pwv, self.pressure, angstrom_exponent=angstrom_exponent,
-                               lambda_min=self.lambda_min, lambda_max=self.lambda_max)
+                               lambda_min=self.lambda_min, lambda_max=self.lambda_max, altitude=self.altitude)
         self.transmission = interp1d(wl, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
         return self.transmission
 
@@ -188,7 +191,7 @@ class AtmosphereGrid(Atmosphere):
     def __init__(self, image_filename="", spectrum_filename="", atmgrid_filename="",
                  airmass=1., pressure=800., temperature=10.,
                  pwv_grid=[0, 10, 10], ozone_grid=[100, 700, 7], aerosol_grid=[0, 0.1, 10],
-                 lambdas=parameters.LAMBDAS):
+                 lambdas=parameters.LAMBDAS, altitude=parameters.OBS_ALTITUDE):
         """Class to load and interpolate grids of atmospheric transmission computed with Libradtran.
 
         Parameters
@@ -213,6 +216,8 @@ class AtmosphereGrid(Atmosphere):
             List of 3 numbers for the aerosol quantity: min, max, number of simulations (default: [0, 0.1, 10]).
         lambdas: array_like, optional
             Array of wavelengths (default: parameters.LAMBDAS).
+        altitude: float
+            Observatory altitude in km (default: parameters.OBS_ALTITUDE).
 
         Examples
         --------
@@ -220,7 +225,8 @@ class AtmosphereGrid(Atmosphere):
         >>> a.image_filename.split('/')[-1]
         'reduc_20170530_134_spectrum.fits'
         """
-        Atmosphere.__init__(self, airmass, pressure, temperature, lambda_min=np.min(lambdas), lambda_max=np.max(lambdas))
+        Atmosphere.__init__(self, airmass, pressure, temperature,
+                            lambda_min=np.min(lambdas), lambda_max=np.max(lambdas), altitude=altitude)
         self.my_logger = set_logger(self.__class__.__name__)
         self.image_filename = image_filename
         if spectrum_filename != "":
