@@ -30,6 +30,7 @@ PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
                          1e6] * 2
 A1_T = 1
 A2_T = 1
+A3_T = 0
 
 #
 # PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
@@ -92,7 +93,7 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
 def make_image():
     spectrum_filename = "./tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = "./tests/data/reduc_20170530_134.fits"
-    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T,
+    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T, A3=A3_T,
              psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=True, with_noise=False)
 
 

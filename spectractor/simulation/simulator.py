@@ -388,9 +388,8 @@ class SpectrogramModel(Spectrum):
         # spectrum_err[idx] = 1e6 * np.max(spectrum_err)
         return spectrum, spectrum_err
 
-    # @profile
-    def simulate(self, A1=1.0, A2=0., aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5, D=parameters.DISTANCE2CCD,
-                 shift_x=0., shift_y=0., angle=0., B=1., psf_poly_params=None):
+    def simulate(self, A1=1.0, A2=0., A3=0., aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=5,
+                 D=parameters.DISTANCE2CCD, shift_x=0., shift_y=0., angle=0., B=1., psf_poly_params=None):
         """
 
         Parameters
