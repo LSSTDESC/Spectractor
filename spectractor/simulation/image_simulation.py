@@ -444,7 +444,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
     else:
-        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.params.labels) - 2) - 1) // 2
+        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.params.labels) - 2) - 1) // len(diffraction_orders)
         spectrum.chromatic_psf.set_polynomial_degrees(spectrum.chromatic_psf.deg)
         if spectrum.chromatic_psf.deg == 0:  # x_c must have deg >= 1
             psf_poly_params.insert(1, 0)
