@@ -561,7 +561,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
     #     self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
     #     return J
 
-    def plot_spectrogram_comparison_simple(self, ax, title='', extent=None, dispersion=False):
+    def plot_spectrogram_comparison_simple(self, ax, title='', extent=None, dispersion=False):  # pragma: no cover
         """Method to plot a spectrogram issued from data and compare it with simulations.
 
         Parameters
@@ -637,7 +637,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             ax[3, 0].legend(fontsize=7)
             ax[3, 0].grid(True)
 
-    def plot_fit(self):
+    def plot_fit(self):  # pragma: no cover
         """Plot the fit result.
 
         Examples
@@ -687,7 +687,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             for j in range(1, ax.shape[1]//2):
                 ax[i, 2 * j].set_ylabel("")
         fig.tight_layout()
-        if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
+        if parameters.LSST_SAVEFIGPATH:
             figname = os.path.join(parameters.LSST_SAVEFIGPATH, f'ffm_bestfit.pdf')
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig.savefig(figname, dpi=100, bbox_inches='tight')
@@ -699,7 +699,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             figname = os.path.join(parameters.LSST_SAVEFIGPATH, f'ffm_bestfit_2.pdf')
             self.my_logger.info(f"\n\tSave figure {figname}.")
             fig2.savefig(figname, dpi=100, bbox_inches='tight')
-        if self.live_fit:  # pragma: no cover
+        if self.live_fit:
             plt.draw()
             plt.pause(1e-8)
             plt.close()
@@ -781,7 +781,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
 
         weighted_mean_fwhm = np.average(w.spectrum.chromatic_psf.table['fwhm'], weights=w.spectrum.chromatic_psf.table['amplitude'])
         my_logger.info(f"\n\tMean FWHM: {weighted_mean_fwhm} pixels (weighted with spectrum amplitude)")
-        if parameters.DEBUG:
+        if parameters.DEBUG:  # pragma: no cover
             fig, ax = plt.subplots(1, 1, figsize=(7, 5), sharex="all")
             ax.plot(w.spectrum.lambdas, np.array(w.spectrum.chromatic_psf.table['fwhm']), label=f"weighted mean={weighted_mean_fwhm} pix")
             ax.set_xlabel(r"$\lambda$ [nm]")
@@ -1402,7 +1402,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     spectrum.spectrogram_saturation = spectrum.chromatic_psf.saturation
 
     # Plot FHWM(lambda)
-    if parameters.DEBUG:
+    if parameters.DEBUG:  # pragma: no cover
         fig, ax = plt.subplots(2, 1, figsize=(10, 8), sharex="all")
         ax[0].plot(spectrum.lambdas, np.array(s.table['fwhm']))
         ax[0].set_xlabel(r"$\lambda$ [nm]")
@@ -1420,7 +1420,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'fwhm.pdf'))
 
     # Summary plot
-    if parameters.DEBUG or parameters.LSST_SAVEFIGPATH:
+    if parameters.DEBUG or parameters.LSST_SAVEFIGPATH:  # pragma: no cover
         gs_kw = dict(width_ratios=[3, 0.08], height_ratios=[1, 1])
         fig, ax = plt.subplots(2, 2, sharex='none', figsize=(16, 6), gridspec_kw=gs_kw)
         xx = np.arange(s.table['Dx'].size)
@@ -1528,7 +1528,7 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
     spectrum.header['MEANFWHM'] = np.mean(np.array(s.table['fwhm']))
 
     # Plot FHWM(lambda)
-    if parameters.DEBUG:
+    if parameters.DEBUG:  # pragma: no cover
         fig, ax = plt.subplots(2, 1, figsize=(10, 8), sharex="all")
         ax[0].plot(spectrum.lambdas, np.array(s.table['fwhm']))
         ax[0].set_xlabel(r"$\lambda$ [nm]")
