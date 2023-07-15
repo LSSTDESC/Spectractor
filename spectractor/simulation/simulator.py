@@ -295,7 +295,7 @@ class SpectrogramModel(Spectrum):
         self.true_spectrum = None
         self.lambdas = None
         self.model = lambda x, y: np.zeros((x.size, y.size))
-        self.psf = load_PSF(psf_type=parameters.PSF_TYPE, clip=False)
+        self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
         self.fix_psf_cube = False
 
         # PSF cube computation

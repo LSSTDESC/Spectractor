@@ -367,7 +367,7 @@ class ImageModel(Image):
 
 
 def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, A3=1, angstrom_exponent=None,
-             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
+             psf_poly_params=None, psf_type=None,  diffraction_orders=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -387,6 +387,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
     # Load reduced image
     spectrum = Spectrum(spectrum_filename)
+    if diffraction_orders is None:
+        diffraction_orders = np.arange(spectrum.order, spectrum.order + 3 * np.sign(spectrum.order), np.sign(spectrum.order))
     image = ImageModel(image_filename, target_label=spectrum.target.label)
     guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
     if "CCDREBIN" in spectrum.header:
@@ -454,7 +456,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Simulate spectrogram
     atmosphere = Atmosphere(airmass, pressure, temperature)
     spectrogram = SpectrogramModel(spectrum, atmosphere=atmosphere, with_background=False, fast_sim=False,
-                                   full_image=True, with_adr=with_adr)
+                                   full_image=True, with_adr=with_adr, diffraction_orders=diffraction_orders)
     spectrogram.simulate(A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv,
                          spectrum.disperser.D, 0, 0, rotation_angle, 1, psf_poly_params)
 
