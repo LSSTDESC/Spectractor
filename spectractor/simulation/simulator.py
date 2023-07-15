@@ -221,8 +221,8 @@ class SpectrumSimulation(Spectrum):
 
 class SpectrogramModel(Spectrum):
 
-    def __init__(self, spectrum, target=None, disperser=None, throughput=None, atmosphere=None, with_background=True,
-                 fast_sim=True, full_image=False, with_adr=True):
+    def __init__(self, spectrum, target=None, disperser=None, throughput=None, atmosphere=None, diffraction_orders=None,
+                 with_background=True, fast_sim=True, full_image=False, with_adr=True):
         """Class to simulate a spectrogram.
 
         Parameters
@@ -237,6 +237,8 @@ class SpectrogramModel(Spectrum):
             Disperser instance (default: None).
         atmosphere: Atmosphere, optional
             Atmosphere or AtmosphereGrid instance to make the atmospheric simulation (default: None).
+        diffraction_orders: array_like, optional
+            List of diffraction orders to simulate. If None, takes first three (default: None).
         with_background: bool, optional
             If True, add the background model to the simulated spectrogram (default: True).
         fast_sim: bool, optional
@@ -255,6 +257,14 @@ class SpectrogramModel(Spectrum):
         >>> sim = SpectrogramModel(spectrum, atmosphere=atmosphere, with_background=True, fast_sim=True)
         """
         Spectrum.__init__(self)
+        if diffraction_orders is None:
+            self.diffraction_orders = np.arange(spectrum.order, spectrum.order + 3 * np.sign(spectrum.order), np.sign(spectrum.order))
+        else:
+            self.diffraction_orders = diffraction_orders
+        if self.diffraction_orders[0] != 1:
+            raise NotImplementedError("Spectrogram simulations are only implemented for 1st diffraction order and followings.")
+        if len(self.diffraction_orders) == 0:
+            raise ValueError(f"At least one diffraction order must be given for spectrogram simulation.")
         for k, v in list(spectrum.__dict__.items()):
             self.__dict__[k] = copy.copy(v)
         if target is not None:
@@ -264,17 +274,44 @@ class SpectrogramModel(Spectrum):
         if throughput is not None:
             self.throughput = throughput
         self.atmosphere = atmosphere
+
+        # load the disperser relative transmissions
+        self.tr_ratio = interp1d(parameters.LAMBDAS, np.ones_like(parameters.LAMBDAS), bounds_error=False, fill_value=1.)
+        if abs(self.order) == 1:
+            self.tr_ratio_next_order = self.disperser.ratio_order_2over1
+            self.tr_ratio_next_next_order = self.disperser.ratio_order_3over1
+        elif abs(self.order) == 2:
+            self.tr_ratio_next_order = self.disperser.ratio_order_3over2
+            self.tr_ratio_next_next_order = None
+        elif abs(self.order) == 3:
+            self.tr_ratio_next_order = None
+            self.tr_ratio_next_next_order = None
+        else:
+            raise ValueError(f"{abs(self.order)=}: must be 1, 2 or 3. "
+                             f"Higher diffraction orders not implemented yet in full forward model.")
+        self.tr = [self.tr_ratio, self.tr_ratio_next_order, self.tr_ratio_next_next_order]
+
         self.true_lambdas = None
         self.true_spectrum = None
         self.lambdas = None
         self.model = lambda x, y: np.zeros((x.size, y.size))
-        self.psf = load_PSF(psf_type=parameters.PSF_TYPE)
-        self.profile_params = None
-        self.psf_cube = None
-        self.psf_cube_order2 = None
-        self.psf_cube_order3 = None
-        self.psf_cube_masked = None
+        self.psf = load_PSF(psf_type=parameters.PSF_TYPE, clip=False)
         self.fix_psf_cube = False
+
+        # PSF cube computation
+        self.psf_cubes = {}
+        self.psf_cubes_masked = {}
+        self.boundaries = {}
+        self.profile_params = {}
+        self.M_sparse_indices = {}
+        for order in self.diffraction_orders:
+            self.psf_cubes[order] = None
+            self.psf_cubes_masked[order] = None
+            self.boundaries[order] = {}
+            self.profile_params[order] = None
+            self.M_sparse_indices[order] = None
+        self.fix_psf_cube = False
+
         self.fix_atm_sim = False
         self.atmosphere_sim = None
         self.fast_sim = fast_sim
@@ -362,6 +399,8 @@ class SpectrogramModel(Spectrum):
             Global amplitude of the spectrum (default: 1).
         A2: float
             Relative amplitude of the order 2 spectrum contamination (default: 0).
+        A3: float
+            Relative amplitude of the order 3 spectrum contamination (default: 0).
         aerosols: float
             VAOD Vertical Aerosols Optical Depth.
         angstrom_exponent: float, optional
@@ -409,126 +448,81 @@ class SpectrogramModel(Spectrum):
             >>> assert np.sum(lambdas) > 0
             >>> assert np.sum(model) > 20
         """
-        import time
-        start = time.time()
+        poly_params = np.array(psf_poly_params).reshape((len(self.diffraction_orders), -1))
         self.rotation_angle = angle
         self.lambdas = self.compute_lambdas_in_spectrogram(D, shift_x, shift_y, angle, niter=5, with_adr=True,
-                                                           order=self.order)
-        dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
-                                                                niter=5, with_adr=True, order=self.order)
+                                                           order=self.diffraction_orders[0])
         self.lambdas_binwidths = np.gradient(self.lambdas)
-        self.my_logger.debug(f'\n\tAfter dispersion: {time.time() - start}')
-        start = time.time()
-        if len(psf_poly_params) % 2 != 0:
-            raise ValueError(f"Argument psf_poly_params must be even size, to be split in parameters"
-                             f"for order 1 and order 2 spectrograms. Got {len(psf_poly_params)=}.")
-        psf_poly_params_order1 = psf_poly_params[:len(psf_poly_params)//2]
-        psf_poly_params_order2 = psf_poly_params[len(psf_poly_params)//2:]
-        if self.profile_params is None or not self.fix_psf_cube:
-            self.profile_params = self.chromatic_psf.update(psf_poly_params_order1, x0=self.r0.real + shift_x,
-                                                            y0=self.r0.imag + shift_y, angle=angle, plot=False)
-            self.profile_params[:, 1] = dispersion_law.real + self.r0.real
-            self.profile_params[:, 2] += dispersion_law.imag
-        self.chromatic_psf.table["Dx"] = self.profile_params[:, 1] - self.r0.real
-        self.chromatic_psf.table["Dy"] = self.profile_params[:, 2] - self.r0.imag
-        self.my_logger.debug(f'\n\tAfter psf params: {time.time() - start}')
-        start = time.time()
         if self.atmosphere_sim is None or not self.fix_atm_sim:
             self.atmosphere.set_lambda_range(self.lambdas)
             self.atmosphere_sim = self.atmosphere.simulate(aerosols=aerosols, ozone=ozone, pwv=pwv,
                                                            angstrom_exponent=angstrom_exponent)
         spectrum, spectrum_err = self.simulate_spectrum(self.lambdas, self.atmosphere_sim)
-        self.my_logger.debug(f'\n\tAfter spectrum: {time.time() - start}')
-        # Fill the order 1 cube
-        nlbda = dispersion_law.size
-        if self.psf_cube is None or not self.fix_psf_cube:
-            start = time.time()
-            self.psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, self.profile_params,
-                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32",
-                                                              mask=self.psf_cube_masked)
-            self.my_logger.debug(f'\n\tAfter psf cube: {time.time() - start}')
-        start = time.time()
-        ima1 = np.zeros((self.Ny, self.Nx))
-        ima1_err2 = np.zeros((self.Ny, self.Nx))
-        for i in range(0, nlbda, 1):
-            # here spectrum[i] is in ADU/s
-            ima1 += spectrum[i] * self.psf_cube[i]
-            ima1_err2 += (spectrum_err[i] * self.psf_cube[i]) ** 2
-        self.my_logger.debug(f'\n\tAfter build ima1: {time.time() - start}')
 
-        # Add order 2
-        if A2 > 0. and self.disperser.ratio_order_2over1 is not None:
-            spectrum_order2 = self.disperser.ratio_order_2over1(self.lambdas) * spectrum
-            spectrum_order2_err = self.disperser.ratio_order_2over1(self.lambdas) * spectrum_err
-            if np.any(np.isnan(spectrum_order2)):
-                spectrum_order2[np.isnan(spectrum_order2)] = 0.
-            dispersion_law_order2 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
-                                                                           niter=5, with_adr=True,
-                                                                           order=self.order + np.sign(self.order))
-            nlbda2 = dispersion_law_order2.size
-            if self.psf_cube_order2 is None or not self.fix_psf_cube:
-                start = time.time()
-                profile_params_order2 = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params_order2,
-                                                                                              apply_bounds=True)
-                profile_params_order2[:, 0] = 1
-                profile_params_order2[:nlbda2, 1] = dispersion_law_order2.real + self.r0.real
-                profile_params_order2[:nlbda2, 2] += dispersion_law_order2.imag
-                self.psf_cube_order2 = self.chromatic_psf.build_psf_cube(self.pixels, profile_params_order2,
-                                                                         fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                                         fwhmy_clip=parameters.PSF_FWHM_CLIP,
-                                                                         dtype="float32", mask=None)
-                self.my_logger.debug(f'\n\tAfter psf cube order 2: {time.time() - start}')
-            start = time.time()
-            ima2 = np.zeros_like(ima1)
-            ima2_err2 = np.zeros_like(ima1)
-            for i in range(0, nlbda2, 1):
-                # here spectrum[i] is in ADU/s
-                ima2 += spectrum_order2[i] * self.psf_cube_order2[i]
-                ima2_err2 += (spectrum_order2_err[i] * self.psf_cube_order2[i]) ** 2
-            if self.disperser.ratio_order_3over2 is not None:
-                spectrum_order3 = self.disperser.ratio_order_3over2(self.lambdas) * spectrum_order2
-                spectrum_order3_err = self.disperser.ratio_order_3over2(self.lambdas) * spectrum_order2_err
-                if np.any(np.isnan(spectrum_order3)):
-                    spectrum_order3[np.isnan(spectrum_order3)] = 0.
-                dispersion_law_order3 = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
-                                                                               niter=5, with_adr=True,
-                                                                               order=self.order + 2*np.sign(self.order))
-                nlbda3 = dispersion_law_order3.size
-                if self.psf_cube_order3 is None or not self.fix_psf_cube:
-                    start3 = time.time()
-                    profile_params_order3 = self.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params_order2, apply_bounds=True)
-                    profile_params_order3[:, 0] = 1
-                    profile_params_order3[:nlbda3, 1] = dispersion_law_order3.real + self.r0.real
-                    profile_params_order3[:nlbda3, 2] += dispersion_law_order3.imag
-                    self.psf_cube_order3 = self.chromatic_psf.build_psf_cube(self.pixels, profile_params_order3,
-                                                                             fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                                             fwhmy_clip=parameters.PSF_FWHM_CLIP,
-                                                                             dtype="float32", mask=None)
-                    self.my_logger.debug(f'\n\tAfter psf cube order 3: {time.time() - start3}')
-                for i in range(0, nlbda2, 1):
-                    # here spectrum[i] is in ADU/s
-                    ima2 += spectrum_order3[i] * self.psf_cube_order3[i]
-                    ima2_err2 += (spectrum_order3_err[i] * self.psf_cube_order3[i]) ** 2
+        As = [1, A2, A3]
+        ima = np.zeros((self.Ny, self.Nx), dtype="float32")
+        ima_err2 = np.zeros((self.Ny, self.Nx), dtype="float32")
+        for k, order in enumerate(self.diffraction_orders):
+            if self.tr[k] is None or As[k] == 0:  # diffraction order undefined
+                continue
+            # Dispersion law
+            dispersion_law = self.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+                                                                    niter=5, with_adr=True, order=order)
+
+            # Spectrum amplitude is in ADU/s
+            spec = As[k] * self.tr[k](self.lambdas) * spectrum
+            spec_err = As[k] * self.tr[k](self.lambdas) * spectrum_err
+            if np.any(np.isnan(spec)):
+                spec[np.isnan(spec)] = 0.
+
+            # Evaluate PSF profile
+            if self.profile_params[order] is None or not self.fix_psf_cube:
+                self.profile_params[order] = self.chromatic_psf.update(poly_params[k], x0=self.r0.real + shift_x,
+                                                                       y0=self.r0.imag + shift_y, angle=angle, plot=False)
+                self.profile_params[order][:, 0] = 1
+                self.profile_params[order][:, 1] = dispersion_law.real + self.r0.real
+                self.profile_params[order][:, 2] += dispersion_law.imag
+            if k == 0:
+                self.chromatic_psf.table["Dx"] = self.profile_params[order][:, 1] - self.r0.real
+                self.chromatic_psf.table["Dy"] = self.profile_params[order][:, 2] - self.r0.imag
+
+            # Fill the PSF cube for each diffraction order
+            argmin = max(0, np.argmin(np.abs(self.profile_params[order][:, 1])))
+            argmax = min(self.Nx, np.argmin(np.abs(self.profile_params[order][:, 1]-self.Nx)) + 1)
+            if self.psf_cubes[order] is None or not self.fix_psf_cube:
+                self.psf_cubes[order] = self.chromatic_psf.build_psf_cube(self.pixels, self.profile_params[order],
+                                                                          fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                                          fwhmy_clip=parameters.PSF_FWHM_CLIP,
+                                                                          dtype="float32",
+                                                                          mask=self.psf_cubes_masked[order],
+                                                                          boundaries=self.boundaries[order])
 
             # Assemble all diffraction orders in simulation
-            # self.data is in ADU/s units here
-            self.spectrogram = A1 * (ima1 + A2 * ima2)
-            self.spectrogram_err = np.sqrt(A1*A1*(ima1_err2 + A2*A2*ima2_err2))
-            self.my_logger.debug(f'\n\tAfter build ima2: {time.time() - start}')
-        else:
-            self.spectrogram = A1 * ima1
-            self.spectrogram_err = A1 * np.sqrt(ima1_err2)
-        start = time.time()
+            for x in range(argmin, argmax):
+                if self.boundaries[order]:
+                    xmin = self.boundaries[order]["xmin"][x]
+                    xmax = self.boundaries[order]["xmax"][x]
+                    ymin = self.boundaries[order]["ymin"][x]
+                    ymax = self.boundaries[order]["ymax"][x]
+                else:
+                    xmin, xmax = 0, self.Nx
+                    ymin, ymax = 0, self.Ny
+                ima[ymin:ymax, xmin:xmax] += spec[x] * self.psf_cubes[order][x, ymin:ymax, xmin:xmax]
+                ima_err2[ymin:ymax, xmin:xmax] += (spec_err[x] * self.psf_cubes[order][x, ymin:ymax, xmin:xmax])**2
+
+        # self.spectrogram is in ADU/s units here
+        self.spectrogram = A1 * ima
+        self.spectrogram_err = A1 * np.sqrt(ima_err2)
+
         if self.with_background:
             self.spectrogram += B * self.spectrogram_bgd
-        self.my_logger.debug(f'\n\tAfter bgd: {time.time() - start}')
         # Save the simulation parameters
         self.header['OZONE_T'] = ozone
         self.header['PWV_T'] = pwv
         self.header['VAOD_T'] = aerosols
         self.header['A1_T'] = A1
         self.header['A2_T'] = A2
+        self.header['A3_T'] = A3
         self.header['D2CCD_T'] = D
         self.header['X0_T'] = shift_x
         self.header['Y0_T'] = shift_y

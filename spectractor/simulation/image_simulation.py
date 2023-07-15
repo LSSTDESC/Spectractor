@@ -366,7 +366,7 @@ class ImageModel(Image):
         # self.true_lambdas, self.true_spectrum = hdu_list[1].data
 
 
-def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, angstrom_exponent=None,
+def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, A3=1, angstrom_exponent=None,
              psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
@@ -455,7 +455,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     atmosphere = Atmosphere(airmass, pressure, temperature)
     spectrogram = SpectrogramModel(spectrum, atmosphere=atmosphere, with_background=False, fast_sim=False,
                                    full_image=True, with_adr=with_adr)
-    spectrogram.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv,
+    spectrogram.simulate(A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv,
                          spectrum.disperser.D, 0, 0, rotation_angle, 1, psf_poly_params)
 
     # Image model
@@ -500,6 +500,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Save images and parameters
     image.header['A1_T'] = A1
     image.header['A2_T'] = A2
+    image.header['A3_T'] = A3
     image.header['X0_T'] = spectrum.x0[0]
     image.header['Y0_T'] = spectrum.x0[1]
     image.header['D2CCD_T'] = float(spectrum.disperser.D)

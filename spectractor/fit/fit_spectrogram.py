@@ -60,29 +60,34 @@ class SpectrogramFitWorkspace(FitWorkspace):
             raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
         self.filename = spectrum.filename.replace("spectrum", "spectrogram")
+        self.diffraction_orders = np.arange(spectrum.order, spectrum.order + 3 * np.sign(spectrum.order), np.sign(spectrum.order))
+        if len(self.diffraction_orders) == 0:
+            raise ValueError(f"At least one diffraction order must be given for spectrogram simulation.")
         length = len(self.spectrum.chromatic_psf.table)
         psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         self.saturation = self.spectrum.spectrogram_saturation
-        p = np.array([1, 1, 0.05, -2, 400, 5, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'],
+        D2CCD = np.copy(spectrum.header['D2CCD'])
+        p = np.array([1, 1, 1, 0.05, -2, 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
                       0, self.spectrum.rotation_angle, 1])
-        self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 9])
-        self.atm_params_indices = np.array([2, 3, 4, 5])
-        self.psf_params_start_index = p.size
-        self.psf_poly_params = psf_poly_params[length:]
         psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.params.labels[length:])
         psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.params.axis_names[length:])
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
-        p = np.concatenate([p, self.psf_poly_params, np.copy(self.psf_poly_params)])
-        input_labels = ["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
-                        r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"] + \
-                       list(psf_poly_params_labels) + [label+"_2" for label in psf_poly_params_labels]
-        axis_names = ["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
-                      r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]",
-                      "$B$"] + list(psf_poly_params_names) + [label+"_2" for label in psf_poly_params_names]
-        bounds = [[0, 2], [0, 2/parameters.GRATING_ORDER_2OVER1], [0, 0.1], [-5, 2], [100, 700], [0, 10],
-                  [p[6] - 5 * parameters.DISTANCE2CCD_ERR, p[6] + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
-                  [-10, 10], [-90, 90], [0.8, 1.2]] + list(psf_poly_params_bounds) * 2
+        p = np.concatenate([p] + [psf_poly_params[length:]] * len(self.diffraction_orders))
+        input_labels = [f"A{order}" for order in self.diffraction_orders]
+        input_labels += ["VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
+                        r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"]
+        for order in self.diffraction_orders:
+            input_labels += [label + f"_{order}" for label in psf_poly_params_labels]
+        axis_names = [f"$A_{order}$" for order in self.diffraction_orders]
+        axis_names += ["VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
+                       r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]", "$B$"]
+        for order in self.diffraction_orders:
+            axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
+        bounds = [[0, 2], [0, 2], [0, 2], [0, 0.1], [-5, 2], [100, 700], [0, 10],
+                  [D2CCD - 5 * parameters.DISTANCE2CCD_ERR, D2CCD + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
+                  [-10, 10], [-90, 90], [0.8, 1.2]]
+        bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
         fixed = [False] * p.size
         for k, par in enumerate(input_labels):
             if "x_c" in par or "saturation" in par:
@@ -91,17 +96,20 @@ class SpectrogramFitWorkspace(FitWorkspace):
             if "y_c" in par:
                 fixed[k] = False
                 p[k] = 0
-        # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        fixed[1] = "A2_T" not in self.spectrum.header  # not self.spectrum.disperser.flat_ratio_order_2over1
-        # fixed[5:7] = [True, True]  # DCCD, x0
-        fixed[7] = True  # Delta x
-        fixed[8] = True  # Delta y
-        fixed[9] = True  # angle
-        fixed[10] = True  # B
-        if not fit_angstrom_exponent:
-            fixed[3] = True  # angstrom exponent
+
         params = FitParameters(p, labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed,
                                truth=truth, filename=self.filename)
+        self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 6, 9])
+        self.atm_params_indices = np.array([params.get_index(label) for label in ["VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]"]])
+        # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
+        params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = "A2_T" not in self.spectrum.header  # not self.spectrum.disperser.flat_ratio_order_2over1
+        params.fixed[params.get_index(r"shift_x [pix]")] = True  # Delta x
+        params.fixed[params.get_index(r"shift_y [pix]")] = True  # Delta y
+        params.fixed[params.get_index(r"angle [deg]")] = True  # angle
+        params.fixed[params.get_index("B")] = True  # B
+        if not fit_angstrom_exponent:
+            params.fixed[params.get_index("angstrom_exp_log10")] = True  # angstrom exponent
+
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
         self.my_logger = set_logger(self.__class__.__name__)
         if atmgrid_file_name == "":
@@ -119,23 +127,17 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.fit_angstrom_exponent = fit_angstrom_exponent
 
         if atmgrid_file_name != "":
-            self.params.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
-            self.params.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
-            self.params.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
-            self.params.fixed[3] = True  # angstrom exponent
+            self.params.bounds[self.params.get_index("VAOD")] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
+            self.params.bounds[self.params.get_index("ozone [db]")] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
+            self.params.bounds[self.params.get_index("PWV [mm]")] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+            self.params.fixed[self.params.get_index("angstrom_exp_log10")] = True  # angstrom exponent
 
         self.simulation = SpectrogramModel(self.spectrum, atmosphere=self.atmosphere,
+                                           diffraction_orders=self.diffraction_orders,
                                            with_background=True, fast_sim=False, with_adr=True)
         self.lambdas_truth = None
         self.amplitude_truth = None
         self.get_spectrogram_truth()
-
-        # PSF cube computation
-        self.psf_cube_masked = None
-        self.psf_cube = None
-        self.psf_cube_order2 = None
-        self.fix_psf_cube = False
-        self.fix_psf_cube_order2 = False
 
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
@@ -188,31 +190,64 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.my_logger.info("\n\tReset spectrogram mask with current parameters.")
         if params is None:
             params = self.params.values
-        A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params = params
-        psf_profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(psf_poly_params,
+        A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params_all = params
+        poly_params = np.array(psf_poly_params_all).reshape((len(self.diffraction_orders), -1))
+
+        for k, order in enumerate(self.diffraction_orders):
+            profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params[k],
                                                                                             apply_bounds=True)
-        self.spectrum.chromatic_psf.from_profile_params_to_shape_params(psf_profile_params)
-        Dx = np.arange(len(psf_profile_params[:, 0])) - self.spectrum.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
-        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        psf_profile_params[:, 0] = 1
-        psf_profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + shift_x
-        psf_profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + shift_y)  # - self.bgd_width
-        psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.simulation.pixels, psf_profile_params,
-                                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
-        self.simulation.psf_cube_masked = psf_cube > 0
-        flat_spectrogram = np.sum(self.simulation.psf_cube_masked.reshape(len(psf_profile_params), self.simulation.pixels[0].size),
-                                  axis=0)
+            if order == self.diffraction_orders[0]:  # only first diffraction order
+                self.spectrum.chromatic_psf.from_profile_params_to_shape_params(profile_params)
+            #Dx = np.arange(len(profile_params[:, 0])) - self.spectrum.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
+            #Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
+            dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
+                                                                             niter=5, with_adr=True,
+                                                                             order=order)
+            #self.my_logger.warning(f"{order} {dispersion_law.real} {self.simulation.r0}")
+            profile_params[:, 0] = 1
+            profile_params[:, 1] = dispersion_law.real + self.simulation.r0.real
+            profile_params[:, 2] += dispersion_law.imag # - self.bgd_width
+            #profile_params[:, 0] = 1
+            #profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + shift_x
+            #profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + shift_y)  # - self.bgd_width
+            psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.simulation.pixels, profile_params,
+                                                                  fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                                  fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+            self.simulation.psf_cubes_masked[order] = psf_cube > 0
+        wl_size = len(profile_params)
+        flat_spectrogram = np.sum(self.simulation.psf_cubes_masked[self.diffraction_orders[0]].reshape(wl_size, self.simulation.pixels[0].size), axis=0)
         mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
         mask = mask.reshape(self.simulation.pixels[0].shape)
         kernel = np.ones((3, self.spectrum.spectrogram_Nx//10))  # enlarge a bit more the edges of the mask
         mask = convolve2d(mask, kernel, 'same').astype(bool)
-        for k in range(self.simulation.psf_cube_masked.shape[0]):
-            self.simulation.psf_cube_masked[k] *= ~mask
+        for order in self.diffraction_orders:
+            for k in range(wl_size):
+                self.simulation.psf_cubes_masked[order][k] *= ~mask
         mask = mask.reshape((self.simulation.pixels[0].size,))
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
         self.mask = list(np.where(mask)[0])
+        # make rectangular mask per wavelength
+        for order in self.diffraction_orders:
+            self.simulation.boundaries[order] = {"xmin": np.zeros(wl_size, dtype=int), "xmax": np.zeros(wl_size, dtype=int),
+                                                 "ymin": np.zeros(wl_size, dtype=int), "ymax": np.zeros(wl_size, dtype=int)}
+            for k in range(wl_size):
+                maskx = np.any(self.simulation.psf_cubes_masked[order][k], axis=0)
+                masky = np.any(self.simulation.psf_cubes_masked[order][k], axis=1)
+                if np.sum(maskx) > 0 and np.sum(masky) > 0:
+                    xmin, xmax = int(np.argmax(maskx)), int(len(maskx) - np.argmax(maskx[::-1]))
+                    ymin, ymax = int(np.argmax(masky)), int(len(masky) - np.argmax(masky[::-1]))
+                else:
+                    xmin, xmax = -1, -1
+                    ymin, ymax = -1, -1
+                self.simulation.boundaries[order]["xmin"][k] = xmin
+                self.simulation.boundaries[order]["xmax"][k] = xmax
+                self.simulation.boundaries[order]["ymin"][k] = ymin
+                self.simulation.boundaries[order]["ymax"][k] = ymax
+                self.simulation.psf_cubes_masked[order][k, ymin:ymax, xmin:xmax] = True
+        self.simulation.M_sparse_indices = {}
+        for order in self.diffraction_orders:
+            self.simulation.M_sparse_indices[order] = np.concatenate([np.where(self.simulation.psf_cubes_masked[order][k].ravel() > 0)[0] for k in range(wl_size)])
 
     def get_spectrogram_truth(self):
         """Load the truth parameters (if provided) from the file header.
@@ -221,6 +256,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if 'A1_T' in list(self.spectrum.header.keys()):
             A1_truth = self.spectrum.header['A1_T']
             A2_truth = self.spectrum.header['A2_T']
+            if 'A3_T' in self.spectrum.header:
+                A3_truth = self.spectrum.header['A3_T']
+            else:
+                A3_truth = 0
             ozone_truth = self.spectrum.header['OZONE_T']
             pwv_truth = self.spectrum.header['PWV_T']
             aerosols_truth = self.spectrum.header['VAOD_T']
@@ -230,7 +269,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             rotation_angle = self.spectrum.header['ROT_T']
             B = 1
             poly_truth = np.fromstring(self.spectrum.header['PSF_P_T'][1:-1], sep=' ', dtype=float)
-            self.truth = (A1_truth, A2_truth, aerosols_truth, ozone_truth, pwv_truth,
+            self.truth = (A1_truth, A2_truth, A3_truth, aerosols_truth, ozone_truth, pwv_truth,
                           D_truth, shiftx_truth, shifty_truth, rotation_angle, B, *poly_truth)
             self.lambdas_truth = np.fromstring(self.spectrum.header['LBDAS_T'][1:-1], sep=' ', dtype=float)
             self.amplitude_truth = np.fromstring(self.spectrum.header['AMPLIS_T'][1:-1], sep=' ', dtype=float)
@@ -311,35 +350,13 @@ class SpectrogramFitWorkspace(FitWorkspace):
             ax[3, 0].legend(fontsize=7)
             ax[3, 0].grid(True)
 
-    def simulate(self, A1, A2, aerosols, angstrom_exponent_log10, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params):
+    def simulate(self, *params):
         """Interface method to simulate a spectrogram.
 
         Parameters
         ----------
-        A1: float
-            Main amplitude parameter.
-        A2: float
-            Relative amplitude of the order 2 spectrogram.
-        aerosols: float
-            Vertical Aerosols Optical Depth quantity for Libradtran (no units).
-        angstrom_exponent_log10: float
-            Logarithm base 10 of Angstrom exponent for aerosols.
-        ozone: float
-            Ozone parameter for Libradtran (in db).
-        pwv: float
-            Precipitable Water Vapor quantity for Libradtran (in mm).
-        D: float
-            Distance between the CCD and the disperser (in mm).
-        shift_x: float
-            Shift of the order 0 position along the X axis (in pixels).
-        shift_y: float
-            Shift of the order 0 position along the Y axis (in pixels).
-        angle: float
-            Angle of the dispersion axis with respect to the X axis (in degrees).
-        B: float
-            Amplitude of the simulated background.
-        psf_poly_params: array_like
-            PSF polynomial parameters formatted with the ChromaticPSF class.
+        params: array_like
+            Simulation parameter array.
 
         Returns
         -------
@@ -359,20 +376,16 @@ class SpectrogramFitWorkspace(FitWorkspace):
         >>> w.plot_fit()
 
         """
-        global plot_counter
+        A1, A2, A3, aerosols, angstrom_exponent_log10, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params = params
+        self.params.values = np.asarray(params)
         if self.fit_angstrom_exponent:
             angstrom_exponent = 10 ** angstrom_exponent_log10
         else:
             angstrom_exponent = None
-        lambdas, model, model_err = \
-            self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, psf_poly_params)
-        self.p = np.array([A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B] + list(psf_poly_params))
+        lambdas, model, model_err = self.simulation.simulate(A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, psf_poly_params)
         self.lambdas = lambdas
         self.model = model.flatten()
         self.model_err = model_err.flatten()
-        if self.live_fit and (plot_counter % 30) == 0:  # pragma: no cover
-            self.plot_fit()
-        plot_counter += 1
         return self.lambdas, self.model, self.model_err
 
     def jacobian(self, params, epsilon, model_input=None):
