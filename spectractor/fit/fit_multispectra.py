@@ -543,7 +543,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # start = time.time()
         return self.lambdas, self.model, self.model_err
 
-    def plot_fit(self):
+    def plot_fit(self):  # pragma: no cover
         """Plot the fit result.
 
         Examples
@@ -627,7 +627,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             if parameters.DISPLAY and self.verbose:
                 plt.show()
 
-    def plot_transmissions(self):
+    def plot_transmissions(self):  # pragma: no cover
         """Plot the fit result for transmissions.
 
         Examples
@@ -704,7 +704,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             if parameters.DISPLAY and self.verbose:
                 plt.show()
 
-    def plot_A1s(self):
+    def plot_A1s(self):  # pragma: no cover
         """
         Examples
         --------
