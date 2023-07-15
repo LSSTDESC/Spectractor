@@ -1566,7 +1566,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # create a mask
         self.data_before_mask = np.copy(self.data)
         self.W_before_mask = np.copy(self.W)
-        self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.sqrtW = sparse.diags(np.sqrt(self.W), format="csr", dtype="float32")
         self.psf_cube_masked = None
         self.boundaries = None
         self.M_sparse_indices = None
@@ -1606,7 +1606,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         mask = mask.reshape((self.pixels[0].size,))
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
-        self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.sqrtW = sparse.diags(np.sqrt(self.W), format="csr", dtype="float32")
         self.sparse_indices = None
         self.mask = list(np.where(mask)[0])
         wl_size = len(profile_params)
@@ -1790,10 +1790,11 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             # M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
             M = self.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32", sparse_indices=self.M_sparse_indices, boundaries=self.boundaries).T
 
-            M_dot_W = M.T * self.sqrtW
+            M_dot_W = sparse_dot_mkl.dot_product_mkl(self.sqrtW, M)
+            W_dot_data = (self.W * self.data).astype("float32")
             # Compute the minimizing amplitudes
             # M_dot_W_dot_M = M_dot_W @ M_dot_W.T
-            tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
+            tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=False)
             dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
             M_dot_W_dot_M = tri + tri.T - dia
             if self.amplitude_priors_method != "psf1d":
@@ -1802,7 +1803,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                 #     cov_matrix = L.T @ L
                 # except np.linalg.LinAlgError:
                 cov_matrix = np.linalg.inv(M_dot_W_dot_M)
-                amplitude_params = cov_matrix @ (M.T @ (self.W * self.data))
+                amplitude_params = cov_matrix @ (M.T @ W_dot_data)
                 if self.amplitude_priors_method == "positive":
                     amplitude_params[amplitude_params < 0] = 0
                 elif self.amplitude_priors_method == "smooth":
@@ -1828,7 +1829,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                 #     cov_matrix = L.T @ L
                 # except np.linalg.LinAlgError:
                 cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-                amplitude_params = cov_matrix @ (M.T @ (self.W * self.data) + self.reg * self.Q_dot_A0)
+                amplitude_params = sparse_dot_mkl.dot_product_mkl(cov_matrix, (sparse_dot_mkl.dot_product_mkl(M.T, W_dot_data) + np.float32(self.reg) * self.Q_dot_A0))
             amplitude_params = np.asarray(amplitude_params).reshape(-1)
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
