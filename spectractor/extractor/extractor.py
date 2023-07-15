@@ -169,7 +169,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.W_before_mask = np.copy(self.W)
 
         # create mask
-        self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.sqrtW = sparse.diags(np.sqrt(self.W), format="csr", dtype="float32")
 
         # design matrix
         self.M = None
@@ -177,7 +177,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         for order in self.diffraction_orders:
             self.M_sparse_indices[order] = None
         self.set_mask(fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=2*parameters.PSF_FWHM_CLIP)  # not a narrow mask for first fit
-        self.M_dot_W_dot_M = np.zeros((self.Nx, self.Nx))
+        self.M_dot_W_dot_M = None
 
         # prepare results
         self.amplitude_params = np.zeros(self.Nx)
@@ -194,8 +194,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if self.reg < 0:
             self.reg = parameters.PSF_FIT_REG_PARAM
         self.my_logger.info(f"\n\tFull forward model fitting with regularisation parameter r={self.reg}.")
-        self.Q = np.zeros((self.Nx, self.Nx))
-        self.Q_dot_A0 = np.zeros(self.Nx)
+        self.Q = np.zeros((self.Nx, self.Nx), dtype="float32")
+        self.Q_dot_A0 = np.zeros(self.Nx, dtype="float32")
         if amplitude_priors_method not in self.amplitude_priors_list:
             raise ValueError(f"Unknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
                              f"Must be either {self.amplitude_priors_list}.")
@@ -221,18 +221,15 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if amplitude_priors_method == "spectrum":
             # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
             # self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
-            self.U = np.linalg.inv(self.amplitude_priors_cov_matrix)
+            self.UTU = np.linalg.inv(self.amplitude_priors_cov_matrix)
             L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] \
                 + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
             L.astype(float)
             L[0, 0] = -1
             L[-1, -1] = -1
             self.L = L
-            self.Q = L.T @ np.linalg.inv(self.amplitude_priors_cov_matrix) @ L
-            # sparse_indices = np.where(self.Q > 0)
-            # self.Q = sparse.csr_matrix((self.Q[sparse_indices].ravel(), sparse_indices), shape=self.Q.shape, dtype="float32")
-            # self.Q = L.T @ U.T @ U @ L
-            self.Q_dot_A0 = self.Q @ self.amplitude_priors
+            self.Q = (L.T @ self.UTU @ L).astype("float32")  # Q is dense do not sparsify it (leads to errors otherwise)
+            self.Q_dot_A0 = self.Q @ self.amplitude_priors.astype("float32")
 
     def set_mask(self, params=None, fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP):
         """
@@ -289,7 +286,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         mask = mask.reshape((self.pixels[0].size,))
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
-        self.sqrtW = np.sqrt(sparse.diags(self.W))
+        self.sqrtW = sparse.diags(np.sqrt(self.W), format="csr", dtype="float32")
+        # self.sqrtW = np.sqrt(sparse.diags(self.W, dtype="float32"))
         self.mask = list(np.where(mask)[0])
         # make rectangular mask per wavelength
         for order in self.diffraction_orders:
@@ -423,7 +421,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.spectrum.adr_params[-1] = airmass
 
         parameters.OBS_CAMERA_ROTATION = rot
-        W_dot_data = self.W * (self.data + (1 - B) * self.bgd_flat)
+        W_dot_data = (self.W * (self.data + (1 - B) * self.bgd_flat)).astype("float32")
 
         # Evaluate ADR and compute wavelength arrays
         self.lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
@@ -466,9 +464,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
-            M_dot_W = M.T * self.sqrtW
+            # M_dot_W = self.sqrtW * M
+            M_dot_W = sparse_dot_mkl.dot_product_mkl(self.sqrtW, M)
             # M_dot_W_dot_M = M_dot_W @ M_dot_W.T
-            tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
+            tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=False)
             dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
             M_dot_W_dot_M = tri + tri.T - dia
             if self.amplitude_priors_method != "spectrum":
@@ -497,13 +496,14 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 elif self.amplitude_priors_method == "noprior":
                     pass
             else:
-                M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
+                M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + np.float32(self.reg) * self.Q
                 # try:  # slower
                 #     L = sparse.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
                 #     cov_matrix = L.T @ L
                 # except np.linalg.LinAlgError:
-                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-                amplitude_params = cov_matrix @ (M.T @ W_dot_data + self.reg * self.Q_dot_A0)
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)  # M_dot_W_dot_M_plus_Q is not so sparse
+                # amplitude_params = cov_matrix @ (M.T @ W_dot_data + self.reg * self.Q_dot_A0)
+                amplitude_params = sparse_dot_mkl.dot_product_mkl(cov_matrix, (sparse_dot_mkl.dot_product_mkl(M.T, W_dot_data) + np.float32(self.reg) * self.Q_dot_A0))
             self.M_dot_W_dot_M = M_dot_W_dot_M
             amplitude_params = np.asarray(amplitude_params).reshape(-1)
         else:
