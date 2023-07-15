@@ -95,18 +95,18 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # This set of fixed parameters was determined so that the reconstructed spectrum has a ZERO bias
         # with respect to the true spectrum injected in the simulation
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        fixed[params.get_index("A1")] = True  # A1
-        fixed[params.get_index("A2")] = (not spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in spectrum.header))
-        fixed[params.get_index("A3")] = True  # A3
-        fixed[params.get_index("D_CCD [mm]")] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_spectrum
-        fixed[params.get_index("shift_x [pix]")] = True  # delta x: if False, extracted spectrum is biased compared with truth
-        fixed[params.get_index("shift_y [pix]")] = True  # delta y
-        fixed[params.get_index("angle [deg]")] = True  # angle
-        fixed[params.get_index("B")] = True  # B: not needed in simulations, to check with data
-        fixed[params.get_index("R")] = True  # camera rot
-        fixed[params.get_index("P [hPa]")] = True  # pressure
-        fixed[params.get_index("T [Celsius]")] = True  # temperature
-        fixed[params.get_index("z")] = True  # airmass
+        params.fixed[params.get_index("A1")] = True  # A1
+        params.fixed[params.get_index("A2")] = (not spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in spectrum.header))
+        params.fixed[params.get_index("A3")] = True  # A3
+        params.fixed[params.get_index("D_CCD [mm]")] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_spectrum
+        params.fixed[params.get_index("shift_x [pix]")] = True  # delta x: if False, extracted spectrum is biased compared with truth
+        params.fixed[params.get_index("shift_y [pix]")] = True  # delta y
+        params.fixed[params.get_index("angle [deg]")] = True  # angle
+        params.fixed[params.get_index("B")] = True  # B: not needed in simulations, to check with data
+        params.fixed[params.get_index("R")] = True  # camera rot
+        params.fixed[params.get_index("P [hPa]")] = True  # pressure
+        params.fixed[params.get_index("T [Celsius]")] = True  # temperature
+        params.fixed[params.get_index("z")] = True  # airmass
 
         FitWorkspace.__init__(self, params, spectrum.filename, verbose, plot, live_fit, truth=truth)
         self.spectrum = spectrum
@@ -151,7 +151,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.psf_cubes_masked[order] = np.empty(1)
             self.boundaries[order] = {}
         self.fix_psf_cube = False
-        self.fix_psf_cube_next_order = False
 
         # prepare the background, data and errors
         self.bgd_std = float(np.std(np.random.poisson(np.abs(self.bgd))))
@@ -255,7 +254,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if params is None:
             params = self.params.values
         A1, A2, A3, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *psf_poly_params_all = params
-        poly_params = np.array(psf_poly_params_all).reshape((len(self.diffraction_orders), len(self.psf_poly_params)))
+        poly_params = np.array(psf_poly_params_all).reshape((len(self.diffraction_orders), -1))
 
         lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
                                                                order=self.spectrum.order)
@@ -274,12 +273,12 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                                                                   fwhmx_clip=fwhmx_clip,
                                                                   fwhmy_clip=fwhmy_clip, dtype="float32")
             self.psf_cubes_masked[order] = psf_cube > 0
-        flat_spectrogram = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(len(profile_params), self.pixels[0].size), axis=0)
+        wl_size = len(profile_params)
+        flat_spectrogram = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(wl_size, self.pixels[0].size), axis=0)
         mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
         mask = mask.reshape(self.pixels[0].shape)
         kernel = np.ones((3, self.spectrum.spectrogram_Nx//10))  # enlarge a bit more the edges of the mask
         mask = convolve2d(mask, kernel, 'same').astype(bool)
-        wl_size = len(profile_params)
         for order in self.diffraction_orders:
             for k in range(wl_size):
                 self.psf_cubes_masked[order][k] *= ~mask
@@ -415,7 +414,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # prepare the vectors
         self.params.values = np.asarray(params)
         A1, A2, A3, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *poly_params_all = params
-        poly_params = np.array(poly_params_all).reshape((len(self.diffraction_orders), len(self.psf_poly_params)))
+        poly_params = np.array(poly_params_all).reshape((len(self.diffraction_orders), -1))
         self.spectrum.adr_params[2] = temperature
         self.spectrum.adr_params[3] = pressure
         self.spectrum.adr_params[-1] = airmass
@@ -425,11 +424,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Evaluate ADR and compute wavelength arrays
         self.lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
-                                                                    order=self.spectrum.order)
+                                                                    order=self.diffraction_orders[0])
         profile_params = []
         M = None
         for k, order in enumerate(self.diffraction_orders):
-            if self.tr[k] is None:  # diffraction order undefined
+            if self.tr[k] is None or self.params[f"A{order}"] == 0:  # diffraction order undefined
                 continue
             # Evaluate PSF profile
             profile_params.append(self.spectrum.chromatic_psf.update(poly_params[k], self.spectrum.spectrogram_x0 + dx0,

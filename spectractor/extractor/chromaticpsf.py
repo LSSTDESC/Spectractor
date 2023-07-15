@@ -361,7 +361,7 @@ class ChromaticPSF:
                 continue
             if xc > Nx_pix + fwhmx_clip * fwhms[x]:
                 break
-            if mask is None and boundaries is None:
+            if mask is None and not boundaries:
                 xmin = max(0, int(xc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
                 xmax = min(Nx_pix, int(xc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
                 ymin = max(0, int(yc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))

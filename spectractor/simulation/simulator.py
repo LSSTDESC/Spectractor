@@ -4,12 +4,10 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 from spectractor.extractor.spectrum import Spectrum
-from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import Target
 from spectractor.extractor.psf import load_PSF
 from spectractor.tools import fftconvolve_gaussian
 from spectractor.config import set_logger
-from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 import spectractor.parameters as parameters
 
