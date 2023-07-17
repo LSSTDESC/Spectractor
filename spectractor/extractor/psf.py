@@ -13,7 +13,8 @@ from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation
 from numba import njit
 
 
-@njit(["float32[:](int64[:], float32, float32, float32, float32)"], fastmath=True, cache=True)
+@njit(["float32[:](int64[:], float32, float32, float32, float32)",
+       "float32[:](float32[:], float32, float32, float32, float32)"], fastmath=True, cache=True)
 def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):  # pragma: nocover
     r"""Compute a 1D Moffat function, whose integral is not normalised to unity.
 
@@ -93,7 +94,8 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):  # pragma: 
     return a
 
 
-@njit(["float32[:](int64[:], float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+@njit(["float32[:](int64[:], float32, float32, float32, float32, float32, float32)",
+       "float32[:](float32[:], float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
 def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
     r"""Compute a 1D Moffat-Gaussian function, whose integral is not normalised to unity.
 
@@ -355,7 +357,8 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
     return a
 
 
-@njit(["float32[:](int64[:], float32, float32, float32)"], fastmath=True, cache=False)
+@njit(["float32[:](int64[:], float32, float32, float32)",
+       "float32[:](float32[:], float32, float32, float32)"], fastmath=True, cache=False)
 def evaluate_gauss1d(y, amplitude, y_c, sigma):  # pragma: nocover
     r"""Compute a 2D Gaussian function, whose integral is normalised to unity.
 
