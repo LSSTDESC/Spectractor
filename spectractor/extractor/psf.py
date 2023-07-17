@@ -95,7 +95,7 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):  # pragma: 
 
 
 @njit(["float32[:](int64[:], float32, float32, float32, float32, float32, float32)",
-       "float32[:](float32[:], float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+       "float32[:](float32[:], float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
 def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: nocover
     r"""Compute a 1D Moffat-Gaussian function, whose integral is not normalised to unity.
 
@@ -740,6 +740,90 @@ class Moffat(PSF):
             return out
         else:  # pragma: no cover
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
+
+    def jacobian(self, pixels, values, epsilon, model_input=None):
+        r"""Evaluate the Moffat function.
+
+        The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
+
+        .. math::
+
+            f(y) \propto \frac{A \Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)},
+            \quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
+
+        Parameters
+        ----------
+        pixels: list
+            List containing the X abscisse 2D array and the Y abscisse 2D array.
+        values: array_like
+            The parameter array. If None, the array used to instanciate the class is taken.
+            If given, the class instance parameter array is updated.
+
+        Returns
+        -------
+        output: array_like
+            The PSF function evaluated.
+
+        Examples
+        --------
+        >>> p = [2,20,30,4,2,10]
+        >>> epsilon = [0.01] * len(p)
+        >>> psf = Moffat(p, clip=True)
+        >>> yy, xx = np.mgrid[:50, :60]
+        >>> output = psf.evaluate(pixels=np.array([xx, yy]))
+        >>> J = psf.jacobian(pixels, values=p, epsilon=, model_input=output)
+
+        ..  doctest::
+            :hide:
+
+            >>> assert np.sum(output) > 0
+            >>> J.shape
+
+        >>> p = [2,20,30,4,2,10]
+        >>> psf = Moffat(p, clip=True)
+        >>> xx = np.arange(0, 50, 1)
+        >>> output = psf.evaluate(pixels=xx)
+
+        ..  doctest::
+            :hide:
+
+            >>> assert np.sum(output) > 0
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.extractor.psf import Moffat
+            p = [2,20,30,4,2,10]
+            psf = Moffat(p)
+            yy, xx = np.mgrid[:50, :60]
+            out = psf.evaluate(pixels=np.array([xx, yy]))
+            fig = plt.figure(figsize=(5,5))
+            plt.imshow(out, origin="lower")
+            plt.xlabel("X [pixels]")
+            plt.ylabel("Y [pixels]")
+            plt.show()
+
+        """
+        if values is not None:
+            self.params.values = np.asarray(values).astype(float)
+        amplitude, x_c, y_c, gamma, alpha, saturation = self.params.values
+        if model_input is None:
+            model_input = self.evaluate(pixels, values=values).flatten()
+        import time
+        start = time.time()
+        J = np.zeros((self.params.values.size, model_input.size))
+        for ip, p in enumerate(values):
+            if self.params.fixed[ip]:
+                continue
+            tmp_p = np.copy(values)
+            if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
+                epsilon[ip] = - epsilon[ip]
+            tmp_p[ip] += epsilon[ip]
+            tmp_lambdas, tmp_model, tmp_model_err = self.evaluate(pixels, values=tmp_p)
+            J[ip] = (tmp_model.flatten() - model_input) / epsilon[ip]
+        self.my_logger.warning(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
+        return J
 
 
 class Gauss(PSF):
