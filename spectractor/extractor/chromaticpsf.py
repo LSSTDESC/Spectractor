@@ -711,11 +711,11 @@ class ChromaticPSF:
 
         """
         self.fill_table_with_profile_params(profile_params)
-        pixel_x = np.arange(self.Nx).astype(int)
+        pixel_x = np.arange(self.Nx, dtype=int)
         # oversampling for precise computation of the PSF
         # pixels.shape = (2, Nx, Ny): self.pixels[1<-y, 0<-first pixel value column, :]
         # TODO: account for rotation ad projection effects is PSF is not round
-        pixel_eval = np.arange(self.pixels[1, 0, 0], self.pixels[1, 0, -1], 0.1)
+        pixel_eval = np.arange(self.pixels[1, 0, 0], self.pixels[1, 0, -1], 0.1, dtype=np.float32)
         for x in pixel_x:
             p = profile_params[x, :]
             # compute FWHM transverse to dispersion axis (assuming revolution symmetry of the PSF)
