@@ -13,9 +13,69 @@ from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation
 from numba import njit
 
 
-@njit(["float32[:](int64[:], float32, float32, float32, float32)",
-       "float32[:](float32[:], float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):
+def evaluate_moffat1d_normalisation(gamma, alpha):
+    r"""Compute 1D Moffat normalisation.
+
+    .. math ::
+
+        A = \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}
+        \quad\text{with}, \alpha > 1/2
+
+    Note that this function is defined only for :math:`alpha > 1/2`.
+
+    Parameters
+    ----------
+    gamma: float
+        Width  :math:`\gamma` of the function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+
+    Returns
+    -------
+    norm: float
+        1D Moffat normalisation.
+
+    Examples
+    --------
+    >>> print(f"{evaluate_moffat1d_normalisation(5, 2):.6f}")
+    0.127324
+    """
+    return special.gamma(alpha) / (gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5))
+
+
+def evaluate_moffat1d_normalisation_dalpha(norm, alpha):
+    r"""Compute 1D Moffat normalisation.
+
+    .. math ::
+
+        A = \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}
+        \quad\text{with}, \alpha > 1/2
+
+    Note that this function is defined only for :math:`alpha > 1/2`.
+
+    Parameters
+    ----------
+    norm: float
+        1D Moffat normalisation.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+
+    Returns
+    -------
+    dalpha: float
+        1D Moffat normalisation derivatives with respect to alpha.
+
+    Examples
+    --------
+    >>> print(f"{evaluate_moffat1d_normalisation_dalpha(5, 2):.6f}")
+    1.931472
+    """
+    return norm * (special.digamma(alpha) - special.digamma(alpha - 0.5))
+
+
+@njit(["float32[:](int64[:], float32, float32, float32, float32, float32)",
+       "float32[:](float32[:], float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+def evaluate_moffat1d(y, amplitude, y_c, gamma, alpha, norm):
     r"""Compute a 1D Moffat function, whose integral is not normalised to unity.
 
     .. math ::
@@ -39,6 +99,8 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):
         Width  :math:`\gamma` of the function.
     alpha: float
         Exponent :math:`\alpha` of the Moffat function.
+    norm: float
+        Normalisation :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}`.
 
     Returns
     -------
@@ -53,11 +115,10 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):
     >>> amplitude = 10
     >>> alpha = 2
     >>> gamma = 5
-    >>> a = evaluate_moffat1d_unnormalized(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha)
-    >>> norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
-    >>> a = a / norm
+    >>> norm = evaluate_moffat1d_normalisation(gamma, alpha)
+    >>> a = evaluate_moffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha, norm=norm)
     >>> print(f"{np.sum(a):.6f}")
-    9.967561
+    9.967563
 
     .. doctest::
         :hide:
@@ -73,7 +134,8 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):
         Ny = 50
         y = np.arange(Ny)
         amplitude = 10
-        a = evaluate_moffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma=5, alpha=2)
+        norm = evaluate_moffat1d_normalisation(gamma, alpha)
+        a = evaluate_moffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma=5, alpha=2, norm=norm)
         plt.plot(a)
         plt.grid()
         plt.xlabel("y")
@@ -84,24 +146,95 @@ def evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha):
     rr = (y - y_c) * (y - y_c)
     rr_gg = rr / (gamma * gamma)
     a = (1 + rr_gg) ** -alpha
-    a *= amplitude
+    a *= (amplitude * norm)
     return a
 
 
-@njit(["float32[:](int64[:], float32, float32, float32, float32, float32, float32)",
-       "float32[:](float32[:], float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma):
-    r"""Compute a 1D Moffat-Gaussian function, whose integral is not normalised to unity.
+@njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda):
+    r"""Compute a 1D Moffat Jacobian, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}\times \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}
+        \quad\text{with}, \alpha > 1/2
+
+    Note that this function is defined only for :math:`alpha > 1/2`.
+
+    Parameters
+    ----------
+    y: array_like
+        1D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    y_c: float
+        Center  :math:`y_c` of the function.
+    gamma: float
+        Width  :math:`\gamma` of the function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+    norm: float
+        Normalisation :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}`.
+    dnormda: float
+        Derivatives of the normalisation with respect to alpha.
+
+    Returns
+    -------
+    J: array_like
+        2D array of the model Jacobian.
+
+    Examples
+    --------
+
+    >>> Ny = 50
+    >>> y = np.arange(Ny)
+    >>> amplitude = 10
+    >>> alpha = 2
+    >>> gamma = 5
+    >>> norm = evaluate_moffat1d_normalisation(gamma, alpha)
+    >>> dnormda = evaluate_moffat1d_normalisation_dalpha(norm, alpha)
+    >>> a = evaluate_moffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha, norm=norm)
+    >>> J = evaluate_moffat1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha, norm=norm, dnormda=dnormda)
+    >>> J.shape
+    (5, 50)
+    >>> J.dtype
+    dtype('float32')
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.allclose(J[0], a.ravel()/amplitude)
+
+    """
+    yc = y - y_c
+    rr = yc * yc
+    rr_gg = rr / (gamma * gamma)
+    inv = 1 / (1 + rr_gg)
+    psf = inv ** alpha
+    dpsf = alpha * inv * psf
+    A = norm * amplitude
+    J = np.zeros((5, y.size), dtype=np.float32)
+    J[0] = norm * psf  # amplitude
+    # fixed x_c so J[1] = 0
+    J[2] = (2 * A / (gamma * gamma)) * yc * dpsf  # y_c
+    J[3] = (2 * A / gamma) * rr_gg * dpsf - (A / gamma) * psf  # gamma
+    J[4] = - A * psf * np.log(1 + rr_gg) + amplitude * psf * dnormda  # alpha
+    return J
+
+
+@njit(["float32[:](int64[:], float32, float32, float32, float32, float32, float32, float32)",
+       "float32[:](float32[:], float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm_moffat):
+    r"""Compute a 1D Moffat-Gaussian function, whose integral is normalised to unity.
 
     .. math ::
 
         f(y) \propto A \left\lbrace
-        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}
-         - \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
+        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}+ \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
         \quad\text{ and } \quad \eta < 0, \alpha > 1/2
 
-    Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor for the Moffat
-    :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}` is not included as special functions
+    Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor for the Moffat+Gauss
+    :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)} + \eta \sqrt{2\pi} \sigma` is not included as special functions
     are not supproted by the numba library.
 
     Parameters
@@ -120,6 +253,8 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gau
         Relative negative amplitude of the Gaussian function.
     sigma: float
         Width :math:`\sigma` of the Gaussian function.
+    norm_moffat: float
+        Normalisation :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}`.
 
     Returns
     -------
@@ -136,10 +271,8 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gau
     >>> alpha = 2
     >>> eta_gauss = -0.1
     >>> sigma = 1
-    >>> a = evaluate_moffatgauss1d_unnormalized(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
-    ... eta_gauss=eta_gauss, sigma=sigma)
-    >>> norm = gamma*np.sqrt(np.pi)*special.gamma(alpha-0.5)/special.gamma(alpha) + eta_gauss*np.sqrt(2*np.pi)*sigma
-    >>> a = a / norm
+    >>> norm = evaluate_moffat1d_normalisation(gamma, alpha)
+    >>> a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha, eta_gauss=eta_gauss, sigma=sigma, norm_moffat=norm)
     >>> print(f"{np.sum(a):.6f}")
     9.966492
     >>> a.dtype
@@ -159,11 +292,12 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gau
         Ny = 50
         y = np.arange(Ny)
         amplitude = 10
-        a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1)
+        norm = evaluate_moffat1d_normalisation(gamma, alpha)
+        a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=5, alpha=2, eta_gauss=-0.1, sigma=1, norm_moffat=norm)
         plt.plot(a)
         plt.grid()
         plt.xlabel("y")
-        plt.ylabel("Moffat")
+        plt.ylabel("Moffat+Gauss")
         plt.show()
 
     """
@@ -171,9 +305,99 @@ def evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gau
     rr = yc * yc
     rr_gg = rr / (gamma * gamma)
     rr_ss = rr / (sigma * sigma)
+    norm = (1. / norm_moffat) + eta_gauss * np.sqrt(2 * np.pi) * sigma
     a = (1 + rr_gg) ** -alpha + eta_gauss * np.exp(-(rr_ss / 2))
-    a *= amplitude
+    a *= (amplitude / norm)
     return a
+
+
+@njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm_moffat, dnormda):
+    r"""Compute a 1D Moffat-Gaussian Jacobian, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(y) \propto A \left\lbrace
+        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha} \times \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}
+         - \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
+        \quad\text{ and } \quad \eta < 0, \alpha > 1/2
+
+    Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor for the Moffat
+    :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)} + \eta \sqrt{2\pi} \sigma` is not included as special functions
+    are not supproted by the numba library.
+
+    Parameters
+    ----------
+    y: array_like
+        1D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    y_c: float
+        Center  :math:`y_c` of the function.
+    gamma: float
+        Width  :math:`\gamma` of the Moffat function.
+    alpha: float
+        Exponent :math:`\alpha` of the Moffat function.
+    eta_gauss: float
+        Relative negative amplitude of the Gaussian function.
+    sigma: float
+        Width :math:`\sigma` of the Gaussian function.
+    norm_moffat: float
+        Normalisation :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}`.
+    dnormda: float
+        Derivatives of the normalisation with respect to alpha.
+
+    Returns
+    -------
+    J: array_like
+        2D array of the model Jacobian.
+
+    Examples
+    --------
+
+    >>> Ny = 50
+    >>> y = np.arange(Ny)
+    >>> amplitude = 10
+    >>> gamma = 5
+    >>> alpha = 2
+    >>> eta_gauss = -0.1
+    >>> sigma = 1
+    >>> norm = evaluate_moffat1d_normalisation(gamma, alpha)
+    >>> dnormda = evaluate_moffat1d_normalisation_dalpha(norm, alpha)
+    >>> a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
+    ... eta_gauss=eta_gauss, sigma=sigma, norm_moffat=norm)
+    >>> J = evaluate_moffatgauss1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
+    ... eta_gauss=eta_gauss, sigma=sigma, norm_moffat=norm, dnormda=dnormda)
+    >>> J.shape
+    (7, 50)
+    >>> J.dtype
+    dtype('float32')
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.allclose(J[0], a.ravel()/amplitude)
+
+    """
+    yc = y - y_c
+    rr = yc * yc
+    rr_gg = rr / (gamma * gamma)
+    rr_ss = rr / (sigma * sigma)
+    inv_moffat = 1 / (1 + rr_gg)
+    psf_moffat = inv_moffat ** alpha
+    dpsf_moffat = alpha * inv_moffat * psf_moffat
+    psf_gauss = np.exp(-(rr_ss / 2))
+    psf = psf_moffat + eta_gauss * psf_gauss
+    norm = amplitude / ((1. / norm_moffat) + eta_gauss * np.sqrt(2 * np.pi) * sigma)
+    J = np.zeros((7, y.size), dtype=np.float32)
+    J[0] = (norm / amplitude) * psf  # amplitude
+    # fixed x_c so J[1] = 0
+    J[2] = (norm / (sigma * sigma)) * yc * eta_gauss * psf_gauss + (2 * norm / (gamma * gamma)) * yc * dpsf_moffat  # y_c
+    J[3] = (2 * norm / gamma) * rr_gg * dpsf_moffat - (norm * norm / (amplitude * norm_moffat * gamma)) * psf   # gamma
+    J[4] = -norm * psf_moffat * np.log(1 + rr_gg) + psf * (norm * norm / amplitude) * (dnormda / (norm_moffat * norm_moffat))   # alpha
+    J[5] = norm * psf_gauss - (np.sqrt(2 * np.pi) * sigma * norm * norm / amplitude) * psf  # eta
+    J[6] = (-eta_gauss * np.sqrt(2*np.pi) * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss  # sigma
+    return J
 
 
 @njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
@@ -414,7 +638,7 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
 @njit(["float32[:](int64[:], float32, float32, float32)",
        "float32[:](float32[:], float32, float32, float32)"], fastmath=True, cache=False)
 def evaluate_gauss1d(y, amplitude, y_c, sigma):
-    r"""Compute a 2D Gaussian function, whose integral is normalised to unity.
+    r"""Compute a 1D Gaussian function, whose integral is normalised to unity.
 
     .. math ::
 
@@ -428,7 +652,7 @@ def evaluate_gauss1d(y, amplitude, y_c, sigma):
     Parameters
     ----------
     y: array_like
-        2D array of pixels :math:`y`, regularly spaced.
+        1D array of pixels :math:`y`, regularly spaced.
     amplitude: float
         Integral :math:`A` of the function.
     y_c: float
@@ -480,6 +704,68 @@ def evaluate_gauss1d(y, amplitude, y_c, sigma):
     norm = np.sqrt(2 * np.pi) * sigma
     a *= amplitude / norm
     return a
+
+
+@njit(["float32[:,:](int64[:], float32, float32, float32)",
+       "float32[:,:](float32[:], float32, float32, float32)"], fastmath=True, cache=False)
+def evaluate_gauss1d_jacobian(y, amplitude, y_c, sigma):
+    r"""Compute a 1D Gaussian function, whose integral is normalised to unity.
+
+    .. math ::
+
+        f(x, y) = \frac{A}{\sigma \sqrt{2 \pi}\left\lbrace e^{-\left[ \left(x-x_c\right)^2\right]/(2 \sigma^2)}
+        \right\rbrace
+
+    .. math ::
+        \quad\text{with}\quad
+        \int_{-\infty}^{\infty}f(y) \mathrm{d}y = A
+
+    Parameters
+    ----------
+    y: array_like
+        2D array of pixels :math:`y`, regularly spaced.
+    amplitude: float
+        Integral :math:`A` of the function.
+    y_c: float
+        X axis center  :math:`y_c` of the function.
+    sigma: float
+        Width :math:`\sigma` of the Gaussian function.
+
+    Returns
+    -------
+    J: array_like
+        2D array of the model Jacobian.
+
+    Examples
+    --------
+
+    >>> Ny = 50
+    >>> y = np.arange(Ny)
+    >>> amplitude = 10
+    >>> sigma = 2
+    >>> a = evaluate_gauss1d(y, amplitude=amplitude, y_c=Ny/2, sigma=2)
+    >>> J = evaluate_gauss1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, sigma=2)
+    >>> J.shape
+    (4, 50)
+    >>> J.dtype
+    dtype('float32')
+
+    .. doctest::
+        :hide:
+
+        >>> assert np.allclose(J[0], a/amplitude)
+
+    """
+    yc = (y - y_c) / sigma
+    rr_ss = yc * yc
+    psf = np.exp(-(rr_ss / 2))
+    norm = amplitude / (np.sqrt(2 * np.pi) * sigma)
+    J = np.zeros((4, y.size), dtype=np.float32)
+    J[0] = (norm / amplitude) * psf  # amplitude
+    # x_c is fixed so J[1] = 0
+    J[2] = (norm / sigma) * yc * psf  # y_c
+    J[3] = (norm / sigma) * rr_ss * psf - (norm / sigma) * psf  # sigma
+    return J
 
 
 @njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32)"], fastmath=True, cache=True)
@@ -613,7 +899,7 @@ def evaluate_gauss2d_jacobian(x, y, amplitude, x_c, y_c, sigma):
     J[0] = (norm / amplitude) * psf  # amplitude
     J[1] = (norm / sigma) * xc * psf  # x_c
     J[2] = (norm / sigma) * yc * psf  # y_c
-    J[3] = (norm / sigma) * rr_ss * psf - (2 * norm / sigma) * psf  # gamma
+    J[3] = (norm / sigma) * rr_ss * psf - (2 * norm / sigma) * psf  # sigma
     return J
 
 
@@ -731,14 +1017,15 @@ class PSF:
         else:
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
-    def jacobian(self, pixels, values, epsilon=None, model_input=None, analytical=True):  # pragma: no cover
+    def jacobian(self, pixels, params, epsilon=None, model_input=None, analytical=True):  # pragma: no cover
         if epsilon is None and not analytical:
             raise ValueError(f"If analytical=False, must give epsilon values for numerical differentiation.")
-        if values is not None:
-            self.params.values = np.asarray(values).astype(float)
+        if params is not None:
+            self.params.values = np.asarray(params).astype(float)
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             return np.zeros((self.params.values.size, pixels[0].size))
         elif pixels.ndim == 1:
+            self.params.fixed[1] = True  # remove x_c
             return np.zeros((self.params.values.size, pixels.size))
         else:
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
@@ -884,7 +1171,7 @@ class Moffat(PSF):
         >>> p = [2,20,30,4,2,10]
         >>> psf = Moffat(p, clip=True)
         >>> yy, xx = np.mgrid[:50, :60]
-        >>> output = psf.evaluate(pixels=np.array([xx, yy]))
+        >>> output = psf.evaluate(pixels=np.array([xx, yy]), values=p)
 
         ..  doctest::
             :hide:
@@ -894,7 +1181,7 @@ class Moffat(PSF):
         >>> p = [2,20,30,4,2,10]
         >>> psf = Moffat(p, clip=True)
         >>> xx = np.arange(0, 50, 1)
-        >>> output = psf.evaluate(pixels=xx)
+        >>> output = psf.evaluate(pixels=xx, values=p)
 
         ..  doctest::
             :hide:
@@ -909,7 +1196,7 @@ class Moffat(PSF):
             p = [2,20,30,4,2,10]
             psf = Moffat(p)
             yy, xx = np.mgrid[:50, :60]
-            out = psf.evaluate(pixels=np.array([xx, yy]))
+            out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
             fig = plt.figure(figsize=(5,5))
             plt.imshow(out, origin="lower")
             plt.xlabel("X [pixels]")
@@ -928,10 +1215,9 @@ class Moffat(PSF):
             return out
         elif pixels.ndim == 1:
             y = np.array(pixels)
-            norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha)
-            if norm > 0:
-                out = evaluate_moffat1d_unnormalized(y, amplitude, y_c, gamma, alpha)
-                out /= norm
+            if alpha > 0.5:
+                norm = evaluate_moffat1d_normalisation(gamma, alpha)
+                out = evaluate_moffat1d(y, amplitude, y_c, gamma, alpha, norm=norm)
             else:
                 out = np.zeros_like(y)
             if self.clip:
@@ -940,7 +1226,7 @@ class Moffat(PSF):
         else:  # pragma: no cover
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
-    def jacobian(self, pixels, values, epsilon=None, model_input=None, analytical=True):
+    def jacobian(self, pixels, params, epsilon=None, model_input=None, analytical=True):
         r"""Evaluate the PSF Moffat Jacobian.
 
         The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
@@ -949,7 +1235,7 @@ class Moffat(PSF):
         ----------
         pixels: array_like
             List containing the X abscisse 2D array and the Y abscisse 2D array.
-        values: array_like
+        params: array_like
             The parameter array. If None, the array used to instanciate the class is taken.
             If given, the class instance parameter array is updated.
         epsilon: array_like, optional
@@ -970,19 +1256,9 @@ class Moffat(PSF):
         >>> p = [2,20,30,4,2,10]
         >>> epsilon = [0.01] * len(p)
         >>> psf = Moffat(p, clip=True)
-        >>> psf.params.fixed[2] = True  # fix y_c
         >>> yy, xx = np.mgrid[:50, :60]
-        >>> output = psf.evaluate(pixels=np.array([xx, yy]))
-        >>> J_ana = psf.jacobian(pixels=np.array([xx, yy]), values=p, epsilon=epsilon, model_input=output, analytical=True)
-        >>> J_ana.shape
-        (6, 3000)
-        >>> np.sum(J_ana[2])
-        0.0
-        >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), values=p, epsilon=epsilon, model_input=output, analytical=False)
-        >>> J_num.shape
-        (6, 3000)
-        >>> np.sum(J_num[2])
-        0.0
+        >>> J_ana = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=True)
+        >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=False)
         >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2) for k in range(len(p))]
         [True, True, True, True, True, True]
         >>> np.allclose(J_num, J_ana, rtol=1e-4, atol=1e-4)
@@ -991,31 +1267,51 @@ class Moffat(PSF):
         ..  doctest::
             :hide:
 
-            >>> assert np.sum(output) > 0
             >>> assert J_ana.shape == (len(p), xx.size)
             >>> assert J_num.shape == (len(p), xx.size)
+
+        1D case
+
+        >>> y = np.mgrid[:50]
+        >>> J_ana = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=True)
+        >>> J_num = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=False)
+        >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2) for k in range(len(p))]
+        [True, True, True, True, True, True]
+        >>> np.allclose(J_num, J_ana, rtol=1e-3, atol=1e-3)
+        True
+
+        ..  doctest::
+            :hide:
+
+            >>> assert J_ana.shape == (len(p), y.size)
+            >>> assert J_num.shape == (len(p), y.size)
         """
         if epsilon is None and not analytical:
             raise ValueError(f"If analytical=False, must give epsilon values for numerical differentiation.")
         amplitude, x_c, y_c, gamma, alpha, saturation = self.params.values.astype(float)
-        J = super().jacobian(pixels, values, epsilon=epsilon, model_input=model_input, analytical=analytical)
+        J = super().jacobian(pixels, params, epsilon=epsilon, model_input=model_input, analytical=analytical)
         if not analytical:
             if model_input is None:
-                model_input = self.evaluate(pixels, values=values)
-            for ip, p in enumerate(values):
+                model = self.evaluate(pixels, values=params)
+            else:
+                x, model, model_err = model_input
+            for ip, p in enumerate(params):
                 if self.params.fixed[ip]:
                     continue
-                tmp_p = np.copy(values).astype(float)
+                tmp_p = np.copy(params).astype(float)
                 if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                     epsilon[ip] = - epsilon[ip]
                 tmp_p[ip] += epsilon[ip]
                 tmp_model = self.evaluate(pixels, values=tmp_p)
-                J[ip] = (tmp_model.ravel() - model_input.ravel()) / epsilon[ip]
+                J[ip] = (tmp_model.ravel() - model.ravel()) / epsilon[ip]
         else:
             if pixels.ndim == 1:
-                raise NotImplementedError(f"Jacobian for 1D has no analytical function yet.")
-            xx, yy = pixels
-            J[:-1] = evaluate_moffat2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha)  # assume saturation is fixed
+                norm = evaluate_moffat1d_normalisation(gamma, alpha)
+                dnormda = evaluate_moffat1d_normalisation_dalpha(norm, alpha)
+                J[:-1] = evaluate_moffat1d_jacobian(pixels, amplitude, y_c, gamma, alpha, norm, dnormda)  # assume saturation is fixed
+            else:
+                xx, yy = pixels
+                J[:-1] = evaluate_moffat2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha)  # assume saturation is fixed
             ipar = self.params.get_fixed_parameters()
             if len(ipar) > 0:
                 J[ipar] = 0.
@@ -1063,7 +1359,7 @@ class Gauss(PSF):
         >>> p = [2,20,30,2,10]
         >>> psf = Gauss(p, clip=True)
         >>> yy, xx = np.mgrid[:50, :60]
-        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+        >>> out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
 
         .. plot::
 
@@ -1073,7 +1369,7 @@ class Gauss(PSF):
             p = [2,20,30,2,10]
             psf = Gauss(p)
             yy, xx = np.mgrid[:50, :60]
-            out = psf.evaluate(pixels=np.array([xx, yy]))
+            out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
             fig = plt.figure(figsize=(5,5))
             plt.imshow(out, origin="lower")
             plt.xlabel("X [pixels]")
@@ -1102,7 +1398,7 @@ class Gauss(PSF):
         else:  # pragma: no cover
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
-    def jacobian(self, pixels, values, epsilon=None, model_input=None, analytical=True):
+    def jacobian(self, pixels, params, epsilon=None, model_input=None, analytical=True):
         r"""Evaluate the PSF Gauss Jacobian.
 
         The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
@@ -1111,7 +1407,7 @@ class Gauss(PSF):
         ----------
         pixels: array_like
             List containing the X abscisse 2D array and the Y abscisse 2D array.
-        values: array_like
+        params: array_like
             The parameter array. If None, the array used to instanciate the class is taken.
             If given, the class instance parameter array is updated.
         epsilon: array_like, optional
@@ -1132,19 +1428,9 @@ class Gauss(PSF):
         >>> p = [2,20,30,2,10]
         >>> epsilon = [0.001] * len(p)
         >>> psf = Gauss(p, clip=True)
-        >>> psf.params.fixed[2] = True  # fix y_c
         >>> yy, xx = np.mgrid[:50, :60]
-        >>> output = psf.evaluate(pixels=np.array([xx, yy]))
-        >>> J_ana = psf.jacobian(pixels=np.array([xx, yy]), values=p, epsilon=epsilon, model_input=output, analytical=True)
-        >>> J_ana.shape
-        (5, 3000)
-        >>> np.sum(J_ana[2])
-        0.0
-        >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), values=p, epsilon=epsilon, model_input=output, analytical=False)
-        >>> J_num.shape
-        (5, 3000)
-        >>> np.sum(J_num[2])
-        0.0
+        >>> J_ana = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=True)
+        >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=False)
         >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2, atol=1e-4) for k in range(len(p))]
         [True, True, True, True, True]
         >>> np.allclose(J_num, J_ana, rtol=1e-2, atol=1e-4)
@@ -1153,31 +1439,49 @@ class Gauss(PSF):
         ..  doctest::
             :hide:
 
-            >>> assert np.sum(output) > 0
             >>> assert J_ana.shape == (len(p), xx.size)
             >>> assert J_num.shape == (len(p), xx.size)
+
+        1D case
+
+        >>> y = np.mgrid[:50]
+        >>> J_ana = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=True)
+        >>> J_num = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=False)
+        >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2, atol=1e-4) for k in range(len(p))]
+        [True, True, True, True, True]
+        >>> np.allclose(J_num, J_ana, rtol=1e-2, atol=1e-4)
+        True
+
+        ..  doctest::
+            :hide:
+
+            >>> assert J_ana.shape == (len(p), y.size)
+            >>> assert J_num.shape == (len(p), y.size)
         """
         if epsilon is None and not analytical:
             raise ValueError(f"If analytical=False, must give epsilon values for numerical differentiation.")
         amplitude, x_c, y_c, sigma, saturation = self.params.values.astype(float)
-        J = super().jacobian(pixels, values, epsilon=epsilon, model_input=model_input, analytical=analytical)
+        J = super().jacobian(pixels, params, epsilon=epsilon, model_input=model_input, analytical=analytical)
         if not analytical:
             if model_input is None:
-                model_input = self.evaluate(pixels, values=values)
-            for ip, p in enumerate(values):
+                model = self.evaluate(pixels, values=params)
+            else:
+                x, model, model_err = model_input
+            for ip, p in enumerate(params):
                 if self.params.fixed[ip]:
                     continue
-                tmp_p = np.copy(values).astype(float)
+                tmp_p = np.copy(params).astype(float)
                 if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                     epsilon[ip] = - epsilon[ip]
                 tmp_p[ip] += epsilon[ip]
                 tmp_model = self.evaluate(pixels, values=tmp_p)
-                J[ip] = (tmp_model.ravel() - model_input.ravel()) / epsilon[ip]
+                J[ip] = (tmp_model.ravel() - model.ravel()) / epsilon[ip]
         else:
             if pixels.ndim == 1:
-                raise NotImplementedError(f"Jacobian for 1D has no analytical function yet.")
-            xx, yy = pixels
-            J[:-1] = evaluate_gauss2d_jacobian(xx, yy, amplitude, x_c, y_c, sigma)  # assume saturation is fixed
+                J[:-1] = evaluate_gauss1d_jacobian(pixels, amplitude, y_c, sigma)  # assume saturation is fixed
+            else:
+                xx, yy = pixels
+                J[:-1] = evaluate_gauss2d_jacobian(xx, yy, amplitude, x_c, y_c, sigma)  # assume saturation is fixed
             ipar = self.params.get_fixed_parameters()
             if len(ipar) > 0:
                 J[ipar] = 0.
@@ -1188,13 +1492,13 @@ class MoffatGauss(PSF):
 
     def __init__(self, values=None, clip=False):
         PSF.__init__(self, clip=clip)
-        self.values_default = np.array([1, 0, 0, 3, 2, 0, 1, 1]).astype(float)
+        self.values_default = np.array([1, 0, 0, 3, 2, -0.5, 1, 1]).astype(float)
         if values is None:
             values = np.copy(self.values_default)
         labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
         axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
         bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 100),
-                  (-1, 0), (0.1, np.inf), (0, np.inf)]
+                  (-1, -5e-3), (0.5, np.inf), (0, np.inf)]
         self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
@@ -1202,7 +1506,7 @@ class MoffatGauss(PSF):
             self.max_half_width = max_half_width
         self.params.bounds[2] = (0, 2 * self.max_half_width)
         self.params.bounds[3] = (0.1, self.max_half_width)
-        self.params.bounds[6] = (0.1, self.max_half_width)
+        self.params.bounds[6] = (0.5, self.max_half_width)
 
     def evaluate(self, pixels, values=None):
         r"""Evaluate the MoffatGauss function.
@@ -1232,7 +1536,7 @@ class MoffatGauss(PSF):
         >>> p = [2,20,30,4,2,-0.5,1,10]
         >>> psf = MoffatGauss(p)
         >>> yy, xx = np.mgrid[:50, :60]
-        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+        >>> out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
 
         .. plot::
 
@@ -1242,7 +1546,7 @@ class MoffatGauss(PSF):
             p = [2,20,30,4,2,-0.5,1,10]
             psf = MoffatGauss(p)
             yy, xx = np.mgrid[:50, :60]
-            out = psf.evaluate(pixels=np.array([xx, yy]))
+            out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
             fig = plt.figure(figsize=(5,5))
             plt.imshow(out, origin="lower")
             plt.xlabel("X [pixels]")
@@ -1261,15 +1565,18 @@ class MoffatGauss(PSF):
             return out
         elif pixels.ndim == 1:
             y = np.array(pixels)
-            norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha) + eta_gauss * np.sqrt(2 * np.pi) * stddev
-            out = evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, stddev) / norm
-            if self.clip:
-                out = np.clip(out, 0, saturation)
-            return out
+            if alpha > 0.5:
+                norm = evaluate_moffat1d_normalisation(gamma, alpha)
+                out = evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, stddev, norm_moffat=norm)
+                if self.clip:
+                    out = np.clip(out, 0, saturation)
+                return out
+            else:
+                return np.zeros_like(y)
         else:  # pragma: no cover
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
-    def jacobian(self, pixels, values, epsilon=None, model_input=None, analytical=True):
+    def jacobian(self, pixels, params, epsilon=None, model_input=None, analytical=True):
         r"""Evaluate the PSF Moffat+Gauss Jacobian.
 
         The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
@@ -1278,7 +1585,7 @@ class MoffatGauss(PSF):
         ----------
         pixels: array_like
             List containing the X abscisse 2D array and the Y abscisse 2D array.
-        values: array_like
+        params: array_like
             The parameter array. If None, the array used to instanciate the class is taken.
             If given, the class instance parameter array is updated.
         epsilon: array_like, optional
@@ -1299,19 +1606,9 @@ class MoffatGauss(PSF):
         >>> p = [2,20,30,4,2,-0.5,1,10]
         >>> epsilon = [0.001] * len(p)
         >>> psf = MoffatGauss(p)
-        >>> psf.params.fixed[2] = True  # fix y_c
         >>> yy, xx = np.mgrid[:50, :60]
-        >>> output = psf.evaluate(pixels=np.array([xx, yy]))
-        >>> J_ana = psf.jacobian(pixels=np.array([xx, yy]), values=p, epsilon=epsilon, model_input=output, analytical=True)
-        >>> J_ana.shape
-        (8, 3000)
-        >>> np.sum(J_ana[2])
-        0.0
-        >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), values=p, epsilon=epsilon, model_input=output, analytical=False)
-        >>> J_num.shape
-        (8, 3000)
-        >>> np.sum(J_num[2])
-        0.0
+        >>> J_ana = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=True)
+        >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=False)
         >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2, atol=1e-4) for k in range(len(p))]
         [True, True, True, True, True, True, True, True]
         >>> np.allclose(J_num, J_ana, rtol=1e-4, atol=1e-4)
@@ -1320,35 +1617,56 @@ class MoffatGauss(PSF):
         ..  doctest::
             :hide:
 
-            >>> assert np.sum(output) > 0
             >>> assert J_ana.shape == (len(p), xx.size)
             >>> assert J_num.shape == (len(p), xx.size)
+
+        1D case
+
+        >>> y = np.mgrid[:50]
+        >>> J_ana = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=True)
+        >>> J_num = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=False)
+        >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2, atol=1e-3) for k in range(len(p))]
+        [True, True, True, True, True, True, True, True]
+        >>> np.allclose(J_num, J_ana, rtol=1e-3, atol=1e-4)
+        True
+
+        ..  doctest::
+            :hide:
+
+            >>> assert J_ana.shape == (len(p), y.size)
+            >>> assert J_num.shape == (len(p), y.size)
         """
         if epsilon is None and not analytical:
             raise ValueError(f"If analytical=False, must give epsilon values for numerical differentiation.")
         amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma, saturation = self.params.values.astype(float)
-        J = super().jacobian(pixels, values, epsilon=epsilon, model_input=model_input, analytical=analytical)
+        J = super().jacobian(pixels, params, epsilon=epsilon, model_input=model_input, analytical=analytical)
         if not analytical:
             if model_input is None:
-                model_input = self.evaluate(pixels, values=values)
-            for ip, p in enumerate(values):
+                model = self.evaluate(pixels, values=params)
+            else:
+                x, model, model_err = model_input
+            for ip, p in enumerate(params):
                 if self.params.fixed[ip]:
                     continue
-                tmp_p = np.copy(values).astype(float)
+                tmp_p = np.copy(params).astype(float)
                 if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                     epsilon[ip] = - epsilon[ip]
                 tmp_p[ip] += epsilon[ip]
                 tmp_model = self.evaluate(pixels, values=tmp_p)
-                J[ip] = (tmp_model.ravel() - model_input.ravel()) / epsilon[ip]
+                J[ip] = (tmp_model.ravel() - model.ravel()) / epsilon[ip]
         else:
             if pixels.ndim == 1:
-                raise NotImplementedError(f"Jacobian for 1D has no analytical function yet.")
-            xx, yy = pixels
-            J[:-1] = evaluate_moffatgauss2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma)  # assume saturation is fixed
+                norm = evaluate_moffat1d_normalisation(gamma, alpha)
+                dnormda = evaluate_moffat1d_normalisation_dalpha(norm, alpha)
+                J[:-1] = evaluate_moffatgauss1d_jacobian(pixels, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm, dnormda)  # assume saturation is fixed
+            else:
+                xx, yy = pixels
+                J[:-1] = evaluate_moffatgauss2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma)  # assume saturation is fixed
             ipar = self.params.get_fixed_parameters()
             if len(ipar) > 0:
                 J[ipar] = 0.
         return J
+
 
 class Order0(PSF):
 
@@ -1421,16 +1739,16 @@ class Order0(PSF):
         >>> x0, y0 = find_target(im, guess)
 
         >>> p = [1,40,50,1,1e20]
-        >>> psf = Order0(target=im.target, values=p)
+        >>> psf = Order0(target=im.target)
 
         2D evaluation:
 
         >>> yy, xx = np.mgrid[:80, :100]
-        >>> out = psf.evaluate(pixels=np.array([xx, yy]))
+        >>> out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
 
         1D evaluation:
 
-        >>> out = psf.evaluate(pixels=np.arange(100))
+        >>> out = psf.evaluate(pixels=np.arange(100), values=p)
 
         .. plot::
 
@@ -1447,7 +1765,7 @@ class Order0(PSF):
             p = [1,40,50,1,1e20]
             psf = Order0(target=im.target, p=p)
             yy, xx = np.mgrid[:80, :100]
-            out = psf.evaluate(pixels=np.array([xx, yy]))
+            out = psf.evaluate(pixels=np.array([xx, yy]), values=p)
             fig = plt.figure(figsize=(5,5))
             plt.imshow(out, origin="lower")
             plt.xlabel("X [pixels]")
@@ -1475,7 +1793,7 @@ class Order0(PSF):
         else:  # pragma: no cover
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
-    def jacobian(self, pixels, values, epsilon=None, model_input=None, analytical=False):
+    def jacobian(self, pixels, params, epsilon=None, model_input=None, analytical=False):
         r"""Evaluate the PSF Order0 Jacobian.
         Analytical Jacobian is not available.
 
@@ -1485,7 +1803,7 @@ class Order0(PSF):
         ----------
         pixels: array_like
             List containing the X abscisse 2D array and the Y abscisse 2D array.
-        values: array_like
+        params: array_like
             The parameter array. If None, the array used to instanciate the class is taken.
             If given, the class instance parameter array is updated.
         epsilon: array_like, optional
@@ -1517,8 +1835,7 @@ class Order0(PSF):
         >>> epsilon = [0.01] * len(p)
         >>> psf.params.fixed[2] = True  # fix y_c
         >>> yy, xx = np.mgrid[:50, :60]
-        >>> output = psf.evaluate(pixels=np.array([xx, yy]))
-        >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), values=p, epsilon=epsilon, model_input=output, analytical=False)
+        >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=False)
         >>> J_num.shape
         (5, 3000)
         >>> np.sum(J_num[2])
@@ -1527,24 +1844,25 @@ class Order0(PSF):
         ..  doctest::
             :hide:
 
-            >>> assert np.sum(output) > 0
             >>> assert J_num.shape == (len(p), xx.size)
         """
         if epsilon is None and not analytical:
             raise ValueError(f"If analytical=False, must give epsilon values for numerical differentiation.")
-        J = super().jacobian(pixels, values, epsilon=epsilon, model_input=model_input, analytical=analytical)
+        J = super().jacobian(pixels, params, epsilon=epsilon, model_input=model_input, analytical=analytical)
         if not analytical:
             if model_input is None:
-                model_input = self.evaluate(pixels, values=values)
-            for ip, p in enumerate(values):
+                model = self.evaluate(pixels, values=params)
+            else:
+                x, model, model_err = model_input
+            for ip, p in enumerate(params):
                 if self.params.fixed[ip]:
                     continue
-                tmp_p = np.copy(values).astype(float)
+                tmp_p = np.copy(params).astype(float)
                 if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                     epsilon[ip] = - epsilon[ip]
                 tmp_p[ip] += epsilon[ip]
                 tmp_model = self.evaluate(pixels, values=tmp_p)
-                J[ip] = (tmp_model.ravel() - model_input.ravel()) / epsilon[ip]
+                J[ip] = (tmp_model.ravel() - model.ravel()) / epsilon[ip]
         else:
             raise ValueError(f"Analytical=True not allowed for Order0 PSF data driven model.")
         return J
@@ -1555,7 +1873,7 @@ class PSFFitWorkspace(FitWorkspace):
 
     """
 
-    def __init__(self, psf, data, data_errors, bgd_model_func=None, file_name="",
+    def __init__(self, psf, data, data_errors, bgd_model_func=None, jacobian_analytical=False, file_name="",
                  verbose=False, plot=False, live_fit=False, truth=None):
         """
 
@@ -1580,7 +1898,8 @@ class PSFFitWorkspace(FitWorkspace):
 
         >>> p = np.array([100, 50, 50, 3, 2, -0.1, 2, 200])
         >>> psf = MoffatGauss(p)
-        >>> data = psf.evaluate(p)
+        >>> yy, xx = np.mgrid[:50, :60]
+        >>> data = psf.evaluate(pixels=np.array([xx, yy]), values=p)
         >>> data_errors = np.sqrt(data+1)
 
         Fit the data:
@@ -1602,13 +1921,14 @@ class PSFFitWorkspace(FitWorkspace):
         self.bgd_model_func = bgd_model_func
         self.saturation = self.psf.params.values[-1]
         self.guess = np.copy(self.psf.params.values)
+        self.jacobian_analytical = jacobian_analytical
 
         # prepare the fit
         if data.ndim == 2:
             self.Ny, self.Nx = self.data.shape
             self.psf.apply_max_width_to_bounds(self.Ny)
             yy, xx = np.mgrid[:self.Ny, :self.Nx]
-            self.pixels = np.asarray([xx, yy])
+            self.pixels = np.asarray([xx, yy], dtype=int)
             # flat data for fitworkspace
             self.data = self.data.flatten()
             self.err = self.err.flatten()
@@ -1616,7 +1936,7 @@ class PSFFitWorkspace(FitWorkspace):
             self.Ny = self.data.size
             self.Nx = 1
             self.psf.apply_max_width_to_bounds(self.Ny)
-            self.pixels = np.arange(self.Ny)
+            self.pixels = np.arange(self.Ny, dtype=int)
             self.params.fixed[1] = True
         else:
             raise ValueError(f"Data array must have dimension 1 or 2. Here pixels.ndim={data.ndim}.")
@@ -1697,16 +2017,7 @@ class PSFFitWorkspace(FitWorkspace):
             w.plot_fit()
 
         """
-        # Initialization of the regression
         self.params.values = np.copy(psf_params)
-        # if not self.fixed_amplitude:
-        #     # Matrix filling
-        #     M = self.psf.evaluate(self.pixels, p=np.array([1] + list(self.p))).flatten()
-        #     M_dot_W_dot_M = M.T @ self.W @ M
-        #     # Regression
-        #     amplitude = M.T @ (self.W * self.data) / M_dot_W_dot_M
-        #     self.p[0] = amplitude
-        # Save results
         self.model = self.psf.evaluate(self.pixels, values=self.params.values).flatten()
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
@@ -1815,6 +2126,29 @@ class PSFFitWorkspace(FitWorkspace):
         if parameters.PdfPages:
             parameters.PdfPages.savefig()
 
+    def jacobian(self, params, epsilon, model_input=None):
+        """Compute the Jacobian matrix of a PSF model, with analytical derivatives if they exist,
+        numerical derivatives otherwise.
+
+        Parameters
+        ----------
+        params: array_like
+            The array of model parameters.
+        epsilon: array_like
+            The array of small steps to compute the partial derivatives of the model.
+        model_input: array_like, optional
+            A model input as a list with (x, model, model_err) to avoid an additional call to simulate().
+
+        Returns
+        -------
+        J: np.array
+            The Jacobian matrix.
+
+        """
+        if model_input is None:
+            model_input = self.simulate(params)
+        return self.psf.jacobian(self.pixels, params=params, epsilon=epsilon, model_input=model_input,
+                                 analytical=self.jacobian_analytical)
 
 def load_PSF(psf_type=parameters.PSF_TYPE, target=None, clip=False):
     """Load the PSF model with a keyword.
