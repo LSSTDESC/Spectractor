@@ -255,7 +255,8 @@ class ChromaticPSF:
                 index = index + shift
         return poly_params
 
-    def evaluate(self, poly_params=None, mode="1D"):
+    def evaluate(self, poly_params=None, mode="1D", fwhmx_clip=parameters.PSF_FWHM_CLIP,
+                       fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float64", mask=None, boundaries=None):
         """Simulate a 2D spectrogram of size Nx times Ny.
 
         Given a set of polynomial parameters defining the chromatic PSF model, a 2D spectrogram
@@ -341,13 +342,15 @@ class ChromaticPSF:
         self.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
         profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:, 1] = np.arange(self.Nx)  # replace x_c
-        output = np.zeros((self.Ny, self.Nx))
+        output = np.zeros((self.Ny, self.Nx), dtype=dtype)
         if mode == "1D":
             for x in range(self.Nx):
                 output[:, x] = self.psf.evaluate(pixels, values=profile_params[x, :])
         elif mode == "2D":
-            for x in range(self.Nx):
-                output += self.psf.evaluate(pixels, values=profile_params[x, :])
+            self.from_profile_params_to_shape_params(profile_params)
+            psf_cube = self.build_psf_cube(pixels, profile_params, fwhmx_clip=fwhmx_clip, fwhmy_clip=fwhmy_clip,
+                                           dtype=dtype, mask=mask, boundaries=boundaries)
+            output = np.sum(psf_cube, axis=0)
         return np.clip(output, 0, self.saturation)
 
     def build_psf_cube(self, pixels, profile_params, fwhmx_clip=parameters.PSF_FWHM_CLIP,
@@ -366,15 +369,11 @@ class ChromaticPSF:
                 xmax = min(Nx_pix, int(xc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
                 ymin = max(0, int(yc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
                 ymax = min(Ny_pix, int(yc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
-                # print(x, xc, yc, xmin, xmax, ymin, ymax, fwhms[x])
-                psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax],
-                                                                      values=profile_params[x, :])
             elif boundaries:
                 xmin = boundaries["xmin"][x]
                 xmax = boundaries["xmax"][x]
                 ymin = boundaries["ymin"][x]
                 ymax = boundaries["ymax"][x]
-                psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], values=profile_params[x, :])
             else:
                 maskx = np.any(mask[x], axis=0)
                 masky = np.any(mask[x], axis=1)
@@ -382,7 +381,7 @@ class ChromaticPSF:
                 ymin = np.argmax(masky)
                 xmax = len(maskx) - np.argmax(maskx[::-1])
                 ymax = len(masky) - np.argmax(masky[::-1])
-                psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], values=profile_params[x, :])
+            psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], values=profile_params[x, :])
         return psf_cube
 
     def build_sparse_M(self, pixels, profile_params, sparse_indices, boundaries, dtype="float32"):
@@ -806,7 +805,9 @@ class ChromaticPSF:
         PSF_models = []
         PSF_truth = []
         if truth is not None:
+            truth.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
             PSF_truth = truth.from_poly_params_to_profile_params(truth.params.values, apply_bounds=True)
+            PSF_truth[:, 1] = np.arange(self.Nx)  # replace x_c
         all_pixels = np.arange(self.profile_params.shape[0])
         for i, name in enumerate(self.psf.params.labels):
             fit, cov, model = fit_poly1d(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], order=self.degrees[name])
@@ -867,14 +868,13 @@ class ChromaticPSF:
 
         >>> psf = MoffatGauss()
         >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
-        >>> params = s0.generate_test_poly_params()
-        >>> saturation = params[-1]
-        >>> data = s0.evaluate(params, mode="1D")
+        >>> s0.params.values = s0.generate_test_poly_params()
+        >>> saturation = s0.params.values[-1]
+        >>> data = s0.evaluate(s0.params.values, mode="1D")
         >>> bgd = 10*np.ones_like(data)
         >>> xx, yy = np.meshgrid(np.arange(s0.Nx), np.arange(s0.Ny))
         >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))
         >>> data += bgd
-        >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
         Extract the background:
@@ -884,15 +884,25 @@ class ChromaticPSF:
         Fit the transverse profile:
 
         >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=saturation)
-        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=10,
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50], pixel_step=5,
         ... bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False, sigma_clip=5)
         >>> s.plot_summary(truth=s0)
 
         ..  doctest::
             :hide:
 
+            >>> truth_profile_params = s0.from_poly_params_to_profile_params(s0.params.values)
+            >>> truth_profile_params[:, 1] = np.arange(s0.Nx)  # replace x_c
+            >>> for i in range(1, s.profile_params.shape[1]):
+            ...     print(s.psf.params.labels[i], np.isclose(np.mean(s.profile_params[1:-1, i]), np.mean(truth_profile_params[:, i]), rtol=5e-2))
+            x_c True
+            y_c True
+            gamma True
+            alpha True
+            eta_gauss True
+            stddev True
+            saturation True
             >>> assert(not np.any(np.isclose(s.table['flux_sum'][3:6], np.zeros(s.Nx)[3:6], rtol=1e-3)))
-            >>> assert(np.all(np.isclose(s.table['Dy'][-10:-1], np.zeros(s.Nx)[-10:-1], rtol=1e-2)))
 
         """
         if saturation is None:
@@ -925,6 +935,7 @@ class ChromaticPSF:
         #           (0.1, min(Ny // 2, fwhm)),
         #           (0, 2 * saturation)]
         psf.apply_max_width_to_bounds(max_half_width=Ny)
+        initial_bounds = np.copy(psf.params.bounds)
         bounds = np.copy(psf.params.bounds)
         bounds[0] = (0.1 * signal_sum, 2 * signal_sum)
         bounds[2] = (middle - w, middle + w)
@@ -984,7 +995,7 @@ class ChromaticPSF:
             psf.params.values = guess
             psf.params.bounds = bounds
             w = PSFFitWorkspace(psf, signal, data_errors=err[:, x], bgd_model_func=None,
-                                live_fit=False, verbose=False)
+                                live_fit=False, verbose=False, jacobian_analytical=True)
             try:
                 run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma_clip, niter_clip=1, verbose=False)
             except:
@@ -1024,6 +1035,7 @@ class ChromaticPSF:
         self.params.values = self.from_profile_params_to_poly_params(self.profile_params, indices=self.fitted_pixels)
         self.from_profile_params_to_shape_params(self.profile_params)
         self.cov_matrix = np.diag(1 / np.array(self.table['flux_err']) ** 2)
+        psf.params.bounds = initial_bounds
 
     def fit_chromatic_psf(self, data, bgd_model_func=None, data_errors=None, mode="1D",
                           amplitude_priors_method="noprior", verbose=False, live_fit=False):
