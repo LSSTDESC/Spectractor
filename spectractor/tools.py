@@ -1931,10 +1931,9 @@ def load_fits(file_name, hdu_index=0):
     (2048, 2048)
 
     """
-    hdu_list = fits.open(file_name)
-    header = hdu_list[hdu_index].header
-    data = hdu_list[hdu_index].data
-    hdu_list.close()  # need to free allocation for file description
+    with fits.open(file_name) as hdu_list:
+        header = hdu_list[hdu_index].header
+        data = hdu_list[hdu_index].data
     return header, data
 
 
@@ -2318,11 +2317,11 @@ def load_wcs_from_file(file_name):
 
     """
     # Load the FITS hdulist using astropy.io.fits
-    hdulist = fits.open(file_name)
-    # Parse the WCS keywords in the primary HDU
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore")
-        wcs = WCS.WCS(hdulist[0].header, fix=False)
+    with fits.open(file_name) as hdulist:
+        # Parse the WCS keywords in the primary HDU
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore")
+            wcs = WCS.WCS(hdulist[0].header, fix=False)
     return wcs
 
 
