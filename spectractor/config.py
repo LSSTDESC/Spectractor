@@ -41,7 +41,7 @@ def from_config_to_parameters(config):
     for section in config.sections():
         for options in config.options(section):
             value = config.get(section, options)
-            if re.match("[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
+            if re.match(r"[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
                 if ' ' in value:
                     value = str(value)
                 elif '.' in value or 'e' in value:

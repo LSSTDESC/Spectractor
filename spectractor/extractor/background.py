@@ -9,7 +9,7 @@ from spectractor import parameters
 from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_removal, plot_image_simple
 
 from astropy.stats import SigmaClip
-from photutils import Background2D, SExtractorBackground
+from photutils.background import Background2D, SExtractorBackground
 from photutils.segmentation import SegmentationImage, detect_threshold, detect_sources
 
 from scipy import ndimage

@@ -622,49 +622,49 @@ def load_LPNHE_image(image):  # pragma: no cover
         The Image instance to fill with file data and header.
     """
     image.my_logger.info(f'\n\tLoading LPNHE image {image.file_name}...')
-    hdus = fits.open(image.file_name)
-    image.header = hdus[0].header
-    hdu1 = hdus["CHAN_14"]
-    hdu2 = hdus["CHAN_06"]
-    data1 = hdu1.data[imgslice(hdu1.header['DATASEC'])].astype(np.float64)
-    bias1 = np.median(hdu1.data[imgslice(hdu1.header['BIASSEC'])].astype(np.float64))
-    data1 -= bias1
-    detsecy, detsecx = imgslice(hdu1.header['DETSEC'])
-    if detsecy.start > detsecy.stop:
-        data1 = data1[:, ::-1]
-    if detsecx.start > detsecx.stop:
-        data1 = data1[::-1, :]
-    data2 = hdu2.data[imgslice(hdu2.header['DATASEC'])].astype(np.float64)
-    bias2 = np.median(hdu2.data[imgslice(hdu2.header['BIASSEC'])].astype(np.float64))
-    data2 -= bias2
-    detsecy, detsecx = imgslice(hdu2.header['DETSEC'])
-    if detsecy.start > detsecy.stop:
-        data2 = data2[:, ::-1]
-    if detsecx.start > detsecx.stop:
-        data2 = data2[::-1, :]
-    data = np.concatenate([data2, data1])
-    image.data = data[::-1, :].T
-    image.date_obs = image.header['DATE-OBS']
-    image.expo = float(image.header['EXPTIME'])
-    image.airmass = -1
-    parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
-    if "mm" not in hdus["XYZ"].header.comments["ZPOS"]:
-        raise KeyError(f'mm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
-                       f'Distances along Z axis must be in mm.')
-    image.my_logger.info(f'\n\tDistance to CCD adjusted to {parameters.DISTANCE2CCD} mm '
-                         f'considering XYZ platform is set at ZPOS={float(hdus["XYZ"].header["ZPOS"])} mm.')
-    # compute CCD gain map
-    image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
-    image.read_out_noise = float(image.header['CCDNOISE']) * np.ones_like(image.data)
-    parameters.CCD_IMSIZE = image.data.shape[1] // parameters.CCD_REBIN
-    # save xys platform position into main header
-    image.header["XPOS"] = hdus["XYZ"].header["XPOS"]
-    image.header.comments["XPOS"] = hdus["XYZ"].header.comments["XPOS"]
-    image.header["YPOS"] = hdus["XYZ"].header["YPOS"]
-    image.header.comments["YPOS"] = hdus["XYZ"].header.comments["YPOS"]
-    image.header["ZPOS"] = hdus["XYZ"].header["ZPOS"]
-    image.header.comments["ZPOS"] = hdus["XYZ"].header.comments["ZPOS"]
-    image.my_logger.info('\n\tImage loaded')
+    with fits.open(image.file_name) as hdus:
+        image.header = hdus[0].header
+        hdu1 = hdus["CHAN_14"]
+        hdu2 = hdus["CHAN_06"]
+        data1 = hdu1.data[imgslice(hdu1.header['DATASEC'])].astype(np.float64)
+        bias1 = np.median(hdu1.data[imgslice(hdu1.header['BIASSEC'])].astype(np.float64))
+        data1 -= bias1
+        detsecy, detsecx = imgslice(hdu1.header['DETSEC'])
+        if detsecy.start > detsecy.stop:
+            data1 = data1[:, ::-1]
+        if detsecx.start > detsecx.stop:
+            data1 = data1[::-1, :]
+        data2 = hdu2.data[imgslice(hdu2.header['DATASEC'])].astype(np.float64)
+        bias2 = np.median(hdu2.data[imgslice(hdu2.header['BIASSEC'])].astype(np.float64))
+        data2 -= bias2
+        detsecy, detsecx = imgslice(hdu2.header['DETSEC'])
+        if detsecy.start > detsecy.stop:
+            data2 = data2[:, ::-1]
+        if detsecx.start > detsecx.stop:
+            data2 = data2[::-1, :]
+        data = np.concatenate([data2, data1])
+        image.data = data[::-1, :].T
+        image.date_obs = image.header['DATE-OBS']
+        image.expo = float(image.header['EXPTIME'])
+        image.airmass = -1
+        parameters.DISTANCE2CCD -= float(hdus["XYZ"].header["ZPOS"])
+        if "mm" not in hdus["XYZ"].header.comments["ZPOS"]:
+            raise KeyError(f'mm is absent from ZPOS key in XYZ header. Had {hdus["XYZ"].header.comments["ZPOS"]}'
+                        f'Distances along Z axis must be in mm.')
+        image.my_logger.info(f'\n\tDistance to CCD adjusted to {parameters.DISTANCE2CCD} mm '
+                            f'considering XYZ platform is set at ZPOS={float(hdus["XYZ"].header["ZPOS"])} mm.')
+        # compute CCD gain map
+        image.gain = float(image.header['CCDGAIN']) * np.ones_like(image.data)
+        image.read_out_noise = float(image.header['CCDNOISE']) * np.ones_like(image.data)
+        parameters.CCD_IMSIZE = image.data.shape[1] // parameters.CCD_REBIN
+        # save xys platform position into main header
+        image.header["XPOS"] = hdus["XYZ"].header["XPOS"]
+        image.header.comments["XPOS"] = hdus["XYZ"].header.comments["XPOS"]
+        image.header["YPOS"] = hdus["XYZ"].header["YPOS"]
+        image.header.comments["YPOS"] = hdus["XYZ"].header.comments["YPOS"]
+        image.header["ZPOS"] = hdus["XYZ"].header["ZPOS"]
+        image.header.comments["ZPOS"] = hdus["XYZ"].header.comments["ZPOS"]
+        image.my_logger.info('\n\tImage loaded')
 
 
 def load_AUXTEL_image(image):  # pragma: no cover
@@ -676,10 +676,9 @@ def load_AUXTEL_image(image):  # pragma: no cover
         The Image instance to fill with file data and header.
     """
     image.my_logger.info(f'\n\tLoading AUXTEL image {image.file_name}...')
-    hdu_list = fits.open(image.file_name)
-    image.header = hdu_list[0].header
-    image.data = hdu_list[1].data.astype(np.float64)
-    hdu_list.close()  # need to free allocation for file descripto
+    with fits.open(image.file_name) as hdu_list:
+        image.header = hdu_list[0].header
+        image.data = hdu_list[1].data.astype(np.float64)
     image.date_obs = image.header['DATE']
     image.expo = float(image.header['EXPTIME'])
     if "empty" not in image.header['FILTER'].lower():
@@ -751,10 +750,9 @@ def load_STARDICE_image(image):  # pragma: no cover
     """
 
     image.my_logger.info(f'\n\tLoading STARDICE image {image.file_name}...')
-    hdu_list = fits.open(image.file_name)
-    image.header = hdu_list[0].header
-    image.data = hdu_list[0].data.astype(np.float64)
-    hdu_list.close()  # need to free allocation for file descripto
+    with fits.open(image.file_name) as hdu_list:
+        image.header = hdu_list[0].header
+        image.data = hdu_list[0].data.astype(np.float64)
     if "BZERO" in image.header:
         del image.header["BZERO"]
     if "BSCALE" in image.header:

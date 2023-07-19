@@ -1332,7 +1332,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, fix=None, xto
     if method == "minimize":
         start = time.time()
         result = optimize.minimize(nll, fit_workspace.p, method=minimizer_method,
-                                   options={'ftol': ftol, 'maxiter': 100000}, bounds=bounds)
+                                   options={'maxiter': 100000}, bounds=bounds)
         fit_workspace.p = result['x']
         if verbose:
             my_logger.debug(f"\n\t{result}")
