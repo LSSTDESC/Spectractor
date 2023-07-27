@@ -1311,7 +1311,8 @@ class Moffat(PSF):
                 J[:-1] = evaluate_moffat1d_jacobian(pixels, amplitude, y_c, gamma, alpha, norm, dnormda)  # assume saturation is fixed
             else:
                 xx, yy = pixels
-                J[:-1] = evaluate_moffat2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha)  # assume saturation is fixed
+                if amplitude > 0:
+                    J[:-1] = evaluate_moffat2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha)  # assume saturation is fixed
             ipar = self.params.get_fixed_parameters()
             if len(ipar) > 0:
                 J[ipar] = 0.
