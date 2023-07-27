@@ -1606,7 +1606,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         if poly_params is None:
             poly_params = self.poly_params
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
-        #if np.sum(self.chromatic_psf.table["fwhm"]) == 0:
         self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
         psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
                                                      fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
@@ -1642,7 +1641,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             self.boundaries["ymin"][k] = ymin
             self.boundaries["ymax"][k] = ymax
             self.psf_cube_masked[k, ymin:ymax, xmin:xmax] = True
-        self.M_sparse_indices = np.concatenate([np.where(self.psf_cube_masked[k].ravel() > 0)[0] for k in range(wl_size)])
+        self.psf_cube_sparse_indices = [np.where(self.psf_cube_masked[k].ravel() > 0)[0] for k in range(wl_size)]
+        self.M_sparse_indices = np.concatenate(self.psf_cube_sparse_indices)
 
     def simulate(self, *shape_params):
         r"""
