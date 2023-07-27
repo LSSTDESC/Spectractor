@@ -1011,9 +1011,9 @@ class PSF:
         if values is not None:
             self.params.values = np.asarray(values).astype(float)
         if pixels.ndim == 3 and pixels.shape[0] == 2:
-            return np.zeros_like(pixels[0])
+            return np.zeros_like(pixels[0], dtype="float32")
         elif pixels.ndim == 1:
-            return np.zeros_like(pixels)
+            return np.zeros_like(pixels, dtype="float32")
         else:
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
@@ -1023,10 +1023,10 @@ class PSF:
         if params is not None:
             self.params.values = np.asarray(params).astype(float)
         if pixels.ndim == 3 and pixels.shape[0] == 2:
-            return np.zeros((self.params.values.size, pixels[0].size))
+            return np.zeros((self.params.values.size, pixels[0].size), dtype="float32")
         elif pixels.ndim == 1:
             self.params.fixed[1] = True  # remove x_c
-            return np.zeros((self.params.values.size, pixels.size))
+            return np.zeros((self.params.values.size, pixels.size), dtype="float32")
         else:
             raise ValueError(f"Pixels array must have dimension 1 or shape=(2,Nx,Ny). Here pixels.ndim={pixels.shape}.")
 
