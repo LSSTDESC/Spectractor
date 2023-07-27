@@ -103,7 +103,6 @@ class ChromaticPSF:
 
     def init_from_table(self, table, saturation=None):
         self.table = table
-        self.psf_param_start_index = 10
         self.n_poly_params = len(self.table)
         self.fitted_pixels = np.arange(len(self.table)).astype(int)
         self.saturation = saturation
@@ -255,7 +254,17 @@ class ChromaticPSF:
                 index = index + shift
         return poly_params
 
-    def evaluate(self, poly_params=None, mode="1D", fwhmx_clip=parameters.PSF_FWHM_CLIP,
+    def set_pixels(self, mode):
+        if mode == "2D":
+            yy, xx = np.mgrid[:self.Ny, :self.Nx]
+            pixels = np.asarray([xx, yy])
+        elif mode == "1D":
+            pixels = np.arange(self.Ny)
+        else:
+            raise ValueError(f"Unknown evaluation mode={mode}. Must be '1D' or '2D'.")
+        return pixels
+
+    def evaluate(self, poly_params, mode="1D", fwhmx_clip=parameters.PSF_FWHM_CLIP,
                        fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float64", mask=None, boundaries=None):
         """Simulate a 2D spectrogram of size Nx times Ny.
 
@@ -330,19 +339,12 @@ class ChromaticPSF:
             plt.show()
 
         """
-        if poly_params is not None:
-            self.params.values = np.asarray(poly_params).astype(float)
-        if mode == "2D":
-            yy, xx = np.mgrid[:self.Ny, :self.Nx]
-            pixels = np.asarray([xx, yy])
-        elif mode == "1D":
-            pixels = np.arange(self.Ny)
-        else:
-            raise ValueError(f"Unknown evaluation mode={mode}. Must be '1D' or '2D'.")
+        self.params.values = np.asarray(poly_params).astype(float)
         self.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
         profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         profile_params[:, 1] = np.arange(self.Nx)  # replace x_c
         output = np.zeros((self.Ny, self.Nx), dtype=dtype)
+        pixels = self.set_pixels(mode=mode)
         if mode == "1D":
             for x in range(self.Nx):
                 output[:, x] = self.psf.evaluate(pixels, values=profile_params[x, :])
@@ -730,7 +732,8 @@ class ChromaticPSF:
 
     def set_bounds(self):
         """
-        This function returns an array of bounds for iminuit. It is very touchy, change the values with caution !
+        This function returns an array of bounds for PSF polynomial parameters (no amplitude ones).
+        It is very touchy, change the values with caution !
 
         Returns
         -------
@@ -1084,7 +1087,7 @@ class ChromaticPSF:
         >>> bgd = 10*np.ones_like(data)
         >>> data += bgd
         >>> data = np.random.poisson(data)
-        >>> data_errors = np.sqrt(np.abs(data))
+        >>> data_errors = np.sqrt(np.abs(data+1))
 
         Extract the background:
 
@@ -1256,6 +1259,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.err = np.copy(self.err[self.bgd_width:-self.bgd_width, :])
         self.Ny, self.Nx = self.data.shape
         self.poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
+        self.profile_params = self.chromatic_psf.from_poly_params_to_profile_params(self.poly_params)
         self.data_before_mask = np.copy(self.data)
 
         # update the bounds
@@ -1853,6 +1857,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             cov_matrix = np.diag(err2)
         poly_params[:self.Nx] = amplitude_params
         self.poly_params = np.copy(poly_params)
+        self.profile_params = np.copy(profile_params)
         self.amplitude_params = np.copy(amplitude_params)
         # TODO: propagate and marginalize over the shape parameter uncertainties ?
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
