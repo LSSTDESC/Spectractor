@@ -519,7 +519,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Save results
         self.M = M
-        self.psf_profile_params = np.copy(profile_params)
+        self.psf_profile_params = profile_params
         self.psf_poly_params = np.copy(poly_params[0])
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
