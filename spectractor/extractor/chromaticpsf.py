@@ -398,6 +398,70 @@ class ChromaticPSF:
                                                                        values=profile_params[x, :]).ravel()
         return sparse.csr_matrix((sparse_psf_cube, sparse_indices, indptr), shape=(len(profile_params), pixels[0].size), dtype=dtype)
 
+    def build_psf_jacobian(self, pixels, profile_params, sparse_indices, boundaries, dtype="float32"):
+        """Generic function to compute the Jacobian matrix of a model, with numerical derivatives.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        J: np.array
+            The Jacobian matrix.
+
+        """
+        if pixels.ndim == 3:
+            mode = "2D"
+            Ny, Nx = pixels[0].shape
+            J = np.zeros((self.n_poly_params - self.Nx, Ny * Nx), dtype=dtype)
+        elif pixels.ndim == 1:
+            mode = "1D"
+            Ny, Nx = pixels.size, profile_params.shape[0]
+            J = np.zeros((self.n_poly_params - self.Nx, Ny * Nx), dtype=dtype)
+        else:
+            raise ValueError(f"pixels argument must have shape (2, Nx, Ny) or (Ny). Got {pixels.shape=}.")
+        if Nx != profile_params.shape[0]:
+            raise ValueError(f"Number of pixels along x axis must be same as profile_params table length. "
+                             f"Got {Nx=} and {profile_params.shape}.")
+        leg_pixels = np.linspace(-1, 1, Nx)
+        legs = np.zeros((self.n_poly_params-Nx, Nx), dtype=dtype)
+        ip = 0
+        repeats = []
+        for ipsf, label in enumerate(self.psf.params.labels):
+            if label == "amplitude": continue
+            nparams = self.degrees[label]+1
+            repeats.append(nparams)
+            for k in range(nparams):
+                # psf_index.append(ipsf)
+                coeffs = np.eye(1, nparams, k)[0]
+                legs[ip] = np.polynomial.legendre.legval(leg_pixels, coeffs).astype(dtype)
+                ip += 1
+        # dM = np.zeros((self.Ny*self.Nx, params.size, amplitude_params.size))
+        # W_dot_data = (self.W * self.data).astype('float32')
+        for x in range(Nx):
+            if mode == "2D":
+                Jpsf = self.psf.jacobian(pixels[:, boundaries["ymin"][x]:boundaries["ymax"][x],
+                                                   boundaries["xmin"][x]:boundaries["xmax"][x]],
+                                         profile_params[x, :], analytical=True)
+            else:
+                Jpsf = self.psf.jacobian(pixels[boundaries["ymin"][x]:boundaries["ymax"][x]], profile_params[x, :], analytical=True)
+
+            J[:, sparse_indices[x]] += np.repeat(Jpsf[1:], repeats, axis=0) * legs[:, x, None]  # Jpsf[1:] excludes amplitude
+
+            # Jtmp = np.repeat(Jpsf[1:], repeats, axis=0) * legs[:, x, None]  # Jpsf[1:] excludes amplitude
+            # dM[self.psf_cube_sparse_indices[x], :, x] = Jtmp.T  #.reshape((params.size, self.boundaries["ymax"][x]-self.boundaries["ymin"][x], self.boundaries["xmax"][x]-self.boundaries["xmin"][x]))
+        # J = (dM @ amplitude_params).T
+        # dMWD_dtheta = np.einsum("ijk,i->jk", dM, W_dot_data)
+        # term1 = np.einsum("ij,ki->kj", cov_matrix, dMWD_dtheta)
+        # WM = self.W * self.M.T.toarray()
+        # dMWM_rQA_dtheta = np.einsum("ijk,li->jlk", dM, WM)
+        # dcov_dtheta = - 2 * cov_matrix @ (dMWM_rQA_dtheta @ cov_matrix)
+        # MWM_rQA = sparse_dot_mkl.dot_product_mkl(self.M.T, W_dot_data) + np.float32(self.reg) * self.Q_dot_A0
+        # dA_dtheta = term1 + dcov_dtheta @ MWM_rQA
+        # term5 = np.einsum("ij,kj->ki", self.M.toarray(), term4)
+        # J += term5
+        return J
+
     def fill_table_with_profile_params(self, profile_params):
         """
         Fill the table with the profile parameters.
@@ -1040,7 +1104,7 @@ class ChromaticPSF:
         self.cov_matrix = np.diag(1 / np.array(self.table['flux_err']) ** 2)
         psf.params.bounds = initial_bounds
 
-    def fit_chromatic_psf(self, data, bgd_model_func=None, data_errors=None, mode="1D",
+    def fit_chromatic_psf(self, data, bgd_model_func=None, data_errors=None, mode="1D", analytical=True,
                           amplitude_priors_method="noprior", verbose=False, live_fit=False):
         """
         Fit a chromatic PSF model on 2D data.
@@ -1126,7 +1190,7 @@ class ChromaticPSF:
 
         >>> parameters.PSF_FIT_REG_PARAM = 0.002
         >>> w = s.fit_chromatic_psf(data, mode="2D", data_errors=data_errors, bgd_model_func=bgd_model_func,
-        ... amplitude_priors_method="psf1d", verbose=True)
+        ... amplitude_priors_method="psf1d", verbose=True, analytical=True)
         >>> s.plot_summary(truth=s0)
         >>> amplitude_residuals.append([s0.params.values[:s0.Nx], w.amplitude_params-s0.params.values[:s0.Nx],
         ... w.amplitude_params_err])
@@ -1153,14 +1217,14 @@ class ChromaticPSF:
         if mode == "1D":
             w = ChromaticPSF1DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose,
-                                           live_fit=live_fit)
-            run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50)
+                                           live_fit=live_fit, analytical=analytical)
+            run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, with_line_search=True)
         elif mode == "2D":
             # first shot to set the mask
             w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
                                            amplitude_priors_method=amplitude_priors_method, verbose=verbose,
-                                           live_fit=live_fit)
-            run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, verbose=verbose)
+                                           live_fit=live_fit, analytical=analytical)
+            run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, verbose=verbose, with_line_search=False)
             if amplitude_priors_method == "psf1d":
                 w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
                 w_reg.run_regularisation()
@@ -1212,7 +1276,7 @@ class ChromaticPSF:
 
 class ChromaticPSFFitWorkspace(FitWorkspace):
 
-    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="",
+    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="", analytical=True,
                  amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
         length = len(chromatic_psf.table)
         params = FitParameters(np.copy(chromatic_psf.params.values[length:]),
@@ -1228,6 +1292,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.data = data
         self.err = data_errors
         self.bgd_model_func = bgd_model_func
+        self.analytical = analytical
         self.poly_params = np.copy(self.chromatic_psf.params.values)
         self.y_c_0_index = -1
         for k, par in enumerate(params.labels):
@@ -1261,6 +1326,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
         self.profile_params = self.chromatic_psf.from_poly_params_to_profile_params(self.poly_params)
         self.data_before_mask = np.copy(self.data)
+        self.boundaries = None
+        self.psf_cube_sparse_indices = None
 
         # update the bounds
         self.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
@@ -1372,13 +1439,43 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                                      f'fit_chromatic_psf_best_fit_{self.amplitude_priors_method}.pdf'),
                         dpi=100, bbox_inches='tight')
 
+    def jacobian(self, params, epsilon, model_input=None):
+        """Generic function to compute the Jacobian matrix of a model, with numerical derivatives.
+
+        Parameters
+        ----------
+        params: array_like
+            The array of model parameters.
+        epsilon: array_like
+            The array of small steps to compute the partial derivatives of the model.
+        model_input: array_like, optional
+            A model input as a list with (x, model, model_err) to avoid an additional call to simulate().
+
+        Returns
+        -------
+        J: np.array
+            The Jacobian matrix.
+
+        """
+        self.amplitude_priors_method = "keep"
+        if not self.analytical:
+            J = super().jacobian(params, epsilon=epsilon, model_input=model_input)
+        else:
+            profile_params = np.copy(self.profile_params)
+            amplitude_params = np.copy(self.amplitude_params)
+            profile_params[:, 0] *= amplitude_params  # np.ones_like(amplitude_params)
+            J = self.chromatic_psf.build_psf_jacobian(self.pixels, profile_params=profile_params,
+                                                      sparse_indices=self.psf_cube_sparse_indices,
+                                                      boundaries=self.boundaries, dtype="float32")
+        return J
+
 
 class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
 
-    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="",
+    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="", analytical=True,
                  amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
         ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                          file_name, amplitude_priors_method, verbose, plot, live_fit, truth=truth)
+                                          file_name, analytical, amplitude_priors_method, verbose, plot, live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         self.pixels = np.arange(self.Ny)
 
@@ -1402,6 +1499,20 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.data_before_mask = np.copy(data)
         self.err = err
         self.pixels = self.pixels.T
+        self.set_mask()
+
+    def set_mask(self, poly_params=None):
+        if poly_params is None:
+            poly_params = self.poly_params
+        poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
+        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
+        psf_cube = np.zeros((len(profile_params), self.Ny, self.Nx))
+        for x in range(psf_cube.shape[0]):
+            psf_cube[x, :, x] = 1
+        self.psf_cube_masked = psf_cube > 0
+        wl_size = len(profile_params)
+        self.boundaries = {"ymin": np.zeros(wl_size, dtype=int), "ymax": self.Ny * np.ones(wl_size, dtype=int)}
+        self.psf_cube_sparse_indices = [np.where(self.psf_cube_masked[k].T.ravel() > 0)[0] for k in range(wl_size)]
 
     def simulate(self, *shape_params):
         """
@@ -1500,30 +1611,34 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
             M = np.array([self.chromatic_psf.psf.evaluate(self.pixels, values=profile_params[x, :]) for x in range(self.Nx)])
             M_dot_W_dot_M = np.array([M[x].T @ (self.W[x] * M[x]) for x in range(self.Nx)])
             if self.amplitude_priors_method != "psf1d":
-                cov_matrix = np.diag([1 / M_dot_W_dot_M[x] if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
-                                      for x in range(self.Nx)])
-                amplitude_params = np.array([
-                    M[x].T @ (self.W[x] * self.data[x]) / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[
-                                                                                    x] > 0 else 0.1 * self.bgd_std
-                    for x in range(self.Nx)])
-                if self.amplitude_priors_method == "positive":
-                    amplitude_params[amplitude_params < 0] = 0
-                elif self.amplitude_priors_method == "smooth":
-                    null_indices = np.where(amplitude_params < 0)[0]
-                    for index in null_indices:
-                        right = amplitude_params[index]
-                        for i in range(index, min(index + 10, self.Nx)):
-                            right = amplitude_params[i]
-                            if i not in null_indices:
-                                break
-                        left = amplitude_params[index]
-                        for i in range(index, max(0, index - 10), -1):
-                            left = amplitude_params[i]
-                            if i not in null_indices:
-                                break
-                        amplitude_params[index] = 0.5 * (right + left)
-                elif self.amplitude_priors_method == "noprior":
-                    pass
+                if self.amplitude_priors_method == "keep":
+                    amplitude_params = np.copy(self.amplitude_params)
+                    cov_matrix = np.copy(self.amplitude_cov_matrix)
+                else:
+                    cov_matrix = np.diag([1 / M_dot_W_dot_M[x] if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
+                                          for x in range(self.Nx)])
+                    amplitude_params = np.array([
+                        M[x].T @ (self.W[x] * self.data[x]) / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[
+                                                                                        x] > 0 else 0.1 * self.bgd_std
+                        for x in range(self.Nx)])
+                    if self.amplitude_priors_method == "positive":
+                        amplitude_params[amplitude_params < 0] = 0
+                    elif self.amplitude_priors_method == "smooth":
+                        null_indices = np.where(amplitude_params < 0)[0]
+                        for index in null_indices:
+                            right = amplitude_params[index]
+                            for i in range(index, min(index + 10, self.Nx)):
+                                right = amplitude_params[i]
+                                if i not in null_indices:
+                                    break
+                            left = amplitude_params[index]
+                            for i in range(index, max(0, index - 10), -1):
+                                left = amplitude_params[i]
+                                if i not in null_indices:
+                                    break
+                            amplitude_params[index] = 0.5 * (right + left)
+                    elif self.amplitude_priors_method == "noprior":
+                        pass
             else:
                 M_dot_W_dot_M_plus_Q = [M_dot_W_dot_M[x] + self.reg * self.Q[x, x] for x in range(self.Nx)]
                 cov_matrix = np.diag([1 / M_dot_W_dot_M_plus_Q[x] if M_dot_W_dot_M_plus_Q[x] > 0 else 0.1 * self.bgd_std
@@ -1549,6 +1664,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         poly_params[:self.Nx] = np.copy(amplitude_params)
         self.poly_params = np.copy(poly_params)
         poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
+        self.profile_params = np.copy(profile_params)
 
         if self.amplitude_priors_method == "fixed":
             self.model = self.chromatic_psf.evaluate(poly_params, mode="1D")[
@@ -1562,10 +1678,10 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
 
 class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
 
-    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, amplitude_priors_method="noprior",
+    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, analytical=True, amplitude_priors_method="noprior",
                  file_name="", verbose=False, plot=False, live_fit=False, truth=None):
         ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                          file_name, amplitude_priors_method, verbose, plot, live_fit, truth=truth)
+                                          file_name, analytical, amplitude_priors_method, verbose, plot, live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         yy, xx = np.mgrid[:self.Ny, :self.Nx]
         self.pixels = np.asarray([xx, yy])
@@ -1584,7 +1700,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W_before_mask = np.copy(self.W)
         self.sqrtW = sparse.diags(np.sqrt(self.W), format="csr", dtype="float32")
         self.psf_cube_masked = None
-        self.boundaries = None
         self.M_sparse_indices = None
         self.set_mask()
 
@@ -1814,30 +1929,34 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
             M_dot_W_dot_M = tri + tri.T - dia
             if self.amplitude_priors_method != "psf1d":
-                # try:
-                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-                #     cov_matrix = L.T @ L
-                # except np.linalg.LinAlgError:
-                cov_matrix = np.linalg.inv(M_dot_W_dot_M)
-                amplitude_params = cov_matrix @ (M.T @ W_dot_data)
-                if self.amplitude_priors_method == "positive":
-                    amplitude_params[amplitude_params < 0] = 0
-                elif self.amplitude_priors_method == "smooth":
-                    null_indices = np.where(amplitude_params < 0)[0]
-                    for index in null_indices:
-                        right = amplitude_params[index]
-                        for i in range(index, min(index + 10, self.Nx)):
-                            right = amplitude_params[i]
-                            if i not in null_indices:
-                                break
-                        left = amplitude_params[index]
-                        for i in range(index, max(0, index - 10), -1):
-                            left = amplitude_params[i]
-                            if i not in null_indices:
-                                break
-                        amplitude_params[index] = 0.5 * (right + left)
-                elif self.amplitude_priors_method == "noprior":
-                    pass
+                if self.amplitude_priors_method == "keep":
+                    amplitude_params = np.copy(self.amplitude_params)
+                    cov_matrix = np.copy(self.amplitude_cov_matrix)
+                else:
+                    # try:
+                    #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
+                    #     cov_matrix = L.T @ L
+                    # except np.linalg.LinAlgError:
+                    cov_matrix = np.linalg.inv(M_dot_W_dot_M)
+                    amplitude_params = cov_matrix @ (M.T @ W_dot_data)
+                    if self.amplitude_priors_method == "positive":
+                        amplitude_params[amplitude_params < 0] = 0
+                    elif self.amplitude_priors_method == "smooth":
+                        null_indices = np.where(amplitude_params < 0)[0]
+                        for index in null_indices:
+                            right = amplitude_params[index]
+                            for i in range(index, min(index + 10, self.Nx)):
+                                right = amplitude_params[i]
+                                if i not in null_indices:
+                                    break
+                            left = amplitude_params[index]
+                            for i in range(index, max(0, index - 10), -1):
+                                left = amplitude_params[i]
+                                if i not in null_indices:
+                                    break
+                            amplitude_params[index] = 0.5 * (right + left)
+                    elif self.amplitude_priors_method == "noprior":
+                        pass
             else:
                 M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
                 # try:
