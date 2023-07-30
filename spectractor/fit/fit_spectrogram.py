@@ -72,7 +72,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                       0, self.spectrum.rotation_angle, 1])
         psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.params.labels[length:])
         psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.params.axis_names[length:])
-        psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds_for_minuit(data=None)
+        psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
         p = np.concatenate([p] + [psf_poly_params[length:]] * len(self.diffraction_orders))
         input_labels = [f"A{order}" for order in self.diffraction_orders]
         input_labels += ["VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
