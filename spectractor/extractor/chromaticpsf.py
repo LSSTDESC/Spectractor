@@ -255,6 +255,32 @@ class ChromaticPSF:
         return poly_params
 
     def set_pixels(self, mode):
+        """Return the pixels array to evaluate ChromaticPSF.
+        If mode='1D', one 1D array of pixels along y axis is returned.
+        If mode='2D', two 2D meshgrid arrays of pixels are returned.
+
+        Parameters
+        ----------
+        mode, str
+            Must be '1D' or '2D'.
+
+        Returns
+        -------
+        pixels: array_like
+            The pixel array.
+
+        Examples
+        --------
+        >>> psf = MoffatGauss()
+        >>> s = ChromaticPSF(psf, Nx=5, Ny=4, deg=1, saturation=20000)
+        >>> pixels = s.set_pixels(mode='1D')
+        >>> pixels.shape
+        (4,)
+        >>> pixels = s.set_pixels(mode='2D')
+        >>> pixels.shape
+        (2, 4, 5)
+
+        """
         if mode == "2D":
             yy, xx = np.mgrid[:self.Ny, :self.Nx]
             pixels = np.asarray([xx, yy])
@@ -281,6 +307,16 @@ class ChromaticPSF:
             as in PSF definition, except amplitude.
         mode: str, optional
             Set the evaluation mode: either transverse 1D PSF profile (mode="1D") or full 2D PSF profile (mode="2D").
+        fwhmx_clip: int, optional
+            Clip PSF evaluation outside fwhmx*FWHM along x axis (default: parameters.PSF_FWHM_CLIP).
+        fwhmy_clip: int, optional
+            Clip PSF evaluation outside fwhmy*FWHM along y axis (default: parameters.PSF_FWHM_CLIP).
+        dtype: str, optional
+            Type of the output array (default: 'float64').
+        mask: array_like, optional
+            Cube of booleans where values are masked (default: None).
+        boundaries: dict, optional
+            Dictionary of boundaries for fast evaluation with keys ymin, ymax, xmin, xmax (default: None).
 
         Returns
         -------
@@ -357,6 +393,29 @@ class ChromaticPSF:
 
     def build_psf_cube(self, pixels, profile_params, fwhmx_clip=parameters.PSF_FWHM_CLIP,
                        fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float64", mask=None, boundaries=None):
+        """Build a cube, with one slice per wavelength evaluation which contains the PSF evaluation.
+
+        Parameters
+        ----------
+        pixels: np.ndarray
+            Array of pixels to evaluate ChromaticPSF.
+        profile_params: array_like
+            ChromaticPSF profile parameters.
+        fwhmx_clip: int, optional
+            Clip PSF evaluation outside fwhmx*FWHM along x axis (default: parameters.PSF_FWHM_CLIP).
+        fwhmy_clip: int, optional
+            Clip PSF evaluation outside fwhmy*FWHM along y axis (default: parameters.PSF_FWHM_CLIP).
+        dtype: str, optional
+            Type of the output array (default: 'float64').
+        mask: array_like, optional
+            Cube of booleans where values are masked (default: None).
+        boundaries: dict, optional
+            Dictionary of boundaries for fast evaluation with keys ymin, ymax, xmin, xmax (default: None).
+
+        Returns
+        -------
+
+        """
         Ny_pix, Nx_pix = pixels[0].shape
         psf_cube = np.zeros((len(profile_params), Ny_pix, Nx_pix), dtype=dtype)
         fwhms = self.table["fwhm"]
