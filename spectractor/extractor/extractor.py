@@ -53,8 +53,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         if len(self.diffraction_orders) == 0:
             raise ValueError(f"At least one diffraction order must be given for spectrogram simulation.")
         self.psf_poly_params = np.copy(spectrum.chromatic_psf.from_table_to_poly_params())
-        self.psf_profile_params = np.copy(spectrum.chromatic_psf.from_table_to_profile_params())
         self.psf_poly_params = self.psf_poly_params[length:]
+        self.psf_profile_params = [np.copy(spectrum.chromatic_psf.from_table_to_profile_params())]
         psf_poly_params_labels = np.copy(spectrum.chromatic_psf.params.labels[length:])
         psf_poly_params_names = np.copy(spectrum.chromatic_psf.params.axis_names[length:])
         spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=spectrum.spectrogram_Ny)
@@ -63,6 +63,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         p = np.array([1, 1, 1, D2CCD, np.copy(spectrum.header['PIXSHIFT']), 0,
                       np.copy(spectrum.rotation_angle), 1, parameters.OBS_CAMERA_ROTATION,
                       np.copy(spectrum.pressure),  np.copy(spectrum.temperature),  np.copy(spectrum.airmass)])
+        self.psf_params_start_index = np.array([12 + len(self.psf_poly_params) * k for k in range(len(self.diffraction_orders))])
         self.saturation = spectrum.spectrogram_saturation
         p = np.concatenate([p] + [self.psf_poly_params] * len(self.diffraction_orders))
         input_labels = [f"A{order}" for order in self.diffraction_orders]
@@ -120,7 +121,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.bgd_flat = self.bgd.flatten()
         self.Ny, self.Nx = self.data.shape
         yy, xx = np.mgrid[:self.Ny, :self.Nx]
-        self.pixels = np.asarray([xx, yy])
+        self.pixels = np.asarray([xx, yy], dtype=int)
 
         # adapt the ChromaticPSF table shape
         if self.Nx != self.spectrum.chromatic_psf.Nx:
@@ -172,9 +173,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # design matrix
         self.M = None
+        self.psf_cube_sparse_indices = {}
         self.M_sparse_indices = {}
         for order in self.diffraction_orders:
             self.M_sparse_indices[order] = None
+            self.psf_cube_sparse_indices[order] = None
         self.set_mask(fwhmx_clip=3*parameters.PSF_FWHM_CLIP, fwhmy_clip=2*parameters.PSF_FWHM_CLIP)  # not a narrow mask for first fit
         self.M_dot_W_dot_M = None
 
@@ -307,8 +310,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 self.boundaries[order]["ymax"][k] = ymax
                 self.psf_cubes_masked[order][k, ymin:ymax, xmin:xmax] = True
         self.M_sparse_indices = {}
+        self.psf_cube_sparse_indices = {}
         for order in self.diffraction_orders:
-            self.M_sparse_indices[order] = np.concatenate([np.where(self.psf_cubes_masked[order][k].ravel() > 0)[0] for k in range(wl_size)])
+            self.psf_cube_sparse_indices[order] = [np.where(self.psf_cubes_masked[order][k].ravel() > 0)[0] for k in range(wl_size)]
+            self.M_sparse_indices[order] = np.concatenate(self.psf_cube_sparse_indices[order])
 
     def simulate(self, *params):
         r"""
@@ -429,6 +434,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         M = None
         for k, order in enumerate(self.diffraction_orders):
             if self.tr[k] is None or self.params[f"A{order}"] == 0:  # diffraction order undefined
+                profile_params.append(None)
                 continue
             # Evaluate PSF profile
             profile_params.append(self.spectrum.chromatic_psf.update(poly_params[k], self.spectrum.spectrogram_x0 + dx0,
@@ -513,7 +519,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Save results
         self.M = M
-        self.psf_profile_params = np.copy(profile_params[0])
+        self.psf_profile_params = np.copy(profile_params)
         self.psf_poly_params = np.copy(poly_params[0])
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
@@ -526,40 +532,56 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         return self.pixels, self.model, self.model_err
 
     # this use of fix_psf_cube gives slower results
-    # def jacobian(self, params, epsilon, fixed_params=None, model_input=None):
-    #     start = time.time()
-    #     if model_input is not None:
-    #         lambdas, model, model_err = model_input
-    #     else:
-    #         lambdas, model, model_err = self.simulate(*params)
-    #     model = model.flatten()
-    #     J = np.zeros((params.size, model.size))
-    #     strategy = copy.copy(self.fix_psf_cube)
-    #     strategy_order2 = copy.copy(self.fix_psf_cube_order2)
-    #     for ip, p in enumerate(params):
-    #         if fixed_params[ip]:
-    #             continue
-    #         # if ip in self.psf_params_index:
-    #         #     self.fix_psf_cube = False
-    #         # else:
-    #         #     self.fix_psf_cube = True
-    #         if ip in self.psf_params_index_order2:
-    #             # reset the 1st order cube when starting 2nd order params
-    #             if ip == self.psf_params_start_index_order2:
-    #                 self.psf_cube = None
-    #             self.fix_psf_cube_order2 = False
-    #         else:
-    #             self.fix_psf_cube_order2 = True
-    #         tmp_p = np.copy(params)
-    #         if tmp_p[ip] + epsilon[ip] < self.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.bounds[ip][1]:
-    #             epsilon[ip] = - epsilon[ip]
-    #         tmp_p[ip] += epsilon[ip]
-    #         tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-    #         J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
-    #     self.fix_psf_cube = strategy
-    #     self.fix_psf_cube_order2 = strategy_order2
-    #     self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
-    #     return J
+    def jacobian(self, params, epsilon, model_input=None):
+        start = time.time()
+        if model_input is not None:
+            lambdas, model, model_err = model_input
+        else:
+            lambdas, model, model_err = self.simulate(*params)
+        model = model.flatten()
+        J = np.zeros((params.size, model.size))
+        strategy = copy.copy(self.fix_psf_cube)
+        strategy = copy.copy(self.amplitude_priors_method)
+        # strategy_order2 = copy.copy(self.fix_psf_cube_order2)
+        for ip, p in enumerate(params):
+            if self.params.fixed[ip]:
+                continue
+            if ip >= self.psf_params_start_index[0]:
+                continue
+            # if ip in self.psf_params_index and "y_c" not in self.params.labels[ip]:
+            #     # self.fix_psf_cube = False
+            #     self.amplitude_priors_method = "fixed"
+            # else:
+            #     # self.fix_psf_cube = True
+            #     self.amplitude_priors_method = strategy
+            # if ip in self.psf_params_index_order2:
+            #     # reset the 1st order cube when starting 2nd order params
+            #     if ip == self.psf_params_start_index_order2:
+            #         self.psf_cube = None
+            #     self.fix_psf_cube_order2 = False
+            # else:
+            #     self.fix_psf_cube_order2 = True
+            tmp_p = np.copy(params)
+            if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
+                epsilon[ip] = - epsilon[ip]
+            tmp_p[ip] += epsilon[ip]
+            tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
+            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+        for k, order in enumerate(self.diffraction_orders):
+            if self.psf_profile_params[k] is None:
+                continue
+            start = self.psf_params_start_index[k]
+            profile_params = np.copy(self.psf_profile_params[k])
+            amplitude_params = np.copy(self.amplitude_params)
+            profile_params[:, 0] *= amplitude_params
+            J[start:start+len(self.psf_poly_params)] = self.spectrum.chromatic_psf.build_psf_jacobian(self.pixels, profile_params=profile_params,
+                                                                                                      sparse_indices=self.psf_cube_sparse_indices[order],
+                                                                                                      boundaries=self.boundaries[order], dtype="float32")
+        # self.fix_psf_cube = strategy
+        self.amplitude_priors_method = strategy
+        # self.fix_psf_cube_order2 = strategy_order2
+        self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
+        return J
 
     def plot_spectrogram_comparison_simple(self, ax, title='', extent=None, dispersion=False):  # pragma: no cover
         """Method to plot a spectrogram issued from data and compare it with simulations.
@@ -715,14 +737,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.params.fixed = [True] * len(self.params.values)
         self.params.fixed[self.params.get_index(r"shift_y [pix]")] = False  # shift y
         self.params.fixed[self.params.get_index(r"angle [deg]")] = False  # angle
-        # else:
-        #     for k, par in enumerate(self.input_labels):
-        #         if "y_c" in par and "_2" not in par:
-        #             self.fixed[k] = False
-        self.sparse_indices = None
         run_minimisation(self, "newton", epsilon, xtol=1e-2, ftol=0.01)  # 1000 / self.data.size)
         self.params.fixed = fixed_default
-        self.sparse_indices = None
         self.set_mask(params=self.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
 
 
@@ -853,9 +869,9 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.data = np.copy(w.amplitude_params)
             w.spectrum.err = np.copy(w.amplitude_params_err)
             w.spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
-            w.spectrum.chromatic_psf.fill_table_with_profile_params(w.psf_profile_params)
+            w.spectrum.chromatic_psf.fill_table_with_profile_params(w.psf_profile_params[0])
             w.spectrum.chromatic_psf.table["amplitude"] = np.copy(w.amplitude_params)
-            w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params)
+            w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params[0])
             w.spectrum.chromatic_psf.params.values = w.spectrum.chromatic_psf.from_table_to_poly_params()
             w.spectrum.spectrogram_fit = w.model
             w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err
@@ -1306,7 +1322,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
                    f'mode={mode} and amplitude_priors_method={method}...')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
-                            amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
+                            amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE, analytical=True)
 
     Dx_rot = spectrum.pixels.astype(float) - image.target_pixcoords_rotated[0]
     s.table['Dx'] = np.copy(Dx_rot)
@@ -1505,10 +1521,10 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
     data = spectrum.spectrogram
     err = spectrum.spectrogram_err
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False,
-                            amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE)
+                            amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE, analytical=True)
 
     # save results
-    spectrum.spectrogram_fit = s.evaluate(s.params.values, mode=mode)
+    spectrum.spectrogram_fit = s.evaluate(poly_params=s.params.values, mode=mode)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
     lambdas = spectrum.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
