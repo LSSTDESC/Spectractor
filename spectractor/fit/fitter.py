@@ -1114,6 +1114,8 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
     costs = []
     params_table = []
     inv_JT_W_J = np.zeros((len(ipar), len(ipar)))
+    new_params = np.zeros(len(tmp_params))
+
     for i in range(niter):
         start = time.time()
         cost, tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.chisq(tmp_params, model_output=True)
@@ -1190,18 +1192,20 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             funcalls = 0
             iter = 0
 
-        tmp_params[ipar] += alpha_min * dparams
+        new_params[ipar] = tmp_params[ipar] + alpha_min * dparams
         # check bounds
-        for ip, p in enumerate(tmp_params):
+        for ip, p in enumerate(new_params):
             if p < fit_workspace.params.bounds[ip][0]:
-                tmp_params[ip] = fit_workspace.params.bounds[ip][0]
+                new_params[ip] = fit_workspace.params.bounds[ip][0]
             if p > fit_workspace.params.bounds[ip][1]:
-                tmp_params[ip] = fit_workspace.params.bounds[ip][1]
+                new_params[ip] = fit_workspace.params.bounds[ip][1]
+
+        tmp_params[ipar] = new_params[ipar]
 
         # prepare outputs
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
-        fit_workspace.p = tmp_params
+        fit_workspace.params.values = tmp_params
         if fit_workspace.verbose:
             my_logger.info(f"\n\tIteration={i}:\tfinal cost={fval:.5g}\tfinal chisq_red={fval / (tmp_model.size - n_data_masked):.5g} "
                            f"\tcomputed in {time.time() - start:.2f}s")
@@ -1225,7 +1229,6 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
                            f"relative change of cost is below ftol={ftol}.")
             break
-    plt.close()
     return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
 
 

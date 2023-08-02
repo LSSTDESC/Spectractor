@@ -39,24 +39,26 @@ def test_fitworkspace(seed=42):
     yerr = sigma * np.ones_like(y)
     y += np.random.normal(scale=sigma, size=N)
     parameters.VERBOSE = True
+    parameters.DEBUG = True
 
     # Do the fits
     file_name = "./outputs/test_linefitworkspace.txt"
-    w = LineFitWorkspace(x, y, yerr, file_name, truth=truth)
+    w = LineFitWorkspace(x, y, yerr, file_name, truth=truth, verbose=True)
     run_minimisation(w, method="minimize")
     assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
-    w.p = np.array([1, 1])
+    w.params.values = np.array([1, 1])
     run_minimisation(w, method="basinhopping")
     assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     # w.p = np.array([4, -0.5])
     # run_minimisation(w, method="least_squares")
     # w.my_logger.warning(f"{w.p} {w.ndim} {sigma} {truth}")
     # assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
-    w.p = np.array([1, 1])
+    w.params.values = np.array([1, 1])
     run_minimisation(w, method="minuit")
     assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
-    w.p = np.array([1, 1])
-    run_minimisation(w, method="newton")
+    w.params.values = np.array([1, 1])
+    run_minimisation(w, method="newton", with_line_search=True)
+    w.my_logger.warning(f"{w.params.values=}")
     assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
 
 
