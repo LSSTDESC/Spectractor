@@ -531,7 +531,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         return self.pixels, self.model, self.model_err
 
-    # this use of fix_psf_cube gives slower results
     def jacobian(self, params, epsilon, model_input=None):
         start = time.time()
         if model_input is not None:
@@ -540,27 +539,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             lambdas, model, model_err = self.simulate(*params)
         model = model.flatten()
         J = np.zeros((params.size, model.size))
-        strategy = copy.copy(self.fix_psf_cube)
-        strategy = copy.copy(self.amplitude_priors_method)
-        # strategy_order2 = copy.copy(self.fix_psf_cube_order2)
         for ip, p in enumerate(params):
             if self.params.fixed[ip]:
                 continue
             if ip >= self.psf_params_start_index[0]:
                 continue
-            # if ip in self.psf_params_index and "y_c" not in self.params.labels[ip]:
-            #     # self.fix_psf_cube = False
-            #     self.amplitude_priors_method = "fixed"
-            # else:
-            #     # self.fix_psf_cube = True
-            #     self.amplitude_priors_method = strategy
-            # if ip in self.psf_params_index_order2:
-            #     # reset the 1st order cube when starting 2nd order params
-            #     if ip == self.psf_params_start_index_order2:
-            #         self.psf_cube = None
-            #     self.fix_psf_cube_order2 = False
-            # else:
-            #     self.fix_psf_cube_order2 = True
             tmp_p = np.copy(params)
             if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                 epsilon[ip] = - epsilon[ip]
@@ -577,9 +560,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             J[start:start+len(self.psf_poly_params)] = self.spectrum.chromatic_psf.build_psf_jacobian(self.pixels, profile_params=profile_params,
                                                                                                       sparse_indices=self.psf_cube_sparse_indices[order],
                                                                                                       boundaries=self.boundaries[order], dtype="float32")
-        # self.fix_psf_cube = strategy
-        self.amplitude_priors_method = strategy
-        # self.fix_psf_cube_order2 = strategy_order2
         self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
