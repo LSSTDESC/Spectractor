@@ -1107,14 +1107,14 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
 
     """
     my_logger = set_logger(__name__)
-    tmp_params = np.copy(fit_workspace.params.values)
+    tmp_params = np.copy(fit_workspace.params.values).astype(float)
     fit_workspace.prepare_weight_matrices()
     n_data_masked = len(fit_workspace.mask) + len(fit_workspace.outliers)
     ipar = fit_workspace.params.get_free_parameters()
     costs = []
     params_table = []
-    inv_JT_W_J = np.zeros((len(ipar), len(ipar)))
-    new_params = np.zeros(len(tmp_params))
+    inv_JT_W_J = np.zeros((len(ipar), len(ipar)), dtype=float)
+    new_params = np.zeros(len(tmp_params), dtype=float)
 
     for i in range(niter):
         start = time.time()
@@ -1433,7 +1433,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         m.limits = bounds
         m.tol = 10
         m.migrad()
-        fit_workspace.values = np.array(m.values[:])
+        fit_workspace.params.values = np.array(m.values[:])
         if verbose:
             my_logger.debug(f"\n\t{m}")
             my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
