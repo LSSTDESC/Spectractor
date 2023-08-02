@@ -54,7 +54,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             raise ValueError(f"At least one diffraction order must be given for spectrogram simulation.")
         self.psf_poly_params = np.copy(spectrum.chromatic_psf.from_table_to_poly_params())
         self.psf_poly_params = self.psf_poly_params[length:]
-        self.psf_profile_params = [np.copy(spectrum.chromatic_psf.from_table_to_profile_params())]
         psf_poly_params_labels = np.copy(spectrum.chromatic_psf.params.labels[length:])
         psf_poly_params_names = np.copy(spectrum.chromatic_psf.params.axis_names[length:])
         spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=spectrum.spectrogram_Ny)
@@ -146,11 +145,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # PSF cube computation
         self.psf_cubes = {}
         self.psf_cubes_masked = {}
+        self.psf_profile_params = {}
         self.boundaries = {}
         for order in self.diffraction_orders:
             self.psf_cubes[order] = np.empty(1)
             self.psf_cubes_masked[order] = np.empty(1)
             self.boundaries[order] = {}
+            self.psf_profile_params[order] = None
         self.fix_psf_cube = False
 
         # prepare the background, data and errors
@@ -430,24 +431,23 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Evaluate ADR and compute wavelength arrays
         self.lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
                                                                     order=self.diffraction_orders[0])
-        profile_params = []
         M = None
         for k, order in enumerate(self.diffraction_orders):
             if self.tr[k] is None or self.params[f"A{order}"] == 0:  # diffraction order undefined
-                profile_params.append(None)
+                self.psf_profile_params[order] = None
                 continue
             # Evaluate PSF profile
-            profile_params.append(self.spectrum.chromatic_psf.update(poly_params[k], self.spectrum.spectrogram_x0 + dx0,
-                                                                     self.spectrum.spectrogram_y0 + dy0, angle, plot=False))
+            self.psf_profile_params[order] = self.spectrum.chromatic_psf.update(poly_params[k], self.spectrum.spectrogram_x0 + dx0,
+                                                                                self.spectrum.spectrogram_y0 + dy0, angle, plot=False)
 
             # Dispersion law
             dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, dx0, dy0, angle,
                                                                              niter=5, with_adr=True, order=order)
 
             # Fill spectrogram trace as a function of the pixel column x
-            profile_params[-1][:, 0] = self.params[f"A{order}"] * self.tr[k](self.lambdas)
-            profile_params[-1][:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
-            profile_params[-1][:, 2] += dispersion_law.imag - self.bgd_width
+            self.psf_profile_params[order][:, 0] = self.params[f"A{order}"] * self.tr[k](self.lambdas)
+            self.psf_profile_params[order][:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
+            self.psf_profile_params[order][:, 2] += dispersion_law.imag - self.bgd_width
 
             # Matrix filling
             # psf_cube_order = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params[-1], fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cubes_masked[order], boundaries=self.boundaries[order])
@@ -457,7 +457,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             #     psf_cube = psf_cube_order
             # else:
             #     psf_cube += psf_cube_order
-            M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, profile_params[-1], dtype="float32", sparse_indices=self.M_sparse_indices[order], boundaries=self.boundaries[order])
+            M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, self.psf_profile_params[order], dtype="float32", sparse_indices=self.M_sparse_indices[order], boundaries=self.boundaries[order])
             if M is None:
                 M = M_order.T
             else:
@@ -519,7 +519,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Save results
         self.M = M
-        self.psf_profile_params = profile_params
         self.psf_poly_params = np.copy(poly_params[0])
         self.amplitude_params = np.copy(amplitude_params)
         self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
@@ -551,10 +550,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
             J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
         for k, order in enumerate(self.diffraction_orders):
-            if self.psf_profile_params[k] is None:
+            if self.psf_profile_params[order] is None:
                 continue
             start = self.psf_params_start_index[k]
-            profile_params = np.copy(self.psf_profile_params[k])
+            profile_params = np.copy(self.psf_profile_params[order])
             amplitude_params = np.copy(self.amplitude_params)
             profile_params[:, 0] *= amplitude_params
             J[start:start+len(self.psf_poly_params)] = self.spectrum.chromatic_psf.build_psf_jacobian(self.pixels, profile_params=profile_params,
@@ -849,9 +848,9 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.spectrum.data = np.copy(w.amplitude_params)
             w.spectrum.err = np.copy(w.amplitude_params_err)
             w.spectrum.cov_matrix = np.copy(w.amplitude_cov_matrix)
-            w.spectrum.chromatic_psf.fill_table_with_profile_params(w.psf_profile_params[0])
+            w.spectrum.chromatic_psf.fill_table_with_profile_params(w.psf_profile_params[w.diffraction_orders[0]])
             w.spectrum.chromatic_psf.table["amplitude"] = np.copy(w.amplitude_params)
-            w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params[0])
+            w.spectrum.chromatic_psf.from_profile_params_to_shape_params(w.psf_profile_params[w.diffraction_orders[0]])
             w.spectrum.chromatic_psf.params.values = w.spectrum.chromatic_psf.from_table_to_poly_params()
             w.spectrum.spectrogram_fit = w.model
             w.spectrum.spectrogram_residuals = (w.data - w.spectrum.spectrogram_fit) / w.err

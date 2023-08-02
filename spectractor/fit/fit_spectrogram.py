@@ -64,16 +64,17 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if len(self.diffraction_orders) == 0:
             raise ValueError(f"At least one diffraction order must be given for spectrogram simulation.")
         length = len(self.spectrum.chromatic_psf.table)
-        psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()
+        self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()[length:]
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         self.saturation = self.spectrum.spectrogram_saturation
         D2CCD = np.copy(spectrum.header['D2CCD'])
         p = np.array([1, 1, 1, 0.05, -2, 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
                       0, self.spectrum.rotation_angle, 1])
+        self.psf_params_start_index = np.array([12 + len(self.psf_poly_params) * k for k in range(len(self.diffraction_orders))])
         psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.params.labels[length:])
         psf_poly_params_names = np.copy(self.spectrum.chromatic_psf.params.axis_names[length:])
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
-        p = np.concatenate([p] + [psf_poly_params[length:]] * len(self.diffraction_orders))
+        p = np.concatenate([p] + [self.psf_poly_params] * len(self.diffraction_orders))
         input_labels = [f"A{order}" for order in self.diffraction_orders]
         input_labels += ["VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
                         r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"]
@@ -192,24 +193,17 @@ class SpectrogramFitWorkspace(FitWorkspace):
             params = self.params.values
         A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params_all = params
         poly_params = np.array(psf_poly_params_all).reshape((len(self.diffraction_orders), -1))
-
         for k, order in enumerate(self.diffraction_orders):
             profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params[k],
                                                                                             apply_bounds=True)
             if order == self.diffraction_orders[0]:  # only first diffraction order
                 self.spectrum.chromatic_psf.from_profile_params_to_shape_params(profile_params)
-            #Dx = np.arange(len(profile_params[:, 0])) - self.spectrum.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
-            #Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
             dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, shift_x, shift_y, angle,
                                                                              niter=5, with_adr=True,
                                                                              order=order)
-            #self.my_logger.warning(f"{order} {dispersion_law.real} {self.simulation.r0}")
             profile_params[:, 0] = 1
             profile_params[:, 1] = dispersion_law.real + self.simulation.r0.real
             profile_params[:, 2] += dispersion_law.imag # - self.bgd_width
-            #profile_params[:, 0] = 1
-            #profile_params[:, 1] = Dx + self.spectrum.spectrogram_x0 + shift_x
-            #profile_params[:, 2] = Dy_disp_axis + (self.spectrum.spectrogram_y0 + shift_y)  # - self.bgd_width
             psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.simulation.pixels, profile_params,
                                                                   fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
                                                                   fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
@@ -246,8 +240,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 self.simulation.boundaries[order]["ymax"][k] = ymax
                 self.simulation.psf_cubes_masked[order][k, ymin:ymax, xmin:xmax] = True
         self.simulation.M_sparse_indices = {}
+        self.simulation.psf_cube_sparse_indices = {}
         for order in self.diffraction_orders:
-            self.simulation.M_sparse_indices[order] = np.concatenate([np.where(self.simulation.psf_cubes_masked[order][k].ravel() > 0)[0] for k in range(wl_size)])
+            self.simulation.psf_cube_sparse_indices[order] = [np.where(self.simulation.psf_cubes_masked[order][k].ravel() > 0)[0] for k in range(wl_size)]
+            self.simulation.M_sparse_indices[order] = np.concatenate(self.simulation.psf_cube_sparse_indices[order])
 
     def get_spectrogram_truth(self):
         """Load the truth parameters (if provided) from the file header.
@@ -409,6 +405,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
                 self.simulation.fix_atm_sim = False
             else:
                 self.simulation.fix_atm_sim = True
+            if ip >= self.psf_params_start_index[0]:
+                continue
             tmp_p = np.copy(params)
             if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                 epsilon[ip] = - epsilon[ip]
@@ -417,6 +415,14 @@ class SpectrogramFitWorkspace(FitWorkspace):
             if self.simulation.fix_atm_sim is False:
                 self.simulation.atmosphere_sim = atmosphere
             J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+        for k, order in enumerate(self.diffraction_orders):
+            if self.simulation.profile_params[order] is None:
+                continue
+            start = self.psf_params_start_index[k]
+            profile_params = np.copy(self.simulation.profile_params[order])
+            J[start:start+len(self.psf_poly_params)] = self.simulation.chromatic_psf.build_psf_jacobian(self.simulation.pixels, profile_params=profile_params,
+                                                                                                        sparse_indices=self.simulation.psf_cube_sparse_indices[order],
+                                                                                                        boundaries=self.simulation.boundaries[order], dtype="float32")
         self.simulation.fix_psf_cube = strategy
         self.simulation.fix_atm_sim = False
         self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")

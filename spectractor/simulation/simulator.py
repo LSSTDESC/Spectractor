@@ -304,12 +304,14 @@ class SpectrogramModel(Spectrum):
         self.boundaries = {}
         self.profile_params = {}
         self.M_sparse_indices = {}
+        self.psf_cube_sparse_indices = {}
         for order in self.diffraction_orders:
             self.psf_cubes[order] = None
             self.psf_cubes_masked[order] = None
             self.boundaries[order] = {}
             self.profile_params[order] = None
             self.M_sparse_indices[order] = None
+            self.psf_cube_sparse_indices[order] = None
         self.fix_psf_cube = False
 
         self.fix_atm_sim = False
@@ -486,7 +488,7 @@ class SpectrogramModel(Spectrum):
                 self.chromatic_psf.table["Dy"] = self.profile_params[order][:, 2] - self.r0.imag
 
             # Fill the PSF cube for each diffraction order
-            argmin = max(0, np.argmin(np.abs(self.profile_params[order][:, 1])))
+            argmin = max(0, int(np.argmin(np.abs(self.profile_params[order][:, 1]))))
             argmax = min(self.Nx, np.argmin(np.abs(self.profile_params[order][:, 1]-self.Nx)) + 1)
             if self.psf_cubes[order] is None or not self.fix_psf_cube:
                 self.psf_cubes[order] = self.chromatic_psf.build_psf_cube(self.pixels, self.profile_params[order],
@@ -508,6 +510,8 @@ class SpectrogramModel(Spectrum):
                     ymin, ymax = 0, self.Ny
                 ima[ymin:ymax, xmin:xmax] += spec[x] * self.psf_cubes[order][x, ymin:ymax, xmin:xmax]
                 ima_err2[ymin:ymax, xmin:xmax] += (spec_err[x] * self.psf_cubes[order][x, ymin:ymax, xmin:xmax])**2
+            if np.allclose(self.profile_params[order][:, 0] , 1):
+                self.profile_params[order][:, 0] = spec
 
         # self.spectrogram is in ADU/s units here
         self.spectrogram = A1 * ima
@@ -516,6 +520,7 @@ class SpectrogramModel(Spectrum):
         if self.with_background:
             self.spectrogram += B * self.spectrogram_bgd
         # Save the simulation parameters
+        self.psf_poly_params = np.copy(poly_params[0])
         self.header['OZONE_T'] = ozone
         self.header['PWV_T'] = pwv
         self.header['VAOD_T'] = aerosols
