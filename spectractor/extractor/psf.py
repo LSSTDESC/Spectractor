@@ -75,7 +75,7 @@ def evaluate_moffat1d_normalisation_dalpha(norm, alpha):
 
 @njit(["float32[:](int64[:], float32, float32, float32, float32, float32)",
        "float32[:](float32[:], float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffat1d(y, amplitude, y_c, gamma, alpha, norm):
+def evaluate_moffat1d(y, amplitude, y_c, gamma, alpha, norm):  # pragma: no cover
     r"""Compute a 1D Moffat function, whose integral is not normalised to unity.
 
     .. math ::
@@ -151,7 +151,7 @@ def evaluate_moffat1d(y, amplitude, y_c, gamma, alpha, norm):
 
 
 @njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda):
+def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda):  # pragma: no cover
     r"""Compute a 1D Moffat Jacobian, whose integral is normalised to unity.
 
     .. math ::
@@ -224,7 +224,7 @@ def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda):
 
 @njit(["float32[:](int64[:], float32, float32, float32, float32, float32, float32, float32)",
        "float32[:](float32[:], float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm_moffat):
+def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm_moffat):  # pragma: no cover
     r"""Compute a 1D Moffat-Gaussian function, whose integral is normalised to unity.
 
     .. math ::
@@ -312,7 +312,7 @@ def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, no
 
 
 @njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm_moffat, dnormda):
+def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm_moffat, dnormda):  # pragma: no cover
     r"""Compute a 1D Moffat-Gaussian Jacobian, whose integral is normalised to unity.
 
     .. math ::
@@ -401,7 +401,7 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
 
 
 @njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):
+def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: no cover
     r"""Compute a 2D Moffat function, whose integral is normalised to unity.
 
     .. math ::
@@ -483,7 +483,7 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):
     return a
 
 @njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha):
+def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: no cover
     r"""Compute a 2D Moffat Jacobian, whose integral is normalised to unity.
 
     Parameters
@@ -544,7 +544,7 @@ def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha):
 
 
 @njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma):
+def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: no cover
     r"""Compute a 2D Moffat-Gaussian function, whose integral is normalised to unity.
 
     .. math ::
@@ -637,7 +637,7 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
 
 @njit(["float32[:](int64[:], float32, float32, float32)",
        "float32[:](float32[:], float32, float32, float32)"], fastmath=True, cache=False)
-def evaluate_gauss1d(y, amplitude, y_c, sigma):
+def evaluate_gauss1d(y, amplitude, y_c, sigma):  # pragma: no cover
     r"""Compute a 1D Gaussian function, whose integral is normalised to unity.
 
     .. math ::
@@ -708,7 +708,7 @@ def evaluate_gauss1d(y, amplitude, y_c, sigma):
 
 @njit(["float32[:,:](int64[:], float32, float32, float32)",
        "float32[:,:](float32[:], float32, float32, float32)"], fastmath=True, cache=False)
-def evaluate_gauss1d_jacobian(y, amplitude, y_c, sigma):
+def evaluate_gauss1d_jacobian(y, amplitude, y_c, sigma):  # pragma: no cover
     r"""Compute a 1D Gaussian function, whose integral is normalised to unity.
 
     .. math ::
@@ -769,7 +769,7 @@ def evaluate_gauss1d_jacobian(y, amplitude, y_c, sigma):
 
 
 @njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_gauss2d(x, y, amplitude, x_c, y_c, sigma):
+def evaluate_gauss2d(x, y, amplitude, x_c, y_c, sigma):  # pragma: no cover
     r"""Compute a 2D Gaussian function, whose integral is normalised to unity.
 
     .. math ::
@@ -847,7 +847,7 @@ def evaluate_gauss2d(x, y, amplitude, x_c, y_c, sigma):
 
 
 @njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_gauss2d_jacobian(x, y, amplitude, x_c, y_c, sigma):
+def evaluate_gauss2d_jacobian(x, y, amplitude, x_c, y_c, sigma):  # pragma: no cover
     r"""Compute a 2D Gaussian Jacobian, whose integral is normalised to unity.
 
     Parameters
@@ -905,7 +905,7 @@ def evaluate_gauss2d_jacobian(x, y, amplitude, x_c, y_c, sigma):
 
 
 @njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma):
+def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: no cover
     r"""Compute a 2D Moffat Jacobian, whose integral is normalised to unity.
 
     Parameters

@@ -231,6 +231,30 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
 
 
 def rescale_x_to_legendre(x):
+    """Rescale array between -1 and 1 for Legendre polynomial evaluation.
+
+    Parameters
+    ----------
+    x: np.ndarray
+
+    Returns
+    -------
+    x_norm: np.ndarray
+
+    See Also
+    --------
+    rescale_x_from_legendre
+
+    Examples
+    --------
+    >>> x = np.linspace(0, 10, 101)
+    >>> x_norm = rescale_x_to_legendre(x)
+    >>> x_norm[0], x_norm[-1], x_norm.size
+    (-1.0, 1.0, 101)
+    >>> x_new = rescale_x_from_legendre(x_norm, 0, 10)
+    >>> assert np.allclose(x_new, x)
+
+    """
     middle = 0.5 * (np.max(x) + np.min(x))
     x_norm = x - middle
     if np.max(x_norm) != 0:
@@ -239,8 +263,35 @@ def rescale_x_to_legendre(x):
         return x_norm
 
 
-def rescale_x_from_legendre(x, Xmax, Xmin):
-    X = 0.5 * x * (Xmax - Xmin) + 0.5 * (Xmax + Xmin)
+def rescale_x_from_legendre(x_norm, Xmin, Xmax):
+    """Rescale normalized array set between -1 and 1 for Legendre polynomial evaluation to normal array
+    between Xmin and Xmax.
+
+    Parameters
+    ----------
+    x: np.ndarray
+    Xmin: float
+    Xmax: float
+
+    Returns
+    -------
+    x: np.ndarray
+
+    See Also
+    --------
+    rescale_x_to_legendre
+
+    Examples
+    --------
+    >>> x = np.linspace(0, 10, 101)
+    >>> x_norm = rescale_x_to_legendre(x)
+    >>> x_norm[0], x_norm[-1], x_norm.size
+    (-1.0, 1.0, 101)
+    >>> x_new = rescale_x_from_legendre(x_norm, 0, 10)
+    >>> assert np.allclose(x_new, x)
+
+    """
+    X = 0.5 * x_norm * (Xmax - Xmin) + 0.5 * (Xmax + Xmin)
     return X
 
 
@@ -333,7 +384,6 @@ def multigauss_and_bgd_jacobian(x, *params):
     >>> assert(np.all(np.isclose(jac.T[0],np.ones_like(x))))
     >>> print(jac.shape)
     (200, 10)
-    >>> jac
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
     x_norm, x_gauss = x
@@ -1135,34 +1185,6 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
         return fitted_model
 
 
-class LevMarLSQFitterWithNan(fitting.LevMarLSQFitter):
-
-    def objective_function(self, fps, *args):
-        """
-        Function to minimize.
-
-        Parameters
-        ----------
-        fps : list
-            parameters returned by the fitter
-        args : list
-            [model, [weights], [input coordinates]]
-        """
-
-        model = args[0]
-        weights = args[1]
-        fitting._fitter_to_model_params(model, fps)
-        meas = args[-1]
-        if weights is None:
-            a = np.ravel(model(*args[2: -1]) - meas)
-            a[np.isfinite(a)] = 0
-            return a
-        else:
-            a = np.ravel(weights * (model(*args[2: -1]) - meas))
-            a[~np.isfinite(a)] = 0
-            return a
-
-
 def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
     """
     Compute the full width half maximum of y(x) curve,
@@ -1318,7 +1340,7 @@ def compute_integral(x, y, bounds=None):
 
     .. doctest::
 
-        >>> x = np.arange(0, 100, 0.5)
+        >>> x = np.arange(0, 100, 1)
         >>> stddev = 4
         >>> middle = 40
         >>> psf = gauss(x, 1/(stddev*np.sqrt(2*np.pi)), middle, stddev)
@@ -1678,7 +1700,7 @@ def detect_peaks(image):
     return detected_peaks
 
 
-def clean_target_spikes(data, saturation):
+def clean_target_spikes(data, saturation):  # pragma: no cover
     saturated_pixels = np.where(data > saturation)
     data[saturated_pixels] = saturation
     NY, NX = data.shape
@@ -2366,14 +2388,35 @@ def imgslice(slicespec):
 
 
 def compute_correlation_matrix(cov):
-    rho = np.zeros_like(cov)
+    """Compute correlation matrix from a covariance matrix.
+
+    Parameters
+    ----------
+    cov: np.ndarray
+        Covariance matrix.
+
+    Returns
+    -------
+    rho: np.ndarray
+        Correlation matrix.
+
+    Examples
+    --------
+    >>> cov = np.array([[4, 1], [1, 16]])
+    >>> compute_correlation_matrix(cov)
+    array([[1.   , 0.125],
+           [0.125, 1.   ]])
+
+
+    """
+    rho = np.zeros_like(cov, dtype="float")
     for i in range(cov.shape[0]):
         for j in range(cov.shape[1]):
             rho[i, j] = cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
     return rho
 
 
-def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):
+def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):  # pragma: no cover
     if ipar is None:
         ipar = np.arange(rho.shape[0]).astype(int)
     im = plt.imshow(rho[ipar[:, None], ipar], interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
@@ -2574,3 +2617,9 @@ class NumpyArrayEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

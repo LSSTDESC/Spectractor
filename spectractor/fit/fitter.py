@@ -742,7 +742,7 @@ class FitWorkspace:
         self.model_err = np.array([])
         return self.x, self.model, self.model_err
 
-    def plot_fit(self):
+    def plot_fit(self):  # pragma: no cover
         """Generic function to plot the result of the fit for 1D curves.
 
         Returns
