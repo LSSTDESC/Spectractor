@@ -957,32 +957,6 @@ class FitWorkspace:
         """
         return -0.5 * self.chisq(p)
 
-    def lnprior(self, p):
-        """Compute the logarithmic prior for a set of model parameters p.
-
-        The function returns 0 for good parameters, and -np.inf for parameters out of their boundaries.
-
-        Parameters
-        ----------
-        p: array_like
-            The array of model parameters.
-
-        Returns
-        -------
-        lnprior: float
-            The logarithmic value fo the prior.
-
-        """
-        in_bounds = True
-        for npar, par in enumerate(p):
-            if par < self.params.bounds[npar][0] or par > self.params.bounds[npar][1]:
-                in_bounds = False
-                break
-        if in_bounds:
-            return 0.0
-        else:
-            return -np.inf
-
     def jacobian(self, params, epsilon, model_input=None):
         """Generic function to compute the Jacobian matrix of a model, with numerical derivatives.
 

@@ -900,6 +900,31 @@ class MCMCFitWorkspace(FitWorkspace):
         print(f"Output file: {self.emcee_filename}")
         print('************************************')
 
+    def lnprior(self, p):
+        """Compute the logarithmic prior for a set of model parameters p.
+
+        The function returns 0 for good parameters, and -np.inf for parameters out of their boundaries.
+
+        Parameters
+        ----------
+        p: array_like
+            The array of model parameters.
+
+        Returns
+        -------
+        lnprior: float
+            The logarithmic value fo the prior.
+
+        """
+        in_bounds = True
+        for npar, par in enumerate(p):
+            if par < self.params.bounds[npar][0] or par > self.params.bounds[npar][1]:
+                in_bounds = False
+                break
+        if in_bounds:
+            return 0.0
+        else:
+            return -np.inf
 
 def lnprob(p):  # pragma: no cover
     global fit_workspace
