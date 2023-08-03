@@ -716,7 +716,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.params.fixed = [True] * len(self.params.values)
         self.params.fixed[self.params.get_index(r"shift_y [pix]")] = False  # shift y
         self.params.fixed[self.params.get_index(r"angle [deg]")] = False  # angle
-        run_minimisation(self, "newton", epsilon, xtol=1e-2, ftol=0.01)  # 1000 / self.data.size)
+        run_minimisation(self, "newton", epsilon, xtol=1e-2, ftol=0.01, with_line_search=False)  # 1000 / self.data.size)
         self.params.fixed = fixed_default
         self.set_mask(params=self.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
 
