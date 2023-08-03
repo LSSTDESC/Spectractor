@@ -93,7 +93,7 @@ def gauss_jacobian(x, A, x0, sigma):
     >>> print(np.array(jac).T.shape)
     (50, 3)
     """
-    dA = gauss(x, A, x0, sigma) / A
+    dA = gauss(x, 1, x0, sigma)
     dx0 = A * (x - x0) / (sigma * sigma) * dA
     dsigma = A * (x - x0) * (x - x0) / (sigma ** 3) * dA
     # return np.array([dA, dx0, dsigma]).T
