@@ -1307,7 +1307,7 @@ class ChromaticPSF:
             # precise fit with sigma clipping
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
                                             sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP,
-                                            niter_clip=3, verbose=verbose)
+                                            niter_clip=3, verbose=verbose, with_line_search=False)
         else:
             raise ValueError(f"Unknown fitting mode={mode}. Must be '1D' or '2D'.")
 

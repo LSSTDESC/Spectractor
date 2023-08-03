@@ -415,6 +415,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
             if self.simulation.fix_atm_sim is False:
                 self.simulation.atmosphere_sim = atmosphere
             J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+        self.simulation.fix_atm_sim = True
+        self.simulation.fix_psf_cube = False
         for k, order in enumerate(self.diffraction_orders):
             if self.simulation.profile_params[order] is None:
                 continue
@@ -571,7 +573,8 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
         #                                            niter=40)
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon,  xtol=1e-6,
-                                        ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=False)
+                                        ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=False,
+                                        with_line_search=True)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
             fit_workspace.params.plot_correlation_matrix()

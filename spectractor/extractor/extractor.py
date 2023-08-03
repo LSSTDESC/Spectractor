@@ -770,7 +770,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         epsilon = 1e-4 * w.params.values
         epsilon[epsilon == 0] = 1e-4
 
-        run_minimisation(w, method=method, xtol=1e-3, ftol=1e-2)  # 1000 / (w.data.size - len(w.mask)))
+        run_minimisation(w, method=method, xtol=1e-3, ftol=1e-2, with_line_search=False)  # 1000 / (w.data.size - len(w.mask)))
         if parameters.DEBUG and parameters.DISPLAY:
             w.plot_fit()
 
@@ -821,7 +821,8 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.set_mask(params=w.params.values, fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP)
             run_minimisation_sigma_clipping(w, "newton", epsilon, xtol=1e-5,
                                             ftol=1e-3, niter_clip=3,  # ftol=100 / (w.data.size - len(w.mask))
-                                            sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP, verbose=True)
+                                            sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP, verbose=True,
+                                            with_line_search=False)
             my_logger.info(f"\n\t  niter = {i} : Newton: total computation time: {time.time() - start}s")
             if parameters.DEBUG and parameters.DISPLAY:
                 w.plot_fit()
