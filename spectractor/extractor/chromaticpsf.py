@@ -835,23 +835,22 @@ class ChromaticPSF:
 
         """
         self.fill_table_with_profile_params(profile_params)
-        pixel_x = np.arange(self.Nx, dtype=int)
+        pixel_x = np.arange(0, self.Nx, parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT, dtype=int)
+        fwhms = np.zeros_like(pixel_x)
         # oversampling for precise computation of the PSF
         # pixels.shape = (2, Nx, Ny): self.pixels[1<-y, 0<-first pixel value column, :]
         # TODO: account for rotation ad projection effects is PSF is not round
-        pixel_eval = np.arange(self.pixels[1, 0, 0], self.pixels[1, 0, -1], 0.1, dtype=np.float32)
-        for x in pixel_x:
+        pixel_eval = np.arange(self.pixels[1, 0, 0], self.pixels[1, 0, -1], 0.5, dtype=np.float32)
+        for ix, x in enumerate(pixel_x):
             p = profile_params[x, :]
             # compute FWHM transverse to dispersion axis (assuming revolution symmetry of the PSF)
             out = self.psf.evaluate(pixel_eval, values=p)
-            fwhm = compute_fwhm(pixel_eval, out, center=p[2], minimum=0)
-            self.table['flux_integral'][x] = p[0]  # if MoffatGauss1D normalized
-            self.table['fwhm'][x] = fwhm
+            fwhms[ix] = compute_fwhm(pixel_eval, out, center=p[2], minimum=0, epsilon=1e-2)
         # clean fwhm bad points
-        fwhms = self.table['fwhm']
         mask = np.logical_and(fwhms > 1, fwhms < self.Ny // 2)  # more than 1 pixel or less than window
         self.table['fwhm'] = interp1d(pixel_x[mask], fwhms[mask], kind="linear",
-                                      bounds_error=False, fill_value="extrapolate")(pixel_x)
+                                      bounds_error=False, fill_value="extrapolate")(np.arange(self.Nx))
+        self.table['flux_integral'] = profile_params[:, 0]  # if MoffatGauss1D normalized
 
     def set_bounds(self):
         """

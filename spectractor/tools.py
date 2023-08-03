@@ -1185,7 +1185,7 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
         return fitted_model
 
 
-def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
+def compute_fwhm(x, y, minimum=0, center=None, full_output=False, epsilon=1e-3):
     """
     Compute the full width half maximum of y(x) curve,
     using an interpolation of the data points and dichotomie method.
@@ -1202,6 +1202,8 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
         The center of the curve. If None, the weighted averageof the y(x) distribution is computed (default: None).
     full_output: bool, optional
         If True, half maximum, the edges of the curve and the curve center are given in output (default: False).
+    epsilon: float, optional
+        Dichotomie algorithm stop if difference is smaller than epsilon (default: 1e-3).
 
     Returns
     -------
@@ -1304,7 +1306,7 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
     def eq(xx):
         return interp(xx) - 0.5 * maximum
 
-    res = dichotomie(eq, a, b, 1e-3)
+    res = dichotomie(eq, a, b, epsilon)
     if center is None:
         center = np.average(x, weights=y)
     fwhm = abs(2 * (res - center))
