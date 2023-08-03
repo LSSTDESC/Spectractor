@@ -22,7 +22,7 @@ from spectractor.fit.fitter import (FitParameters, FitWorkspace, run_minimisatio
 try:
     import sparse_dot_mkl
 except ModuleNotFoundError:
-    pass
+    sparse_dot_mkl = None
 
 
 class ChromaticPSF:
@@ -1985,7 +1985,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             M_dot_W = M.T @ self.sqrtW
             W_dot_data = (self.W * self.data).astype("float32")
             # Compute the minimizing amplitudes
-            if 'sparse_dot_mkl' not in sys.modules:
+            if sparse_dot_mkl is None:
                 M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             else:
                 tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)

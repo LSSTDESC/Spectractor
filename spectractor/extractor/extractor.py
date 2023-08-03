@@ -23,7 +23,7 @@ from spectractor.fit.fitter import (run_minimisation, run_minimisation_sigma_cli
 try:
     import sparse_dot_mkl
 except ModuleNotFoundError:
-    pass
+    sparse_dot_mkl = None
 
 
 def dumpParameters():
@@ -475,7 +475,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
             M_dot_W = M.T @ self.sqrtW
-            if 'sparse_dot_mkl' not in sys.modules:
+            if sparse_dot_mkl is None:
                 M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             else:
                 tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
