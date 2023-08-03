@@ -1,4 +1,5 @@
 import os
+import sys
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,7 +20,11 @@ from spectractor.tools import ensure_dir, plot_image_simple, from_lambda_to_colo
 from spectractor.fit.fitter import (run_minimisation, run_minimisation_sigma_clipping, write_fitparameter_json,
                                     RegFitWorkspace, FitWorkspace, FitParameters)
 
-import sparse_dot_mkl
+try:
+    import sparse_dot_mkl
+except ModuleNotFoundError:
+    pass
+
 
 def dumpParameters():
     for item in dir(parameters):
@@ -469,12 +474,13 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
-            # M_dot_W = self.sqrtW * M
-            M_dot_W = sparse_dot_mkl.dot_product_mkl(self.sqrtW, M)
-            # M_dot_W_dot_M = M_dot_W @ M_dot_W.T
-            tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=False)
-            dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
-            M_dot_W_dot_M = tri + tri.T - dia
+            M_dot_W = M.T @ self.sqrtW
+            if 'sparse_dot_mkl' not in sys.modules:
+                M_dot_W_dot_M = M_dot_W @ M_dot_W.T
+            else:
+                tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
+                dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
+                M_dot_W_dot_M = tri + tri.T - dia
             if self.amplitude_priors_method != "spectrum":
                 # try:  # slower
                 #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
@@ -507,8 +513,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 #     cov_matrix = L.T @ L
                 # except np.linalg.LinAlgError:
                 cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)  # M_dot_W_dot_M_plus_Q is not so sparse
-                # amplitude_params = cov_matrix @ (M.T @ W_dot_data + self.reg * self.Q_dot_A0)
-                amplitude_params = sparse_dot_mkl.dot_product_mkl(cov_matrix, (sparse_dot_mkl.dot_product_mkl(M.T, W_dot_data) + np.float32(self.reg) * self.Q_dot_A0))
+                amplitude_params = cov_matrix @ (M.T @ W_dot_data + self.reg * self.Q_dot_A0)
             self.M_dot_W_dot_M = M_dot_W_dot_M
             amplitude_params = np.asarray(amplitude_params).reshape(-1)
         else:

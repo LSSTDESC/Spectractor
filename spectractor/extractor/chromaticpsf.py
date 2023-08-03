@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import sys
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from tqdm import tqdm
@@ -18,8 +19,10 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.fit.fitter import (FitParameters, FitWorkspace, run_minimisation, run_minimisation_sigma_clipping,
                                     RegFitWorkspace)
-
-import sparse_dot_mkl
+try:
+    import sparse_dot_mkl
+except ModuleNotFoundError:
+    pass
 
 
 class ChromaticPSF:
@@ -1979,13 +1982,15 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
             # M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
             M = self.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32", sparse_indices=self.M_sparse_indices, boundaries=self.boundaries).T
 
-            M_dot_W = sparse_dot_mkl.dot_product_mkl(self.sqrtW, M)
+            M_dot_W = M.T @ self.sqrtW
             W_dot_data = (self.W * self.data).astype("float32")
             # Compute the minimizing amplitudes
-            # M_dot_W_dot_M = M_dot_W @ M_dot_W.T
-            tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=False)
-            dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
-            M_dot_W_dot_M = tri + tri.T - dia
+            if 'sparse_dot_mkl' not in sys.modules:
+                M_dot_W_dot_M = M_dot_W @ M_dot_W.T
+            else:
+                tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
+                dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
+                M_dot_W_dot_M = tri + tri.T - dia
             if self.amplitude_priors_method != "psf1d":
                 if self.amplitude_priors_method == "keep":
                     amplitude_params = np.copy(self.amplitude_params)
@@ -2022,7 +2027,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                 #     cov_matrix = L.T @ L
                 # except np.linalg.LinAlgError:
                 cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-                amplitude_params = sparse_dot_mkl.dot_product_mkl(cov_matrix, (sparse_dot_mkl.dot_product_mkl(M.T, W_dot_data) + np.float32(self.reg) * self.Q_dot_A0))
+                amplitude_params = cov_matrix @ (M.T @ W_dot_data + np.float32(self.reg) * self.Q_dot_A0)
             amplitude_params = np.asarray(amplitude_params).reshape(-1)
             self.M = M
             self.M_dot_W_dot_M = M_dot_W_dot_M
