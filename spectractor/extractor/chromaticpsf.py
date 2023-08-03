@@ -836,7 +836,7 @@ class ChromaticPSF:
         """
         self.fill_table_with_profile_params(profile_params)
         pixel_x = np.arange(0, self.Nx, parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT, dtype=int)
-        fwhms = np.zeros_like(pixel_x)
+        fwhms = np.zeros_like(pixel_x, dtype=float)
         # oversampling for precise computation of the PSF
         # pixels.shape = (2, Nx, Ny): self.pixels[1<-y, 0<-first pixel value column, :]
         # TODO: account for rotation ad projection effects is PSF is not round
