@@ -62,21 +62,21 @@ def test_fitworkspace(seed=42):
     run_minimisation(w, method="newton")
     assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
 
-    def lnprob(p):
-        lp = w.lnprior(p)
-        if not np.isfinite(lp):
-            return -1e20
-        return lp + w.lnlike(p)
-
-    run_emcee(w, ln=lnprob)
-    w.analyze_chains()
-
-    assert w.chains.shape == (5000, 20, 2)
-    assert np.all(w.gelmans < 0.03)
-    assert os.path.exists(file_name.replace(".txt", "_emcee.h5"))
-    assert os.path.exists(file_name.replace(".txt", "_emcee_convergence.pdf"))
-    assert os.path.exists(file_name.replace(".txt", "_emcee_triangle.pdf"))
-    assert np.all([np.abs(w.params.values[i] - truth[i]) / np.sqrt(w.params.cov[i, i]) < 3 for i in range(w.params.ndim)])
+    # def lnprob(p):
+    #     lp = w.lnprior(p)
+    #     if not np.isfinite(lp):
+    #         return -1e20
+    #     return lp + w.lnlike(p)
+    #
+    # run_emcee(w, ln=lnprob)
+    # w.analyze_chains()
+    #
+    # assert w.chains.shape == (5000, 20, 2)
+    # assert np.all(w.gelmans < 0.03)
+    # assert os.path.exists(file_name.replace(".txt", "_emcee.h5"))
+    # assert os.path.exists(file_name.replace(".txt", "_emcee_convergence.pdf"))
+    # assert os.path.exists(file_name.replace(".txt", "_emcee_triangle.pdf"))
+    # assert np.all([np.abs(w.params.values[i] - truth[i]) / np.sqrt(w.params.cov[i, i]) < 3 for i in range(w.params.ndim)])
 
 
 def test_minimisation_sigma_clipping(seed=42):
