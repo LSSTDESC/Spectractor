@@ -1,4 +1,3 @@
-from iminuit import Minuit
 from scipy import optimize
 import time
 import matplotlib.pyplot as plt
@@ -1415,28 +1414,6 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         if verbose:
             my_logger.debug(f"\n\t{p}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
-            if parameters.DEBUG:
-                fit_workspace.plot_fit()
-    elif method == "minuit":
-        start = time.time()
-        error = 0.1 * np.abs(guess) * np.ones_like(guess)
-        error[2:5] = 0.3 * np.abs(guess[2:5]) * np.ones_like(guess[2:5])
-        z = np.where(np.isclose(error, 0.0, 1e-6))
-        error[z] = 1.
-        # noinspection PyArgumentList
-        # m = Minuit(fcn=nll, values=guess, error=error, errordef=1, fix=fix, print_level=verbose, limit=bounds)
-        m = Minuit(nll, np.copy(guess))
-        m.errors = error
-        m.errordef = 1
-        m.fixed = fit_workspace.params.fixed
-        m.print_level = verbose
-        m.limits = bounds
-        m.tol = 10
-        m.migrad()
-        fit_workspace.params.values = np.array(m.values[:])
-        if verbose:
-            my_logger.debug(f"\n\t{m}")
-            my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
             if parameters.DEBUG:
                 fit_workspace.plot_fit()
     elif method == "newton":

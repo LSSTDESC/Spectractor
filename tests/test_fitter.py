@@ -54,9 +54,6 @@ def test_fitworkspace(seed=42):
     # w.my_logger.warning(f"{w.p} {w.ndim} {sigma} {truth}")
     # assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     w.params.values = np.array([1, 1])
-    run_minimisation(w, method="minuit")
-    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
-    w.params.values = np.array([1, 1])
     run_minimisation(w, method="newton", with_line_search=True)
     assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
 

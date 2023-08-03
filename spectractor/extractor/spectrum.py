@@ -4,7 +4,7 @@ from astropy.io import fits
 from astropy.table import Table
 import astropy.units as u
 from scipy import integrate
-from iminuit import Minuit
+from scipy import optimize
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -20,11 +20,12 @@ from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
-                               rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd)
+                               rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd, multigauss_and_bgd_jacobian)
 from spectractor.extractor.psf import load_PSF
 from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 from spectractor.simulation.throughput import TelescopeTransmission
+from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation
 
 
 fits_mappings = {'config': 'CONFIG',
@@ -1289,6 +1290,81 @@ class Spectrum:
         return lambdas, lambdas_order2, dispersion_law, dispersion_law_order2
 
 
+class MultigaussAndBgdFitWorkspace(FitWorkspace):
+    def __init__(self, guess, x, data, err, bounds, file_name="", verbose=False, plot=False, live_fit=False, truth=None):
+        """
+
+        Parameters
+        ----------
+
+        Examples
+        --------
+
+        >>> from spectractor.config import load_config
+        >>> load_config("default.ini")
+        >>> x = np.arange(600.,800.,1)
+        >>> x_norm = rescale_x_to_legendre(x)
+        >>> p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+        >>> y = multigauss_and_bgd(np.array([x_norm, x]), *p)
+        >>> print(f'{y[0]:.2f}')
+        20.00
+        >>> err = 0.1 * np.sqrt(y)
+        >>> guess = (10,0,0,0.1,10,640,2,20,750,7)
+        >>> bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
+        >>> w = MultigaussAndBgdFitWorkspace(guess, x, y, err, np.array(bounds).T)
+        >>> w = run_multigaussandbgd_minimisation(w, method="newton")
+        >>> popt = w.params.values
+        >>> assert np.allclose(p, w.params.values, rtol=1e-4, atol=1e-5)
+        >>> _ = w.plot_fit()
+
+        .. plot::
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            from spectractor.tools import multigauss_and_bgd, fit_multigauss_and_bgd
+            x = np.arange(600.,800.,1)
+            x_norm = rescale_x_to_legendre(x)
+            p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+            y = multigauss_and_bgd(np.array([x_norm, x]), *p)
+            err = 0.1 * np.sqrt(y)
+            guess = (10,0,0,0.1,10,640,2,20,750,7)
+            bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
+            w = MultigaussAndBgdFitWorkspace(guess, x, y, err, np.array(bounds).T)
+            w = run_multigaussandbgd_minimisation(w, method="newton")
+            w.plot_fit()
+
+        """
+        bgd_nparams = parameters.CALIB_BGD_NPARAMS
+        labels = [f"b_{k}" for k in range(bgd_nparams)]
+        for ngauss in range((len(guess) - bgd_nparams) // 3):
+            labels += [f"A_{ngauss}", f"x0_{ngauss}", f"sigma_{ngauss}"]
+
+        params = FitParameters(values=guess,labels=labels,bounds=bounds,truth=truth)
+        FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot,
+                              live_fit=live_fit, truth=truth)
+        self.my_logger = set_logger(self.__class__.__name__)
+        if data.shape != err.shape:
+            raise ValueError(f"Data and uncertainty arrays must have the same shapes. "
+                             f"Here data.shape={data.shape} and data_errors.shape={err.shape}.")
+        self.x = x
+        self.x_norm = rescale_x_to_legendre(x)
+        self.xs = np.array([self.x_norm, x])
+        self.data = data
+        self.err = err
+
+    def simulate(self, *p):
+        self.model = multigauss_and_bgd(self.xs, *p)
+        return self.x, self.model, np.zeros_like(self.model)
+
+    def jacobian(self, params, epsilon, model_input=None):
+        return multigauss_and_bgd_jacobian(self.xs, *params).T
+
+
+def run_multigaussandbgd_minimisation(w, method="newton"):
+    run_minimisation(w, method=method, ftol=1 / w.x.size, xtol=1e-6, niter=50)
+    return w
+
+
 def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func=None, snr_minlevel=3, ax=None,
                  calibration_lines_only=False,
                  xlim=(parameters.LAMBDA_MIN, parameters.LAMBDA_MAX)):
@@ -1636,6 +1712,10 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             sigma = spec_err[index]
         if cov_matrix is not None:
             sigma = cov_matrix[index, index]
+        # w = MultigaussAndBgdFitWorkspace(guess, lambdas[index], spec[index], sigma, np.array(bounds).T)
+        # w = run_multigaussandbgd_minimisation(w, method="newton")
+        # popt = w.params.values
+        # pcov = w.params.cov
         popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma)
         # noise level defined as the std of the residuals if no error
         x_norm = rescale_x_to_legendre(lambdas[index])
@@ -1797,12 +1877,7 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
         spectrum.convert_from_ADUrate_to_flam()
         chisq = detect_lines(spectrum.lines, spectrum.lambdas, spectrum.data, spec_err=spectrum.err,
                              fwhm_func=fwhm_func, ax=None, calibration_lines_only=True)
-        chisq += ((shift) / parameters.PIXSHIFT_PRIOR) ** 2
-        if parameters.DEBUG and parameters.DISPLAY:
-            if parameters.LIVE_FIT:
-                spectrum.plot_spectrum(live_fit=True, label=f'Order {spectrum.order:d} spectrum\n'
-                                                            r'$D_\mathrm{CCD}'
-                                                            rf'={D:.2f}\,$mm, $\delta u_0={shift:.2f}\,$pix')
+        chisq += (shift / parameters.PIXSHIFT_PRIOR) ** 2
         spectrum.convert_from_flam_to_ADUrate()
         return chisq
 
@@ -1851,24 +1926,20 @@ def calibrate_spectrum(spectrum, with_adr=False, niter=5, grid_search=False):
     start = np.array([D, pixel_shift])
 
     # now minimize around the global minimum found previously
-    # res = opt.minimize(shift_minimizer, start, args=(), method='L-BFGS-B',
-    #                    options={'maxiter': 200, 'ftol': 1e-3},
-    #                    bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
-    error = [parameters.DISTANCE2CCD_ERR, pixel_shift_step]
-    fix = [False, False]
-    m = Minuit(shift_minimizer, start)
-    m.errors = error
-    m.errordef = 1
-    m.fixed = fix
-    m.print_level = 0
-    m.limits = ((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2))
-    m.migrad()
-    # if parameters.DEBUG:
-    #     print(m.prin)
-    # if not res.success:
-    #     spectrum.my_logger.warning('\n\tMinimizer failed.')
-    #     print(res)
-    D, pixel_shift = np.array(m.values[:])
+    res = optimize.minimize(shift_minimizer, start, args=(), method='L-BFGS-B',
+                            options={'maxiter': 200, 'ftol': 1e-3},
+                            bounds=((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2)))
+    # error = [parameters.DISTANCE2CCD_ERR, pixel_shift_step]
+    # fix = [False, False]
+    # m = Minuit(shift_minimizer, start)
+    # m.errors = error
+    # m.errordef = 1
+    # m.fixed = fix
+    # m.print_level = 0
+    # m.limits = ((D - 5 * parameters.DISTANCE2CCD_ERR, D + 5 * parameters.DISTANCE2CCD_ERR), (-2, 2))
+    # m.migrad()
+    # D, pixel_shift = np.array(m.values[:])
+    D, pixel_shift = res.x
     spectrum.disperser.D = D
     x0 = [x0[0] + pixel_shift, x0[1]]
     spectrum.x0 = x0
