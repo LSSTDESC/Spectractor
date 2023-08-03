@@ -1135,7 +1135,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         for ip in range(J.shape[0]):
             if ip not in ipar:
                 continue
-            if np.all(np.array(J[ip]).flatten() == np.zeros(np.array(J[ip]).size)):
+            if np.allclose(np.array(J[ip]).ravel(), 0, atol=1e-20):
                 ipar = np.delete(ipar, list(ipar).index(ip))
                 fit_workspace.params.fixed[ip] = True
                 my_logger.warning(
