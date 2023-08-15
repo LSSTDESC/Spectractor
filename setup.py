@@ -2,7 +2,12 @@ from setuptools import setup
 import os
 import re
 
-reqs = open('requirements.txt', 'r').read().strip().splitlines()
+reqs = []
+
+# skip using requirements.txt in a CONDA environment
+if os.getenv('CONDA_PREFIX') is None:
+    reqs = open('requirements.txt', 'r').read().strip().splitlines()
+
 if os.getenv('READTHEDOCS'):
     reqs.remove('mpi4py')
 
