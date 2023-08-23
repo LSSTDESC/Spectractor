@@ -2,6 +2,7 @@ from scipy.signal import argrelextrema, savgol_filter
 from scipy.interpolate import interp1d
 from astropy.io import fits
 from astropy.table import Table
+import astropy.units as u
 from scipy import integrate
 from iminuit import Minuit
 import matplotlib.pyplot as plt
@@ -10,9 +11,11 @@ import os
 import random
 import string
 import astropy
+import warnings
+warnings.filterwarnings('ignore', category=astropy.io.fits.card.VerifyWarning, append=True)
 
 from spectractor import parameters
-from spectractor.config import set_logger, load_config, update_derived_parameters, apply_rebinning_to_parameters
+from spectractor.config import set_logger, load_config, update_derived_parameters
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
 from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
@@ -49,7 +52,8 @@ fits_mappings = {'config': 'CONFIG',
                  'spectrogram_Nx': 'S_NX',
                  'spectrogram_Ny': 'S_NY',
                  'spectrogram_deg': 'S_DEG',
-                 'spectrogram_saturation': 'S_SAT'
+                 'spectrogram_saturation': 'S_SAT',
+                 'order': 'S_ORDER'
                  }
 
 
@@ -122,6 +126,8 @@ class Spectrum:
         Outside pressure in hPa.
     humidity: float
         Outside relative humidity in fraction of one.
+    throughput: callable
+        Instrumental throughput of the telescope.
     spectrogram: array
         Spectrogram 2D image in image units.
     spectrogram_bgd: array
@@ -283,9 +289,9 @@ class Spectrum:
             self.adr_params = [self.dec, self.hour_angle, self.temperature, self.pressure,
                                self.humidity, self.airmass]
 
-        t = self.load_filter()
+        self.throughput = self.load_filter()
         if self.target is not None and len(self.target.spectra) > 0:
-            spec = self.target.spectra[0] * t.transmission(self.target.wavelengths[0])
+            spec = self.target.spectra[0] * self.throughput.transmission(self.target.wavelengths[0])
             lambda_ref = np.sum(self.target.wavelengths[0] * spec) / np.sum(spec)
             self.lambda_ref = lambda_ref
             self.header['LBDA_REF'] = lambda_ref
@@ -407,7 +413,7 @@ class Spectrum:
         if self.x0 is not None:
             label += rf', $x_0={self.x0[0]:.2f}\,$pix'
         title = self.target.label
-        if self.data_next_order is not None and np.sum(self.data_next_order) > 0.05 * np.sum(self.data):
+        if self.data_next_order is not None and np.sum(np.abs(self.data_next_order)) > 0.05 * np.sum(np.abs(self.data)):
             distance = self.disperser.grating_lambda_to_pixel(self.lambdas, self.x0, order=parameters.SPEC_ORDER+1)
             max_index = np.argmin(np.abs(distance + self.x0[0] - parameters.CCD_IMSIZE))
             plot_spectrum_simple(ax, self.lambdas[:max_index], self.data_next_order[:max_index], data_err=self.err_next_order[:max_index],
@@ -584,7 +590,9 @@ class Spectrum:
             elif extname == "PSF_TAB":
                 hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
             elif extname == "LINES":
-                tab = self.lines.print_detected_lines(amplitude_units=self.units, print_table=False)
+                u.set_enabled_aliases({'flam': u.erg / u.s / u.cm**2 / u.nm,
+                                       'reduced': u.dimensionless_unscaled})
+                tab = self.lines.print_detected_lines(amplitude_units=self.units.replace("erg/s/cm$^2$/nm", "flam"), print_table=False)
                 hdus[extname] = fits.table_to_hdu(tab)
             elif extname == "CONFIG":
                 # HIERARCH and CONTINUE not compatible together in FITS headers
@@ -730,7 +738,7 @@ class Spectrum:
             from spectractor._version import __version__
             if self.config != "":
                 raise AttributeError(f"With Spectractor above 2.4 do not provide a config file in Spectrum(config=...)."
-                                     "Now config parameters are loaded from the file header. Got {self.config=}.")
+                                     f"Now config parameters are loaded from the file header. Got {self.config=}.")
             if self.header["VERSION"] != str(__version__):
                 self.my_logger.warning(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
                                        f"different from current Spectractor software {__version__}.")
@@ -1091,11 +1099,11 @@ class Spectrum:
         >>> s.x0 = [743, 683]
         >>> s.spectrogram_x0 = -280
         >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
-        >>> lambdas[:4]
-        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> lambdas[:4]  #doctest: +ELLIPSIS
+        array([334.874..., 336.022..., 337.170..., 338.318...])
         >>> lambdas_order2 = s.compute_lambdas_in_spectrogram(58, 0, 0, 0, order=2)
-        >>> lambdas_order2[:4]
-        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
+        >>> lambdas_order2[:4]  #doctest: +ELLIPSIS
+        array([175.248..., 175.661..., 176.088..., 176.527...])
         """
         # Distance in x and y with respect to the true order 0 position at lambda_ref
         Dx, Dy_disp_axis = self.compute_disp_axis_in_spectrogram(shift_x=shift_x, shift_y=shift_y, angle=angle)
@@ -1149,16 +1157,16 @@ class Spectrum:
         >>> s.x0 = [743, 683]
         >>> s.spectrogram_x0 = -280
         >>> lambdas = s.compute_lambdas_in_spectrogram(58, 0, 0, 0)
-        >>> lambdas[:4]
-        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
+        >>> lambdas[:4]  #doctest: +ELLIPSIS
+        array([334.874..., 336.022..., 337.170..., 338.318...])
         >>> dispersion_law = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=1)
-        >>> dispersion_law[:4]
-        array([280.0000185 +1.07837872j, 281.00001766+1.06655761j,
-               282.00001686+1.05487099j, 283.0000161 +1.04331681j])
+        >>> dispersion_law[:4]  #doctest: +ELLIPSIS
+        array([280.0... +1.0...j, 281.0...+1.0...j,
+               282.0...+1.0...j, 283.0... +1.0...j])
         >>> dispersion_law_order2 = s.compute_dispersion_in_spectrogram(lambdas, 0, 0, 0, order=2)
-        >>> dispersion_law_order2[:4]
-        array([573.69582907+1.07837872j, 575.80158761+1.06655761j,
-               577.90853861+1.05487099j, 580.01668263+1.04331681j])
+        >>> dispersion_law_order2[:4]  #doctest: +ELLIPSIS
+        array([573.6...+1.0...j, 575.8...+1.0...j,
+               577.9...+1.0...j, 580.0...+1.0...j])
 
         """
         new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
@@ -1622,7 +1630,6 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
             sigma = spec_err[index]
         if cov_matrix is not None:
             sigma = cov_matrix[index, index]
-        # my_logger.warning(f'\n{guess} {np.mean(spec[bgd_index])} {np.std(spec[bgd_index])}')
         popt, pcov = fit_multigauss_and_bgd(lambdas[index], spec[index], guess=guess, bounds=bounds, sigma=sigma)
         # noise level defined as the std of the residuals if no error
         noise_level = np.std(spec[index] - multigauss_and_bgd(lambdas[index], *popt))

@@ -68,7 +68,7 @@ def load_config(config_filename, rebin=True):
 
     Examples
     --------
-
+    >>> parameters.VERBOSE = True
     >>> load_config("./config/ctio.ini")
     >>> assert parameters.OBS_NAME == "CTIO"
 
@@ -83,6 +83,7 @@ def load_config(config_filename, rebin=True):
         FileNotFoundError: Config file ./config/unknown_file.ini does not exist.
 
     """
+    my_logger = set_logger(__name__)
     mypath = os.path.dirname(__file__)
     if not os.path.isfile(os.path.join(mypath, parameters.CONFIG_DIR, "default.ini")):
         raise FileNotFoundError('Config file default.ini does not exist.')
@@ -97,6 +98,7 @@ def load_config(config_filename, rebin=True):
         else:
             config_filename = os.path.join(mypath, parameters.CONFIG_DIR, config_filename)
     # Load the configuration file
+    my_logger.info(f"\n\tLoading {config_filename} with {parameters.VERBOSE=}...")
     config = configparser.ConfigParser()
     config.read(config_filename)
     from_config_to_parameters(config)
@@ -114,13 +116,15 @@ def load_config(config_filename, rebin=True):
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
         sys.exit(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
 
-    if parameters.VERBOSE:
+    if parameters.VERBOSE or parameters.DEBUG:
+        txt = ""
         for section in config.sections():
-            print(f"Section: {section}")
+            txt += f"Section: {section}\n"
             for options in config.options(section):
                 value = config.get(section, options)
                 par = getattr(parameters, options.upper())
-                print(f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}")
+                txt += f"x {options}: {value}\t=> parameters.{options.upper()}: {par}\t {type(par)}\n"
+        my_logger.info(f"Loaded {config_filename} with\n{txt}")
 
 def update_derived_parameters():
     # Derive other parameters
@@ -129,7 +133,9 @@ def update_derived_parameters():
     parameters.CCD_ARCSEC2RADIANS = np.pi / (180. * 3600.)  # conversion factor from arcsec to radians
     if not isinstance(parameters.OBS_DIAMETER, astropy.units.quantity.Quantity):
         parameters.OBS_DIAMETER = parameters.OBS_DIAMETER * units.m  # Diameter of the telescope
-    parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4.  # Surface of telescope
+    if not isinstance(parameters.OBS_SECONDARY_DIAMETER, astropy.units.quantity.Quantity):
+        parameters.OBS_SECONDARY_DIAMETER = parameters.OBS_SECONDARY_DIAMETER * units.m  # Diameter of the telescope
+    parameters.OBS_SURFACE = np.pi * parameters.OBS_DIAMETER ** 2 / 4. - np.pi * parameters.OBS_SECONDARY_DIAMETER ** 2 / 4.  # Surface of telescope
     # Conversion factor
     # Units of SEDs in flam (erg/s/cm2/nm) :
     parameters.hc = const.h * const.c  # h.c product of fundamental constants c and h

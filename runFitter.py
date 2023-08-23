@@ -1,4 +1,5 @@
 from spectractor import parameters
+from spectractor.extractor.spectrum import Spectrum
 from spectractor.fit.fit_spectrogram import SpectrogramFitWorkspace, run_spectrogram_minimisation
 from spectractor.fit.fit_spectrum import SpectrumFitWorkspace, run_spectrum_minimisation
 from spectractor.config import load_config
@@ -16,10 +17,8 @@ if __name__ == "__main__":
                         help="Enter verbose (print more stuff).", default=False)
     parser.add_argument("-o", "--output_directory", dest="output_directory", default="outputs/",
                         help="Write results in given output directory (default: ./outputs/).")
-    parser.add_argument("-l", "--logbook", dest="logbook", default="ctiofulllogbook_jun2017_v5.csv",
-                        help="CSV logbook file. (default: ctiofulllogbook_jun2017_v5.csv).")
-    parser.add_argument("-c", "--config", dest="config", default="config/ctio.ini",
-                        help="INI config file. (default: config/ctio.ini).")
+    parser.add_argument("-c", "--config", dest="config", default="",
+                        help="config file to be given for spectra extracted with Spectractor<2.4. (default: ''.")
     args = parser.parse_args()
 
     parameters.VERBOSE = args.verbose
@@ -29,13 +28,13 @@ if __name__ == "__main__":
 
     file_names = args.input
 
-    load_config(args.config)
+    if args.config != '':
+        load_config(args.config)
 
     for file_name in file_names:
-        atmgrid_filename = '' #file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
-        w = SpectrumFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=1000,
-                                 burnin=200, nbins=10, verbose=1, plot=True, live_fit=False)
+        atmgrid_filename = ''  # file_name.replace('sim', 'reduc').replace('spectrum', 'atmsim')
+        spec = Spectrum(file_name)
+        w = SpectrumFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False, fit_angstrom_exponent=True)
         run_spectrum_minimisation(w, method="newton")
-        w = SpectrogramFitWorkspace(file_name, atmgrid_file_name=atmgrid_filename, nsteps=2000,
-                                    burnin=1000, nbins=10, verbose=1, plot=True, live_fit=False)
+        w = SpectrogramFitWorkspace(spec, atmgrid_file_name=atmgrid_filename, verbose=True, plot=True, live_fit=False, fit_angstrom_exponent=True)
         run_spectrogram_minimisation(w, method="newton")

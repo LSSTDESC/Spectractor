@@ -3,32 +3,25 @@ mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all oth
 
 from numpy.testing import run_module_suite  # noqa: E402
 import numpy as np  # noqa: E402
-from spectractor.fit.fitter import (FitWorkspace, run_minimisation,  # noqa: E402
+from spectractor.fit.fitter import (FitParameters, MCMCFitWorkspace, run_minimisation,  # noqa: E402
                                     run_emcee, run_minimisation_sigma_clipping)  # noqa: E402
 from spectractor.config import set_logger  # noqa: E402
 from spectractor import parameters  # noqa: E402
 
 import os  # noqa: E402
-import sys  # noqa: E402
-import unittest  # noqa: E402
 
 
-class LineFitWorkspace(FitWorkspace):
+class LineFitWorkspace(MCMCFitWorkspace):
 
     def __init__(self, x, y, yerr, file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
                  verbose=0, plot=False, live_fit=False, truth=None):
-        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit, truth=truth)
+        params = FitParameters(np.array([1, 1]), labels=["a", "b"], axis_names=["$a$", "$b$"],
+                               bounds=[[-100, 100], [-100, 100]], truth=truth, filename=file_name)
+        MCMCFitWorkspace.__init__(self, params, file_name, nwalkers, nsteps, burnin, nbins, verbose, plot, live_fit)
         self.my_logger = set_logger(self.__class__.__name__)
         self.x = x
         self.data = y
         self.err = yerr
-        self.a = 1
-        self.b = 1
-        self.p = np.array([self.a, self.b])
-        self.input_labels = ["a", "b"]
-        self.axis_names = ["$a$", "$b$"]
-        self.bounds = np.array([(-100, 100), (-100, 100)])
-        self.nwalkers = max(2 * self.ndim, nwalkers)
 
     def simulate(self, a, b):
         self.model = a * self.x + b
@@ -54,20 +47,20 @@ def test_fitworkspace(seed=42):
     file_name = "./outputs/test_linefitworkspace.txt"
     w = LineFitWorkspace(x, y, yerr, file_name, truth=truth, nwalkers=20, nsteps=5000, burnin=1000, nbins=20)
     run_minimisation(w, method="minimize")
-    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     w.p = np.array([1, 1])
     run_minimisation(w, method="basinhopping")
-    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     # w.p = np.array([4, -0.5])
     # run_minimisation(w, method="least_squares")
     # w.my_logger.warning(f"{w.p} {w.ndim} {sigma} {truth}")
     # assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
     w.p = np.array([1, 1])
     run_minimisation(w, method="minuit")
-    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     w.p = np.array([1, 1])
     run_minimisation(w, method="newton")
-    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
 
     def lnprob(p):
         lp = w.lnprior(p)
@@ -83,7 +76,7 @@ def test_fitworkspace(seed=42):
     assert os.path.exists(file_name.replace(".txt", "_emcee.h5"))
     assert os.path.exists(file_name.replace(".txt", "_emcee_convergence.pdf"))
     assert os.path.exists(file_name.replace(".txt", "_emcee_triangle.pdf"))
-    assert np.all([np.abs(w.p[i] - truth[i]) / np.sqrt(w.cov[i, i]) < 3 for i in range(w.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / np.sqrt(w.params.cov[i, i]) < 3 for i in range(w.params.ndim)])
 
 
 def test_minimisation_sigma_clipping(seed=42):
@@ -110,12 +103,12 @@ def test_minimisation_sigma_clipping(seed=42):
     clip_niter = 4
     w = LineFitWorkspace(x, y, yerr, file_name="", truth=truth, nwalkers=20, nsteps=5000, burnin=1000, nbins=20)
     run_minimisation_sigma_clipping(w, method="minimize", sigma_clip=sigma, niter_clip=clip_niter)
-    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     assert np.all(outliers == w.outliers)
     w.p = np.array([1, 1])
     w.outliers = []
     run_minimisation_sigma_clipping(w, method="basinhopping", sigma_clip=sigma, niter_clip=clip_niter)
-    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     assert np.all(outliers == w.outliers)
     # w.p = np.array([1, 1])
     # w.outliers = []
@@ -125,12 +118,12 @@ def test_minimisation_sigma_clipping(seed=42):
     w.p = np.array([1, 1])
     w.outliers = []
     run_minimisation_sigma_clipping(w, method="minuit", sigma_clip=sigma, niter_clip=clip_niter)
-    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     assert np.all(outliers == w.outliers)
     w.p = np.array([1, 1])
     w.outliers = []
     run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma, niter_clip=clip_niter)
-    assert np.all([np.abs(w.p[i] - truth[i]) / sigma < 1 for i in range(w.ndim)])
+    assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     assert np.all(outliers == w.outliers)
 
 
