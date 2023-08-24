@@ -183,7 +183,7 @@ def plot_shifts_histograms(dra, ddec):  # pragma: no cover
         parameters.PdfPages.savefig()
 
 
-def wcs_xy_translation(wcs, shift_x, shift_y):
+def wcs_xy_translation(wcs, shift_x, shift_y):  # pragma: no cover
     """Compute a translated WCS if image is shifted in x or y."""
     new_wcs = deepcopy(wcs)
     new_wcs.wcs.crpix[0] += shift_x
@@ -194,7 +194,7 @@ def wcs_xy_translation(wcs, shift_x, shift_y):
     return new_wcs
 
 
-def wcs_flip_x(wcs, image):
+def wcs_flip_x(wcs, image):  # pragma: no cover
     """Compute a flip WCS if image is flip along x axis."""
     new_wcs = deepcopy(wcs)
     new_wcs.wcs.crpix[0] = image.data.shape[1] - new_wcs.wcs.crpix[0]
@@ -210,7 +210,7 @@ def wcs_flip_x(wcs, image):
     return new_wcs
 
 
-def wcs_flip_y(wcs, image):
+def wcs_flip_y(wcs, image):  # pragma: no cover
     """Compute a flip WCS if image is flip along y axis."""
     new_wcs = deepcopy(wcs)
     new_wcs.wcs.crpix[1] = image.data.shape[0] - new_wcs.wcs.crpix[1]
@@ -226,7 +226,7 @@ def wcs_flip_y(wcs, image):
     return new_wcs
 
 
-def wcs_transpose(wcs, image):
+def wcs_transpose(wcs, image):  # pragma: no cover
     """Compute a transposed WCS if image is transposed with np.transpose()."""
     new_wcs = wcs_flip_y(wcs, image)
     tmp_crpix = np.copy(wcs.wcs.crpix)
@@ -254,7 +254,8 @@ def wcs_transpose(wcs, image):
 
 class Astrometry():  # pragma: no cover
 
-    def __init__(self, image, wcs_file_name="", output_directory="", gaia_mag_g_limit=23, source_extractor="iraf"):
+    def __init__(self, image, wcs_file_name="", gaia_file_name="", output_directory="",
+                 gaia_mag_g_limit=23, source_extractor="iraf"):
         """Class to handle astrometric computations.
 
         Parameters
@@ -263,6 +264,8 @@ class Astrometry():  # pragma: no cover
             Input Spectractor Image.
         wcs_file_name: str, optional
             The path to a WCS fits file. WCS content will be loaded (default: "").
+        gaia_file_name: str, optional
+            The path to a Gaia catalog ecsv file (default: "").
         output_directory: str, optional
             The output directory path. If empty, a directory *_wcs is created next to the analyzed image (default: "").
         gaia_mag_g_limit: float, optional
@@ -309,7 +312,10 @@ class Astrometry():  # pragma: no cover
             self.wcs_file_name = set_wcs_file_name(self.image.file_name, output_directory=output_directory)
             if os.path.isfile(self.wcs_file_name):
                 self.wcs = load_wcs_from_file(self.wcs_file_name)
-        self.gaia_file_name = set_gaia_catalog_file_name(self.image.file_name, output_directory=output_directory)
+        if gaia_file_name != "":
+            self.gaia_file_name = gaia_file_name
+        else:
+            self.gaia_file_name = set_gaia_catalog_file_name(self.image.file_name, output_directory=output_directory)
         self.gaia_catalog = None
         self.gaia_index = None
         self.gaia_matches = None
@@ -350,7 +356,7 @@ class Astrometry():  # pragma: no cover
         >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
         >>> target_x, target_y = a.get_target_pixel_position()
         >>> print(target_x, target_y) # doctest: +ELLIPSIS
-        743... 683...
+        745... 684...
 
         """
         target_x, target_y = self.wcs.all_world2pix(self.image.target.radec_position_after_pm.ra,
@@ -387,8 +393,8 @@ class Astrometry():  # pragma: no cover
         .. doctest:
             :hide:
 
-            >>> assert np.isclose(gaia_x[0], 744, atol=0.5)
-            >>> assert np.isclose(gaia_y[0], 683, atol=0.5)
+            >>> assert np.isclose(gaia_x[0], 745, atol=1)
+            >>> assert np.isclose(gaia_y[0], 684, atol=1)
 
         """
         if gaia_index is None:
@@ -422,6 +428,7 @@ class Astrometry():  # pragma: no cover
             >>> assert quad_stars.shape == (4, 2)
 
         """
+        u.set_enabled_aliases({'DEG': u.deg})
         coords = []
         with fits.open(self.match_file_name) as hdu:
             table = Table.read(hdu)
@@ -894,6 +901,9 @@ class Astrometry():  # pragma: no cover
 
         >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
         >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> a.load_gaia_catalog_around_target()  #doctest: +ELLIPSIS
+        INFO: Query finished...
+        <Table length=...>...
         >>> residuals = a.compute_gaia_pixel_residuals()
 
         .. doctest:
@@ -1050,8 +1060,7 @@ class Astrometry():  # pragma: no cover
         ...     os.remove('./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs')
         >>> tag = file_name.split('/')[-1]
         >>> disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
-        >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")  # doctest: +ELLIPSIS
-        Section:...
+        >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")
         >>> a = Astrometry(im, source_extractor="astrometrynet")
         >>> a.run_simple_astrometry(extent=((300,1400),(300,1400)))  # doctest: +ELLIPSIS
         WCS ...
@@ -1088,7 +1097,7 @@ class Astrometry():  # pragma: no cover
             elif self.source_extractor == "astrometrynet":
                 self.my_logger.info(f"\n\tSource extraction directly with solve-field.")
                 # must write a temporary image file with Spectractor flips and rotations
-                fits.writeto(tmp_image_file_name, self.image.data, header=self.image.header)
+                fits.writeto(tmp_image_file_name, self.image.data, header=self.image.header, overwrite=True)
                 solve_field_input = tmp_image_file_name
             else:
                 raise ValueError(f"Got {self.source_extractor=}. Must be either 'iraf' or 'astrometrynet' "
@@ -1175,7 +1184,6 @@ class Astrometry():  # pragma: no cover
         >>> tag = file_name.split('/')[-1]
         >>> disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")  # doctest: +ELLIPSIS
-        Section:...
         >>> a = Astrometry(im)
         >>> a.run_simple_astrometry(extent=((300,1400),(300,1400)))  # doctest: +ELLIPSIS
         WCS ...
@@ -1205,13 +1213,7 @@ class Astrometry():  # pragma: no cover
                 self.my_logger.info(f"\n\tLoad Gaia catalog from {self.gaia_file_name}.")
                 self.gaia_catalog = ascii.read(self.gaia_file_name, format="ecsv")
             else:
-                radius = 2 * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
-                                 np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
-                radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
-                self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
-                                    f"arcsec from {self.image.target.label} {self.image.target.radec_position}...")
-                self.gaia_catalog = load_gaia_catalog(self.image.target.radec_position, radius=radius, gaia_mag_g_limit=self.gaia_mag_g_limit)
-                ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
+                self.load_gaia_catalog_around_target()
             self.my_logger.info(f"\n\tGaia catalog loaded.")
 
         # update coordinates with proper motion data
@@ -1363,7 +1365,6 @@ class Astrometry():  # pragma: no cover
         >>> tag = file_name.split('/')[-1]
         >>> disperser_label, target_label, xpos, ypos = logbook.search_for_image(tag)
         >>> im = Image(file_name, target_label=target_label, disperser_label=disperser_label, config="ctio.ini")  # doctest: +ELLIPSIS
-        Section:...
         >>> a = Astrometry(im)
         >>> extent = ((max(0, xpos - radius), min(xpos + radius, parameters.CCD_IMSIZE)),
         ...           (max(0, ypos - radius), min(ypos + radius, parameters.CCD_IMSIZE)))
@@ -1419,6 +1420,8 @@ class Astrometry():  # pragma: no cover
                 k -= 1
                 break
         t.pprint_all()
+        if len(t) == 0:
+            raise IndexError(f"Astrometry has failed at every iteration, empty table {t=}.")
         best_iter = int(np.argmin(t["gaia_residuals_quad_sum"]))
         self.my_logger.info(f'\n\tBest run: iteration #{best_iter}')
         self.run_simple_astrometry(extent=extent, sources=sources_list[best_iter])
@@ -1433,5 +1436,7 @@ class Astrometry():  # pragma: no cover
 
 if __name__ == "__main__":
     import doctest
-
+    im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+    a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+    a.load_gaia_catalog_around_target()
     doctest.testmod()

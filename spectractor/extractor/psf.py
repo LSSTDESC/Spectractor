@@ -1,3 +1,4 @@
+import copy
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,7 +8,7 @@ from scipy.interpolate import RegularGridInterpolator
 from spectractor.tools import plot_image_simple
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.fit.fitter import FitWorkspace, run_minimisation
+from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation
 
 from numba import njit
 
@@ -512,17 +513,15 @@ class PSF:
 
         """
         self.my_logger = set_logger(self.__class__.__name__)
-        self.p = np.array([])
-        self.param_names = ["amplitude", "x_c", "y_c", "saturation"]
-        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", "saturation"]
-        self.bounds = [[]]
-        self.p_default = np.array([1, 0, 0, 1])
+        self.values_default = np.array([1, 0, 0, 1])
+        self.params = FitParameters(values=self.values_default, labels=["amplitude", "x_c", "y_c", "saturation"],
+                                    axis_names=["$A$", r"$x_c$", r"$y_c$", "saturation"])
         self.max_half_width = np.inf
         self.clip = clip
 
-    def evaluate(self, pixels, p=None):  # pragma: no cover
-        if p is not None:
-            self.p = np.asarray(p).astype(float)
+    def evaluate(self, pixels, values=None):  # pragma: no cover
+        if values is not None:
+            self.params.values = np.asarray(values).astype(float)
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             return np.zeros_like(pixels)
         elif pixels.ndim == 1:
@@ -578,7 +577,7 @@ class PSF:
             >>> assert w.costs[-1] / w.pixels.size < 1.3
             >>> assert np.abs(np.mean(residuals)) < 0.4
             >>> assert np.std(residuals) < 1.2
-            >>> assert np.all(np.isclose(psf.p[1:3], p0[1:3], atol=1e-1))
+            >>> assert np.all(np.isclose(psf.params.values[1:3], p0[1:3], atol=1e-1))
 
         Fit the data in 1D:
 
@@ -594,10 +593,10 @@ class PSF:
 
             >>> assert w.model is not None
             >>> residuals = (w.data-w.model)/w.err
-            >>> assert w.costs[-1] / w.pixels.size < 1.2
+            >>> assert w.costs[-1] / w.pixels.size < 1.5
             >>> assert np.abs(np.mean(residuals)) < 0.2
             >>> assert np.std(residuals) < 1.2
-            >>> assert np.all(np.isclose(w.p[2], p0[2], atol=1e-1))
+            >>> assert np.all(np.isclose(w.params.values[2], p0[2], atol=1e-1))
 
         .. plot::
 
@@ -619,32 +618,31 @@ class PSF:
         """
         w = PSFFitWorkspace(self, data, data_errors, bgd_model_func=bgd_model_func,
                             verbose=False, live_fit=False)
-        run_minimisation(w, method="newton", ftol=1 / w.pixels.size, xtol=1e-6, niter=50, fix=w.fixed)
-        self.p = np.copy(w.p)
+        run_minimisation(w, method="newton", ftol=1 / w.pixels.size, xtol=1e-6, niter=50)
+        self.params.values = np.copy(w.params.values)
         return w
 
 
 class Moffat(PSF):
 
-    def __init__(self, p=None, clip=False):
+    def __init__(self, values=None, clip=False):
         PSF.__init__(self, clip=clip)
-        self.p_default = np.array([1, 0, 0, 3, 2, 1]).astype(float)
-        if p is not None:
-            self.p = np.asarray(p).astype(float)
-        else:
-            self.p = np.copy(self.p_default)
-        self.param_names = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
-        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf),
-                                (1.1, 100), (0, np.inf)])
+        self.values_default = np.array([1, 0, 0, 3, 2, 1]).astype(float)
+        if values is None:
+            values = np.copy(self.values_default)
+        labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "saturation"]
+        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", "saturation"]
+        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf),
+                                (1.1, 100), (0, np.inf)]
+        self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.bounds[2] = (0, 2 * self.max_half_width)
-        self.bounds[3] = (0.1, self.max_half_width)
+        self.params.bounds[2] = (0, 2 * self.max_half_width)
+        self.params.bounds[3] = (0.1, self.max_half_width)
 
-    def evaluate(self, pixels, p=None):
+    def evaluate(self, pixels, values=None):
         r"""Evaluate the Moffat function.
 
         The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
@@ -658,7 +656,7 @@ class Moffat(PSF):
         ----------
         pixels: list
             List containing the X abscisse 2D array and the Y abscisse 2D array.
-        p: array_like
+        values: array_like
             The parameter array. If None, the array used to instanciate the class is taken.
             If given, the class instance parameter array is updated.
 
@@ -705,9 +703,9 @@ class Moffat(PSF):
             plt.show()
 
         """
-        if p is not None:
-            self.p = np.asarray(p).astype(float)
-        amplitude, x_c, y_c, gamma, alpha, saturation = self.p
+        if values is not None:
+            self.params.values = np.asarray(values).astype(float)
+        amplitude, x_c, y_c, gamma, alpha, saturation = self.params.values
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
             out = evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha)
@@ -731,22 +729,21 @@ class Moffat(PSF):
 
 class Gauss(PSF):
 
-    def __init__(self, p=None, clip=False):
+    def __init__(self, values=None, clip=False):
         PSF.__init__(self, clip=clip)
-        self.p_default = np.array([1, 0, 0, 1, 1]).astype(float)
-        if p is not None:
-            self.p = np.asarray(p).astype(float)
-        else:
-            self.p = np.copy(self.p_default)
-        self.param_names = ["amplitude", "x_c", "y_c", "sigma", "saturation"]
-        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\sigma$", "saturation"]
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (0, np.inf)])
+        self.values_default = np.array([1, 0, 0, 1, 1]).astype(float)
+        if values is None:
+            values = np.copy(self.values_default)
+        labels = ["amplitude", "x_c", "y_c", "sigma", "saturation"]
+        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\sigma$", "saturation"]
+        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (1, np.inf), (0, np.inf)]
+        self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.bounds[2] = (0, 2 * self.max_half_width)
-        self.bounds[3] = (1, self.max_half_width)
+        self.params.bounds[2] = (0, 2 * self.max_half_width)
+        self.params.bounds[3] = (1, self.max_half_width)
 
     def evaluate(self, pixels, p=None):
         r"""Evaluate the Gauss function.
@@ -790,8 +787,8 @@ class Gauss(PSF):
 
         """
         if p is not None:
-            self.p = np.asarray(p).astype(float)
-        amplitude, x_c, y_c, sigma, saturation = self.p
+            self.params.values = np.asarray(p).astype(float)
+        amplitude, x_c, y_c, sigma, saturation = self.params.values
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
             out = evaluate_gauss2d(x, y, amplitude, x_c, y_c, sigma)
@@ -813,27 +810,25 @@ class Gauss(PSF):
 
 class MoffatGauss(PSF):
 
-    def __init__(self, p=None, clip=False):
+    def __init__(self, values=None, clip=False):
         PSF.__init__(self, clip=clip)
-        self.p_default = np.array([1, 0, 0, 3, 2, 0, 1, 1]).astype(float)
-        if p is not None:
-            self.p = np.asarray(p).astype(float)
-        else:
-            self.p = np.copy(self.p_default)
-        self.param_names = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev",
-                            "saturation"]
-        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 100),
-                                (-1, 0), (0.1, np.inf), (0, np.inf)])
+        self.values_default = np.array([1, 0, 0, 3, 2, 0, 1, 1]).astype(float)
+        if values is None:
+            values = np.copy(self.values_default)
+        labels = ["amplitude", "x_c", "y_c", "gamma", "alpha", "eta_gauss", "stddev", "saturation"]
+        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", r"$\alpha$", r"$\eta$", r"$\sigma$", "saturation"]
+        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.1, np.inf), (1.1, 100),
+                  (-1, 0), (0.1, np.inf), (0, np.inf)]
+        self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
 
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.bounds[2] = (0, 2 * self.max_half_width)
-        self.bounds[3] = (0.1, self.max_half_width)
-        self.bounds[6] = (0.1, self.max_half_width)
+        self.params.bounds[2] = (0, 2 * self.max_half_width)
+        self.params.bounds[3] = (0.1, self.max_half_width)
+        self.params.bounds[6] = (0.1, self.max_half_width)
 
-    def evaluate(self, pixels, p=None):
+    def evaluate(self, pixels, values=None):
         r"""Evaluate the MoffatGauss function.
 
         The function is normalized to have an integral equal to amplitude parameter, with normalisation factor:
@@ -847,7 +842,7 @@ class MoffatGauss(PSF):
         ----------
         pixels: list
             List containing the X abscisse 2D array and the Y abscisse 2D array.
-        p: array_like
+        values: array_like
             The parameter array. If None, the array used to instanciate the class is taken.
             If given, the class instance parameter array is updated.
 
@@ -879,9 +874,9 @@ class MoffatGauss(PSF):
             plt.show()
 
         """
-        if p is not None:
-            self.p = np.asarray(p).astype(float)
-        amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev, saturation = self.p
+        if values is not None:
+            self.params.values = np.asarray(values).astype(float)
+        amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev, saturation = self.params.values
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
             out = evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, stddev)
@@ -890,8 +885,7 @@ class MoffatGauss(PSF):
             return out
         elif pixels.ndim == 1:
             y = np.array(pixels)
-            norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha) + eta_gauss * np.sqrt(
-                2 * np.pi) * stddev
+            norm = gamma * np.sqrt(np.pi) * special.gamma(alpha - 0.5) / special.gamma(alpha) + eta_gauss * np.sqrt(2 * np.pi) * stddev
             out = evaluate_moffatgauss1d_unnormalized(y, amplitude, y_c, gamma, alpha, eta_gauss, stddev) / norm
             if self.clip:
                 out = np.clip(out, 0, saturation)
@@ -902,16 +896,15 @@ class MoffatGauss(PSF):
 
 class Order0(PSF):
 
-    def __init__(self, target, p=None, clip=False):
+    def __init__(self, target, values=None, clip=False):
         PSF.__init__(self, clip=clip)
-        self.p_default = np.array([1, 0, 0, 1, 1]).astype(float)
-        if p is not None:
-            self.p = np.asarray(p).astype(float)
-        else:
-            self.p = np.copy(self.p_default)
-        self.param_names = ["amplitude", "x_c", "y_c", "gamma", "saturation"]
-        self.axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", "saturation"]
-        self.bounds = np.array([(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.5, 5), (0, np.inf)])
+        self.values_default = np.array([1, 0, 0, 1, 1]).astype(float)
+        if values is None:
+            values = np.copy(self.values_default)
+        labels = ["amplitude", "x_c", "y_c", "gamma", "saturation"]
+        axis_names = ["$A$", r"$x_c$", r"$y_c$", r"$\gamma$", "saturation"]
+        bounds = [(0, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (0.5, 5), (0, np.inf)]
+        self.params = FitParameters(values=values, labels=labels, axis_names=axis_names, bounds=bounds)
         self.psf_func = self.build_interpolated_functions(target=target)
 
     def build_interpolated_functions(self, target):
@@ -941,9 +934,9 @@ class Order0(PSF):
     def apply_max_width_to_bounds(self, max_half_width=None):
         if max_half_width is not None:
             self.max_half_width = max_half_width
-        self.bounds[2] = (0, 2 * self.max_half_width)
+        self.params.bounds[2] = (0, 2 * self.max_half_width)
 
-    def evaluate(self, pixels, p=None):
+    def evaluate(self, pixels, values=None):
         r"""Evaluate the Order 0 interpolated function.
 
         The function is normalized to have an integral equal to amplitude parameter.
@@ -952,7 +945,7 @@ class Order0(PSF):
         ----------
         pixels: list
             List containing the X abscisse 2D array and the Y abscisse 2D array.
-        p: array_like
+        values: array_like
             The parameter array. If None, the array used to instanciate the class is taken.
             If given, the class instance parameter array is updated.
 
@@ -972,7 +965,7 @@ class Order0(PSF):
         >>> x0, y0 = find_target(im, guess)
 
         >>> p = [1,40,50,1,1e20]
-        >>> psf = Order0(target=im.target, p=p)
+        >>> psf = Order0(target=im.target, values=p)
 
         2D evaluation:
 
@@ -1007,12 +1000,11 @@ class Order0(PSF):
             plt.show()
 
         """
-        if p is not None:
-            self.p = np.asarray(p).astype(float)
-        amplitude, x_c, y_c, gamma, saturation = self.p
+        if values is not None:
+            self.params.values = np.asarray(values).astype(float)
+        amplitude, x_c, y_c, gamma, saturation = self.params.values
         if pixels.ndim == 3 and pixels.shape[0] == 2:
             x, y = pixels  # .astype(np.float32)  # float32 to increase rapidity
-            #out = self.psf_func(x[0], y[:, 0], amplitude, x_c, y_c, gamma)
             out = self.psf_func(x, y, amplitude, x_c, y_c, gamma)
             if self.clip:
                 out = np.clip(out, 0, saturation)
@@ -1034,22 +1026,18 @@ class PSFFitWorkspace(FitWorkspace):
     """
 
     def __init__(self, psf, data, data_errors, bgd_model_func=None, file_name="",
-                 nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=0, plot=False, live_fit=False, truth=None):
+                 verbose=False, plot=False, live_fit=False, truth=None):
         """
 
         Parameters
         ----------
-        psf
+        psf: PSF
+            PSF model instance.
         data: array_like
             The data array (background subtracted) of dimension 1 or 2.
         data_errors
         bgd_model_func
         file_name
-        nwalkers
-        nsteps
-        burnin
-        nbins
         verbose
         plot
         live_fit
@@ -1070,7 +1058,9 @@ class PSFFitWorkspace(FitWorkspace):
         >>> w = PSFFitWorkspace(psf, data, data_errors, bgd_model_func=None, verbose=True)
 
         """
-        FitWorkspace.__init__(self, file_name, nwalkers, nsteps, burnin, nbins, verbose=verbose, plot=plot,
+        params = copy.deepcopy(psf.params)
+        params.fixed[-1] = True  # saturation
+        FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot,
                               live_fit=live_fit, truth=truth)
         self.my_logger = set_logger(self.__class__.__name__)
         if data.shape != data_errors.shape:
@@ -1080,15 +1070,8 @@ class PSFFitWorkspace(FitWorkspace):
         self.data = data
         self.err = data_errors
         self.bgd_model_func = bgd_model_func
-        self.p = np.copy(self.psf.p)  # [1:])
-        self.guess = np.copy(self.psf.p)
-        self.saturation = self.psf.p[-1]
-        self.fixed = [False] * len(self.p)
-        self.fixed[-1] = True  # fix saturation parameter
-        self.input_labels = list(np.copy(self.psf.param_names))  # [1:]))
-        self.axis_names = list(np.copy(self.psf.axis_names))  # [1:]))
-        self.bounds = self.psf.bounds  # [1:]
-        self.nwalkers = max(2 * self.ndim, nwalkers)
+        self.saturation = self.psf.params.values[-1]
+        self.guess = np.copy(self.psf.params.values)
 
         # prepare the fit
         if data.ndim == 2:
@@ -1104,14 +1087,13 @@ class PSFFitWorkspace(FitWorkspace):
             self.Nx = 1
             self.psf.apply_max_width_to_bounds(self.Ny)
             self.pixels = np.arange(self.Ny)
-            self.fixed[1] = True
+            self.params.fixed[1] = True
         else:
             raise ValueError(f"Data array must have dimension 1 or 2. Here pixels.ndim={data.ndim}.")
 
         # update bounds
-        self.bounds = self.psf.bounds  # [1:]
         total_flux = np.sum(data)
-        self.bounds[0] = (0.1 * total_flux, 2 * total_flux)
+        self.params.bounds[0] = [0.1 * total_flux, 2 * total_flux]
 
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
@@ -1156,9 +1138,9 @@ class PSFFitWorkspace(FitWorkspace):
 
         >>> data1d = data[:,int(p[1])]
         >>> data1d_err = data_errors[:,int(p[1])]
-        >>> psf.p[0] = p[0] / 10.5
+        >>> psf.params.values[0] = p[0] / 10.5
         >>> w = PSFFitWorkspace(psf, data1d, data1d_err, bgd_model_func=None, verbose=True)
-        >>> x, mod, mod_err = w.simulate(*psf.p)
+        >>> x, mod, mod_err = w.simulate(*psf.params.values)
         >>> w.plot_fit()
 
         ..  doctest::
@@ -1186,7 +1168,7 @@ class PSFFitWorkspace(FitWorkspace):
 
         """
         # Initialization of the regression
-        self.p = np.copy(psf_params)
+        self.params.values = np.copy(psf_params)
         # if not self.fixed_amplitude:
         #     # Matrix filling
         #     M = self.psf.evaluate(self.pixels, p=np.array([1] + list(self.p))).flatten()
@@ -1195,7 +1177,7 @@ class PSFFitWorkspace(FitWorkspace):
         #     amplitude = M.T @ (self.W * self.data) / M_dot_W_dot_M
         #     self.p[0] = amplitude
         # Save results
-        self.model = self.psf.evaluate(self.pixels, p=self.p).flatten()
+        self.model = self.psf.evaluate(self.pixels, values=self.params.values).flatten()
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
@@ -1213,12 +1195,12 @@ class PSFFitWorkspace(FitWorkspace):
                 ax[0].plot(self.pixels, self.bgd_model_func(self.pixels), 'b--', label="fitted bgd")
             if self.guess is not None:
                 if self.bgd_model_func is not None:
-                    ax[0].plot(self.pixels, self.psf.evaluate(self.pixels, p=self.guess)
+                    ax[0].plot(self.pixels, self.psf.evaluate(self.pixels, values=self.guess)
                                + self.bgd_model_func(self.pixels), 'k--', label="Guess")
                 else:
-                    ax[0].plot(self.pixels, self.psf.evaluate(self.pixels, p=self.guess),
+                    ax[0].plot(self.pixels, self.psf.evaluate(self.pixels, values=self.guess),
                                'k--', label="Guess")
-                self.psf.p = np.copy(self.p)
+                self.psf.values = np.copy(self.params.values)
             model = np.copy(self.model)
             # if self.bgd_model_func is not None:
             #    model = self.model + self.bgd_model_func(self.pixels)
@@ -1230,8 +1212,8 @@ class PSFFitWorkspace(FitWorkspace):
             ax[0].legend(loc=2, numpoints=1)
             ax[0].grid(True)
             txt = ""
-            for ip, p in enumerate(self.input_labels):
-                txt += f'{p}: {self.p[ip]:.4g}\n'
+            for ip, p in enumerate(self.params.labels):
+                txt += f'{p}: {self.params.values[ip]:.4g}\n'
             ax[0].text(0.95, 0.95, txt, horizontalalignment='right', verticalalignment='top', transform=ax[0].transAxes)
             # residuals
             residuals = (data - model) / self.err

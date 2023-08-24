@@ -2,8 +2,7 @@ from astropy.coordinates import Angle, SkyCoord, Latitude
 from astropy.io import fits
 import astropy.units as units
 from scipy import ndimage
-from matplotlib import cm
-from matplotlib.colors import LogNorm
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -829,20 +828,20 @@ def find_target(image, guess=None, rotated=False, widths=[parameters.XWINDOW, pa
     Examples
     --------
     >>> parameters.CCD_REBIN = 1
-    >>> im = Image('tests/data/reduc_20170605_028.fits', target_label="PNG321.0+3.9", config="./config/ctio.ini")
-    >>> im.plot_image()
-    >>> guess = [820, 580]
+    >>> im = Image('tests/data/reduc_20170530_134.fits', target_label="HD111980", config="./config/ctio.ini")
+    >>> im.plot_image(scale="symlog")
+    >>> guess = [750, 680]
     >>> parameters.VERBOSE = True
     >>> parameters.DEBUG = True
     >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "fit"
     >>> find_target(im, guess)  #doctest: +ELLIPSIS
-    [816.8... 587.3...]
+    [743.7... 683.1...]
     >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "WCS"
     >>> find_target(im, guess)  #doctest: +ELLIPSIS
-    [816.9... 587.1...]
+    [745... 684...]
     >>> parameters.SPECTRACTOR_FIT_TARGET_CENTROID = "guess"
     >>> find_target(im, guess, widths=(100, 100))
-    [820, 580]
+    [750, 680]
     """
     target_pixcoords = [-1, -1]
     theX = -1
@@ -1135,12 +1134,12 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
     psf = Moffat(clip=True)
     total_flux = np.sum(sub_image_subtracted)
-    psf.p[:3] = [total_flux, avX, avY]
-    psf.p[-1] = image.saturation
+    psf.params.values[:3] = [total_flux, avX, avY]
+    psf.params.values[-1] = image.saturation
     if image.target_star2D is not None:
-        psf.p = image.target_star2D.p
-        psf.p[1] = avX
-        psf.p[2] = avY
+        psf.params.values = image.target_star2D.params.values
+        psf.params.values[1] = avX
+        psf.params.values[2] = avY
     mean_prior = 10  # in pixels
     # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf],
     # [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] #for Moffat2D
@@ -1148,15 +1147,15 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     # [100*image.saturation,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] #for Gauss2D
     # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation],
     # [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
-    psf.bounds[:3] = [[0.1 * total_flux, 4 * total_flux],
-                      [avX - mean_prior, avX + mean_prior],
-                      [avY - mean_prior, avY + mean_prior]]
+    psf.params.bounds[:3] = [[0.1 * total_flux, 4 * total_flux],
+                             [avX - mean_prior, avX + mean_prior],
+                             [avY - mean_prior, avY + mean_prior]]
     # fit
     # star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     # star2D = fit_PSF2D_minuit(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     psf.fit_psf(sub_image_subtracted, data_errors=sub_errors, bgd_model_func=image.target_bkgd2D)
-    new_avX = psf.p[1]
-    new_avY = psf.p[2]
+    new_avX = psf.params.values[1]
+    new_avY = psf.params.values[2]
     image.target_star2D = psf
     # check target positions
     dist = np.sqrt((new_avY - avY) ** 2 + (new_avX - avX) ** 2)
@@ -1229,6 +1228,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
 
     Create a mock spectrogram:
 
+    >>> from scipy.ndimage import gaussian_filter
     >>> N = parameters.CCD_IMSIZE
     >>> im.data = np.ones((N, N))
     >>> slope = -0.1
@@ -1236,6 +1236,7 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
     >>> for x in np.arange(N):
     ...     im.data[int(y(x)), x] = 100
     ...     im.data[int(y(x))+1, x] = 100
+    >>> im.data = gaussian_filter(im.data, sigma=5)
     >>> im.target_pixcoords=(N//2, N//2)
     >>> parameters.DEBUG = True
     >>> theta = compute_rotation_angle_hessian(im)
@@ -1262,7 +1263,6 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         mask = np.where(lambda_minus > lambda_threshold)
         theta_mask = np.copy(theta)
         theta_mask[mask] = np.nan
-        # print len(theta_mask[~np.isnan(theta_mask)]), lambda_threshold
     theta_guess = float(image.disperser.theta(image.target_pixcoords))
     mask2 = np.logical_or(angle_range[0] > theta - theta_guess, theta - theta_guess > angle_range[1])
     theta_mask[mask2] = np.nan
@@ -1287,9 +1287,9 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         gs_kw = dict(width_ratios=[3, 1], height_ratios=[1])
         f, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(6.5, 3), gridspec_kw=gs_kw)
         xindex = np.arange(data.shape[1])
-        x_new = np.linspace(xindex.min(), xindex.max(), 50)
+        x_new = np.linspace(np.min(xindex), np.max(xindex), 50)
         y_new = width_cut - margin_cut - 3 + (x_new - x0) * np.tan(theta_median * np.pi / 180.)
-        cmap = copy.copy(cm.get_cmap('bwr'))
+        cmap = copy.copy(mpl.colormaps['bwr'])
         cmap.set_bad(color='lightgrey')
         im = ax1.imshow(theta_mask, origin='lower', cmap=cmap, aspect='auto', vmin=angle_range[0], vmax=angle_range[1])
         cb = plt.colorbar(im, ax=ax1)
@@ -1408,7 +1408,7 @@ def turn_image(image):
         raise ValueError(f"Unknown method for rotation angle computation: choose among False, disperser, hessian. "
                          f"Got {parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE}")
     image.header['ROTANGLE'] = image.rotation_angle
-    image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree')
+    image.my_logger.info(f'\n\tRotate the image with angle theta={image.rotation_angle:.2f} degree from method {parameters.SPECTRACTOR_COMPUTE_ROTATION_ANGLE}.')
     image.data_rotated = np.copy(image.data)
     if not np.isnan(image.rotation_angle):
         image.data_rotated = ndimage.rotate(image.data, image.rotation_angle,
