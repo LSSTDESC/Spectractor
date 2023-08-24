@@ -862,8 +862,8 @@ class Spectrum:
                     raise FileNotFoundError(f"\n\tNo spectrogram info in {input_file_name} "
                                             f"and not even a spectrogram file {spectrogram_file_name}.")
                 if "PSF_TAB" in hdu_list:
-                    self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]),
-                                                saturation=self.spectrogram_saturation)
+                    self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
+                                                       saturation=self.spectrogram_saturation)
                 elif os.path.isfile(psf_file_name):  # retro-compatibility
                     self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
                     self.load_chromatic_psf(psf_file_name)
@@ -967,7 +967,8 @@ class Spectrum:
                 self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
                 self.spectrogram_fit = hdu_list["S_FIT"].data
                 self.spectrogram_residuals = hdu_list["S_RES"].data
-                self.chromatic_psf.init_table(Table.read(hdu_list["PSF_TAB"]), saturation=self.spectrogram_saturation)
+                self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
+                                                   saturation=self.spectrogram_saturation)
                 self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
 
     def load_spectrogram(self, input_file_name):  # pragma: no cover
