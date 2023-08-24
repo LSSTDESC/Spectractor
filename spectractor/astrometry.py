@@ -265,7 +265,7 @@ class Astrometry():  # pragma: no cover
         wcs_file_name: str, optional
             The path to a WCS fits file. WCS content will be loaded (default: "").
         gaia_file_name: str, optional
-            The path to a Gaia caralog ecsv file (default: "").
+            The path to a Gaia catalog ecsv file (default: "").
         output_directory: str, optional
             The output directory path. If empty, a directory *_wcs is created next to the analyzed image (default: "").
         gaia_mag_g_limit: float, optional
