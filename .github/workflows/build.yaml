@@ -16,23 +16,23 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
+          python-version: "3.11"
           miniforge-variant: Mambaforge
           miniforge-version: latest
           show-channel-urls: true
           activate-environment: test
 
-      - name: Test Simbad URL is contactable
-        shell: bash -l {0}
-        run: |
-          curl -L http://simbad.u-strasbg.fr/ > /dev/null
-
       - name: Install dependencies
         # Might be quicker to install rubin-env plus any necessary additions.
         shell: bash -l {0}
         run: |
-          mamba install -y -q numpy>1.15 scipy matplotlib>3.1 pandas llvmlite numba astropy>=3.2 photutils>=1.7 astroquery coloredlogs scikit-image>=0.20 h5py emcee tqdm mpi4py schwimmbad iminuit>=2 coverage>=3.6 configparser coveralls deprecated pyyaml nose rubin-libradtran getCalspec>=2.0.0 sparse_dot_mkl
+          mamba install -y  "numpy>1.15" scipy "matplotlib>3.1" pandas llvmlite numba "astropy>=3.2" "photutils>=1.7" astroquery coloredlogs scikit-image>=0.20 h5py emcee tqdm mpi4py schwimmbad "iminuit>=2" "coverage>=3.6" configparser coveralls deprecated pyyaml nose rubin-libradtran "getCalspec>=2.0.0"
           # python -c "from getCalspec.rebuild import rebuild_tables; rebuild_tables()"
           mamba install astrometry
+
+      - name: Download test data
+        shell: bash -l {0}
+        run: |
           wget -r -q -nc http://data.astrometry.net/5000/index-5002-24.fits
           wget -r -q -nc http://data.astrometry.net/5000/index-5000-40.fits
           mv data.astrometry.net/5000/index-*.fits $CONDA_PREFIX/data/
@@ -47,7 +47,7 @@ jobs:
       - name: Build and install
         shell: bash -l {0}
         run: |
-          pip install -v -e .
+          pip install -v --no-deps -e .
 
       - name: Run full chain
         shell: bash -l {0}

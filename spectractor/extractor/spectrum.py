@@ -837,43 +837,42 @@ class Spectrum:
             psf_file_name = psf_file_name_override
 
         if not self.fast_load:
-            hdu_list = fits.open(input_file_name)
-            # load other spectrum info
-            if len(hdu_list) > 1:
-                self.cov_matrix = hdu_list["SPEC_COV"].data
-                if len(hdu_list) > 2:
-                    _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
-                    if len(hdu_list) > 3:
-                        self.target.image = hdu_list["ORDER0"].data
-                        self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
-                        self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
-            # load spectrogram info
-            if len(hdu_list) > 4:
-                self.spectrogram = hdu_list["S_DATA"].data
-                self.spectrogram_err = hdu_list["S_ERR"].data
-                self.spectrogram_bgd = hdu_list["S_BGD"].data
-                if len(hdu_list) > 7:
-                    self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
-                    self.spectrogram_fit = hdu_list["S_FIT"].data
-                    self.spectrogram_residuals = hdu_list["S_RES"].data
-            elif os.path.isfile(spectrogram_file_name):
-                self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
-                self.load_spectrogram(spectrogram_file_name)
-            else:
-                raise FileNotFoundError(f"\n\tNo spectrogram info in {input_file_name} "
-                                        f"and not even a spectrogram file {spectrogram_file_name}.")
-            if "PSF_TAB" in hdu_list:
-                self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
-                                                   saturation=self.spectrogram_saturation)
-            elif os.path.isfile(psf_file_name):  # retro-compatibility
-                self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
-                self.load_chromatic_psf(psf_file_name)
-            else:
-                raise FileNotFoundError(f"\n\tNo PSF info in {input_file_name} "
-                                        f"and not even a PSF file {psf_file_name}.")
-            if "LINES" in hdu_list:
-                self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
-            hdu_list.close()
+            with fits.open(input_file_name) as hdu_list:
+                # load other spectrum info
+                if len(hdu_list) > 1:
+                    self.cov_matrix = hdu_list["SPEC_COV"].data
+                    if len(hdu_list) > 2:
+                        _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
+                        if len(hdu_list) > 3:
+                            self.target.image = hdu_list["ORDER0"].data
+                            self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+                            self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
+                # load spectrogram info
+                if len(hdu_list) > 4:
+                    self.spectrogram = hdu_list["S_DATA"].data
+                    self.spectrogram_err = hdu_list["S_ERR"].data
+                    self.spectrogram_bgd = hdu_list["S_BGD"].data
+                    if len(hdu_list) > 7:
+                        self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
+                        self.spectrogram_fit = hdu_list["S_FIT"].data
+                        self.spectrogram_residuals = hdu_list["S_RES"].data
+                elif os.path.isfile(spectrogram_file_name):
+                    self.my_logger.info(f'\n\tLoading spectrogram from {spectrogram_file_name}...')
+                    self.load_spectrogram(spectrogram_file_name)
+                else:
+                    raise FileNotFoundError(f"\n\tNo spectrogram info in {input_file_name} "
+                                            f"and not even a spectrogram file {spectrogram_file_name}.")
+                if "PSF_TAB" in hdu_list:
+                    self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
+                                                       saturation=self.spectrogram_saturation)
+                elif os.path.isfile(psf_file_name):  # retro-compatibility
+                    self.my_logger.info(f'\n\tLoading PSF from {psf_file_name}...')
+                    self.load_chromatic_psf(psf_file_name)
+                else:
+                    raise FileNotFoundError(f"\n\tNo PSF info in {input_file_name} "
+                                            f"and not even a PSF file {psf_file_name}.")
+                if "LINES" in hdu_list:
+                    self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
 
     def load_spectrum_latest(self, input_file_name):
         """Load the spectrum from a FITS file (data, error and wavelengths) from Spectrum files generated
@@ -955,23 +954,23 @@ class Spectrum:
             self.chromatic_psf.opt_reg = float(self.header["PSF_REG"])
 
         if not self.fast_load:
-            hdu_list = fits.open(input_file_name)
-            # load other spectrum info
-            self.cov_matrix = hdu_list["SPEC_COV"].data
-            _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
-            self.target.image = hdu_list["ORDER0"].data
-            self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
-            self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
-            # load spectrogram info
-            self.spectrogram = hdu_list["S_DATA"].data
-            self.spectrogram_err = hdu_list["S_ERR"].data
-            self.spectrogram_bgd = hdu_list["S_BGD"].data
-            self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
-            self.spectrogram_fit = hdu_list["S_FIT"].data
-            self.spectrogram_residuals = hdu_list["S_RES"].data
-            self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]), saturation=self.spectrogram_saturation)
-            self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
-            hdu_list.close()
+            with fits.open(input_file_name) as hdu_list:
+                # load other spectrum info
+                self.cov_matrix = hdu_list["SPEC_COV"].data
+                _, self.data_next_order, self.err_next_order = hdu_list["ORDER2"].data
+                self.target.image = hdu_list["ORDER0"].data
+                self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
+                self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
+                # load spectrogram info
+                self.spectrogram = hdu_list["S_DATA"].data
+                self.spectrogram_err = hdu_list["S_ERR"].data
+                self.spectrogram_bgd = hdu_list["S_BGD"].data
+                self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
+                self.spectrogram_fit = hdu_list["S_FIT"].data
+                self.spectrogram_residuals = hdu_list["S_RES"].data
+                self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
+                                                   saturation=self.spectrogram_saturation)
+                self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
 
     def load_spectrogram(self, input_file_name):  # pragma: no cover
         """OBSOLETE: Load the spectrum from a fits file (data, error and wavelengths).
@@ -987,26 +986,25 @@ class Spectrum:
         >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
         """
         if os.path.isfile(input_file_name):
-            hdu_list = fits.open(input_file_name)
-            header = hdu_list[0].header
-            self.spectrogram = hdu_list[0].data
-            self.spectrogram_err = hdu_list[1].data
-            self.spectrogram_bgd = hdu_list[2].data
-            if len(hdu_list) > 3:
-                self.spectrogram_bgd_rms = hdu_list[3].data
-                self.spectrogram_fit = hdu_list[4].data
-                self.spectrogram_residuals = hdu_list[5].data
-            self.spectrogram_x0 = float(header['S_X0'])
-            self.spectrogram_y0 = float(header['S_Y0'])
-            self.spectrogram_xmin = int(header['S_XMIN'])
-            self.spectrogram_xmax = int(header['S_XMAX'])
-            self.spectrogram_ymin = int(header['S_YMIN'])
-            self.spectrogram_ymax = int(header['S_YMAX'])
-            self.spectrogram_deg = int(header['S_DEG'])
-            self.spectrogram_saturation = float(header['S_SAT'])
-            self.spectrogram_Nx = self.spectrogram_xmax - self.spectrogram_xmin
-            self.spectrogram_Ny = self.spectrogram_ymax - self.spectrogram_ymin
-            hdu_list.close()  # need to free allocation for file description
+            with fits.open(input_file_name) as hdu_list:
+                header = hdu_list[0].header
+                self.spectrogram = hdu_list[0].data
+                self.spectrogram_err = hdu_list[1].data
+                self.spectrogram_bgd = hdu_list[2].data
+                if len(hdu_list) > 3:
+                    self.spectrogram_bgd_rms = hdu_list[3].data
+                    self.spectrogram_fit = hdu_list[4].data
+                    self.spectrogram_residuals = hdu_list[5].data
+                self.spectrogram_x0 = float(header['S_X0'])
+                self.spectrogram_y0 = float(header['S_Y0'])
+                self.spectrogram_xmin = int(header['S_XMIN'])
+                self.spectrogram_xmax = int(header['S_XMAX'])
+                self.spectrogram_ymin = int(header['S_YMIN'])
+                self.spectrogram_ymax = int(header['S_YMAX'])
+                self.spectrogram_deg = int(header['S_DEG'])
+                self.spectrogram_saturation = float(header['S_SAT'])
+                self.spectrogram_Nx = self.spectrogram_xmax - self.spectrogram_xmin
+                self.spectrogram_Ny = self.spectrogram_ymax - self.spectrogram_ymin
             self.my_logger.info('\n\tSpectrogram loaded from %s' % input_file_name)
         else:
             self.my_logger.warning('\n\tSpectrogram file %s not found' % input_file_name)

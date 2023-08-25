@@ -431,7 +431,8 @@ class Grating:
             self.ratio_order_3over1 = None
         filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
         if os.path.isfile(filename):
-            lines = [ll.rstrip('\n') for ll in open(filename)]
+            with open(filename) as f:
+                lines = [ll.rstrip('\n') for ll in f]
             self.theta_tilt = float(lines[1].split(' ')[2])
         else:
             self.theta_tilt = 0
@@ -801,7 +802,8 @@ class Hologram(Grating):
                 raise ValueError("To define an hologram, you must provide hologram_grooves_per_mm.txt or N.txt files.")
         filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
         if os.path.isfile(filename):
-            lines = [ll.rstrip('\n') for ll in open(filename)]
+            with open(filename) as f:
+                lines = [ll.rstrip('\n') for ll in f]
             self.holo_center = list(map(float, lines[1].split(' ')[:2]))
             self.theta_tilt = float(lines[1].split(' ')[2])
         else:

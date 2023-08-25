@@ -527,44 +527,44 @@ class AtmosphereGrid(Atmosphere):
             self.my_logger.error('\n\tNo file name is given...')
         else:
 
-            hdu = fits.open(self.filename)
-            hdr = hdu[0].header
-            self.header = hdr
-            self.image_filename = hdr['DATAFILE']
+            with fits.open(self.filename) as hdu:
+                hdr = hdu[0].header
+                self.header = hdr
+                self.image_filename = hdr['DATAFILE']
 
-            self.airmass = hdr['AIRMASS']
-            self.pressure = hdr['PRESSURE']
-            self.temperature = hdr['TEMPERAT']
+                self.airmass = hdr['AIRMASS']
+                self.pressure = hdr['PRESSURE']
+                self.temperature = hdr['TEMPERAT']
 
-            self.NB_ATM_POINTS = hdr['NBATMPTS']
+                self.NB_ATM_POINTS = hdr['NBATMPTS']
 
-            NB_AER_POINTS = hdr['NBAERPTS']
-            AER_MIN = hdr['AERMIN']
-            AER_MAX = hdr['AERMAX']
+                NB_AER_POINTS = hdr['NBAERPTS']
+                AER_MIN = hdr['AERMIN']
+                AER_MAX = hdr['AERMAX']
 
-            NB_PWV_POINTS = hdr['NBPWVPTS']
-            PWV_MIN = hdr['PWVMIN']
-            PWV_MAX = hdr['PWVMAX']
+                NB_PWV_POINTS = hdr['NBPWVPTS']
+                PWV_MIN = hdr['PWVMIN']
+                PWV_MAX = hdr['PWVMAX']
 
-            NB_OZ_POINTS = hdr['NBOZPTS']
-            OZ_MIN = hdr['OZMIN']
-            OZ_MAX = hdr['OZMAX']
+                NB_OZ_POINTS = hdr['NBOZPTS']
+                OZ_MIN = hdr['OZMIN']
+                OZ_MAX = hdr['OZMAX']
 
-            self.AER_Points = np.linspace(AER_MIN, AER_MAX, NB_AER_POINTS)
-            self.OZ_Points = np.linspace(OZ_MIN, OZ_MAX, NB_OZ_POINTS)
-            self.PWV_Points = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
+                self.AER_Points = np.linspace(AER_MIN, AER_MAX, NB_AER_POINTS)
+                self.OZ_Points = np.linspace(OZ_MIN, OZ_MAX, NB_OZ_POINTS)
+                self.PWV_Points = np.linspace(PWV_MIN, PWV_MAX, NB_PWV_POINTS)
 
-            NBWLBINS = hdr['NBWLBIN']
+                NBWLBINS = hdr['NBWLBIN']
 
-            self.index_atm_count = hdr['IDX_CNT']
-            self.index_atm_aer = hdr['IDX_AER']
-            self.index_atm_pwv = hdr['IDX_PWV']
-            self.index_atm_oz = hdr['IDX_OZ']
-            self.index_atm_data = hdr['IDX_DATA']
+                self.index_atm_count = hdr['IDX_CNT']
+                self.index_atm_aer = hdr['IDX_AER']
+                self.index_atm_pwv = hdr['IDX_PWV']
+                self.index_atm_oz = hdr['IDX_OZ']
+                self.index_atm_data = hdr['IDX_DATA']
 
-            self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_ATM_HEADER + NBWLBINS - 1))
+                self.atmgrid = np.zeros((self.NB_ATM_POINTS + 1, self.NB_ATM_HEADER + NBWLBINS - 1))
 
-            self.atmgrid[:, :] = hdu[0].data[:, :]
+                self.atmgrid[:, :] = hdu[0].data[:, :]
 
             self.my_logger.debug(f'\n\tAtmosphere.load_image atm-file={self.filename}')
 

@@ -11,7 +11,7 @@ from spectractor.extractor.extractor import Spectractor  # noqa: E402
 from spectractor.logbook import LogBook  # noqa: E402
 from spectractor.config import load_config, apply_rebinning_to_parameters  # noqa: E402
 from spectractor.simulation.image_simulation import ImageSim  # noqa: E402
-from spectractor.tools import plot_spectrum_simple, uvspec_available  # noqa: E402
+from spectractor.tools import (plot_spectrum_simple, uvspec_available)  # noqa: E402
 from spectractor.fit.fit_spectrum import SpectrumFitWorkspace, run_spectrum_minimisation  # noqa: E402
 from spectractor.fit.fit_spectrogram import (SpectrogramFitWorkspace,  # noqa: E402
                                              run_spectrogram_minimisation)  # noqa: E402
@@ -19,6 +19,7 @@ import os  # noqa: E402
 import numpy as np  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import unittest  # noqa: E402
+import astropy.config  # noqa: E402
 
 
 # original parameters
@@ -99,6 +100,7 @@ def make_image():
 
 
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
+@astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
 def test_ctio_fullchain():
     parameters.VERBOSE = True
     parameters.DEBUG = False
