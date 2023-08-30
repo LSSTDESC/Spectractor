@@ -373,7 +373,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         with :math:`\mathbf{W}` the weight matrix, inverse of the covariance matrix. In our case this matrix is diagonal
         as the pixels are considered all independent. The minimum of equation :eq:`chromaticspsf2d_chi2` is reached for
-        a the set of amplitude parameters :math:`\hat{\mathbf{A}}` given by
+        a set of amplitude parameters :math:`\hat{\mathbf{A}}` given by
 
         .. math::
 
