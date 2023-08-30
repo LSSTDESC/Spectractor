@@ -417,6 +417,8 @@ class ChromaticPSF:
 
         Returns
         -------
+        psf_cube: np.ndarray
+            Cube of chromatic PSF evaluations, each slice being a PSF for a given wavelength.
 
         """
         Ny_pix, Nx_pix = pixels[0].shape
@@ -448,8 +450,34 @@ class ChromaticPSF:
             psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], values=profile_params[x, :])
         return psf_cube
 
-    def build_sparse_M(self, pixels, profile_params, sparse_indices, boundaries, dtype="float32"):
-        sparse_psf_cube = np.zeros(sparse_indices.size, dtype=dtype)
+    def build_sparse_M(self, pixels, profile_params, M_sparse_indices, boundaries, dtype="float32"):
+        r"""
+        Compute the sparse model matrix :math:`\mathbf{M}`.
+        Given a vector of amplitudes :math:`\mathbf{A}`, spectrogram model is:
+        .. math::
+
+            \mathbf{I} = \mathbf{M} \cdot \mathbf{A}.
+
+        Parameters
+        ----------
+        pixels: np.ndarray
+            Array of pixels to evaluate ChromaticPSF.
+        profile_params: array_like
+            ChromaticPSF profile parameters.
+        M_sparse_indices: array_like
+            Array of indices where each element gives the sparse indices for a slice of the ChromaticPSF cube.
+        boundaries: dict
+            Dictionary of boundaries for fast evaluation with keys ymin, ymax, xmin, xmax .
+        dtype: str, optional
+            Type of the output array (default: 'float32').
+
+        Returns
+        -------
+        M: np.ndarray
+            The model matrix :math:`\mathbf{M}`.
+
+        """
+        sparse_psf_cube = np.zeros(M_sparse_indices.size, dtype=dtype)
         indptr = np.zeros(len(profile_params)+1, dtype=int)
         for x in range(len(profile_params)):
             indptr[x+1] = (boundaries["xmax"][x]-boundaries["xmin"][x])*(boundaries["ymax"][x]-boundaries["ymin"][x]) + indptr[x]
@@ -458,18 +486,34 @@ class ChromaticPSF:
             sparse_psf_cube[indptr[x]:indptr[x+1]] = self.psf.evaluate(pixels[:, boundaries["ymin"][x]:boundaries["ymax"][x],
                                                                                  boundaries["xmin"][x]:boundaries["xmax"][x]],
                                                                        values=profile_params[x, :]).ravel()
-        return sparse.csr_matrix((sparse_psf_cube, sparse_indices, indptr), shape=(len(profile_params), pixels[0].size), dtype=dtype)
+        return sparse.csr_matrix((sparse_psf_cube, M_sparse_indices, indptr), shape=(len(profile_params), pixels[0].size), dtype=dtype)
 
-    def build_psf_jacobian(self, pixels, profile_params, sparse_indices, boundaries, dtype="float32"):
-        """Generic function to compute the Jacobian matrix of a model, with numerical derivatives.
+    def build_psf_jacobian(self, pixels, profile_params, psf_cube_sparse_indices, boundaries, dtype="float32"):
+        r"""
+        Compute the Jacobian matrix :math:`\mathbf{J}` of a ChromaticPSF model, with analytical derivatives.
+        Amplitude parameters :math:`\mathbf{A}` are excluded, only PSF shape and position parameters :math:`\theta` are included.
+
+        .. math::
+
+            \mathbf{J} = \frac{\partial \mathbf{M}}{\partial \theta} \cdot \mathbf{A}.
 
         Parameters
         ----------
+        pixels: np.ndarray
+            Array of pixels to evaluate ChromaticPSF.
+        profile_params: array_like
+            ChromaticPSF profile parameters.
+        psf_cube_sparse_indices: array_like
+            Array of indices where each element gives the sparse indices for a slice of the ChromaticPSF cube.
+        boundaries: dict
+            Dictionary of boundaries for fast evaluation with keys ymin, ymax, xmin, xmax .
+        dtype: str, optional
+            Type of the output array (default: 'float32').
 
         Returns
         -------
-        J: np.array
-            The Jacobian matrix.
+        J: np.ndarray
+            The Jacobian matrix math:`\mathbf{J}`.
 
         """
         if pixels.ndim == 3:
@@ -508,20 +552,7 @@ class ChromaticPSF:
             else:
                 Jpsf = self.psf.jacobian(pixels[boundaries["ymin"][x]:boundaries["ymax"][x]], profile_params[x, :], analytical=True)
 
-            J[:, sparse_indices[x]] += np.repeat(Jpsf[1:], repeats, axis=0) * legs[:, x, None]  # Jpsf[1:] excludes amplitude
-
-            # Jtmp = np.repeat(Jpsf[1:], repeats, axis=0) * legs[:, x, None]  # Jpsf[1:] excludes amplitude
-            # dM[self.psf_cube_sparse_indices[x], :, x] = Jtmp.T  #.reshape((params.size, self.boundaries["ymax"][x]-self.boundaries["ymin"][x], self.boundaries["xmax"][x]-self.boundaries["xmin"][x]))
-        # J = (dM @ amplitude_params).T
-        # dMWD_dtheta = np.einsum("ijk,i->jk", dM, W_dot_data)
-        # term1 = np.einsum("ij,ki->kj", cov_matrix, dMWD_dtheta)
-        # WM = self.W * self.M.T.toarray()
-        # dMWM_rQA_dtheta = np.einsum("ijk,li->jlk", dM, WM)
-        # dcov_dtheta = - 2 * cov_matrix @ (dMWM_rQA_dtheta @ cov_matrix)
-        # MWM_rQA = sparse_dot_mkl.dot_product_mkl(self.M.T, W_dot_data) + np.float32(self.reg) * self.Q_dot_A0
-        # dA_dtheta = term1 + dcov_dtheta @ MWM_rQA
-        # term5 = np.einsum("ij,kj->ki", self.M.toarray(), term4)
-        # J += term5
+            J[:, psf_cube_sparse_indices[x]] += np.repeat(Jpsf[1:], repeats, axis=0) * legs[:, x, None]  # Jpsf[1:] excludes amplitude
         return J
 
     def fill_table_with_profile_params(self, profile_params):
@@ -530,7 +561,7 @@ class ChromaticPSF:
 
         Parameters
         ----------
-        profile_params: array
+        profile_params: np.ndarray
            a Nx * len(self.psf.param_names) numpy array containing the PSF parameters as a function of pixels.
 
         Examples
