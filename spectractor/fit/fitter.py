@@ -1172,8 +1172,11 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         else:
             JT_W_R0 = JT_W @ np.concatenate(residuals).ravel()
         dparams = - inv_JT_W_J @ JT_W_R0
+        new_params = np.copy(tmp_params)
+        new_params[ipar] = tmp_params[ipar] + dparams
+        fval = fit_workspace.chisq(new_params)
 
-        if with_line_search:
+        if with_line_search or fval > cost:
             def line_search(alpha):
                 tmp_params_2 = np.copy(tmp_params)
                 tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
@@ -1186,13 +1189,12 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
 
             # tol parameter acts on alpha (not func)
             alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=5e-1, brack=(0, 1))
+            new_params[ipar] = tmp_params[ipar] + alpha_min * dparams
         else:
             alpha_min = 1
-            fval = np.copy(cost)
             funcalls = 0
             iter = 0
 
-        new_params[ipar] = tmp_params[ipar] + alpha_min * dparams
         # check bounds
         for ip, p in enumerate(new_params):
             if p < fit_workspace.params.bounds[ip][0]:
