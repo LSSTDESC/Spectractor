@@ -1176,7 +1176,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         new_params[ipar] = tmp_params[ipar] + dparams
         fval = fit_workspace.chisq(new_params)
 
-        if with_line_search or fval > cost:
+        if with_line_search or fval > 1.01 * cost:
             def line_search(alpha):
                 tmp_params_2 = np.copy(tmp_params)
                 tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
