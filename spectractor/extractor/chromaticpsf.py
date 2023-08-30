@@ -86,7 +86,9 @@ class ChromaticPSF:
             y0 = Ny / 2
         self.y0 = y0
         self.profile_params = np.zeros((Nx, len(self.psf.params.labels)))
-        self.pixels = np.mgrid[:Nx, :Ny]
+        yy, xx = np.mgrid[:self.Ny, :self.Nx]
+        self.pixels = np.asarray([xx, yy])
+
         self.saturation = 1e20
         self.psf_param_start_index = 0
         self.n_poly_params = 0
@@ -872,9 +874,9 @@ class ChromaticPSF:
         pixel_x = np.arange(0, self.Nx, parameters.PSF_PIXEL_STEP_TRANSVERSE_FIT, dtype=int)
         fwhms = np.zeros_like(pixel_x, dtype=float)
         # oversampling for precise computation of the PSF
-        # pixels.shape = (2, Nx, Ny): self.pixels[1<-y, 0<-first pixel value column, :]
+        # pixels.shape = (2, Ny, Nx): self.pixels[1<-y, :, 0<-first pixel value column]
         # TODO: account for rotation ad projection effects is PSF is not round
-        pixel_eval = np.arange(self.pixels[1, 0, 0], self.pixels[1, 0, -1], 0.5, dtype=np.float32)
+        pixel_eval = np.arange(self.pixels[1, 0, 0], self.pixels[1, -1, 0], 0.5, dtype=np.float32)
         for ix, x in enumerate(pixel_x):
             p = profile_params[x, :]
             # compute FWHM transverse to dispersion axis (assuming revolution symmetry of the PSF)
