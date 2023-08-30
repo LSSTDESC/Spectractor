@@ -222,7 +222,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 for i in range(niter):
                     new_samples[i] = np.interp(new_x, old_x, samples[i])
                 self.amplitude_priors_cov_matrix = np.cov(new_samples.T)
-                # self.amplitude_priors_cov_matrix[np.abs(self.amplitude_priors_cov_matrix) < 1e-3 * np.max(self.amplitude_priors_cov_matrix)] = 0
         # regularisation matrices
         if amplitude_priors_method == "spectrum":
             # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
@@ -427,6 +426,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.psf_profile_params[order][:, 2] += dispersion_law.imag - self.bgd_width
 
             # Matrix filling
+            # Older piece of code, using full matrices (non sparse). Keep here for temporary archive.
             # psf_cube_order = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params[-1], fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cubes_masked[order], boundaries=self.boundaries[order])
             # if self.sparse_indices is None:
             #    self.sparse_indices = np.concatenate([np.where(self.psf_cube_masked[k].ravel() > 0)[0] for k in range(len(profile_params))])
@@ -440,7 +440,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             else:
                 M += M_order.T
 
-        #M = psf_cube.reshape(len(profile_params[0]), self.pixels[0].size).T  # flattening
+        # M = psf_cube.reshape(len(profile_params[0]), self.pixels[0].size).T  # flattening
         # if self.sparse_indices is None:
         #     self.sparse_indices = np.where(M > 0)
         # M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
@@ -508,7 +508,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         return self.pixels, self.model, self.model_err
 
     def jacobian(self, params, epsilon, model_input=None):
-        start = time.time()
         if model_input is not None:
             lambdas, model, model_err = model_input
         else:
@@ -536,7 +535,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             J[start:start+len(self.psf_poly_params)] = self.spectrum.chromatic_psf.build_psf_jacobian(self.pixels, profile_params=profile_params,
                                                                                                       sparse_indices=self.psf_cube_sparse_indices[order],
                                                                                                       boundaries=self.boundaries[order], dtype="float32")
-        self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
     def amplitude_derivatives(self):

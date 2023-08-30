@@ -725,12 +725,9 @@ class ChromaticPSF:
             nparams = self.degrees[label]+1
             repeats.append(nparams)
             for k in range(nparams):
-                # psf_index.append(ipsf)
                 coeffs = np.eye(1, nparams, k)[0]
                 legs[ip] = np.polynomial.legendre.legval(leg_pixels, coeffs).astype(dtype)
                 ip += 1
-        # dM = np.zeros((self.Ny*self.Nx, params.size, amplitude_params.size))
-        # W_dot_data = (self.W * self.data).astype('float32')
         for x in range(Nx):
             if mode == "2D":
                 Jpsf = self.psf.jacobian(pixels[:, boundaries["ymin"][x]:boundaries["ymax"][x],
@@ -1642,7 +1639,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.params.values[:self.Nx])
             self.amplitude_priors_cov_matrix = np.copy(self.chromatic_psf.cov_matrix)
-            # self.amplitude_priors_err = np.copy(self.chromatic_psf.table["flux_err"])
             self.Q = np.diag([1 / np.sum(self.err[:, x] ** 2) for x in range(self.Nx)])
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
         if self.amplitude_priors_method == "fixed":
@@ -1973,11 +1969,7 @@ class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
         self.profile_params = np.copy(profile_params)
 
         if self.amplitude_priors_method == "fixed":
-            self.model = self.chromatic_psf.evaluate(poly_params, mode="1D")[
-                         self.bgd_width:-self.bgd_width, :].T
-            fig = plt.figure()
-            plt.imshow(self.model, origin="lower")
-            plt.show()
+            self.model = self.chromatic_psf.evaluate(poly_params, mode="1D")[self.bgd_width:-self.bgd_width, :].T
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
@@ -1999,7 +1991,6 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.W = self.W.flatten()
         self.data = self.data.flatten()
         self.err = self.err.flatten()
-        self.sparse_indices = None
 
         # create a mask
         self.data_before_mask = np.copy(self.data)
@@ -2193,14 +2184,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         profile_params[:self.Nx, 1] = np.arange(self.Nx)
         # profile_params[:self.Nx, 2] -= self.bgd_width
         if self.amplitude_priors_method != "fixed":
-            # Matrix filling
-            # psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
-            #                                              fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-            #                                              fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cube_masked)
-            # M = psf_cube.reshape(len(profile_params), self.pixels[0].size).T  # flattening
-            # self.sparse_indices = np.where(M > 0)
-            # M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
-            M = self.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32", sparse_indices=self.M_sparse_indices, boundaries=self.boundaries).T
+            M = self.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32",
+                                                  M_sparse_indices=self.M_sparse_indices, boundaries=self.boundaries).T
 
             M_dot_W = M.T @ self.sqrtW
             W_dot_data = (self.W * self.data).astype("float32")
@@ -2209,7 +2194,8 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
                 M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             else:
                 tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
-                dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
+                dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))),
+                                        shape=tri.shape, dtype="float32")
                 M_dot_W_dot_M = tri + tri.T - dia
             if self.amplitude_priors_method != "psf1d":
                 if self.amplitude_priors_method == "keep":
