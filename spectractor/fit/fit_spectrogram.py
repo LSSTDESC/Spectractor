@@ -423,7 +423,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
             start = self.psf_params_start_index[k]
             profile_params = np.copy(self.simulation.profile_params[order])
             J[start:start+len(self.psf_poly_params)] = self.simulation.chromatic_psf.build_psf_jacobian(self.simulation.pixels, profile_params=profile_params,
-                                                                                                        sparse_indices=self.simulation.psf_cube_sparse_indices[order],
+                                                                                                        psf_cube_sparse_indices=self.simulation.psf_cube_sparse_indices[order],
                                                                                                         boundaries=self.simulation.boundaries[order], dtype="float32")
         self.simulation.fix_psf_cube = strategy
         self.simulation.fix_atm_sim = False
