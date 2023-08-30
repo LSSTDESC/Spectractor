@@ -1196,8 +1196,8 @@ class ChromaticPSF:
         return np.asarray(np.sign(self.table['Dx']) *
                           np.sqrt((self.table['Dx'] - shift_x) ** 2 + (self.table['Dy_disp_axis'] - shift_y) ** 2))
 
-    def update(self, psf_poly_params, x0, y0, angle, plot=False):
-        profile_params = self.from_poly_params_to_profile_params(psf_poly_params, apply_bounds=True)
+    def update(self, psf_poly_params, x0, y0, angle, plot=False, apply_bounds=True):
+        profile_params = self.from_poly_params_to_profile_params(psf_poly_params, apply_bounds=apply_bounds)
         self.fill_table_with_profile_params(profile_params)
         Dx = np.arange(self.Nx) - x0  # distance in (x,y) spectrogram frame for column x
         self.table["Dx"] = Dx

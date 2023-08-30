@@ -413,8 +413,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 self.psf_profile_params[order] = None
                 continue
             # Evaluate PSF profile
-            self.psf_profile_params[order] = self.spectrum.chromatic_psf.update(poly_params[k], self.spectrum.spectrogram_x0 + dx0,
-                                                                                self.spectrum.spectrogram_y0 + dy0, angle, plot=False)
+            if k == 0:
+                self.psf_profile_params[order] = self.spectrum.chromatic_psf.update(poly_params[k], self.spectrum.spectrogram_x0 + dx0,
+                                                                                    self.spectrum.spectrogram_y0 + dy0, angle, plot=False, apply_bounds=True)
+            else:
+                self.psf_profile_params[order] = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params[k], apply_bounds=True)
 
             # Dispersion law
             dispersion_law = self.spectrum.compute_dispersion_in_spectrogram(self.lambdas, dx0, dy0, angle,
