@@ -567,6 +567,73 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.my_logger.debug(f"\n\tJacobian time computation = {time.time() - start:.1f}s")
         return J
 
+    def amplitude_derivatives(self):
+        r"""
+        Compute analytically the amplitude vector \hat{\mathbf{A}} derivatives with respect to the PSF parameters.
+        With
+
+        .. math::
+
+            \hat{\mathbf{A}} =  \hat{\mathbf{C}} \cdot \mathbf{M}^T \mathbf{W} \mathbf{y}
+
+            \hat{\mathbf{C}} = (\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}
+
+        derivatives are
+
+        .. math::
+
+            \frac{\partial \hat{\mathbf{A}}}{\partial \theta} =  \frac{\partial \hat{\mathbf{C}}}{\partial \theta} \cdot \mathbf{M}^T \mathbf{W} \mathbf{y} + \hat{\mathbf{C}} \cdot \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{y}}{\partial \theta}
+
+            \frac{\partial \hat{\mathbf{C}}}{\partial \theta} = - \hat{\mathbf{C}} \cdot \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{M}}{\partial \theta}  \cdot  \hat{\mathbf{C}}
+
+            \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{M}}{\partial \theta} = 2 \frac{\partial \mathbf{M}^T}{\partial \theta} \mathbf{W} \mathbf{M}
+
+            \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{y}}{\partial \theta} = \frac{\partial \mathbf{M}^T}{\partial \theta} \mathbf{W} \mathbf{y}
+
+        If amplitude vector is regularized via Tikhonov regularisation, regularisation term is added appropriately.
+
+        Returns
+        -------
+        dA_dtheta: list
+            List of amplitude vector derivatives.
+
+        Examples
+        --------
+        >>> spec = Spectrum("./tests/data/sim_20170530_134_spectrum.fits")
+        >>> w = FullForwardModelFitWorkspace(spectrum=spec, amplitude_priors_method="spectrum", verbose=True)
+        >>> y, mod, mod_err = w.simulate(*w.params.values)
+        >>> dA_dtheta = w.amplitude_derivatives()
+        >>> print(np.array(dA_dtheta).shape, w.amplitude_params.shape)
+        (26, 669) (669,)
+
+        """
+        # compute matrices without derivatives
+        WM = sparse.dia_matrix((self.W, 0), shape=(self.W.size, self.W.size), dtype="float32") @ self.M
+        WD = (self.W * (self.data + (1 - self.params.values[self.params.get_index("B")]) * self.bgd_flat)).astype("float32")
+        MWD = self.M.T @ WD
+        if self.amplitude_priors_method == "spectrum":
+              MWD += np.float32(self.reg) * self.Q_dot_A0
+        # compute list of partial derivatives of model matrix M for all diffraction orders
+        dM_dtheta = []
+        Jpsf_indices = []
+        for k, order in enumerate(self.diffraction_orders):
+            if self.psf_profile_params[order] is None:
+                continue
+            profile_params = np.copy(self.psf_profile_params[order])
+            dMsparse_order = self.spectrum.chromatic_psf.build_sparse_dM(self.pixels, profile_params=profile_params,
+                                                                         M_sparse_indices=self.M_sparse_indices[order],
+                                                                         boundaries=self.boundaries[order], dtype="float32")
+            dM_dtheta += dMsparse_order
+            start = self.psf_params_start_index[k]
+            Jpsf_indices += list(range(start, start+len(dMsparse_order)))
+        # compute partial derivatives of amplitude vector A
+        nparams = len(dM_dtheta)
+        dMWD_dtheta = [dM_dtheta[ip].T @ WD for ip in range(nparams)]
+        dMWM_rQA_dtheta = [2 * dM_dtheta[ip].T @ WM for ip in range(nparams)]
+        dcov_dtheta = [-self.amplitude_cov_matrix @ (dMWM_rQA_dtheta[ip] @ self.amplitude_cov_matrix) for ip in range(nparams)]
+        dA_dtheta = [self.amplitude_cov_matrix @ dMWD_dtheta[ip] + dcov_dtheta[ip] @ MWD for ip in range(nparams)]
+        return dA_dtheta
+
     def plot_spectrogram_comparison_simple(self, ax, title='', extent=None, dispersion=False):  # pragma: no cover
         """Method to plot a spectrogram issued from data and compare it with simulations.
 

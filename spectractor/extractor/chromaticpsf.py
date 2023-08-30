@@ -2052,6 +2052,121 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         self.model_err = np.zeros_like(self.model)
         return self.pixels, self.model, self.model_err
 
+    def amplitude_derivatives(self):
+        r"""
+        Compute analytically the amplitude vector \hat{\mathbf{A}} derivatives with respect to the PSF parameters.
+        With
+
+        .. math::
+
+            \hat{\mathbf{A}} =  \hat{\mathbf{C}} \cdot \mathbf{M}^T \mathbf{W} \mathbf{y}
+
+            \hat{\mathbf{C}} = (\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}
+
+        derivatives are
+
+        .. math::
+
+            \frac{\partial \hat{\mathbf{A}}}{\partial \theta} =  \frac{\partial \hat{\mathbf{C}}}{\partial \theta} \cdot \mathbf{M}^T \mathbf{W} \mathbf{y} + \hat{\mathbf{C}} \cdot \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{y}}{\partial \theta}
+
+            \frac{\partial \hat{\mathbf{C}}}{\partial \theta} = - \hat{\mathbf{C}} \cdot \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{M}}{\partial \theta}  \cdot  \hat{\mathbf{C}}
+
+            \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{M}}{\partial \theta} = 2 \frac{\partial \mathbf{M}^T}{\partial \theta} \mathbf{W} \mathbf{M}
+
+            \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{y}}{\partial \theta} = \frac{\partial \mathbf{M}^T}{\partial \theta} \mathbf{W} \mathbf{y}
+
+        If amplitude vector is regularized via Tikhonov regularisation, regularisation term is added appropriately.
+
+        Returns
+        -------
+        dA_dtheta: list
+            List of amplitude vector derivatives.
+
+        Examples
+        --------
+
+        Set the parameters:
+
+        .. doctest::
+
+            >>> parameters.PIXDIST_BACKGROUND = 40
+            >>> parameters.PIXWIDTH_BACKGROUND = 10
+            >>> parameters.PIXWIDTH_SIGNAL = 30
+
+        Build a mock spectrogram with random Poisson noise:
+
+        .. doctest::
+
+            >>> psf = Moffat(clip=False)
+            >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=100000)
+            >>> params = s0.generate_test_poly_params()
+            >>> params[:s0.Nx] *= 10
+            >>> s0.params.values = params
+            >>> saturation = params[-1]
+            >>> data = s0.evaluate(params, mode="2D")
+            >>> bgd = 10*np.ones_like(data)
+            >>> data += bgd
+            >>> data = np.random.poisson(data)
+            >>> data_errors = np.sqrt(data+1)
+
+        Extract the background:
+
+        .. doctest::
+
+            >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+
+        Estimate the first guess values:
+
+        .. doctest::
+
+            >>> s = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=saturation)
+            >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+            ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+            >>> s.plot_summary(truth=s0)
+
+        Simulate the data with a Tikhonov prior on amplitude parameters:
+
+        .. doctest::
+
+            >>> parameters.PSF_FIT_REG_PARAM = 0.002
+            >>> s.params.values = s.from_table_to_poly_params()
+            >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
+            ... amplitude_priors_method="psf1d", verbose=True)
+            >>> y, mod, mod_err = w.simulate(s.params.values[s.Nx:])
+            >>> w.plot_fit()
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None
+
+        Get the derivatives:
+
+        .. doctest::
+
+            >>> dA_dtheta = w.amplitude_derivatives()
+            >>> print(np.array(dA_dtheta).shape, w.amplitude_params.shape)
+            (13, 120) (120,)
+
+        """
+        # compute matrices without derivatives
+        WM = sparse.dia_matrix((self.W, 0), shape=(self.W.size, self.W.size), dtype="float32") @ self.M
+        WD = (self.W * self.data).astype("float32")
+        MWD = self.M.T @ WD
+        if self.amplitude_priors_method == "psf1d":
+            MWD += np.float32(self.reg) * self.Q_dot_A0
+        # compute partial derivatives of model matrix M
+        dM_dtheta = self.chromatic_psf.build_sparse_dM(self.pixels, profile_params=self.profile_params,
+                                                       M_sparse_indices=self.M_sparse_indices,
+                                                       boundaries=self.boundaries, dtype="float32")
+        # compute partial derivatives of amplitude vector A
+        nparams = len(dM_dtheta)
+        dMWD_dtheta = [dM_dtheta[ip].T @ WD for ip in range(nparams)]
+        dMWM_dtheta = [2 * dM_dtheta[ip].T @ WM for ip in range(nparams)]
+        dcov_dtheta = [-self.amplitude_cov_matrix @ (dMWM_dtheta[ip] @ self.amplitude_cov_matrix) for ip in range(nparams)]
+        dA_dtheta = [self.amplitude_cov_matrix @ dMWD_dtheta[ip] + dcov_dtheta[ip] @ MWD for ip in range(nparams)]
+        return dA_dtheta
+
 
 if __name__ == "__main__":
     import doctest
