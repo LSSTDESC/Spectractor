@@ -1388,7 +1388,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
     if method == "minimize":
         start = time.time()
         result = optimize.minimize(nll, fit_workspace.params.values, method=minimizer_method,
-                                   options={'ftol': ftol, 'maxiter': 100000}, bounds=bounds)
+                                   options={'maxiter': 100000}, bounds=bounds)
         fit_workspace.params.values = result['x']
         if verbose:
             my_logger.debug(f"\n\t{result}")
@@ -1533,14 +1533,14 @@ class RegFitWorkspace(FitWorkspace):
             self.chisquare = diff @ self.w.W @ diff
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
-        self.w.amplitude_params_err = np.array([np.sqrt(cov[x, x]) for x in range(cov.shape[0])])
+        self.w.amplitude_params_err = np.array([np.sqrt(np.abs(cov[x, x])) for x in range(cov.shape[0])])
         self.G = self.chisquare / ((self.w.data.size - len(self.w.mask) - len(self.w.outliers)) - np.trace(self.resolution)) ** 2
         return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
     def plot_fit(self):
         log10_opt_reg = self.params.values[0]
         opt_reg = 10 ** log10_opt_reg
-        regs = 10 ** np.linspace(min(-10, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
+        regs = 10 ** np.linspace(min(-7, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
         Gs = []
         chisqs = []
         resolutions = []
@@ -1579,7 +1579,7 @@ class RegFitWorkspace(FitWorkspace):
         ax[2].set_ylabel(r"$\mathrm{Tr}\,\mathbf{R}$")
         ax[2].set_xlabel("Regularisation hyper-parameter $r$")
         ax[2].grid()
-        fig.tight_layout()
+        # fig.tight_layout()
         plt.subplots_adjust(hspace=0)
         if parameters.DISPLAY:
             plt.show()
