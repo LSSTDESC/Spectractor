@@ -1690,7 +1690,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.amplitude_cov_matrix = np.zeros((self.Nx, self.Nx))
 
         # priors on amplitude parameters
-        self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed']
+        self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'psf1d', 'fixed', 'keep']
         self.amplitude_priors_method = amplitude_priors_method
         self.fwhm_priors = np.copy(self.chromatic_psf.table['fwhm'])
         self.reg = parameters.PSF_FIT_REG_PARAM
@@ -1823,6 +1823,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             The Jacobian matrix.
 
         """
+        method = copy.copy(self.amplitude_priors_method)
         self.amplitude_priors_method = "keep"
         if not self.analytical:
             J = super().jacobian(params, epsilon=epsilon, model_input=model_input)
@@ -1831,8 +1832,9 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             amplitude_params = np.copy(self.amplitude_params)
             profile_params[:, 0] *= amplitude_params  # np.ones_like(amplitude_params)
             J = self.chromatic_psf.build_psf_jacobian(self.pixels, profile_params=profile_params,
-                                                      sparse_indices=self.psf_cube_sparse_indices,
+                                                      psf_cube_sparse_indices=self.psf_cube_sparse_indices,
                                                       boundaries=self.boundaries, dtype="float32")
+        self.amplitude_priors_method = method
         return J
 
 

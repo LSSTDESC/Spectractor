@@ -191,7 +191,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.amplitude_cov_matrix = np.zeros((self.Nx, self.Nx))
 
         # priors on amplitude parameters
-        self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'spectrum', 'fixed']
+        self.amplitude_priors_list = ['noprior', 'positive', 'smooth', 'spectrum', 'fixed', 'keep']
         self.amplitude_priors_method = amplitude_priors_method
         self.fwhm_priors = np.copy(spectrum.chromatic_psf.table['fwhm'])
         self.reg = spectrum.chromatic_psf.opt_reg
@@ -437,7 +437,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             #     psf_cube = psf_cube_order
             # else:
             #     psf_cube += psf_cube_order
-            M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, self.psf_profile_params[order], dtype="float32", sparse_indices=self.M_sparse_indices[order], boundaries=self.boundaries[order])
+            M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, self.psf_profile_params[order],
+                                                                 dtype="float32", M_sparse_indices=self.M_sparse_indices[order], boundaries=self.boundaries[order])
             if M is None:
                 M = M_order.T
             else:
@@ -457,30 +458,34 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
                 M_dot_W_dot_M = tri + tri.T - dia
             if self.amplitude_priors_method != "spectrum":
-                # try:  # slower
-                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-                #     cov_matrix = L.T @ L
-                # except np.linalg.LinAlgError:
-                cov_matrix = np.linalg.inv(M_dot_W_dot_M)
-                amplitude_params = cov_matrix @ (M.T @ W_dot_data)
-                if self.amplitude_priors_method == "positive":
-                    amplitude_params[amplitude_params < 0] = 0
-                elif self.amplitude_priors_method == "smooth":
-                    null_indices = np.where(amplitude_params < 0)[0]
-                    for index in null_indices:
-                        right = amplitude_params[index]
-                        for i in range(index, min(index + 10, self.Nx)):
-                            right = amplitude_params[i]
-                            if i not in null_indices:
-                                break
-                        left = amplitude_params[index]
-                        for i in range(index, max(0, index - 10), -1):
-                            left = amplitude_params[i]
-                            if i not in null_indices:
-                                break
-                        amplitude_params[index] = 0.5 * (right + left)
-                elif self.amplitude_priors_method == "noprior":
-                    pass
+                if self.amplitude_priors_method == "keep":
+                    amplitude_params = np.copy(self.amplitude_params)
+                    cov_matrix = np.copy(self.amplitude_cov_matrix)
+                else:
+                    # try:  # slower
+                    #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
+                    #     cov_matrix = L.T @ L
+                    # except np.linalg.LinAlgError:
+                    cov_matrix = np.linalg.inv(M_dot_W_dot_M)
+                    amplitude_params = cov_matrix @ (M.T @ W_dot_data)
+                    if self.amplitude_priors_method == "positive":
+                        amplitude_params[amplitude_params < 0] = 0
+                    elif self.amplitude_priors_method == "smooth":
+                        null_indices = np.where(amplitude_params < 0)[0]
+                        for index in null_indices:
+                            right = amplitude_params[index]
+                            for i in range(index, min(index + 10, self.Nx)):
+                                right = amplitude_params[i]
+                                if i not in null_indices:
+                                    break
+                            left = amplitude_params[index]
+                            for i in range(index, max(0, index - 10), -1):
+                                left = amplitude_params[i]
+                                if i not in null_indices:
+                                    break
+                            amplitude_params[index] = 0.5 * (right + left)
+                    elif self.amplitude_priors_method == "noprior":
+                        pass
             else:
                 M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + np.float32(self.reg) * self.Q
                 # try:  # slower
@@ -517,6 +522,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             lambdas, model, model_err = self.simulate(*params)
         model = model.flatten()
         J = np.zeros((params.size, model.size))
+        method = copy.copy(self.amplitude_priors_method)
+        self.amplitude_priors_method = "keep"
         for ip, p in enumerate(params):
             if self.params.fixed[ip]:
                 continue
@@ -528,6 +535,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
             J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+        self.amplitude_priors_method = method
         for k, order in enumerate(self.diffraction_orders):
             if self.psf_profile_params[order] is None:
                 continue
@@ -536,7 +544,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             amplitude_params = np.copy(self.amplitude_params)
             profile_params[:, 0] *= amplitude_params
             J[start:start+len(self.psf_poly_params)] = self.spectrum.chromatic_psf.build_psf_jacobian(self.pixels, profile_params=profile_params,
-                                                                                                      sparse_indices=self.psf_cube_sparse_indices[order],
+                                                                                                      psf_cube_sparse_indices=self.psf_cube_sparse_indices[order],
                                                                                                       boundaries=self.boundaries[order], dtype="float32")
         return J
 
