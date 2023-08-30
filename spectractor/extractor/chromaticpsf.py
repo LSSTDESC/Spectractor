@@ -739,6 +739,70 @@ class ChromaticPSF:
             J[:, psf_cube_sparse_indices[x]] += np.repeat(Jpsf[1:], repeats, axis=0) * legs[:, x, None]  # Jpsf[1:] excludes amplitude
         return J
 
+    def build_sparse_dM(self, pixels, profile_params, M_sparse_indices, boundaries, dtype="float32"):
+        r"""
+        Compute the partial derivatives of the model matrix :math:`\mathbf{M}`, with analytical derivatives.
+        Amplitude parameters :math:`\mathbf{A}` are excluded, only PSF shape and position parameters :math:`\theta` are included.
+
+        Parameters
+        ----------
+        pixels: np.ndarray
+            Array of pixels to evaluate ChromaticPSF.
+        profile_params: array_like
+            ChromaticPSF profile parameters.
+        M_sparse_indices: array_like
+            Sparse indices of the model matrix :math:`\mathbf{M}`.
+        boundaries: dict
+            Dictionary of boundaries for fast evaluation with keys ymin, ymax, xmin, xmax .
+        dtype: str, optional
+            Type of the output array (default: 'float32').
+
+        Returns
+        -------
+        dM: list
+            List of sparse matrices :math:`\partial \mathbf{M}/\partial \theta`
+
+        """
+        if pixels.ndim == 3:
+            mode = "2D"
+            Ny, Nx = pixels[0].shape
+        elif pixels.ndim == 1:
+            mode = "1D"
+            Ny, Nx = pixels.size, profile_params.shape[0]
+        else:
+            raise ValueError(f"pixels argument must have shape (2, Nx, Ny) or (Ny). Got {pixels.shape=}.")
+        if Nx != profile_params.shape[0]:
+            raise ValueError(f"Number of pixels along x axis must be same as profile_params table length. "
+                             f"Got {Nx=} and {profile_params.shape}.")
+        leg_pixels = np.linspace(-1, 1, Nx)
+        legs = np.zeros((self.n_poly_params-Nx, Nx), dtype=dtype)
+        ip = 0
+        repeats = []
+        for ipsf, label in enumerate(self.psf.params.labels):
+            if label == "amplitude": continue
+            nparams = self.degrees[label]+1
+            repeats.append(nparams)
+            for k in range(nparams):
+                # psf_index.append(ipsf)
+                coeffs = np.eye(1, nparams, k)[0]
+                legs[ip] = np.polynomial.legendre.legval(leg_pixels, coeffs).astype(dtype)
+                ip += 1
+        sparse_J = np.zeros((self.n_poly_params - self.Nx, M_sparse_indices.size), dtype=dtype)
+        indptr = np.zeros(Nx+1, dtype=int)
+        for x in range(Nx):
+            if mode == "2D":
+                Jpsf = self.psf.jacobian(pixels[:, boundaries["ymin"][x]:boundaries["ymax"][x],
+                                                   boundaries["xmin"][x]:boundaries["xmax"][x]],
+                                         profile_params[x, :], analytical=True)
+            else:
+                Jpsf = self.psf.jacobian(pixels[boundaries["ymin"][x]:boundaries["ymax"][x]], profile_params[x, :], analytical=True)
+            indptr[x+1] = (boundaries["xmax"][x]-boundaries["xmin"][x])*(boundaries["ymax"][x]-boundaries["ymin"][x]) + indptr[x]
+            if boundaries["xmin"][x] < 0:
+                continue
+            sparse_J[:, indptr[x]:indptr[x+1]] += np.repeat(Jpsf[1:], repeats, axis=0) * legs[:, x, None]
+        dM = [sparse.csr_matrix((sparse_J[ip], M_sparse_indices, indptr), shape=(len(profile_params), pixels[0].size), dtype=dtype).T for ip in range(sparse_J.shape[0])]
+        return dM
+
     def fill_table_with_profile_params(self, profile_params):
         """
         Fill the table with the profile parameters.
