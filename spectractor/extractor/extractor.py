@@ -148,12 +148,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.tr = [self.tr_ratio, self.tr_ratio_next_order, self.tr_ratio_next_next_order]
 
         # PSF cube computation
-        self.psf_cubes = {}
         self.psf_cubes_masked = {}
         self.psf_profile_params = {}
         self.boundaries = {}
         for order in self.diffraction_orders:
-            self.psf_cubes[order] = np.empty(1)
             self.psf_cubes_masked[order] = np.empty(1)
             self.boundaries[order] = {}
             self.psf_profile_params[order] = None
@@ -267,6 +265,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
                                                                order=self.spectrum.order)
+        self.psf_cubes_masked = {}
+        self.M_sparse_indices = {}
+        self.psf_cube_sparse_indices = {}
         for k, order in enumerate(self.diffraction_orders):
             profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params[k],
                                                                                             apply_bounds=True)
@@ -281,45 +282,16 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params,
                                                                   fwhmx_clip=fwhmx_clip,
                                                                   fwhmy_clip=fwhmy_clip, dtype="float32")
-            self.psf_cubes_masked[order] = psf_cube > 0
-        wl_size = len(profile_params)
-        flat_spectrogram = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(wl_size, self.pixels[0].size), axis=0)
-        mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
-        mask = mask.reshape(self.pixels[0].shape)
-        kernel = np.ones((3, self.spectrum.spectrogram_Nx//10))  # enlarge a bit more the edges of the mask
-        mask = convolve2d(mask, kernel, 'same').astype(bool)
-        for order in self.diffraction_orders:
-            for k in range(wl_size):
-                self.psf_cubes_masked[order][k] *= ~mask
-        mask = mask.reshape((self.pixels[0].size,))
+
+            self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.get_psf_cube_masked(psf_cube, convolve=True)
+            # make rectangular mask per wavelength
+            self.boundaries[order], self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.get_boundaries(self.psf_cubes_masked[order])
+            self.psf_cube_sparse_indices[order], self.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.psf_cubes_masked[order])
+        mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube.shape[0], psf_cube[0].size), axis=0) == 0
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
         self.sqrtW = sparse.diags(np.sqrt(self.W), format="csr", dtype="float32")
-        # self.sqrtW = np.sqrt(sparse.diags(self.W, dtype="float32"))
         self.mask = list(np.where(mask)[0])
-        # make rectangular mask per wavelength
-        for order in self.diffraction_orders:
-            self.boundaries[order] = {"xmin": np.zeros(wl_size, dtype=int), "xmax": np.zeros(wl_size, dtype=int),
-                                      "ymin": np.zeros(wl_size, dtype=int), "ymax": np.zeros(wl_size, dtype=int)}
-            for k in range(wl_size):
-                maskx = np.any(self.psf_cubes_masked[order][k], axis=0)
-                masky = np.any(self.psf_cubes_masked[order][k], axis=1)
-                if np.sum(maskx) > 0 and np.sum(masky) > 0:
-                    xmin, xmax = int(np.argmax(maskx)), int(len(maskx) - np.argmax(maskx[::-1]))
-                    ymin, ymax = int(np.argmax(masky)), int(len(masky) - np.argmax(masky[::-1]))
-                else:
-                    xmin, xmax = -1, -1
-                    ymin, ymax = -1, -1
-                self.boundaries[order]["xmin"][k] = xmin
-                self.boundaries[order]["xmax"][k] = xmax
-                self.boundaries[order]["ymin"][k] = ymin
-                self.boundaries[order]["ymax"][k] = ymax
-                self.psf_cubes_masked[order][k, ymin:ymax, xmin:xmax] = True
-        self.M_sparse_indices = {}
-        self.psf_cube_sparse_indices = {}
-        for order in self.diffraction_orders:
-            self.psf_cube_sparse_indices[order] = [np.where(self.psf_cubes_masked[order][k].ravel() > 0)[0] for k in range(wl_size)]
-            self.M_sparse_indices[order] = np.concatenate(self.psf_cube_sparse_indices[order])
 
     def simulate(self, *params):
         r"""
