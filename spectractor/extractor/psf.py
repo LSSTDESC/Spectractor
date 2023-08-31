@@ -482,14 +482,17 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: no co
     a *= amplitude / norm
     return a
 
+
 @njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
 def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: no cover
     r"""Compute a 2D Moffat Jacobian, whose integral is normalised to unity.
 
     Parameters
     ----------
-    eval: array_like
-        Previous evaluation of the model.
+    x: array_like
+        2D array of pixels :math:`x`, regularly spaced.
+    y: array_like
+        2D array of pixels :math:`y`, regularly spaced.
     amplitude: float
         Integral :math:`A` of the function.
     x_c: float
@@ -540,7 +543,6 @@ def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha):  # prag
     J[3] = (2 * norm / (gamma)) * rr_gg * dpsf - (2 * norm / gamma) * psf  # gamma
     J[4] = (norm / (alpha - 1)) * psf - norm * psf * np.log(1 + rr_gg)  # alpha
     return J
-
 
 
 @njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
