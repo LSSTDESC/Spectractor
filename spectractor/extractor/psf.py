@@ -151,7 +151,7 @@ def evaluate_moffat1d(y, amplitude, y_c, gamma, alpha, norm):  # pragma: no cove
 
 
 @njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
-def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda, fixed):  # pragma: no cover
+def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda, fixed):
     r"""Compute a 1D Moffat Jacobian, whose integral is normalised to unity.
 
     .. math ::
