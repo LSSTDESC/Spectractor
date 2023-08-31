@@ -1481,10 +1481,10 @@ class Gauss(PSF):
                 J[ip] = (tmp_model.ravel() - model.ravel()) / epsilon[ip]
         else:
             if pixels.ndim == 1:
-                J[:-1] = evaluate_gauss1d_jacobian(pixels, amplitude, y_c, sigma)  # assume saturation is fixed
+                J[:-1] = evaluate_gauss1d_jacobian(pixels, amplitude, y_c, sigma)  # [:-1] assumes saturation is fixed
             else:
                 xx, yy = pixels
-                J[:-1] = evaluate_gauss2d_jacobian(xx, yy, amplitude, x_c, y_c, sigma)  # assume saturation is fixed
+                J[:-1] = evaluate_gauss2d_jacobian(xx, yy, amplitude, x_c, y_c, sigma)  # [:-1] assume saturation is fixed
             ipar = self.params.get_fixed_parameters()
             if len(ipar) > 0:
                 J[ipar] = 0.
