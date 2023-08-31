@@ -218,29 +218,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
         self.mask = list(np.where(mask)[0])
-        # make rectangular mask per wavelength
-        for order in self.diffraction_orders:
-            self.simulation.boundaries[order] = {"xmin": np.zeros(wl_size, dtype=int), "xmax": np.zeros(wl_size, dtype=int),
-                                                 "ymin": np.zeros(wl_size, dtype=int), "ymax": np.zeros(wl_size, dtype=int)}
-            for k in range(wl_size):
-                maskx = np.any(self.simulation.psf_cubes_masked[order][k], axis=0)
-                masky = np.any(self.simulation.psf_cubes_masked[order][k], axis=1)
-                if np.sum(maskx) > 0 and np.sum(masky) > 0:
-                    xmin, xmax = int(np.argmax(maskx)), int(len(maskx) - np.argmax(maskx[::-1]))
-                    ymin, ymax = int(np.argmax(masky)), int(len(masky) - np.argmax(masky[::-1]))
-                else:
-                    xmin, xmax = -1, -1
-                    ymin, ymax = -1, -1
-                self.simulation.boundaries[order]["xmin"][k] = xmin
-                self.simulation.boundaries[order]["xmax"][k] = xmax
-                self.simulation.boundaries[order]["ymin"][k] = ymin
-                self.simulation.boundaries[order]["ymax"][k] = ymax
-                self.simulation.psf_cubes_masked[order][k, ymin:ymax, xmin:xmax] = True
-        self.simulation.M_sparse_indices = {}
-        self.simulation.psf_cube_sparse_indices = {}
-        for order in self.diffraction_orders:
-            self.simulation.psf_cube_sparse_indices[order] = [np.where(self.simulation.psf_cubes_masked[order][k].ravel() > 0)[0] for k in range(wl_size)]
-            self.simulation.M_sparse_indices[order] = np.concatenate(self.simulation.psf_cube_sparse_indices[order])
 
     def get_spectrogram_truth(self):
         """Load the truth parameters (if provided) from the file header.
