@@ -193,6 +193,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
             params = self.params.values
         A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params_all = params
         poly_params = np.array(psf_poly_params_all).reshape((len(self.diffraction_orders), -1))
+        self.simulation.psf_cubes_masked = {}
+        self.simulation.M_sparse_indices = {}
+        self.simulation.psf_cube_sparse_indices = {}
         for k, order in enumerate(self.diffraction_orders):
             profile_params = self.spectrum.chromatic_psf.from_poly_params_to_profile_params(poly_params[k],
                                                                                             apply_bounds=True)
@@ -207,17 +210,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
             psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.simulation.pixels, profile_params,
                                                                   fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
                                                                   fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
-            self.simulation.psf_cubes_masked[order] = psf_cube > 0
-        wl_size = len(profile_params)
-        flat_spectrogram = np.sum(self.simulation.psf_cubes_masked[self.diffraction_orders[0]].reshape(wl_size, self.simulation.pixels[0].size), axis=0)
-        mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
-        mask = mask.reshape(self.simulation.pixels[0].shape)
-        kernel = np.ones((3, self.spectrum.spectrogram_Nx//10))  # enlarge a bit more the edges of the mask
-        mask = convolve2d(mask, kernel, 'same').astype(bool)
-        for order in self.diffraction_orders:
-            for k in range(wl_size):
-                self.simulation.psf_cubes_masked[order][k] *= ~mask
-        mask = mask.reshape((self.simulation.pixels[0].size,))
+            psf_cube_masked = self.spectrum.chromatic_psf.get_psf_cube_masked(psf_cube, convolve=True)
+            # make rectangular mask per wavelength
+            self.simulation.boundaries[order], self.simulation.psf_cubes_masked[order] = self.spectrum.chromatic_psf.get_boundaries(psf_cube_masked)
+            self.simulation.psf_cube_sparse_indices[order], self.simulation.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(psf_cube_masked)
+        mask = np.sum(self.simulation.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube.shape[0], self.simulation.pixels[0].size), axis=0)
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
         self.mask = list(np.where(mask)[0])
