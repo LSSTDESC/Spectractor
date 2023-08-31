@@ -809,6 +809,34 @@ class ChromaticPSF:
         dM: list
             List of sparse matrices :math:`\partial \mathbf{M}/\partial \theta`
 
+        Examples
+        --------
+
+        >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
+        >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
+        >>> profile_params[:, 0] = np.ones(s.Nx)  # normalized PSF
+        >>> profile_params[:, 1] = np.arange(s.Nx)  # PSF x_c positions
+        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> s.params.fixed[s.Nx:s.Nx+s.deg+1] = [True] * (s.deg+1)  # fix all x_c parameters
+        >>> dM = s.build_sparse_dM(s.set_pixels(mode="2D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
+        >>> len(dM), dM[0].shape
+        (13, (2000, 100))
+        >>> dM[0].dtype
+        dtype('float32')
+        >>> plt.imshow((dM[s.params.get_index("y_c_0")-s.Nx] @ np.ones(s.Nx)).reshape((s.Ny, s.Nx)), origin="lower"); plt.show()  # doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at ...>
+
+        .. doctest::
+            :hide:
+
+            >>> assert len(dM) == len(s.params) - s.Nx
+            >>> assert dM[0].shape == (s.Ny * s.Nx, s.Nx)
+            >>> J = s.build_psf_jacobian(s.set_pixels(mode="2D"), profile_params, psf_cube_sparse_indices, boundaries, dtype="float32")
+            >>> assert np.allclose(dM[s.params.get_index("y_c_0")-s.Nx] @ np.ones(s.Nx), J[s.params.get_index("y_c_0")-s.Nx])
+
         """
         if pixels.ndim == 3:
             mode = "2D"
