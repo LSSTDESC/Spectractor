@@ -663,6 +663,30 @@ class ChromaticPSF:
         M: np.ndarray
             The model matrix :math:`\mathbf{M}`.
 
+        Examples
+        --------
+
+        >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
+        >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
+        >>> profile_params[:, 0] = np.ones(s.Nx)  # normalized PSF
+        >>> profile_params[:, 1] = np.arange(s.Nx)  # PSF x_c positions
+        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> M = s.build_sparse_M(s.set_pixels(mode="2D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
+        >>> M.shape
+        (2000, 100)
+        >>> M.dtype
+        dtype('float32')
+        >>> plt.imshow((M @ np.ones(s.Nx)).reshape((s.Ny, s.Nx)), origin="lower"); plt.show()  # doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at ...>
+
+        .. doctest::
+            :hide:
+
+            >>> assert M.shape == (s.Ny * s.Nx, s.Nx)
+
         """
         sparse_psf_cube = np.zeros(M_sparse_indices.size, dtype=dtype)
         indptr = np.zeros(len(profile_params)+1, dtype=int)
@@ -673,7 +697,7 @@ class ChromaticPSF:
             sparse_psf_cube[indptr[x]:indptr[x+1]] = self.psf.evaluate(pixels[:, boundaries["ymin"][x]:boundaries["ymax"][x],
                                                                                  boundaries["xmin"][x]:boundaries["xmax"][x]],
                                                                        values=profile_params[x, :]).ravel()
-        return sparse.csr_matrix((sparse_psf_cube, M_sparse_indices, indptr), shape=(len(profile_params), pixels[0].size), dtype=dtype)
+        return sparse.csr_matrix((sparse_psf_cube, M_sparse_indices, indptr), shape=(len(profile_params), pixels[0].size), dtype=dtype).T
 
     def build_psf_jacobian(self, pixels, profile_params, psf_cube_sparse_indices, boundaries, dtype="float32"):
         r"""
@@ -2251,7 +2275,7 @@ class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
         # profile_params[:self.Nx, 2] -= self.bgd_width
         if self.amplitude_priors_method != "fixed":
             M = self.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32",
-                                                  M_sparse_indices=self.M_sparse_indices, boundaries=self.boundaries).T
+                                                  M_sparse_indices=self.M_sparse_indices, boundaries=self.boundaries)
 
             M_dot_W = M.T @ self.sqrtW
             W_dot_data = (self.W * self.data).astype("float32")

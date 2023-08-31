@@ -440,9 +440,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, self.psf_profile_params[order],
                                                                  dtype="float32", M_sparse_indices=self.M_sparse_indices[order], boundaries=self.boundaries[order])
             if M is None:
-                M = M_order.T
+                M = M_order
             else:
-                M += M_order.T
+                M += M_order
 
         # M = psf_cube.reshape(len(profile_params[0]), self.pixels[0].size).T  # flattening
         # if self.sparse_indices is None:
