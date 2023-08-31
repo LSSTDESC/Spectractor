@@ -265,7 +265,7 @@ class Astrometry():  # pragma: no cover
         wcs_file_name: str, optional
             The path to a WCS fits file. WCS content will be loaded (default: "").
         gaia_file_name: str, optional
-            The path to a Gaia caralog ecsv file (default: "").
+            The path to a Gaia catalog ecsv file (default: "").
         output_directory: str, optional
             The output directory path. If empty, a directory *_wcs is created next to the analyzed image (default: "").
         gaia_mag_g_limit: float, optional
@@ -430,9 +430,8 @@ class Astrometry():  # pragma: no cover
         """
         u.set_enabled_aliases({'DEG': u.deg})
         coords = []
-        hdu = fits.open(self.match_file_name)
-        table = Table.read(hdu)
-        hdu.close()
+        with fits.open(self.match_file_name) as hdu:
+            table = Table.read(hdu)
         for k in range(0, len(table["QUADPIX"][0]), 2):
             coord = [float(table["QUADPIX"][0][k]), float(table["QUADPIX"][0][k+1])]
             if np.sum(coord) > 0:
@@ -1133,11 +1132,11 @@ class Astrometry():  # pragma: no cover
         # The source file given to solve-field is understood as a FITS file with pixel origin value at 1,
         # whereas pixel coordinates comes from photutils using a numpy convention with pixel origin value at 0
         # To correct for this we shift the CRPIX center of 1 pixel
-        hdu = fits.open(self.wcs_file_name)
-        hdu[0].header['CRPIX1'] = float(hdu[0].header['CRPIX1']) + 1
-        hdu[0].header['CRPIX2'] = float(hdu[0].header['CRPIX2']) + 1
-        self.my_logger.info(f"\n\tWrite astrometry.net WCS solution in {self.wcs_file_name}...")
-        hdu.writeto(self.wcs_file_name, overwrite=True)
+        with fits.open(self.wcs_file_name) as hdu:
+            hdu[0].header['CRPIX1'] = float(hdu[0].header['CRPIX1']) + 1
+            hdu[0].header['CRPIX2'] = float(hdu[0].header['CRPIX2']) + 1
+            self.my_logger.info(f"\n\tWrite astrometry.net WCS solution in {self.wcs_file_name}...")
+            hdu.writeto(self.wcs_file_name, overwrite=True)
 
         # load quad stars
         self.quad_stars_pixel_positions = self.get_quad_stars_pixel_positions()
@@ -1275,14 +1274,14 @@ class Astrometry():  # pragma: no cover
         ddec_median = np.median(ddec.to(u.arcsec).value)
         dra_rms = np.std(dra.to(u.arcsec).value)
         ddec_rms = np.std(ddec.to(u.arcsec).value)
-        hdu = fits.open(self.wcs_file_name)
-        hdu[0].header['CRVAL1'] = self.wcs.wcs.crval[0]
-        hdu[0].header['CRVAL2'] = self.wcs.wcs.crval[1]
-        hdu[0].header['CRV1_MED'] = dra_median
-        hdu[0].header['CRV2_MED'] = ddec_median
-        hdu[0].header['CRV1_RMS'] = dra_rms
-        hdu[0].header['CRV2_RMS'] = ddec_rms
-        hdu.writeto(self.wcs_file_name, overwrite=True)
+        with fits.open(self.wcs_file_name) as hdu:
+            hdu[0].header['CRVAL1'] = self.wcs.wcs.crval[0]
+            hdu[0].header['CRVAL2'] = self.wcs.wcs.crval[1]
+            hdu[0].header['CRV1_MED'] = dra_median
+            hdu[0].header['CRV2_MED'] = ddec_median
+            hdu[0].header['CRV1_RMS'] = dra_rms
+            hdu[0].header['CRV2_RMS'] = ddec_rms
+            hdu.writeto(self.wcs_file_name, overwrite=True)
 
         # check histogram medians
         self.wcs = load_wcs_from_file(self.wcs_file_name)
@@ -1301,12 +1300,12 @@ class Astrometry():  # pragma: no cover
         ddec_median = np.median(ddec.to(u.arcsec).value)
         dra_rms = np.std(dra.to(u.arcsec).value)
         ddec_rms = np.std(ddec.to(u.arcsec).value)
-        hdu = fits.open(self.wcs_file_name)
-        hdu[0].header['CRV1_MED'] = dra_median
-        hdu[0].header['CRV2_MED'] = ddec_median
-        hdu[0].header['CRV1_RMS'] = dra_rms
-        hdu[0].header['CRV2_RMS'] = ddec_rms
-        hdu.writeto(self.wcs_file_name, overwrite=True)
+        with fits.open(self.wcs_file_name) as hdu:
+            hdu[0].header['CRV1_MED'] = dra_median
+            hdu[0].header['CRV2_MED'] = ddec_median
+            hdu[0].header['CRV1_RMS'] = dra_rms
+            hdu[0].header['CRV2_RMS'] = ddec_rms
+            hdu.writeto(self.wcs_file_name, overwrite=True)
 
         # if parameters.DEBUG:
         #     plot_shifts_histograms(dra, ddec)
