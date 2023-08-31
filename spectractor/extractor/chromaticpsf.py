@@ -752,6 +752,12 @@ class ChromaticPSF:
                 coeffs = np.eye(1, nparams, k)[0]
                 legs[ip] = np.polynomial.legendre.legval(leg_pixels, coeffs).astype(dtype)
                 ip += 1
+        for ip, label in enumerate(self.psf.params.labels):
+            if "amplitude" in label:  # skip computation of ChromaticPSF jacobian for amplitude parameters
+                self.psf.params.fixed[ip] = True
+            else:  # check if all ChromaticPSF parameters related to PSF parameter ip are fixed
+                indices = np.array([k for k in range(len(self.params)) if label in self.params.labels[k]])
+                self.psf.params.fixed[ip] = np.all(np.array(self.params.fixed)[indices])
         for x in range(Nx):
             if mode == "2D":
                 Jpsf = self.psf.jacobian(pixels[:, boundaries["ymin"][x]:boundaries["ymax"][x],

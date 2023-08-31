@@ -150,8 +150,8 @@ def evaluate_moffat1d(y, amplitude, y_c, gamma, alpha, norm):  # pragma: no cove
     return a
 
 
-@njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda):  # pragma: no cover
+@njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
+def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda, fixed):  # pragma: no cover
     r"""Compute a 1D Moffat Jacobian, whose integral is normalised to unity.
 
     .. math ::
@@ -177,6 +177,8 @@ def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda): 
         Normalisation :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}`.
     dnormda: float
         Derivatives of the normalisation with respect to alpha.
+    fixed: array_like
+        Array of booleans, with True values for fixed parameters.
 
     Returns
     -------
@@ -194,11 +196,13 @@ def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda): 
     >>> norm = evaluate_moffat1d_normalisation(gamma, alpha)
     >>> dnormda = evaluate_moffat1d_normalisation_dalpha(norm, alpha)
     >>> a = evaluate_moffat1d(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha, norm=norm)
-    >>> J = evaluate_moffat1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha, norm=norm, dnormda=dnormda)
+    >>> J = evaluate_moffat1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha, norm=norm, dnormda=dnormda, fixed=np.array([False, False, True, False]))
     >>> J.shape
     (5, 50)
     >>> J.dtype
     dtype('float32')
+    >>> np.allclose(J[2], 0)
+    True
 
     .. doctest::
         :hide:
@@ -214,11 +218,15 @@ def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda): 
     dpsf = alpha * inv * psf
     A = norm * amplitude
     J = np.zeros((5, y.size), dtype=np.float32)
-    J[0] = norm * psf  # amplitude
+    if not fixed[0]:
+        J[0] = norm * psf  # amplitude
     # fixed x_c so J[1] = 0
-    J[2] = (2 * A / (gamma * gamma)) * yc * dpsf  # y_c
-    J[3] = (2 * A / gamma) * rr_gg * dpsf - (A / gamma) * psf  # gamma
-    J[4] = - A * psf * np.log(1 + rr_gg) + amplitude * psf * dnormda  # alpha
+    if not fixed[2]:
+        J[2] = (2 * A / (gamma * gamma)) * yc * dpsf  # y_c
+    if not fixed[3]:
+        J[3] = (2 * A / gamma) * rr_gg * dpsf - (A / gamma) * psf  # gamma
+    if not fixed[4]:
+        J[4] = - A * psf * np.log(1 + rr_gg) + amplitude * psf * dnormda  # alpha
     return J
 
 
@@ -311,8 +319,8 @@ def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, no
     return a
 
 
-@njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm_moffat, dnormda):  # pragma: no cover
+@njit(["float32[:,:](int64[:], float32, float32, float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
+def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm_moffat, dnormda, fixed):  # pragma: no cover
     r"""Compute a 1D Moffat-Gaussian Jacobian, whose integral is normalised to unity.
 
     .. math ::
@@ -346,6 +354,8 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
         Normalisation :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}`.
     dnormda: float
         Derivatives of the normalisation with respect to alpha.
+    fixed: array_like
+        Array of booleans, with True values for fixed parameters.
 
     Returns
     -------
@@ -367,11 +377,13 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
     >>> a = evaluate_moffatgauss1d(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
     ... eta_gauss=eta_gauss, sigma=sigma, norm_moffat=norm)
     >>> J = evaluate_moffatgauss1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, gamma=gamma, alpha=alpha,
-    ... eta_gauss=eta_gauss, sigma=sigma, norm_moffat=norm, dnormda=dnormda)
+    ... eta_gauss=eta_gauss, sigma=sigma, norm_moffat=norm, dnormda=dnormda, fixed=np.array([False, False, True, False, False]))
     >>> J.shape
     (7, 50)
     >>> J.dtype
     dtype('float32')
+    >>> np.allclose(J[2], 0)
+    True
 
     .. doctest::
         :hide:
@@ -390,13 +402,19 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
     psf = psf_moffat + eta_gauss * psf_gauss
     norm = amplitude / ((1. / norm_moffat) + eta_gauss * np.sqrt(2 * np.pi) * sigma)
     J = np.zeros((7, y.size), dtype=np.float32)
-    J[0] = (norm / amplitude) * psf  # amplitude
+    if not fixed[0]:
+        J[0] = (norm / amplitude) * psf  # amplitude
     # fixed x_c so J[1] = 0
-    J[2] = (norm / (sigma * sigma)) * yc * eta_gauss * psf_gauss + (2 * norm / (gamma * gamma)) * yc * dpsf_moffat  # y_c
-    J[3] = (2 * norm / gamma) * rr_gg * dpsf_moffat - (norm * norm / (amplitude * norm_moffat * gamma)) * psf   # gamma
-    J[4] = -norm * psf_moffat * np.log(1 + rr_gg) + psf * (norm * norm / amplitude) * (dnormda / (norm_moffat * norm_moffat))   # alpha
-    J[5] = norm * psf_gauss - (np.sqrt(2 * np.pi) * sigma * norm * norm / amplitude) * psf  # eta
-    J[6] = (-eta_gauss * np.sqrt(2*np.pi) * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss  # sigma
+    if not fixed[2]:
+        J[2] = (norm / (sigma * sigma)) * yc * eta_gauss * psf_gauss + (2 * norm / (gamma * gamma)) * yc * dpsf_moffat  # y_c
+    if not fixed[3]:
+        J[3] = (2 * norm / gamma) * rr_gg * dpsf_moffat - (norm * norm / (amplitude * norm_moffat * gamma)) * psf   # gamma
+    if not fixed[4]:
+        J[4] = -norm * psf_moffat * np.log(1 + rr_gg) + psf * (norm * norm / amplitude) * (dnormda / (norm_moffat * norm_moffat))   # alpha
+    if not fixed[5]:
+        J[5] = norm * psf_gauss - (np.sqrt(2 * np.pi) * sigma * norm * norm / amplitude) * psf  # eta
+    if not fixed[6]:
+        J[6] = (-eta_gauss * np.sqrt(2*np.pi) * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss  # sigma
     return J
 
 
@@ -483,8 +501,8 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: no co
     return a
 
 
-@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: no cover
+@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
+def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, fixed):  # pragma: no cover
     r"""Compute a 2D Moffat Jacobian, whose integral is normalised to unity.
 
     Parameters
@@ -503,6 +521,8 @@ def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha):  # prag
         Width  :math:`\gamma` of the function.
     alpha: float
         Exponent :math:`\alpha` of the Moffat function.
+    fixed: array_like
+        Array of booleans, with True values for fixed parameters.
 
     Returns
     -------
@@ -517,11 +537,13 @@ def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha):  # prag
     >>> yy, xx = np.mgrid[:Ny, :Nx]
     >>> amplitude = 10
     >>> a = evaluate_moffat2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2)
-    >>> J = evaluate_moffat2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2)
+    >>> J = evaluate_moffat2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2, fixed=np.array([False, False, True, False, False]))
     >>> J.shape
     (5, 2500)
     >>> J.dtype
     dtype('float32')
+    >>> np.allclose(J[2], 0)
+    True
 
     .. doctest::
         :hide:
@@ -537,11 +559,16 @@ def evaluate_moffat2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha):  # prag
     dpsf = alpha * inv * psf
     norm = np.float32(amplitude * (alpha-1) / (np.pi * gamma * gamma))
     J = np.zeros((5, x.size), dtype=np.float32)
-    J[0] = (norm / amplitude) * psf  # amplitude
-    J[1] = (2 * norm / (gamma * gamma)) * xc * dpsf  # x_c
-    J[2] = (2 * norm / (gamma * gamma)) * yc * dpsf  # y_c
-    J[3] = (2 * norm / (gamma)) * rr_gg * dpsf - (2 * norm / gamma) * psf  # gamma
-    J[4] = (norm / (alpha - 1)) * psf - norm * psf * np.log(1 + rr_gg)  # alpha
+    if not fixed[0]:
+        J[0] = (norm / amplitude) * psf  # amplitude
+    if not fixed[1]:
+        J[1] = (2 * norm / (gamma * gamma)) * xc * dpsf  # x_c
+    if not fixed[2]:
+        J[2] = (2 * norm / (gamma * gamma)) * yc * dpsf  # y_c
+    if not fixed[3]:
+        J[3] = (2 * norm / (gamma)) * rr_gg * dpsf - (2 * norm / gamma) * psf  # gamma
+    if not fixed[4]:
+        J[4] = (norm / (alpha - 1)) * psf - norm * psf * np.log(1 + rr_gg)  # alpha
     return J
 
 
@@ -708,9 +735,9 @@ def evaluate_gauss1d(y, amplitude, y_c, sigma):  # pragma: no cover
     return a
 
 
-@njit(["float32[:,:](int64[:], float32, float32, float32)",
-       "float32[:,:](float32[:], float32, float32, float32)"], fastmath=True, cache=False)
-def evaluate_gauss1d_jacobian(y, amplitude, y_c, sigma):  # pragma: no cover
+@njit(["float32[:,:](int64[:], float32, float32, float32, boolean[:])",
+       "float32[:,:](float32[:], float32, float32, float32, boolean[:])"], fastmath=True, cache=False)
+def evaluate_gauss1d_jacobian(y, amplitude, y_c, sigma, fixed):  # pragma: no cover
     r"""Compute a 1D Gaussian function, whose integral is normalised to unity.
 
     .. math ::
@@ -732,6 +759,8 @@ def evaluate_gauss1d_jacobian(y, amplitude, y_c, sigma):  # pragma: no cover
         X axis center  :math:`y_c` of the function.
     sigma: float
         Width :math:`\sigma` of the Gaussian function.
+    fixed: array_like
+        Array of booleans, with True values for fixed parameters.
 
     Returns
     -------
@@ -746,11 +775,13 @@ def evaluate_gauss1d_jacobian(y, amplitude, y_c, sigma):  # pragma: no cover
     >>> amplitude = 10
     >>> sigma = 2
     >>> a = evaluate_gauss1d(y, amplitude=amplitude, y_c=Ny/2, sigma=2)
-    >>> J = evaluate_gauss1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, sigma=2)
+    >>> J = evaluate_gauss1d_jacobian(y, amplitude=amplitude, y_c=Ny/2, sigma=2, fixed=np.array([False, False, True]))
     >>> J.shape
     (4, 50)
     >>> J.dtype
     dtype('float32')
+    >>> np.allclose(J[2], 0)
+    True
 
     .. doctest::
         :hide:
@@ -763,10 +794,13 @@ def evaluate_gauss1d_jacobian(y, amplitude, y_c, sigma):  # pragma: no cover
     psf = np.exp(-(rr_ss / 2))
     norm = amplitude / (np.sqrt(2 * np.pi) * sigma)
     J = np.zeros((4, y.size), dtype=np.float32)
-    J[0] = (norm / amplitude) * psf  # amplitude
+    if not fixed[0]:
+        J[0] = (norm / amplitude) * psf  # amplitude
     # x_c is fixed so J[1] = 0
-    J[2] = (norm / sigma) * yc * psf  # y_c
-    J[3] = (norm / sigma) * rr_ss * psf - (norm / sigma) * psf  # sigma
+    if not fixed[2]:
+        J[2] = (norm / sigma) * yc * psf  # y_c
+    if not fixed[3]:
+        J[3] = (norm / sigma) * rr_ss * psf - (norm / sigma) * psf  # sigma
     return J
 
 
@@ -848,8 +882,8 @@ def evaluate_gauss2d(x, y, amplitude, x_c, y_c, sigma):  # pragma: no cover
     return a
 
 
-@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_gauss2d_jacobian(x, y, amplitude, x_c, y_c, sigma):  # pragma: no cover
+@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
+def evaluate_gauss2d_jacobian(x, y, amplitude, x_c, y_c, sigma, fixed):  # pragma: no cover
     r"""Compute a 2D Gaussian Jacobian, whose integral is normalised to unity.
 
     Parameters
@@ -866,6 +900,8 @@ def evaluate_gauss2d_jacobian(x, y, amplitude, x_c, y_c, sigma):  # pragma: no c
         Y axis center  :math:`y_c` of the function.
     sigma: float
         Width :math:`\sigma` of the Gaussian function.
+    fixed: array_like
+        Array of booleans, with True values for fixed parameters.
 
     Returns
     -------
@@ -880,11 +916,13 @@ def evaluate_gauss2d_jacobian(x, y, amplitude, x_c, y_c, sigma):  # pragma: no c
     >>> yy, xx = np.mgrid[:Ny, :Nx]
     >>> amplitude = 10
     >>> a = evaluate_gauss2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, sigma=1)
-    >>> J = evaluate_gauss2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, sigma=1)
+    >>> J = evaluate_gauss2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, sigma=1, fixed=np.array([False, False, True, False, False]))
     >>> J.shape
     (4, 2500)
     >>> J.dtype
     dtype('float32')
+    >>> np.allclose(J[2], 0)
+    True
 
     .. doctest::
         :hide:
@@ -898,16 +936,20 @@ def evaluate_gauss2d_jacobian(x, y, amplitude, x_c, y_c, sigma):  # pragma: no c
     psf = np.exp(-(rr_ss / 2))
     norm = amplitude / (2 * np.pi * sigma * sigma)
     J = np.zeros((4, x.size), dtype=np.float32)
-    J[0] = (norm / amplitude) * psf  # amplitude
-    J[1] = (norm / sigma) * xc * psf  # x_c
-    J[2] = (norm / sigma) * yc * psf  # y_c
-    J[3] = (norm / sigma) * rr_ss * psf - (2 * norm / sigma) * psf  # sigma
+    if not fixed[0]:
+        J[0] = (norm / amplitude) * psf  # amplitude
+    if not fixed[1]:
+        J[1] = (norm / sigma) * xc * psf  # x_c
+    if not fixed[2]:
+        J[2] = (norm / sigma) * yc * psf  # y_c
+    if not fixed[3]:
+        J[3] = (norm / sigma) * rr_ss * psf - (2 * norm / sigma) * psf  # sigma
     return J
 
 
 
-@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
-def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma):  # pragma: no cover
+@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32, float32, float32, boolean[:])"], fastmath=True, cache=True)
+def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma, fixed):  # pragma: no cover
     r"""Compute a 2D Moffat Jacobian, whose integral is normalised to unity.
 
     Parameters
@@ -930,6 +972,8 @@ def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta
         Relative negative amplitude of the Gaussian function.
     sigma: float
         Width :math:`\sigma` of the Gaussian function.
+    fixed: array_like
+        Array of booleans, with True values for fixed parameters.
 
 
     Returns
@@ -947,11 +991,13 @@ def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta
     >>> a = evaluate_moffatgauss2d(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2,
     ... eta_gauss=-0.1, sigma=1)
     >>> J = evaluate_moffatgauss2d_jacobian(xx, yy, amplitude=amplitude, x_c=Nx/2, y_c=Ny/2, gamma=5, alpha=2,
-    ... eta_gauss=-0.1, sigma=1)
+    ... eta_gauss=-0.1, sigma=1, fixed=np.array([False, False, True, False, False, False, False]))
     >>> J.shape
     (7, 2500)
     >>> J.dtype
     dtype('float32')
+    >>> np.allclose(J[2], 0)
+    True
 
     .. doctest::
         :hide:
@@ -971,13 +1017,20 @@ def evaluate_moffatgauss2d_jacobian(x, y, amplitude, x_c, y_c, gamma, alpha, eta
     psf = psf_moffat + eta_gauss * psf_gauss
     norm = amplitude / ((np.pi * gamma * gamma) / (alpha - 1) + eta_gauss * 2 * np.pi * sigma * sigma)
     J = np.zeros((7, x.size), dtype=np.float32)
-    J[0] = (norm / amplitude) * psf  # amplitude
-    J[1] = (norm / (sigma * sigma)) * xc * eta_gauss * psf_gauss + (2 * norm / (gamma * gamma)) * xc * dpsf_moffat  # x_c
-    J[2] = (norm / (sigma * sigma)) * yc * eta_gauss * psf_gauss + (2 * norm / (gamma * gamma)) * yc * dpsf_moffat  # x_c
-    J[3] = (-2 * np.pi * gamma * norm * norm / (alpha-1) / amplitude) * psf + (2 * norm / gamma) * rr_gg * dpsf_moffat  # gamma
-    J[4] = (np.pi * gamma * gamma) * norm * norm / (amplitude * (alpha-1) * (alpha-1)) * psf - norm * psf_moffat * np.log(1 + rr_gg)  # alpha
-    J[5] = norm * psf_gauss - (2 * np.pi * sigma * sigma * norm * norm / amplitude) * psf
-    J[6] = (-4 * eta_gauss * np.pi * sigma * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss
+    if not fixed[0]:
+        J[0] = (norm / amplitude) * psf  # amplitude
+    if not fixed[1]:
+        J[1] = (norm / (sigma * sigma)) * xc * eta_gauss * psf_gauss + (2 * norm / (gamma * gamma)) * xc * dpsf_moffat  # x_c
+    if not fixed[2]:
+        J[2] = (norm / (sigma * sigma)) * yc * eta_gauss * psf_gauss + (2 * norm / (gamma * gamma)) * yc * dpsf_moffat  # x_c
+    if not fixed[3]:
+        J[3] = (-2 * np.pi * gamma * norm * norm / (alpha-1) / amplitude) * psf + (2 * norm / gamma) * rr_gg * dpsf_moffat  # gamma
+    if not fixed[4]:
+        J[4] = (np.pi * gamma * gamma) * norm * norm / (amplitude * (alpha-1) * (alpha-1)) * psf - norm * psf_moffat * np.log(1 + rr_gg)  # alpha
+    if not fixed[5]:
+        J[5] = norm * psf_gauss - (2 * np.pi * sigma * sigma * norm * norm / amplitude) * psf
+    if not fixed[6]:
+        J[6] = (-4 * eta_gauss * np.pi * sigma * norm * norm / amplitude) * psf + (eta_gauss * norm / sigma) * rr_ss * psf_gauss
     return J
 
 
@@ -1258,12 +1311,16 @@ class Moffat(PSF):
         >>> p = [2,20,30,4,2,10]
         >>> epsilon = [0.01] * len(p)
         >>> psf = Moffat(p, clip=True)
+        >>> psf.params.fixed = [True, True, False, False, False, True]  # fix amplitude, x_c, saturation
+
+        2D case
+
         >>> yy, xx = np.mgrid[:50, :60]
         >>> J_ana = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=True)
         >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=False)
-        >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2) for k in range(len(p))]
-        [True, True, True, True, True, True]
         >>> np.allclose(J_num, J_ana, rtol=1e-4, atol=1e-4)
+        True
+        >>> np.allclose(J_ana[0:2], 0)
         True
 
         ..  doctest::
@@ -1277,9 +1334,9 @@ class Moffat(PSF):
         >>> y = np.mgrid[:50]
         >>> J_ana = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=True)
         >>> J_num = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=False)
-        >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2) for k in range(len(p))]
-        [True, True, True, True, True, True]
         >>> np.allclose(J_num, J_ana, rtol=1e-3, atol=1e-3)
+        True
+        >>> np.allclose(J_ana[0:2], 0)
         True
 
         ..  doctest::
@@ -1307,17 +1364,15 @@ class Moffat(PSF):
                 tmp_model = self.evaluate(pixels, values=tmp_p)
                 J[ip] = (tmp_model.ravel() - model.ravel()) / epsilon[ip]
         else:
+            fixed = np.array(self.params.fixed)
             if pixels.ndim == 1:
                 norm = evaluate_moffat1d_normalisation(gamma, alpha)
                 dnormda = evaluate_moffat1d_normalisation_dalpha(norm, alpha)
-                J[:-1] = evaluate_moffat1d_jacobian(pixels, amplitude, y_c, gamma, alpha, norm, dnormda)  # assume saturation is fixed
+                J[:-1] = evaluate_moffat1d_jacobian(pixels, amplitude, y_c, gamma, alpha, norm, dnormda, fixed=fixed)  # [:-1] assumes saturation is fixed
             else:
                 xx, yy = pixels
                 if amplitude > 0:
-                    J[:-1] = evaluate_moffat2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha)  # assume saturation is fixed
-            ipar = self.params.get_fixed_parameters()
-            if len(ipar) > 0:
-                J[ipar] = 0.
+                    J[:-1] = evaluate_moffat2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha, fixed=fixed)  # [:-1] assumes saturation is fixed
         return J
 
 
@@ -1431,12 +1486,16 @@ class Gauss(PSF):
         >>> p = [2,20,30,2,10]
         >>> epsilon = [0.001] * len(p)
         >>> psf = Gauss(p, clip=True)
+        >>> psf.params.fixed = [True, True, False, False, True]  # fix amplitude, x_c, saturation
+
+        2D case
+
         >>> yy, xx = np.mgrid[:50, :60]
         >>> J_ana = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=True)
         >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=False)
-        >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2, atol=1e-4) for k in range(len(p))]
-        [True, True, True, True, True]
         >>> np.allclose(J_num, J_ana, rtol=1e-2, atol=1e-4)
+        True
+        >>> np.allclose(J_ana[0:2], 0)
         True
 
         ..  doctest::
@@ -1450,9 +1509,9 @@ class Gauss(PSF):
         >>> y = np.mgrid[:50]
         >>> J_ana = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=True)
         >>> J_num = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=False)
-        >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2, atol=1e-4) for k in range(len(p))]
-        [True, True, True, True, True]
         >>> np.allclose(J_num, J_ana, rtol=1e-2, atol=1e-4)
+        True
+        >>> np.allclose(J_ana[0:2], 0)
         True
 
         ..  doctest::
@@ -1480,14 +1539,12 @@ class Gauss(PSF):
                 tmp_model = self.evaluate(pixels, values=tmp_p)
                 J[ip] = (tmp_model.ravel() - model.ravel()) / epsilon[ip]
         else:
+            fixed = np.array(self.params.fixed)
             if pixels.ndim == 1:
-                J[:-1] = evaluate_gauss1d_jacobian(pixels, amplitude, y_c, sigma)  # [:-1] assumes saturation is fixed
+                J[:-1] = evaluate_gauss1d_jacobian(pixels, amplitude, y_c, sigma, fixed=fixed)  # [:-1] assumes saturation is fixed
             else:
                 xx, yy = pixels
-                J[:-1] = evaluate_gauss2d_jacobian(xx, yy, amplitude, x_c, y_c, sigma)  # [:-1] assume saturation is fixed
-            ipar = self.params.get_fixed_parameters()
-            if len(ipar) > 0:
-                J[ipar] = 0.
+                J[:-1] = evaluate_gauss2d_jacobian(xx, yy, amplitude, x_c, y_c, sigma, fixed=fixed)  # [:-1] assume saturation is fixed
         return J
 
 
@@ -1609,12 +1666,16 @@ class MoffatGauss(PSF):
         >>> p = [2,20,30,4,2,-0.5,1,10]
         >>> epsilon = [0.001] * len(p)
         >>> psf = MoffatGauss(p)
+        >>> psf.params.fixed = [True, True, False, False, False, False, False, True]  # fix amplitude, x_c, saturation
+
+        2D case
+
         >>> yy, xx = np.mgrid[:50, :60]
         >>> J_ana = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=True)
         >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=False)
-        >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2, atol=1e-4) for k in range(len(p))]
-        [True, True, True, True, True, True, True, True]
         >>> np.allclose(J_num, J_ana, rtol=1e-4, atol=1e-4)
+        True
+        >>> np.allclose(J_ana[0:2], 0)
         True
 
         ..  doctest::
@@ -1628,9 +1689,9 @@ class MoffatGauss(PSF):
         >>> y = np.mgrid[:50]
         >>> J_ana = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=True)
         >>> J_num = psf.jacobian(pixels=y, params=p, epsilon=epsilon, analytical=False)
-        >>> [np.isclose(np.sum(J_num[k]), np.sum(J_ana[k]), rtol=2e-2, atol=1e-3) for k in range(len(p))]
-        [True, True, True, True, True, True, True, True]
-        >>> np.allclose(J_num, J_ana, rtol=1e-3, atol=1e-4)
+        >>> np.allclose(J_num, J_ana, rtol=1e-3, atol=1e-3)
+        True
+        >>> np.allclose(J_ana[0:2], 0)
         True
 
         ..  doctest::
@@ -1658,16 +1719,14 @@ class MoffatGauss(PSF):
                 tmp_model = self.evaluate(pixels, values=tmp_p)
                 J[ip] = (tmp_model.ravel() - model.ravel()) / epsilon[ip]
         else:
+            fixed = np.array(self.params.fixed)
             if pixels.ndim == 1:
                 norm = evaluate_moffat1d_normalisation(gamma, alpha)
                 dnormda = evaluate_moffat1d_normalisation_dalpha(norm, alpha)
-                J[:-1] = evaluate_moffatgauss1d_jacobian(pixels, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm, dnormda)  # assume saturation is fixed
+                J[:-1] = evaluate_moffatgauss1d_jacobian(pixels, amplitude, y_c, gamma, alpha, eta_gauss, sigma, norm, dnormda, fixed=fixed)   # [:-1] assume saturation is fixed
             else:
                 xx, yy = pixels
-                J[:-1] = evaluate_moffatgauss2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma)  # assume saturation is fixed
-            ipar = self.params.get_fixed_parameters()
-            if len(ipar) > 0:
-                J[ipar] = 0.
+                J[:-1] = evaluate_moffatgauss2d_jacobian(xx, yy, amplitude, x_c, y_c, gamma, alpha, eta_gauss, sigma, fixed=fixed)  # [:-1] assume saturation is fixed
         return J
 
 
@@ -1837,12 +1896,15 @@ class Order0(PSF):
 
         >>> epsilon = [0.01] * len(p)
         >>> psf.params.fixed[2] = True  # fix y_c
+        >>> psf.params.fixed = [True, True, False, False, True]  # fix amplitude, x_c, saturation
         >>> yy, xx = np.mgrid[:50, :60]
         >>> J_num = psf.jacobian(pixels=np.array([xx, yy]), params=p, epsilon=epsilon, analytical=False)
         >>> J_num.shape
         (5, 3000)
         >>> np.sum(J_num[2])
         0.0
+        >>> np.allclose(J_num[0:2], 0)
+        True
 
         ..  doctest::
             :hide:
