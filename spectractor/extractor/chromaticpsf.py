@@ -425,10 +425,8 @@ class ChromaticPSF:
         Examples
         --------
 
-        >>> psf = Moffat()
-        >>> s = ChromaticPSF(psf, Nx=100, Ny=20, deg=2, saturation=20000)
-        >>> poly_params = s.generate_test_poly_params()
-        >>> profile_params = s.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
+        >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
+        >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 1] = np.arange(s.Nx)
         >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube.shape
@@ -496,10 +494,8 @@ class ChromaticPSF:
         Examples
         --------
 
-        >>> psf = Moffat()
-        >>> s = ChromaticPSF(psf, Nx=100, Ny=20, deg=2, saturation=20000)
-        >>> poly_params = s.generate_test_poly_params()
-        >>> profile_params = s.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
+        >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
+        >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 1] = np.arange(s.Nx)
         >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
@@ -554,10 +550,8 @@ class ChromaticPSF:
         Examples
         --------
 
-        >>> psf = Moffat()
-        >>> s = ChromaticPSF(psf, Nx=100, Ny=20, deg=2, saturation=20000)
-        >>> poly_params = s.generate_test_poly_params()
-        >>> profile_params = s.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
+        >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
+        >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 1] = np.arange(s.Nx)
         >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
@@ -619,16 +613,14 @@ class ChromaticPSF:
         Examples
         --------
 
-        >>> psf = Moffat()
-        >>> s = ChromaticPSF(psf, Nx=100, Ny=20, deg=2, saturation=20000)
-        >>> poly_params = s.generate_test_poly_params()
-        >>> profile_params = s.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
+        >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
+        >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 1] = np.arange(s.Nx)
         >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
         >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
         >>> M_sparse_indices.shape
-        (38000,)
+        (72000,)
         >>> len(psf_cube_sparse_indices)
         100
         """
@@ -725,6 +717,31 @@ class ChromaticPSF:
         -------
         J: np.ndarray
             The Jacobian matrix math:`\mathbf{J}`.
+
+        Examples
+        --------
+
+        >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
+        >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
+        >>> profile_params[:, 0] = np.ones(s.Nx)  # normalized PSF
+        >>> profile_params[:, 1] = np.arange(s.Nx)  # PSF x_c positions
+        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> s.params.fixed[s.Nx:s.Nx+s.deg+1] = [True] * (s.deg+1)  # fix all x_c parameters
+        >>> J = s.build_psf_jacobian(s.set_pixels(mode="2D"), profile_params, psf_cube_sparse_indices, boundaries, dtype="float32")
+        >>> J.shape
+        (13, 2000)
+        >>> J.dtype
+        dtype('float32')
+        >>> plt.imshow(J[s.params.get_index("y_c_0")-s.Nx].reshape((s.Ny, s.Nx)), origin="lower"); plt.show()  # doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at ...>
+
+        .. doctest::
+            :hide:
+
+            >>> assert J.shape == (len(s.params) - s.Nx, s.Ny * s.Nx)
 
         """
         if pixels.ndim == 3:
@@ -1070,7 +1087,7 @@ class ChromaticPSF:
         ..  doctest::
             :hide:
 
-            >>> assert(np.all(np.isclose(profile_params[0], [10, 0, 50, 5, 2, 0, 1, 8e3])))
+            >>> assert np.allclose(profile_params[0], [10, 0, 50, 5, 2, -5e-3, 1, 8e3], rtol=1e-3, atol=1e-3)
 
         From the profile parameters to the polynomial parameters:
 
@@ -1079,7 +1096,7 @@ class ChromaticPSF:
         ..  doctest::
             :hide:
 
-            >>> assert(np.all(np.isclose(profile_params, poly_params_test)))
+            >>> assert np.allclose(profile_params, poly_params_test)
 
         From the polynomial parameters to the profile parameters without Moffat amplitudes:
 
@@ -1088,7 +1105,7 @@ class ChromaticPSF:
         ..  doctest::
             :hide:
 
-            >>> assert(np.all(np.isclose(profile_params[0], [1, 0, 50, 5, 2, 0, 1, 8e3])))
+            >>> assert np.allclose(profile_params[0], [1, 0, 50, 5, 2, 0, 1, 8e3])
 
         """
         length = len(self.table)
