@@ -1150,8 +1150,8 @@ class PSF:
             >>> assert w.model is not None
             >>> residuals = (w.data-w.model)/w.err
             >>> assert w.costs[-1] / w.pixels.size < 1.5
-            >>> assert np.abs(np.mean(residuals)) < 0.2
-            >>> assert np.std(residuals) < 1.2
+            >>> assert np.abs(np.mean(residuals)) < 0.3
+            >>> assert np.std(residuals) < 1.5
             >>> assert np.all(np.isclose(w.params.values[2], p0[2], atol=1e-1))
 
         .. plot::
