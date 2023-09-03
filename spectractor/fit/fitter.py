@@ -3,6 +3,7 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import numpy as np
+import scipy
 import os
 import json
 from dataclasses import dataclass
@@ -819,88 +820,41 @@ class FitWorkspace:
                 res = L @ (model - self.data)
         return res
 
-    def compute_W_with_model_error(self, model_err):
-        W = self.W
-        zeros = W == 0
-        if self.W.ndim == 1 and self.W.dtype != object:
-            if np.any(model_err > 0):
-                W = 1 / (self.data_cov + model_err * model_err)
-        elif self.W.dtype == object:
-            K = len(self.W)
-            if self.W[0].ndim == 1:
-                if np.any(model_err > 0):
-                    W = [1 / (self.data_cov[k] + model_err[k] * model_err[k]) for k in range(K)]
-            elif self.W[0].ndim == 2:
-                K = len(self.W)
-                if np.any(model_err > 0):
-                    cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
-                    L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
-                    W = [L[k].T @ L[k] for k in range(K)]
-            else:
-                raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
-                                 f"I get W[0]={self.W[0]}")
-        elif self.W.ndim == 2 and self.W.dtype != object:
-            if np.any(model_err > 0):
-                cov = self.data_cov + np.diag(model_err * model_err)
-                L = np.linalg.inv(np.linalg.cholesky(cov))
-                W = L.T @ L
-        W[zeros] = 0
-        return W
+    def prepare_weight_matrices(self):
+        r"""Compute weight matrix :math:`\mathbf{W}` `self.W` as the inverse of data covariance matrix `self.data_cov`.
+        Cancel weights of data outliers given by `self.outliers`.
 
-    def chisq(self, p, model_output=False):
-        """Compute the chi square for a set of model parameters p.
+        Examples
+        --------
+        1D case:
 
-        Four cases are implemented: diagonal W, 2D W, array of diagonal Ws, array of 2D Ws. The two latter cases
-        are for multiple independent data vectors with W being block diagonal.
+        >>> w = FitWorkspace()
+        >>> w.data_cov = 2 * np.ones(4)
+        >>> w.prepare_weight_matrices()
+        >>> w.W
+        array([0.5, 0.5, 0.5, 0.5])
 
-        Parameters
-        ----------
-        p: array_like
-            The array of model parameters.
-        model_output: bool, optional
-            If true, the simulated model is output.
+        2D case:
 
-        Returns
-        -------
-        chisq: float
-            The chi square value.
+        >>> w = FitWorkspace()
+        >>> w.data = np.array([1,2,3])
+        >>> w.data_cov = np.diag([1,2,4])
+        >>> w.prepare_weight_matrices()
+        >>> w.W
+        array([[1.  , 0.  , 0.  ],
+               [0.  , 0.5 , 0.  ],
+               [0.  , 0.  , 0.25]])
+
+        Add outliers:
+
+        >>> w.outliers = np.array([2])
+        >>> w.prepare_weight_matrices()
+        >>> w.W
+        array([[1. , 0. , 0. ],
+               [0. , 0.5, 0. ],
+               [0. , 0. , 0. ]])
 
         """
-        # check data format
-        if (self.data.dtype != object and self.data.ndim > 1) or (self.err.dtype != object and self.err.ndim > 1):
-            raise ValueError("Fitworkspace.data and Fitworkspace.err must be a flat 1D array,"
-                             " or an array of flat arrays of unequal lengths.")
-        # prepare weight matrices in case they have not been built before
-        self.prepare_weight_matrices()
-        x, model, model_err = self.simulate(*p)
-        W = self.compute_W_with_model_error(model_err)
-        if W.ndim == 1 and W.dtype != object:
-            res = (model - self.data)
-            chisq = res @ (W * res)
-        elif W.dtype == object:
-            K = len(W)
-            res = [model[k] - self.data[k] for k in range(K)]
-            if W[0].ndim == 1:
-                chisq = np.sum([res[k] @ (W[k] * res[k]) for k in range(K)])
-            elif W[0].ndim == 2:
-                chisq = np.sum([res[k] @ W[k] @ res[k] for k in range(K)])
-            else:
-                raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
-                                 f"I get W[0]={W[0]}")
-        elif W.ndim == 2 and W.dtype != object:
-            res = (model - self.data)
-            chisq = res @ W @ res
-        else:
-            raise ValueError(
-                f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
-                f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
-                f"\nHere W type is {type(W)}, shape is {W.shape} and W is {W}.")
-        if model_output:
-            return chisq, x, model, model_err
-        else:
-            return chisq
-
-    def prepare_weight_matrices(self):
         # Prepare covariance matrix for data
         if self.data_cov is None:
             self.data_cov = np.asarray(self.err.flatten() ** 2)
@@ -940,6 +894,156 @@ class FitWorkspace:
                     f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
                     f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
                     f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
+
+    def compute_W_with_model_error(self, model_err):
+        """Propagate model uncertainties to weight matrix W.
+        The method add the mode uncertainties in quadrature to the inverse of the weight matrix W
+        `self.data_cov` and re-invert it.
+
+        Parameters
+        ----------
+        model_err: np.ndarray
+            Flat array of model uncertainties.
+
+        Returns
+        -------
+        W: array_like
+            Weight matrix with model uncertainties propagated.
+
+        Examples
+        --------
+        1D case:
+
+        >>> w = FitWorkspace()
+        >>> w.data_cov = 2 * np.ones(4)
+        >>> w.prepare_weight_matrices()
+        >>> w.compute_W_with_model_error(np.sqrt(2) * np.ones(4))
+        array([0.25, 0.25, 0.25, 0.25])
+
+        2D case:
+
+        >>> w = FitWorkspace()
+        >>> w.data = np.array([1,2,3])
+        >>> w.data_cov = np.diag([1,1,1])
+        >>> w.prepare_weight_matrices()
+        >>> w.compute_W_with_model_error(np.sqrt(3) * np.ones(3))
+        array([[0.25, 0.  , 0.  ],
+               [0.  , 0.25, 0.  ],
+               [0.  , 0.  , 0.25]])
+
+        Add outliers:
+
+        >>> w.outliers = np.array([2])
+        >>> w.prepare_weight_matrices()
+        >>> w.compute_W_with_model_error(np.sqrt(3) * np.ones(3))
+        array([[0.25, 0.  , 0.  ],
+               [0.  , 0.25, 0.  ],
+               [0.  , 0.  , 0.  ]])
+
+        Use sparse matrix:
+
+        >>> w.W = scipy.sparse.diags(np.ones(3)).tocsr()
+        >>> w.W[-1, -1] = 0  # mask last data point
+        >>> w.W.toarray()
+        array([[1., 0., 0.],
+               [0., 1., 0.],
+               [0., 0., 0.]])
+        >>> w.compute_W_with_model_error(np.sqrt(3) * np.ones(3)).toarray()
+        array([[0.25, 0.  , 0.  ],
+               [0.  , 0.25, 0.  ],
+               [0.  , 0.  , 0.  ]])
+
+        """
+        if model_err.ndim > 1:
+            raise ValueError(f"model_err must be a flat 1D array. Got {model_err.shape=}.")
+        if np.any(model_err > 0):
+            if not scipy.sparse.issparse(self.W):
+                zeros = self.W == 0
+                if self.W.ndim == 1 and self.W.dtype != object:
+                    self.W = 1 / (self.data_cov + model_err * model_err)
+                elif self.W.dtype == object:
+                    K = len(self.W)
+                    if self.W[0].ndim == 1:
+                        self.W = [1 / (self.data_cov[k] + model_err[k] * model_err[k]) for k in range(K)]
+                    elif self.W[0].ndim == 2:
+                        K = len(self.W)
+                        cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
+                        L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
+                        self.W = [L[k].T @ L[k] for k in range(K)]
+                    else:
+                        raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
+                                         f"I get W[0]={self.W[0]}")
+                elif self.W.ndim == 2 and self.W.dtype != object:
+                    cov = self.data_cov + np.diag(model_err * model_err)
+                    L = np.linalg.inv(np.linalg.cholesky(cov))
+                    self.W = L.T @ L
+                # needs to reapply the mask of outliers
+                self.W[zeros] = 0
+            else:
+                cov = self.data_cov + np.diag(model_err * model_err)
+                L = np.linalg.inv(np.linalg.cholesky(cov))
+                W = L.T @ L
+                # needs to reapply the mask of outliers
+                rows, cols = self.W.nonzero()
+                self.W = scipy.sparse.csr_matrix((W[rows, cols], (rows, cols)), dtype=self.W.dtype, shape=self.W.shape)
+        return self.W
+
+    def chisq(self, p, model_output=False):
+        """Compute the chi square for a set of model parameters p.
+
+        Four cases are implemented: diagonal W, 2D W, array of diagonal Ws, array of 2D Ws. The two latter cases
+        are for multiple independent data vectors with W being block diagonal.
+
+        Parameters
+        ----------
+        p: array_like
+            The array of model parameters.
+        model_output: bool, optional
+            If true, the simulated model is output.
+
+        Returns
+        -------
+        chisq: float
+            The chi square value.
+
+        """
+        # check data format
+        if (self.data.dtype != object and self.data.ndim > 1) or (self.err.dtype != object and self.err.ndim > 1):
+            raise ValueError("Fitworkspace.data and Fitworkspace.err must be a flat 1D array,"
+                             " or an array of flat arrays of unequal lengths.")
+        # prepare weight matrices in case they have not been built before
+        self.prepare_weight_matrices()
+        x, model, model_err = self.simulate(*p)
+        W = self.compute_W_with_model_error(model_err)
+        if not scipy.sparse.issparse(self.W):
+            if W.ndim == 1 and W.dtype != object:
+                res = (model - self.data)
+                chisq = res @ (W * res)
+            elif W.dtype == object:
+                K = len(W)
+                res = [model[k] - self.data[k] for k in range(K)]
+                if W[0].ndim == 1:
+                    chisq = np.sum([res[k] @ (W[k] * res[k]) for k in range(K)])
+                elif W[0].ndim == 2:
+                    chisq = np.sum([res[k] @ W[k] @ res[k] for k in range(K)])
+                else:
+                    raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
+                                     f"I get W[0]={W[0]}")
+            elif W.ndim == 2 and W.dtype != object:
+                res = (model - self.data)
+                chisq = res @ W @ res
+            else:
+                raise ValueError(
+                    f"Weight covariance matrix must be a np.ndarray of dimension 1 or 2 if not sparse,"
+                    f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
+                    f"\nHere W type is {type(W)}, shape is {W.shape} and W is {W}.")
+        else:
+            res = (model - self.data)
+            chisq = res @ W @ res
+        if model_output:
+            return chisq, x, model, model_err
+        else:
+            return chisq
 
     def lnlike(self, p):
         """Compute the logarithmic likelihood for a set of model parameters p as -0.5*chisq.
@@ -1123,7 +1227,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             my_logger.info(f"\n\tIteration={i}:\tinitial cost={cost:.5g}\tinitial chisq_red={cost / (tmp_model.size - n_data_masked):.5g}")
         W = fit_workspace.compute_W_with_model_error(tmp_model_err)
         # residuals
-        if isinstance(W, np.ndarray) and W.dtype != object:
+        if (isinstance(W, np.ndarray) or scipy.sparse.issparse(W)) and W.dtype != object:
             residuals = (tmp_model - fit_workspace.data).flatten()
         elif isinstance(W, np.ndarray) and W.dtype == object:
             residuals = [(tmp_model[k] - fit_workspace.data[k]) for k in range(len(W))]
