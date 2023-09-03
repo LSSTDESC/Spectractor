@@ -506,7 +506,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.M = M
         self.psf_poly_params = np.copy(poly_params[0])
         self.amplitude_params = np.copy(amplitude_params)
-        self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
+        self.amplitude_params_err = np.array([np.sqrt(np.abs(cov_matrix[x, x])) for x in range(self.Nx)])
         self.amplitude_cov_matrix = np.copy(cov_matrix)
 
         # Compute the model
