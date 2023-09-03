@@ -456,7 +456,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             else:
                 tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
                 dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
-                M_dot_W_dot_M = tri + tri.T - dia
+                M_dot_W_dot_M = (tri + tri.T - dia).toarray()
             if self.amplitude_priors_method != "spectrum":
                 if self.amplitude_priors_method == "keep":
                     amplitude_params = np.copy(self.amplitude_params)
