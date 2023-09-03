@@ -446,20 +446,30 @@ class ChromaticPSF:
             80
 
         """
-        Ny_pix, Nx_pix = pixels[0].shape
-        psf_cube = np.zeros((len(profile_params), Ny_pix, Nx_pix), dtype=dtype)
+        if pixels.ndim == 3:
+            mode = "2D"
+            Ny, Nx = pixels[0].shape
+        elif pixels.ndim == 1:
+            mode = "1D"
+            Ny, Nx = pixels.size, profile_params.shape[0]
+        else:
+            raise ValueError(f"pixels argument must have shape (2, Nx, Ny) or (Ny). Got {pixels.shape=}.")
+        if Nx != profile_params.shape[0]:
+            raise ValueError(f"Number of pixels along x axis must be same as profile_params table length. "
+                             f"Got {Nx=} and {profile_params.shape}.")
+        psf_cube = np.zeros((len(profile_params), Ny, Nx), dtype=dtype)
         fwhms = self.table["fwhm"]
         for x in range(len(profile_params)):
             xc, yc = profile_params[x, 1:3]
             if xc < - fwhmx_clip * fwhms[x]:
                 continue
-            if xc > Nx_pix + fwhmx_clip * fwhms[x]:
+            if xc > Nx + fwhmx_clip * fwhms[x]:
                 break
             if mask is None and not boundaries:
                 xmin = max(0, int(xc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
-                xmax = min(Nx_pix, int(xc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
+                xmax = min(Nx, int(xc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
                 ymin = max(0, int(yc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
-                ymax = min(Ny_pix, int(yc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
+                ymax = min(Ny, int(yc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
             elif boundaries:
                 xmin = boundaries["xmin"][x]
                 xmax = boundaries["xmax"][x]
@@ -472,7 +482,10 @@ class ChromaticPSF:
                 ymin = np.argmax(masky)
                 xmax = len(maskx) - np.argmax(maskx[::-1])
                 ymax = len(masky) - np.argmax(masky[::-1])
-            psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], values=profile_params[x, :])
+            if mode == "2D":
+                psf_cube[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], values=profile_params[x, :])
+            else:
+                psf_cube[x, ymin:ymax, x] = self.psf.evaluate(pixels[ymin:ymax], values=profile_params[x, :])
         return psf_cube
 
     @staticmethod
@@ -662,6 +675,9 @@ class ChromaticPSF:
         >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 0] = np.ones(s.Nx)  # normalized PSF
         >>> profile_params[:, 1] = np.arange(s.Nx)  # PSF x_c positions
+
+        2D case
+
         >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
         >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
         >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
@@ -679,17 +695,52 @@ class ChromaticPSF:
 
             >>> assert M.shape == (s.Ny * s.Nx, s.Nx)
 
+        1D case
+
+        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="1D"), profile_params)
+        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
+        >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
+        >>> M = s.build_sparse_M(s.set_pixels(mode="1D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
+        >>> M.shape
+        (2000, 100)
+        >>> M.dtype
+        dtype('float32')
+        >>> plt.imshow((M @ np.ones(s.Nx)).reshape((s.Ny, s.Nx)), origin="lower"); plt.show()  # doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at ...>
+
+        .. doctest::
+            :hide:
+
+            >>> assert M.shape == (s.Ny * s.Nx, s.Nx)
+
         """
+        if pixels.ndim == 3:
+            mode = "2D"
+            Ny, Nx = pixels[0].shape
+        elif pixels.ndim == 1:
+            mode = "1D"
+            Ny, Nx = pixels.size, profile_params.shape[0]
+        else:
+            raise ValueError(f"pixels argument must have shape (2, Nx, Ny) or (Ny). Got {pixels.shape=}.")
+        if Nx != profile_params.shape[0]:
+            raise ValueError(f"Number of pixels along x axis must be same as profile_params table length. "
+                             f"Got {Nx=} and {profile_params.shape}.")
         sparse_psf_cube = np.zeros(M_sparse_indices.size, dtype=dtype)
         indptr = np.zeros(len(profile_params)+1, dtype=int)
         for x in range(len(profile_params)):
-            indptr[x+1] = (boundaries["xmax"][x]-boundaries["xmin"][x])*(boundaries["ymax"][x]-boundaries["ymin"][x]) + indptr[x]
-            if boundaries["xmin"][x] < 0:
-                continue
-            sparse_psf_cube[indptr[x]:indptr[x+1]] = self.psf.evaluate(pixels[:, boundaries["ymin"][x]:boundaries["ymax"][x],
+            if mode == "2D":
+                indptr[x + 1] = (boundaries["xmax"][x] - boundaries["xmin"][x]) * (boundaries["ymax"][x] - boundaries["ymin"][x]) + indptr[x]
+                if boundaries["xmin"][x] < 0:
+                    continue
+                sparse_psf_cube[indptr[x]:indptr[x+1]] = self.psf.evaluate(pixels[:, boundaries["ymin"][x]:boundaries["ymax"][x],
                                                                                  boundaries["xmin"][x]:boundaries["xmax"][x]],
-                                                                       values=profile_params[x, :]).ravel()
-        return sparse.csr_matrix((sparse_psf_cube, M_sparse_indices, indptr), shape=(len(profile_params), pixels[0].size), dtype=dtype).T
+                                                                           values=profile_params[x, :]).ravel()
+            else:
+                indptr[x + 1] = boundaries["ymax"][x] - boundaries["ymin"][x] + indptr[x]
+                sparse_psf_cube[indptr[x]:indptr[x+1]] = self.psf.evaluate(pixels[boundaries["ymin"][x]:boundaries["ymax"][x]],
+                                                                           values=profile_params[x, :])
+        return sparse.csr_matrix((sparse_psf_cube, M_sparse_indices, indptr), shape=(len(profile_params), Ny*Nx), dtype=dtype).T
 
     def build_psf_jacobian(self, pixels, profile_params, psf_cube_sparse_indices, boundaries, dtype="float32"):
         r"""
