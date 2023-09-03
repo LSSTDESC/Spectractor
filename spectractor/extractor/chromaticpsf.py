@@ -454,9 +454,6 @@ class ChromaticPSF:
             Ny, Nx = pixels.size, profile_params.shape[0]
         else:
             raise ValueError(f"pixels argument must have shape (2, Nx, Ny) or (Ny). Got {pixels.shape=}.")
-        if Nx != profile_params.shape[0]:
-            raise ValueError(f"Number of pixels along x axis must be same as profile_params table length. "
-                             f"Got {Nx=} and {profile_params.shape}.")
         psf_cube = np.zeros((len(profile_params), Ny, Nx), dtype=dtype)
         fwhms = self.table["fwhm"]
         for x in range(len(profile_params)):
