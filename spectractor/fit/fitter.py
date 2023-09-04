@@ -810,13 +810,19 @@ class FitWorkspace:
                     cov = self.data_cov + np.diag(model_err * model_err)
                     L = np.linalg.inv(np.linalg.cholesky(cov))
                 else:
-                    if self.W.ndim == 1 and self.W.dtype != object:
-                        L = np.sqrt(self.W)
-                    elif self.W.ndim == 2 and self.W.dtype != object:
-                        L = np.linalg.cholesky(self.W)
+                    if not scipy.sparse.issparse(self.W):
+                        if self.W.ndim == 1 and self.W.dtype != object:
+                            L = np.diag(np.sqrt(self.W))
+                        elif self.W.ndim == 2 and self.W.dtype != object:
+                            L = np.linalg.cholesky(self.W)
+                        else:
+                            raise ValueError(f"Case not implemented with self.W.ndim={self.W.ndim} "
+                                             f"and self.W.dtype={self.W.dtype}")
                     else:
-                        raise ValueError(f"Case not implemented with self.W.ndim={self.W.ndim} "
-                                         f"and self.W.dtype={self.W.dtype}")
+                        if scipy.sparse.isspmatrix_dia(self.W):
+                            L = self.W.sqrt()
+                        else:
+                            L = np.linalg.cholesky(self.W.toarray())
                 res = L @ (model - self.data)
         return res
 
@@ -1520,6 +1526,24 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
         fit_workspace.params.values = p.x  # m.np_values()
         if verbose:
             my_logger.debug(f"\n\t{p}")
+            my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
+            if parameters.DEBUG:
+                fit_workspace.plot_fit()
+    elif method == "lm":  # pragma: no cover
+        if epsilon is None:
+            epsilon = 1e-4 * guess
+            epsilon[epsilon == 0] = 1e-4
+
+        def Dfun(params):
+            return fit_workspace.jacobian(params, epsilon=epsilon, model_input=None).T
+
+        start = time.time()
+        x, cov, infodict, mesg, ier = optimize.leastsq(fit_workspace.weighted_residuals, guess, Dfun=Dfun,
+                                                       ftol=ftol, xtol=xtol, full_output=True)
+        fit_workspace.params.values = x
+        fit_workspace.params.cov = cov
+        if verbose:
+            my_logger.debug(f"\n\t{x}")
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
             if parameters.DEBUG:
                 fit_workspace.plot_fit()
