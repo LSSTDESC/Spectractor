@@ -295,7 +295,7 @@ class ChromaticPSF:
             raise ValueError(f"Unknown evaluation mode={mode}. Must be '1D' or '2D'.")
         return pixels
 
-    def evaluate(self, poly_params, mode="1D", fwhmx_clip=parameters.PSF_FWHM_CLIP,
+    def evaluate(self, pixels, poly_params, fwhmx_clip=parameters.PSF_FWHM_CLIP,
                        fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float64", mask=None, boundaries=None):
         """Simulate a 2D spectrogram of size Nx times Ny.
 
@@ -305,13 +305,14 @@ class ChromaticPSF:
 
         Parameters
         ----------
+        pixels: array_like
+            The pixel array. If `pixels.ndim==1`, ChromaticPSF is evaluated using 1D PSF slices. Otherwise, `pixels`
+            must have a shape like (2, Nx, Ny).
         poly_params: array_like
             Parameter array of the model, in the form:
             - Nx first parameters are amplitudes for the Moffat transverse profiles
             - next parameters are polynomial coefficients for all the PSF parameters in the same order
             as in PSF definition, except amplitude.
-        mode: str, optional
-            Set the evaluation mode: either transverse 1D PSF profile (mode="1D") or full 2D PSF profile (mode="2D").
         fwhmx_clip: int, optional
             Clip PSF evaluation outside fwhmx*FWHM along x axis (default: parameters.PSF_FWHM_CLIP).
         fwhmy_clip: int, optional
@@ -339,7 +340,7 @@ class ChromaticPSF:
 
         .. doctest::
 
-            >>> output = s.evaluate(poly_params, mode="1D")
+            >>> output = s.evaluate(s.set_pixels(mode="1D"), poly_params)
             >>> im = plt.imshow(output, origin='lower')  # doctest: +ELLIPSIS
             >>> plt.colorbar(im)  # doctest: +ELLIPSIS
             <matplotlib.colorbar.Colorbar object at 0x...>
@@ -352,7 +353,7 @@ class ChromaticPSF:
             psf = MoffatGauss()
             s = ChromaticPSF(psf, Nx=100, Ny=20, deg=4, saturation=20000)
             poly_params = s.generate_test_poly_params()
-            output = s.build_spectrogram_image(poly_params, mode="1D")
+            output = s.evaluate(s.set_pixels(mode="1D"), poly_params)
             im = plt.imshow(output, origin='lower')
             plt.colorbar(im)
             plt.show()
@@ -361,7 +362,7 @@ class ChromaticPSF:
 
         .. doctest::
 
-            >>> output = s.evaluate(poly_params, mode="2D")
+            >>> output = s.evaluate(s.set_pixels(mode="2D"), poly_params)
             >>> im = plt.imshow(output, origin='lower')  # doctest: +ELLIPSIS
             >>> plt.colorbar(im)  # doctest: +ELLIPSIS
             <matplotlib.colorbar.Colorbar object at 0x...>
@@ -374,20 +375,27 @@ class ChromaticPSF:
             psf = MoffatGauss()
             s = ChromaticPSF(psf, Nx=100, Ny=20, deg=4, saturation=20000)
             poly_params = s.generate_test_poly_params()
-            output = s.build_spectrogram_image(poly_params, mode="2D")
+            output = s.evaluate(s.set_pixels(mode="2D"), poly_params)
             im = plt.imshow(output, origin='lower')
             plt.colorbar(im)
             plt.show()
 
         """
-        self.params.values = np.asarray(poly_params).astype(float)
-        self.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
         profile_params = self.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
-        profile_params[:, 1] = np.arange(self.Nx)  # replace x_c
-        output = np.zeros((self.Ny, self.Nx), dtype=dtype)
-        pixels = self.set_pixels(mode=mode)
+        if pixels.ndim == 3:
+            mode = "2D"
+            Ny, Nx = pixels[0].shape
+        elif pixels.ndim == 1:
+            mode = "1D"
+            Ny, Nx = pixels.size, profile_params.shape[0]
+        else:
+            raise ValueError(f"pixels argument must have shape (2, Nx, Ny) or (Ny). Got {pixels.shape=}.")
+        self.params.values = np.asarray(poly_params).astype(float)
+        self.psf.apply_max_width_to_bounds(max_half_width=Ny)
+        profile_params[:, 1] = np.arange(Nx)  # replace x_c
+        output = np.zeros((Ny, Nx), dtype=dtype)
         if mode == "1D":
-            for x in range(self.Nx):
+            for x in range(Nx):
                 output[:, x] = self.psf.evaluate(pixels, values=profile_params[x, :])
         elif mode == "2D":
             self.from_profile_params_to_shape_params(profile_params)
@@ -1015,7 +1023,7 @@ class ChromaticPSF:
         >>> psf = MoffatGauss()
         >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
-        >>> data = s.evaluate(poly_params_test, mode="1D")
+        >>> data = s.evaluate(s.set_pixels(mode="1D"), poly_params_test)
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
@@ -1152,7 +1160,7 @@ class ChromaticPSF:
         >>> psf = MoffatGauss()
         >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=1, saturation=8000)
         >>> poly_params_test = s.generate_test_poly_params()
-        >>> data = s.evaluate(poly_params_test, mode="1D")
+        >>> data = s.evaluate(s.set_pixels(mode="1D"), poly_params_test)
         >>> data = np.random.poisson(data)
         >>> data_errors = np.sqrt(data+1)
 
@@ -1400,7 +1408,7 @@ class ChromaticPSF:
         >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
         >>> s0.params.values = s0.generate_test_poly_params()
         >>> saturation = s0.params.values[-1]
-        >>> data = s0.evaluate(s0.params.values, mode="1D")
+        >>> data = s0.evaluate(s0.set_pixels(mode="1D"), s0.params.values)
         >>> bgd = 10*np.ones_like(data)
         >>> xx, yy = np.meshgrid(np.arange(s0.Nx), np.arange(s0.Ny))
         >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))
@@ -1610,7 +1618,7 @@ class ChromaticPSF:
         >>> params[:s0.Nx] *= 1
         >>> s0.params.values = params
         >>> saturation = params[-1]
-        >>> data = s0.evaluate(params, mode="2D")
+        >>> data = s0.evaluate(s0.set_pixels(mode="2D"), params)
         >>> bgd = 10*np.ones_like(data)
         >>> data += bgd
         >>> data = np.random.poisson(data)
@@ -1678,42 +1686,42 @@ class ChromaticPSF:
 
         """
         if mode == "1D":
-            w = ChromaticPSF1DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
-                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose,
-                                           live_fit=live_fit, analytical=analytical)
+            w = ChromaticPSFFitWorkspace(self, data, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
+                                        amplitude_priors_method=amplitude_priors_method, verbose=verbose,
+                                        live_fit=live_fit, analytical=analytical)
             run_minimisation(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50, with_line_search=True)
         elif mode == "2D":
             # first shot to set the mask
-            w = ChromaticPSF2DFitWorkspace(self, data, data_errors=data_errors, bgd_model_func=bgd_model_func,
-                                           amplitude_priors_method=amplitude_priors_method, verbose=verbose,
-                                           live_fit=live_fit, analytical=analytical)
+            w = ChromaticPSFFitWorkspace(self, data, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
+                                         amplitude_priors_method=amplitude_priors_method, verbose=verbose,
+                                         live_fit=live_fit, analytical=analytical)
             run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, verbose=verbose, with_line_search=False)
-            if amplitude_priors_method == "psf1d":
-                w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
-                w_reg.run_regularisation()
-                w.reg = np.copy(w_reg.opt_reg)
-                w.trace_r = np.trace(w_reg.resolution)
-                self.opt_reg = w_reg.opt_reg
-                w.simulate(*w.params.values)
-                if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
-                    self.my_logger.warning(
-                        f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
-                        f"below the trace of the prior covariance matrix "
-                        f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
-                        f"high regularisation parameter in case of a bad fit. Therefore the final "
-                        f"covariance matrix is mulitiplied by the ratio of the traces and "
-                        f"the amplitude parameters are very close the amplitude priors.")
-                    r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
-                    w.amplitude_cov_matrix *= r
-                    w.amplitude_params_err = np.array([np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(self.Nx)])
+        else:
+            raise ValueError(f"mode argument must be '1D' or '2D'. Got {mode=}.")
+        if amplitude_priors_method == "psf1d":
+            w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
+            w_reg.run_regularisation()
+            w.reg = np.copy(w_reg.opt_reg)
+            w.trace_r = np.trace(w_reg.resolution)
+            self.opt_reg = w_reg.opt_reg
+            w.simulate(*w.params.values)
+            if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
+                self.my_logger.warning(
+                    f"\n\tTrace of final covariance matrix ({np.trace(w.amplitude_cov_matrix)}) is "
+                    f"below the trace of the prior covariance matrix "
+                    f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
+                    f"high regularisation parameter in case of a bad fit. Therefore the final "
+                    f"covariance matrix is mulitiplied by the ratio of the traces and "
+                    f"the amplitude parameters are very close the amplitude priors.")
+                r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
+                w.amplitude_cov_matrix *= r
+                w.amplitude_params_err = np.array([np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(self.Nx)])
 
             w.set_mask(poly_params=w.poly_params)
             # precise fit with sigma clipping
             run_minimisation_sigma_clipping(w, method="newton", ftol=1 / (w.Nx * w.Ny), xtol=1e-6, niter=50,
                                             sigma_clip=parameters.SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP,
                                             niter_clip=3, verbose=verbose, with_line_search=False)
-        else:
-            raise ValueError(f"Unknown fitting mode={mode}. Must be '1D' or '2D'.")
 
         # recompute and save params in class attributes
         w.simulate(*w.params.values)
@@ -1739,8 +1747,10 @@ class ChromaticPSF:
 
 class ChromaticPSFFitWorkspace(FitWorkspace):
 
-    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="", analytical=True,
+    def __init__(self, chromatic_psf, data, data_errors, mode, bgd_model_func=None, file_name="", analytical=True,
                  amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
+        if mode not in ["1D", "2D"]:
+            raise ValueError(f"mode argument must be '1D' or '2D'. Got {mode=}.")
         length = len(chromatic_psf.table)
         params = FitParameters(np.copy(chromatic_psf.params.values[length:]),
                                labels=list(np.copy(chromatic_psf.params.labels[length:])),
@@ -1771,26 +1781,37 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         if self.Nx != self.chromatic_psf.Nx:
             raise AttributeError(f"Data x shape {self.Nx} different from "
                                  f"ChromaticPSF input Nx {self.chromatic_psf.Nx}.")
-        self.pixels = np.arange(self.Ny)
 
         # prepare the background, data and errors
         self.bgd = np.zeros_like(self.data)
         if self.bgd_model_func is not None:
-            self.bgd = self.bgd_model_func(np.arange(self.Nx), self.pixels)
+            self.bgd = self.bgd_model_func(np.arange(self.Nx), np.arange(self.Ny))
         self.data = self.data - self.bgd
         self.bgd_std = float(np.std(np.random.poisson(np.abs(self.bgd))))
 
         # crop spectrogram to fit faster
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
         self.data = self.data[self.bgd_width:-self.bgd_width, :]
-        self.pixels = np.arange(self.data.shape[0])
-        self.err = np.copy(self.err[self.bgd_width:-self.bgd_width, :])
+        self.err = self.err[self.bgd_width:-self.bgd_width, :]
         self.Ny, self.Nx = self.data.shape
+        self.data = self.data.astype("float32").ravel()
+        self.err = self.err.astype("float32").ravel()
+        self.pixels = np.arange(self.data.shape[0])
+
+        if mode == "1D":
+            self.pixels = np.arange(self.Ny)
+        else:
+            yy, xx = np.mgrid[:self.Ny, :self.Nx]
+            self.pixels = np.asarray([xx, yy])
+
+
         self.poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
         self.profile_params = self.chromatic_psf.from_poly_params_to_profile_params(self.poly_params)
         self.data_before_mask = np.copy(self.data)
         self.boundaries = None
         self.psf_cube_sparse_indices = None
+        self.psf_cube_masked = None
+        self.M_sparse_indices = None
 
         # update the bounds
         self.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.Ny)
@@ -1799,13 +1820,15 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
         # (which is not exactly true in rotated images)
-        self.data_cov = (self.err * self.err).flatten()
-        self.W = 1. / (self.err * self.err)
-        self.W = self.W.flatten()
+        self.data_cov = sparse.diags(self.err * self.err, dtype="float32")
+        self.W = sparse.diags(1 / (self.err * self.err), dtype="float32")
+        self.sqrtW = self.W.sqrt()
+        # create a mask
+        self.W_before_mask = self.W.copy()
 
         # design matrix
-        self.M = np.zeros((self.Nx, self.data.size))
-        self.M_dot_W_dot_M = np.zeros((self.Nx, self.Nx))
+        self.M = sparse.csr_matrix((self.Nx, self.data.size), dtype="float32")
+        self.M_dot_W_dot_M = sparse.csr_matrix((self.Nx, self.Nx), dtype="float32")
 
         # prepare results
         self.amplitude_params = np.zeros(self.Nx)
@@ -1823,13 +1846,22 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         if amplitude_priors_method not in self.amplitude_priors_list:
             raise ValueError(f"Unknown prior method for the amplitude fitting: {self.amplitude_priors_method}. "
                              f"Must be either {self.amplitude_priors_list}.")
+        # regularisation matrices
+        self.reg = parameters.PSF_FIT_REG_PARAM
         if self.amplitude_priors_method == "psf1d":
             self.amplitude_priors = np.copy(self.chromatic_psf.params.values[:self.Nx])
             self.amplitude_priors_cov_matrix = np.copy(self.chromatic_psf.cov_matrix)
-            self.Q = np.diag([1 / np.sum(self.err[:, x] ** 2) for x in range(self.Nx)])
+            self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
+            L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
+            L.astype(float)
+            L[0, 0] = -1
+            L[-1, -1] = -1
+            self.L = L
+            self.Q = L.T @ self.U.T @ self.U @ L
             self.Q_dot_A0 = self.Q @ self.amplitude_priors
         if self.amplitude_priors_method == "fixed":
             self.amplitude_priors = np.copy(self.chromatic_psf.params.values[:self.Nx])
+        self.set_mask()
 
     def plot_fit(self):
         cmap_bwr = copy.copy(mpl.colormaps["bwr"])
@@ -1840,17 +1872,12 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         data = np.copy(self.data_before_mask)
         model = np.copy(self.model)
         err = np.copy(self.err)
-        if isinstance(self, ChromaticPSF1DFitWorkspace):
-            data = np.array([data[x] for x in range(self.Nx)], dtype=float).T
-            model = np.array([model[x] for x in range(self.Nx)], dtype=float).T
-            err = np.array([err[x] for x in range(self.Nx)], dtype=float).T
-        if isinstance(self, ChromaticPSF2DFitWorkspace):
-            if len(self.outliers) > 0 or len(self.mask) > 0:
-                bad_indices = np.array(list(self.get_bad_indices()) + list(self.mask)).astype(int)
-                data[bad_indices] = np.nan
-            data = data.reshape((self.Ny, self.Nx))
-            model = model.reshape((self.Ny, self.Nx))
-            err = err.reshape((self.Ny, self.Nx))
+        if len(self.outliers) > 0 or len(self.mask) > 0:
+            bad_indices = np.array(list(self.get_bad_indices()) + list(self.mask)).astype(int)
+            data[bad_indices] = np.nan
+        data = data.reshape((self.Ny, self.Nx))
+        model = model.reshape((self.Ny, self.Nx))
+        err = err.reshape((self.Ny, self.Nx))
         gs_kw = dict(width_ratios=[3, 0.15], height_ratios=[1, 1, 1, 1])
 
         fig, ax = plt.subplots(nrows=4, ncols=2, figsize=(7, 7), gridspec_kw=gs_kw)
@@ -1900,6 +1927,390 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH,
                                      f'fit_chromatic_psf_best_fit_{self.amplitude_priors_method}.pdf'),
                         dpi=100, bbox_inches='tight')
+
+    def set_mask(self, poly_params=None):
+        if poly_params is None:
+            poly_params = self.poly_params
+        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
+        self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
+        psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
+                                                     fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                     fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+        self.psf_cube_masked = self.chromatic_psf.get_psf_cube_masked(psf_cube, convolve=True)
+        self.boundaries, self.psf_cube_masked = self.chromatic_psf.get_boundaries(self.psf_cube_masked)
+        self.psf_cube_sparse_indices, self.M_sparse_indices = self.chromatic_psf.get_sparse_indices(self.psf_cube_masked)
+        mask = np.sum(self.psf_cube_masked.reshape(psf_cube.shape[0], psf_cube[0].size), axis=0) == 0
+        W = np.copy(self.W_before_mask.data.ravel())
+        W[mask] = 0
+        self.W = sparse.diags(W, dtype="float32")
+        self.sqrtW = self.W.sqrt()
+        self.mask = list(np.where(mask)[0])
+
+    def simulate(self, *shape_params):
+        r"""
+        Compute a ChromaticPSF2D model given PSF shape parameters and minimizing
+        amplitude parameters using a spectrogram data array.
+
+        The ChromaticPSF2D model :math:`\vec{m}(\vec{x},\vec{p})` can be written as
+
+        .. math ::
+            :label: chromaticpsf2d
+
+            \vec{m}(\vec{x},\vec{p}) = \sum_{i=0}^{N_x} A_i \phi\left(\vec{x},\vec{p}_i\right)
+
+        with :math:`\vec{x}` the 2D array  of the pixel coordinates, :math:`\vec{A}` the amplitude parameter array
+        along the x axis of the spectrogram, :math:`\phi\left(\vec{x},\vec{p}_i\right)` the 2D PSF kernel whose integral
+        is normalised to one parametrized with the :math:`\vec{p}_i` non-linear parameter array. If the :math:`\vec{x}`
+        2D array is flatten in 1D, equation :eq:`chromaticpsf2d` is
+
+        .. math ::
+            :label: chromaticpsf2d_matrix
+            :nowrap:
+
+            \begin{align}
+            \vec{m}(\vec{x},\vec{p}) & = \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \\
+
+            \mathbf{M}\left(\vec{x},\vec{p}\right) & = \left(\begin{array}{cccc}
+             \phi\left(\vec{x}_1,\vec{p}_1\right) & \phi\left(\vec{x}_2,\vec{p}_1\right) & ...
+             & \phi\left(\vec{x}_{N_x},\vec{p}_1\right) \\
+             ... & ... & ... & ...\\
+             \phi\left(\vec{x}_1,\vec{p}_{N_x}\right) & \phi\left(\vec{x}_2,\vec{p}_{N_x}\right) & ...
+             & \phi\left(\vec{x}_{N_x},\vec{p}_{N_x}\right) \\
+            \end{array}\right)
+            \end{align}
+
+
+        with :math:`\mathbf{M}` the design matrix.
+
+        The goal of this function is to perform a minimisation of the amplitude vector :math:`\mathbf{A}` given
+        a set of non-linear parameters :math:`\mathbf{p}` and a spectrogram data array :math:`mathbf{y}` modelise as
+
+        .. math:: \mathbf{y} = \mathbf{m}(\vec{x},\vec{p}) + \vec{\epsilon}
+
+        with :math:`\vec{\epsilon}` a random noise vector. The :math:`\chi^2` function to minimise is
+
+        .. math::
+            :label: chromaticspsf2d_chi2
+
+            \chi^2(\mathbf{A})= \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A}\right)^T \mathbf{W}
+            \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)
+
+
+        with :math:`\mathbf{W}` the weight matrix, inverse of the covariance matrix. In our case this matrix is diagonal
+        as the pixels are considered all independent. The minimum of equation :eq:`chromaticspsf2d_chi2` is reached for
+        the set of amplitude parameters :math:`\hat{\mathbf{A}}` given by
+
+        .. math::
+
+            \hat{\mathbf{A}} =  (\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1} \mathbf{M}^T \mathbf{W} \mathbf{y}
+
+        The error matrix on the :math:`\hat{\mathbf{A}}` coefficient is simply
+        :math:`(\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}`.
+
+        Parameters
+        ----------
+        shape_params: array_like
+            PSF shape polynomial parameter array.
+
+        Examples
+        --------
+
+        Set the parameters:
+
+        >>> parameters.PIXDIST_BACKGROUND = 40
+        >>> parameters.PIXWIDTH_BACKGROUND = 10
+        >>> parameters.PIXWIDTH_SIGNAL = 30
+
+        Build a mock spectrogram without random Poisson noise:
+
+        >>> psf = Moffat(clip=False)
+        >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=100000)
+        >>> params = s0.generate_test_poly_params()
+        >>> params[:s0.Nx] *= 10
+        >>> s0.params.values = params
+        >>> saturation = params[-1]
+        >>> data = s0.evaluate(s0.set_pixels(mode="2D"), params)
+        >>> bgd = 10*np.ones_like(data)
+        >>> data += bgd
+        >>> data_errors = np.sqrt(data+1)
+
+        Extract the background:
+
+        >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+
+        Estimate the first guess values:
+
+        >>> s = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=saturation)
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+        >>> s.plot_summary(truth=s0)
+
+        1D case.
+
+        Simulate the data with fixed amplitude priors:
+
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "1D", bgd_model_func=bgd_model_func,
+        ... amplitude_priors_method="fixed", verbose=True)
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> w.plot_fit()
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None
+
+        Fit the amplitude of data without any prior:
+
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "1D", bgd_model_func=bgd_model_func, verbose=True,
+        ... amplitude_priors_method="noprior")
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+
+        Fit the amplitude of data smoothing the result with a window of size 10 pixels:
+
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "1D", bgd_model_func=bgd_model_func, verbose=True,
+        ... amplitude_priors_method="smooth")
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+
+        Fit the amplitude of data using the transverse PSF1D fit as a prior and with a
+        Tikhonov regularisation parameter set by parameters.PSF_FIT_REG_PARAM:
+
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "1D", bgd_model_func=bgd_model_func, verbose=True,
+        ... amplitude_priors_method="psf1d")
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> w.plot_fit()
+
+        ..  doctest::
+            :hide:
+
+            >>> assert mod is not None
+            >>> assert np.mean(np.abs(mod-w.data)/w.err) < 1
+
+        2D case
+
+        Simulate the data with fixed amplitude priors:
+
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "2D", bgd_model_func=bgd_model_func,
+        ... amplitude_priors_method="fixed", verbose=True)
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> w.plot_fit()
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None
+
+        Simulate the data with a Tikhonov prior on amplitude parameters:
+
+        >>> parameters.PSF_FIT_REG_PARAM = 0.002
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "2D", bgd_model_func=bgd_model_func,
+        ... amplitude_priors_method="psf1d", verbose=True)
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> w.plot_fit()
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None
+
+        """
+        # linear regression for the amplitude parameters
+        # prepare the vectors
+        poly_params = np.concatenate([np.ones(self.Nx), shape_params])
+        poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
+        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
+        profile_params[:self.Nx, 0] = 1
+        profile_params[:self.Nx, 1] = np.arange(self.Nx)
+        # profile_params[:self.Nx, 2] -= self.bgd_width
+        if self.amplitude_priors_method != "fixed":
+            M = self.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32",
+                                                  M_sparse_indices=self.M_sparse_indices, boundaries=self.boundaries)
+
+            M_dot_W = M.T @ self.sqrtW
+            W_dot_data = self.W @ self.data
+            # Compute the minimizing amplitudes
+            if sparse_dot_mkl is None:
+                M_dot_W_dot_M = M_dot_W @ M_dot_W.T
+            else:
+                tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
+                dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))),
+                                        shape=tri.shape, dtype="float32")
+                M_dot_W_dot_M = tri + tri.T - dia
+            if self.amplitude_priors_method != "psf1d":
+                if self.amplitude_priors_method == "keep":
+                    amplitude_params = np.copy(self.amplitude_params)
+                    cov_matrix = np.copy(self.amplitude_cov_matrix)
+                else:
+                    # try:
+                    #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
+                    #     cov_matrix = L.T @ L
+                    # except np.linalg.LinAlgError:
+                    cov_matrix = np.linalg.inv(M_dot_W_dot_M.toarray())
+                    amplitude_params = cov_matrix @ (M.T @ W_dot_data)
+                    if self.amplitude_priors_method == "positive":
+                        amplitude_params[amplitude_params < 0] = 0
+                    elif self.amplitude_priors_method == "smooth":
+                        null_indices = np.where(amplitude_params < 0)[0]
+                        for index in null_indices:
+                            right = amplitude_params[index]
+                            for i in range(index, min(index + 10, self.Nx)):
+                                right = amplitude_params[i]
+                                if i not in null_indices:
+                                    break
+                            left = amplitude_params[index]
+                            for i in range(index, max(0, index - 10), -1):
+                                left = amplitude_params[i]
+                                if i not in null_indices:
+                                    break
+                            amplitude_params[index] = 0.5 * (right + left)
+                    elif self.amplitude_priors_method == "noprior":
+                        pass
+            else:
+                M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
+                # try:
+                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
+                #     cov_matrix = L.T @ L
+                # except np.linalg.LinAlgError:
+                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
+                amplitude_params = cov_matrix @ (M.T @ W_dot_data + np.float32(self.reg) * self.Q_dot_A0)
+            amplitude_params = np.asarray(amplitude_params).reshape(-1)
+            self.M = M
+            self.M_dot_W_dot_M = M_dot_W_dot_M
+            self.model = M @ amplitude_params
+        else:
+            amplitude_params = np.copy(self.amplitude_priors)
+            err2 = np.copy(amplitude_params)
+            err2[err2 <= 0] = np.min(np.abs(err2[err2 > 0]))
+            cov_matrix = np.diag(err2)
+        self.amplitude_params = np.copy(amplitude_params)
+        # TODO: propagate and marginalize over the shape parameter uncertainties ?
+        self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
+        self.amplitude_cov_matrix = np.copy(cov_matrix)
+        poly_params[:self.Nx] = amplitude_params
+
+        if self.amplitude_priors_method == "fixed":
+            self.model = self.chromatic_psf.evaluate(self.pixels, poly_params)
+            # self.chromatic_psf.params.values is updated in evaluate(): reset to original values
+            self.chromatic_psf.params.values[self.Nx + self.y_c_0_index] += self.bgd_width
+        self.poly_params = np.copy(poly_params)
+        self.profile_params = np.copy(profile_params)
+        self.model_err = np.zeros_like(self.model)
+        return self.pixels, self.model, self.model_err
+
+    def amplitude_derivatives(self):
+        r"""
+        Compute analytically the amplitude vector \hat{\mathbf{A}} derivatives with respect to the PSF parameters.
+        With
+
+        .. math::
+
+            \hat{\mathbf{A}} =  \hat{\mathbf{C}} \cdot \mathbf{M}^T \mathbf{W} \mathbf{y}
+
+            \hat{\mathbf{C}} = (\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}
+
+        derivatives are
+
+        .. math::
+
+            \frac{\partial \hat{\mathbf{A}}}{\partial \theta} =  \frac{\partial \hat{\mathbf{C}}}{\partial \theta} \cdot \mathbf{M}^T \mathbf{W} \mathbf{y} + \hat{\mathbf{C}} \cdot \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{y}}{\partial \theta}
+
+            \frac{\partial \hat{\mathbf{C}}}{\partial \theta} = - \hat{\mathbf{C}} \cdot \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{M}}{\partial \theta}  \cdot  \hat{\mathbf{C}}
+
+            \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{M}}{\partial \theta} = 2 \frac{\partial \mathbf{M}^T}{\partial \theta} \mathbf{W} \mathbf{M}
+
+            \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{y}}{\partial \theta} = \frac{\partial \mathbf{M}^T}{\partial \theta} \mathbf{W} \mathbf{y}
+
+        If amplitude vector is regularized via Tikhonov regularisation, regularisation term is added appropriately.
+
+        Returns
+        -------
+        dA_dtheta: list
+            List of amplitude vector derivatives.
+
+        Examples
+        --------
+
+        Set the parameters:
+
+        >>> parameters.PIXDIST_BACKGROUND = 40
+        >>> parameters.PIXWIDTH_BACKGROUND = 10
+        >>> parameters.PIXWIDTH_SIGNAL = 30
+
+        Build a mock spectrogram without random Poisson noise:
+
+        >>> psf = Moffat(clip=False)
+        >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=100000)
+        >>> params = s0.generate_test_poly_params()
+        >>> params[:s0.Nx] *= 10
+        >>> s0.params.values = params
+        >>> saturation = params[-1]
+        >>> data = s0.evaluate(s0.set_pixels(mode="2D"), params)
+        >>> bgd = 10*np.ones_like(data)
+        >>> data += bgd
+        >>> data_errors = np.sqrt(data+1)
+
+        Extract the background:
+
+        >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
+
+        Estimate the first guess values:
+
+        >>> s = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=saturation)
+        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
+        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
+        >>> s.plot_summary(truth=s0)
+
+        Simulate the data with a Tikhonov prior on amplitude parameters:
+
+        >>> parameters.PSF_FIT_REG_PARAM = 0.002
+        >>> s.params.values = s.from_table_to_poly_params()
+        >>> w = ChromaticPSFFitWorkspace(s, data, data_errors, "2D", bgd_model_func=bgd_model_func,
+        ... amplitude_priors_method="psf1d", verbose=True)
+        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
+        >>> w.plot_fit()
+
+        .. doctest::
+            :hide:
+
+            >>> assert mod is not None
+
+        Get the derivatives:
+
+        >>> dA_dtheta = w.amplitude_derivatives()
+        >>> print(np.array(dA_dtheta).shape, w.amplitude_params.shape)
+        (13, 120) (120,)
+
+        """
+        # compute matrices without derivatives
+        WM =  self.W @ self.M  #  sparse.diags(self.W, shape=(self.W.size, self.W.size), dtype="float32") @ self.M
+        WD = self.W @ self.data
+        MWD = self.M.T @ WD
+        if self.amplitude_priors_method == "psf1d":
+            MWD += np.float32(self.reg) * self.Q_dot_A0
+        # compute partial derivatives of model matrix M
+        dM_dtheta = self.chromatic_psf.build_sparse_dM(self.pixels, profile_params=self.profile_params,
+                                                       M_sparse_indices=self.M_sparse_indices,
+                                                       boundaries=self.boundaries, dtype="float32")
+        # compute partial derivatives of amplitude vector A
+        nparams = len(dM_dtheta)
+        dMWD_dtheta = [dM_dtheta[ip].T @ WD for ip in range(nparams)]
+        dMWM_dtheta = [2 * dM_dtheta[ip].T @ WM for ip in range(nparams)]
+        dcov_dtheta = [-self.amplitude_cov_matrix @ (dMWM_dtheta[ip] @ self.amplitude_cov_matrix) for ip in range(nparams)]
+        dA_dtheta = [self.amplitude_cov_matrix @ dMWD_dtheta[ip] + dcov_dtheta[ip] @ MWD for ip in range(nparams)]
+        return dA_dtheta
 
     def jacobian(self, params, epsilon, model_input=None):
         r"""Generic function to compute the Jacobian matrix of a model, linear parameters being fixed (see Notes),
@@ -1959,608 +2370,6 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
                                                       boundaries=self.boundaries, dtype="float32")
         self.amplitude_priors_method = method
         return J
-
-
-class ChromaticPSF1DFitWorkspace(ChromaticPSFFitWorkspace):
-
-    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, file_name="", analytical=True,
-                 amplitude_priors_method="noprior", verbose=False, plot=False, live_fit=False, truth=None):
-        ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                          file_name, analytical, amplitude_priors_method, verbose, plot, live_fit, truth=truth)
-        self.my_logger = set_logger(self.__class__.__name__)
-        self.pixels = np.arange(self.Ny)
-
-        # error matrix
-        # here image uncertainties are assumed to be uncorrelated
-        # (which is not exactly true in rotated images)
-        self.data_cov = self.err * self.err
-        W = 1. / (self.err * self.err)
-        # these lines make the code thinks that W is block diagonal
-        self.W = np.empty(self.Nx, dtype=object)
-        for x in range(self.Nx):
-            self.W[x] = W[:, x]
-
-        # data: ordered by pixel columns
-        data = np.empty(self.Nx, dtype=object)
-        err = np.empty(self.Nx, dtype=object)
-        for x in range(self.Nx):
-            data[x] = self.data[:, x]
-            err[x] = self.err[:, x]
-        self.data = data
-        self.data_before_mask = np.copy(data)
-        self.err = err
-        self.pixels = self.pixels.T
-        self.set_mask()
-
-    def set_mask(self, poly_params=None):
-        if poly_params is None:
-            poly_params = self.poly_params
-        poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
-        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
-        psf_cube = np.zeros((len(profile_params), self.Ny, self.Nx))
-        for x in range(psf_cube.shape[0]):
-            psf_cube[x, :, x] = 1
-        self.psf_cube_masked = psf_cube > 0
-        wl_size = len(profile_params)
-        self.boundaries = {"ymin": np.zeros(wl_size, dtype=int), "ymax": self.Ny * np.ones(wl_size, dtype=int)}
-        self.psf_cube_sparse_indices = [np.where(self.psf_cube_masked[k].T.ravel() > 0)[0] for k in range(wl_size)]
-
-    def simulate(self, *shape_params):
-        """
-        Compute a ChromaticPSF model given PSF shape parameters and minimizing
-        amplitude parameters given a spectrogram data array.
-
-        Parameters
-        ----------
-        shape_params: array_like
-            PSF shape polynomial parameter array.
-
-        Examples
-        --------
-
-        Set the parameters:
-
-        >>> parameters.PIXDIST_BACKGROUND = 40
-        >>> parameters.PIXWIDTH_BACKGROUND = 10
-        >>> parameters.PIXWIDTH_SIGNAL = 30
-
-        Build a mock spectrogram with random Poisson noise:
-
-        >>> psf = MoffatGauss()
-        >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=1000)
-        >>> params = s0.generate_test_poly_params()
-        >>> s0.params.values = params
-        >>> saturation = params[-1]
-        >>> data = s0.evaluate(params, mode="1D")
-        >>> bgd = 10*np.ones_like(data)
-        >>> data += bgd
-        >>> data = np.random.poisson(data)
-        >>> data_errors = np.sqrt(data+1)
-
-        Extract the background:
-
-        >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
-
-        Estimate the first guess values:
-
-        >>> s = ChromaticPSF(psf, Nx=100, Ny=100, deg=4, saturation=saturation)
-        >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-        ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
-        >>> guess = np.copy(s.table["amplitude"])
-
-        Fit the amplitude of data without any prior:
-
-        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True,
-        ... amplitude_priors_method="noprior")
-        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
-        >>> w.plot_fit()
-
-        ..  doctest::
-            :hide:
-
-            >>> assert mod is not None
-            >>> assert np.mean(np.abs(mod.flatten()-np.concatenate(w.data).ravel())/np.concatenate(w.err).ravel()) < 1
-
-        Fit the amplitude of data smoothing the result with a window of size 10 pixels:
-
-        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True,
-        ... amplitude_priors_method="smooth")
-        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
-        >>> w.plot_fit()
-
-        ..  doctest::
-            :hide:
-
-            >>> assert mod is not None
-            >>> assert np.mean(np.abs(mod.flatten()-np.concatenate(w.data).ravel())/np.concatenate(w.err).ravel()) < 1
-
-        Fit the amplitude of data using the transverse PSF1D fit as a prior and with a
-        Tikhonov regularisation parameter set by parameters.PSF_FIT_REG_PARAM:
-
-        >>> w = ChromaticPSF1DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func, verbose=True,
-        ... amplitude_priors_method="psf1d")
-        >>> y, mod, mod_err = w.simulate(*s.params.values[s.Nx:])
-        >>> w.plot_fit()
-
-        ..  doctest::
-            :hide:
-
-            >>> assert mod is not None
-            >>> assert np.mean(np.abs(mod.flatten()-np.concatenate(w.data).ravel())/np.concatenate(w.err).ravel()) < 1
-
-        """
-        # linear regression for the amplitude parameters
-        poly_params = np.copy(self.poly_params)
-        poly_params[self.Nx:] = np.copy(shape_params)
-        poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
-        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
-        profile_params[:self.Nx, 0] = 1
-        profile_params[:self.Nx, 1] = np.arange(self.Nx)
-        # profile_params[:self.Nx, 2] -= self.bgd_width
-        if self.amplitude_priors_method != "fixed":
-            # Matrix filling
-            M = np.array([self.chromatic_psf.psf.evaluate(self.pixels, values=profile_params[x, :]) for x in range(self.Nx)])
-            M_dot_W_dot_M = np.array([M[x].T @ (self.W[x] * M[x]) for x in range(self.Nx)])
-            if self.amplitude_priors_method != "psf1d":
-                if self.amplitude_priors_method == "keep":
-                    amplitude_params = np.copy(self.amplitude_params)
-                    cov_matrix = np.copy(self.amplitude_cov_matrix)
-                else:
-                    cov_matrix = np.diag([1 / M_dot_W_dot_M[x] if M_dot_W_dot_M[x] > 0 else 0.1 * self.bgd_std
-                                          for x in range(self.Nx)])
-                    amplitude_params = np.array([
-                        M[x].T @ (self.W[x] * self.data[x]) / (M_dot_W_dot_M[x]) if M_dot_W_dot_M[
-                                                                                        x] > 0 else 0.1 * self.bgd_std
-                        for x in range(self.Nx)])
-                    if self.amplitude_priors_method == "positive":
-                        amplitude_params[amplitude_params < 0] = 0
-                    elif self.amplitude_priors_method == "smooth":
-                        null_indices = np.where(amplitude_params < 0)[0]
-                        for index in null_indices:
-                            right = amplitude_params[index]
-                            for i in range(index, min(index + 10, self.Nx)):
-                                right = amplitude_params[i]
-                                if i not in null_indices:
-                                    break
-                            left = amplitude_params[index]
-                            for i in range(index, max(0, index - 10), -1):
-                                left = amplitude_params[i]
-                                if i not in null_indices:
-                                    break
-                            amplitude_params[index] = 0.5 * (right + left)
-                    elif self.amplitude_priors_method == "noprior":
-                        pass
-            else:
-                M_dot_W_dot_M_plus_Q = [M_dot_W_dot_M[x] + self.reg * self.Q[x, x] for x in range(self.Nx)]
-                cov_matrix = np.diag([1 / M_dot_W_dot_M_plus_Q[x] if M_dot_W_dot_M_plus_Q[x] > 0 else 0.1 * self.bgd_std
-                                      for x in range(self.Nx)])
-                amplitude_params = [
-                    cov_matrix[x, x] * (M[x].T @ (self.W[x] * self.data[x]) + self.reg * self.Q_dot_A0[x])
-                    for x in range(self.Nx)]
-            self.M = M
-            self.M_dot_W_dot_M = M_dot_W_dot_M
-            self.model = np.zeros((self.Nx, self.Ny), dtype=float)
-            for x in range(self.Nx):
-                self.model[x] = M[x] * amplitude_params[x]
-
-        else:
-            amplitude_params = np.copy(self.amplitude_priors)
-            err2 = np.copy(amplitude_params)
-            err2[err2 <= 0] = np.min(np.abs(err2[err2 > 0]))
-            cov_matrix = np.diag(err2)
-        self.amplitude_params = np.copy(amplitude_params)
-        self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x])
-                                              if cov_matrix[x, x] > 0 else 0 for x in range(self.Nx)])
-        self.amplitude_cov_matrix = np.copy(cov_matrix)
-        poly_params[:self.Nx] = np.copy(amplitude_params)
-        self.poly_params = np.copy(poly_params)
-        poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
-        self.profile_params = np.copy(profile_params)
-
-        if self.amplitude_priors_method == "fixed":
-            self.model = self.chromatic_psf.evaluate(poly_params, mode="1D")[self.bgd_width:-self.bgd_width, :].T
-        self.model_err = np.zeros_like(self.model)
-        return self.pixels, self.model, self.model_err
-
-
-class ChromaticPSF2DFitWorkspace(ChromaticPSFFitWorkspace):
-
-    def __init__(self, chromatic_psf, data, data_errors, bgd_model_func=None, analytical=True, amplitude_priors_method="noprior",
-                 file_name="", verbose=False, plot=False, live_fit=False, truth=None):
-        ChromaticPSFFitWorkspace.__init__(self, chromatic_psf, data, data_errors, bgd_model_func,
-                                          file_name, analytical, amplitude_priors_method, verbose, plot, live_fit, truth=truth)
-        self.my_logger = set_logger(self.__class__.__name__)
-        yy, xx = np.mgrid[:self.Ny, :self.Nx]
-        self.pixels = np.asarray([xx, yy])
-
-        # error matrix
-        # here image uncertainties are assumed to be uncorrelated
-        # (which is not exactly true in rotated images)
-        self.W = 1. / (self.err * self.err)
-        self.W = self.W.flatten()
-        self.data = self.data.flatten()
-        self.err = self.err.flatten()
-
-        # create a mask
-        self.data_before_mask = np.copy(self.data)
-        self.W_before_mask = np.copy(self.W)
-        self.sqrtW = sparse.diags(np.sqrt(self.W), format="csr", dtype="float32")
-        self.psf_cube_masked = None
-        self.M_sparse_indices = None
-        self.set_mask()
-
-        # regularisation matrices
-        self.reg = parameters.PSF_FIT_REG_PARAM
-        if amplitude_priors_method == "psf1d":
-            # U = np.diag([1 / np.sqrt(np.sum(self.err[:, x]**2)) for x in range(self.Nx)])
-            self.U = np.diag([1 / np.sqrt(self.amplitude_priors_cov_matrix[x, x]) for x in range(self.Nx)])
-            L = np.diag(-2 * np.ones(self.Nx)) + np.diag(np.ones(self.Nx), -1)[:-1, :-1] \
-                + np.diag(np.ones(self.Nx), 1)[:-1, :-1]
-            L.astype(float)
-            L[0, 0] = -1
-            L[-1, -1] = -1
-            self.L = L
-            self.Q = L.T @ self.U.T @ self.U @ L
-            self.Q_dot_A0 = self.Q @ self.amplitude_priors
-
-    def set_mask(self, poly_params=None):
-        if poly_params is None:
-            poly_params = self.poly_params
-        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
-        self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
-        psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
-                                                     fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                     fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
-        self.psf_cube_masked = self.chromatic_psf.get_psf_cube_masked(psf_cube, convolve=True)
-        self.boundaries, self.psf_cube_masked = self.chromatic_psf.get_boundaries(self.psf_cube_masked)
-        self.psf_cube_sparse_indices, self.M_sparse_indices = self.chromatic_psf.get_sparse_indices(self.psf_cube_masked)
-        mask = np.sum(self.psf_cube_masked.reshape(psf_cube.shape[0], psf_cube[0].size), axis=0) == 0
-        self.W = np.copy(self.W_before_mask)
-        self.W[mask] = 0
-        self.sqrtW = sparse.diags(np.sqrt(self.W), format="csr", dtype="float32")
-        self.mask = list(np.where(mask)[0])
-
-    def simulate(self, *shape_params):
-        r"""
-        Compute a ChromaticPSF2D model given PSF shape parameters and minimizing
-        amplitude parameters using a spectrogram data array.
-
-        The ChromaticPSF2D model :math:`\vec{m}(\vec{x},\vec{p})` can be written as
-
-        .. math ::
-            :label: chromaticpsf2d
-
-            \vec{m}(\vec{x},\vec{p}) = \sum_{i=0}^{N_x} A_i \phi\left(\vec{x},\vec{p}_i\right)
-
-        with :math:`\vec{x}` the 2D array  of the pixel coordinates, :math:`\vec{A}` the amplitude parameter array
-        along the x axis of the spectrogram, :math:`\phi\left(\vec{x},\vec{p}_i\right)` the 2D PSF kernel whose integral
-        is normalised to one parametrized with the :math:`\vec{p}_i` non-linear parameter array. If the :math:`\vec{x}`
-        2D array is flatten in 1D, equation :eq:`chromaticpsf2d` is
-
-        .. math ::
-            :label: chromaticpsf2d_matrix
-            :nowrap:
-
-            \begin{align}
-            \vec{m}(\vec{x},\vec{p}) & = \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \\
-
-            \mathbf{M}\left(\vec{x},\vec{p}\right) & = \left(\begin{array}{cccc}
-             \phi\left(\vec{x}_1,\vec{p}_1\right) & \phi\left(\vec{x}_2,\vec{p}_1\right) & ...
-             & \phi\left(\vec{x}_{N_x},\vec{p}_1\right) \\
-             ... & ... & ... & ...\\
-             \phi\left(\vec{x}_1,\vec{p}_{N_x}\right) & \phi\left(\vec{x}_2,\vec{p}_{N_x}\right) & ...
-             & \phi\left(\vec{x}_{N_x},\vec{p}_{N_x}\right) \\
-            \end{array}\right)
-            \end{align}
-
-
-        with :math:`\mathbf{M}` the design matrix.
-
-        The goal of this function is to perform a minimisation of the amplitude vector :math:`\mathbf{A}` given
-        a set of non-linear parameters :math:`\mathbf{p}` and a spectrogram data array :math:`mathbf{y}` modelise as
-
-        .. math:: \mathbf{y} = \mathbf{m}(\vec{x},\vec{p}) + \vec{\epsilon}
-
-        with :math:`\vec{\epsilon}` a random noise vector. The :math:`\chi^2` function to minimise is
-
-        .. math::
-            :label: chromaticspsf2d_chi2
-
-            \chi^2(\mathbf{A})= \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A}\right)^T \mathbf{W}
-            \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)
-
-
-        with :math:`\mathbf{W}` the weight matrix, inverse of the covariance matrix. In our case this matrix is diagonal
-        as the pixels are considered all independent. The minimum of equation :eq:`chromaticspsf2d_chi2` is reached for
-        a the set of amplitude parameters :math:`\hat{\mathbf{A}}` given by
-
-        .. math::
-
-            \hat{\mathbf{A}} =  (\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1} \mathbf{M}^T \mathbf{W} \mathbf{y}
-
-        The error matrix on the :math:`\hat{\mathbf{A}}` coefficient is simply
-        :math:`(\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}`.
-
-        See Also
-        --------
-        ChromaticPSF1DFitWorkspace.simulate
-
-        Parameters
-        ----------
-        shape_params: array_like
-            PSF shape polynomial parameter array.
-
-        Examples
-        --------
-
-        Set the parameters:
-
-        .. doctest::
-
-            >>> parameters.PIXDIST_BACKGROUND = 40
-            >>> parameters.PIXWIDTH_BACKGROUND = 10
-            >>> parameters.PIXWIDTH_SIGNAL = 30
-
-        Build a mock spectrogram with random Poisson noise:
-
-        .. doctest::
-
-            >>> psf = Moffat(clip=False)
-            >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=100000)
-            >>> params = s0.generate_test_poly_params()
-            >>> params[:s0.Nx] *= 10
-            >>> s0.params.values = params
-            >>> saturation = params[-1]
-            >>> data = s0.evaluate(params, mode="2D")
-            >>> bgd = 10*np.ones_like(data)
-            >>> data += bgd
-            >>> data = np.random.poisson(data)
-            >>> data_errors = np.sqrt(data+1)
-
-        Extract the background:
-
-        .. doctest::
-
-            >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
-
-        Estimate the first guess values:
-
-        .. doctest::
-
-            >>> s = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=saturation)
-            >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-            ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
-            >>> s.plot_summary(truth=s0)
-
-        Simulate the data with fixed amplitude priors:
-
-        .. doctest::
-
-            >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
-            ... amplitude_priors_method="fixed", verbose=True)
-            >>> y, mod, mod_err = w.simulate(s.params.values[s.Nx:])
-            >>> w.plot_fit()
-
-        .. doctest::
-            :hide:
-
-            >>> assert mod is not None
-
-        Simulate the data with a Tikhonov prior on amplitude parameters:
-
-        .. doctest::
-
-            >>> parameters.PSF_FIT_REG_PARAM = 0.002
-            >>> s.params.values = s.from_table_to_poly_params()
-            >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
-            ... amplitude_priors_method="psf1d", verbose=True)
-            >>> y, mod, mod_err = w.simulate(s.params.values[s.Nx:])
-            >>> w.plot_fit()
-
-        .. doctest::
-            :hide:
-
-            >>> assert mod is not None
-
-        """
-        # linear regression for the amplitude parameters
-        # prepare the vectors
-        poly_params = np.copy(self.poly_params)
-        poly_params[self.Nx:] = np.copy(shape_params)
-        poly_params[self.Nx + self.y_c_0_index] -= self.bgd_width
-        profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
-        profile_params[:self.Nx, 0] = 1
-        profile_params[:self.Nx, 1] = np.arange(self.Nx)
-        # profile_params[:self.Nx, 2] -= self.bgd_width
-        if self.amplitude_priors_method != "fixed":
-            M = self.chromatic_psf.build_sparse_M(self.pixels, profile_params, dtype="float32",
-                                                  M_sparse_indices=self.M_sparse_indices, boundaries=self.boundaries)
-
-            M_dot_W = M.T @ self.sqrtW
-            W_dot_data = (self.W * self.data).astype("float32")
-            # Compute the minimizing amplitudes
-            if sparse_dot_mkl is None:
-                M_dot_W_dot_M = M_dot_W @ M_dot_W.T
-            else:
-                tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
-                dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))),
-                                        shape=tri.shape, dtype="float32")
-                M_dot_W_dot_M = tri + tri.T - dia
-            if self.amplitude_priors_method != "psf1d":
-                if self.amplitude_priors_method == "keep":
-                    amplitude_params = np.copy(self.amplitude_params)
-                    cov_matrix = np.copy(self.amplitude_cov_matrix)
-                else:
-                    # try:
-                    #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M))
-                    #     cov_matrix = L.T @ L
-                    # except np.linalg.LinAlgError:
-                    cov_matrix = np.linalg.inv(M_dot_W_dot_M)
-                    amplitude_params = cov_matrix @ (M.T @ W_dot_data)
-                    if self.amplitude_priors_method == "positive":
-                        amplitude_params[amplitude_params < 0] = 0
-                    elif self.amplitude_priors_method == "smooth":
-                        null_indices = np.where(amplitude_params < 0)[0]
-                        for index in null_indices:
-                            right = amplitude_params[index]
-                            for i in range(index, min(index + 10, self.Nx)):
-                                right = amplitude_params[i]
-                                if i not in null_indices:
-                                    break
-                            left = amplitude_params[index]
-                            for i in range(index, max(0, index - 10), -1):
-                                left = amplitude_params[i]
-                                if i not in null_indices:
-                                    break
-                            amplitude_params[index] = 0.5 * (right + left)
-                    elif self.amplitude_priors_method == "noprior":
-                        pass
-            else:
-                M_dot_W_dot_M_plus_Q = M_dot_W_dot_M + self.reg * self.Q
-                # try:
-                #     L = np.linalg.inv(np.linalg.cholesky(M_dot_W_dot_M_plus_Q))
-                #     cov_matrix = L.T @ L
-                # except np.linalg.LinAlgError:
-                cov_matrix = np.linalg.inv(M_dot_W_dot_M_plus_Q)
-                amplitude_params = cov_matrix @ (M.T @ W_dot_data + np.float32(self.reg) * self.Q_dot_A0)
-            amplitude_params = np.asarray(amplitude_params).reshape(-1)
-            self.M = M
-            self.M_dot_W_dot_M = M_dot_W_dot_M
-            self.model = M @ amplitude_params
-        else:
-            amplitude_params = np.copy(self.amplitude_priors)
-            err2 = np.copy(amplitude_params)
-            err2[err2 <= 0] = np.min(np.abs(err2[err2 > 0]))
-            cov_matrix = np.diag(err2)
-        poly_params[:self.Nx] = amplitude_params
-        self.poly_params = np.copy(poly_params)
-        self.profile_params = np.copy(profile_params)
-        self.amplitude_params = np.copy(amplitude_params)
-        # TODO: propagate and marginalize over the shape parameter uncertainties ?
-        self.amplitude_params_err = np.array([np.sqrt(cov_matrix[x, x]) for x in range(self.Nx)])
-        self.amplitude_cov_matrix = np.copy(cov_matrix)
-        # in_bounds, penalty, name = self.chromatic_psf.check_bounds(poly_params, noise_level=self.bgd_std)
-        if self.amplitude_priors_method == "fixed":
-            poly_params[self.Nx + self.y_c_0_index] += self.bgd_width
-            self.model = self.chromatic_psf.evaluate(poly_params, mode="2D")[
-                         self.bgd_width:-self.bgd_width, :]
-        self.model_err = np.zeros_like(self.model)
-        return self.pixels, self.model, self.model_err
-
-    def amplitude_derivatives(self):
-        r"""
-        Compute analytically the amplitude vector \hat{\mathbf{A}} derivatives with respect to the PSF parameters.
-        With
-
-        .. math::
-
-            \hat{\mathbf{A}} =  \hat{\mathbf{C}} \cdot \mathbf{M}^T \mathbf{W} \mathbf{y}
-
-            \hat{\mathbf{C}} = (\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}
-
-        derivatives are
-
-        .. math::
-
-            \frac{\partial \hat{\mathbf{A}}}{\partial \theta} =  \frac{\partial \hat{\mathbf{C}}}{\partial \theta} \cdot \mathbf{M}^T \mathbf{W} \mathbf{y} + \hat{\mathbf{C}} \cdot \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{y}}{\partial \theta}
-
-            \frac{\partial \hat{\mathbf{C}}}{\partial \theta} = - \hat{\mathbf{C}} \cdot \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{M}}{\partial \theta}  \cdot  \hat{\mathbf{C}}
-
-            \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{M}}{\partial \theta} = 2 \frac{\partial \mathbf{M}^T}{\partial \theta} \mathbf{W} \mathbf{M}
-
-            \frac{\partial \mathbf{M}^T \mathbf{W} \mathbf{y}}{\partial \theta} = \frac{\partial \mathbf{M}^T}{\partial \theta} \mathbf{W} \mathbf{y}
-
-        If amplitude vector is regularized via Tikhonov regularisation, regularisation term is added appropriately.
-
-        Returns
-        -------
-        dA_dtheta: list
-            List of amplitude vector derivatives.
-
-        Examples
-        --------
-
-        Set the parameters:
-
-        .. doctest::
-
-            >>> parameters.PIXDIST_BACKGROUND = 40
-            >>> parameters.PIXWIDTH_BACKGROUND = 10
-            >>> parameters.PIXWIDTH_SIGNAL = 30
-
-        Build a mock spectrogram with random Poisson noise:
-
-        .. doctest::
-
-            >>> psf = Moffat(clip=False)
-            >>> s0 = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=100000)
-            >>> params = s0.generate_test_poly_params()
-            >>> params[:s0.Nx] *= 10
-            >>> s0.params.values = params
-            >>> saturation = params[-1]
-            >>> data = s0.evaluate(params, mode="2D")
-            >>> bgd = 10*np.ones_like(data)
-            >>> data += bgd
-            >>> data = np.random.poisson(data)
-            >>> data_errors = np.sqrt(data+1)
-
-        Extract the background:
-
-        .. doctest::
-
-            >>> bgd_model_func, _, _ = extract_spectrogram_background_sextractor(data, data_errors, ws=[30,50])
-
-        Estimate the first guess values:
-
-        .. doctest::
-
-            >>> s = ChromaticPSF(psf, Nx=120, Ny=100, deg=2, saturation=saturation)
-            >>> s.fit_transverse_PSF1D_profile(data, data_errors, w=20, ws=[30,50],
-            ... pixel_step=1, bgd_model_func=bgd_model_func, saturation=saturation, live_fit=False)
-            >>> s.plot_summary(truth=s0)
-
-        Simulate the data with a Tikhonov prior on amplitude parameters:
-
-        .. doctest::
-
-            >>> parameters.PSF_FIT_REG_PARAM = 0.002
-            >>> s.params.values = s.from_table_to_poly_params()
-            >>> w = ChromaticPSF2DFitWorkspace(s, data, data_errors, bgd_model_func=bgd_model_func,
-            ... amplitude_priors_method="psf1d", verbose=True)
-            >>> y, mod, mod_err = w.simulate(s.params.values[s.Nx:])
-            >>> w.plot_fit()
-
-        .. doctest::
-            :hide:
-
-            >>> assert mod is not None
-
-        Get the derivatives:
-
-        .. doctest::
-
-            >>> dA_dtheta = w.amplitude_derivatives()
-            >>> print(np.array(dA_dtheta).shape, w.amplitude_params.shape)
-            (13, 120) (120,)
-
-        """
-        # compute matrices without derivatives
-        WM = sparse.dia_matrix((self.W, 0), shape=(self.W.size, self.W.size), dtype="float32") @ self.M
-        WD = (self.W * self.data).astype("float32")
-        MWD = self.M.T @ WD
-        if self.amplitude_priors_method == "psf1d":
-            MWD += np.float32(self.reg) * self.Q_dot_A0
-        # compute partial derivatives of model matrix M
-        dM_dtheta = self.chromatic_psf.build_sparse_dM(self.pixels, profile_params=self.profile_params,
-                                                       M_sparse_indices=self.M_sparse_indices,
-                                                       boundaries=self.boundaries, dtype="float32")
-        # compute partial derivatives of amplitude vector A
-        nparams = len(dM_dtheta)
-        dMWD_dtheta = [dM_dtheta[ip].T @ WD for ip in range(nparams)]
-        dMWM_dtheta = [2 * dM_dtheta[ip].T @ WM for ip in range(nparams)]
-        dcov_dtheta = [-self.amplitude_cov_matrix @ (dMWM_dtheta[ip] @ self.amplitude_cov_matrix) for ip in range(nparams)]
-        dA_dtheta = [self.amplitude_cov_matrix @ dMWD_dtheta[ip] + dcov_dtheta[ip] @ MWD for ip in range(nparams)]
-        return dA_dtheta
 
 
 if __name__ == "__main__":

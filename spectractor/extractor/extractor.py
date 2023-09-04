@@ -1557,7 +1557,7 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
                             amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE, analytical=True)
 
     # save results
-    spectrum.spectrogram_fit = s.evaluate(poly_params=s.params.values, mode=mode)
+    spectrum.spectrogram_fit = s.evaluate(s.set_pixels(mode=mode), poly_params=s.params.values)
     spectrum.spectrogram_residuals = (data - spectrum.spectrogram_fit - bgd_model_func(np.arange(Nx),
                                                                                        np.arange(Ny))) / err
     lambdas = spectrum.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
