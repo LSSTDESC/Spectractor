@@ -1933,9 +1933,14 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
             poly_params = self.poly_params
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
-        psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
-                                                     fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                     fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
+        if self.pixels.ndim == 1:
+            psf_cube = np.zeros((len(profile_params), self.Ny, self.Nx))
+            for x in range(psf_cube.shape[0]):
+                psf_cube[x, :, x] = 1
+        else:
+            psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
+                                                        fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                        fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
         self.psf_cube_masked = self.chromatic_psf.get_psf_cube_masked(psf_cube, convolve=True)
         self.boundaries, self.psf_cube_masked = self.chromatic_psf.get_boundaries(self.psf_cube_masked)
         self.psf_cube_sparse_indices, self.M_sparse_indices = self.chromatic_psf.get_sparse_indices(self.psf_cube_masked)
