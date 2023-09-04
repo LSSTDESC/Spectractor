@@ -1224,7 +1224,6 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
     costs = []
     params_table = []
     inv_JT_W_J = np.zeros((len(ipar), len(ipar)), dtype=float)
-    new_params = np.zeros(len(tmp_params), dtype=float)
 
     for i in range(niter):
         start = time.time()
@@ -1286,7 +1285,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         new_params[ipar] = tmp_params[ipar] + dparams
         fval = fit_workspace.chisq(new_params)
 
-        if with_line_search or fval > 1.001 * cost:
+        if with_line_search or fval > 1.01 * cost:
             def line_search(alpha):
                 tmp_params_2 = np.copy(tmp_params)
                 tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
