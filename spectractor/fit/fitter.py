@@ -860,6 +860,20 @@ class FitWorkspace:
                [0. , 0.5, 0. ],
                [0. , 0. , 0. ]])
 
+        Use sparse matrix:
+
+        >>> w.W = scipy.sparse.diags(np.ones(3)).tocsr()
+        >>> w.W.toarray()
+        array([[1., 0., 0.],
+               [0., 1., 0.],
+               [0., 0., 1.]])
+        >>> w.prepare_weight_matrices()
+        >>> w.W.toarray()
+        array([[1., 0., 0.],
+               [0., 1., 0.],
+               [0., 0., 0.]])
+
+
         """
         # Prepare covariance matrix for data
         if self.data_cov is None:
@@ -882,24 +896,32 @@ class FitWorkspace:
                     self.W = np.asarray(self.W)
         if len(self.outliers) > 0:
             bad_indices = self.get_bad_indices()
-            if self.W.ndim == 1 and self.W.dtype != object:
-                self.W[bad_indices] = 0
-            elif self.W.ndim == 2 and self.W.dtype != object:
-                self.W[:, bad_indices] = 0
-                self.W[bad_indices, :] = 0
-            elif self.W.dtype == object:
-                if self.data_cov[0].ndim == 1:
-                    for k in range(len(self.W)):
-                        self.W[k][bad_indices[k]] = 0
+            if not scipy.sparse.issparse(self.W):
+                if self.W.ndim == 1 and self.W.dtype != object:
+                    self.W[bad_indices] = 0
+                elif self.W.ndim == 2 and self.W.dtype != object:
+                    self.W[:, bad_indices] = 0
+                    self.W[bad_indices, :] = 0
+                elif self.W.dtype == object:
+                    if self.data_cov[0].ndim == 1:
+                        for k in range(len(self.W)):
+                            self.W[k][bad_indices[k]] = 0
+                    else:
+                        for k in range(len(self.W)):
+                            self.W[k][:, bad_indices[k]] = 0
+                            self.W[k][bad_indices[k], :] = 0
                 else:
-                    for k in range(len(self.W)):
-                        self.W[k][:, bad_indices[k]] = 0
-                        self.W[k][bad_indices[k], :] = 0
+                    raise ValueError(
+                        f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
+                        f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
+                        f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
             else:
-                raise ValueError(
-                    f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
-                    f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
-                    f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
+                W = self.W.toarray()
+                W[:, bad_indices] = 0
+                W[bad_indices, :] = 0
+                rows, cols = self.W.nonzero()
+                self.W = scipy.sparse.csr_matrix((W[rows, cols], (rows, cols)), dtype=self.W.dtype, shape=self.W.shape)
+                self.W.eliminate_zeros()
 
     def compute_W_with_model_error(self, model_err):
         """Propagate model uncertainties to weight matrix W.
