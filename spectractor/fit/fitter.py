@@ -883,8 +883,7 @@ class FitWorkspace:
             if self.data_cov.ndim == 1 and self.data_cov.dtype != object:
                 self.W = 1 / self.data_cov
             elif self.data_cov.ndim == 2 and self.data_cov.dtype != object:
-                L = np.linalg.inv(np.linalg.cholesky(self.data_cov))
-                self.W = L.T @ L
+                self.W = np.linalg.inv(self.data_cov)
             elif self.data_cov.dtype is object:
                 if self.data_cov[0].ndim == 1:
                     self.W = np.array([1 / self.data_cov[k] for k in range(self.data_cov.shape[0])])
