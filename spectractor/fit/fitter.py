@@ -1002,8 +1002,7 @@ class FitWorkspace:
                                          f"I get W[0]={self.W[0]}")
                 elif self.W.ndim == 2 and self.W.dtype != object:
                     cov = self.data_cov + np.diag(model_err * model_err)
-                    L = np.linalg.inv(np.linalg.cholesky(cov))
-                    self.W = L.T @ L
+                    self.W = np.linalg.inv(cov)
                 # needs to reapply the mask of outliers
                 self.W[zeros] = 0
             else:
