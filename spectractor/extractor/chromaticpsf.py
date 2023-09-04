@@ -1820,8 +1820,8 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
         # (which is not exactly true in rotated images)
-        self.data_cov = sparse.diags(self.err * self.err, dtype="float32")
-        self.W = sparse.diags(1 / (self.err * self.err), dtype="float32")
+        self.data_cov = sparse.diags(self.err * self.err, dtype="float32", format="dia")
+        self.W = sparse.diags(1 / (self.err * self.err), dtype="float32", format="dia")
         self.sqrtW = self.W.sqrt()
         # create a mask
         self.W_before_mask = self.W.copy()
@@ -1942,7 +1942,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         mask = np.sum(self.psf_cube_masked.reshape(psf_cube.shape[0], psf_cube[0].size), axis=0) == 0
         W = np.copy(self.W_before_mask.data.ravel())
         W[mask] = 0
-        self.W = sparse.diags(W, dtype="float32")
+        self.W = sparse.diags(W, dtype="float32", format="dia")
         self.sqrtW = self.W.sqrt()
         self.mask = list(np.where(mask)[0])
 
@@ -2295,7 +2295,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
 
         """
         # compute matrices without derivatives
-        WM =  self.W @ self.M  #  sparse.diags(self.W, shape=(self.W.size, self.W.size), dtype="float32") @ self.M
+        WM =  self.W @ self.M
         WD = self.W @ self.data
         MWD = self.M.T @ WD
         if self.amplitude_priors_method == "psf1d":

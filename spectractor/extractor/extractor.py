@@ -173,7 +173,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.W_before_mask = np.copy(self.W)
 
         # create mask
-        self.sqrtW = sparse.diags(np.sqrt(self.W), format="csr", dtype="float32")
+        self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
 
         # design matrix
         self.M = None
@@ -289,7 +289,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube.shape[0], psf_cube[0].size), axis=0) == 0
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
-        self.sqrtW = sparse.diags(np.sqrt(self.W), format="csr", dtype="float32")
+        self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
         self.mask = list(np.where(mask)[0])
 
     def simulate(self, *params):
