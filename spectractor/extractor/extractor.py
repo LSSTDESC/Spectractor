@@ -935,34 +935,6 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             w.plot_fit()
             parameters.SAVE = False
 
-    # Save results
-    # w.spectrum.convert_from_ADUrate_to_flam()
-    # x, model, model_err = w.simulate(*w.p)
-
-    # Propagate uncertainties
-    # from spectractor.tools import plot_correlation_matrix_simple, compute_correlation_matrix
-    # M = np.copy(w.M)
-    # amplitude_params = np.copy(w.amplitude_params)
-    # ipar = np.array(np.where(np.array(w.fixed).astype(int) == 0)[0])
-    # w.amplitude_priors_method = "fixed"
-    # jac = w.jacobian(w.p, epsilon=epsilon, fixed_params=w.fixed, model_input=[x, model, model_err])
-    # jac = jac[ipar]
-    # start = jac.shape[0]
-    # J = np.hstack([jac.T, M])
-    # H = (J.T * w.W) @ J
-    # H[start:, start:] += w.reg*w.Q
-    # full_cov_matrix = np.linalg.inv(H)
-    # amplitude_params_err = np.array([np.sqrt(full_cov_matrix[start+x, start+x]) for x in range(w.Nx)])
-    # plt.errorbar(w.lambdas, amplitude_params, yerr=amplitude_params_err)
-    # plt.grid()
-    # plt.show()
-    # plt.figure()
-    # plot_correlation_matrix_simple(ax=plt.gca(), rho=compute_correlation_matrix(full_cov_matrix))
-    # plt.show()
-    # w.amplitude_params = amplitude_params
-    # w.amplitude_params_err = amplitude_params_err
-    # w.amplitude_cov_matrix = full_cov_matrix[start:, start:]
-
     # Propagate parameters
     A1, A2, A3, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *poly_params_all = w.params.values
     w.spectrum.rotation_angle = angle
