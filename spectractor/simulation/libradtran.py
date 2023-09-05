@@ -19,6 +19,12 @@ from spectractor.tools import ensure_dir
 import spectractor.parameters as parameters
 from spectractor.config import set_logger
 
+try:
+    from atmosphtransmemullsst.simpleatmospherictransparencyemulator import SimpleAtmEmulator
+    emulator = SimpleAtmEmulator()
+except ModuleNotFoundError:
+    emulator = None
+
 
 class Libradtran:
 
@@ -144,97 +150,102 @@ class Libradtran:
         >>> print(atmosphere2[-5:])
         [0.9659722 0.9659722 0.9571998 0.9571998 0.9554523]
         """
+        if emulator is None:
+            self.my_logger.debug(
+                f'\n\t--------------------------------------------'
+                f'\n\tevaluate'
+                f'\n\t 1) airmass = {airmass}'
+                f'\n\t 2) pwv = {pwv}'
+                f'\n\t 3) ozone = {ozone}'
+                f'\n\t 4) aer = {aerosol}'
+                f'\n\t 5) pressure =  {pressure}'
+                f'\n\t--------------------------------------------')
 
-        self.my_logger.debug(
-            f'\n\t--------------------------------------------'
-            f'\n\tevaluate'
-            f'\n\t 1) airmass = {airmass}'
-            f'\n\t 2) pwv = {pwv}'
-            f'\n\t 3) ozone = {ozone}'
-            f'\n\t 4) aer = {aerosol}'
-            f'\n\t 5) pressure =  {pressure}'
-            f'\n\t--------------------------------------------')
-
-        # Set up type of run
-        if self.proc == 'sc':
-            runtype = 'no_absorption'
-        elif self.proc == 'ab':
-            runtype = 'no_scattering'
-        elif self.proc == 'ae':
-            runtype = 'aerosol_default'
-        elif self.proc == 'as':
-            runtype = 'aerosol_special'
-        else:
-            runtype = 'clearsky'
-
-        #   Selection of RTE equation solver
-        if self.equation_solver == 'pp':  # parallel plan
-            equation_solver_equations = 'twostr'
-        elif self.equation_solver == 'ps':  # pseudo spherical
-            equation_solver_equations = 'sdisort'
-        else:
-            self.my_logger.error(f'Unknown RTE equation solver {self.equation_solver}.')
-            sys.exit()
-
-        # loop on molecular model resolution
-        # molecular_resolution = np.array(['coarse','medium','fine'])
-        # select only COARSE Model
-        molecular_resolution = 'coarse'
-
-        self.settings["data_files_path"] = os.path.join(self.libradtran_path, 'data')
-        self.settings["atmosphere_file"] = os.path.join(self.libradtran_path, 'data/atmmod/', self.atmosphere_standard + '.dat')
-        self.settings["albedo"] = '0.2'
-        self.settings["rte_solver"] = equation_solver_equations
-
-        if self.absorption_model == 'reptran':
-            self.settings["mol_abs_param"] = self.absorption_model + ' ' + molecular_resolution
-        else:
-            self.settings["mol_abs_param"] = self.absorption_model
-
-        # Convert airmass into zenith angle
-        sza = np.arccos(1. / airmass) * 180. / np.pi
-
-        # Should be no_absorption
-        if runtype == 'aerosol_default':
-            self.settings["aerosol_default"] = ''
-        elif runtype == 'aerosol_special':
-            self.settings["aerosol_default"] = ''
-            if angstrom_exponent is None or angstrom_exponent < 0:
-                self.settings["aerosol_set_tau_at_wvl"] = f'500 {aerosol:.20f}'
+            # Set up type of run
+            if self.proc == 'sc':
+                runtype = 'no_absorption'
+            elif self.proc == 'ab':
+                runtype = 'no_scattering'
+            elif self.proc == 'ae':
+                runtype = 'aerosol_default'
+            elif self.proc == 'as':
+                runtype = 'aerosol_special'
             else:
-                # below formula recover default aerosols models with angstrom_exponent=0.0192
-                tau = aerosol / 0.04 * (0.5 ** angstrom_exponent)
-                self.settings["aerosol_angstrom"] = f"{tau:.10f} {angstrom_exponent:.10f}"
+                runtype = 'clearsky'
 
-        if runtype == 'no_scattering':
-            self.settings["no_scattering"] = ''
-        if runtype == 'no_absorption':
-            self.settings["no_absorption"] = ''
+            #   Selection of RTE equation solver
+            if self.equation_solver == 'pp':  # parallel plan
+                equation_solver_equations = 'twostr'
+            elif self.equation_solver == 'ps':  # pseudo spherical
+                equation_solver_equations = 'sdisort'
+            else:
+                self.my_logger.error(f'Unknown RTE equation solver {self.equation_solver}.')
+                sys.exit()
 
-        # water vapor
-        self.settings["mol_modify H2O"] = f'{pwv:.20f} MM'
+            # loop on molecular model resolution
+            # molecular_resolution = np.array(['coarse','medium','fine'])
+            # select only COARSE Model
+            molecular_resolution = 'coarse'
 
-        # Ozone
-        self.settings["mol_modify O3"] = f'{ozone:.20f} DU'
+            self.settings["data_files_path"] = os.path.join(self.libradtran_path, 'data')
+            self.settings["atmosphere_file"] = os.path.join(self.libradtran_path, 'data/atmmod/', self.atmosphere_standard + '.dat')
+            self.settings["albedo"] = '0.2'
+            self.settings["rte_solver"] = equation_solver_equations
 
-        # rescale pressure if reasonable pressure values are provided
-        if 600. < pressure < 1015.:
-            self.settings["pressure"] = pressure
+            if self.absorption_model == 'reptran':
+                self.settings["mol_abs_param"] = self.absorption_model + ' ' + molecular_resolution
+            else:
+                self.settings["mol_abs_param"] = self.absorption_model
+
+            # Convert airmass into zenith angle
+            sza = np.arccos(1. / airmass) * 180. / np.pi
+
+            # Should be no_absorption
+            if runtype == 'aerosol_default':
+                self.settings["aerosol_default"] = ''
+            elif runtype == 'aerosol_special':
+                self.settings["aerosol_default"] = ''
+                if angstrom_exponent is None or angstrom_exponent < 0:
+                    self.settings["aerosol_set_tau_at_wvl"] = f'500 {aerosol:.20f}'
+                else:
+                    # below formula recover default aerosols models with angstrom_exponent=0.0192
+                    tau = aerosol / 0.04 * (0.5 ** angstrom_exponent)
+                    self.settings["aerosol_angstrom"] = f"{tau:.10f} {angstrom_exponent:.10f}"
+
+            if runtype == 'no_scattering':
+                self.settings["no_scattering"] = ''
+            if runtype == 'no_absorption':
+                self.settings["no_absorption"] = ''
+
+            # water vapor
+            self.settings["mol_modify H2O"] = f'{pwv:.20f} MM'
+
+            # Ozone
+            self.settings["mol_modify O3"] = f'{ozone:.20f} DU'
+
+            # rescale pressure if reasonable pressure values are provided
+            if 600. < pressure < 1015.:
+                self.settings["pressure"] = pressure
+            else:
+                self.my_logger.error(f'\n\tcrazy pressure p={pressure} hPa')
+            # only for mie executable from libradtran to compute mie diffusion
+            # self.settings["temperature"] = temperature + 273.15
+
+            self.settings["altitude"] = str(altitude)  # observatory altitude
+            self.settings["source"] = 'solar ' + os.path.join(self.libradtran_path, 'data/solar_flux/kurudz_1.0nm.dat')
+            self.settings["sza"] = str(sza)
+            self.settings["phi0"] = '0'
+            self.settings["wavelength"] = f'{int(lambda_min)} {int(np.ceil(lambda_max))}'
+            self.settings["output_user"] = 'lambda edir'
+            self.settings["output_quantity"] = 'reflectivity'  # transmittance
+            self.settings["quiet"] = ''
+
+            wl, atm = self.run(path=self.libradtran_path)
         else:
-            self.my_logger.error(f'\n\tcrazy pressure p={pressure} hPa')
-        # only for mie executable from libradtran to compute mie diffusion
-        # self.settings["temperature"] = temperature + 273.15
-
-        self.settings["altitude"] = str(altitude)  # observatory altitude
-        self.settings["source"] = 'solar ' + os.path.join(self.libradtran_path, 'data/solar_flux/kurudz_1.0nm.dat')
-        self.settings["sza"] = str(sza)
-        self.settings["phi0"] = '0'
-        self.settings["wavelength"] = f'{int(lambda_min)} {int(np.ceil(lambda_max))}'
-        self.settings["output_user"] = 'lambda edir'
-        self.settings["output_quantity"] = 'reflectivity'  # transmittance
-        self.settings["quiet"] = ''
-
-        wl, atm = self.run(path=self.libradtran_path)
+            emulator.lambda0 = 500
+            #TODO: adapt bounds and epsilons with emulator data steps and ranges
+            wl = np.arange(max(emulator.WLMIN, lambda_min), min(emulator.WLMAX, lambda_max),  parameters.LAMBDA_STEP)
+            atm = emulator.GetAllTransparencies(wl, airmass, pwv, ozone, flagAerosols=True, ncomp=1, taus=[aerosol], betas=[angstrom_exponent])
         return wl, atm
 
 
