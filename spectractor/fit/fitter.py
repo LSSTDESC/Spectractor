@@ -1303,6 +1303,14 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         dparams = - inv_JT_W_J @ JT_W_R0
         new_params = np.copy(tmp_params)
         new_params[ipar] = tmp_params[ipar] + dparams
+
+        # check bounds
+        for ip, p in enumerate(new_params):
+            if p < fit_workspace.params.bounds[ip][0]:
+                new_params[ip] = fit_workspace.params.bounds[ip][0]
+            if p > fit_workspace.params.bounds[ip][1]:
+                new_params[ip] = fit_workspace.params.bounds[ip][1]
+
         fval = fit_workspace.chisq(new_params)
 
         if with_line_search or fval > (1 + 10 * ftol) * cost:
@@ -1319,17 +1327,16 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             # tol parameter acts on alpha (not func)
             alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=5e-1, brack=(0, 1))
             new_params[ipar] = tmp_params[ipar] + alpha_min * dparams
+            # check bounds
+            for ip, p in enumerate(new_params):
+                if p < fit_workspace.params.bounds[ip][0]:
+                    new_params[ip] = fit_workspace.params.bounds[ip][0]
+                if p > fit_workspace.params.bounds[ip][1]:
+                    new_params[ip] = fit_workspace.params.bounds[ip][1]
         else:
             alpha_min = 1
             funcalls = 0
             iter = 0
-
-        # check bounds
-        for ip, p in enumerate(new_params):
-            if p < fit_workspace.params.bounds[ip][0]:
-                new_params[ip] = fit_workspace.params.bounds[ip][0]
-            if p > fit_workspace.params.bounds[ip][1]:
-                new_params[ip] = fit_workspace.params.bounds[ip][1]
 
         tmp_params[ipar] = new_params[ipar]
 
