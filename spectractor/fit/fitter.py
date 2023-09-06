@@ -1588,12 +1588,12 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         # prepare outputs
         costs.append(fval)
         params_table.append(np.copy(tmp_params))
-        fit_workspace.p = tmp_params
+        fit_workspace.params.values = tmp_params
         if fit_workspace.verbose:
             my_logger.info(f"\n\tIteration={i}:\tfinal cost={fval:.5g}\tfinal chisq_red={fval / (tmp_model.size - n_data_masked):.5g} "
-                           f"\tcomputed in {time.time() - start:.2f}s")
+                           f"\tcomputed in {time.time() - start:.2f}s"
+                           f"\n\tNew parameters: {tmp_params[ipar]}")
             my_logger.debug(f"\n\t Parameter shifts: {alpha_min * dparams}\n"
-                            f"\n\t New parameters: {tmp_params[ipar]}"
                             f"\n\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}")
         if fit_workspace.live_fit:  # pragma: no cover
             fit_workspace.simulate(*tmp_params)
@@ -1838,14 +1838,15 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
             fit_workspace.save_gradient_descent()
 
 
-def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ftol=1e-4,
+def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ftol=1e-4, with_line_search=True,
                                     niter=50, sigma_clip=5.0, niter_clip=3, verbose=False):
     my_logger = set_logger(__name__)
     fit_workspace.sigma_clip = sigma_clip
     for step in range(niter_clip):
         if verbose:
             my_logger.info(f"\n\tSigma-clipping step {step}/{niter_clip} (sigma={sigma_clip})")
-        run_minimisation(fit_workspace, method=method, epsilon=epsilon, xtol=xtol, ftol=ftol, niter=niter)
+        run_minimisation(fit_workspace, method=method, epsilon=epsilon, xtol=xtol, ftol=ftol, niter=niter,
+                         with_line_search=with_line_search, verbose=verbose)
         # remove outliers
         if fit_workspace.data.dtype == object:
             # indices_no_nan = ~np.isnan(np.concatenate(fit_workspace.data).ravel())
