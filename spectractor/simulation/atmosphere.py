@@ -12,6 +12,9 @@ import spectractor.simulation.libradtran as libradtran
 from spectractor.simulation.throughput import plot_transmission_simple
 
 
+angstrom_exponent_default = 0.0192
+
+
 class Atmosphere:
 
     def __init__(self, airmass, pressure, temperature, lambda_min=250, lambda_max=1200, altitude=parameters.OBS_ALTITUDE):

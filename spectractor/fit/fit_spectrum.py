@@ -3,12 +3,13 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 from scipy.interpolate import interp1d
 import getCalspec
+import copy
 
 from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.simulation.simulator import SpectrumSimulation
-from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid, angstrom_exponent_default
 from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisation_sigma_clipping, run_minimisation,
                                     write_fitparameter_json)
 from spectractor.tools import plot_spectrum_simple
@@ -59,7 +60,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         if not getCalspec.is_calspec(spectrum.target.label):
             raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
-        p = np.array([1, 0, 0.01, -2, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
+        p = np.array([1, 0, 0.05, np.log10(angstrom_exponent_default), 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
         # fixed[0] = True
         fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
@@ -165,7 +166,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ylim = ax2.get_ylim()
         residuals_model = self.model_err[sub][idx] / self.err[sub][idx]
         ax2.fill_between(lambdas[sub][idx], -residuals_model, residuals_model, alpha=0.3, color=p0[0].get_color())
-        std = np.std(residuals)  # max(np.std(residuals), np.std(residuals_model))
+        std = np.nanstd(residuals)  # max(np.std(residuals), np.std(residuals_model))
         ax2.set_ylim(-5*std, 5*std)
         ax2.set_xlabel(ax.get_xlabel())
         # ax2.set_ylabel('(Data-Model)/Err', fontsize=10)
@@ -362,11 +363,13 @@ def run_spectrum_minimisation(fit_workspace, method="newton"):
 
         fit_workspace.simulation.fast_sim = False
         # fit_workspace.fixed[0] = True
-        fixed = [True] * len(fit_workspace.params.values)
-        fixed[0] = False
+        fixed = copy.copy(fit_workspace.params.fixed)
+        fit_workspace.params.fixed = [True] * len(fit_workspace.params.values)
+        fit_workspace.params.fixed[0] = False
         run_minimisation(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-3, ftol=100 / fit_workspace.data.size,
                          verbose=False)
         # fit_workspace.fixed[0] = False
+        fit_workspace.params.fixed = fixed
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon, xtol=1e-6,
                                         ftol=1 / fit_workspace.data.size, sigma_clip=20, niter_clip=3, verbose=False)
 

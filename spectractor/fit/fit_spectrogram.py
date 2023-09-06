@@ -12,7 +12,7 @@ from spectractor.config import set_logger
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.simulation.simulator import SpectrogramModel
-from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid, angstrom_exponent_default
 from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisation, run_minimisation_sigma_clipping,
                                     write_fitparameter_json)
 
@@ -68,7 +68,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         self.saturation = self.spectrum.spectrogram_saturation
         D2CCD = np.copy(spectrum.header['D2CCD'])
-        p = np.array([1, 1, 1, 0.05, -2, 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
+        p = np.array([1, 1, 1, 0.05, np.log10(angstrom_exponent_default), 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
                       0, self.spectrum.rotation_angle, 1])
         self.psf_params_start_index = np.array([12 + len(self.psf_poly_params) * k for k in range(len(self.diffraction_orders))])
         psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.params.labels[length:])
@@ -486,7 +486,7 @@ def lnprob_spectrogram(p):  # pragma: no cover
     return lp + fit_workspace.lnlike_spectrogram(p)
 
 
-def run_spectrogram_minimisation(fit_workspace, method="newton"):
+def run_spectrogram_minimisation(fit_workspace, method="newton", verbose=False):
     """Interface function to fit spectrogram simulation parameters to data.
 
     Parameters
@@ -547,7 +547,7 @@ def run_spectrogram_minimisation(fit_workspace, method="newton"):
         #                                            fix=fit_workspace.fixed, xtol=1e-6, ftol=1 / fit_workspace.data.size,
         #                                            niter=40)
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon,  xtol=1e-6,
-                                        ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=False,
+                                        ftol=1 / fit_workspace.data.size, sigma_clip=100, niter_clip=3, verbose=verbose,
                                         with_line_search=True)
         my_logger.info(f"\n\tNewton: total computation time: {time.time() - start}s")
         if fit_workspace.filename != "":
