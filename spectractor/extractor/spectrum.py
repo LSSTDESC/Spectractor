@@ -382,7 +382,7 @@ class Spectrum:
             t.reset_lambda_range(transmission_threshold=1e-4)
         return t
 
-    def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False):
+    def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False, calibration_only=False):
         """Plot spectrum with emission and absorption lines.
 
         Parameters
@@ -398,6 +398,8 @@ class Spectrum:
             (default: False).
         force_lines: bool
             Force the over plot of vertical lines for atomic lines if set to True (default: False).
+        calibration_only: bool
+            Plot only the lines used for calibration if True (default: False).
 
         Examples
         --------
@@ -405,8 +407,11 @@ class Spectrum:
         >>> s.plot_spectrum(xlim=[500,900], live_fit=False, force_lines=True)
         """
         if ax is None:
+            doplot = True
             plt.figure(figsize=[12, 6])
             ax = plt.gca()
+        else:
+            doplot = False
         if label == '':
             label = f'Order {self.order:d} spectrum\n' \
                     r'$D_{\mathrm{CCD}}=' \
@@ -430,14 +435,14 @@ class Spectrum:
         if self.lambdas is not None:
             self.lines.plot_detected_lines(ax, print_table=parameters.VERBOSE)
         if self.lambdas is not None and self.lines is not None:
-            self.lines.plot_atomic_lines(ax, fontsize=12, force=force_lines)
+            self.lines.plot_atomic_lines(ax, fontsize=12, force=force_lines, calibration_only=calibration_only)
         ax.legend(loc='best')
         if self.filters is not None:
             ax.get_legend().set_title(self.filters)
         plt.gcf().tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, f'{self.target.label}_spectrum.pdf'))
-        if parameters.DISPLAY:  # pragma: no cover
+        if parameters.DISPLAY and doplot:  # pragma: no cover
             if live_fit:
                 plt.draw()
                 plt.pause(1e-8)
@@ -502,6 +507,60 @@ class Spectrum:
             plt.show()
         if parameters.PdfPages:  # pragma: no cover
             parameters.PdfPages.savefig()
+
+    def plot_spectrum_summary(self, xlim=None, figsize=(10, 8)):
+        """Plot spectrum with emission and absorption lines.
+
+        Parameters
+        ----------
+        ax: Axes, optional
+            Axes instance (default: None).
+        label: str
+            Label for the legend (default: '').
+        xlim: list, optional
+            List of minimum and maximum abscisses (default: None)
+        live_fit: bool, optional
+            If True the spectrum is plotted in live during the fitting procedures
+            (default: False).
+        force_lines: bool
+            Force the over plot of vertical lines for atomic lines if set to True (default: False).
+
+        Examples
+        --------
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s.plot_spectrum_summary()
+        """
+        if not np.any([line.fitted for line in self.lines.lines]):
+            fwhm_func = interp1d(self.chromatic_psf.table['lambdas'],
+                                 self.chromatic_psf.table['fwhm'],
+                                 fill_value=(parameters.CALIB_PEAK_WIDTH, parameters.CALIB_PEAK_WIDTH),
+                                 bounds_error=False)
+            detect_lines(self.lines, self.lambdas, self.data, self.err, fwhm_func=fwhm_func,
+                         calibration_lines_only=True)
+
+        gs_kw = dict(width_ratios=[1, 1], height_ratios=[1, 0.2])
+        fig, ax = plt.subplots(2, 2, gridspec_kw=gs_kw, sharex=True, figsize=figsize)
+        label = f'Order {self.order:d} spectrum\n' \
+                r'$D_{\mathrm{CCD}}=' \
+                rf'{self.disperser.D:.2f}\,$mm'
+        plot_spectrum_simple(ax[0, 0], self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
+                             title=self.target.label, units=self.units, lw=1, linestyle="-")
+        if len(self.target.spectra) > 0:
+            plot_indices = np.logical_and(self.target.wavelengths[0] > np.min(self.lambdas),
+                                          self.target.wavelengths[0] < np.max(self.lambdas))
+            s = self.target.spectra[0] / np.max(self.target.spectra[0][plot_indices]) * np.max(self.data)
+            ax[0, 0].plot(self.target.wavelengths[0], s, lw=2, label='Normalized\nCALSPEC spectrum')
+        self.lines.plot_atomic_lines(ax[0, 0], fontsize=12, force=False, calibration_only=True)
+        self.lines.plot_detected_lines(ax[0, 0], print_table=False, calibration_only=True)
+
+        ax[0, 0].legend()
+
+        ax[1, 0].plot(self.lambdas, np.array(self.chromatic_psf.table['fwhm']), "r-", lw=2)
+        ax[1, 0].set_ylabel("FWHM [pix]")
+        ax[1, 0].grid()
+        ax[1, 0].set_xlabel(r'$\lambda$ [nm]')
+        fig.subplots_adjust(hspace=0)
+        plt.show()
 
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).

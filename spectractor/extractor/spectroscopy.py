@@ -249,9 +249,10 @@ class Lines:
         sorted_lines = sorted(sorted_lines, key=lambda x: x.wavelength)
         return sorted_lines
 
-    def plot_atomic_lines(self, ax, color_atomic='g', color_atmospheric='b', fontsize=12, force=False):
+    def plot_atomic_lines(self, ax, color_atomic='g', color_atmospheric='b', fontsize=12, force=False,
+                          calibration_only=False):
         """Over plot the atomic lines as vertical lines, only if they are fitted or with high
-        signal to  noise ratio, unless force keyword is set to True.
+        signal-to-noise ratio, unless force keyword is set to True.
 
         Parameters
         ----------
@@ -264,7 +265,9 @@ class Lines:
         fontsize: int
             Font size of the spectral line labels (default: 12).
         force: bool
-            Force the plot of vertical lines if set to True (default: False).
+            Force the plot of vertical lines if set to True even if they are not detected (default: False).
+        calibration_only: bool
+            Plot only the lines used for calibration if True (default: False).
 
         Examples
         --------
@@ -306,6 +309,8 @@ class Lines:
         for line in self.lines:
             if (not line.fitted or not line.high_snr) and not force:
                 continue
+            if not line.use_for_calibration and calibration_only:
+                continue
             color = color_atomic
             if line.atmospheric:
                 color = color_atmospheric
@@ -316,7 +321,7 @@ class Lines:
                             xycoords='axes fraction', color=color, fontsize=fontsize)
         return ax
 
-    def plot_detected_lines(self, ax=None, print_table=False):
+    def plot_detected_lines(self, ax=None, print_table=False, calibration_only=False):
         """Overplot the fitted lines on a spectrum.
 
         Parameters
@@ -325,6 +330,8 @@ class Lines:
             The Axes instance if needed (default: None).
         print_table: bool, optional
             If True, print a summary table (default: False).
+        calibration_only: bool
+            Plot only the lines used for calibration if True (default: False).
 
         Examples
         --------
@@ -391,6 +398,8 @@ class Lines:
         """
         lambdas = np.zeros(1)
         for line in self.lines:
+            if not line.use_for_calibration and calibration_only:
+                continue
             if line.fitted is True:
                 # look for lines in subset fit
                 bgd_npar = line.fit_bgd_npar
@@ -403,10 +412,10 @@ class Lines:
                         bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
                         # bgd = np.polyval(line.fit_popt[0:bgd_npar], lambdas)
                         ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
-        if print_table:
-            self.table = self.print_detected_lines(print_table=True)
+        self.table = self.print_detected_lines(print_table=print_table, calibration_only=calibration_only)
 
-    def print_detected_lines(self, output_file_name="", overwrite=False, print_table=False, amplitude_units=""):
+    def print_detected_lines(self, output_file_name="", overwrite=False, print_table=False, amplitude_units="",
+                             calibration_only=False):
         """Print the detected line on screen as an Astropy table, and write it in a file.
 
         Parameters
@@ -419,6 +428,8 @@ class Lines:
             If True, print a summary table (default: False).
         amplitude_units: str, optional
             Units of the line amplitude (default: "").
+        calibration_only: bool
+            Include only the lines used for calibration if True (default: False).
 
         Returns
         -------
@@ -464,6 +475,8 @@ class Lines:
         j = 0
 
         for line in self.lines:
+            if not line.use_for_calibration and calibration_only:
+                continue
             if line.fitted is True:
                 # look for lines in subset fit
                 bgd_npar = line.fit_bgd_npar

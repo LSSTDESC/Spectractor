@@ -842,9 +842,9 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             if parameters.LSST_SAVEFIGPATH:
                 fig.savefig(os.path.join(parameters.LSST_SAVEFIGPATH, 'fwhm_2.pdf'))
 
-        my_logger.info("\n\tStart regularization parameter only.")
         # Optimize the regularisation parameter only if it was not done before
         if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
+            my_logger.info("\n\tStart regularization parameter estimation...")
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
             w_reg.run_regularisation()
             w.opt_reg = w_reg.opt_reg
