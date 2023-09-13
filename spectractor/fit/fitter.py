@@ -1,15 +1,11 @@
-from iminuit import Minuit
 from scipy import optimize
-from schwimmbad import MPIPool
-import emcee
 import time
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import numpy as np
-import sys
+import scipy
 import os
 import json
-import multiprocessing
 from dataclasses import dataclass
 from typing import Optional, Union
 
@@ -17,7 +13,6 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.tools import (formatting_numbers, compute_correlation_matrix, plot_correlation_matrix_simple,
                                NumpyArrayEncoder)
-from spectractor.fit.statistics import Likelihood
 
 
 @dataclass()
@@ -246,6 +241,28 @@ class FitParameters:
         else:
             raise KeyError(f"{label=} not in FitParameters.labels ({self.labels=}).")
 
+    def set(self, label, value):
+        """Set value parameter given its label.
+
+        Parameters
+        ----------
+        label: str
+            The parameter label.
+        value: float
+            The new parameter value.
+
+        Examples
+        --------
+        >>> params = FitParameters(values=[1, 2, 3, 4], labels=["x", "y", "z", "t"], fixed=[True, False, True, False])
+        >>> params["z"]
+        3.0
+        >>> params.set("z", 0)
+        >>> params["z"]
+        0.0
+        """
+        key = self.get_index(label)
+        self.values[key] = value
+
     @property
     def rho(self):
         """Correlation matrix computed from the covariance matrix
@@ -401,9 +418,10 @@ class FitParameters:
         icov = 0
         for ip in range(self.ndim):
             if ip in ifree:
-                txt += "%s: %s +%s -%s\n\t" % formatting_numbers(self.values[ip], np.sqrt(self.cov[icov, icov]),
+                txt += "%s: %s +%s -%s" % formatting_numbers(self.values[ip], np.sqrt(self.cov[icov, icov]),
                                                                  np.sqrt(self.cov[icov, icov]),
                                                                  label=self.labels[ip])
+                txt += f" bounds={self.bounds[ip]}\n\t"
                 icov += 1
             else:
                 txt += f"{self.labels[ip]}: {self.values[ip]} (fixed)\n\t"
@@ -720,7 +738,7 @@ class FitWorkspace:
         self.model_err = np.array([])
         return self.x, self.model, self.model_err
 
-    def plot_fit(self):
+    def plot_fit(self):  # pragma: no cover
         """Generic function to plot the result of the fit for 1D curves.
 
         Returns
@@ -792,43 +810,209 @@ class FitWorkspace:
                     cov = self.data_cov + np.diag(model_err * model_err)
                     L = np.linalg.inv(np.linalg.cholesky(cov))
                 else:
-                    if self.W.ndim == 1 and self.W.dtype != object:
-                        L = np.sqrt(self.W)
-                    elif self.W.ndim == 2 and self.W.dtype != object:
-                        L = np.linalg.cholesky(self.W)
+                    if not scipy.sparse.issparse(self.W):
+                        if self.W.ndim == 1 and self.W.dtype != object:
+                            L = np.diag(np.sqrt(self.W))
+                        elif self.W.ndim == 2 and self.W.dtype != object:
+                            L = np.linalg.cholesky(self.W)
+                        else:
+                            raise ValueError(f"Case not implemented with self.W.ndim={self.W.ndim} "
+                                             f"and self.W.dtype={self.W.dtype}")
                     else:
-                        raise ValueError(f"Case not implemented with self.W.ndim={self.W.ndim} "
-                                         f"and self.W.dtype={self.W.dtype}")
+                        if scipy.sparse.isspmatrix_dia(self.W):
+                            L = self.W.sqrt()
+                        else:
+                            L = np.linalg.cholesky(self.W.toarray())
                 res = L @ (model - self.data)
         return res
 
-    def compute_W_with_model_error(self, model_err):
-        W = self.W
-        zeros = W == 0
-        if self.W.ndim == 1 and self.W.dtype != object:
-            if np.any(model_err > 0):
-                W = 1 / (self.data_cov + model_err * model_err)
-        elif self.W.dtype == object:
-            K = len(self.W)
-            if self.W[0].ndim == 1:
-                if np.any(model_err > 0):
-                    W = [1 / (self.data_cov[k] + model_err[k] * model_err[k]) for k in range(K)]
-            elif self.W[0].ndim == 2:
-                K = len(self.W)
-                if np.any(model_err > 0):
-                    cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
-                    L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
-                    W = [L[k].T @ L[k] for k in range(K)]
+    def prepare_weight_matrices(self):
+        r"""Compute weight matrix :math:`\mathbf{W}` `self.W` as the inverse of data covariance matrix `self.data_cov`.
+        Cancel weights of data outliers given by `self.outliers`.
+
+        Examples
+        --------
+        1D case:
+
+        >>> w = FitWorkspace()
+        >>> w.data_cov = 2 * np.ones(4)
+        >>> w.prepare_weight_matrices()
+        >>> w.W
+        array([0.5, 0.5, 0.5, 0.5])
+
+        2D case:
+
+        >>> w = FitWorkspace()
+        >>> w.data = np.array([1,2,3])
+        >>> w.data_cov = np.diag([1,2,4])
+        >>> w.prepare_weight_matrices()
+        >>> w.W
+        array([[1.  , 0.  , 0.  ],
+               [0.  , 0.5 , 0.  ],
+               [0.  , 0.  , 0.25]])
+
+        Add outliers:
+
+        >>> w.outliers = np.array([2])
+        >>> w.prepare_weight_matrices()
+        >>> w.W
+        array([[1. , 0. , 0. ],
+               [0. , 0.5, 0. ],
+               [0. , 0. , 0. ]])
+
+        Use sparse matrix:
+
+        >>> w.W = scipy.sparse.diags(np.ones(3)).tocsr()
+        >>> w.W.toarray()
+        array([[1., 0., 0.],
+               [0., 1., 0.],
+               [0., 0., 1.]])
+        >>> w.prepare_weight_matrices()
+        >>> w.W.toarray()
+        array([[1., 0., 0.],
+               [0., 1., 0.],
+               [0., 0., 0.]])
+
+
+        """
+        # Prepare covariance matrix for data
+        if self.data_cov is None:
+            self.data_cov = np.asarray(self.err.flatten() ** 2)
+        # Prepare inverse covariance matrix for data
+        if self.W is None:
+            if self.data_cov.ndim == 1 and self.data_cov.dtype != object:
+                self.W = 1 / self.data_cov
+            elif self.data_cov.ndim == 2 and self.data_cov.dtype != object:
+                self.W = np.linalg.inv(self.data_cov)
+            elif self.data_cov.dtype is object:
+                if self.data_cov[0].ndim == 1:
+                    self.W = np.array([1 / self.data_cov[k] for k in range(self.data_cov.shape[0])])
+                else:
+                    self.W = []
+                    for k in range(len(self.data_cov)):
+                        L = np.linalg.inv(np.linalg.cholesky(self.data_cov[k]))
+                        self.W[k] = L.T @ L
+                    self.W = np.asarray(self.W)
+        if len(self.outliers) > 0:
+            bad_indices = self.get_bad_indices()
+            if not scipy.sparse.issparse(self.W):
+                if self.W.ndim == 1 and self.W.dtype != object:
+                    self.W[bad_indices] = 0
+                elif self.W.ndim == 2 and self.W.dtype != object:
+                    self.W[:, bad_indices] = 0
+                    self.W[bad_indices, :] = 0
+                elif self.W.dtype == object:
+                    if self.data_cov[0].ndim == 1:
+                        for k in range(len(self.W)):
+                            self.W[k][bad_indices[k]] = 0
+                    else:
+                        for k in range(len(self.W)):
+                            self.W[k][:, bad_indices[k]] = 0
+                            self.W[k][bad_indices[k], :] = 0
+                else:
+                    raise ValueError(
+                        f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
+                        f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
+                        f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
             else:
-                raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
-                                 f"I get W[0]={self.W[0]}")
-        elif self.W.ndim == 2 and self.W.dtype != object:
-            if np.any(model_err > 0):
+                W = self.W.toarray()
+                W[:, bad_indices] = 0
+                W[bad_indices, :] = 0
+                rows, cols = self.W.nonzero()
+                self.W = scipy.sparse.csr_matrix((W[rows, cols], (rows, cols)), dtype=self.W.dtype, shape=self.W.shape)
+                self.W.eliminate_zeros()
+
+    def compute_W_with_model_error(self, model_err):
+        """Propagate model uncertainties to weight matrix W.
+        The method add the mode uncertainties in quadrature to the inverse of the weight matrix W
+        `self.data_cov` and re-invert it.
+
+        Parameters
+        ----------
+        model_err: np.ndarray
+            Flat array of model uncertainties.
+
+        Returns
+        -------
+        W: array_like
+            Weight matrix with model uncertainties propagated.
+
+        Examples
+        --------
+        1D case:
+
+        >>> w = FitWorkspace()
+        >>> w.data_cov = 2 * np.ones(4)
+        >>> w.prepare_weight_matrices()
+        >>> w.compute_W_with_model_error(np.sqrt(2) * np.ones(4))
+        array([0.25, 0.25, 0.25, 0.25])
+
+        2D case:
+
+        >>> w = FitWorkspace()
+        >>> w.data = np.array([1,2,3])
+        >>> w.data_cov = np.diag([1,1,1])
+        >>> w.prepare_weight_matrices()
+        >>> w.compute_W_with_model_error(np.sqrt(3) * np.ones(3))
+        array([[0.25, 0.  , 0.  ],
+               [0.  , 0.25, 0.  ],
+               [0.  , 0.  , 0.25]])
+
+        Add outliers:
+
+        >>> w.outliers = np.array([2])
+        >>> w.prepare_weight_matrices()
+        >>> w.compute_W_with_model_error(np.sqrt(3) * np.ones(3))
+        array([[0.25, 0.  , 0.  ],
+               [0.  , 0.25, 0.  ],
+               [0.  , 0.  , 0.  ]])
+
+        Use sparse matrix:
+
+        >>> w.W = scipy.sparse.diags(np.ones(3)).tocsr()
+        >>> w.W[-1, -1] = 0  # mask last data point
+        >>> w.W.toarray()
+        array([[1., 0., 0.],
+               [0., 1., 0.],
+               [0., 0., 0.]])
+        >>> w.compute_W_with_model_error(np.sqrt(3) * np.ones(3)).toarray()
+        array([[0.25, 0.  , 0.  ],
+               [0.  , 0.25, 0.  ],
+               [0.  , 0.  , 0.  ]])
+
+        """
+        if model_err.ndim > 1:
+            raise ValueError(f"model_err must be a flat 1D array. Got {model_err.shape=}.")
+        if np.any(model_err > 0):
+            if not scipy.sparse.issparse(self.W):
+                zeros = self.W == 0
+                if self.W.ndim == 1 and self.W.dtype != object:
+                    self.W = 1 / (self.data_cov + model_err * model_err)
+                elif self.W.dtype == object:
+                    K = len(self.W)
+                    if self.W[0].ndim == 1:
+                        self.W = [1 / (self.data_cov[k] + model_err[k] * model_err[k]) for k in range(K)]
+                    elif self.W[0].ndim == 2:
+                        K = len(self.W)
+                        cov = [self.data_cov[k] + np.diag(model_err[k] ** 2) for k in range(K)]
+                        L = [np.linalg.inv(np.linalg.cholesky(cov[k])) for k in range(K)]
+                        self.W = [L[k].T @ L[k] for k in range(K)]
+                    else:
+                        raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
+                                         f"I get W[0]={self.W[0]}")
+                elif self.W.ndim == 2 and self.W.dtype != object:
+                    cov = self.data_cov + np.diag(model_err * model_err)
+                    self.W = np.linalg.inv(cov)
+                # needs to reapply the mask of outliers
+                self.W[zeros] = 0
+            else:
                 cov = self.data_cov + np.diag(model_err * model_err)
                 L = np.linalg.inv(np.linalg.cholesky(cov))
                 W = L.T @ L
-        W[zeros] = 0
-        return W
+                # needs to reapply the mask of outliers
+                rows, cols = self.W.nonzero()
+                self.W = scipy.sparse.csr_matrix((W[rows, cols], (rows, cols)), dtype=self.W.dtype, shape=self.W.shape)
+        return self.W
 
     def chisq(self, p, model_output=False):
         """Compute the chi square for a set of model parameters p.
@@ -857,72 +1041,35 @@ class FitWorkspace:
         self.prepare_weight_matrices()
         x, model, model_err = self.simulate(*p)
         W = self.compute_W_with_model_error(model_err)
-        if W.ndim == 1 and W.dtype != object:
-            res = (model - self.data)
-            chisq = res @ (W * res)
-        elif W.dtype == object:
-            K = len(W)
-            res = [model[k] - self.data[k] for k in range(K)]
-            if W[0].ndim == 1:
-                chisq = np.sum([res[k] @ (W[k] * res[k]) for k in range(K)])
-            elif W[0].ndim == 2:
-                chisq = np.sum([res[k] @ W[k] @ res[k] for k in range(K)])
+        if not scipy.sparse.issparse(self.W):
+            if W.ndim == 1 and W.dtype != object:
+                res = (model - self.data)
+                chisq = res @ (W * res)
+            elif W.dtype == object:
+                K = len(W)
+                res = [model[k] - self.data[k] for k in range(K)]
+                if W[0].ndim == 1:
+                    chisq = np.sum([res[k] @ (W[k] * res[k]) for k in range(K)])
+                elif W[0].ndim == 2:
+                    chisq = np.sum([res[k] @ W[k] @ res[k] for k in range(K)])
+                else:
+                    raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
+                                     f"I get W[0]={W[0]}")
+            elif W.ndim == 2 and W.dtype != object:
+                res = (model - self.data)
+                chisq = res @ W @ res
             else:
-                raise ValueError(f"First element of fitworkspace.W has no ndim attribute or has a dimension above 2. "
-                                 f"I get W[0]={W[0]}")
-        elif W.ndim == 2 and W.dtype != object:
+                raise ValueError(
+                    f"Weight covariance matrix must be a np.ndarray of dimension 1 or 2 if not sparse,"
+                    f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
+                    f"\nHere W type is {type(W)}, shape is {W.shape} and W is {W}.")
+        else:
             res = (model - self.data)
             chisq = res @ W @ res
-        else:
-            raise ValueError(
-                f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
-                f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
-                f"\nHere W type is {type(W)}, shape is {W.shape} and W is {W}.")
         if model_output:
             return chisq, x, model, model_err
         else:
             return chisq
-
-    def prepare_weight_matrices(self):
-        # Prepare covariance matrix for data
-        if self.data_cov is None:
-            self.data_cov = np.asarray(self.err.flatten() ** 2)
-        # Prepare inverse covariance matrix for data
-        if self.W is None:
-            if self.data_cov.ndim == 1 and self.data_cov.dtype != object:
-                self.W = 1 / self.data_cov
-            elif self.data_cov.ndim == 2 and self.data_cov.dtype != object:
-                L = np.linalg.inv(np.linalg.cholesky(self.data_cov))
-                self.W = L.T @ L
-            elif self.data_cov.dtype is object:
-                if self.data_cov[0].ndim == 1:
-                    self.W = np.array([1 / self.data_cov[k] for k in range(self.data_cov.shape[0])])
-                else:
-                    self.W = []
-                    for k in range(len(self.data_cov)):
-                        L = np.linalg.inv(np.linalg.cholesky(self.data_cov[k]))
-                        self.W[k] = L.T @ L
-                    self.W = np.asarray(self.W)
-        if len(self.outliers) > 0:
-            bad_indices = self.get_bad_indices()
-            if self.W.ndim == 1 and self.W.dtype != object:
-                self.W[bad_indices] = 0
-            elif self.W.ndim == 2 and self.W.dtype != object:
-                self.W[:, bad_indices] = 0
-                self.W[bad_indices, :] = 0
-            elif self.W.dtype == object:
-                if self.data_cov[0].ndim == 1:
-                    for k in range(len(self.W)):
-                        self.W[k][bad_indices[k]] = 0
-                else:
-                    for k in range(len(self.W)):
-                        self.W[k][:, bad_indices[k]] = 0
-                        self.W[k][bad_indices[k], :] = 0
-            else:
-                raise ValueError(
-                    f"Data inverse covariance matrix must be a np.ndarray of dimension 1 or 2,"
-                    f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
-                    f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
 
     def lnlike(self, p):
         """Compute the logarithmic likelihood for a set of model parameters p as -0.5*chisq.
@@ -939,32 +1086,6 @@ class FitWorkspace:
 
         """
         return -0.5 * self.chisq(p)
-
-    def lnprior(self, p):
-        """Compute the logarithmic prior for a set of model parameters p.
-
-        The function returns 0 for good parameters, and -np.inf for parameters out of their boundaries.
-
-        Parameters
-        ----------
-        p: array_like
-            The array of model parameters.
-
-        Returns
-        -------
-        lnprior: float
-            The logarithmic value fo the prior.
-
-        """
-        in_bounds = True
-        for npar, par in enumerate(p):
-            if par < self.params.bounds[npar][0] or par > self.params.bounds[npar][1]:
-                in_bounds = False
-                break
-        if in_bounds:
-            return 0.0
-        else:
-            return -np.inf
 
     def jacobian(self, params, epsilon, model_input=None):
         """Generic function to compute the Jacobian matrix of a model, with numerical derivatives.
@@ -1096,384 +1217,6 @@ class FitWorkspace:
         self.my_logger.info(f"\n\tSave gradient descent log {output_filename}.")
 
 
-class MCMCFitWorkspace(FitWorkspace):
-
-    def __init__(self, params, file_name="", nwalkers=18, nsteps=1000, burnin=100, nbins=10,
-                 verbose=False, plot=False, live_fit=False, truth=None):
-        """Generic class to create a fit workspace with parameters, bounds and general fitting methods.
-
-        Parameters
-        ----------
-        params: FitParameters
-            The parameters to fit to data.
-        file_name: str, optional
-            The generic file name to save results. If file_name=="", nothing is saved ond disk (default: "").
-        nwalkers: int, optional
-            Number of walkers for MCMC exploration (default: 18).
-        nsteps: int, optional
-            Number of steps for MCMC exploration (default: 1000).
-        burnin: int, optional
-            Number of burn-in steps for MCMC exploration (default: 100).
-        nbins: int, optional
-            Number of bins to make histograms after MCMC exploration (default: 10).
-        verbose: bool, optional
-            Level of verbosity (default: False).
-        plot: bool, optional
-            Level of plotting (default: False).
-        live_fit: bool, optional
-            If True, model, data and residuals plots are made along the fitting procedure (default: False).
-        truth: array_like, optional
-            Array of true parameters (default: None).
-
-        Examples
-        --------
-        >>> params = FitParameters(values=[1, 1, 1, 1, 1])
-        >>> w = MCMCFitWorkspace(params)
-        >>> w.nwalkers
-        18
-        """
-        FitWorkspace.__init__(self, params, file_name=file_name, verbose=verbose, plot=plot, live_fit=live_fit, truth=truth)
-        self.my_logger = set_logger(self.__class__.__name__)
-        self.nwalkers = max(2 * self.params.ndim, nwalkers)
-        self.nsteps = nsteps
-        self.nbins = nbins
-        self.burnin = burnin
-        self.start = []
-        self.likelihood = np.array([[]])
-        self.gelmans = np.array([])
-        self.chains = np.array([[]])
-        self.lnprobs = np.array([[]])
-        self.flat_chains = np.array([[]])
-        self.valid_chains = [False] * self.nwalkers
-        self.global_average = None
-        self.global_std = None
-        self.use_grid = False
-        if self.filename != "":
-            if "." in self.filename:
-                self.emcee_filename = os.path.splitext(self.filename)[0] + "_emcee.h5"
-            else:
-                self.my_logger.warning("\n\tFile name must have an extension.")
-        else:
-            self.emcee_filename = "emcee.h5"
-
-    def set_start(self, percent=0.02, a_random=1e-5):
-        """Set the random starting points for MCMC exploration.
-
-        A set of parameters are drawn with a uniform distribution between +/- percent times the starting guess.
-        For null guess parameters, starting points are drawn from a uniform distribution between +/- a_random.
-
-        Parameters
-        ----------
-        percent: float, optional
-            Percent of the guess parameters to set the uniform interval to draw random points (default: 0.02).
-        a_random: float, optional
-            Absolute value to set the +/- uniform interval to draw random points
-            for null guess parameters (default: 1e-5).
-
-        Returns
-        -------
-        start: np.array
-            Array of starting points of shape (ndim, nwalkers).
-
-        """
-        self.start = np.array([np.random.uniform(self.params.values[i] - percent * self.params.values[i],
-                                                 self.params.values[i] + percent * self.params.values[i],
-                                                 self.nwalkers) for i in range(self.params.ndim)]).T
-        self.start[self.start == 0] = a_random * np.random.uniform(-1, 1)
-        return self.start
-
-    def load_chains(self):
-        """Load the MCMC chains from a hdf5 file. The burn-in points are not rejected at this stage.
-
-        Returns
-        -------
-        chains: np.array
-            Array of the chains.
-        lnprobs: np.array
-            Array of the logarithmic posterior probability.
-
-        """
-        self.chains = [[]]
-        self.lnprobs = [[]]
-        self.nsteps = 0
-        # tau = -1
-        reader = emcee.backends.HDFBackend(self.emcee_filename)
-        try:
-            tau = reader.get_autocorr_time()
-        except emcee.autocorr.AutocorrError:
-            tau = -1
-        self.chains = reader.get_chain(discard=0, flat=False, thin=1)
-        self.lnprobs = reader.get_log_prob(discard=0, flat=False, thin=1)
-        self.nsteps = self.chains.shape[0]
-        self.nwalkers = self.chains.shape[1]
-        print(f"Auto-correlation time: {tau}")
-        print(f"Burn-in: {self.burnin}")
-        print(f"Chains shape: {self.chains.shape}")
-        print(f"Log prob shape: {self.lnprobs.shape}")
-        return self.chains, self.lnprobs
-
-    def build_flat_chains(self):
-        """Flatten the chains array and apply burn-in.
-
-        Returns
-        -------
-        flat_chains: np.array
-            Flat chains.
-
-        """
-        self.flat_chains = self.chains[self.burnin:, self.valid_chains, :].reshape((-1, self.params.ndim))
-        return self.flat_chains
-
-    def analyze_chains(self):
-        """Load the chains, build the probability densities for the parameters, compute the best fitting values
-        and the uncertainties and covariance matrices, and plot.
-
-        """
-        self.load_chains()
-        self.set_chain_validity()
-        self.convergence_tests()
-        self.build_flat_chains()
-        self.likelihood = self.chain2likelihood()
-        self.params.cov = self.likelihood.cov_matrix
-        self.params.values = self.likelihood.mean_vec
-        self.simulate(*self.params.values)
-        self.plot_fit()
-        figure_name = os.path.splitext(self.emcee_filename)[0] + '_triangle.pdf'
-        self.likelihood.triangle_plots(output_filename=figure_name)
-
-    def chain2likelihood(self, pdfonly=False, walker_index=-1):
-        """Convert the chains to a psoterior probability density function via histograms.
-
-        Parameters
-        ----------
-        pdfonly: bool, optional
-            If True, do not compute the covariances and the 2D correlation plots (default: False).
-        walker_index: int, optional
-            The walker index to plot. If -1, all walkers are selected (default: -1).
-
-        Returns
-        -------
-        likelihood: np.array
-            Posterior density function.
-
-        """
-        if walker_index >= 0:
-            chains = self.chains[self.burnin:, walker_index, :]
-        else:
-            chains = self.flat_chains
-        rangedim = range(chains.shape[1])
-        centers = []
-        for i in rangedim:
-            centers.append(np.linspace(np.min(chains[:, i]), np.max(chains[:, i]), self.nbins - 1))
-        likelihood = Likelihood(centers, labels=self.params.labels, axis_names=self.params.axis_names, truth=self.params.truth)
-        if walker_index < 0:
-            for i in rangedim:
-                likelihood.pdfs[i].fill_histogram(chains[:, i], weights=None)
-                if not pdfonly:
-                    for j in rangedim:
-                        if i != j:
-                            likelihood.contours[i][j].fill_histogram(chains[:, i], chains[:, j], weights=None)
-            output_file = ""
-            if self.filename != "":
-                output_file = os.path.splitext(self.filename)[0] + "_bestfit.txt"
-            likelihood.stats(output=output_file)
-        else:
-            for i in rangedim:
-                likelihood.pdfs[i].fill_histogram(chains[:, i], weights=None)
-        return likelihood
-
-    def compute_local_acceptance_rate(self, start_index, last_index, walker_index):
-        """Compute the local acceptance rate in a chain.
-
-        Parameters
-        ----------
-        start_index: int
-            Beginning index.
-        last_index: int
-            End index.
-        walker_index: int
-            Index of the walker.
-
-        Returns
-        -------
-        freq: float
-            The acceptance rate.
-
-        """
-        frequences = []
-        test = -2 * self.lnprobs[start_index, walker_index]
-        counts = 1
-        for index in range(start_index + 1, last_index):
-            chi2 = -2 * self.lnprobs[index, walker_index]
-            if np.isclose(chi2, test):
-                counts += 1
-            else:
-                frequences.append(float(counts))
-                counts = 1
-                test = chi2
-        frequences.append(counts)
-        return 1.0 / np.mean(frequences)
-
-    def set_chain_validity(self):
-        """Test the validity of a chain: reject chains whose chi2 is far from the mean of the others.
-
-        Returns
-        -------
-        valid_chains: list
-            List of boolean values, True if the chain is valid, or False if invalid.
-
-        """
-        nchains = [k for k in range(self.nwalkers)]
-        chisq_averages = []
-        chisq_std = []
-        for k in nchains:
-            chisqs = -2 * self.lnprobs[self.burnin:, k]
-            # if np.mean(chisqs) < 1e5:
-            chisq_averages.append(np.mean(chisqs))
-            chisq_std.append(np.std(chisqs))
-        self.global_average = np.mean(chisq_averages)
-        self.global_std = np.mean(chisq_std)
-        self.valid_chains = [False] * self.nwalkers
-        for k in nchains:
-            chisqs = -2 * self.lnprobs[self.burnin:, k]
-            chisq_average = np.mean(chisqs)
-            chisq_std = np.std(chisqs)
-            if 3 * self.global_std + self.global_average < chisq_average < 1e5:
-                self.valid_chains[k] = False
-            elif chisq_std < 0.1 * self.global_std:
-                self.valid_chains[k] = False
-            else:
-                self.valid_chains[k] = True
-        return self.valid_chains
-
-    def convergence_tests(self):
-        """Compute the convergence tests (Gelman-Rubin, acceptance rate).
-
-        """
-        chains = self.chains[self.burnin:, :, :]  # .reshape((-1, self.ndim))
-        nchains = [k for k in range(self.nwalkers)]
-        fig, ax = plt.subplots(self.params.ndim + 1, 2, figsize=(16, 7), sharex='all')
-        fontsize = 8
-        steps = np.arange(self.burnin, self.nsteps)
-        # Chi2 vs Index
-        print("Chisq statistics:")
-        for k in nchains:
-            chisqs = -2 * self.lnprobs[self.burnin:, k]
-            text = f"\tWalker {k:d}: {float(np.mean(chisqs)):.3f} +/- {float(np.std(chisqs)):.3f}"
-            if not self.valid_chains[k]:
-                text += " -> excluded"
-                ax[self.params.ndim, 0].plot(steps, chisqs, c='0.5', linestyle='--')
-            else:
-                ax[self.params.ndim, 0].plot(steps, chisqs)
-            print(text)
-        # global_average = np.mean(-2*self.lnprobs[self.valid_chains, self.burnin:])
-        # global_std = np.std(-2*self.lnprobs[self.valid_chains, self.burnin:])
-        ax[self.params.ndim, 0].set_ylim(
-            [self.global_average - 5 * self.global_std, self.global_average + 5 * self.global_std])
-        # Parameter vs Index
-        print("Computing Parameter vs Index plots...")
-        for i in range(self.params.ndim):
-            ax[i, 0].set_ylabel(self.params.axis_names[i], fontsize=fontsize)
-            for k in nchains:
-                if self.valid_chains[k]:
-                    ax[i, 0].plot(steps, chains[:, k, i])
-                else:
-                    ax[i, 0].plot(steps, chains[:, k, i], c='0.5', linestyle='--')
-                ax[i, 0].get_yaxis().set_label_coords(-0.05, 0.5)
-        ax[self.params.ndim, 0].set_ylabel(r'$\chi^2$', fontsize=fontsize)
-        ax[self.params.ndim, 0].set_xlabel('Steps', fontsize=fontsize)
-        ax[self.params.ndim, 0].get_yaxis().set_label_coords(-0.05, 0.5)
-        # Acceptance rate vs Index
-        print("Computing acceptance rate...")
-        min_len = self.nsteps
-        window = 100
-        if min_len > window:
-            for k in nchains:
-                ARs = []
-                indices = []
-                for pos in range(self.burnin + window, self.nsteps, window):
-                    ARs.append(self.compute_local_acceptance_rate(pos - window, pos, k))
-                    indices.append(pos)
-                if self.valid_chains[k]:
-                    ax[self.params.ndim, 1].plot(indices, ARs, label=f'Walker {k:d}')
-                else:
-                    ax[self.params.ndim, 1].plot(indices, ARs, label=f'Walker {k:d}', c='gray', linestyle='--')
-                ax[self.params.ndim, 1].set_xlabel('Steps', fontsize=fontsize)
-                ax[self.params.ndim, 1].set_ylabel('Aceptance rate', fontsize=fontsize)
-                # ax[self.dim + 1, 2].legend(loc='upper left', ncol=2, fontsize=10)
-        # Parameter PDFs by chain
-        print("Computing chain by chain PDFs...")
-        for k in nchains:
-            likelihood = self.chain2likelihood(pdfonly=True, walker_index=k)
-            likelihood.stats(pdfonly=True, verbose=False)
-            # for i in range(self.dim):
-            # ax[i, 1].plot(likelihood.pdfs[i].axe.axis, likelihood.pdfs[i].grid, lw=var.LINEWIDTH,
-            #               label=f'Walker {k:d}')
-            # ax[i, 1].set_xlabel(self.axis_names[i])
-            # ax[i, 1].set_ylabel('PDF')
-            # ax[i, 1].legend(loc='upper right', ncol=2, fontsize=10)
-        # Gelman-Rubin test.py
-        if len(nchains) > 1:
-            step = max(1, (self.nsteps - self.burnin) // 20)
-            self.gelmans = []
-            print(f'Gelman-Rubin tests (burnin={self.burnin:d}, step={step:d}, nsteps={self.nsteps:d}):')
-            for i in range(self.params.ndim):
-                Rs = []
-                lens = []
-                for pos in range(self.burnin + step, self.nsteps, step):
-                    chain_averages = []
-                    chain_variances = []
-                    global_average = np.mean(self.chains[self.burnin:pos, self.valid_chains, i])
-                    for k in nchains:
-                        if not self.valid_chains[k]:
-                            continue
-                        chain_averages.append(np.mean(self.chains[self.burnin:pos, k, i]))
-                        chain_variances.append(np.var(self.chains[self.burnin:pos, k, i], ddof=1))
-                    W = np.mean(chain_variances)
-                    B = 0
-                    for n in range(len(chain_averages)):
-                        B += (chain_averages[n] - global_average) ** 2
-                    B *= ((pos + 1) / (len(chain_averages) - 1))
-                    R = (W * pos / (pos + 1) + B / (pos + 1) * (len(chain_averages) + 1) / len(chain_averages)) / W
-                    Rs.append(R - 1)
-                    lens.append(pos)
-                print(f'\t{self.params.labels[i]}: R-1 = {Rs[-1]:.3f} (l = {lens[-1] - 1:d})')
-                self.gelmans.append(Rs[-1])
-                ax[i, 1].plot(lens, Rs, lw=1, label=self.params.axis_names[i])
-                ax[i, 1].axhline(0.03, c='k', linestyle='--')
-                ax[i, 1].set_xlabel('Walker length', fontsize=fontsize)
-                ax[i, 1].set_ylabel('$R-1$', fontsize=fontsize)
-                ax[i, 1].set_ylim(0, 0.6)
-                # ax[self.dim, 3].legend(loc='best', ncol=2, fontsize=10)
-        self.gelmans = np.array(self.gelmans)
-        fig.tight_layout()
-        plt.subplots_adjust(hspace=0)
-        if parameters.DISPLAY:  # pragma: no cover
-            plt.show()
-        if parameters.PdfPages:
-            parameters.PdfPages.savefig()
-        figure_name = self.emcee_filename.replace('.h5', '_convergence.pdf')
-        print(f'Save figure: {figure_name}')
-        fig.savefig(figure_name, dpi=100)
-
-    def print_settings(self):
-        """Print the main settings of the FitWorkspace.
-
-        """
-        print('************************************')
-        print(f"Input file: {self.filename}\nWalkers: {self.nwalkers}\t Steps: {self.nsteps}")
-        print(f"Output file: {self.emcee_filename}")
-        print('************************************')
-
-
-def lnprob(p):  # pragma: no cover
-    global fit_workspace
-    lp = fit_workspace.lnprior(p)
-    if not np.isfinite(lp):
-        return -1e20
-    return lp + fit_workspace.lnlike(p)
-
-
 def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, with_line_search=True):
     """
 
@@ -1494,13 +1237,14 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
 
     """
     my_logger = set_logger(__name__)
-    tmp_params = np.copy(fit_workspace.params.values)
+    tmp_params = np.copy(fit_workspace.params.values).astype(float)
     fit_workspace.prepare_weight_matrices()
     n_data_masked = len(fit_workspace.mask) + len(fit_workspace.outliers)
     ipar = fit_workspace.params.get_free_parameters()
     costs = []
     params_table = []
-    inv_JT_W_J = np.zeros((len(ipar), len(ipar)))
+    inv_JT_W_J = np.zeros((len(ipar), len(ipar)), dtype=float)
+
     for i in range(niter):
         start = time.time()
         cost, tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.chisq(tmp_params, model_output=True)
@@ -1508,7 +1252,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             my_logger.info(f"\n\tIteration={i}:\tinitial cost={cost:.5g}\tinitial chisq_red={cost / (tmp_model.size - n_data_masked):.5g}")
         W = fit_workspace.compute_W_with_model_error(tmp_model_err)
         # residuals
-        if isinstance(W, np.ndarray) and W.dtype != object:
+        if (isinstance(W, np.ndarray) or scipy.sparse.issparse(W)) and W.dtype != object:
             residuals = (tmp_model - fit_workspace.data).flatten()
         elif isinstance(W, np.ndarray) and W.dtype == object:
             residuals = [(tmp_model[k] - fit_workspace.data[k]) for k in range(len(W))]
@@ -1520,7 +1264,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         for ip in range(J.shape[0]):
             if ip not in ipar:
                 continue
-            if np.all(np.array(J[ip]).flatten() == np.zeros(np.array(J[ip]).size)):
+            if np.allclose(np.array(J[ip]).ravel(), 0, atol=1e-20):
                 ipar = np.delete(ipar, list(ipar).index(ip))
                 fit_workspace.params.fixed[ip] = True
                 my_logger.warning(
@@ -1557,8 +1301,19 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
         else:
             JT_W_R0 = JT_W @ np.concatenate(residuals).ravel()
         dparams = - inv_JT_W_J @ JT_W_R0
+        new_params = np.copy(tmp_params)
+        new_params[ipar] = tmp_params[ipar] + dparams
 
-        if with_line_search:
+        # check bounds
+        for ip, p in enumerate(new_params):
+            if p < fit_workspace.params.bounds[ip][0]:
+                new_params[ip] = fit_workspace.params.bounds[ip][0]
+            if p > fit_workspace.params.bounds[ip][1]:
+                new_params[ip] = fit_workspace.params.bounds[ip][1]
+
+        fval = fit_workspace.chisq(new_params)
+
+        if with_line_search or fval > (1 + 10 * ftol) * cost:
             def line_search(alpha):
                 tmp_params_2 = np.copy(tmp_params)
                 tmp_params_2[ipar] = tmp_params[ipar] + alpha * dparams
@@ -1571,19 +1326,19 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
 
             # tol parameter acts on alpha (not func)
             alpha_min, fval, iter, funcalls = optimize.brent(line_search, full_output=True, tol=5e-1, brack=(0, 1))
+            new_params[ipar] = tmp_params[ipar] + alpha_min * dparams
+            # check bounds
+            for ip, p in enumerate(new_params):
+                if p < fit_workspace.params.bounds[ip][0]:
+                    new_params[ip] = fit_workspace.params.bounds[ip][0]
+                if p > fit_workspace.params.bounds[ip][1]:
+                    new_params[ip] = fit_workspace.params.bounds[ip][1]
         else:
             alpha_min = 1
-            fval = np.copy(cost)
             funcalls = 0
             iter = 0
 
-        tmp_params[ipar] += alpha_min * dparams
-        # check bounds
-        for ip, p in enumerate(tmp_params):
-            if p < fit_workspace.params.bounds[ip][0]:
-                tmp_params[ip] = fit_workspace.params.bounds[ip][0]
-            if p > fit_workspace.params.bounds[ip][1]:
-                tmp_params[ip] = fit_workspace.params.bounds[ip][1]
+        tmp_params[ipar] = new_params[ipar]
 
         # prepare outputs
         costs.append(fval)
@@ -1612,7 +1367,6 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
                            f"relative change of cost is below ftol={ftol}.")
             break
-    plt.close()
     return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
 
 
@@ -1770,7 +1524,7 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
     if method == "minimize":
         start = time.time()
         result = optimize.minimize(nll, fit_workspace.params.values, method=minimizer_method,
-                                   options={'ftol': ftol, 'maxiter': 100000}, bounds=bounds)
+                                   options={'maxiter': 100000}, bounds=bounds)
         fit_workspace.params.values = result['x']
         if verbose:
             my_logger.debug(f"\n\t{result}")
@@ -1801,26 +1555,22 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
             my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
             if parameters.DEBUG:
                 fit_workspace.plot_fit()
-    elif method == "minuit":
+    elif method == "lm":  # pragma: no cover
+        if epsilon is None:
+            epsilon = 1e-4 * guess
+            epsilon[epsilon == 0] = 1e-4
+
+        def Dfun(params):
+            return fit_workspace.jacobian(params, epsilon=epsilon, model_input=None).T
+
         start = time.time()
-        error = 0.1 * np.abs(guess) * np.ones_like(guess)
-        error[2:5] = 0.3 * np.abs(guess[2:5]) * np.ones_like(guess[2:5])
-        z = np.where(np.isclose(error, 0.0, 1e-6))
-        error[z] = 1.
-        # noinspection PyArgumentList
-        # m = Minuit(fcn=nll, values=guess, error=error, errordef=1, fix=fix, print_level=verbose, limit=bounds)
-        m = Minuit(nll, np.copy(guess))
-        m.errors = error
-        m.errordef = 1
-        m.fixed = fit_workspace.params.fixed
-        m.print_level = verbose
-        m.limits = bounds
-        m.tol = 10
-        m.migrad()
-        fit_workspace.values = np.array(m.values[:])
+        x, cov, infodict, mesg, ier = optimize.leastsq(fit_workspace.weighted_residuals, guess, Dfun=Dfun,
+                                                       ftol=ftol, xtol=xtol, full_output=True)
+        fit_workspace.params.values = x
+        fit_workspace.params.cov = cov
         if verbose:
-            my_logger.debug(f"\n\t{m}")
-            my_logger.debug(f"\n\tMinuit: total computation time: {time.time() - start}s")
+            my_logger.debug(f"\n\t{x}")
+            my_logger.debug(f"\n\tLeast_squares: total computation time: {time.time() - start}s")
             if parameters.DEBUG:
                 fit_workspace.plot_fit()
     elif method == "newton":
@@ -1838,8 +1588,8 @@ def run_minimisation(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ft
             fit_workspace.save_gradient_descent()
 
 
-def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ftol=1e-4, with_line_search=True,
-                                    niter=50, sigma_clip=5.0, niter_clip=3, verbose=False):
+def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None, xtol=1e-4, ftol=1e-4,
+                                    niter=50, sigma_clip=5.0, niter_clip=3, verbose=False, with_line_search=True):
     my_logger = set_logger(__name__)
     fit_workspace.sigma_clip = sigma_clip
     for step in range(niter_clip):
@@ -1876,38 +1626,6 @@ def run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=None
         else:
             my_logger.info(f'\n\tNo outliers detected at first iteration: break the sigma clipping iterations.')
             break
-
-
-def run_emcee(mcmc_fit_workspace, ln=lnprob):
-    my_logger = set_logger(__name__)
-    mcmc_fit_workspace.print_settings()
-    nsamples = mcmc_fit_workspace.nsteps
-    p0 = mcmc_fit_workspace.set_start()
-    filename = mcmc_fit_workspace.emcee_filename
-    backend = emcee.backends.HDFBackend(filename)
-    try:  # pragma: no cover
-        pool = MPIPool()
-        if not pool.is_master():
-            pool.wait()
-            sys.exit(0)
-        sampler = emcee.EnsembleSampler(mcmc_fit_workspace.nwalkers, mcmc_fit_workspace.ndim, ln, args=(),
-                                        pool=pool, backend=backend)
-        my_logger.info(f"\n\tInitial size: {backend.iteration}")
-        if backend.iteration > 0:
-            p0 = backend.get_last_sample()
-        if nsamples - backend.iteration > 0:
-            sampler.run_mcmc(p0, nsteps=max(0, nsamples - backend.iteration), progress=True)
-        pool.close()
-    except ValueError:
-        sampler = emcee.EnsembleSampler(mcmc_fit_workspace.nwalkers, mcmc_fit_workspace.params.ndim, ln, args=(),
-                                        threads=multiprocessing.cpu_count(), backend=backend)
-        my_logger.info(f"\n\tInitial size: {backend.iteration}")
-        if backend.iteration > 0:
-            p0 = sampler.get_last_sample()
-        for _ in sampler.sample(p0, iterations=max(0, nsamples - backend.iteration), progress=True, store=True):
-            continue
-    mcmc_fit_workspace.chains = sampler.chain
-    mcmc_fit_workspace.lnprobs = sampler.lnprobability
 
 
 class RegFitWorkspace(FitWorkspace):
@@ -1969,14 +1687,14 @@ class RegFitWorkspace(FitWorkspace):
             self.chisquare = diff @ self.w.W @ diff
         self.w.amplitude_params = A
         self.w.amplitude_cov_matrix = cov
-        self.w.amplitude_params_err = np.array([np.sqrt(cov[x, x]) for x in range(cov.shape[0])])
+        self.w.amplitude_params_err = np.array([np.sqrt(np.abs(cov[x, x])) for x in range(cov.shape[0])])
         self.G = self.chisquare / ((self.w.data.size - len(self.w.mask) - len(self.w.outliers)) - np.trace(self.resolution)) ** 2
         return np.asarray([log10_r]), np.asarray([self.G]), np.zeros_like(self.data)
 
     def plot_fit(self):
         log10_opt_reg = self.params.values[0]
         opt_reg = 10 ** log10_opt_reg
-        regs = 10 ** np.linspace(min(-10, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
+        regs = 10 ** np.linspace(min(-7, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
         Gs = []
         chisqs = []
         resolutions = []
@@ -2015,7 +1733,7 @@ class RegFitWorkspace(FitWorkspace):
         ax[2].set_ylabel(r"$\mathrm{Tr}\,\mathbf{R}$")
         ax[2].set_xlabel("Regularisation hyper-parameter $r$")
         ax[2].grid()
-        fig.tight_layout()
+        # fig.tight_layout()
         plt.subplots_adjust(hspace=0)
         if parameters.DISPLAY:
             plt.show()

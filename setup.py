@@ -44,7 +44,7 @@ setup(
     license='BSD',
     python_requires='>=3.7',
     author='J. Neveu, S. Dagoret-Campagne',
-    author_email='jneveu@lal.in2p3.fr',
+    author_email='jeremy.neveu@universite-paris-saclay.fr',
     description='',
     long_description=long_description,
 )

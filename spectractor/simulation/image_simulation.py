@@ -366,8 +366,8 @@ class ImageModel(Image):
         # self.true_lambdas, self.true_spectrum = hdu_list[1].data
 
 
-def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, angstrom_exponent=None,
-             psf_poly_params=None, psf_type=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
+def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aerosols=0.03, A1=1, A2=1, A3=1, angstrom_exponent=None,
+             psf_poly_params=None, psf_type=None,  diffraction_orders=None, with_rotation=True, with_stars=True, with_adr=True, with_noise=True):
     """ The basic use of the extractor consists first to define:
     - the path to the fits image from which to extract the image,
     - the path of the output directory to save the extracted spectrum (created automatically if does not exist yet),
@@ -387,6 +387,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     my_logger.info(f'\n\tStart IMAGE SIMULATOR')
     # Load reduced image
     spectrum = Spectrum(spectrum_filename)
+    if diffraction_orders is None:
+        diffraction_orders = np.arange(spectrum.order, spectrum.order + 3 * np.sign(spectrum.order), np.sign(spectrum.order))
     image = ImageModel(image_filename, target_label=spectrum.target.label)
     guess = np.array([spectrum.header['TARGETX'], spectrum.header['TARGETY']])
     if "CCDREBIN" in spectrum.header:
@@ -442,7 +444,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
         my_logger.info('\n\tUse PSF parameters from _table.csv file.')
         psf_poly_params = spectrum.chromatic_psf.from_table_to_poly_params()
     else:
-        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.params.labels) - 2) - 1) // 2
+        spectrum.chromatic_psf.deg = ((len(psf_poly_params) - 1) // (len(spectrum.chromatic_psf.psf.params.labels) - 2) - 1) // len(diffraction_orders)
         spectrum.chromatic_psf.set_polynomial_degrees(spectrum.chromatic_psf.deg)
         if spectrum.chromatic_psf.deg == 0:  # x_c must have deg >= 1
             psf_poly_params.insert(1, 0)
@@ -454,8 +456,8 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Simulate spectrogram
     atmosphere = Atmosphere(airmass, pressure, temperature)
     spectrogram = SpectrogramModel(spectrum, atmosphere=atmosphere, with_background=False, fast_sim=False,
-                                   full_image=True, with_adr=with_adr)
-    spectrogram.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv,
+                                   full_image=True, with_adr=with_adr, diffraction_orders=diffraction_orders)
+    spectrogram.simulate(A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv,
                          spectrum.disperser.D, 0, 0, rotation_angle, 1, psf_poly_params)
 
     # Image model
@@ -500,6 +502,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     # Save images and parameters
     image.header['A1_T'] = A1
     image.header['A2_T'] = A2
+    image.header['A3_T'] = A3
     image.header['X0_T'] = spectrum.x0[0]
     image.header['Y0_T'] = spectrum.x0[1]
     image.header['D2CCD_T'] = float(spectrum.disperser.D)

@@ -40,6 +40,11 @@ conda install -c conda-forge astrometry
 and then download and move [index files](http://astrometry.net/doc/readme.html#getting-index-files) in the `$CONDA_PREFIX/data` folder.
 - compile it from [sources](https://astrometrynet.readthedocs.io/en/latest/): it needs the installation of [netpbm](https://netpbm.sourceforge.net/) and [wcslib](https://www.atnf.csiro.au/people/mcalabre/WCS/wcslib/); `solve-field` executable must in the user `$PATH` or the user has to set an environmental variable `$ASTROMETRYNET_DIR` pointing to the install directory.
 
+For faster matrix multiplications, if available for a given computer configuration, one can install [sparse_dot_mkl](https://anaconda.org/conda-forge/sparse_dot_mkl):
+```
+conda install -c conda-forge sparse_dot_mkl
+```
+
 Spectractor is able to perform parameter fits using the MCMC library [emcee](https://emcee.readthedocs.io/en/stable/) (optional) with [mpi4py](https://mpi4py.readthedocs.io/en/stable/) and [h5py](https://www.h5py.org/).  The latter might be better installed using `conda install ...` command to get their own dependencies (openmp and hdf5).
 
 ## Basic extraction

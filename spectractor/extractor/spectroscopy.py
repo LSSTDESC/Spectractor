@@ -398,9 +398,10 @@ class Lines:
                 if lambdas.shape != line.fit_lambdas.shape or not np.allclose(lambdas, line.fit_lambdas, 1e-3):
                     lambdas = np.copy(line.fit_lambdas)
                     if ax is not None:
-                        ax.plot(lambdas, multigauss_and_bgd(lambdas, *line.fit_popt), lw=2, color='b')
                         x_norm = rescale_x_to_legendre(lambdas)
+                        ax.plot(lambdas, multigauss_and_bgd(np.array([x_norm, lambdas]), *line.fit_popt), lw=2, color='b')
                         bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
+                        # bgd = np.polyval(line.fit_popt[0:bgd_npar], lambdas)
                         ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
         if print_table:
             self.table = self.print_detected_lines(print_table=True)

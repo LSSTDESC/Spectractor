@@ -23,14 +23,16 @@ import astropy.config  # noqa: E402
 
 
 # original parameters
+N_DIFF_ORDERS = 3
 PSF_POLY_ORDER = 2
 PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
                          0, 0, 0,
                          3, 1, 1,
                          3, 0, 0,
-                         1e6] * 2
+                         1e6] * N_DIFF_ORDERS
 A1_T = 1
 A2_T = 1
+A3_T = 0
 
 #
 # PSF_POLY_PARAMS_TRUTH = [1, 0, 0,
@@ -93,7 +95,7 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
 def make_image():
     spectrum_filename = "./tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = "./tests/data/reduc_20170530_134.fits"
-    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T,
+    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T, A3=A3_T,
              psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=True, with_noise=False)
 
 
@@ -101,7 +103,7 @@ def make_image():
 @astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
 def test_ctio_fullchain():
     parameters.VERBOSE = True
-    parameters.DEBUG = True
+    parameters.DEBUG = False
     sim_image = "./tests/data/sim_20170530_134.fits"
 
     # load test and make image simulation
@@ -145,7 +147,7 @@ def test_ctio_fullchain():
                                f"\n\t\tspectrum.header['CHI2_FIT']={spectrum.header['CHI2_FIT']:.4g}"
                                f"\n\t\tspectrum.chromatic_psf.poly_params="
                                f"{spectrum.chromatic_psf.params.values[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1]}"
-                               f" vs {PSF_POLY_PARAMS_TRUTH[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1]}"
+                               f" vs {PSF_POLY_PARAMS_TRUTH[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1]}"
                                f"\n\t\tresiduals wrt truth: mean={np.mean(residuals[100:-100]):.5g}, "
                                f"std={np.std(residuals[100:-100]):.5g}")
     assert np.isclose(float(spectrum.header['X0_T'] / parameters.CCD_REBIN), spectrum.x0[0], atol=0.2 * parameters.CCD_REBIN)
@@ -159,7 +161,7 @@ def test_ctio_fullchain():
         assert float(spectrum.header['CHI2_FIT']) < 1.5e-1
     assert np.all(
         np.isclose(spectrum.chromatic_psf.params.values[spectrum.chromatic_psf.Nx + 2 * (PSF_POLY_ORDER + 1):-1],
-                   np.array(PSF_POLY_PARAMS_TRUTH)[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1], rtol=0.01, atol=0.01))
+                   np.array(PSF_POLY_PARAMS_TRUTH)[2 * (PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1], rtol=0.01, atol=0.01))
     assert np.abs(np.mean(residuals[100:-100])) < 0.25
     assert np.std(residuals[100:-100]) < 3
 
@@ -195,24 +197,24 @@ def test_ctio_fullchain():
     run_spectrogram_minimisation(w, method="newton")
     nsigma = 2
     labels = ["A1_T", "A2_T", "VAOD_T", "OZONE_T", "PWV_T"]
-    indices = [0, 1, 2, 4, 5]
-    A1, A2, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, shift_t, B, *psf_poly_params = w.p
+    indices = [0, 1, 3, 5, 6]
+    A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, shift_t, B, *psf_poly_params = w.params.values
     ipar = w.params.get_free_parameters()  # non fixed param indices
     cov_indices = [list(ipar).index(k) for k in indices]  # non fixed param indices in cov matrix
     assert w.costs[-1] / w.data.size < 1e-3
     k = 0
     for i, l in zip(indices, labels):
         icov = cov_indices[k]
-        spectrum.my_logger.info(f"Test {l} best-fit {w.p[i]:.3f}+/-{np.sqrt(w.params.cov[icov, icov]):.3f} "
+        spectrum.my_logger.info(f"Test {l} best-fit {w.params.values[i]:.3f}+/-{np.sqrt(w.params.cov[icov, icov]):.3f} "
                                 f"vs {spectrum.header[l]:.3f} at {nsigma}sigma level: "
-                                f"{np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
-        assert np.abs(w.p[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
+                                f"{np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma}")
+        assert np.abs(w.params.values[i] - spectrum.header[l]) / np.sqrt(w.params.cov[icov, icov]) < nsigma
         k += 1
     assert np.isclose(shift_y, 0, atol=parameters.PIXSHIFT_PRIOR)  # shift_y
     assert np.isclose(D, spectrum.header["D2CCD_T"], atol=0.1)  # D2CCD
     assert np.isclose(B, 1, atol=1e-3)  # B
-    assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1],
-                             np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//2 - 1],
+    assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
+                             np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              rtol=0.01, atol=0.01))
 
 

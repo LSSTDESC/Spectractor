@@ -135,7 +135,7 @@ def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_st
     >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
-    >>> data = s0.evaluate(params, mode="1D")
+    >>> data = s0.evaluate(s0.set_pixels(mode="1D"), params)
     >>> bgd = 10*np.ones_like(data)
     >>> data += bgd
     >>> data = np.random.poisson(data)
@@ -239,7 +239,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     >>> s0 = ChromaticPSF(psf, Nx=100, Ny=200, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
-    >>> data = s0.evaluate(params, mode="1D")
+    >>> data = s0.evaluate(s0.set_pixels(mode="1D"))
     >>> bgd = 10*np.ones_like(data)
     >>> data += bgd
     >>> data = np.random.poisson(data)
@@ -383,7 +383,7 @@ def extract_spectrogram_background_poly2D(data, deg=1, ws=(20, 30), pixel_step=1
     >>> s0 = ChromaticPSF(psf, Nx=100, Ny=100, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
-    >>> data = s0.evaluate(params, mode="1D")
+    >>> data = s0.evaluate(s0.set_pixels(mode="1D"), params)
     >>> bgd = 10.*np.ones_like(data)
     >>> xx, yy = np.meshgrid(np.arange(s0.Nx), np.arange(s0.Ny))
     >>> bgd += 1000*np.exp(-((xx-20)**2+(yy-10)**2)/(2*2))

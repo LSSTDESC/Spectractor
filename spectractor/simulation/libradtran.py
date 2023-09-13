@@ -98,7 +98,8 @@ class Libradtran:
             self.my_logger.error(f"\n\t{e.stderr}")
             sys.exit()
 
-    def simulate(self, airmass, aerosol, ozone, pwv, pressure, angstrom_exponent=None, lambda_min=250, lambda_max=1200):
+    def simulate(self, airmass, aerosol, ozone, pwv, pressure, angstrom_exponent=None, lambda_min=250, lambda_max=1200,
+                 altitude=parameters.OBS_ALTITUDE):
         """Simulate the atmosphere transmission with Libratran.
 
         Parameters
@@ -120,6 +121,8 @@ class Libradtran:
             Minimum wavelength for simulation in nm.
         lambda_max: float
             Maximum wavelength for simulation in nm.
+        altitude: float
+            Observatory altitude in km (default: parameters.OBS_ALTITUDE).
 
         Returns
         -------
@@ -222,7 +225,7 @@ class Libradtran:
         # only for mie executable from libradtran to compute mie diffusion
         # self.settings["temperature"] = temperature + 273.15
 
-        self.settings["altitude"] = str(parameters.OBS_ALTITUDE)  # observatory altitude
+        self.settings["altitude"] = str(altitude)  # observatory altitude
         self.settings["source"] = 'solar ' + os.path.join(self.libradtran_path, 'data/solar_flux/kurudz_1.0nm.dat')
         self.settings["sza"] = str(sza)
         self.settings["phi0"] = '0'

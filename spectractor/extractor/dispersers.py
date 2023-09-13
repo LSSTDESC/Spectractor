@@ -318,6 +318,7 @@ class Grating:
         self.transmission_err = None
         self.ratio_order_2over1 = None
         self.ratio_order_3over2 = None
+        self.ratio_order_3over1 = None
         self.flat_ratio_order_2over1 = True
         self.load_files(verbose=verbose)
 
@@ -422,10 +423,12 @@ class Grating:
                 l, t = a.T
             else:
                 l, t, e = a.T
-            self.ratio_order_3over2 = interpolate.interp1d(l, t, bounds_error=False, kind="linear",
-                                                           fill_value="extrapolate")  # "(0, t[-1]))
+            self.ratio_order_3over2 = interpolate.interp1d(l, t, bounds_error=False, kind="linear", fill_value="extrapolate")
+            self.ratio_order_3over1 = interpolate.interp1d(l, self.ratio_order_3over2(l)*self.ratio_order_2over1(l),
+                                                           bounds_error=False, kind="linear", fill_value="extrapolate")
         else:
             self.ratio_order_3over2 = None
+            self.ratio_order_3over1 = None
         filename = os.path.join(self.data_dir, self.label, "hologram_center.txt")
         if os.path.isfile(filename):
             with open(filename) as f:
@@ -493,7 +496,7 @@ class Grating:
         >>> assert np.isclose(theta, np.arctan2(500*parameters.CCD_PIXEL2MM, parameters.DISTANCE2CCD))
         """
         theta0 = get_theta0(x0)
-        return np.arcsin(order * lambdas * 1e-6 * self.N(x0) + np.sin(theta0))
+        return np.arcsin(np.clip(order * lambdas * 1e-6 * self.N(x0) + np.sin(theta0),-1, 1))
 
     def grating_refraction_angle_to_lambda(self, thetas, x0, order=1):
         """ Convert refraction angles into wavelengths (in nm) with.

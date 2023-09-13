@@ -54,7 +54,7 @@ def test_simulator():
     file_names = ['tests/data/reduc_20170530_134_spectrum.fits']
 
     parameters.VERBOSE = True
-    parameters.DEBUG = True
+    parameters.DEBUG = False
     load_config('config/ctio.ini')
 
     for file_name in file_names:

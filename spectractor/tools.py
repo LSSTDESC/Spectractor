@@ -30,7 +30,8 @@ from numba import njit
 _SCIKIT_IMAGE_NEW_HESSIAN = None
 
 
-@njit(fastmath=True, cache=True)
+# do not increase speed:
+# @njit(fastmath=True, cache=True)
 def gauss(x, A, x0, sigma):
     """Evaluate the Gaussian function.
 
@@ -63,7 +64,8 @@ def gauss(x, A, x0, sigma):
     return A * np.exp(-(x - x0) * (x - x0) / (2 * sigma * sigma))
 
 
-@njit(fastmath=True, cache=True)
+# do not increase speed:
+# @njit(fastmath=True, cache=True)
 def gauss_jacobian(x, A, x0, sigma):
     """Compute the Jacobian matrix of the Gaussian function.
 
@@ -91,7 +93,7 @@ def gauss_jacobian(x, A, x0, sigma):
     >>> print(np.array(jac).T.shape)
     (50, 3)
     """
-    dA = gauss(x, A, x0, sigma) / A
+    dA = gauss(x, 1, x0, sigma)
     dx0 = A * (x - x0) / (sigma * sigma) * dA
     dsigma = A * (x - x0) * (x - x0) / (sigma ** 3) * dA
     # return np.array([dA, dx0, dsigma]).T
@@ -229,6 +231,30 @@ def fit_multigauss_and_line(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf,
 
 
 def rescale_x_to_legendre(x):
+    """Rescale array between -1 and 1 for Legendre polynomial evaluation.
+
+    Parameters
+    ----------
+    x: np.ndarray
+
+    Returns
+    -------
+    x_norm: np.ndarray
+
+    See Also
+    --------
+    rescale_x_from_legendre
+
+    Examples
+    --------
+    >>> x = np.linspace(0, 10, 101)
+    >>> x_norm = rescale_x_to_legendre(x)
+    >>> x_norm[0], x_norm[-1], x_norm.size
+    (-1.0, 1.0, 101)
+    >>> x_new = rescale_x_from_legendre(x_norm, 0, 10)
+    >>> assert np.allclose(x_new, x)
+
+    """
     middle = 0.5 * (np.max(x) + np.min(x))
     x_norm = x - middle
     if np.max(x_norm) != 0:
@@ -237,8 +263,35 @@ def rescale_x_to_legendre(x):
         return x_norm
 
 
-def rescale_x_from_legendre(x, Xmax, Xmin):
-    X = 0.5 * x * (Xmax - Xmin) + 0.5 * (Xmax + Xmin)
+def rescale_x_from_legendre(x_norm, Xmin, Xmax):
+    """Rescale normalized array set between -1 and 1 for Legendre polynomial evaluation to normal array
+    between Xmin and Xmax.
+
+    Parameters
+    ----------
+    x: np.ndarray
+    Xmin: float
+    Xmax: float
+
+    Returns
+    -------
+    x: np.ndarray
+
+    See Also
+    --------
+    rescale_x_to_legendre
+
+    Examples
+    --------
+    >>> x = np.linspace(0, 10, 101)
+    >>> x_norm = rescale_x_to_legendre(x)
+    >>> x_norm[0], x_norm[-1], x_norm.size
+    (-1.0, 1.0, 101)
+    >>> x_new = rescale_x_from_legendre(x_norm, 0, 10)
+    >>> assert np.allclose(x_new, x)
+
+    """
+    X = 0.5 * x_norm * (Xmax - Xmin) + 0.5 * (Xmax + Xmin)
     return X
 
 
@@ -266,10 +319,15 @@ def multigauss_and_bgd(x, *params):
     --------
     >>> parameters.CALIB_BGD_NPARAMS = 4
     >>> x = np.arange(600., 800., 1)
-    >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
-    >>> y = multigauss_and_bgd(x, *p)
+    >>> x_norm = rescale_x_to_legendre(x)
+    >>> p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd(np.array([x_norm, x]), *p)
     >>> print(f'{y[0]:.2f}')
-    19.00
+    20.00
+    >>> print(f'{np.max(y):.2f}')
+    60.00
+    >>> print(f'{np.argmax(y)}')
+    150
 
     .. plot::
 
@@ -278,18 +336,20 @@ def multigauss_and_bgd(x, *params):
         import numpy as np
         parameters.CALIB_BGD_NPARAMS = 4
         x = np.arange(600., 800., 1)
-        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
-        y = multigauss_and_bgd(x, *p)
+        x_norm = rescale_x_to_legendre(x)
+        p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+        y = multigauss_and_bgd(np.array([x_norm, x]), *p)
         plt.plot(x,y,'r-')
         plt.show()
 
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
-    # out = np.polyval(params[0:bgd_nparams], x)
-    x_norm = rescale_x_to_legendre(x)
+    x_norm, x_gauss = x
+    # x_norm = rescale_x_to_legendre(x)
     out = np.polynomial.legendre.legval(x_norm, params[0:bgd_nparams])
+    # out = np.polyval(params[0:bgd_nparams], x)
     for k in range((len(params) - bgd_nparams) // 3):
-        out += gauss(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
+        out += gauss(x_gauss, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3])
     return out
 
 
@@ -318,26 +378,25 @@ def multigauss_and_bgd_jacobian(x, *params):
     >>> import spectractor.parameters as parameters
     >>> parameters.CALIB_BGD_NPARAMS = 4
     >>> x = np.arange(600.,800.,1)
-    >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
-    >>> y = multigauss_and_bgd_jacobian(x, *p)
-    >>> assert(np.all(np.isclose(y.T[0],np.ones_like(x))))
-    >>> print(y.shape)
+    >>> x_norm = rescale_x_to_legendre(x)
+    >>> p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+    >>> jac = multigauss_and_bgd_jacobian(np.array([x_norm, x]), *p)
+    >>> assert(np.all(np.isclose(jac.T[0],np.ones_like(x))))
+    >>> print(jac.shape)
     (200, 10)
     """
     bgd_nparams = parameters.CALIB_BGD_NPARAMS
-    out = []
-    x_norm = rescale_x_to_legendre(x)
-    for k in range(bgd_nparams):
-        # out.append(params[k]*(parameters.CALIB_BGD_ORDER-k)*x**(parameters.CALIB_BGD_ORDER-(k+1)))
-        # out.append(x ** (bgd_nparams - 1 - k))
+    x_norm, x_gauss = x
+    out = np.zeros((len(params), len(x_norm)))
+    # x_norm = rescale_x_to_legendre(x)
+    for k in range(0, bgd_nparams):
+        # out[k] = x ** (bgd_nparams - 1 - k)
         c = np.zeros(bgd_nparams)
         c[k] = 1
-        out.append(np.polynomial.legendre.legval(x_norm, c))
-    for k in range((len(params) - bgd_nparams) // 3):
-        jac = np.array(gauss_jacobian(x, *params[bgd_nparams + 3 * k:bgd_nparams + 3 * k + 3]))
-        for j in jac:
-            out.append(list(j))
-    return np.array(out).T
+        out[k] = np.polynomial.legendre.legval(x_norm, c)  # np.eye(1, bgd_nparams, k)[0])
+    for ngauss in range((len(params) - bgd_nparams) // 3):
+        out[bgd_nparams + 3 * ngauss:bgd_nparams + 3 * ngauss + 3] = gauss_jacobian(x_gauss, *params[bgd_nparams + 3 * ngauss:bgd_nparams + 3 * ngauss + 3])
+    return out.T
 
 
 # noinspection PyTypeChecker
@@ -375,16 +434,17 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
     >>> from spectractor.config import load_config
     >>> load_config("default.ini")
     >>> x = np.arange(600.,800.,1)
-    >>> p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
-    >>> y = multigauss_and_bgd(x, *p)
+    >>> x_norm = rescale_x_to_legendre(x)
+    >>> p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+    >>> y = multigauss_and_bgd(np.array([x_norm, x]), *p)
     >>> print(f'{y[0]:.2f}')
-    19.00
+    20.00
     >>> err = 0.1 * np.sqrt(y)
-    >>> guess = (15,0,0,0,10,640,2,20,750,7)
+    >>> guess = (10,0,0,0.1,10,640,2,20,750,7)
     >>> bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
     >>> popt, pcov = fit_multigauss_and_bgd(x, y, guess=guess, bounds=bounds, sigma=err)
-    >>> assert np.all(np.isclose(p,popt,rtol=1e-4))
-    >>> fit = multigauss_and_bgd(x, *popt)
+    >>> assert np.allclose(p,popt,rtol=1e-4, atol=1e-5)
+    >>> fit = multigauss_and_bgd(np.array([x_norm, x]), *popt)
 
     .. plot::
 
@@ -392,21 +452,24 @@ def fit_multigauss_and_bgd(x, y, guess=[0, 1, 10, 1000, 1, 0], bounds=(-np.inf, 
         import numpy as np
         from spectractor.tools import multigauss_and_bgd, fit_multigauss_and_bgd
         x = np.arange(600.,800.,1)
-        p = [20, 1, -1, -1, 20, 650, 3, 40, 750, 5]
-        y = multigauss_and_bgd(x, *p)
+        x_norm = rescale_x_to_legendre(x)
+        p = [20, 0, 0, 0, 20, 650, 3, 40, 750, 5]
+        y = multigauss_and_bgd(np.array([x_norm, x]), *p)
         err = 0.1 * np.sqrt(y)
-        guess = (15,0,0,0,10,640,2,20,750,7)
+        guess = (10,0,0,0.1,10,640,2,20,750,7)
         bounds = ((-np.inf,-np.inf,-np.inf,-np.inf,1,600,1,1,600,1),(np.inf,np.inf,np.inf,np.inf,100,800,100,100,800,100))
         popt, pcov = fit_multigauss_and_bgd(x, y, guess=guess, bounds=bounds, sigma=err)
-        fit = multigauss_and_bgd(x, *popt)
+        fit = multigauss_and_bgd(np.array([x_norm, x]), *popt)
         fig = plt.figure()
-        plt.errorbar(x,y,yerr=err,linestyle='None')
-        plt.plot(x,fit,'r-')
-        plt.plot(x,multigauss_and_bgd(x, *guess),'k--')
+        plt.errorbar(x,y,yerr=err,linestyle='None',label="data")
+        plt.plot(x,fit,'r-',label="best fit")
+        plt.plot(x,multigauss_and_bgd(np.array([x_norm, x]), *guess),'k--',label="guess")
+        plt.legend()
         plt.show()
     """
     maxfev = 10000
-    popt, pcov = curve_fit(multigauss_and_bgd, x, y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma,
+    x_norm = rescale_x_to_legendre(x)
+    popt, pcov = curve_fit(multigauss_and_bgd, np.array([x_norm, x]), y, p0=guess, bounds=bounds, maxfev=maxfev, sigma=sigma,
                            absolute_sigma=True, method='trf', xtol=1e-4, ftol=1e-4, verbose=0,
                            jac=multigauss_and_bgd_jacobian, x_scale='jac')
     # error = 0.1 * np.abs(guess) * np.ones_like(guess)
@@ -1122,35 +1185,7 @@ def fit_moffat1d(x, y, guess=None, bounds=None):
         return fitted_model
 
 
-class LevMarLSQFitterWithNan(fitting.LevMarLSQFitter):
-
-    def objective_function(self, fps, *args):
-        """
-        Function to minimize.
-
-        Parameters
-        ----------
-        fps : list
-            parameters returned by the fitter
-        args : list
-            [model, [weights], [input coordinates]]
-        """
-
-        model = args[0]
-        weights = args[1]
-        fitting._fitter_to_model_params(model, fps)
-        meas = args[-1]
-        if weights is None:
-            a = np.ravel(model(*args[2: -1]) - meas)
-            a[np.isfinite(a)] = 0
-            return a
-        else:
-            a = np.ravel(weights * (model(*args[2: -1]) - meas))
-            a[~np.isfinite(a)] = 0
-            return a
-
-
-def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
+def compute_fwhm(x, y, minimum=0, center=None, full_output=False, epsilon=1e-3):
     """
     Compute the full width half maximum of y(x) curve,
     using an interpolation of the data points and dichotomie method.
@@ -1167,6 +1202,8 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
         The center of the curve. If None, the weighted averageof the y(x) distribution is computed (default: None).
     full_output: bool, optional
         If True, half maximum, the edges of the curve and the curve center are given in output (default: False).
+    epsilon: float, optional
+        Dichotomie algorithm stop if difference is smaller than epsilon (default: 1e-3).
 
     Returns
     -------
@@ -1269,7 +1306,7 @@ def compute_fwhm(x, y, minimum=0, center=None, full_output=False):
     def eq(xx):
         return interp(xx) - 0.5 * maximum
 
-    res = dichotomie(eq, a, b, 1e-3)
+    res = dichotomie(eq, a, b, epsilon)
     if center is None:
         center = np.average(x, weights=y)
     fwhm = abs(2 * (res - center))
@@ -1305,7 +1342,7 @@ def compute_integral(x, y, bounds=None):
 
     .. doctest::
 
-        >>> x = np.arange(0, 100, 0.5)
+        >>> x = np.arange(0, 100, 1)
         >>> stddev = 4
         >>> middle = 40
         >>> psf = gauss(x, 1/(stddev*np.sqrt(2*np.pi)), middle, stddev)
@@ -1665,7 +1702,7 @@ def detect_peaks(image):
     return detected_peaks
 
 
-def clean_target_spikes(data, saturation):
+def clean_target_spikes(data, saturation):  # pragma: no cover
     saturated_pixels = np.where(data > saturation)
     data[saturated_pixels] = saturation
     NY, NX = data.shape
@@ -2352,14 +2389,35 @@ def imgslice(slicespec):
 
 
 def compute_correlation_matrix(cov):
-    rho = np.zeros_like(cov)
+    """Compute correlation matrix from a covariance matrix.
+
+    Parameters
+    ----------
+    cov: np.ndarray
+        Covariance matrix.
+
+    Returns
+    -------
+    rho: np.ndarray
+        Correlation matrix.
+
+    Examples
+    --------
+    >>> cov = np.array([[4, 1], [1, 16]])
+    >>> compute_correlation_matrix(cov)
+    array([[1.   , 0.125],
+           [0.125, 1.   ]])
+
+
+    """
+    rho = np.zeros_like(cov, dtype="float")
     for i in range(cov.shape[0]):
         for j in range(cov.shape[1]):
             rho[i, j] = cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
     return rho
 
 
-def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):
+def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):  # pragma: no cover
     if ipar is None:
         ipar = np.arange(rho.shape[0]).astype(int)
     im = plt.imshow(rho[ipar[:, None], ipar], interpolation="nearest", cmap='bwr', vmin=-1, vmax=1)
@@ -2560,3 +2618,9 @@ class NumpyArrayEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
