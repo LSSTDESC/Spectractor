@@ -508,6 +508,70 @@ class Spectrum:
         if parameters.PdfPages:  # pragma: no cover
             parameters.PdfPages.savefig()
 
+    def plot_table_in_axis(self, ax):
+        def getRoundedValues(df):
+            toReturn = []
+            rows = [r for r in df.values]
+
+            for row in rows:
+                rowItems = []
+                for itemNum, item in enumerate(row):
+                    if itemNum == 0:
+                        rowItems.append(str(item))
+                    else:
+                        assert isinstance(item, float)
+                        rowItems.append(f'{item:.4}')
+                toReturn.append(rowItems)
+            return toReturn
+
+        def getColumnNames(df):
+            headerRow = [headerRowMap[col] for col in df.columns]
+            return headerRow
+
+        headerRowMap = {
+            'Line': 'Line',
+            'Tabulated': 'Tabulated\n(nm)',
+            'Detected': 'Detected\n(nm)',
+            'Shift': 'Shift\n(nm)',
+            'Err': 'Err\n(nm)',
+            'FWHM': 'FWHM\n(nm)',
+            'Amplitude': 'Amplitude',
+            'SNR': 'SNR',
+            'Chisq': '${\chi}^2$',  #'$\bm{\chi}^2$',
+            'Eqwidth_mod': 'Eq. Width\n(model)',
+            'Eqwidth_data': 'Eq. Width\n(data)',
+        }
+
+        # Hide the axes
+        ax.axis('off')
+
+        df = self.lines.table.to_pandas()
+
+        # Create a table
+        table_data = ax.table(cellText=getRoundedValues(df),
+                              colLabels=getColumnNames(df),
+                              cellLoc='left',
+                              loc='center',
+                              edges='horizontal')
+
+        # Style the table
+        table_data.auto_set_font_size(False)
+        table_data.set_fontsize(10)
+        table_data.scale(1.5, 1.1)  # Adjust the table size if needed
+
+        # Set header row height to be double the default height
+        header_cells = table_data.get_celld()
+        for key, cell in header_cells.items():
+            cell.set_text_props(fontfamily='serif', fontsize=10)
+            if key[0] == 0:
+                cell.set_text_props(weight='bold')
+                cell.set_height(0.15)  # Adjust the height as needed
+            if key[1] == 0:  # First column
+                if key[0] == 0:  # first line of first column
+                    continue
+                cell.set_text_props(fontstyle='italic', fontfamily='serif', fontsize=11)
+                cell._text.set_horizontalalignment('left')
+
     def plot_spectrum_summary(self, xlim=None, figsize=(10, 8)):
         """Plot spectrum with emission and absorption lines.
 
@@ -538,27 +602,45 @@ class Spectrum:
             detect_lines(self.lines, self.lambdas, self.data, self.err, fwhm_func=fwhm_func,
                          calibration_lines_only=True)
 
-        gs_kw = dict(width_ratios=[1, 1], height_ratios=[1, 0.2])
-        fig, ax = plt.subplots(2, 2, gridspec_kw=gs_kw, sharex=True, figsize=figsize)
+        def generate_axes(fig):
+            gridspec = fig.add_gridspec(nrows=19, ncols=12)
+            axes = {}
+            axes['A'] = fig.add_subplot(gridspec[0:8, 0:12])
+            axes['B'] = fig.add_subplot(gridspec[8:10, 0:12], sharex=axes['A'])
+            axes['C'] = fig.add_subplot(gridspec[11:19, 2:10])
+            return axes
+
+        fig = plt.figure(figsize=figsize)
+        axes = generate_axes(fig)
+        mainPlot = axes['A']
+        widthPlot = axes['B']
+        tablePlot = axes['C']
+        self.plot_table_in_axis(tablePlot)
+
         label = f'Order {self.order:d} spectrum\n' \
                 r'$D_{\mathrm{CCD}}=' \
                 rf'{self.disperser.D:.2f}\,$mm'
-        plot_spectrum_simple(ax[0, 0], self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
+        plot_spectrum_simple(mainPlot, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
                              title=self.target.label, units=self.units, lw=1, linestyle="-")
         if len(self.target.spectra) > 0:
             plot_indices = np.logical_and(self.target.wavelengths[0] > np.min(self.lambdas),
                                           self.target.wavelengths[0] < np.max(self.lambdas))
             s = self.target.spectra[0] / np.max(self.target.spectra[0][plot_indices]) * np.max(self.data)
-            ax[0, 0].plot(self.target.wavelengths[0], s, lw=2, label='Normalized\nCALSPEC spectrum')
-        self.lines.plot_atomic_lines(ax[0, 0], fontsize=12, force=False, calibration_only=True)
-        self.lines.plot_detected_lines(ax[0, 0], print_table=False, calibration_only=True)
+            mainPlot.plot(self.target.wavelengths[0], s, lw=2, label='Normalized\nCALSPEC spectrum')
+        self.lines.plot_atomic_lines(mainPlot, fontsize=12, force=False, calibration_only=True)
+        self.lines.plot_detected_lines(mainPlot, print_table=False, calibration_only=True)
 
-        ax[0, 0].legend()
+        mainPlot.legend()
 
-        ax[1, 0].plot(self.lambdas, np.array(self.chromatic_psf.table['fwhm']), "r-", lw=2)
-        ax[1, 0].set_ylabel("FWHM [pix]")
-        ax[1, 0].grid()
-        ax[1, 0].set_xlabel(r'$\lambda$ [nm]')
+        widthPlot.plot(self.lambdas, np.array(self.chromatic_psf.table['fwhm']), "r-", lw=2)
+        widthPlot.set_ylabel("FWHM [pix]")
+        widthPlot.grid()
+        widthPlot.set_xlabel(r'$\lambda$ [nm]')
+
+        # hide the tick labels in the shared x axis on the main plot
+        for label in mainPlot.get_xticklabels():
+            label.set_visible(False)
+
         fig.subplots_adjust(hspace=0)
         plt.show()
 
