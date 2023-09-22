@@ -321,15 +321,13 @@ class Lines:
                             xycoords='axes fraction', color=color, fontsize=fontsize)
         return ax
 
-    def plot_detected_lines(self, ax=None, print_table=False, calibration_only=False):
+    def plot_detected_lines(self, ax=None, calibration_only=False):
         """Overplot the fitted lines on a spectrum.
 
         Parameters
         ----------
         ax: Axes
             The Axes instance if needed (default: None).
-        print_table: bool, optional
-            If True, print a summary table (default: False).
         calibration_only: bool
             Plot only the lines used for calibration if True (default: False).
 
@@ -412,20 +410,12 @@ class Lines:
                         bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
                         # bgd = np.polyval(line.fit_popt[0:bgd_npar], lambdas)
                         ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
-        self.table = self.print_detected_lines(print_table=print_table, calibration_only=calibration_only)
 
-    def print_detected_lines(self, output_file_name="", overwrite=False, print_table=False, amplitude_units="",
-                             calibration_only=False):
-        """Print the detected line on screen as an Astropy table, and write it in a file.
+    def build_detected_line_table(self, amplitude_units="", calibration_only=False):
+        """Build the detected line on screen as an Astropy table.
 
         Parameters
         ----------
-        output_file_name: str, optional
-            Output file name. If not empty, save the table in a file (default: '').
-        overwrite: bool, optional
-            If True, overwrite the existing file if it exists (default: False).
-        print_table: bool, optional
-            If True, print a summary table (default: False).
         amplitude_units: str, optional
             Units of the line amplitude (default: "").
         calibration_only: bool
@@ -461,7 +451,7 @@ class Lines:
 
         Print the result
         >>> spec.lines = lines
-        >>> t = lines.print_detected_lines(output_file_name="test_detected_lines.csv")
+        >>> t = lines.build_detected_line_table()
 
         .. doctest::
             :hide:
@@ -506,10 +496,7 @@ class Lines:
             for col in t.colnames[-2:]:
                 t[col].unit = 'nm'
             t[t.colnames[-3]].unit = 'reduced'
-            if output_file_name != "":
-                t.write(output_file_name, overwrite=overwrite)
-            if print_table:
-                print(t)
+            t.convert_bytestring_to_unicode()
         return t
 
 
@@ -539,7 +526,7 @@ STELLAR_LINES = [FE1, FE2, FE3, FE4, CAII1, CAII2, HEI1, MG1, MG2]
 # O2 = Line(762.2, atmospheric=True, label=r'$O_2$',  # 762.2 is a weighted average of the O2 line simulated by Libradtran
 #           label_pos=[0.007, 0.02],
 #           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
-O2_1 = Line(760.3, atmospheric=True, label='',
+O2_1 = Line(760.3, atmospheric=True, label='$O_2$',
             label_pos=[0.007, 0.02], use_for_calibration=True)  # libradtran paper fig.3
 O2_2 = Line(763.1, atmospheric=True, label='$O_2$',
             label_pos=[0.007, 0.02], use_for_calibration=True)  # libradtran paper fig.3

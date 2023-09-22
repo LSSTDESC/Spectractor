@@ -19,7 +19,7 @@ from spectractor import parameters
 from spectractor.config import set_logger, load_config, update_derived_parameters
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
-from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
+from spectractor.tools import (ensure_dir, load_fits, plot_image_simple, plot_table_in_axis,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd, multigauss_and_bgd_jacobian)
 from spectractor.extractor.psf import load_PSF
@@ -432,9 +432,11 @@ class Spectrum:
                 plot_indices = np.logical_and(self.target.wavelengths[k] > np.min(self.lambdas),
                                               self.target.wavelengths[k] < np.max(self.lambdas))
                 s = self.target.spectra[k] / np.max(self.target.spectra[k][plot_indices]) * np.max(self.data)
-                ax.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
+                ax.plot(self.target.wavelengths[k], s, lw=2, label=f'Tabulated spectra #{k}')
         if self.lambdas is not None:
-            self.lines.plot_detected_lines(ax, print_table=parameters.VERBOSE)
+            self.lines.plot_detected_lines(ax)
+        if self.lines is not None and len(self.lines.table) > 0:
+            self.my_logger.info(f"\n{self.lines.table}")
         if self.lambdas is not None and self.lines is not None:
             self.lines.plot_atomic_lines(ax, fontsize=12, force=force_lines, calibration_only=calibration_only)
         ax.legend(loc='best')
@@ -509,70 +511,6 @@ class Spectrum:
         if parameters.PdfPages:  # pragma: no cover
             parameters.PdfPages.savefig()
 
-    def plot_table_in_axis(self, ax):
-        def getRoundedValues(df):
-            toReturn = []
-            rows = [r for r in df.values]
-
-            for row in rows:
-                rowItems = []
-                for itemNum, item in enumerate(row):
-                    if itemNum == 0:
-                        rowItems.append(str(item))
-                    else:
-                        assert isinstance(item, float)
-                        rowItems.append(f'{item:.4}')
-                toReturn.append(rowItems)
-            return toReturn
-
-        def getColumnNames(df):
-            headerRow = [headerRowMap[col] for col in df.columns]
-            return headerRow
-
-        headerRowMap = {
-            'Line': 'Line',
-            'Tabulated': 'Tabulated\n(nm)',
-            'Detected': 'Detected\n(nm)',
-            'Shift': 'Shift\n(nm)',
-            'Err': 'Err\n(nm)',
-            'FWHM': 'FWHM\n(nm)',
-            'Amplitude': 'Amplitude',
-            'SNR': 'SNR',
-            'Chisq': '${\chi}^2$',  #'$\bm{\chi}^2$',
-            'Eqwidth_mod': 'Eq. Width\n(model)',
-            'Eqwidth_data': 'Eq. Width\n(data)',
-        }
-
-        # Hide the axes
-        ax.axis('off')
-
-        df = self.lines.table.to_pandas()
-
-        # Create a table
-        table_data = ax.table(cellText=getRoundedValues(df),
-                              colLabels=getColumnNames(df),
-                              cellLoc='left',
-                              loc='center',
-                              edges='horizontal')
-
-        # Style the table
-        table_data.auto_set_font_size(False)
-        table_data.set_fontsize(10)
-        table_data.scale(1.5, 1.1)  # Adjust the table size if needed
-
-        # Set header row height to be double the default height
-        header_cells = table_data.get_celld()
-        for key, cell in header_cells.items():
-            cell.set_text_props(fontfamily='serif', fontsize=10)
-            if key[0] == 0:
-                cell.set_text_props(weight='bold')
-                cell.set_height(0.15)  # Adjust the height as needed
-            if key[1] == 0:  # First column
-                if key[0] == 0:  # first line of first column
-                    continue
-                cell.set_text_props(fontstyle='italic', fontfamily='serif', fontsize=11)
-                cell._text.set_horizontalalignment('left')
-
     def plot_spectrum_summary(self, xlim=None, figsize=(12, 12), saveAs=''):
         """Plot spectrum with emission and absorption lines.
 
@@ -606,36 +544,45 @@ class Spectrum:
                          calibration_lines_only=True)
 
         def generate_axes(fig):
-            tableShrink = 2
+            tableShrink = 3
             tableGap = 1
-            gridspec = fig.add_gridspec(nrows=16, ncols=12)
+            gridspec = fig.add_gridspec(nrows=24, ncols=20)
             axes = {}
-            axes['A'] = fig.add_subplot(gridspec[0:8, 0:12])
-            axes['B'] = fig.add_subplot(gridspec[8:10, 0:12], sharex=axes['A'])
-            axes['C'] = fig.add_subplot(gridspec[10:12, 0:12], sharex=axes['A'])
-            axes['D'] = fig.add_subplot(gridspec[12+tableGap:16, tableShrink:12-tableShrink])
+            axes['A'] = fig.add_subplot(gridspec[0:3, 0:19])
+            axes['C'] = fig.add_subplot(gridspec[3:6, 0:19], sharex=axes['A'])
+            axes['B'] = fig.add_subplot(gridspec[7:15, 0:19])
+            axes['CA'] = fig.add_subplot(gridspec[0:3, 19:20])
+            axes['CC'] = fig.add_subplot(gridspec[3:6, 19:20])
+            axes['D'] = fig.add_subplot(gridspec[15:17, 0:19], sharex=axes['B'])
+            axes['E'] = fig.add_subplot(gridspec[17+tableGap:24, tableShrink:19-tableShrink])
             return axes
 
         fig = plt.figure(figsize=figsize)
         axes = generate_axes(fig)
-        mainPlot = axes['A']
-        residualsPlot = axes['B']
-        widthPlot = axes['C']
-        tablePlot = axes['D']
-        self.plot_table_in_axis(tablePlot)
+        plt.suptitle(f"{self.target.label} {self.date_obs}", y=0.91, fontsize=16)
+        mainPlot = axes['B']
+        spectrogramPlot = axes['A']
+        spectrogramPlotCb = axes['CA']
+        residualsPlot = axes['C']
+        residualsPlotCb = axes['CC']
+        widthPlot = axes['D']
+        tablePlot = axes['E']
 
         label = f'Order {self.order:d} spectrum\n' \
                 r'$D_{\mathrm{CCD}}=' \
                 rf'{self.disperser.D:.2f}\,$mm'
         plot_spectrum_simple(mainPlot, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
-                             title=self.target.label, units=self.units, lw=1, linestyle="-")
+                             title='', units=self.units, lw=1, linestyle="-")
         if len(self.target.spectra) > 0:
             plot_indices = np.logical_and(self.target.wavelengths[0] > np.min(self.lambdas),
                                           self.target.wavelengths[0] < np.max(self.lambdas))
             s = self.target.spectra[0] / np.max(self.target.spectra[0][plot_indices]) * np.max(self.data)
             mainPlot.plot(self.target.wavelengths[0], s, lw=2, label='Normalized\nCALSPEC spectrum')
         self.lines.plot_atomic_lines(mainPlot, fontsize=12, force=False, calibration_only=True)
-        self.lines.plot_detected_lines(mainPlot, print_table=False, calibration_only=True)
+        self.lines.plot_detected_lines(mainPlot, calibration_only=True)
+
+        table = self.lines.build_detected_line_table(calibration_only=True)
+        plot_table_in_axis(tablePlot, table)
 
         mainPlot.legend()
 
@@ -646,11 +593,23 @@ class Spectrum:
 
         residualsPlot.plot(self.lambdas, np.array(self.chromatic_psf.table['fwhm']), "b-", lw=2, label='temporary fake plot')
 
+        spectrogram = np.copy(self.spectrogram)
+        res = self.spectrogram_residuals.reshape((-1, self.spectrogram_Nx))
+        std = np.std(res)
+        if spectrogram.shape[0] != res.shape[0]:
+            margin = (spectrogram.shape[0] - res.shape[0]) // 2
+            spectrogram = spectrogram[margin:-margin]
+        plot_image_simple(spectrogramPlot, data=spectrogram, title='Data',
+                          aspect='auto', cax=spectrogramPlotCb, units='ADU/s', cmap='viridis')
+        spectrogramPlot.set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+        plot_image_simple(residualsPlot, data=res, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
+                          aspect='auto', cax=residualsPlotCb, units=r'$\sigma$', cmap='bwr')
+        residualsPlot.set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
+
         # hide the tick labels in the plots which share an x axis
         for label in itertools.chain(mainPlot.get_xticklabels(), residualsPlot.get_xticklabels()):
             label.set_visible(False)
 
-        fig.subplots_adjust(hspace=0)
         if saveAs:
             plt.savefig(saveAs)
         plt.show()
@@ -745,7 +704,7 @@ class Spectrum:
             elif extname == "LINES":
                 u.set_enabled_aliases({'flam': u.erg / u.s / u.cm**2 / u.nm,
                                        'reduced': u.dimensionless_unscaled})
-                tab = self.lines.print_detected_lines(amplitude_units=self.units.replace("erg/s/cm$^2$/nm", "flam"), print_table=False)
+                tab = self.lines.build_detected_line_table(amplitude_units=self.units.replace("erg/s/cm$^2$/nm", "flam"))
                 hdus[extname] = fits.table_to_hdu(tab)
             elif extname == "CONFIG":
                 # HIERARCH and CONTINUE not compatible together in FITS headers
@@ -1940,7 +1899,9 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
                 lambda_shifts.append(peak_pos - line.wavelength)
                 snrs.append(snr)
     if ax is not None:
-        lines.plot_detected_lines(ax, print_table=parameters.DEBUG)
+        lines.plot_detected_lines(ax)
+    lines.table = lines.build_detected_line_table()
+    lines.my_logger.debug(f"\n{lines.table}")
     if len(lambda_shifts) > 0:
         global_chisq /= len(lambda_shifts)
         shift = np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2)

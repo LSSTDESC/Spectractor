@@ -1135,7 +1135,7 @@ def SpectractorRun(image, output_directory, guess=None):
     # Save the spectrum
     my_logger.info('\n\t  ======================= SAVE SPECTRUM =============================')
     spectrum.save_spectrum(output_filename, overwrite=True)
-    spectrum.lines.print_detected_lines(amplitude_units=spectrum.units)
+    spectrum.lines.table = spectrum.lines.build_detected_line_table(amplitude_units=spectrum.units)
 
     # Plot the spectrum
     if parameters.VERBOSE and parameters.DISPLAY:
