@@ -1095,9 +1095,16 @@ class Astrometry():  # pragma: no cover
                 self.write_sources()
                 solve_field_input = self.sources_file_name
             elif self.source_extractor == "astrometrynet":
+                # use data without spectrums if it exists
+                if "data_wo_spectrums" in self.image.__dict__.keys():
+                    if getattr(self.image, "data_wo_spectrums") is not None:
+                        data = self.image.data_wo_spectrums.copy()
+                    else:
+                        data = self.image.data
+
                 self.my_logger.info(f"\n\tSource extraction directly with solve-field.")
                 # must write a temporary image file with Spectractor flips and rotations
-                fits.writeto(tmp_image_file_name, self.image.data, header=self.image.header, overwrite=True)
+                fits.writeto(tmp_image_file_name, data, header=self.image.header, overwrite=True)
                 solve_field_input = tmp_image_file_name
             else:
                 raise ValueError(f"Got {self.source_extractor=}. Must be either 'iraf' or 'astrometrynet' "
