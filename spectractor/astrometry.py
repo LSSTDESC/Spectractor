@@ -1098,7 +1098,7 @@ class Astrometry():  # pragma: no cover
                 # use data without spectrums if it exists
                 if "data_wo_spectrums" in self.image.__dict__.keys():
                     if getattr(self.image, "data_wo_spectrums") is not None:
-                        data = self.image.data_wo_spectrums.copy()
+                        data = getattr(self.image, "data_wo_spectrums").copy()
                     else:
                         data = self.image.data
 
