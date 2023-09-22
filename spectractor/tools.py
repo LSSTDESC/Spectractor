@@ -1793,7 +1793,9 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
         cb.formatter.set_powerlimits((0, 0))
         cb.locator = MaxNLocator(7, prune=None)
         cb.update_ticks()
-    cb.set_label('%s (%s scale)' % (units, scale))  # ,fontsize=16)
+        cb.set_label(f'{units}')  # ,fontsize=16)
+    else:
+        cb.set_label(f'{units} ({scale} scale)')  # ,fontsize=16)
     if title != "":
         ax.set_title(title)
     if target_pixcoords is not None:
@@ -1937,6 +1939,72 @@ def plot_compass_simple(ax, parallactic_angle=None, arrow_size=0.1, origin=[0.15
         ax.annotate("Z", xy=origin, xycoords='axes fraction', xytext=p_xy + origin, textcoords='axes fraction',
                     arrowprops=dict(arrowstyle="<|-", fc="lightgreen", ec="lightgreen"), color="lightgreen",
                     horizontalalignment='center', verticalalignment='center')
+
+
+def plot_table_in_axis(ax, table):
+    def getRoundedValues(df):
+        toReturn = []
+        rows = [r for r in df.values]
+
+        for row in rows:
+            rowItems = []
+            for itemNum, item in enumerate(row):
+                if itemNum == 0:
+                    rowItems.append(str(item))
+                else:
+                    assert isinstance(item, float)
+                    rowItems.append(f'{item:.4}')
+            toReturn.append(rowItems)
+        return toReturn
+
+    def getColumnNames(df):
+        headerRow = [headerRowMap[col] for col in df.columns]
+        return headerRow
+
+    headerRowMap = {
+        'Line': 'Line',
+        'Tabulated': 'Tabulated\n(nm)',
+        'Detected': 'Detected\n(nm)',
+        'Shift': 'Shift\n(nm)',
+        'Err': 'Err\n(nm)',
+        'FWHM': 'FWHM\n(nm)',
+        'Amplitude': 'Amplitude',
+        'SNR': 'SNR',
+        'Chisq': '${\chi}^2$',
+        'Eqwidth_mod': 'Eq. Width\n(model)',
+        'Eqwidth_data': 'Eq. Width\n(data)',
+    }
+
+    # Hide the axes
+    ax.axis('off')
+
+    table.convert_bytestring_to_unicode()
+    df = table.to_pandas()
+
+    # Create a table
+    table_data = ax.table(cellText=getRoundedValues(df),
+                          colLabels=getColumnNames(df),
+                          cellLoc='left',
+                          loc='center',
+                          edges='horizontal')
+
+    # Style the table
+    table_data.auto_set_font_size(False)
+    table_data.set_fontsize(10)
+    table_data.scale(1.5, 1.1)  # Adjust the table size if needed
+
+    # Set header row height to be double the default height
+    header_cells = table_data.get_celld()
+    for key, cell in header_cells.items():
+        cell.set_text_props(fontfamily='serif', fontsize=10)
+        if key[0] == 0:
+            cell.set_text_props(weight='bold')
+            cell.set_height(0.15)  # Adjust the height as needed
+        if key[1] == 0:  # First column
+            if key[0] == 0:  # first line of first column
+                continue
+            cell.set_text_props(fontstyle='italic', fontfamily='serif', fontsize=11)
+            cell._text.set_horizontalalignment('left')
 
 
 def load_fits(file_name, hdu_index=0):

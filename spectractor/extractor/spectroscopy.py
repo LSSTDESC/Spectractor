@@ -249,9 +249,10 @@ class Lines:
         sorted_lines = sorted(sorted_lines, key=lambda x: x.wavelength)
         return sorted_lines
 
-    def plot_atomic_lines(self, ax, color_atomic='g', color_atmospheric='b', fontsize=12, force=False):
+    def plot_atomic_lines(self, ax, color_atomic='g', color_atmospheric='b', fontsize=12, force=False,
+                          calibration_only=False):
         """Over plot the atomic lines as vertical lines, only if they are fitted or with high
-        signal to  noise ratio, unless force keyword is set to True.
+        signal-to-noise ratio, unless force keyword is set to True.
 
         Parameters
         ----------
@@ -264,7 +265,9 @@ class Lines:
         fontsize: int
             Font size of the spectral line labels (default: 12).
         force: bool
-            Force the plot of vertical lines if set to True (default: False).
+            Force the plot of vertical lines if set to True even if they are not detected (default: False).
+        calibration_only: bool
+            Plot only the lines used for calibration if True (default: False).
 
         Examples
         --------
@@ -306,6 +309,8 @@ class Lines:
         for line in self.lines:
             if (not line.fitted or not line.high_snr) and not force:
                 continue
+            if not line.use_for_calibration and calibration_only:
+                continue
             color = color_atomic
             if line.atmospheric:
                 color = color_atmospheric
@@ -316,15 +321,15 @@ class Lines:
                             xycoords='axes fraction', color=color, fontsize=fontsize)
         return ax
 
-    def plot_detected_lines(self, ax=None, print_table=False):
+    def plot_detected_lines(self, ax=None, calibration_only=False):
         """Overplot the fitted lines on a spectrum.
 
         Parameters
         ----------
         ax: Axes
             The Axes instance if needed (default: None).
-        print_table: bool, optional
-            If True, print a summary table (default: False).
+        calibration_only: bool
+            Plot only the lines used for calibration if True (default: False).
 
         Examples
         --------
@@ -391,6 +396,8 @@ class Lines:
         """
         lambdas = np.zeros(1)
         for line in self.lines:
+            if not line.use_for_calibration and calibration_only:
+                continue
             if line.fitted is True:
                 # look for lines in subset fit
                 bgd_npar = line.fit_bgd_npar
@@ -403,22 +410,16 @@ class Lines:
                         bgd = np.polynomial.legendre.legval(x_norm, line.fit_popt[0:bgd_npar])
                         # bgd = np.polyval(line.fit_popt[0:bgd_npar], lambdas)
                         ax.plot(lambdas, bgd, lw=2, color='b', linestyle='--')
-        if print_table:
-            self.table = self.print_detected_lines(print_table=True)
 
-    def print_detected_lines(self, output_file_name="", overwrite=False, print_table=False, amplitude_units=""):
-        """Print the detected line on screen as an Astropy table, and write it in a file.
+    def build_detected_line_table(self, amplitude_units="", calibration_only=False):
+        """Build the detected line on screen as an Astropy table.
 
         Parameters
         ----------
-        output_file_name: str, optional
-            Output file name. If not empty, save the table in a file (default: '').
-        overwrite: bool, optional
-            If True, overwrite the existing file if it exists (default: False).
-        print_table: bool, optional
-            If True, print a summary table (default: False).
         amplitude_units: str, optional
             Units of the line amplitude (default: "").
+        calibration_only: bool
+            Include only the lines used for calibration if True (default: False).
 
         Returns
         -------
@@ -450,20 +451,15 @@ class Lines:
 
         Print the result
         >>> spec.lines = lines
-        >>> t = lines.print_detected_lines(output_file_name="test_detected_lines.csv")
-
-        .. doctest::
-            :hide:
-
-            >>> assert len(t) > 0
-            >>> assert os.path.isfile('test_detected_lines.csv')
-            >>> os.remove('test_detected_lines.csv')
+        >>> t = lines.build_detected_line_table()
         """
         lambdas = np.zeros(1)
         rows = []
         j = 0
 
         for line in self.lines:
+            if not line.use_for_calibration and calibration_only:
+                continue
             if line.fitted is True:
                 # look for lines in subset fit
                 bgd_npar = line.fit_bgd_npar
@@ -493,21 +489,18 @@ class Lines:
             for col in t.colnames[-2:]:
                 t[col].unit = 'nm'
             t[t.colnames[-3]].unit = 'reduced'
-            if output_file_name != "":
-                t.write(output_file_name, overwrite=overwrite)
-            if print_table:
-                print(t)
+            t.convert_bytestring_to_unicode()
         return t
 
 
 # Line catalog
 
 # Hydrogen lines
-HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.04, 0.02], use_for_calibration=True)
+HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.02, 0.02], use_for_calibration=True)
 HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=False)
 HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=False)
-HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.04, 0.02], use_for_calibration=False)
+HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.02, 0.02], use_for_calibration=False)
 HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
 
 # Stellar lines (Fraunhofer lines) https://en.wikipedia.org/wiki/Fraunhofer_lines
@@ -526,8 +519,8 @@ STELLAR_LINES = [FE1, FE2, FE3, FE4, CAII1, CAII2, HEI1, MG1, MG2]
 # O2 = Line(762.2, atmospheric=True, label=r'$O_2$',  # 762.2 is a weighted average of the O2 line simulated by Libradtran
 #           label_pos=[0.007, 0.02],
 #           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
-O2_1 = Line(760.3, atmospheric=True, label='',
-            label_pos=[0.007, 0.02], use_for_calibration=True)  # libradtran paper fig.3
+O2_1 = Line(760.3, atmospheric=True, label='$O_2$',
+            label_pos=[-0.02, 0.02], use_for_calibration=True)  # libradtran paper fig.3
 O2_2 = Line(763.1, atmospheric=True, label='$O_2$',
             label_pos=[0.007, 0.02], use_for_calibration=True)  # libradtran paper fig.3
 O2B = Line(687.472, atmospheric=True, label=r'$O_2(B)$',  # 687.472 is a weighted average of the O2B line simulated by Libradtran

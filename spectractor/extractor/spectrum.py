@@ -12,13 +12,14 @@ import random
 import string
 import astropy
 import warnings
+import itertools
 warnings.filterwarnings('ignore', category=astropy.io.fits.card.VerifyWarning, append=True)
 
 from spectractor import parameters
 from spectractor.config import set_logger, load_config, update_derived_parameters
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
-from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
+from spectractor.tools import (ensure_dir, load_fits, plot_image_simple, plot_table_in_axis,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd, multigauss_and_bgd_jacobian)
 from spectractor.extractor.psf import load_PSF
@@ -382,7 +383,7 @@ class Spectrum:
             t.reset_lambda_range(transmission_threshold=1e-4)
         return t
 
-    def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False):
+    def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False, calibration_only=False):
         """Plot spectrum with emission and absorption lines.
 
         Parameters
@@ -398,6 +399,8 @@ class Spectrum:
             (default: False).
         force_lines: bool
             Force the over plot of vertical lines for atomic lines if set to True (default: False).
+        calibration_only: bool
+            Plot only the lines used for calibration if True (default: False).
 
         Examples
         --------
@@ -405,8 +408,11 @@ class Spectrum:
         >>> s.plot_spectrum(xlim=[500,900], live_fit=False, force_lines=True)
         """
         if ax is None:
+            doplot = True
             plt.figure(figsize=[12, 6])
             ax = plt.gca()
+        else:
+            doplot = False
         if label == '':
             label = f'Order {self.order:d} spectrum\n' \
                     r'$D_{\mathrm{CCD}}=' \
@@ -426,18 +432,20 @@ class Spectrum:
                 plot_indices = np.logical_and(self.target.wavelengths[k] > np.min(self.lambdas),
                                               self.target.wavelengths[k] < np.max(self.lambdas))
                 s = self.target.spectra[k] / np.max(self.target.spectra[k][plot_indices]) * np.max(self.data)
-                ax.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
+                ax.plot(self.target.wavelengths[k], s, lw=2, label=f'Tabulated spectra #{k}')
         if self.lambdas is not None:
-            self.lines.plot_detected_lines(ax, print_table=parameters.VERBOSE)
+            self.lines.plot_detected_lines(ax)
+        if self.lines is not None and len(self.lines.table) > 0:
+            self.my_logger.info(f"\n{self.lines.table}")
         if self.lambdas is not None and self.lines is not None:
-            self.lines.plot_atomic_lines(ax, fontsize=12, force=force_lines)
+            self.lines.plot_atomic_lines(ax, fontsize=12, force=force_lines, calibration_only=calibration_only)
         ax.legend(loc='best')
         if self.filters is not None:
             ax.get_legend().set_title(self.filters)
         plt.gcf().tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, f'{self.target.label}_spectrum.pdf'))
-        if parameters.DISPLAY:  # pragma: no cover
+        if parameters.DISPLAY and doplot:  # pragma: no cover
             if live_fit:
                 plt.draw()
                 plt.pause(1e-8)
@@ -502,6 +510,107 @@ class Spectrum:
             plt.show()
         if parameters.PdfPages:  # pragma: no cover
             parameters.PdfPages.savefig()
+
+    def plot_spectrum_summary(self, xlim=None, figsize=(12, 12), save_as=''):
+        """Plot spectrum with emission and absorption lines.
+
+        Parameters
+        ----------
+        xlim: list, optional
+            List of minimum and maximum abscisses (default: None).
+        figsize: tuple
+            Figure size (default: (12, 12)).
+        save_as : str, optional
+            Path to save the figure to, if specified.
+
+        Examples
+        --------
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s.plot_spectrum_summary()
+        """
+        if not np.any([line.fitted for line in self.lines.lines]):
+            fwhm_func = interp1d(self.chromatic_psf.table['lambdas'],
+                                 self.chromatic_psf.table['fwhm'],
+                                 fill_value=(parameters.CALIB_PEAK_WIDTH, parameters.CALIB_PEAK_WIDTH),
+                                 bounds_error=False)
+            detect_lines(self.lines, self.lambdas, self.data, self.err, fwhm_func=fwhm_func,
+                         calibration_lines_only=True)
+
+        def generate_axes(fig):
+            tableShrink = 3
+            tableGap = 1
+            gridspec = fig.add_gridspec(nrows=23, ncols=20)
+            axes = {}
+            axes['A'] = fig.add_subplot(gridspec[0:3, 0:19])
+            axes['C'] = fig.add_subplot(gridspec[3:6, 0:19], sharex=axes['A'])
+            axes['B'] = fig.add_subplot(gridspec[6:14, 0:19])
+            axes['CA'] = fig.add_subplot(gridspec[0:3, 19:20])
+            axes['CC'] = fig.add_subplot(gridspec[3:6, 19:20])
+            axes['D'] = fig.add_subplot(gridspec[14:16, 0:19], sharex=axes['B'])
+            axes['E'] = fig.add_subplot(gridspec[16+tableGap:23, tableShrink:19-tableShrink])
+            return axes
+
+        fig = plt.figure(figsize=figsize)
+        axes = generate_axes(fig)
+        plt.suptitle(f"{self.target.label} {self.date_obs}", y=0.91, fontsize=16)
+        mainPlot = axes['B']
+        spectrogramPlot = axes['A']
+        spectrogramPlotCb = axes['CA']
+        residualsPlot = axes['C']
+        residualsPlotCb = axes['CC']
+        widthPlot = axes['D']
+        tablePlot = axes['E']
+
+        label = f'Order {self.order:d} spectrum\n' \
+                r'$D_{\mathrm{CCD}}=' \
+                rf'{self.disperser.D:.2f}\,$mm'
+        plot_spectrum_simple(mainPlot, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
+                             title='', units=self.units, lw=1, linestyle="-")
+        if len(self.target.spectra) > 0:
+            plot_indices = np.logical_and(self.target.wavelengths[0] > np.min(self.lambdas),
+                                          self.target.wavelengths[0] < np.max(self.lambdas))
+            s = self.target.spectra[0] / np.max(self.target.spectra[0][plot_indices]) * np.max(self.data)
+            mainPlot.plot(self.target.wavelengths[0], s, lw=2, label='Normalized\nCALSPEC spectrum')
+        self.lines.plot_atomic_lines(mainPlot, fontsize=12, force=False, calibration_only=True)
+        self.lines.plot_detected_lines(mainPlot, calibration_only=True)
+
+        table = self.lines.build_detected_line_table(calibration_only=True)
+        plot_table_in_axis(tablePlot, table)
+
+        mainPlot.legend()
+
+        widthPlot.plot(self.lambdas, np.array(self.chromatic_psf.table['fwhm']), "r-", lw=2)
+        widthPlot.set_ylabel("FWHM [pix]")
+        widthPlot.set_xlabel(r'$\lambda$ [nm]')
+        widthPlot.grid()
+
+        spectrogram = np.copy(self.spectrogram)
+        res = self.spectrogram_residuals.reshape((-1, self.spectrogram_Nx))
+        std = np.std(res)
+        if spectrogram.shape[0] != res.shape[0]:
+            margin = (spectrogram.shape[0] - res.shape[0]) // 2
+            spectrogram = spectrogram[margin:-margin]
+        plot_image_simple(spectrogramPlot, data=spectrogram, title='Data',
+                          aspect='auto', cax=spectrogramPlotCb, units='ADU/s', cmap='viridis')
+        spectrogramPlot.set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+        spectrogramPlot.grid(False)
+        plot_image_simple(residualsPlot, data=res, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
+                          aspect='auto', cax=residualsPlotCb, units=r'$\sigma$', cmap='bwr')
+        residualsPlot.set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
+        residualsPlot.grid(False)
+
+        # hide the tick labels in the plots which share an x axis
+        for label in itertools.chain(mainPlot.get_xticklabels(), residualsPlot.get_xticklabels(), spectrogramPlot.get_xticklabels()):
+            label.set_visible(False)
+
+        # align y labels
+        for ax in [spectrogramPlot, residualsPlot, mainPlot, widthPlot]:
+            ax.yaxis.set_label_coords(-0.05, 0.5)
+
+        fig.subplots_adjust(hspace=0)
+        if save_as:
+            plt.savefig(save_as)
+        plt.show()
 
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).
@@ -593,7 +702,7 @@ class Spectrum:
             elif extname == "LINES":
                 u.set_enabled_aliases({'flam': u.erg / u.s / u.cm**2 / u.nm,
                                        'reduced': u.dimensionless_unscaled})
-                tab = self.lines.print_detected_lines(amplitude_units=self.units.replace("erg/s/cm$^2$/nm", "flam"), print_table=False)
+                tab = self.lines.build_detected_line_table(amplitude_units=self.units.replace("erg/s/cm$^2$/nm", "flam"))
                 hdus[extname] = fits.table_to_hdu(tab)
             elif extname == "CONFIG":
                 # HIERARCH and CONTINUE not compatible together in FITS headers
@@ -1788,7 +1897,9 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
                 lambda_shifts.append(peak_pos - line.wavelength)
                 snrs.append(snr)
     if ax is not None:
-        lines.plot_detected_lines(ax, print_table=parameters.DEBUG)
+        lines.plot_detected_lines(ax)
+    lines.table = lines.build_detected_line_table()
+    lines.my_logger.debug(f"\n{lines.table}")
     if len(lambda_shifts) > 0:
         global_chisq /= len(lambda_shifts)
         shift = np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2)
