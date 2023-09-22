@@ -572,7 +572,7 @@ class Spectrum:
                 cell.set_text_props(fontstyle='italic', fontfamily='serif', fontsize=11)
                 cell._text.set_horizontalalignment('left')
 
-    def plot_spectrum_summary(self, xlim=None, figsize=(10, 8)):
+    def plot_spectrum_summary(self, xlim=None, figsize=(12, 12), saveAs=''):
         """Plot spectrum with emission and absorption lines.
 
         Parameters
@@ -588,6 +588,8 @@ class Spectrum:
             (default: False).
         force_lines: bool
             Force the over plot of vertical lines for atomic lines if set to True (default: False).
+        saveAs : str, optional
+            Path to save the figure to, if specified.
 
         Examples
         --------
@@ -642,6 +644,8 @@ class Spectrum:
             label.set_visible(False)
 
         fig.subplots_adjust(hspace=0)
+        if saveAs:
+            plt.savefig(saveAs)
         plt.show()
 
     def save_spectrum(self, output_file_name, overwrite=False):
