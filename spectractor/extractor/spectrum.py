@@ -12,6 +12,7 @@ import random
 import string
 import astropy
 import warnings
+import itertools
 warnings.filterwarnings('ignore', category=astropy.io.fits.card.VerifyWarning, append=True)
 
 from spectractor import parameters
@@ -605,18 +606,22 @@ class Spectrum:
                          calibration_lines_only=True)
 
         def generate_axes(fig):
-            gridspec = fig.add_gridspec(nrows=19, ncols=12)
+            tableShrink = 2
+            tableGap = 1
+            gridspec = fig.add_gridspec(nrows=16, ncols=12)
             axes = {}
             axes['A'] = fig.add_subplot(gridspec[0:8, 0:12])
             axes['B'] = fig.add_subplot(gridspec[8:10, 0:12], sharex=axes['A'])
-            axes['C'] = fig.add_subplot(gridspec[11:19, 2:10])
+            axes['C'] = fig.add_subplot(gridspec[10:12, 0:12], sharex=axes['A'])
+            axes['D'] = fig.add_subplot(gridspec[12+tableGap:16, tableShrink:12-tableShrink])
             return axes
 
         fig = plt.figure(figsize=figsize)
         axes = generate_axes(fig)
         mainPlot = axes['A']
-        widthPlot = axes['B']
-        tablePlot = axes['C']
+        residualsPlot = axes['B']
+        widthPlot = axes['C']
+        tablePlot = axes['D']
         self.plot_table_in_axis(tablePlot)
 
         label = f'Order {self.order:d} spectrum\n' \
@@ -639,8 +644,10 @@ class Spectrum:
         widthPlot.grid()
         widthPlot.set_xlabel(r'$\lambda$ [nm]')
 
-        # hide the tick labels in the shared x axis on the main plot
-        for label in mainPlot.get_xticklabels():
+        residualsPlot.plot(self.lambdas, np.array(self.chromatic_psf.table['fwhm']), "b-", lw=2, label='temporary fake plot')
+
+        # hide the tick labels in the plots which share an x axis
+        for label in itertools.chain(mainPlot.get_xticklabels(), residualsPlot.get_xticklabels()):
             label.set_visible(False)
 
         fig.subplots_adjust(hspace=0)
