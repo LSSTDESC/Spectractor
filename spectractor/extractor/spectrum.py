@@ -511,23 +511,16 @@ class Spectrum:
         if parameters.PdfPages:  # pragma: no cover
             parameters.PdfPages.savefig()
 
-    def plot_spectrum_summary(self, xlim=None, figsize=(12, 12), saveAs=''):
+    def plot_spectrum_summary(self, xlim=None, figsize=(12, 12), save_as=''):
         """Plot spectrum with emission and absorption lines.
 
         Parameters
         ----------
-        ax: Axes, optional
-            Axes instance (default: None).
-        label: str
-            Label for the legend (default: '').
         xlim: list, optional
-            List of minimum and maximum abscisses (default: None)
-        live_fit: bool, optional
-            If True the spectrum is plotted in live during the fitting procedures
-            (default: False).
-        force_lines: bool
-            Force the over plot of vertical lines for atomic lines if set to True (default: False).
-        saveAs : str, optional
+            List of minimum and maximum abscisses (default: None).
+        figsize: tuple
+            Figure size (default: (12, 12)).
+        save_as : str, optional
             Path to save the figure to, if specified.
 
         Examples
@@ -588,10 +581,8 @@ class Spectrum:
 
         widthPlot.plot(self.lambdas, np.array(self.chromatic_psf.table['fwhm']), "r-", lw=2)
         widthPlot.set_ylabel("FWHM [pix]")
-        widthPlot.grid()
         widthPlot.set_xlabel(r'$\lambda$ [nm]')
-
-        residualsPlot.plot(self.lambdas, np.array(self.chromatic_psf.table['fwhm']), "b-", lw=2, label='temporary fake plot')
+        widthPlot.grid()
 
         spectrogram = np.copy(self.spectrogram)
         res = self.spectrogram_residuals.reshape((-1, self.spectrogram_Nx))
@@ -617,8 +608,8 @@ class Spectrum:
             ax.yaxis.set_label_coords(-0.05, 0.5)
 
         fig.subplots_adjust(hspace=0)
-        if saveAs:
-            plt.savefig(saveAs)
+        if save_as:
+            plt.savefig(save_as)
         plt.show()
 
     def save_spectrum(self, output_file_name, overwrite=False):

@@ -496,11 +496,11 @@ class Lines:
 # Line catalog
 
 # Hydrogen lines
-HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.04, 0.02], use_for_calibration=True)
+HALPHA = Line(656.3, atmospheric=False, label='$H\\alpha$', label_pos=[-0.02, 0.02], use_for_calibration=True)
 HBETA = Line(486.3, atmospheric=False, label='$H\\beta$', label_pos=[0.007, 0.02], use_for_calibration=True)
 HGAMMA = Line(434.0, atmospheric=False, label='$H\\gamma$', label_pos=[0.007, 0.02], use_for_calibration=False)
 HDELTA = Line(410.2, atmospheric=False, label='$H\\delta$', label_pos=[0.007, 0.02], use_for_calibration=False)
-HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.04, 0.02], use_for_calibration=False)
+HEPSILON = Line(397.0, atmospheric=False, label='$H\\epsilon$', label_pos=[-0.02, 0.02], use_for_calibration=False)
 HYDROGEN_LINES = [HALPHA, HBETA, HGAMMA, HDELTA, HEPSILON]
 
 # Stellar lines (Fraunhofer lines) https://en.wikipedia.org/wiki/Fraunhofer_lines
@@ -520,7 +520,7 @@ STELLAR_LINES = [FE1, FE2, FE3, FE4, CAII1, CAII2, HEI1, MG1, MG2]
 #           label_pos=[0.007, 0.02],
 #           use_for_calibration=True)  # http://onlinelibrary.wiley.com/doi/10.1029/98JD02799/pdf
 O2_1 = Line(760.3, atmospheric=True, label='$O_2$',
-            label_pos=[0.007, 0.02], use_for_calibration=True)  # libradtran paper fig.3
+            label_pos=[-0.02, 0.02], use_for_calibration=True)  # libradtran paper fig.3
 O2_2 = Line(763.1, atmospheric=True, label='$O_2$',
             label_pos=[0.007, 0.02], use_for_calibration=True)  # libradtran paper fig.3
 O2B = Line(687.472, atmospheric=True, label=r'$O_2(B)$',  # 687.472 is a weighted average of the O2B line simulated by Libradtran

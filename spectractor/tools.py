@@ -1970,7 +1970,7 @@ def plot_table_in_axis(ax, table):
         'FWHM': 'FWHM\n(nm)',
         'Amplitude': 'Amplitude',
         'SNR': 'SNR',
-        'Chisq': '${\chi}^2$',  #'$\bm{\chi}^2$',
+        'Chisq': '${\chi}^2$',
         'Eqwidth_mod': 'Eq. Width\n(model)',
         'Eqwidth_data': 'Eq. Width\n(data)',
     }
@@ -1978,6 +1978,7 @@ def plot_table_in_axis(ax, table):
     # Hide the axes
     ax.axis('off')
 
+    table.convert_bytestring_to_unicode()
     df = table.to_pandas()
 
     # Create a table
