@@ -546,15 +546,15 @@ class Spectrum:
         def generate_axes(fig):
             tableShrink = 3
             tableGap = 1
-            gridspec = fig.add_gridspec(nrows=24, ncols=20)
+            gridspec = fig.add_gridspec(nrows=23, ncols=20)
             axes = {}
             axes['A'] = fig.add_subplot(gridspec[0:3, 0:19])
             axes['C'] = fig.add_subplot(gridspec[3:6, 0:19], sharex=axes['A'])
-            axes['B'] = fig.add_subplot(gridspec[7:15, 0:19])
+            axes['B'] = fig.add_subplot(gridspec[6:14, 0:19])
             axes['CA'] = fig.add_subplot(gridspec[0:3, 19:20])
             axes['CC'] = fig.add_subplot(gridspec[3:6, 19:20])
-            axes['D'] = fig.add_subplot(gridspec[15:17, 0:19], sharex=axes['B'])
-            axes['E'] = fig.add_subplot(gridspec[17+tableGap:24, tableShrink:19-tableShrink])
+            axes['D'] = fig.add_subplot(gridspec[14:16, 0:19], sharex=axes['B'])
+            axes['E'] = fig.add_subplot(gridspec[16+tableGap:23, tableShrink:19-tableShrink])
             return axes
 
         fig = plt.figure(figsize=figsize)
@@ -602,14 +602,21 @@ class Spectrum:
         plot_image_simple(spectrogramPlot, data=spectrogram, title='Data',
                           aspect='auto', cax=spectrogramPlotCb, units='ADU/s', cmap='viridis')
         spectrogramPlot.set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+        spectrogramPlot.grid(False)
         plot_image_simple(residualsPlot, data=res, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
                           aspect='auto', cax=residualsPlotCb, units=r'$\sigma$', cmap='bwr')
         residualsPlot.set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
+        residualsPlot.grid(False)
 
         # hide the tick labels in the plots which share an x axis
-        for label in itertools.chain(mainPlot.get_xticklabels(), residualsPlot.get_xticklabels()):
+        for label in itertools.chain(mainPlot.get_xticklabels(), residualsPlot.get_xticklabels(), spectrogramPlot.get_xticklabels()):
             label.set_visible(False)
 
+        # align y labels
+        for ax in [spectrogramPlot, residualsPlot, mainPlot, widthPlot]:
+            ax.yaxis.set_label_coords(-0.05, 0.5)
+
+        fig.subplots_adjust(hspace=0)
         if saveAs:
             plt.savefig(saveAs)
         plt.show()

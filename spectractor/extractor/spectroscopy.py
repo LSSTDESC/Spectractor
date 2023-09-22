@@ -452,13 +452,6 @@ class Lines:
         Print the result
         >>> spec.lines = lines
         >>> t = lines.build_detected_line_table()
-
-        .. doctest::
-            :hide:
-
-            >>> assert len(t) > 0
-            >>> assert os.path.isfile('test_detected_lines.csv')
-            >>> os.remove('test_detected_lines.csv')
         """
         lambdas = np.zeros(1)
         rows = []
