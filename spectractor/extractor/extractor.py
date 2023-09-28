@@ -199,6 +199,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.reg = float(spectrum.header['PSF_REG'])
         if self.reg < 0:
             self.reg = parameters.PSF_FIT_REG_PARAM
+        self.trace_r = self.Nx / np.min(self.fwhm_priors)  # spectrophotometric uncertainty principle
         self.my_logger.info(f"\n\tFull forward model fitting with regularisation parameter r={self.reg}.")
         self.Q = np.zeros((self.Nx, self.Nx), dtype="float32")
         self.Q_dot_A0 = np.zeros(self.Nx, dtype="float32")
@@ -846,9 +847,10 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
             my_logger.info("\n\tStart regularization parameter estimation...")
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
-            w_reg.run_regularisation()
+            w_reg.run_regularisation(Ndof=w.trace_r)
             w.opt_reg = w_reg.opt_reg
             w.reg = np.copy(w_reg.opt_reg)
+            w.trace_r = np.trace(w_reg.resolution)
             w.simulate(*w.params.values)
             if np.trace(w.amplitude_cov_matrix) < np.trace(w.amplitude_priors_cov_matrix):
                 w.my_logger.warning(
@@ -863,7 +865,7 @@ def run_ffm_minimisation(w, method="newton", niter=2):
                 w.amplitude_params_err = np.array(
                     [np.sqrt(w.amplitude_cov_matrix[x, x]) for x in range(w.Nx)])
             w.spectrum.header['PSF_REG'] = w.opt_reg
-            w.spectrum.header['TRACE_R'] = np.trace(w_reg.resolution)
+            w.spectrum.header['TRACE_R'] = w.trace_r
 
         if parameters.DEBUG and parameters.DISPLAY:
             w.plot_fit()

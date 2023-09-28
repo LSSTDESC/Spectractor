@@ -1700,7 +1700,7 @@ class ChromaticPSF:
             raise ValueError(f"mode argument must be '1D' or '2D'. Got {mode=}.")
         if amplitude_priors_method == "psf1d":
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
-            w_reg.run_regularisation()
+            w_reg.run_regularisation(Ndof=w.trace_r)
             w.reg = np.copy(w_reg.opt_reg)
             w.trace_r = np.trace(w_reg.resolution)
             self.opt_reg = w_reg.opt_reg
@@ -1840,7 +1840,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.amplitude_priors_method = amplitude_priors_method
         self.fwhm_priors = np.copy(self.chromatic_psf.table['fwhm'])
         self.reg = parameters.PSF_FIT_REG_PARAM
-        self.trace_r = -1
+        self.trace_r = self.Nx / np.min(self.fwhm_priors)  # spectrophotometric uncertainty principle
         self.Q = np.zeros((self.Nx, self.Nx))
         self.Q_dot_A0 = np.zeros(self.Nx)
         if amplitude_priors_method not in self.amplitude_priors_list:

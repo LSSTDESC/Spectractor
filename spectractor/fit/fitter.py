@@ -1680,10 +1680,10 @@ class RegFitWorkspace(FitWorkspace):
 
     def print_regularisation_summary(self):
         self.my_logger.info(f"\n\tOptimal regularisation parameter: {self.opt_reg}"
-                            f"\n\tTr(R) = {np.trace(self.resolution)}"
+                            f"\n\tTr(R) = N_dof = {np.trace(self.resolution)}"
                             f"\n\tN_params = {len(self.w.amplitude_params)}"
                             f"\n\tN_data = {self.w.data.size - len(self.w.mask) - len(self.w.outliers)}"
-                            f" (without mask and outliers)")
+                            f" (excluding masked pixels and outliers)")
 
     def simulate(self, log10_r):
         reg = 10 ** log10_r
@@ -1713,27 +1713,16 @@ class RegFitWorkspace(FitWorkspace):
 
     def plot_fit(self):
         log10_opt_reg = self.params.values[0]
-        opt_reg = 10 ** log10_opt_reg
         regs = 10 ** np.linspace(min(-7, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
         Gs = []
         chisqs = []
         resolutions = []
-        x = np.arange(len(self.w.amplitude_priors))
         for r in regs:
             self.simulate(np.log10(r))
-            if parameters.DISPLAY and False:  # pragma: no cover
-                fig = plt.figure()
-                plt.errorbar(x, self.w.amplitude_params, yerr=[np.sqrt(self.w.amplitude_cov_matrix[i, i]) for i in x],
-                             label=f"fit r={r:.2g}")
-                plt.plot(x, self.w.amplitude_priors, label="prior")
-                plt.grid()
-                plt.legend()
-                plt.draw()
-                plt.pause(1e-8)
-                plt.close(fig)
             Gs.append(self.G)
             chisqs.append(self.chisquare)
             resolutions.append(np.trace(self.resolution))
+        opt_reg = 10 ** log10_opt_reg
         fig, ax = plt.subplots(3, 1, figsize=(7, 5), sharex="all")
         ax[0].plot(regs, Gs)
         ax[0].axvline(opt_reg, color="k")
@@ -1771,12 +1760,49 @@ class RegFitWorkspace(FitWorkspace):
         if parameters.DISPLAY:
             plt.show()
 
-    def run_regularisation(self):
+    def run_regularisation(self, Ndof=None):
         run_minimisation(self, method="minimize", ftol=1e-4, xtol=1e-2, verbose=self.verbose, epsilon=[1e-1],
                          minimizer_method="Nelder-Mead")
         self.opt_reg = 10 ** self.params.values[0]
         self.simulate(np.log10(self.opt_reg))
         self.print_regularisation_summary()
+        if Ndof is not None:
+            r_Ndof = self.set_regularisation_with_Ndof(Ndof)
+            if self.opt_reg < 1e-3 * r_Ndof or self.opt_reg > 1e3 * r_Ndof:
+                self.my_logger.warning(f"\n\tRegularisation parameter r minimizing G(r) is 3 orders of magnitude away "
+                                       f"from optimal regularisation parameter {r_Ndof} using {Ndof=}. "
+                                       f"Probably that the model does not fit well data at this stage. "
+                                       f"Switch to optimal parameter.")
+                self.opt_reg = r_Ndof
+                self.simulate(np.log10(self.opt_reg))
+                self.print_regularisation_summary()
+
+    def set_regularisation_with_Ndof(self, Ndof):
+        """Find regularisation parameter $r$ that checks $Tr(R) = Ndof$.
+
+        Parameters
+        ----------
+        Ndof: float
+            Number of degrees of freedom, ie $Tr(R)$.
+
+        Returns
+        -------
+        r: float
+            Regularisation parameter.
+
+        """
+        log10_opt_reg = self.params.values[0]
+        regs = 10 ** np.linspace(min(-7, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
+        Gs = np.zeros_like(regs)
+        chisqs = np.zeros_like(regs)
+        resolutions = np.zeros_like(regs)
+        for ir, r in enumerate(regs):
+            self.simulate(np.log10(r))
+            Gs[ir] = self.G
+            chisqs[ir] = self.chisquare
+            resolutions[ir] = np.trace(self.resolution)
+        Ndof_index = np.argmin(np.abs(resolutions - Ndof))
+        return regs[Ndof_index]
 
 
 if __name__ == "__main__":
