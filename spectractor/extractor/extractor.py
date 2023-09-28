@@ -100,6 +100,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # This set of fixed parameters was determined so that the reconstructed spectrum has a ZERO bias
         # with respect to the true spectrum injected in the simulation
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
+        for order in self.diffraction_orders:
+            params.fixed[params.get_index(f"A{order}")] = True
+        if "A2" in params.labels:
+            params.fixed[params.get_index("A2")] = (not spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in spectrum.header))
         params.fixed[params.get_index("A1")] = True  # A1
         params.fixed[params.get_index("A2")] = (not spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in spectrum.header))
         params.fixed[params.get_index("A3")] = True  # A3
