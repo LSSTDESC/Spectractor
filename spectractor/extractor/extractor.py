@@ -104,9 +104,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             params.fixed[params.get_index(f"A{order}")] = True
         if "A2" in params.labels:
             params.fixed[params.get_index("A2")] = (not spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in spectrum.header))
-        params.fixed[params.get_index("A1")] = True  # A1
-        params.fixed[params.get_index("A2")] = (not spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in spectrum.header))
-        params.fixed[params.get_index("A3")] = True  # A3
         params.fixed[params.get_index("D_CCD [mm]")] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_spectrum
         params.fixed[params.get_index("shift_x [pix]")] = True  # delta x: if False, extracted spectrum is biased compared with truth
         params.fixed[params.get_index("shift_y [pix]")] = True  # delta y
