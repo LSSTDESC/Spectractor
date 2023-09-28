@@ -1260,18 +1260,36 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             raise TypeError(f"Type of fit_workspace.W is {type(W)}. It must be a np.ndarray.")
         # Jacobian
         J = fit_workspace.jacobian(tmp_params, epsilon, model_input=[tmp_lambdas, tmp_model, tmp_model_err])
-        # remove parameters with unexpected null Jacobian vectors
+        # remove parameters with unexpected null Jacobian vectors or that are degenerated
+        J_vectors = [np.array(J[ip]).ravel() for ip in range(J.shape[0])]
+        J_norms = [np.linalg.norm(J_vectors[ip]) for ip in range(J.shape[0])]
         for ip in range(J.shape[0]):
             if ip not in ipar:
                 continue
-            if np.allclose(np.array(J[ip]).ravel(), 0, atol=1e-20):
+            # check for null vectors
+            if J_norms[ip] < 1e-20:
                 ipar = np.delete(ipar, list(ipar).index(ip))
                 fit_workspace.params.fixed[ip] = True
                 my_logger.warning(
                     f"\n\tStep {i}: {fit_workspace.params.labels[ip]} has a null Jacobian; parameter is fixed "
                     f"at its last known current value ({tmp_params[ip]}).")
-        # remove fixed parameters
+                continue
+            # check for degeneracies using Cauchy-Schwartz inequality; fix the second parameter
+            for jp in range(ip, J.shape[0]):
+                if ip == jp or jp not in ipar:
+                    continue
+                inner = np.abs(J_vectors[ip] @  J_vectors[jp])
+                if np.abs(inner - J_norms[ip] * J_norms[jp]) < 1e-8 * inner:
+                    ipar = np.delete(ipar, list(ipar).index(jp))
+                    fit_workspace.params.fixed[jp] = True
+                    my_logger.warning(
+                        f"\n\tStep {i}: {fit_workspace.params.labels[ip]} is degenerated with {fit_workspace.params.labels[jp]}; "
+                        f"parameter {fit_workspace.params.labels[jp]} is fixed at its last known current value ({tmp_params[jp]}).")
+                    continue
+        # remove fixed and degenerated parameters; then transpose
         J = J[ipar].T
+
+        # compute J.T @ W @ J matrix and invert it
         if W.ndim == 1 and W.dtype != object:
             JT_W = J.T * W
             JT_W_J = JT_W @ J
@@ -1300,6 +1318,8 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             JT_W_R0 = JT_W @ residuals
         else:
             JT_W_R0 = JT_W @ np.concatenate(residuals).ravel()
+
+        # Gauss-Newton step:
         dparams = - inv_JT_W_J @ JT_W_R0
         new_params = np.copy(tmp_params)
         new_params[ipar] = tmp_params[ipar] + dparams
