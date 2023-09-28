@@ -418,8 +418,8 @@ class FitParameters:
         icov = 0
         for ip in range(self.ndim):
             if ip in ifree:
-                txt += "%s: %s +%s -%s" % formatting_numbers(self.values[ip], np.sqrt(self.cov[icov, icov]),
-                                                                 np.sqrt(self.cov[icov, icov]),
+                txt += "%s: %s +%s -%s" % formatting_numbers(self.values[ip], np.sqrt(np.abs(self.cov[icov, icov])),
+                                                                 np.sqrt(np.abs(self.cov[icov, icov])),
                                                                  label=self.labels[ip])
                 txt += f" bounds={self.bounds[ip]}\n\t"
                 icov += 1
