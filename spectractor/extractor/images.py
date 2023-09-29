@@ -1143,7 +1143,7 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
         psf.params.values[1] = avX
         psf.params.values[2] = avY
     mean_prior = 10  # in pixels
-    psf.params.bounds[:4] = [[0.1 * total_flux, 4 * total_flux],
+    psf.params.bounds[:4] = [[0.1 * total_flux, 10 * total_flux],
                              [avX - mean_prior, avX + mean_prior],
                              [avY - mean_prior, avY + mean_prior],
                              [0.5*min(sigX, sigY), min(NX, NY)]]
