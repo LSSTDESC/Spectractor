@@ -1702,6 +1702,17 @@ class ChromaticPSF:
             w = ChromaticPSFFitWorkspace(self, data, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
                                          amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                          live_fit=live_fit, analytical=analytical)
+            # first, fit the transverse position
+            w.my_logger.info("\n\tFit y_c parameters...")
+            fixed_default = np.copy(w.params.fixed)
+            w.params.fixed = [True] * w.params.ndim
+            for k in range(w.params.ndim):
+                if "y_c" in w.params.labels[k]:
+                    w.params.fixed[k] = False  # y_c_k
+            run_minimisation(w, method="newton", ftol=100 / (w.Nx * w.Ny), xtol=1e-3, niter=10, verbose=verbose, with_line_search=False)
+            # then fit all parameters together
+            w.my_logger.info("\n\tFit all ChromaticPSF parameters...")
+            w.params.fixed = fixed_default
             run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, verbose=verbose, with_line_search=False)
         else:
             raise ValueError(f"mode argument must be '1D' or '2D'. Got {mode=}.")
