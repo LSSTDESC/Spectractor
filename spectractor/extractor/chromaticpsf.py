@@ -12,7 +12,7 @@ from scipy import sparse
 
 from astropy.table import Table
 
-from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm)
+from spectractor.tools import (rescale_x_to_legendre, plot_image_simple, compute_fwhm)
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss, Moffat
 from spectractor import parameters
@@ -1348,8 +1348,14 @@ class ChromaticPSF:
             PSF_truth[:, 1] = np.arange(self.Nx)  # replace x_c
         all_pixels = np.arange(self.profile_params.shape[0])
         for i, name in enumerate(self.psf.params.labels):
-            fit, cov, model = fit_poly1d(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], order=self.degrees[name])
-            PSF_models.append(np.polyval(fit, all_pixels))
+            legs = [self.params.values[k] for k in range(self.params.ndim) if name in self.params.labels[k]]
+            pval = np.polynomial.legendre.leg2poly(legs)[::-1]
+            delta = 0
+            if name == 'x_c':
+                delta = self.x0
+            if name == 'y_c':
+                delta = self.y0
+            PSF_models.append(np.polyval(pval, rescale_x_to_legendre(all_pixels)) + delta)
         for i, name in enumerate(self.psf.params.labels):
             p = ax.plot(all_pixels, self.profile_params[:, i], marker='+', linestyle='none')
             ax.plot(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], label=name,
@@ -1570,7 +1576,8 @@ class ChromaticPSF:
                 signal -= np.mean(signal[bgd_index])
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
-        self.params.values = self.from_profile_params_to_poly_params(self.profile_params, indices=self.fitted_pixels)
+        selected_pixels = self.profile_params[:, 0] > 0.1 * np.max(self.profile_params[:, 0])  # keep only brightest pixels
+        self.params.values = self.from_profile_params_to_poly_params(self.profile_params, indices=selected_pixels)
         self.from_profile_params_to_shape_params(self.profile_params)
         self.cov_matrix = np.diag(1 / np.array(self.table['flux_err']) ** 2)
         psf.params.bounds = initial_bounds
