@@ -14,6 +14,9 @@ from spectractor.config import set_logger
 from spectractor.tools import (formatting_numbers, compute_correlation_matrix, plot_correlation_matrix_simple,
                                NumpyArrayEncoder)
 
+from lsst.utils.threads import disable_implicit_threading
+disable_implicit_threading()
+
 
 @dataclass()
 class FitParameter:
