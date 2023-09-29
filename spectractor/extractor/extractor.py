@@ -1325,8 +1325,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     method = "noprior"
     mode = "1D"
 
-    my_logger.info('\n\t  ======================= ChromaticPSF polynomial fit  =============================')
-
+    my_logger.info('\n\t  ======================= ChromaticPSF1D polynomial fit  =============================')
     my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
                    f'mode={mode} and amplitude_priors_method={method}...')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err,
@@ -1528,6 +1527,8 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
                    f'mode={mode} and amplitude_priors_method={method}...')
     data = spectrum.spectrogram
     err = spectrum.spectrogram_err
+
+    my_logger.info('\n\t  ======================= ChromaticPSF2D polynomial fit  =============================')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False,
                             amplitude_priors_method=method, mode=mode, verbose=parameters.VERBOSE, analytical=True)
 
