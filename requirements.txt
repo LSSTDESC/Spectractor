@@ -20,4 +20,4 @@ deprecated
 pyyaml
 nose
 getCalspec>=2.0.0
-lsst.utils
+lsst_utils
