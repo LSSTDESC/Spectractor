@@ -918,11 +918,8 @@ class FitWorkspace:
                         f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
                         f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
             else:
-                W = self.W.toarray()
-                W[:, bad_indices] = 0
-                W[bad_indices, :] = 0
-                rows, cols = self.W.nonzero()
-                self.W = scipy.sparse.csr_matrix((W[rows, cols], (rows, cols)), dtype=self.W.dtype, shape=self.W.shape)
+                self.W[:, bad_indices] = 0
+                self.W[bad_indices, :] = 0
                 self.W.eliminate_zeros()
 
     def compute_W_with_model_error(self, model_err):
