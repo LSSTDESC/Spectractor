@@ -865,7 +865,7 @@ class FitWorkspace:
 
         Use sparse matrix:
 
-        >>> w.W = scipy.sparse.diags(np.ones(3)).tocsr()
+        >>> w.W = scipy.sparse.diags(np.ones(3))
         >>> w.W.toarray()
         array([[1., 0., 0.],
                [0., 1., 0.],
@@ -918,9 +918,12 @@ class FitWorkspace:
                         f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
                         f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
             else:
-                self.W[:, bad_indices] = 0
-                self.W[bad_indices, :] = 0
-                self.W.eliminate_zeros()
+                format = self.W.getformat()
+                W = self.W.tocsr()
+                W[:, bad_indices] = 0
+                W[bad_indices, :] = 0
+                W.eliminate_zeros()
+                self.W = W.asformat(format=format)
 
     def compute_W_with_model_error(self, model_err):
         """Propagate model uncertainties to weight matrix W.
