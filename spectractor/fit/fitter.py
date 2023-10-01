@@ -871,6 +871,8 @@ class FitWorkspace:
                [0., 1., 0.],
                [0., 0., 1.]])
         >>> w.prepare_weight_matrices()
+        >>> w.W.getformat()
+        'dia'
         >>> w.W.toarray()
         array([[1., 0., 0.],
                [0., 1., 0.],
