@@ -280,15 +280,15 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             profile_params[:, 0] = 1
             profile_params[:, 1] = dispersion_law.real + self.spectrum.spectrogram_x0
             profile_params[:, 2] += dispersion_law.imag - self.bgd_width
-            psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params,
-                                                                  fwhmx_clip=fwhmx_clip,
-                                                                  fwhmy_clip=fwhmy_clip, dtype="float32")
+            psf_cube_masked = self.spectrum.chromatic_psf.build_psf_cube_masked(self.pixels, profile_params,
+                                                                                fwhmx_clip=fwhmx_clip,
+                                                                                fwhmy_clip=fwhmy_clip)
 
-            self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.get_psf_cube_masked(psf_cube, convolve=True)
+            self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.convolve_psf_cube_masked(psf_cube_masked)
             # make rectangular mask per wavelength
             self.boundaries[order], self.psf_cubes_masked[order] = self.spectrum.chromatic_psf.get_boundaries(self.psf_cubes_masked[order])
             self.psf_cube_sparse_indices[order], self.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(self.psf_cubes_masked[order])
-        mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube.shape[0], psf_cube[0].size), axis=0) == 0
+        mask = np.sum(self.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
         self.sqrtW = sparse.diags(np.sqrt(self.W), format="dia", dtype="float32")
