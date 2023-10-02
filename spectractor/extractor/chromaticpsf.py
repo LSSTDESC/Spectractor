@@ -1642,7 +1642,10 @@ class ChromaticPSF:
                 signal -= np.mean(signal[bgd_index])
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
-        selected_pixels = self.profile_params[:, 0] > 0.1 * np.max(self.profile_params[:, 0])  # keep only brightest pixels
+        # keep only brightest transverse profiles
+        selected_pixels = self.profile_params[:, 0] > 0.1 * np.max(self.profile_params[:, 0])
+        # then keep only profiles with first shape parameter (index=3) are not too deviant from its median value
+        selected_pixels = selected_pixels & (np.abs(self.profile_params[:, 3]) < 5 * np.median(self.profile_params[:, 3]))
         self.params.values = self.from_profile_params_to_poly_params(self.profile_params, indices=selected_pixels)
         self.from_profile_params_to_shape_params(self.profile_params)
         self.cov_matrix = np.diag(1 / np.array(self.table['flux_err']) ** 2)
