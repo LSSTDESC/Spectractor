@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from matplotlib import colormaps
 from matplotlib import colors
 from matplotlib.ticker import MaxNLocator
@@ -38,7 +39,9 @@ def _build_sim_sample(spectra, aerosols=0.05, ozone=300, pwv=5, angstrom_exponen
 
     Examples
     --------
-    >>> _build_sim_sample([Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")])
+    >>> spectra = _build_sim_sample([Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")])
+    >>> len(spectra)
+    1
     """
     sim_spectra = []
     for spec in spectra:

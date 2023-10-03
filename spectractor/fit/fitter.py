@@ -986,8 +986,6 @@ class FitWorkspace:
                [0.  , 0.  , 0.  ]])
 
         """
-        if model_err.ndim > 1:
-            raise ValueError(f"model_err must be a flat 1D array. Got {model_err.shape=}.")
         if np.any(model_err > 0):
             if not scipy.sparse.issparse(self.W):
                 zeros = self.W == 0
