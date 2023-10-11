@@ -103,7 +103,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 6, 9])
         self.atm_params_indices = np.array([params.get_index(label) for label in ["VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]"]])
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = "A2_T" not in self.spectrum.header  # not self.spectrum.disperser.flat_ratio_order_2over1
+        if "A2" in params.labels:
+            params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = "A2_T" not in self.spectrum.header
+        if "A3" in params.labels:
+            params.fixed[params.get_index(f"A{self.diffraction_orders[2]}")] = "A3_T" not in self.spectrum.header
         params.fixed[params.get_index(r"shift_x [pix]")] = True  # Delta x
         params.fixed[params.get_index(r"shift_y [pix]")] = True  # Delta y
         params.fixed[params.get_index(r"angle [deg]")] = True  # angle
