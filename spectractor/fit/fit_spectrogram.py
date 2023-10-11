@@ -103,7 +103,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 6, 9])
         self.atm_params_indices = np.array([params.get_index(label) for label in ["VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]"]])
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
-        params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = "A2_T" not in self.spectrum.header  # not self.spectrum.disperser.flat_ratio_order_2over1
+        if "A2" in params.labels:
+            params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = "A2_T" not in self.spectrum.header
+        if "A3" in params.labels:
+            params.fixed[params.get_index(f"A{self.diffraction_orders[2]}")] = "A3_T" not in self.spectrum.header
         params.fixed[params.get_index(r"shift_x [pix]")] = True  # Delta x
         params.fixed[params.get_index(r"shift_y [pix]")] = True  # Delta y
         params.fixed[params.get_index(r"angle [deg]")] = True  # angle
@@ -207,14 +210,14 @@ class SpectrogramFitWorkspace(FitWorkspace):
             profile_params[:, 0] = 1
             profile_params[:, 1] = dispersion_law.real + self.simulation.r0.real
             profile_params[:, 2] += dispersion_law.imag # - self.bgd_width
-            psf_cube = self.spectrum.chromatic_psf.build_psf_cube(self.simulation.pixels, profile_params,
-                                                                  fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                                  fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
-            psf_cube_masked = self.spectrum.chromatic_psf.get_psf_cube_masked(psf_cube, convolve=True)
+            psf_cube_masked = self.spectrum.chromatic_psf.build_psf_cube_masked(self.simulation.pixels, profile_params,
+                                                                                fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                                                fwhmy_clip=parameters.PSF_FWHM_CLIP)
+            psf_cube_masked = self.spectrum.chromatic_psf.convolve_psf_cube_masked(psf_cube_masked)
             # make rectangular mask per wavelength
             self.simulation.boundaries[order], self.simulation.psf_cubes_masked[order] = self.spectrum.chromatic_psf.get_boundaries(psf_cube_masked)
             self.simulation.psf_cube_sparse_indices[order], self.simulation.M_sparse_indices[order] = self.spectrum.chromatic_psf.get_sparse_indices(psf_cube_masked)
-        mask = np.sum(self.simulation.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube.shape[0], self.simulation.pixels[0].size), axis=0) == 0
+        mask = np.sum(self.simulation.psf_cubes_masked[self.diffraction_orders[0]].reshape(psf_cube_masked.shape[0], self.simulation.pixels[0].size), axis=0) == 0
         self.W = np.copy(self.W_before_mask)
         self.W[mask] = 0
         self.mask = list(np.where(mask)[0])

@@ -12,7 +12,7 @@ from scipy import sparse
 
 from astropy.table import Table
 
-from spectractor.tools import (fit_poly1d, plot_image_simple, compute_fwhm)
+from spectractor.tools import (rescale_x_to_legendre, plot_image_simple, compute_fwhm)
 from spectractor.extractor.background import extract_spectrogram_background_sextractor
 from spectractor.extractor.psf import PSF, PSFFitWorkspace, MoffatGauss, Moffat
 from spectractor import parameters
@@ -493,16 +493,84 @@ class ChromaticPSF:
                 psf_cube[x, ymin:ymax, x] = self.psf.evaluate(pixels[ymin:ymax], values=profile_params[x, :])
         return psf_cube
 
-    @staticmethod
-    def get_psf_cube_masked(psf_cube, convolve=True):
-        """Compute the ChromaticPSF cube of boolean values where intensity is positive.
+    def build_psf_cube_masked(self, pixels, profile_params, fwhmx_clip=parameters.PSF_FWHM_CLIP,
+                              fwhmy_clip=parameters.PSF_FWHM_CLIP):
+        """Build a boolean cube, with one slice per wavelength evaluation which contains booleans where PSF evaluation is non zero.
 
         Parameters
         ----------
-        psf_cube: np.ndarray
+        pixels: np.ndarray
+            Array of pixels to evaluate ChromaticPSF.
+        profile_params: array_like
+            ChromaticPSF profile parameters.
+        fwhmx_clip: int, optional
+            Clip PSF evaluation outside fwhmx*FWHM along x axis (default: parameters.PSF_FWHM_CLIP).
+        fwhmy_clip: int, optional
+            Clip PSF evaluation outside fwhmy*FWHM along y axis (default: parameters.PSF_FWHM_CLIP).
+
+        Returns
+        -------
+        psf_cube_masked: np.ndarray
+            Cube of chromatic masked PSF evaluations, each slice being a PSF for a given wavelength.
+
+        Examples
+        --------
+
+        >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
+        >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
+        >>> profile_params[:, 1] = np.arange(s.Nx)
+        >>> psf_cube = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube.shape
+        (100, 20, 100)
+        >>> plt.imshow(psf_cube[20], origin="lower"); plt.show()  # doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at ...>
+        >>> plt.imshow(psf_cube[80], origin="lower"); plt.show()  # doctest: +ELLIPSIS
+        <matplotlib.image.AxesImage object at ...>
+
+        .. doctest::
+            :hide:
+
+            >>> assert psf_cube.shape == (s.Nx, s.Ny, s.Nx)
+            >>> np.argmax(np.sum(psf_cube[20], axis=0))
+            10
+            >>> np.argmax(np.sum(psf_cube[80], axis=0))
+            70
+
+        """
+        if pixels.ndim == 3:
+            mode = "2D"
+            Ny, Nx = pixels[0].shape
+        elif pixels.ndim == 1:
+            mode = "1D"
+            Ny, Nx = pixels.size, profile_params.shape[0]
+        else:
+            raise ValueError(f"pixels argument must have shape (2, Nx, Ny) or (Ny). Got {pixels.shape=}.")
+        psf_cube_masked = np.zeros((len(profile_params), Ny, Nx), dtype=bool)
+        fwhms = self.table["fwhm"]
+        for x in range(len(profile_params)):
+            xc, yc = profile_params[x, 1:3]
+            if xc < - fwhmx_clip * fwhms[x]:
+                continue
+            if xc > Nx + fwhmx_clip * fwhms[x]:
+                break
+            xmin = max(0, int(xc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
+            xmax = min(Nx, int(xc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmx_clip * fwhms[x])))
+            ymin = max(0, int(yc - max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
+            ymax = min(Ny, int(yc + max(1*parameters.PIXWIDTH_SIGNAL, fwhmy_clip * fwhms[x])))
+            if mode == "2D":
+                psf_cube_masked[x, ymin:ymax, xmin:xmax] = self.psf.evaluate(pixels[:, ymin:ymax, xmin:xmax], values=profile_params[x, :]) > 0
+            else:
+                psf_cube_masked[x, ymin:ymax, x] = self.psf.evaluate(pixels[ymin:ymax], values=profile_params[x, :]) > 0
+        return psf_cube_masked
+
+    @staticmethod
+    def convolve_psf_cube_masked(psf_cube_masked):
+        """Convolve the ChromaticPSF cube of boolean values to enlarge a bit the mask.
+
+        Parameters
+        ----------
+        psf_cube_masked: np.ndarray
             A ChromaticPSF cube.
-        convolve: bool
-            If True, the region with True values is enlarged a bit via a convolution product (default: True).
 
         Returns
         -------
@@ -515,8 +583,8 @@ class ChromaticPSF:
         >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
         >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 1] = np.arange(s.Nx)
-        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
-        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> psf_cube_masked.dtype
         dtype('bool')
         >>> psf_cube_masked.shape
@@ -534,16 +602,14 @@ class ChromaticPSF:
             >>> assert np.sum(psf_cube_masked[80], axis=0)[80]
 
         """
-        wl_size = psf_cube.shape[0]
-        psf_cube_masked = psf_cube > 0
-        if convolve:
-            flat_spectrogram = np.sum(psf_cube_masked.reshape(wl_size, psf_cube[0].size), axis=0)
-            mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
-            mask = mask.reshape(psf_cube[0].shape)
-            kernel = np.ones((3, psf_cube.shape[2]//10))  # enlarge a bit more the edges of the mask
-            mask = convolve2d(mask, kernel, 'same').astype(bool)
-            for k in range(wl_size):
-                psf_cube_masked[k] *= ~mask
+        wl_size = psf_cube_masked.shape[0]
+        flat_spectrogram = np.sum(psf_cube_masked.reshape(wl_size, psf_cube_masked[0].size), axis=0)
+        mask = flat_spectrogram == 0  # < 1e-2 * np.max(flat_spectrogram)
+        mask = mask.reshape(psf_cube_masked[0].shape)
+        kernel = np.ones((3, psf_cube_masked.shape[2]//10))  # enlarge a bit more the edges of the mask
+        mask = convolve2d(mask, kernel, 'same').astype(bool)
+        for k in range(wl_size):
+            psf_cube_masked[k] *= ~mask
         return psf_cube_masked
 
     @staticmethod
@@ -571,8 +637,8 @@ class ChromaticPSF:
         >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
         >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 1] = np.arange(s.Nx)
-        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
-        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
         >>> boundaries["xmin"].shape
         (100,)
@@ -634,8 +700,8 @@ class ChromaticPSF:
         >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
         >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 1] = np.arange(s.Nx)
-        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
-        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
         >>> M_sparse_indices.shape
         (72000,)
@@ -683,8 +749,8 @@ class ChromaticPSF:
 
         2D case
 
-        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
-        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
         >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
         >>> M = s.build_sparse_M(s.set_pixels(mode="2D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
@@ -702,8 +768,8 @@ class ChromaticPSF:
 
         1D case
 
-        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="1D"), profile_params)
-        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="1D"), profile_params)
+        >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
         >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
         >>> M = s.build_sparse_M(s.set_pixels(mode="1D"), profile_params, M_sparse_indices, boundaries, dtype="float32")
@@ -781,8 +847,8 @@ class ChromaticPSF:
         >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 0] = np.ones(s.Nx)  # normalized PSF
         >>> profile_params[:, 1] = np.arange(s.Nx)  # PSF x_c positions
-        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
-        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
         >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
         >>> s.params.fixed[s.Nx:s.Nx+s.deg+1] = [True] * (s.deg+1)  # fix all x_c parameters
@@ -872,8 +938,8 @@ class ChromaticPSF:
         >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 0] = np.ones(s.Nx)  # normalized PSF
         >>> profile_params[:, 1] = np.arange(s.Nx)  # PSF x_c positions
-        >>> psf_cube = s.build_psf_cube(s.set_pixels(mode="2D"), profile_params)
-        >>> psf_cube_masked = s.get_psf_cube_masked(psf_cube, convolve=True)
+        >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked = s.convolve_psf_cube_masked(psf_cube_masked)
         >>> boundaries, psf_cube_masked = s.get_boundaries(psf_cube_masked)
         >>> psf_cube_sparse_indices, M_sparse_indices = s.get_sparse_indices(psf_cube_masked)
         >>> s.params.fixed[s.Nx:s.Nx+s.deg+1] = [True] * (s.deg+1)  # fix all x_c parameters
@@ -1348,8 +1414,14 @@ class ChromaticPSF:
             PSF_truth[:, 1] = np.arange(self.Nx)  # replace x_c
         all_pixels = np.arange(self.profile_params.shape[0])
         for i, name in enumerate(self.psf.params.labels):
-            fit, cov, model = fit_poly1d(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], order=self.degrees[name])
-            PSF_models.append(np.polyval(fit, all_pixels))
+            legs = [self.params.values[k] for k in range(self.params.ndim) if name in self.params.labels[k]]
+            pval = np.polynomial.legendre.leg2poly(legs)[::-1]
+            delta = 0
+            if name == 'x_c':
+                delta = self.x0
+            if name == 'y_c':
+                delta = self.y0
+            PSF_models.append(np.polyval(pval, rescale_x_to_legendre(all_pixels)) + delta)
         for i, name in enumerate(self.psf.params.labels):
             p = ax.plot(all_pixels, self.profile_params[:, i], marker='+', linestyle='none')
             ax.plot(all_pixels[self.fitted_pixels], self.profile_params[self.fitted_pixels, i], label=name,
@@ -1570,7 +1642,11 @@ class ChromaticPSF:
                 signal -= np.mean(signal[bgd_index])
             self.table['flux_err'][x] = np.sqrt(np.sum(err[:, x] ** 2))
             self.table['flux_sum'][x] = np.sum(signal)
-        self.params.values = self.from_profile_params_to_poly_params(self.profile_params, indices=self.fitted_pixels)
+        # keep only brightest transverse profiles
+        selected_pixels = self.profile_params[:, 0] > 0.1 * np.max(self.profile_params[:, 0])
+        # then keep only profiles with first shape parameter (index=3) are not too deviant from its median value
+        selected_pixels = selected_pixels & (np.abs(self.profile_params[:, 3]) < 5 * np.median(self.profile_params[:, 3]))
+        self.params.values = self.from_profile_params_to_poly_params(self.profile_params, indices=selected_pixels)
         self.from_profile_params_to_shape_params(self.profile_params)
         self.cov_matrix = np.diag(1 / np.array(self.table['flux_err']) ** 2)
         psf.params.bounds = initial_bounds
@@ -1695,12 +1771,23 @@ class ChromaticPSF:
             w = ChromaticPSFFitWorkspace(self, data, data_errors=data_errors, mode=mode, bgd_model_func=bgd_model_func,
                                          amplitude_priors_method=amplitude_priors_method, verbose=verbose,
                                          live_fit=live_fit, analytical=analytical)
+            # first, fit the transverse position
+            w.my_logger.info("\n\tFit y_c parameters...")
+            fixed_default = np.copy(w.params.fixed)
+            w.params.fixed = [True] * w.params.ndim
+            for k in range(w.params.ndim):
+                if "y_c" in w.params.labels[k]:
+                    w.params.fixed[k] = False  # y_c_k
+            run_minimisation(w, method="newton", ftol=100 / (w.Nx * w.Ny), xtol=1e-3, niter=10, verbose=verbose, with_line_search=False)
+            # then fit all parameters together
+            w.my_logger.info("\n\tFit all ChromaticPSF parameters...")
+            w.params.fixed = fixed_default
             run_minimisation(w, method="newton", ftol=10 / (w.Nx * w.Ny), xtol=1e-4, niter=50, verbose=verbose, with_line_search=False)
         else:
             raise ValueError(f"mode argument must be '1D' or '2D'. Got {mode=}.")
         if amplitude_priors_method == "psf1d":
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
-            w_reg.run_regularisation()
+            w_reg.run_regularisation(Ndof=w.trace_r)
             w.reg = np.copy(w_reg.opt_reg)
             w.trace_r = np.trace(w_reg.resolution)
             self.opt_reg = w_reg.opt_reg
@@ -1840,7 +1927,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.amplitude_priors_method = amplitude_priors_method
         self.fwhm_priors = np.copy(self.chromatic_psf.table['fwhm'])
         self.reg = parameters.PSF_FIT_REG_PARAM
-        self.trace_r = -1
+        self.trace_r = self.Nx / np.min(self.fwhm_priors)  # spectrophotometric uncertainty principle
         self.Q = np.zeros((self.Nx, self.Nx))
         self.Q_dot_A0 = np.zeros(self.Nx)
         if amplitude_priors_method not in self.amplitude_priors_list:
@@ -1934,17 +2021,17 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         profile_params = self.chromatic_psf.from_poly_params_to_profile_params(poly_params, apply_bounds=True)
         self.chromatic_psf.from_profile_params_to_shape_params(profile_params)
         if self.pixels.ndim == 1:
-            psf_cube = np.zeros((len(profile_params), self.Ny, self.Nx))
-            for x in range(psf_cube.shape[0]):
-                psf_cube[x, :, x] = 1
+            psf_cube_masked = np.zeros((len(profile_params), self.Ny, self.Nx), dtype=bool)
+            for x in range(psf_cube_masked.shape[0]):
+                psf_cube_masked[x, :, x] = 1
         else:
-            psf_cube = self.chromatic_psf.build_psf_cube(self.pixels, profile_params,
-                                                        fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
-                                                        fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32")
-        self.psf_cube_masked = self.chromatic_psf.get_psf_cube_masked(psf_cube, convolve=True)
+            psf_cube_masked = self.chromatic_psf.build_psf_cube_masked(self.pixels, profile_params,
+                                                                       fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
+                                                                       fwhmy_clip=parameters.PSF_FWHM_CLIP)
+        self.psf_cube_masked = self.chromatic_psf.convolve_psf_cube_masked(psf_cube_masked)
         self.boundaries, self.psf_cube_masked = self.chromatic_psf.get_boundaries(self.psf_cube_masked)
         self.psf_cube_sparse_indices, self.M_sparse_indices = self.chromatic_psf.get_sparse_indices(self.psf_cube_masked)
-        mask = np.sum(self.psf_cube_masked.reshape(psf_cube.shape[0], psf_cube[0].size), axis=0) == 0
+        mask = np.sum(self.psf_cube_masked.reshape(psf_cube_masked.shape[0], psf_cube_masked[0].size), axis=0) == 0
         W = np.copy(self.W_before_mask.data.ravel())
         W[mask] = 0
         self.W = sparse.diags(W, dtype="float32", format="dia")

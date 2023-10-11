@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from matplotlib import colormaps
 from matplotlib import colors
 from matplotlib.ticker import MaxNLocator
 from astropy.io import ascii
@@ -38,7 +39,9 @@ def _build_sim_sample(spectra, aerosols=0.05, ozone=300, pwv=5, angstrom_exponen
 
     Examples
     --------
-    >>> _build_sim_sample([Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")])
+    >>> spectra = _build_sim_sample([Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")])
+    >>> len(spectra)
+    1
     """
     sim_spectra = []
     for spec in spectra:
@@ -656,9 +659,9 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         (array(...
         >>> w.plot_fit()
         """
-        cmap_bwr = copy.copy(cm.get_cmap('bwr'))
+        cmap_bwr = copy.copy(colormaps.get_cmap('bwr'))
         cmap_bwr.set_bad(color='lightgrey')
-        cmap_viridis = copy.copy(cm.get_cmap('viridis'))
+        cmap_viridis = copy.copy(colormaps.get_cmap('viridis'))
         cmap_viridis.set_bad(color='lightgrey')
 
         data = copy.deepcopy(self.data)

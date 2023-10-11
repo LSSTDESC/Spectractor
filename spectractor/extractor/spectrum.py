@@ -28,6 +28,9 @@ from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_x
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation
 
+from lsst.utils.threads import disable_implicit_threading
+disable_implicit_threading()
+
 
 fits_mappings = {'config': 'CONFIG',
                  'date_obs': 'DATE-OBS',

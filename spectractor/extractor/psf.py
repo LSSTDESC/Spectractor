@@ -418,7 +418,8 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
     return J
 
 
-@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
+@njit(["float32[:,:](int64[:,:], int64[:,:], float32, float32, float32, float32, float32)",
+       "float64[:,:](float64[:,:], float64[:,:], float32, float32, float32, float32, float32)"], fastmath=True, cache=True)
 def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: no cover
     r"""Compute a 2D Moffat function, whose integral is normalised to unity.
 

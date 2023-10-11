@@ -13,7 +13,6 @@ h5py #==2.8.0
 emcee #==3.0rc2
 tqdm
 schwimmbad
-# iminuit>=2
 coverage>=3.6 # <5
 configparser
 coveralls
@@ -21,3 +20,4 @@ deprecated
 pyyaml
 nose
 getCalspec>=2.0.0
+lsst_utils

@@ -14,6 +14,9 @@ from spectractor.config import set_logger
 from spectractor.tools import (formatting_numbers, compute_correlation_matrix, plot_correlation_matrix_simple,
                                NumpyArrayEncoder)
 
+from lsst.utils.threads import disable_implicit_threading
+disable_implicit_threading()
+
 
 @dataclass()
 class FitParameter:
@@ -418,9 +421,9 @@ class FitParameters:
         icov = 0
         for ip in range(self.ndim):
             if ip in ifree:
-                txt += "%s: %s +%s -%s" % formatting_numbers(self.values[ip], np.sqrt(self.cov[icov, icov]),
-                                                                 np.sqrt(self.cov[icov, icov]),
-                                                                 label=self.labels[ip])
+                txt += "%s: %s +%s -%s" % formatting_numbers(self.values[ip], np.sqrt(np.abs(self.cov[icov, icov])),
+                                                             np.sqrt(np.abs(self.cov[icov, icov])),
+                                                             label=self.labels[ip])
                 txt += f" bounds={self.bounds[ip]}\n\t"
                 icov += 1
             else:
@@ -862,12 +865,14 @@ class FitWorkspace:
 
         Use sparse matrix:
 
-        >>> w.W = scipy.sparse.diags(np.ones(3)).tocsr()
+        >>> w.W = scipy.sparse.diags(np.ones(3))
         >>> w.W.toarray()
         array([[1., 0., 0.],
                [0., 1., 0.],
                [0., 0., 1.]])
         >>> w.prepare_weight_matrices()
+        >>> w.W.getformat()
+        'dia'
         >>> w.W.toarray()
         array([[1., 0., 0.],
                [0., 1., 0.],
@@ -915,12 +920,12 @@ class FitWorkspace:
                         f"either made of 1D or 2D arrays of equal lengths or not for block diagonal matrices."
                         f"\nHere W type is {type(self.W)}, shape is {self.W.shape} and W is {self.W}.")
             else:
-                W = self.W.toarray()
+                format = self.W.getformat()
+                W = self.W.tocsr()
                 W[:, bad_indices] = 0
                 W[bad_indices, :] = 0
-                rows, cols = self.W.nonzero()
-                self.W = scipy.sparse.csr_matrix((W[rows, cols], (rows, cols)), dtype=self.W.dtype, shape=self.W.shape)
-                self.W.eliminate_zeros()
+                W.eliminate_zeros()
+                self.W = W.asformat(format=format)
 
     def compute_W_with_model_error(self, model_err):
         """Propagate model uncertainties to weight matrix W.
@@ -981,8 +986,6 @@ class FitWorkspace:
                [0.  , 0.  , 0.  ]])
 
         """
-        if model_err.ndim > 1:
-            raise ValueError(f"model_err must be a flat 1D array. Got {model_err.shape=}.")
         if np.any(model_err > 0):
             if not scipy.sparse.issparse(self.W):
                 zeros = self.W == 0
@@ -1260,18 +1263,36 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             raise TypeError(f"Type of fit_workspace.W is {type(W)}. It must be a np.ndarray.")
         # Jacobian
         J = fit_workspace.jacobian(tmp_params, epsilon, model_input=[tmp_lambdas, tmp_model, tmp_model_err])
-        # remove parameters with unexpected null Jacobian vectors
+        # remove parameters with unexpected null Jacobian vectors or that are degenerated
+        J_vectors = [np.array(J[ip]).ravel() for ip in range(J.shape[0])]
+        J_norms = [np.linalg.norm(J_vectors[ip]) for ip in range(J.shape[0])]
         for ip in range(J.shape[0]):
             if ip not in ipar:
                 continue
-            if np.allclose(np.array(J[ip]).ravel(), 0, atol=1e-20):
+            # check for null vectors
+            if J_norms[ip] < 1e-20:
                 ipar = np.delete(ipar, list(ipar).index(ip))
                 fit_workspace.params.fixed[ip] = True
                 my_logger.warning(
                     f"\n\tStep {i}: {fit_workspace.params.labels[ip]} has a null Jacobian; parameter is fixed "
                     f"at its last known current value ({tmp_params[ip]}).")
-        # remove fixed parameters
+                continue
+            # check for degeneracies using Cauchy-Schwartz inequality; fix the second parameter
+            for jp in range(ip, J.shape[0]):
+                if ip == jp or jp not in ipar:
+                    continue
+                inner = np.abs(J_vectors[ip] @  J_vectors[jp])
+                if np.abs(inner - J_norms[ip] * J_norms[jp]) < 1e-8 * inner:
+                    ipar = np.delete(ipar, list(ipar).index(jp))
+                    fit_workspace.params.fixed[jp] = True
+                    my_logger.warning(
+                        f"\n\tStep {i}: {fit_workspace.params.labels[ip]} is degenerated with {fit_workspace.params.labels[jp]}; "
+                        f"parameter {fit_workspace.params.labels[jp]} is fixed at its last known current value ({tmp_params[jp]}).")
+                    continue
+        # remove fixed and degenerated parameters; then transpose
         J = J[ipar].T
+
+        # compute J.T @ W @ J matrix and invert it
         if W.ndim == 1 and W.dtype != object:
             JT_W = J.T * W
             JT_W_J = JT_W @ J
@@ -1300,6 +1321,8 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             JT_W_R0 = JT_W @ residuals
         else:
             JT_W_R0 = JT_W @ np.concatenate(residuals).ravel()
+
+        # Gauss-Newton step:
         dparams = - inv_JT_W_J @ JT_W_R0
         new_params = np.copy(tmp_params)
         new_params[ipar] = tmp_params[ipar] + dparams
@@ -1660,10 +1683,10 @@ class RegFitWorkspace(FitWorkspace):
 
     def print_regularisation_summary(self):
         self.my_logger.info(f"\n\tOptimal regularisation parameter: {self.opt_reg}"
-                            f"\n\tTr(R) = {np.trace(self.resolution)}"
+                            f"\n\tTr(R) = N_dof = {np.trace(self.resolution)}"
                             f"\n\tN_params = {len(self.w.amplitude_params)}"
                             f"\n\tN_data = {self.w.data.size - len(self.w.mask) - len(self.w.outliers)}"
-                            f" (without mask and outliers)")
+                            f" (excluding masked pixels and outliers)")
 
     def simulate(self, log10_r):
         reg = 10 ** log10_r
@@ -1693,27 +1716,16 @@ class RegFitWorkspace(FitWorkspace):
 
     def plot_fit(self):
         log10_opt_reg = self.params.values[0]
-        opt_reg = 10 ** log10_opt_reg
         regs = 10 ** np.linspace(min(-7, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
         Gs = []
         chisqs = []
         resolutions = []
-        x = np.arange(len(self.w.amplitude_priors))
         for r in regs:
             self.simulate(np.log10(r))
-            if parameters.DISPLAY and False:  # pragma: no cover
-                fig = plt.figure()
-                plt.errorbar(x, self.w.amplitude_params, yerr=[np.sqrt(self.w.amplitude_cov_matrix[i, i]) for i in x],
-                             label=f"fit r={r:.2g}")
-                plt.plot(x, self.w.amplitude_priors, label="prior")
-                plt.grid()
-                plt.legend()
-                plt.draw()
-                plt.pause(1e-8)
-                plt.close(fig)
             Gs.append(self.G)
             chisqs.append(self.chisquare)
             resolutions.append(np.trace(self.resolution))
+        opt_reg = 10 ** log10_opt_reg
         fig, ax = plt.subplots(3, 1, figsize=(7, 5), sharex="all")
         ax[0].plot(regs, Gs)
         ax[0].axvline(opt_reg, color="k")
@@ -1751,12 +1763,49 @@ class RegFitWorkspace(FitWorkspace):
         if parameters.DISPLAY:
             plt.show()
 
-    def run_regularisation(self):
+    def run_regularisation(self, Ndof=None):
         run_minimisation(self, method="minimize", ftol=1e-4, xtol=1e-2, verbose=self.verbose, epsilon=[1e-1],
                          minimizer_method="Nelder-Mead")
         self.opt_reg = 10 ** self.params.values[0]
         self.simulate(np.log10(self.opt_reg))
         self.print_regularisation_summary()
+        if Ndof is not None:
+            r_Ndof = self.set_regularisation_with_Ndof(Ndof)
+            if self.opt_reg < 1e-3 * r_Ndof or self.opt_reg > 1e3 * r_Ndof:
+                self.my_logger.warning(f"\n\tRegularisation parameter r minimizing G(r) is 3 orders of magnitude away "
+                                       f"from optimal regularisation parameter {r_Ndof} using {Ndof=}. "
+                                       f"Probably that the model does not fit well data at this stage. "
+                                       f"Switch to optimal parameter.")
+                self.opt_reg = r_Ndof
+                self.simulate(np.log10(self.opt_reg))
+                self.print_regularisation_summary()
+
+    def set_regularisation_with_Ndof(self, Ndof):
+        """Find regularisation parameter $r$ that checks $Tr(R) = Ndof$.
+
+        Parameters
+        ----------
+        Ndof: float
+            Number of degrees of freedom, ie $Tr(R)$.
+
+        Returns
+        -------
+        r: float
+            Regularisation parameter.
+
+        """
+        log10_opt_reg = self.params.values[0]
+        regs = 10 ** np.linspace(min(-7, 0.9 * log10_opt_reg), max(3, 1.2 * log10_opt_reg), 50)
+        Gs = np.zeros_like(regs)
+        chisqs = np.zeros_like(regs)
+        resolutions = np.zeros_like(regs)
+        for ir, r in enumerate(regs):
+            self.simulate(np.log10(r))
+            Gs[ir] = self.G
+            chisqs[ir] = self.chisquare
+            resolutions[ir] = np.trace(self.resolution)
+        Ndof_index = np.argmin(np.abs(resolutions - Ndof))
+        return regs[Ndof_index]
 
 
 if __name__ == "__main__":
