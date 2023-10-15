@@ -21,3 +21,4 @@ pyyaml
 nose
 getCalspec>=2.0.0
 lsst_utils
+packaging

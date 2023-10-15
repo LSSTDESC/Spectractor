@@ -849,12 +849,16 @@ class Spectrum:
         # check the version of the file
         if "VERSION" in self.header:
             from spectractor._version import __version__
+            from packaging import version
             if self.config != "":
                 raise AttributeError(f"With Spectractor above 2.4 do not provide a config file in Spectrum(config=...)."
                                      f"Now config parameters are loaded from the file header. Got {self.config=}.")
             if self.header["VERSION"] != str(__version__):
+                self.my_logger.debug(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
+                                     f"different from current Spectractor software {__version__}.")
+            if version.parse(self.header["VERSION"]) < version.parse("3.0"):
                 self.my_logger.warning(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
-                                       f"different from current Spectractor software {__version__}.")
+                                       f"below Spectractor software 3.0. It may be deprecated.")
             self.load_spectrum_latest(input_file_name)
         else:
             self.my_logger.warning("\n\tNo information about Spectractor software version is given in the header. "
