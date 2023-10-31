@@ -441,7 +441,7 @@ class SpectrogramModel(Spectrum):
         -------
         >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> spec.disperser.ratio_ratio_order_3over2 = lambda lbda: 0.1
-        >>> psf_poly_params = spec.chromatic_psf.from_table_to_poly_params()
+        >>> psf_poly_params = list(spec.chromatic_psf.from_table_to_poly_params()) * 3
         >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
         >>> sim = SpectrogramModel(spec, atmosphere=atmosphere, with_background=True, fast_sim=True)
         >>> lambdas, model, model_err = sim.simulate(A2=1, angle=-1.5, psf_poly_params=psf_poly_params)

@@ -1248,6 +1248,7 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
     params_table = []
     inv_JT_W_J = np.zeros((len(ipar), len(ipar)), dtype=float)
 
+    start_total = time.time()
     for i in range(niter):
         start = time.time()
         cost, tmp_lambdas, tmp_model, tmp_model_err = fit_workspace.chisq(tmp_params, model_output=True)
@@ -1390,6 +1391,12 @@ def gradient_descent(fit_workspace, epsilon, niter=10, xtol=1e-3, ftol=1e-3, wit
             my_logger.info(f"\n\tGradient descent terminated in {i} iterations because the "
                            f"relative change of cost is below ftol={ftol}.")
             break
+        if time.time() - start > parameters.SPECTRACTOR_FIT_TIMEOUT_PER_ITER:
+            raise TimeoutError(f"Gradient descent iteration longer than {parameters.SPECTRACTOR_FIT_TIMEOUT_PER_ITER=}. "
+                               f"Check data quality or increase parameters.SPECTRACTOR_FIT_TIMEOUT_PER_ITER in config file.")
+    if time.time() - start_total > parameters.SPECTRACTOR_FIT_TIMEOUT:
+        raise TimeoutError(f"Gradient descent longer than {parameters.SPECTRACTOR_FIT_TIMEOUT=}. "
+                           f"Check data quality or increase parameters.SPECTRACTOR_FIT_TIMEOUT in config file.")
     return tmp_params, inv_JT_W_J, np.array(costs), np.array(params_table)
 
 

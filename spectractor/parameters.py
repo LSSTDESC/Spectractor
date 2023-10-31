@@ -37,6 +37,8 @@ SPECTRACTOR_DECONVOLUTION_PSF2D = True  # deconvolve spectrogram with simple 2D 
 SPECTRACTOR_DECONVOLUTION_FFM = True  # deconvolve spectrogram with full forward model: False, True
 SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP = 20  # value of sigma clip parameter for the spectractor deconvolution process PSF2D and FFM
 SPECTRACTOR_BACKGROUND_SUBTRACTION = True #if True the background is estimated and subtracted 
+SPECTRACTOR_FIT_TIMEOUT_PER_ITER = 600  # maximum time per gradient descent iteration before TimeoutError in seconds
+SPECTRACTOR_FIT_TIMEOUT = 3600  # maximum time per gradient descent before TimeoutError in seconds
 
 # Paths
 DISPERSER_DIR = "./extractor/dispersers/"
@@ -63,14 +65,11 @@ CCD_REBIN = 1  # rebinning of the image in pixel
 OBS_NAME = 'CTIO'
 OBS_ALTITUDE = 2.200  # CTIO altitude in k meters from astropy package (Cerro Pachon)
 OBS_LATITUDE = '-30 10 07.90'  # CTIO latitude
-OBS_DIAMETER = 0.9  # Diameter of the telescope in meter
-OBS_SECONDARY_DIAMETER = 0  # Diameter of the secondary mirror in meter
+OBS_SURFACE = 6361  # Effective surface of the telescope in cm**2 accounting for obscuration
 OBS_EPOCH = "J2000.0"
-OBS_TRANSMISSION_SYSTEMATICS = 0.005
 OBS_OBJECT_TYPE = 'STAR'  # To choose between STAR, HG-AR, MONOCHROMATOR
-OBS_TELESCOPE_TRANSMISSION = 'ctio_throughput.txt'  # telescope transmission file
-OBS_FULL_INSTRUMENT_TRANSMISSON = 'ctio_throughput_300517_v1.txt'  # full instrument transmission file
-OBS_QUANTUM_EFFICIENCY = "qecurve.txt"  # quantum efficiency of the detector file
+OBS_FULL_INSTRUMENT_TRANSMISSON = 'ctio_throughput_300517_v1.txt'  # Full instrument transmission file
+OBS_TRANSMISSION_SYSTEMATICS = 0.005
 OBS_CAMERA_ROTATION = 0  # Camera (x,y) rotation angle with respect to (north-up, east-left) system in degrees
 OBS_CAMERA_DEC_FLIP_SIGN = 1  # Camera (x,y) flip signs with respect to (north-up, east-left) system
 OBS_CAMERA_RA_FLIP_SIGN = 1  # Camera (x,y) flip signs with respect to (north-up, east-left) system

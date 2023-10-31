@@ -85,7 +85,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                        r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]", "$B$"]
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
-        bounds = [[0, 2], [0, 2], [0, 2], [0, 0.1], [-5, 2], [100, 700], [0, 10],
+        bounds = [[0, 2], [0, 2], [0, 2], [0, 0.1], [-5, 2], [100, 700], [0, 20],
                   [D2CCD - 5 * parameters.DISTANCE2CCD_ERR, D2CCD + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
                   [-10, 10], [-90, 90], [0.8, 1.2]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
