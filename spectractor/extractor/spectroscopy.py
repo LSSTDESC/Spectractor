@@ -430,6 +430,7 @@ class Lines:
         --------
 
         Creation of a mock spectrum with emission and absorption lines
+
         >>> from spectractor.extractor.spectrum import Spectrum, detect_lines
         >>> lambdas = np.arange(300,1000,1)
         >>> spectrum = 1e4*np.exp(-((lambdas-600)/200)**2)
@@ -444,12 +445,14 @@ class Lines:
         >>> fwhm_func = interp1d(lambdas, 0.01 * lambdas)
 
         Detect the lines
+
         >>> lines = Lines([HALPHA, HBETA, O2_1], hydrogen_only=True,
         ... atmospheric_lines=True, redshift=0, emission_spectrum=True)
         >>> global_chisq = detect_lines(lines, lambdas, spectrum, spectrum_err, fwhm_func=fwhm_func)
         >>> assert(global_chisq < 1)
 
         Print the result
+
         >>> spec.lines = lines
         >>> t = lines.build_detected_line_table()
         """
