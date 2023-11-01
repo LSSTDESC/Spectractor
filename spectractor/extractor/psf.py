@@ -672,8 +672,7 @@ def evaluate_gauss1d(y, amplitude, y_c, sigma):  # pragma: no cover
 
     .. math ::
 
-        f(x, y) = \frac{A}{\sigma \sqrt{2 \pi}\left\lbrace e^{-\left[ \left(x-x_c\right)^2\right]/(2 \sigma^2)}
-        \right\rbrace
+        f(y) = \frac{A}{\sigma \sqrt{2 \pi}\left\lbrace e^{-\left[ \left(y-y_c\right)^2\right]/(2 \sigma^2)}\right\rbrace
 
     .. math ::
         \quad\text{with}\quad
@@ -743,8 +742,7 @@ def evaluate_gauss1d_jacobian(y, amplitude, y_c, sigma, fixed):  # pragma: no co
 
     .. math ::
 
-        f(x, y) = \frac{A}{\sigma \sqrt{2 \pi}\left\lbrace e^{-\left[ \left(x-x_c\right)^2\right]/(2 \sigma^2)}
-        \right\rbrace
+        f(y) = \frac{A}{\sigma \sqrt{2 \pi}\left\lbrace e^{-\left[ \left(y-y_c\right)^2\right]/(2 \sigma^2)}\right\rbrace
 
     .. math ::
         \quad\text{with}\quad

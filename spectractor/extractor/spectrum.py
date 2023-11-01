@@ -814,7 +814,8 @@ class Spectrum:
         Examples
         --------
 
-        # Latest Spectractor output format: do not provide a config file (parameters are loaded from file header)
+        Latest Spectractor output format: do not provide a config file (parameters are loaded from file header)
+
         >>> from spectractor import parameters
         >>> s = Spectrum(config="")
         >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
@@ -826,7 +827,8 @@ class Spectrum:
             >>> assert parameters.CCD_REBIN == s.header["REBIN"]
             >>> assert s.parallactic_angle == s.header["PARANGLE"]
 
-        # Spectractor output format older than version <=2.3: must give the config file
+        Spectractor output format older than version <=2.3: must give the config file
+
         >>> parameters.VERBOSE = False
         >>> s = Spectrum(config="./config/ctio.ini")
         >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
