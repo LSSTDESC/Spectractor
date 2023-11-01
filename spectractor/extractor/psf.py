@@ -18,10 +18,10 @@ def evaluate_moffat1d_normalisation(gamma, alpha):
 
     .. math ::
 
-        A = \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}
+        A = \frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}
         \quad\text{with}, \alpha > 1/2
 
-    Note that this function is defined only for :math:`alpha > 1/2`.
+    Note that this function is defined only for :math:`\alpha > 1/2`.
 
     Parameters
     ----------
@@ -48,10 +48,10 @@ def evaluate_moffat1d_normalisation_dalpha(norm, alpha):
 
     .. math ::
 
-        A = \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}
+        A = \frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}
         \quad\text{with}, \alpha > 1/2
 
-    Note that this function is defined only for :math:`alpha > 1/2`.
+    Note that this function is defined only for :math:`\alpha > 1/2`.
 
     Parameters
     ----------
@@ -83,8 +83,8 @@ def evaluate_moffat1d(y, amplitude, y_c, gamma, alpha, norm):  # pragma: no cove
         f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}
         \quad\text{with}, \alpha > 1/2
 
-    Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor
-    :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}` is not included as special functions
+    Note that this function is defined only for :math:`\alpha > 1/2`. The normalisation factor
+    :math:`\frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}` is not included as special functions
     are not supported by numba library.
 
     Parameters
@@ -100,7 +100,7 @@ def evaluate_moffat1d(y, amplitude, y_c, gamma, alpha, norm):  # pragma: no cove
     alpha: float
         Exponent :math:`\alpha` of the Moffat function.
     norm: float
-        Normalisation :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}`.
+        Normalisation :math:`\frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}`.
 
     Returns
     -------
@@ -156,10 +156,10 @@ def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda, f
 
     .. math ::
 
-        f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}\times \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}
+        f(y) \propto \frac{A}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}\times \frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}
         \quad\text{with}, \alpha > 1/2
 
-    Note that this function is defined only for :math:`alpha > 1/2`.
+    Note that this function is defined only for :math:`\alpha > 1/2`.
 
     Parameters
     ----------
@@ -174,7 +174,7 @@ def evaluate_moffat1d_jacobian(y, amplitude, y_c, gamma, alpha, norm, dnormda, f
     alpha: float
         Exponent :math:`\alpha` of the Moffat function.
     norm: float
-        Normalisation :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}`.
+        Normalisation :math:`\frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}`.
     dnormda: float
         Derivatives of the normalisation with respect to alpha.
     fixed: array_like
@@ -241,8 +241,8 @@ def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, no
         \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha}+ \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
         \quad\text{ and } \quad \eta < 0, \alpha > 1/2
 
-    Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor for the Moffat+Gauss
-    :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)} + \eta \sqrt{2\pi} \sigma` is not included as special functions
+    Note that this function is defined only for :math:`\alpha > 1/2`. The normalisation factor for the Moffat+Gauss
+    :math:`\frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)} + \eta \sqrt{2\pi} \sigma` is not included as special functions
     are not supproted by the numba library.
 
     Parameters
@@ -262,7 +262,7 @@ def evaluate_moffatgauss1d(y, amplitude, y_c, gamma, alpha, eta_gauss, sigma, no
     sigma: float
         Width :math:`\sigma` of the Gaussian function.
     norm_moffat: float
-        Normalisation :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}`.
+        Normalisation :math:`\frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}`.
 
     Returns
     -------
@@ -326,12 +326,12 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
     .. math ::
 
         f(y) \propto A \left\lbrace
-        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha} \times \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}
+        \frac{1}{\left[ 1 +\left(\frac{y-y_c}{\gamma}\right)^2 \right]^\alpha} \times \frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}
          - \eta e^{-(y-y_c)^2/(2\sigma^2)}\right\rbrace
         \quad\text{ and } \quad \eta < 0, \alpha > 1/2
 
-    Note that this function is defined only for :math:`alpha > 1/2`. The normalisation factor for the Moffat
-    :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)} + \eta \sqrt{2\pi} \sigma` is not included as special functions
+    Note that this function is defined only for :math:`\alpha > 1/2`. The normalisation factor for the Moffat
+    :math:`\frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)} + \eta \sqrt{2\pi} \sigma` is not included as special functions
     are not supproted by the numba library.
 
     Parameters
@@ -351,7 +351,7 @@ def evaluate_moffatgauss1d_jacobian(y, amplitude, y_c, gamma, alpha, eta_gauss, 
     sigma: float
         Width :math:`\sigma` of the Gaussian function.
     norm_moffat: float
-        Normalisation :math:`\frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}`.
+        Normalisation :math:`\frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}`.
     dnormda: float
         Derivatives of the normalisation with respect to alpha.
     fixed: array_like
@@ -430,7 +430,7 @@ def evaluate_moffat2d(x, y, amplitude, x_c, y_c, gamma, alpha):  # pragma: no co
         \quad\text{with}\quad
         \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
 
-    Note that this function is defined only for :math:`alpha > 1`.
+    Note that this function is defined only for :math:`\alpha > 1`.
 
     Note that the normalisation of a 2D Moffat function is analytical so it is not expected that
     the sum of the output array is equal to :math:`A`, but lower.
@@ -589,7 +589,7 @@ def evaluate_moffatgauss2d(x, y, amplitude, x_c, y_c, gamma, alpha, eta_gauss, s
         \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}f(x, y) \mathrm{d}x \mathrm{d}y = A
         \quad\text{and} \quad \eta < 0
 
-    Note that this function is defined only for :math:`alpha > 1`.
+    Note that this function is defined only for :math:`\alpha > 1`.
 
     Parameters
     ----------
@@ -1206,7 +1206,7 @@ class Moffat(PSF):
 
         .. math::
 
-            f(y) \propto \frac{A \Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)},
+            f(y) \propto \frac{A \Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)},
             \quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
 
         Parameters
@@ -1576,7 +1576,7 @@ class MoffatGauss(PSF):
 
         .. math::
 
-            f(y) \propto  \frac{A}{ \frac{\Gamma(alpha)}{\gamma \sqrt{\pi} \Gamma(alpha -1/2)}+\eta\sqrt{2\pi}\sigma},
+            f(y) \propto  \frac{A}{ \frac{\Gamma(\alpha)}{\gamma \sqrt{\pi} \Gamma(\alpha -1/2)}+\eta\sqrt{2\pi}\sigma},
             \quad \int_{y_{\text{min}}}^{y_{\text{max}}} f(y) \mathrm{d}y = A
 
         Parameters
