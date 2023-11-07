@@ -138,7 +138,7 @@ class Libradtran:
         [1196. 1197. 1198. 1199. 1200.]
         >>> print(atmosphere[-5:])
         [0.9617202 0.9617202 0.9529933 0.9529933 0.9512588]
-        >>> lambdas2, atmosphere2 = lib.simulate(1.2, 0.07, 400, 2, 800, angstrom_exponent=0.02, lambda_max=1200)
+        >>> lambdas2, atmosphere2 = lib.simulate(1.2, 0.07, 400, 2, 800, angstrom_exponent=-0.02, lambda_max=1200)
         >>> print(lambdas2[-5:])
         [1196. 1197. 1198. 1199. 1200.]
         >>> print(atmosphere2[-5:])
@@ -199,12 +199,12 @@ class Libradtran:
             self.settings["aerosol_default"] = ''
         elif runtype == 'aerosol_special':
             self.settings["aerosol_default"] = ''
-            if angstrom_exponent is None or angstrom_exponent < 0:
+            if angstrom_exponent is None or angstrom_exponent > 0:
                 self.settings["aerosol_set_tau_at_wvl"] = f'500 {aerosol:.20f}'
             else:
                 # below formula recover default aerosols models with angstrom_exponent=0.0192
-                tau = aerosol / 0.04 * (0.5 ** angstrom_exponent)
-                self.settings["aerosol_angstrom"] = f"{tau:.10f} {angstrom_exponent:.10f}"
+                tau = aerosol / 0.04 * (0.5 ** -angstrom_exponent)
+                self.settings["aerosol_angstrom"] = f"{tau:.10f} {-angstrom_exponent:.10f}"
 
         if runtype == 'no_scattering':
             self.settings["no_scattering"] = ''
