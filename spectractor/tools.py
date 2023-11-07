@@ -2691,7 +2691,6 @@ class NumpyArrayEncoder(json.JSONEncoder):
             return float(obj)
         else:
             return super().default(obj)
-        #return json.JSONEncoder.default(self, obj)
 
 
 if __name__ == "__main__":
