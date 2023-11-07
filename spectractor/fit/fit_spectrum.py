@@ -9,7 +9,7 @@ from spectractor import parameters
 from spectractor.config import set_logger
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.simulation.simulator import SpectrumSimulation
-from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid, angstrom_exponent_default
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisation_sigma_clipping, run_minimisation,
                                     write_fitparameter_json)
 from spectractor.tools import plot_spectrum_simple
@@ -60,7 +60,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         if not getCalspec.is_calspec(spectrum.target.label):
             raise ValueError(f"{spectrum.target.label=} must be a CALSPEC star according to getCalspec package.")
         self.spectrum = spectrum
-        p = np.array([1, 0, 0.05, np.log10(angstrom_exponent_default), 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
+        p = np.array([1, 0, 0.05, -1, 400, 5, 1, self.spectrum.header['D2CCD'], self.spectrum.header['PIXSHIFT'], 0])
         fixed = [False] * p.size
         # fixed[0] = True
         fixed[1] = "A2_T" not in self.spectrum.header  # fit A2 only on sims to evaluate extraction biases
@@ -71,12 +71,12 @@ class SpectrumFitWorkspace(FitWorkspace):
         # fixed[-1] = True
         if not fit_angstrom_exponent:
             fixed[3] = True  # angstrom_exponent
-        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-5, 2), (100, 700), (0, 20),
+        bounds = [(0, 2), (0, 2/parameters.GRATING_ORDER_2OVER1), (0, 0.1), (-5, 0), (100, 700), (0, 20),
                        (0.1, 10),(p[7] - 5 * parameters.DISTANCE2CCD_ERR, p[7] + 5 * parameters.DISTANCE2CCD_ERR),
                   (-2, 2), (-np.inf, np.inf)]
-        params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]",
-                                                "reso [pix]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
-                               axis_names=["$A_1$", "$A_2$", "VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]",
+        params = FitParameters(p, labels=["A1", "A2", "VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]",
+                                          "reso [pix]", r"D_CCD [mm]", r"alpha_pix [pix]", "B"],
+                               axis_names=["$A_1$", "$A_2$", "VAOD", r'$\"a$', "ozone [db]", "PWV [mm]",
                                            "reso [pix]", r"$D_{CCD}$ [mm]", r"$\alpha_{\mathrm{pix}}$ [pix]", "$B$"],
                                bounds=bounds, fixed=fixed, truth=truth, filename=spectrum.filename)
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=spectrum.filename)
@@ -87,6 +87,7 @@ class SpectrumFitWorkspace(FitWorkspace):
             self.atmosphere = AtmosphereGrid(spectrum_filename=spectrum.filename, atmgrid_filename=atmgrid_file_name)
             if parameters.VERBOSE:
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
+        self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
         self.lambdas = self.spectrum.lambdas
         self.data = self.spectrum.data
         self.err = self.spectrum.err
@@ -97,7 +98,7 @@ class SpectrumFitWorkspace(FitWorkspace):
             self.params.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.params.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
             self.params.fixed[3] = True  # angstrom exponent
-        self.simulation = SpectrumSimulation(self.spectrum, atmosphere=self.atmosphere, fast_sim=True)
+        self.simulation = SpectrumSimulation(self.spectrum, atmosphere=self.atmosphere, fast_sim=True, with_adr=True)
         self.amplitude_truth = None
         self.lambdas_truth = None
         self.get_truth()
@@ -178,7 +179,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         ax.get_yaxis().set_label_coords(-0.08, 0.6)
         # ax2.get_yaxis().set_label_coords(-0.11, 0.5)
 
-    def simulate(self, A1, A2, aerosols, angstrom_exponent_log10, ozone, pwv, reso, D, shift_x, B):
+    def simulate(self, A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x, B):
         """Interface method to simulate a spectrogram.
 
         Parameters
@@ -189,8 +190,8 @@ class SpectrumFitWorkspace(FitWorkspace):
             Relative amplitude of the order 2 spectrogram.
         aerosols: float
             Vertical Aerosols Optical Depth quantity for Libradtran (no units).
-        angstrom_exponent_log10: float
-            Logarithm base 10 of Angstrom exponent for aerosols.
+        angstrom_exponent: float
+            Angstrom exponent for aerosols.
         ozone: float
             Ozone parameter for Libradtran (in db).
         pwv: float
@@ -223,9 +224,7 @@ class SpectrumFitWorkspace(FitWorkspace):
         >>> w.plot_fit()
 
         """
-        if self.fit_angstrom_exponent:
-            angstrom_exponent = 10 ** angstrom_exponent_log10
-        else:
+        if not self.fit_angstrom_exponent:
             angstrom_exponent = None
         lambdas, model, model_err = self.simulation.simulate(A1, A2, aerosols, angstrom_exponent, ozone, pwv, reso, D, shift_x, B)
         self.model = model

@@ -12,7 +12,7 @@ from spectractor.config import set_logger
 from spectractor.tools import plot_image_simple, from_lambda_to_colormap
 from spectractor.extractor.spectrum import Spectrum
 from spectractor.simulation.simulator import SpectrogramModel
-from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid, angstrom_exponent_default
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.fit.fitter import (FitWorkspace, FitParameters, run_minimisation, run_minimisation_sigma_clipping,
                                     write_fitparameter_json)
 
@@ -68,7 +68,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         self.saturation = self.spectrum.spectrogram_saturation
         D2CCD = np.copy(spectrum.header['D2CCD'])
-        p = np.array([1, 1, 1, 0.05, np.log10(angstrom_exponent_default), 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
+        p = np.array([1, 1, 1, 0.05, -1, 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
                       0, self.spectrum.rotation_angle, 1])
         self.psf_params_start_index = np.array([12 + len(self.psf_poly_params) * k for k in range(len(self.diffraction_orders))])
         psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.params.labels[length:])
@@ -76,16 +76,16 @@ class SpectrogramFitWorkspace(FitWorkspace):
         psf_poly_params_bounds = self.spectrum.chromatic_psf.set_bounds()
         p = np.concatenate([p] + [self.psf_poly_params] * len(self.diffraction_orders))
         input_labels = [f"A{order}" for order in self.diffraction_orders]
-        input_labels += ["VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
+        input_labels += ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]", r"D_CCD [mm]",
                         r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B"]
         for order in self.diffraction_orders:
             input_labels += [label + f"_{order}" for label in psf_poly_params_labels]
         axis_names = [f"$A_{order}$" for order in self.diffraction_orders]
-        axis_names += ["VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
+        axis_names += ["VAOD", r'$\"a$', "ozone [db]", "PWV [mm]", r"$D_{CCD}$ [mm]",
                        r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]", "$B$"]
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
-        bounds = [[0, 2], [0, 2], [0, 2], [0, 0.1], [-5, 2], [100, 700], [0, 20],
+        bounds = [[0, 2], [0, 2], [0, 2], [0, 0.1], [-5, 0], [100, 700], [0, 20],
                   [D2CCD - 5 * parameters.DISTANCE2CCD_ERR, D2CCD + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
                   [-10, 10], [-90, 90], [0.8, 1.2]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
@@ -101,7 +101,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         params = FitParameters(p, labels=input_labels, axis_names=axis_names, bounds=bounds, fixed=fixed,
                                truth=truth, filename=self.filename)
         self.fixed_psf_params = np.array([0, 1, 2, 3, 4, 5, 6, 9])
-        self.atm_params_indices = np.array([params.get_index(label) for label in ["VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]"]])
+        self.atm_params_indices = np.array([params.get_index(label) for label in ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]"]])
         # A2 is free only if spectrogram is a simulation or if the order 2/1 ratio is not known and flat
         if "A2" in params.labels:
             params.fixed[params.get_index(f"A{self.diffraction_orders[1]}")] = "A2_T" not in self.spectrum.header
@@ -111,8 +111,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
         params.fixed[params.get_index(r"shift_y [pix]")] = True  # Delta y
         params.fixed[params.get_index(r"angle [deg]")] = True  # angle
         params.fixed[params.get_index("B")] = True  # B
-        if not fit_angstrom_exponent:
-            params.fixed[params.get_index("angstrom_exp_log10")] = True  # angstrom exponent
 
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=self.filename)
         self.my_logger = set_logger(self.__class__.__name__)
@@ -122,6 +120,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.use_grid = True
             self.atmosphere = AtmosphereGrid(spectrum_filename=spectrum.filename, atmgrid_filename=atmgrid_file_name)
             self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
+        self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
+        if not fit_angstrom_exponent:
+            self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
         if self.spectrum.spectrogram_Ny > 2 * parameters.PIXDIST_BACKGROUND:
             self.crop_spectrogram()
         self.lambdas = self.spectrum.lambdas
@@ -134,7 +135,10 @@ class SpectrogramFitWorkspace(FitWorkspace):
             self.params.bounds[self.params.get_index("VAOD")] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
             self.params.bounds[self.params.get_index("ozone [db]")] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
             self.params.bounds[self.params.get_index("PWV [mm]")] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
-            self.params.fixed[self.params.get_index("angstrom_exp_log10")] = True  # angstrom exponent
+            self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
+        if self.atmosphere.emulator is not None:
+            self.params.bounds[self.params.get_index("ozone [db]")] = (self.atmosphere.emulator.OZMIN, self.atmosphere.emulator.OZMAX)
+            self.params.bounds[self.params.get_index("PWV [mm]")] = (self.atmosphere.emulator.PWVMIN, self.atmosphere.emulator.PWVMAX)
 
         self.simulation = SpectrogramModel(self.spectrum, atmosphere=self.atmosphere,
                                            diffraction_orders=self.diffraction_orders,
@@ -349,11 +353,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         >>> w.plot_fit()
 
         """
-        A1, A2, A3, aerosols, angstrom_exponent_log10, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params = params
+        A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, *psf_poly_params = params
         self.params.values = np.asarray(params)
-        if self.fit_angstrom_exponent:
-            angstrom_exponent = 10 ** angstrom_exponent_log10
-        else:
+        if not self.fit_angstrom_exponent:
             angstrom_exponent = None
         lambdas, model, model_err = self.simulation.simulate(A1, A2, A3, aerosols, angstrom_exponent, ozone, pwv, D, shift_x, shift_y, angle, B, psf_poly_params)
         self.lambdas = lambdas
