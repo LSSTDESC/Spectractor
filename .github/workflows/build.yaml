@@ -66,7 +66,7 @@ jobs:
       - name: Run doctests and coverage
         shell: bash -l {0}
         run: |
-          coverage run -m pytest --doctest-modules --cov-append --cov-report xml
+          coverage run -m pytest --doctest-modules  --doctest-only --cov-append --cov-report xml
       - name: Coveralls
         uses: coverallsapp/github-action@master
         with:
