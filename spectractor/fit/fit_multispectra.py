@@ -77,7 +77,7 @@ def _build_test_sample(nspectra=3, aerosols=0.05, ozone=300, pwv=5, angstrom_exp
     >>> _build_test_sample(3)
     """
     spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
-    targets = ["HD111980", "MU COL", "ETADOR"]
+    targets = ["HD111980", "HD111980"] #, "MU COL", "ETADOR", "HD205905", "HD142331", "HD160617"]
     zs = np.linspace(1, 2, len(targets))
     pressure, temperature = 800, 10
     spectra = []
@@ -150,7 +150,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                                                lambda_max=np.max(spectrum.lambdas) + 1))
         self.fix_atm_sim = False
         self.atmospheres_curr = []
-        p = np.array([0.05, self.atmospheres[0].angstrom_exponent_default, 400, 5, -1, *np.zeros(self.nspectra), *np.ones(self.nspectra)])
+        p = np.array([0.05, self.atmospheres[0].angstrom_exponent_default, 400, 5,
+                      self.atmospheres[0].angstrom_exponent_default, *np.zeros(self.nspectra), *np.ones(self.nspectra)])
         self.deltas_first_index = 5
         self.A1_first_index = self.deltas_first_index + self.nspectra
         fixed = [False] * p.size
@@ -170,7 +171,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                 fixed[ip] = True
         labels = ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]", "reso"] + [f"delta_{k}" for k in range(self.nspectra)] + [f"A1_{k}" for k in range(self.nspectra)]
         axis_names = ["VAOD", r'$\"a$', "ozone [db]", "PWV [mm]", "reso"] + [f"$\delta_{k}$" for k in range(self.nspectra)] + ["$A_1^{(" + str(k) + ")}$" for k in range(self.nspectra)]
-        bounds = [(0, 0.1), (-5, 0), (100, 700), (0, 20), (0.1, 100)] + [(-20, 20)] * self.nspectra + [(1e-3, 2)] * self.nspectra
+        bounds = [(0, 1), (0, 3), (100, 700), (0, 20), (0.1, 100)] + [(-20, 20)] * self.nspectra + [(1e-3, 2)] * self.nspectra
         if fixed[4]:  # reso
             bounds[4] = (-1, 0)
         params = FitParameters(p, labels=labels, axis_names=axis_names, fixed=fixed, bounds=bounds)
@@ -462,7 +463,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             pwv_truth = self.spectra[0].header['PWV_T']
             aerosols_truth = self.spectra[0].header['VAOD_T']
             if "ANGEXP_T" in self.spectra[0].header and self.spectra[0].header["ANGEXP_T"] is not None:
-                angstrom_exponent_truth = 10 ** self.spectra[0].header["ANGEXP_T"]
+                angstrom_exponent_truth = self.spectra[0].header["ANGEXP_T"]
                 self.truth = (aerosols_truth, angstrom_exponent_truth, ozone_truth, pwv_truth)
             else:
                 angstrom_exponent_truth = None
@@ -542,10 +543,11 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         # first: force the grey terms to have an average of 1
         deltas = np.array(A1s)[:self.nspectra]
         A1s = np.array(A1s)[self.nspectra:]
-        if A1s.size > 1:
-            m = 1
-            A1s[0] = m * A1s.size - np.sum(A1s[1:])
-            self.params.values[self.A1_first_index] = A1s[0]
+        # if A1s.size > 1:
+        #     m = 1
+        #     A1s[0] = m * A1s.size - np.sum(A1s[1:])
+        #     self.params.values[self.A1_first_index] = A1s[0]
+        A1s[0] = 1
         # second: force the delta lambda terms to have an average of 0
         if deltas.size > 1:
             m = 0
@@ -956,11 +958,11 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False,
 
     Examples
     --------
-    >>> spectra = _build_test_sample(5, aerosols=0.05, angstrom_exponent=None, ozone=300, pwv=3)
+    >>> spectra = _build_test_sample(20, aerosols=0.5, angstrom_exponent=1.5, ozone=300, pwv=3)
     >>> parameters.VERBOSE = True
     >>> parameters.DEBUG = True
     >>> w = MultiSpectraFitWorkspace("./outputs/test", spectra, bin_width=5, verbose=True,
-    ... fixed_deltas=True, fixed_A1s=False, fit_angstrom_exponent=False)
+    ... fixed_deltas=True, fixed_A1s=False, fit_angstrom_exponent=True)
     >>> run_multispectra_minimisation(w, method="newton", verbose=True, sigma_clip=10)
     >>> print(w.params.print_parameters_summary())  #doctest: +ELLIPSIS
     VAOD:...
@@ -974,16 +976,16 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False,
         run_minimisation(fit_workspace, method=method)
     else:
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
-        # epsilon = 1e-4 * guess
-        # epsilon[epsilon == 0] = 1e-4
+        epsilon = 1e-4 * guess
+        epsilon[epsilon == 0] = 1e-4
 
         # very touchy to avoid biases when fitting simulations with A1s
         # good epsilons: epsilon = np.array([0.0001, 1e-4, 5, 0.05, 0.01]) + [1e-2] * fit_workspace.nspectra + [1e-4] * fit_workspace.nspectra)
-        epsilon = np.array([0.0001, 1e-4, 5, 0.05, 0.01])
-        epsilon = np.array(list(epsilon) + [1e-2] * fit_workspace.nspectra + [1e-4] * fit_workspace.nspectra)
+        #epsilon = np.array([0.0001, 1e-3, 5, 0.01, 0.01])
+        #epsilon = np.array(list(epsilon) + [1e-3] * fit_workspace.nspectra + [1e-4] * fit_workspace.nspectra)
 
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon,
-                                        xtol=1e-6, ftol=0.001 / fit_workspace.data.size,
+                                        xtol=1e-6, ftol=1e-4 / fit_workspace.data.size,
                                         sigma_clip=sigma_clip, niter_clip=niter_clip,
                                         verbose=verbose, with_line_search=True)
 

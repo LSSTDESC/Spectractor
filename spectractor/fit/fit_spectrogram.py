@@ -68,7 +68,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         self.saturation = self.spectrum.spectrogram_saturation
         D2CCD = np.copy(spectrum.header['D2CCD'])
-        p = np.array([1, 1, 1, 0.05, -1, 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
+        p = np.array([1, 1, 1, 0.05, 1.2, 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
                       0, self.spectrum.rotation_angle, 1])
         self.psf_params_start_index = np.array([12 + len(self.psf_poly_params) * k for k in range(len(self.diffraction_orders))])
         psf_poly_params_labels = np.copy(self.spectrum.chromatic_psf.params.labels[length:])
@@ -85,7 +85,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                        r"$\Delta_{\mathrm{x}}$ [pix]", r"$\Delta_{\mathrm{y}}$ [pix]", r"$\theta$ [deg]", "$B$"]
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
-        bounds = [[0, 2], [0, 2], [0, 2], [0, 0.1], [-5, 0], [100, 700], [0, 20],
+        bounds = [[0, 2], [0, 2], [0, 2], [0, 0.1], [0, 3], [100, 700], [0, 20],
                   [D2CCD - 5 * parameters.DISTANCE2CCD_ERR, D2CCD + 5 * parameters.DISTANCE2CCD_ERR], [-2, 2],
                   [-10, 10], [-90, 90], [0.8, 1.2]]
         bounds += list(psf_poly_params_bounds) * len(self.diffraction_orders)
@@ -130,7 +130,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.data = self.spectrum.spectrogram.flatten()
         self.err = self.spectrum.spectrogram_err.flatten()
         self.fit_angstrom_exponent = fit_angstrom_exponent
-
+        self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
         if atmgrid_file_name != "":
             self.params.bounds[self.params.get_index("VAOD")] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
             self.params.bounds[self.params.get_index("ozone [db]")] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))

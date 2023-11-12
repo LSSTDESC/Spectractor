@@ -212,7 +212,7 @@ class SpectrumSimulation(Spectrum):
             self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
         # Save the truth parameters
         self.header['OZONE_T'] = ozone
-        self.header['LOG10A_T'] = angstrom_exponent
+        self.header['ANGEXP_T'] = angstrom_exponent
         self.header['PWV_T'] = pwv
         self.header['VAOD_T'] = aerosols
         self.header['A1_T'] = A1
