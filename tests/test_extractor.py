@@ -1,8 +1,6 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-from numpy.testing import run_module_suite  # noqa: E402
-
 from spectractor import parameters  # noqa: E402
 from spectractor.extractor.extractor import Spectractor  # noqa: E402
 from spectractor.logbook import LogBook  # noqa: E402
@@ -152,7 +150,3 @@ def extractor_auxtel():
             # assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrum.fits')) is True
             # assert os.path.isfile('./outputs/' + tag.replace('.fits', '_spectrogram.fits')) is True
 
-
-if __name__ == "__main__":
-
-    run_module_suite()
