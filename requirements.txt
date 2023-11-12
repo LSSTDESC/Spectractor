@@ -19,6 +19,7 @@ coveralls
 deprecated
 pyyaml
 pytest
+pytest-cov
 getCalspec>=2.0.0
 lsst_utils
 packaging

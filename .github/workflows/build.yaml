@@ -26,7 +26,7 @@ jobs:
         # Might be quicker to install rubin-env plus any necessary additions.
         shell: bash -l {0}
         run: |
-          mamba install -y  "numpy>1.15" scipy "matplotlib>3.1" pandas llvmlite numba "astropy>=3.2" "photutils>=1.7" astroquery coloredlogs scikit-image>=0.20 h5py emcee tqdm mpi4py schwimmbad "iminuit>=2" "coverage>=3.6" configparser coveralls deprecated pyyaml pytest rubin-libradtran "getCalspec>=2.0.0"
+          mamba install -y  "numpy>1.15" scipy "matplotlib>3.1" pandas llvmlite numba "astropy>=3.2" "photutils>=1.7" astroquery coloredlogs scikit-image>=0.20 h5py emcee tqdm mpi4py schwimmbad "iminuit>=2" "coverage>=3.6" configparser coveralls deprecated pyyaml pytest pytest-cov rubin-libradtran "getCalspec>=2.0.0"
           # python -c "from getCalspec.rebuild import rebuild_tables; rebuild_tables()"
           pip install lsst.utils
           mamba install astrometry
@@ -66,7 +66,8 @@ jobs:
       - name: Run doctests and coverage
         shell: bash -l {0}
         run: |
-          .github/workflows/coverage_and_test.sh
+          coverage run -m pytest --doctest-modules --cov-append
+          
 
       - name: Coveralls
         env:
