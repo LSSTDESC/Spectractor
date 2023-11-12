@@ -18,7 +18,7 @@ configparser
 coveralls
 deprecated
 pyyaml
-nose
+pytest
 getCalspec>=2.0.0
 lsst_utils
 packaging
