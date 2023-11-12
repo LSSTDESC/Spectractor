@@ -53,25 +53,22 @@ jobs:
       - name: Run full chain test
         shell: bash -l {0}
         run: |
-          pytest tests/test_fullchain.py --log-cli-level=INFO --cov 
+          pytest tests/test_fullchain.py --log-cli-level=INFO --cov --cov-report xml
 
       - name: Run pytests
         shell: bash -l {0}
         run: |
-          pytest tests/test_extractor.py --log-cli-level=INFO --cov --cov-append
-          pytest tests/test_simulator.py --log-cli-level=INFO --cov --cov-append
-          pytest tests/test_utils.py --log-cli-level=INFO --cov --cov-append
-          pytest tests/test_fitter.py --log-cli-level=INFO --cov --cov-append
+          pytest tests/test_extractor.py --log-cli-level=INFO --cov --cov-append --cov-report xml
+          pytest tests/test_simulator.py --log-cli-level=INFO --cov --cov-append --cov-report xml
+          pytest tests/test_utils.py --log-cli-level=INFO --cov --cov-append --cov-report xml
+          pytest tests/test_fitter.py --log-cli-level=INFO --cov --cov-append --cov-report xml
 
       - name: Run doctests and coverage
         shell: bash -l {0}
         run: |
-          coverage run -m pytest --doctest-modules --cov-append
-          
-
+          coverage run -m pytest --doctest-modules --cov-append --cov-report xml
       - name: Coveralls
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          pip3 install --upgrade coveralls
-          coveralls --service=github
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: coverage.xml
