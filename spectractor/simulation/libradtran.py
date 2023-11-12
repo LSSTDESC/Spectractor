@@ -199,12 +199,12 @@ class Libradtran:
             self.settings["aerosol_default"] = ''
         elif runtype == 'aerosol_special':
             self.settings["aerosol_default"] = ''
-            if angstrom_exponent is None or angstrom_exponent > 0:
+            if angstrom_exponent is None or angstrom_exponent < 0:
                 self.settings["aerosol_set_tau_at_wvl"] = f'500 {aerosol:.20f}'
             else:
-                # below formula recover default aerosols models with angstrom_exponent=0.0192
-                tau = aerosol / 0.04 * (0.5 ** -angstrom_exponent)
-                self.settings["aerosol_angstrom"] = f"{tau:.10f} {-angstrom_exponent:.10f}"
+                # below formula recover default aerosols models with angstrom_exponent=1.2
+                tau = aerosol * (0.5 ** angstrom_exponent)
+                self.settings["aerosol_angstrom"] = f"{angstrom_exponent:.10f} {tau:.10f}"
 
         if runtype == 'no_scattering':
             self.settings["no_scattering"] = ''
