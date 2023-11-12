@@ -65,9 +65,8 @@ jobs:
 
       - name: Run doctests and coverage
         shell: bash -l {0}
+        run: pytest spectractor tests/test_fullchain.py -v --cov --cov-append --cov-report xml --doctest-plus --doctest-only --doctest-modules spectractor --doctest-continue-on-failure
         continue-on-error: true
-        run: |
-           pytest spectractor tests/test_fullchain.py -v --cov --cov-append --cov-report xml --doctest-plus --doctest-only --doctest-modules spectractor --doctest-continue-on-failure
       - name: Coveralls
         uses: coverallsapp/github-action@master
         with:
