@@ -519,21 +519,21 @@ class ChromaticPSF:
         >>> s = ChromaticPSF(Moffat(), Nx=100, Ny=20, deg=2, saturation=20000)
         >>> profile_params = s.from_poly_params_to_profile_params(s.generate_test_poly_params(), apply_bounds=True)
         >>> profile_params[:, 1] = np.arange(s.Nx)
-        >>> psf_cube = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
-        >>> psf_cube.shape
+        >>> psf_cube_masked = s.build_psf_cube_masked(s.set_pixels(mode="2D"), profile_params)
+        >>> psf_cube_masked.shape
         (100, 20, 100)
-        >>> plt.imshow(psf_cube[20], origin="lower"); plt.show()  # doctest: +ELLIPSIS
+        >>> plt.imshow(psf_cube_masked[20], origin="lower"); plt.show()  # doctest: +ELLIPSIS
         <matplotlib.image.AxesImage object at ...>
-        >>> plt.imshow(psf_cube[80], origin="lower"); plt.show()  # doctest: +ELLIPSIS
+        >>> plt.imshow(psf_cube_masked[80], origin="lower"); plt.show()  # doctest: +ELLIPSIS
         <matplotlib.image.AxesImage object at ...>
 
         .. doctest::
             :hide:
 
-            >>> assert psf_cube.shape == (s.Nx, s.Ny, s.Nx)
-            >>> np.argmax(np.sum(psf_cube[20], axis=0))
+            >>> assert psf_cube_masked.shape == (s.Nx, s.Ny, s.Nx)
+            >>> np.argmax(np.sum(psf_cube_masked[20], axis=0))
             10
-            >>> np.argmax(np.sum(psf_cube[80], axis=0))
+            >>> np.argmax(np.sum(psf_cube_masked[80], axis=0))
             70
 
         """

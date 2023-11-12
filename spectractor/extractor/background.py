@@ -239,7 +239,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     >>> s0 = ChromaticPSF(psf, Nx=100, Ny=200, saturation=1000)
     >>> params = s0.generate_test_poly_params()
     >>> saturation = params[-1]
-    >>> data = s0.evaluate(s0.set_pixels(mode="1D"))
+    >>> data = s0.evaluate(s0.set_pixels(mode="1D"), poly_params=params)
     >>> bgd = 10*np.ones_like(data)
     >>> data += bgd
     >>> data = np.random.poisson(data)
