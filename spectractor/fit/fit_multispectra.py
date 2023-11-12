@@ -958,7 +958,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False,
 
     Examples
     --------
-    >>> spectra = _build_test_sample(20, aerosols=0.5, angstrom_exponent=1.5, ozone=300, pwv=3)
+    >>> spectra = _build_test_sample(20, aerosols=0.05, angstrom_exponent=1.5, ozone=300, pwv=3)
     >>> parameters.VERBOSE = True
     >>> parameters.DEBUG = True
     >>> w = MultiSpectraFitWorkspace("./outputs/test", spectra, bin_width=5, verbose=True,
