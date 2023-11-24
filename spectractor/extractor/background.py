@@ -10,7 +10,7 @@ from spectractor.tools import fit_poly1d_outlier_removal, fit_poly2d_outlier_rem
 
 from astropy.stats import SigmaClip
 from photutils import Background2D, SExtractorBackground
-from photutils import make_source_mask
+from photutils.segmentation import detect_sources, detect_threshold
 
 from scipy.signal import medfilt2d
 from scipy.interpolate import interp2d
@@ -32,6 +32,57 @@ def remove_image_background_sextractor(data, sigma=3.0, box_size=(50, 50), filte
         plt.show()
     return data_wo_bkg
 
+
+def make_source_mask(data, nsigma, npixels, mask=None, sigclip_sigma=3.0,
+                     sigclip_iters=5, dilate_size=11):
+    """
+    Make a source mask using source segmentation and binary dilation.
+
+    This is a slight stripped down version of the method which was removed from
+    photutils in 1.7.0.
+
+    Parameters
+    ----------
+    data : 2D `~numpy.ndarray`
+        The 2D array of the image.
+    nsigma : float
+        The number of standard deviations per pixel above the ``background``
+        for which to consider a pixel as possibly being part of a source.
+    npixels : int
+        The minimum number of connected pixels, each greater than
+        ``threshold``, that an object must have to be detected. ``npixels``
+        must be a positive integer.
+    mask : 2D bool `~numpy.ndarray`, optional
+        A boolean mask with the same shape as ``data``, where a `True` value
+        indicates the corresponding element of ``data`` is masked. Masked
+        pixels are ignored when computing the image background statistics.
+    sigclip_sigma : float, optional
+        The number of standard deviations to use as the clipping limit when
+        calculating the image background statistics.
+    sigclip_iters : int, optional
+        The maximum number of iterations to perform sigma clipping, or `None`
+        to clip until convergence is achieved (i.e., continue until the last
+        iteration clips nothing) when calculating the image background
+        statistics.
+    dilate_size : int, optional
+        The size of the square array used to dilate the segmentation image.
+
+    Returns
+    -------
+    mask : 2D bool `~numpy.ndarray`
+        A 2D boolean image containing the source mask.
+    """
+    sigma_clip = SigmaClip(sigma=sigclip_sigma, maxiters=sigclip_iters)
+    threshold = detect_threshold(data, nsigma, background=None, error=None,
+                                 mask=mask, sigma_clip=sigma_clip)
+
+    segm = detect_sources(data, threshold, npixels)
+    if segm is None:
+        return np.zeros(data.shape, dtype=bool)
+
+    footprint = np.ones((dilate_size, dilate_size))
+    # Replace with size= when photutils>=1.7 is enforced in rubin-env
+    return segm.make_source_mask(footprint=footprint)
 
 def extract_spectrogram_background_fit1D(data, err, deg=1, ws=(20, 30), pixel_step=1, sigma=5):
     """
@@ -178,6 +229,11 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     if Dy_disp_axis is None:
         Dy_disp_axis = np.ones(Nx) * (Ny // 2)
 
+    # first estimate of median background
+    filter_size = parameters.PIXWIDTH_BOXSIZE // 2
+    if filter_size % 2 == 0:  # must be odd since photutils 1.5.0
+        filter_size += 1
+
     # mask sources
     mask = make_source_mask(data, nsigma=3, npixels=5, dilate_size=11)
     mask += data == 0
@@ -196,7 +252,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
     #                    sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
     #                    mask=mask)
     bkg = Background2D(data, (parameters.PIXWIDTH_BOXSIZE, parameters.PIXWIDTH_BOXSIZE),
-                       filter_size=(parameters.PIXWIDTH_BOXSIZE // 2, parameters.PIXWIDTH_BOXSIZE // 2),
+                       filter_size=(filter_size, filter_size),
                        sigma_clip=sigma_clip, bkg_estimator=bkg_estimator,
                        mask=mask)
     bkg.background[data == 0] = 0
@@ -231,7 +287,7 @@ def extract_spectrogram_background_sextractor(data, err, ws=(20, 30), mask_signa
         ax0.set_ylabel(parameters.PLOT_YLABEL)
         ax0.set_xticks([])
         ax1.set_xticks([])
-        bkg.plot_meshes(outlines=True, color='red', axes=ax1, linewidth=0.5)
+        bkg.plot_meshes(outlines=True, color='red', ax=ax1, linewidth=0.5)
         b = bkg.background
         im = ax1.imshow(b, origin='lower', aspect="auto")
         # ax1.set_xlabel(parameters.PLOT_XLABEL)
