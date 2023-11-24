@@ -1742,8 +1742,8 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     else:
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
     im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
-    ax.grid(color='silver', ls='solid')
-    ax.grid(True)
+    # ax.grid(color='silver', ls='solid')
+    # ax.grid(True)
     ax.set_xlabel(parameters.PLOT_XLABEL)
     ax.set_ylabel(parameters.PLOT_YLABEL)
     cb = plt.colorbar(im, ax=ax, cax=cax)
@@ -1814,7 +1814,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
                     zorder=zorder, markersize=2, linestyle=linestyle)
     else:
         ax.plot(xs, data, color=color, lw=lw, label=label, linestyle=linestyle, zorder=zorder)
-    ax.grid(True)
+    # ax.grid(True)
     if xlim is None and lambdas is not None:
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
     ax.set_xlim(xlim)
