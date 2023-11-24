@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
 from matplotlib.ticker import MaxNLocator
@@ -7,6 +6,7 @@ from astropy.io import ascii
 import copy
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
 
@@ -569,14 +569,14 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         im = ax[1, 0].pcolormesh(xx, yy, model / norm, vmin=0, vmax=1, cmap=cmap_viridis)
         plt.colorbar(im, cax=ax[1, 1], label='1/max(data)', format="%.1f")
         ax[1, 0].set_title("Model", fontsize=12, color='white', x=0.91, y=0.76)
-        ax[1, 0].grid(color='silver', ls='solid')
+        #ax[1, 0].grid(color='silver', ls='solid')
         ax[1, 0].scatter(self.lambdas[0][1:-1], ylbda, cmap=from_lambda_to_colormap(self.lambdas[0][1:-1]),
                          edgecolors='None', c=self.lambdas[0][1:-1], label='', marker='o', s=20)
         # data
         im = ax[0, 0].pcolormesh(xx, yy, data / norm, vmin=0, vmax=1, cmap=cmap_viridis)
         plt.colorbar(im, cax=ax[0, 1], label='1/max(data)', format="%.1f")
         ax[0, 0].set_title("Data", fontsize=12, color='white', x=0.91, y=0.76)
-        ax[0, 0].grid(color='silver', ls='solid')
+        #ax[0, 0].grid(color='silver', ls='solid')
         ax[0, 0].scatter(self.lambdas[0][1:-1], ylbda, cmap=from_lambda_to_colormap(self.lambdas[0][1:-1]),
                          edgecolors='None', c=self.lambdas[0][1:-1], label='', marker='o', s=20)
         # residuals
@@ -587,7 +587,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         im = ax[2, 0].pcolormesh(xx, yy, residuals, vmin=-3 * std, vmax=3 * std, cmap=cmap_bwr)
         plt.colorbar(im, cax=ax[2, 1], label='(Data-Model)/Err', format="%.0f")
         # ax[2, 0].set_title('(Data-Model)/Err', fontsize=10, color='black', x=0.84, y=0.76)
-        ax[2, 0].grid(color='silver', ls='solid')
+        #ax[2, 0].grid(color='silver', ls='solid')
         ax[2, 0].scatter(self.lambdas[0][1:-1], ylbda, cmap=from_lambda_to_colormap(self.lambdas[0][1:-1]),
                          edgecolors='None', c=self.lambdas[0][1:-1], label='', marker='o', s=10*self.nspectra)
         ax[2, 0].text(0.05, 0.8, f'mean={np.nanmean(residuals):.3f}\nstd={np.nanstd(residuals):.3f}',
@@ -635,13 +635,13 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         ax[0, 0].set_ylabel(r'Instrumental transmission')
         ax[0, 0].set_xlim(self.lambdas[0][0], self.lambdas[0][-1])
         ax[0, 0].set_ylim(0, 1.1 * np.nanmax(transmission))
-        ax[0, 0].grid(True)
+        #ax[0, 0].grid(True)
         ax[0, 0].set_xlabel(r'$\lambda$ [nm]')
         if self.true_instrumental_transmission is not None:
             ax[0, 0].plot(self.lambdas[0], self.true_instrumental_transmission, "g-",
                           label=r'true $T_{\mathrm{inst}}* \left\langle A_1 \right\rangle$')
             ax[1, 0].set_xlabel(r'$\lambda$ [nm]')
-            ax[1, 0].grid(True)
+            #ax[1, 0].grid(True)
             ax[1, 0].set_ylabel(r'(Data-Truth)/Err')
             norm = transmission_err
             residuals = (self.amplitude_params - self.true_instrumental_transmission) / norm
@@ -664,12 +664,12 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         ax[0, 1].set_ylabel(r'Atmospheric transmission')
         ax[0, 1].set_xlabel(r'$\lambda$ [nm]')
         ax[0, 1].set_xlim(self.lambdas[0][0], self.lambdas[0][-1])
-        ax[0, 1].grid(True)
+        #ax[0, 1].grid(True)
         if self.truth is not None:
             ax[0, 1].plot(self.lambdas[0], self.true_atmospheric_transmission, "b-", label=r'true $T_{\mathrm{atm}}$')
             ax[1, 1].set_xlabel(r'$\lambda$ [nm]')
             ax[1, 1].set_ylabel(r'Data-Truth')
-            ax[1, 1].grid(True)
+            #ax[1, 1].grid(True)
             residuals = np.asarray(tatm_binned) - self.true_atmospheric_transmission
             ax[1, 1].errorbar(self.lambdas[0], residuals, label=r'$T_{\mathrm{inst}}$', fmt='k.')  # , markersize=0.1)
             ax[1, 1].set_ylim(-1.1 * np.max(np.abs(residuals)), 1.1 * np.max(np.abs(residuals)))
@@ -720,7 +720,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         plt.axhline(1, color="k", linestyle="--")
         plt.axhline(np.mean(A1s), color="b", linestyle="--",
                     label=rf"$\left\langle A_1\right\rangle = {np.mean(A1s):.3f}$ (std={np.std(A1s):.3f})")
-        plt.grid()
+        #plt.grid()
         plt.ylabel("Relative grey transmissions")
         plt.xlabel("Spectrum index")
         plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -872,7 +872,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton"):
             plt.plot(fit_workspace.lambdas[k],
                      tinst * np.array([fit_workspace.M[k][i, i] for i in range(fit_workspace.lambdas[k].size)]))
             plt.ylim(0, 1.2 * np.max(fit_workspace.data[k]))
-        plt.grid()
+        #plt.grid()
         plt.title(f"reso={reso:.3f}")
         plt.show()
         if fit_workspace.filename != "":
