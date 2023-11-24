@@ -420,7 +420,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     if not with_rotation:
         rotation_angle = 0
     else:
-        rotation_angle = float(with_rotation)  #spectrum.rotation_angle
+        rotation_angle = spectrum.rotation_angle
 
     # Load PSF
     if psf_type is not None:
