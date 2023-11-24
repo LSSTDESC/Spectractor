@@ -3,7 +3,6 @@ mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all oth
 
 import pytest  # noqa: E402
 import numpy as np  # noqa: E402
-from numpy.testing import run_module_suite  # noqa: E402
 from photutils.datasets import make_4gaussians_image  # noqa: E402
 from spectractor.extractor.background import make_source_mask  # noqa: E402
 from photutils.utils.exceptions import NoDetectionsWarning  # noqa: E402
@@ -19,6 +18,3 @@ def test_make_source_mask():
         mask = make_source_mask(data, 100, 100)
         assert np.count_nonzero(mask) == 0
 
-
-if __name__ == "__main__":
-    run_module_suite()

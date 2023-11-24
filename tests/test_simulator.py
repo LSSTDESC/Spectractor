@@ -1,7 +1,6 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-from numpy.testing import run_module_suite  # noqa: E402
 import numpy as np  # noqa: E402
 
 from spectractor import parameters  # noqa: E402
@@ -68,7 +67,3 @@ def test_simulator():
         assert np.sum(spectrum_simulation.data) < 1e-10
         assert np.sum(spectrum_simulation.data_next_order) < 1e-10
 
-
-if __name__ == "__main__":
-
-    run_module_suite()

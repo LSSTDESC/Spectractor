@@ -14,7 +14,8 @@ from matplotlib.ticker import MaxNLocator
 
 import json
 import warnings
-from scipy.signal import fftconvolve, gaussian
+from scipy.signal.windows import gaussian
+from scipy.signal import fftconvolve
 from scipy.ndimage import maximum_filter, generate_binary_structure, binary_erosion
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
@@ -1970,7 +1971,7 @@ def plot_table_in_axis(ax, table):
         'FWHM': 'FWHM\n(nm)',
         'Amplitude': 'Amplitude',
         'SNR': 'SNR',
-        'Chisq': '${\chi}^2$',
+        'Chisq': r'${\chi}^2$',
         'Eqwidth_mod': 'Eq. Width\n(model)',
         'Eqwidth_data': 'Eq. Width\n(data)',
     }
