@@ -99,7 +99,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.input_labels = ["A2", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]",
                              r"angle [deg]", "B", "R"] + list(self.psf_poly_params_labels)
         self.axis_names = ["$A_2$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^(\mathrm{fit})$ [pix]",
-                           r"$\delta_{\mathrm{y}}^(\mathrm{fit})$ [pix]",
+                           r"$\delta_{\mathrm{y}}^{(\mathrm{fit})}$ [pix]",
                            r"$\alpha$ [deg]", "$B$", "R"] + list(self.psf_poly_params_names)
         bounds_D = (self.D - 5 * parameters.DISTANCE2CCD_ERR, self.D + 5 * parameters.DISTANCE2CCD_ERR)
         self.bounds = np.concatenate([np.array([(0, 2 / parameters.GRATING_ORDER_2OVER1), bounds_D,
@@ -1206,12 +1206,12 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         ax[0].set_xlabel(r"$\lambda$ [nm]")
         ax[0].set_ylabel("Transverse FWHM [pixels]")
         ax[0].set_ylim((0.8 * np.min(s.table['fwhm']), 1.2 * np.max(s.table['fwhm'])))  # [-10:])))
-        ax[0].grid()
+        # ax[0].grid()
         ax[1].plot(spectrum.lambdas, np.array(s.table['y_c']))
         ax[1].set_xlabel(r"$\lambda$ [nm]")
         ax[1].set_ylabel("Distance from mean dispersion axis [pixels]")
         # ax[1].set_ylim((0.8*np.min(s.table['Dy']), 1.2*np.max(s.table['fwhm'][-10:])))
-        ax[1].grid()
+        # ax[1].grid()
         if parameters.DISPLAY:
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
@@ -1240,7 +1240,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         ax[1, 0].plot(spectrum.lambdas, (s.table['flux_sum'] - s.table['flux_integral']) / s.table['flux_sum'],
                       label='(model_integral-cross_sum)/cross_sum')
         ax[1, 0].legend()
-        ax[1, 0].grid(True)
+        # ax[1, 0].grid(True)
         ax[1, 0].set_xlim(ax[0, 0].get_xlim())
         ax[1, 0].set_ylim(-1, 1)
         ax[1, 0].set_ylabel('Relative difference')
@@ -1342,12 +1342,12 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
         ax[0].set_xlabel(r"$\lambda$ [nm]")
         ax[0].set_ylabel("Transverse FWHM [pixels]")
         ax[0].set_ylim((0.8 * np.min(s.table['fwhm']), 1.2 * np.max(s.table['fwhm'])))  # [-10:])))
-        ax[0].grid()
+        # ax[0].grid()
         ax[1].plot(spectrum.lambdas, np.array(s.table['y_c']))
         ax[1].set_xlabel(r"$\lambda$ [nm]")
         ax[1].set_ylabel("Distance from mean dispersion axis [pixels]")
         # ax[1].set_ylim((0.8*np.min(s.table['Dy']), 1.2*np.max(s.table['fwhm'][-10:])))
-        ax[1].grid()
+        # ax[1].grid()
         if parameters.DISPLAY:
             plt.show()
         if parameters.LSST_SAVEFIGPATH:
@@ -1371,13 +1371,13 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     s0.set_polynomial_degrees(s0.deg)
     s0.profile_params = s0.from_poly_params_to_profile_params(s0.poly_params)
     s0.from_profile_params_to_shape_params(s0.profile_params)
-    gs_kw = dict(width_ratios=[2, 1], height_ratios=[2, 1])
+    gs_kw = dict(width_ratios=[2.5, 1], height_ratios=[2, 1])
     fig, ax = plt.subplots(2, 2, figsize=(11, 5), sharex="all", gridspec_kw=gs_kw)
     ax[0, 0].plot(lambdas_truth, amplitude_truth, label="truth", zorder=42, lw=2)
     amplitude_priors_err = [np.sqrt(w.amplitude_priors_cov_matrix[x, x]) for x in range(w.Nx)]
     ax[0, 0].errorbar(spectrum.lambdas, w.amplitude_priors, yerr=amplitude_priors_err, label="prior")
     ax[0, 0].errorbar(spectrum.lambdas, w.amplitude_params, yerr=w.amplitude_params_err, label="2D")
-    ax[0, 0].grid()
+    # ax[0, 0].grid()
     ax[0, 0].legend()
     ax[0, 0].set_xlabel(r"$\lambda$ [nm]")
     ax[0, 0].set_ylabel(f"Amplitude $A$ [ADU/s]")
@@ -1389,7 +1389,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     res = (w.amplitude_params - amplitude_truth_interp) / w.amplitude_params_err
     ax[1, 0].errorbar(spectrum.lambdas, res, yerr=np.ones_like(res),
                       label=f"2D: mean={np.mean(res):.2f}, std={np.std(res):.2f}")
-    ax[1, 0].grid()
+    # ax[1, 0].grid()
     ax[1, 0].legend(ncol=3).set_zorder(43)
     ax[1, 0].set_xlabel(r"$\lambda$ [nm]")
     ax[1, 0].set_ylim(-5, 5)
@@ -1402,7 +1402,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     ax[0, 1].plot(lambdas_truth, s0.table["fwhm"], label="truth")
     ax[0, 1].plot(spectrum.lambdas, w.fwhm_priors, label="prior")
     ax[0, 1].plot(spectrum.lambdas, s.table["fwhm"], label="fit")
-    ax[0, 1].grid()
+    # ax[0, 1].grid()
     ax[0, 1].set_ylim(0, 10)
     ax[0, 1].legend()
     ax[0, 1].set_xlabel(r"$\lambda$ [nm]")
@@ -1412,7 +1412,7 @@ def plot_comparison_truth(spectrum, w):  # pragma: no cover
     ax[1, 1].plot(lambdas_truth, np.zeros_like(lambdas_truth), label="truth")
     ax[1, 1].plot(spectrum.lambdas, w.fwhm_priors - fwhm_truth, label="prior")
     ax[1, 1].plot(spectrum.lambdas, s.table["fwhm"] - fwhm_truth, label="2D")
-    ax[1, 1].grid()
+    # ax[1, 1].grid()
     ax[1, 1].set_ylim(-0.5, 0.5)
     ax[1, 1].legend()
     plt.subplots_adjust(hspace=0)

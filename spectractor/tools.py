@@ -25,6 +25,8 @@ from math import floor
 
 from numba import njit
 
+_SCIKIT_IMAGE_NEW_HESSIAN = None
+
 
 @njit(fastmath=True, cache=True)
 def gauss(x, A, x0, sigma):
@@ -1392,8 +1394,24 @@ def weighted_avg_and_std(values, weights):
 
 
 def hessian_and_theta(data, margin_cut=1):
+    # Check for unannounced API change on hessian_matrix in scikit-image>=0.20
+    # See https://github.com/scikit-image/scikit-image/pull/6624
+    global _SCIKIT_IMAGE_NEW_HESSIAN
+
+    if _SCIKIT_IMAGE_NEW_HESSIAN is None:
+        from importlib import metadata
+        import packaging
+
+        vers = packaging.version.parse(metadata.version("scikit-image"))
+        if vers < packaging.version.parse("0.20.0"):
+            _SCIKIT_IMAGE_NEW_HESSIAN = False
+        else:
+            _SCIKIT_IMAGE_NEW_HESSIAN = True
+
     # compute hessian matrices on the image
-    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order='rc')
+    order = "xy" if _SCIKIT_IMAGE_NEW_HESSIAN else "rc"
+    # compute hessian matrices on the image
+    Hxx, Hxy, Hyy = hessian_matrix(data, sigma=3, order=order)
     lambda_plus = 0.5 * ((Hxx + Hyy) + np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     lambda_minus = 0.5 * ((Hxx + Hyy) - np.sqrt((Hxx - Hyy) ** 2 + 4 * Hxy * Hxy))
     theta = 0.5 * np.arctan2(2 * Hxy, Hxx - Hyy) * 180 / np.pi
@@ -1724,8 +1742,8 @@ def plot_image_simple(ax, data, scale="lin", title="", units="Image units", cmap
     else:
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
     im = ax.imshow(data, origin='lower', cmap=cmap, norm=norm, aspect=aspect)
-    ax.grid(color='silver', ls='solid')
-    ax.grid(True)
+    # ax.grid(color='silver', ls='solid')
+    # ax.grid(True)
     ax.set_xlabel(parameters.PLOT_XLABEL)
     ax.set_ylabel(parameters.PLOT_YLABEL)
     cb = plt.colorbar(im, ax=ax, cax=cax)
@@ -1796,7 +1814,7 @@ def plot_spectrum_simple(ax, lambdas, data, data_err=None, xlim=None, color='r',
                     zorder=zorder, markersize=2, linestyle=linestyle)
     else:
         ax.plot(xs, data, color=color, lw=lw, label=label, linestyle=linestyle, zorder=zorder)
-    ax.grid(True)
+    # ax.grid(True)
     if xlim is None and lambdas is not None:
         xlim = [parameters.LAMBDA_MIN, parameters.LAMBDA_MAX]
     ax.set_xlim(xlim)
@@ -2335,7 +2353,7 @@ def plot_correlation_matrix_simple(ax, rho, axis_names=None, ipar=None):
     if axis_names is not None:
         names = [axis_names[ip] for ip in ipar]
         plt.xticks(np.arange(ipar.size), names, rotation='vertical', fontsize=9)
-        plt.yticks(np.arange(ipar.size), names, fontsize=7)
+        plt.yticks(np.arange(ipar.size), names, fontsize=9)
     cbar = plt.colorbar(im)
     cbar.ax.tick_params(labelsize=7)
     plt.gcf().tight_layout()

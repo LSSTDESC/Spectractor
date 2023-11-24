@@ -301,7 +301,7 @@ class FitWorkspace:
                 title += ", "
         plt.title(title)
         plt.legend()
-        plt.grid()
+        # plt.grid()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
         return fig
@@ -1031,7 +1031,7 @@ def gradient_descent(fit_workspace, params, epsilon, niter=10, fixed_params=None
                            f"\n\t\t Line search: alpha_min={alpha_min:.3g} iter={iter} funcalls={funcalls}"
                            f"\n\tParameter shifts: {alpha_min * dparams}"
                            f"\n\tNew parameters: {tmp_params[ipar]}"
-                           f"\n\tFinal cost={fval:.5g} final chisq_red={fval / (tmp_model.size - len(fit_workspace.mask)):.5g} "
+                           f"\n\tFinal cost={fval:.5g} final chisq_red={fval / (tmp_model.size - len(fit_workspace.mask)):.5g} {tmp_model.size=} {len(fit_workspace.mask)=}"
                            f"computed in {time.time() - start:.2f}s")
         if fit_workspace.live_fit:  # pragma: no cover
             fit_workspace.simulate(*tmp_params)
@@ -1124,7 +1124,7 @@ def simple_newton_minimisation(fit_workspace, params, epsilon, niter=10, fixed_p
         r = np.log10(fit_workspace.regs)
         js = [fit_workspace.jacobian(np.asarray([rr]), epsilon, fixed_params=fixed_params)[0] for rr in np.array(r)]
         plt.plot(r, js, label="J")
-        plt.grid()
+        # plt.grid()
         plt.legend()
         plt.show()
 
@@ -1135,7 +1135,7 @@ def simple_newton_minimisation(fit_workspace, params, epsilon, niter=10, fixed_p
             plt.plot(r, mod)
             plt.axvline(tmp_params)
             plt.axhline(tmp_model)
-            plt.grid()
+            # plt.grid()
             plt.legend()
             plt.draw()
             plt.pause(1e-8)
@@ -1199,11 +1199,11 @@ def plot_gradient_descent(fit_workspace, costs, params_table):
         ax[1].plot(iterations, params_table[:, ip], label=f"{fit_workspace.axis_names[ip]}")
     ax[1].set_yscale("symlog")
     ax[1].legend(ncol=6, loc=9)
-    ax[1].grid()
+    # ax[1].grid()
     ax[0].set_yscale("log")
     ax[0].set_ylabel(r"$\chi^2$")
     ax[1].set_ylabel("Parameters")
-    ax[0].grid()
+    # ax[0].grid()
     ax[1].set_xlabel("Iterations")
     ax[0].xaxis.set_major_locator(MaxNLocator(integer=True))
     fig.tight_layout()
@@ -1512,7 +1512,7 @@ class RegFitWorkspace(FitWorkspace):
                 plt.errorbar(x, self.w.amplitude_params, yerr=[np.sqrt(self.w.amplitude_cov_matrix[i, i]) for i in x],
                              label=f"fit r={r:.2g}")
                 plt.plot(x, self.w.amplitude_priors, label="prior")
-                plt.grid()
+                # plt.grid()
                 plt.legend()
                 plt.draw()
                 plt.pause(1e-8)
@@ -1527,18 +1527,18 @@ class RegFitWorkspace(FitWorkspace):
         ax[2].axvline(opt_reg, color="k")
         ax[0].set_ylabel(r"$G(r)$")
         # ax[0].set_xlabel("Regularisation hyper-parameter $r$")
-        ax[0].grid()
+        # ax[0].grid()
         ax[0].set_title(f"Optimal regularisation parameter: {opt_reg:.3g}")
         ax[1].plot(regs, chisqs)
         ax[1].set_ylabel(r"$\chi^2(\mathbf{A}(r) \vert \mathbf{\theta})$")
         # ax[1].set_xlabel("Regularisation hyper-parameter $r$")
-        ax[1].grid()
+        # ax[1].grid()
         ax[1].set_xscale("log")
         ax[2].set_xscale("log")
         ax[2].plot(regs, resolutions)
         ax[2].set_ylabel(r"$\mathrm{Tr}\,\mathbf{R}$")
         ax[2].set_xlabel("Regularisation hyper-parameter $r$")
-        ax[2].grid()
+        # ax[2].grid()
         fig.tight_layout()
         plt.subplots_adjust(hspace=0.05)
         if parameters.DISPLAY:
