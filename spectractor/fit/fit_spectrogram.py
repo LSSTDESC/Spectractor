@@ -116,13 +116,17 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.my_logger = set_logger(self.__class__.__name__)
         if atmgrid_file_name == "":
             self.atmosphere = Atmosphere(self.spectrum.airmass, self.spectrum.pressure, self.spectrum.temperature)
+            if self.atmosphere.emulator is not None:
+                self.params.bounds[self.params.get_index("ozone [db]")] = (self.atmosphere.emulator.OZMIN, self.atmosphere.emulator.OZMAX)
+                self.params.bounds[self.params.get_index("PWV [mm]")] = (self.atmosphere.emulator.PWVMIN, self.atmosphere.emulator.PWVMAX)
         else:
             self.use_grid = True
             self.atmosphere = AtmosphereGrid(spectrum_filename=spectrum.filename, atmgrid_filename=atmgrid_file_name)
-            self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
-        self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
-        if not fit_angstrom_exponent:
+            self.params.bounds[self.params.get_index("VAOD")] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
+            self.params.bounds[self.params.get_index("ozone [db]")] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
+            self.params.bounds[self.params.get_index("PWV [mm]")] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
             self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
+            self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
         if self.spectrum.spectrogram_Ny > 2 * parameters.PIXDIST_BACKGROUND:
             self.crop_spectrogram()
         self.lambdas = self.spectrum.lambdas
@@ -130,16 +134,9 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.data = self.spectrum.spectrogram.flatten()
         self.err = self.spectrum.spectrogram_err.flatten()
         self.fit_angstrom_exponent = fit_angstrom_exponent
-        self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
-        if atmgrid_file_name != "":
-            self.params.bounds[self.params.get_index("VAOD")] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
-            self.params.bounds[self.params.get_index("ozone [db]")] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
-            self.params.bounds[self.params.get_index("PWV [mm]")] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+        if not fit_angstrom_exponent:
             self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
-        if self.atmosphere.emulator is not None:
-            self.params.bounds[self.params.get_index("ozone [db]")] = (self.atmosphere.emulator.OZMIN, self.atmosphere.emulator.OZMAX)
-            self.params.bounds[self.params.get_index("PWV [mm]")] = (self.atmosphere.emulator.PWVMIN, self.atmosphere.emulator.PWVMAX)
-
+        self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
         self.simulation = SpectrogramModel(self.spectrum, atmosphere=self.atmosphere,
                                            diffraction_orders=self.diffraction_orders,
                                            with_background=True, fast_sim=False, with_adr=True)

@@ -82,9 +82,16 @@ class SpectrumFitWorkspace(FitWorkspace):
         FitWorkspace.__init__(self, params, verbose=verbose, plot=plot, live_fit=live_fit, file_name=spectrum.filename)
         if atmgrid_file_name == "":
             self.atmosphere = Atmosphere(self.spectrum.airmass, self.spectrum.pressure, self.spectrum.temperature)
+            if self.atmosphere.emulator is not None:
+                self.params.bounds[self.params.get_index("ozone [db]")] = (self.atmosphere.emulator.OZMIN, self.atmosphere.emulator.OZMAX)
+                self.params.bounds[self.params.get_index("PWV [mm]")] = (self.atmosphere.emulator.PWVMIN, self.atmosphere.emulator.PWVMAX)
         else:
             self.use_grid = True
             self.atmosphere = AtmosphereGrid(spectrum_filename=spectrum.filename, atmgrid_filename=atmgrid_file_name)
+            self.params.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
+            self.params.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
+            self.params.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
+            self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
             if parameters.VERBOSE:
                 self.my_logger.info(f'\n\tUse atmospheric grid models from file {atmgrid_file_name}. ')
         self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
@@ -94,11 +101,6 @@ class SpectrumFitWorkspace(FitWorkspace):
         self.data_cov = self.spectrum.cov_matrix
         self.fit_angstrom_exponent = fit_angstrom_exponent
         self.params.values[self.params.get_index("angstrom_exp")] = self.atmosphere.angstrom_exponent_default
-        if atmgrid_file_name != "":
-            self.params.bounds[2] = (min(self.atmosphere.AER_Points), max(self.atmosphere.AER_Points))
-            self.params.bounds[4] = (min(self.atmosphere.OZ_Points), max(self.atmosphere.OZ_Points))
-            self.params.bounds[5] = (min(self.atmosphere.PWV_Points), max(self.atmosphere.PWV_Points))
-            self.params.fixed[self.params.get_index("angstrom_exp")] = True  # angstrom exponent
         self.simulation = SpectrumSimulation(self.spectrum, atmosphere=self.atmosphere, fast_sim=True, with_adr=True)
         self.amplitude_truth = None
         self.lambdas_truth = None
