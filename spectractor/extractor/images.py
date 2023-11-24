@@ -435,7 +435,7 @@ class Image(object):
                    horizontalalignment='left', verticalalignment='top', transform=ax[0].transAxes)
         ax[0].scatter(x, y)
         ax[0].plot(x, model, "k-")
-        ax[0].grid()
+        # ax[0].grid()
         ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
         ax[0].set_xlabel(r"Data pixel values [ADU]")
         plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Statistical uncertainty map",
@@ -996,13 +996,13 @@ def find_target_1Dprofile(image, sub_image, guess):
         ax2.plot(X, profile_X_raw, 'r-', lw=2)
         ax2.plot(X, bkgd_X(X), 'g--', lw=2, label='bkgd')
         ax2.axvline(avX, color='b', linestyle='-', label='new', lw=2)
-        ax2.grid(True)
+        # ax2.grid(True)
         ax2.set_xlabel(parameters.PLOT_XLABEL)
         ax2.legend(loc=1)
         ax3.plot(Y, profile_Y_raw, 'r-', lw=2)
         ax3.plot(Y, bkgd_Y(Y), 'g--', lw=2, label='bkgd')
         ax3.axvline(avY, color='b', linestyle='-', label='new', lw=2)
-        ax3.grid(True)
+        # ax3.grid(True)
         ax3.set_xlabel(parameters.PLOT_YLABEL)
         ax3.legend(loc=1)
         f.tight_layout()
@@ -1095,7 +1095,7 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
         Y, X = np.mgrid[:NY, :NX]
         star2D = psf.evaluate(pixels=np.array([X, Y]))
         plot_image_simple(ax1, data=sub_image_subtracted, scale="lin", title="", units=image.units,
-                          target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
+                          target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax, cmap="gray")
         ax1.legend(loc=1)
 
         ax1.text(0.05, 0.05, f'Data', color="white",
@@ -1105,9 +1105,9 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
         ax3.text(0.05, 0.05, f'Residuals', color="white",
                  horizontalalignment='left', verticalalignment='bottom', transform=ax3.transAxes)
         plot_image_simple(ax2, data=star2D, scale="lin", title="",
-                          units=f'{image.units}', vmin=vmin, vmax=vmax)
+                          units=f'{image.units}', vmin=vmin, vmax=vmax, cmap="gray")
         plot_image_simple(ax3, data=sub_image_subtracted - star2D, scale="lin", title="",
-                          units=f'{image.units}', target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax)
+                          units=f'{image.units}', target_pixcoords=[new_avX, new_avY], vmin=vmin, vmax=vmax, cmap="gray")
         ax3.legend(loc=1)
 
         f.tight_layout()
@@ -1223,11 +1223,11 @@ def compute_rotation_angle_hessian(image, angle_range=(-10, 10), width_cut=param
         ax1.legend()
         ax1.set_xlabel(parameters.PLOT_XLABEL)
         ax1.set_ylabel(parameters.PLOT_YLABEL)
-        ax1.grid(True)
+        # ax1.grid(True)
         ax2.hist(theta_hist, bins=int(np.sqrt(len(theta_hist))))
         ax2.axvline(theta_median, color='k')
         ax2.set_xlabel(parameters.PLOT_ROT_LABEL)
-        ax2.grid()
+        # ax2.grid()
         f.tight_layout()
         if parameters.DISPLAY:  # pragma: no cover
             plt.show()
