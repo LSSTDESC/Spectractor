@@ -1033,6 +1033,8 @@ def SpectractorRun(image, output_directory, guess=None):
     -------
     spectrum: Spectrum
         The extracted spectrum object.
+    w: FullForwardModelFitWorkspace
+        The FFM wrokspace.
 
     Examples
     --------
@@ -1052,7 +1054,7 @@ def SpectractorRun(image, output_directory, guess=None):
         ...         continue
         ...     image = SpectractorInit(file_name, target_label=target_label,
         ...                             disperser_label=disperser_label, config='./config/ctio.ini')
-        ...     spectrum = SpectractorRun(image, './tests/data/', guess=[xpos, ypos])
+        ...     spectrum, w = SpectractorRun(image, './tests/data/', guess=[xpos, ypos])
 
     .. doctest::
         :hide:
@@ -1141,7 +1143,7 @@ def SpectractorRun(image, output_directory, guess=None):
     if parameters.VERBOSE and parameters.DISPLAY:
         spectrum.plot_spectrum(xlim=None)
 
-    return spectrum
+    return spectrum, w
 
 
 def Spectractor(file_name, output_directory, target_label='', guess=None, disperser_label="", config=''):
@@ -1196,7 +1198,7 @@ def Spectractor(file_name, output_directory, target_label='', guess=None, disper
 
     """
     image = SpectractorInit(file_name, target_label=target_label, disperser_label=disperser_label, config=config)
-    spectrum = SpectractorRun(image, guess=guess, output_directory=output_directory)
+    spectrum, w = SpectractorRun(image, guess=guess, output_directory=output_directory)
     return spectrum
 
 
