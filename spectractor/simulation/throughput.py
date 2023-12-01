@@ -93,8 +93,8 @@ def plot_transmission_simple(ax, lambdas, transmissions,  uncertainties=None, la
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="FGB37")
         >>> lambdas, transmissions, errors = load_transmission(os.path.join(parameters.THROUGHPUT_DIR, "RG715.txt"))
         >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="RG715")
-        >>> lambdas, transmissions, errors = load_transmission(os.path.join(parameters.THROUGHPUT_DIR, parameters.OBS_TELESCOPE_TRANSMISSION))
-        >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Telescope")
+        >>> lambdas, transmissions, errors = load_transmission(os.path.join(parameters.THROUGHPUT_DIR, parameters.OBS_FULL_INSTRUMENT_TRANSMISSON))
+        >>> plot_transmission_simple(ax, lambdas, transmissions, errors, title="CTIO", label="Full instrument")
         >>> if parameters.DISPLAY: plt.show()
 
     """

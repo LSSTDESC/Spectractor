@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from matplotlib import colormaps
 from matplotlib import colors
 from matplotlib.ticker import MaxNLocator
 from astropy.io import ascii
@@ -10,7 +11,7 @@ from scipy.interpolate import interp1d
 
 from spectractor import parameters
 from spectractor.config import set_logger
-from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid, angstrom_exponent_default
+from spectractor.simulation.atmosphere import Atmosphere, AtmosphereGrid
 from spectractor.simulation.simulator import SpectrumSimulation
 from spectractor.fit.fitter import (FitWorkspace, run_minimisation_sigma_clipping, run_minimisation, FitParameters)
 from spectractor.tools import from_lambda_to_colormap, fftconvolve_gaussian
@@ -29,8 +30,8 @@ def _build_sim_sample(spectra, aerosols=0.05, ozone=300, pwv=5, angstrom_exponen
     aerosols: float
         VAOD Vertical Aerosols Optical Depth
     angstrom_exponent: float, optional
-        Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
-        If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
+        Angstrom exponent for aerosols.
+        If None, the Atmosphere.angstrom_exponent_default value is used (default: None).
     ozone: float
         Ozone quantity in Dobson
     pwv: float
@@ -38,7 +39,9 @@ def _build_sim_sample(spectra, aerosols=0.05, ozone=300, pwv=5, angstrom_exponen
 
     Examples
     --------
-    >>> _build_sim_sample([Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")])
+    >>> spectra = _build_sim_sample([Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")])
+    >>> len(spectra)
+    1
     """
     sim_spectra = []
     for spec in spectra:
@@ -62,8 +65,8 @@ def _build_test_sample(nspectra=3, aerosols=0.05, ozone=300, pwv=5, angstrom_exp
     aerosols: float
         VAOD Vertical Aerosols Optical Depth
     angstrom_exponent: float, optional
-        Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
-        If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
+        Angstrom exponent for aerosols.
+        If None, the Atmosphere.angstrom_exponent_default value is used (default: None).
     ozone: float
         Ozone quantity in Dobson
     pwv: float
@@ -74,7 +77,7 @@ def _build_test_sample(nspectra=3, aerosols=0.05, ozone=300, pwv=5, angstrom_exp
     >>> _build_test_sample(3)
     """
     spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
-    targets = ["HD111980", "MU COL", "ETADOR"]
+    targets = ["HD111980", "HD111980"] #, "MU COL", "ETADOR", "HD205905", "HD142331", "HD160617"]
     zs = np.linspace(1, 2, len(targets))
     pressure, temperature = 800, 10
     spectra = []
@@ -147,7 +150,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                                                lambda_max=np.max(spectrum.lambdas) + 1))
         self.fix_atm_sim = False
         self.atmospheres_curr = []
-        p = np.array([0.05, np.log10(angstrom_exponent_default), 400, 5, -1, *np.zeros(self.nspectra), *np.ones(self.nspectra)])
+        p = np.array([0.05, self.atmospheres[0].angstrom_exponent_default, 400, 5,
+                      self.atmospheres[0].angstrom_exponent_default, *np.zeros(self.nspectra), *np.ones(self.nspectra)])
         self.deltas_first_index = 5
         self.A1_first_index = self.deltas_first_index + self.nspectra
         fixed = [False] * p.size
@@ -165,9 +169,9 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         if fixed_deltas:
             for ip in range(self.deltas_first_index, self.nspectra + self.deltas_first_index):
                 fixed[ip] = True
-        labels = ["VAOD", "angstrom_exp_log10", "ozone [db]", "PWV [mm]", "reso"] + [f"delta_{k}" for k in range(self.nspectra)] + [f"A1_{k}" for k in range(self.nspectra)]
-        axis_names = ["VAOD", r'$\log_{10}\"a$', "ozone [db]", "PWV [mm]", "reso"] + [f"$\delta_{k}$" for k in range(self.nspectra)] + ["$A_1^{(" + str(k) + ")}$" for k in range(self.nspectra)]
-        bounds = [(0, 0.1), (-5, 2), (100, 700), (0, 10), (0.1, 100)] + [(-20, 20)] * self.nspectra + [(1e-3, 2)] * self.nspectra
+        labels = ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]", "reso"] + [f"delta_{k}" for k in range(self.nspectra)] + [f"A1_{k}" for k in range(self.nspectra)]
+        axis_names = ["VAOD", r'$\"a$', "ozone [db]", "PWV [mm]", "reso"] + [f"$\delta_{k}$" for k in range(self.nspectra)] + ["$A_1^{(" + str(k) + ")}$" for k in range(self.nspectra)]
+        bounds = [(0, 1), (0, 3), (100, 700), (0, 20), (0.1, 100)] + [(-20, 20)] * self.nspectra + [(1e-3, 2)] * self.nspectra
         if fixed[4]:  # reso
             bounds[4] = (-1, 0)
         params = FitParameters(p, labels=labels, axis_names=axis_names, fixed=fixed, bounds=bounds)
@@ -193,6 +197,9 @@ class MultiSpectraFitWorkspace(FitWorkspace):
                                                              for k in range(self.nspectra)])),
                                      temperature=float(np.mean([self.spectra[k].temperature
                                                                 for k in range(self.nspectra)])))
+        if self.atmospheres[0].emulator is not None:
+            self.params.bounds[self.params.get_index("ozone [db]")] = (self.atmospheres[0].emulator.OZMIN, self.atmospheres[0].emulator.OZMAX)
+            self.params.bounds[self.params.get_index("PWV [mm]")] = (self.atmospheres[0].emulator.PWVMIN, self.atmospheres[0].emulator.PWVMAX)
         self.true_instrumental_transmission = None
         self.true_atmospheric_transmission = None
         self.true_A1s = None
@@ -455,9 +462,9 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             ozone_truth = self.spectra[0].header['OZONE_T']
             pwv_truth = self.spectra[0].header['PWV_T']
             aerosols_truth = self.spectra[0].header['VAOD_T']
-            if "LOG10A_T" in self.spectra[0].header and self.spectra[0].header["LOG10A_T"] is not None:
-                angstrom_exponent_truth = 10 ** self.spectra[0].header["LOG10A_T"]
-                self.truth = (aerosols_truth, np.log10(angstrom_exponent_truth), ozone_truth, pwv_truth)
+            if "ANGEXP_T" in self.spectra[0].header and self.spectra[0].header["ANGEXP_T"] is not None:
+                angstrom_exponent_truth = self.spectra[0].header["ANGEXP_T"]
+                self.truth = (aerosols_truth, angstrom_exponent_truth, ozone_truth, pwv_truth)
             else:
                 angstrom_exponent_truth = None
                 self.truth = (aerosols_truth, None, ozone_truth, pwv_truth)
@@ -488,15 +495,15 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             self.true_instrumental_transmission = tinst(self.lambdas[0])
         self.true_instrumental_transmission = np.array(self.true_instrumental_transmission)
 
-    def simulate(self, aerosols, angstrom_exponent_log10, ozone, pwv, reso, *A1s):
+    def simulate(self, aerosols, angstrom_exponent, ozone, pwv, reso, *A1s):
         """Interface method to simulate multiple spectra with a single atmosphere.
 
         Parameters
         ----------
         aerosols: float
             Vertical Aerosols Optical Depth quantity for Libradtran (no units).
-        angstrom_exponent_log10: float
-            Logarithm base 10 of Angstrom exponent for aerosols.
+        angstrom_exponent: float
+            Angstrom exponent for aerosols.
         ozone: float
             Ozone parameter for Libradtran (in db).
         pwv: float
@@ -530,18 +537,17 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         >>> assert np.sum(w.amplitude_params) > 0
 
         """
-        if self.fit_angstrom_exponent:
-            angstrom_exponent = 10 ** angstrom_exponent_log10
-        else:
+        if not self.fit_angstrom_exponent:
             angstrom_exponent = None
         # linear regression for the instrumental transmission parameters T
         # first: force the grey terms to have an average of 1
         deltas = np.array(A1s)[:self.nspectra]
         A1s = np.array(A1s)[self.nspectra:]
-        if A1s.size > 1:
-            m = 1
-            A1s[0] = m * A1s.size - np.sum(A1s[1:])
-            self.params.values[self.A1_first_index] = A1s[0]
+        # if A1s.size > 1:
+        #     m = 1
+        #     A1s[0] = m * A1s.size - np.sum(A1s[1:])
+        #     self.params.values[self.A1_first_index] = A1s[0]
+        A1s[0] = 1
         # second: force the delta lambda terms to have an average of 0
         if deltas.size > 1:
             m = 0
@@ -656,9 +662,9 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         (array(...
         >>> w.plot_fit()
         """
-        cmap_bwr = copy.copy(cm.get_cmap('bwr'))
+        cmap_bwr = copy.copy(colormaps.get_cmap('bwr'))
         cmap_bwr.set_bad(color='lightgrey')
-        cmap_viridis = copy.copy(cm.get_cmap('viridis'))
+        cmap_viridis = copy.copy(colormaps.get_cmap('viridis'))
         cmap_viridis.set_bad(color='lightgrey')
 
         data = copy.deepcopy(self.data)
@@ -736,8 +742,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         """
         gs_kw = dict(width_ratios=[1, 1], height_ratios=[1, 0.15])
         fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(9, 6), gridspec_kw=gs_kw, sharex="all")
-        aerosols, angstrom_exponent_log10, ozone, pwv, reso, *A1s = self.params.values
-        plt.suptitle(f'VAOD={aerosols:.3f}, log10(a)={angstrom_exponent_log10}, ozone={ozone:.0f}db, PWV={pwv:.2f}mm', y=1)
+        aerosols, angstrom_exponent, ozone, pwv, reso, *A1s = self.params.values
+        plt.suptitle(f'VAOD={aerosols:.3f}, ang_exp={angstrom_exponent}, ozone={ozone:.0f}db, PWV={pwv:.2f}mm', y=1)
         masked = self.amplitude_params_err > 1e6
         transmission = np.copy(self.amplitude_params)
         transmission_err = np.copy(self.amplitude_params_err)
@@ -766,7 +772,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             ax[1, 0].remove()
         ax[0, 0].legend()
 
-        tatm = self.atmosphere.simulate(ozone=ozone, pwv=pwv, aerosols=aerosols, angstrom_exponent=10 ** angstrom_exponent_log10)
+        tatm = self.atmosphere.simulate(ozone=ozone, pwv=pwv, aerosols=aerosols, angstrom_exponent=angstrom_exponent)
         tatm_binned = []
         for i in range(1, self.lambdas_bin_edges.size):
             lbdas = np.arange(self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i] + 1, 1)
@@ -847,8 +853,8 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         plt.show()
 
     def save_transmissions(self):
-        aerosols, angstrom_exponent_log10, ozone, pwv, reso, *A1s = self.params.values
-        tatm = self.atmosphere.simulate(ozone=ozone, pwv=pwv, aerosols=aerosols, angstrom_exponent=10 ** angstrom_exponent_log10)
+        aerosols, angstrom_exponent, ozone, pwv, reso, *A1s = self.params.values
+        tatm = self.atmosphere.simulate(ozone=ozone, pwv=pwv, aerosols=aerosols, angstrom_exponent=angstrom_exponent)
         tatm_binned = []
         for i in range(1, self.lambdas_bin_edges.size):
             lbdas = np.arange(self.lambdas_bin_edges[i - 1], self.lambdas_bin_edges[i] + 1, 1)
@@ -910,10 +916,10 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             if tmp_p[ip] + epsilon[ip] < self.params.bounds[ip][0] or tmp_p[ip] + epsilon[ip] > self.params.bounds[ip][1]:
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
-            if "XXXX_" not in self.params.labels[ip]:
-                tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-                for s in range(model.shape[0]):
-                    J[ip].append((tmp_model[s] - model[s]) / epsilon[ip])
+            # if "XXXX_" not in self.params.labels[ip]:
+            tmp_x, tmp_model, tmp_model_err = self.simulate(*tmp_p)
+            for s in range(model.shape[0]):
+                J[ip].append((tmp_model[s] - model[s]) / epsilon[ip])
             # else:  # don't work
             #     k = int(self.params.labels[ip].split("_")[-1]) - 1
             #     dM_dA1k = np.zeros_like(M)
@@ -952,13 +958,15 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False,
 
     Examples
     --------
-    >>> spectra = _build_test_sample(3, aerosols=0.05, angstrom_exponent=0.02, ozone=300, pwv=5)
+    >>> spectra = _build_test_sample(20, aerosols=0.05, angstrom_exponent=1.5, ozone=300, pwv=3)
     >>> parameters.VERBOSE = True
+    >>> parameters.DEBUG = True
     >>> w = MultiSpectraFitWorkspace("./outputs/test", spectra, bin_width=5, verbose=True,
     ... fixed_deltas=True, fixed_A1s=False, fit_angstrom_exponent=True)
     >>> run_multispectra_minimisation(w, method="newton", verbose=True, sigma_clip=10)
     >>> print(w.params.print_parameters_summary())  #doctest: +ELLIPSIS
     VAOD:...
+    >>> w.plot_fit()
     >>> assert np.all(np.isclose(w.A1s, 1, atol=5e-3))
 
     """
@@ -968,16 +976,16 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False,
         run_minimisation(fit_workspace, method=method)
     else:
         my_logger.info(f"\n\tStart guess: {guess}\n\twith {fit_workspace.params.labels}")
-        # epsilon = 1e-4 * guess
-        # epsilon[epsilon == 0] = 1e-4
+        epsilon = 1e-4 * guess
+        epsilon[epsilon == 0] = 1e-4
 
         # very touchy to avoid biases when fitting simulations with A1s
         # good epsilons: epsilon = np.array([0.0001, 1e-4, 5, 0.05, 0.01]) + [1e-2] * fit_workspace.nspectra + [1e-4] * fit_workspace.nspectra)
-        epsilon = np.array([0.0001, 1e-4, 5, 0.05, 0.01])
-        epsilon = np.array(list(epsilon) + [1e-2] * fit_workspace.nspectra + [1e-4] * fit_workspace.nspectra)
+        #epsilon = np.array([0.0001, 1e-3, 5, 0.01, 0.01])
+        #epsilon = np.array(list(epsilon) + [1e-3] * fit_workspace.nspectra + [1e-4] * fit_workspace.nspectra)
 
         run_minimisation_sigma_clipping(fit_workspace, method="newton", epsilon=epsilon,
-                                        xtol=1e-6, ftol=0.001 / fit_workspace.data.size,
+                                        xtol=1e-6, ftol=1e-4 / fit_workspace.data.size,
                                         sigma_clip=sigma_clip, niter_clip=niter_clip,
                                         verbose=verbose, with_line_search=True)
 
@@ -992,7 +1000,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False,
         fit_workspace.simulate(*fit_workspace.params.values)
 
         # Renormalize A1s and instrumental transmission
-        aerosols, angstrom_exponent_log10, ozone, pwv,reso, *A1s = fit_workspace.params.values
+        aerosols, angstrom_exponent, ozone, pwv,reso, *A1s = fit_workspace.params.values
         A1s = np.array(A1s)[fit_workspace.nspectra:]
         mean_A1 = np.mean(A1s)
         fit_workspace.amplitude_params /= mean_A1
