@@ -2480,9 +2480,11 @@ def compute_correlation_matrix(cov):
 
     """
     rho = np.zeros_like(cov, dtype="float")
+    # rescale cov matrix in case it contains very low value in diagonal (for float precision)
+    cov_scaled = cov * np.mean([cov[i, i] for i in range(cov.shape[0])])
     for i in range(cov.shape[0]):
         for j in range(cov.shape[1]):
-            rho[i, j] = cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
+            rho[i, j] = cov_scaled[i, j] / np.sqrt(cov_scaled[i, i] * cov_scaled[j, j])
     return rho
 
 
