@@ -1,7 +1,6 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-from numpy.testing import run_module_suite  # noqa: E402
 from scipy.interpolate import interp1d  # noqa: E402
 
 from spectractor import parameters  # noqa: E402
@@ -216,7 +215,3 @@ def test_ctio_fullchain():
     assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              rtol=0.01, atol=0.01))
-
-
-if __name__ == "__main__":
-    run_module_suite()

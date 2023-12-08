@@ -338,6 +338,61 @@ class Astrometry():  # pragma: no cover
         if os.path.isfile(self.match_file_name):
             self.quad_stars_pixel_positions = self.get_quad_stars_pixel_positions()
 
+    def load_gaia_catalog_around_target(self):
+        """Load the Gaia stars catalog around the target position.
+
+        The radius of the search is set accordingly to the maximum range of detected sources.
+
+        Returns
+        -------
+        gaia_catalog: Table
+            The table of Gaia stars around the target position.
+
+        Examples
+        --------
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> a.load_gaia_catalog_around_target()  #doctest: +ELLIPSIS
+        INFO: Query finished...
+        <Table length=...>...
+        """
+        radius = 0.5 * np.sqrt(2) * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
+                                        np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
+        radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
+        self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
+                            f"arcsec from {self.image.target.label} {self.image.target.radec_position}...")
+        self.gaia_catalog = load_gaia_catalog(self.image.target.radec_position, radius=radius, gaia_mag_g_limit=self.gaia_mag_g_limit)
+        ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
+        return self.gaia_catalog
+
+    def load_sources_from_file(self):
+        """Load the sources from the class associated self.sources_file_name file.
+
+        By default, the creation of an Astrometry class instance try to load the default
+        source file if it exists.
+
+        Returns
+        -------
+        sources: Table
+            The table of detected sources.
+
+        Examples
+        --------
+        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
+        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
+        >>> a.load_sources_from_file()  # doctest: +ELLIPSIS
+        <Table length=...
+
+        """
+        self.my_logger.info(f"\n\tLoad source positions and flux from {self.sources_file_name}")
+        sources = Table.read(self.sources_file_name)
+        sources['X'].name = "xcentroid"
+        sources['Y'].name = "ycentroid"
+        sources['FLUX'].name = "flux"
+        sources.sort("flux", reverse=True)
+        self.sources = sources
+        return sources
+
     def get_target_pixel_position(self):
         """Gives the principal targetted object position in pixels in the image given the WCS.
         The object proper motion is taken into account.
@@ -443,61 +498,6 @@ class Astrometry():  # pragma: no cover
                                    f"Please check {self.match_file_name}.")
         self.quad_stars_pixel_positions = np.array(coords)
         return self.quad_stars_pixel_positions
-
-    def load_sources_from_file(self):
-        """Load the sources from the class associated self.sources_file_name file.
-
-        By default, the creation of an Astrometry class instance try to load the default
-        source file if it exists.
-
-        Returns
-        -------
-        sources: Table
-            The table of detected sources.
-
-        Examples
-        --------
-        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
-        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
-        >>> a.load_sources_from_file()  # doctest: +ELLIPSIS
-        <Table length=...
-
-        """
-        self.my_logger.info(f"\n\tLoad source positions and flux from {self.sources_file_name}")
-        sources = Table.read(self.sources_file_name)
-        sources['X'].name = "xcentroid"
-        sources['Y'].name = "ycentroid"
-        sources['FLUX'].name = "flux"
-        sources.sort("flux", reverse=True)
-        self.sources = sources
-        return sources
-
-    def load_gaia_catalog_around_target(self):
-        """Load the Gaia stars catalog around the target position.
-
-        The radius of the search is set accordingly to the maximum range of detected sources.
-
-        Returns
-        -------
-        gaia_catalog: Table
-            The table of Gaia stars around the target position.
-
-        Examples
-        --------
-        >>> im = Image("./tests/data/reduc_20170530_134.fits", target_label="HD111980")
-        >>> a = Astrometry(im, wcs_file_name="./tests/data/reduc_20170530_134_wcs/reduc_20170530_134.wcs")
-        >>> a.load_gaia_catalog_around_target()  #doctest: +ELLIPSIS
-        INFO: Query finished...
-        <Table length=...>...
-        """
-        radius = 0.5 * np.sqrt(2) * max(np.max(self.sources["xcentroid"]) - np.min(self.sources["xcentroid"]),
-                                        np.max(self.sources["ycentroid"]) - np.min(self.sources["ycentroid"]))
-        radius *= parameters.CCD_PIXEL2ARCSEC * u.arcsec
-        self.my_logger.info(f"\n\tLoading Gaia catalog within radius < {radius.value} "
-                            f"arcsec from {self.image.target.label} {self.image.target.radec_position}...")
-        self.gaia_catalog = load_gaia_catalog(self.image.target.radec_position, radius=radius, gaia_mag_g_limit=self.gaia_mag_g_limit)
-        ascii.write(self.gaia_catalog, self.gaia_file_name, format='ecsv', overwrite=True)
-        return self.gaia_catalog
 
     def write_sources(self):
         """Write a fits file containing the source positions and fluxes.
