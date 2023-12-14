@@ -1,8 +1,6 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-from numpy.testing import run_module_suite  # noqa: E402
-
 from spectractor import parameters  # noqa: E402
 from spectractor.astrometry import Astrometry  # noqa: E402
 from spectractor.logbook import LogBook  # noqa: E402
@@ -68,6 +66,3 @@ def test_astrometry():
             assert np.abs(x0_wcs - float(im.header['X0_T'])) < 0.5
             assert np.abs(y0_wcs - float(im.header['Y0_T'])) < 1
 
-
-if __name__ == "__main__":
-    run_module_suite()

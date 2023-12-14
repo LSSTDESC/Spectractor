@@ -1,7 +1,6 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-from numpy.testing import run_module_suite  # noqa: E402
 from spectractor.fit.fit_multispectra import _build_test_sample, MultiSpectraFitWorkspace, run_multispectra_minimisation
 from spectractor import parameters
 import numpy as np
@@ -39,6 +38,3 @@ def test_multispectra():
             k += 1
         assert np.all(np.isclose(w.A1s, 1, atol=5e-3))
 
-
-if __name__ == "__main__":
-    run_module_suite()

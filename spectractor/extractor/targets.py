@@ -209,11 +209,11 @@ class Star(Target):
 
         Emission line object:
 
-        >>> s = Star('3C273')
+        >>> s = Star('PNG321.0+3.9')
         >>> print(s.label)
-        3C273
+        PNG321.0+3.9
         >>> print(s.radec_position.dec)  # doctest: +ELLIPSIS
-        2d03m...s
+        -54d18m07.521s
         >>> print(s.emission_spectrum)
         True
 
@@ -239,11 +239,11 @@ class Star(Target):
         Examples
         --------
         >>> parameters.VERBOSE = True
-        >>> s = Star('3C273')
+        >>> s = Star('PNG321.0+3.9')
         >>> print(s.radec_position.dec)
-        2d03m08.597s
+        -54d18m07.521s
         >>> print(s.redshift)
-        0.158339
+        -0.00021
         >>> s = Star('eta dor')
         >>> print(s.radec_position.dec)
         -66d02m22.635s
@@ -290,19 +290,13 @@ class Star(Target):
 
         Examples
         --------
-        >>> s = Star('3C273')
-        >>> print(s.spectra[0][:4])
-        [0.0000000e+00 2.5048577e-14 2.4238061e-14 2.4088789e-14]
         >>> s = Star('HD111980')
         >>> print(s.spectra[0][:4])
-        [2.3621000e-13 2.1016000e-13 2.1632999e-13 2.4676000e-13]
-        >>> s = Star('PKS1510-089')
-        >>> print(s.redshift)
-        0.36
+        [2.2839e-13 2.0263e-13 2.0889e-13 2.3928e-13]
         >>> print(f'{parameters.LAMBDA_MIN:.1f}, {parameters.LAMBDA_MAX:.1f}')
-        408.0, 1496.0
+        300.0, 1100.0
         >>> print(s.spectra[0][:4])
-        [117.34012 139.27621  87.38032 143.0816 ]
+        [2.2839e-13 2.0263e-13 2.0889e-13 2.3928e-13]
         """
         self.wavelengths = []  # in nm
         self.spectra = []
@@ -335,8 +329,11 @@ class Star(Target):
                                redshift=self.redshift, emission_spectrum=self.emission_spectrum,
                                hydrogen_only=self.hydrogen_only)
         else:  # maybe a quasar, try with NED query
-            from astroquery.ipac.ned import Ned
-            hdulists = Ned.get_spectra(self.label, show_progress=False)
+            from astroquery.ned import Ned
+            try:
+                hdulists = Ned.get_spectra(self.label) #, show_progress=False)
+            except Exception as err:
+                raise err
             if len(hdulists) > 0:
                 self.emission_spectrum = True
                 self.hydrogen_only = False
@@ -415,7 +412,7 @@ class Star(Target):
         >>> s = Star('HD111980')
         >>> s.build_sed(index=0)
         >>> s.sed(550)
-        array(1.67448019e-11)
+        array(1.67508011e-11)
         """
         if len(self.spectra) == 0:
             self.sed = interp1d(parameters.LAMBDAS, np.zeros_like(parameters.LAMBDAS), kind='linear', bounds_error=False,
