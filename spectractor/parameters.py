@@ -39,6 +39,7 @@ SPECTRACTOR_DECONVOLUTION_SIGMA_CLIP = 20  # value of sigma clip parameter for t
 SPECTRACTOR_BACKGROUND_SUBTRACTION = True #if True the background is estimated and subtracted 
 SPECTRACTOR_FIT_TIMEOUT_PER_ITER = 600  # maximum time per gradient descent iteration before TimeoutError in seconds
 SPECTRACTOR_FIT_TIMEOUT = 3600  # maximum time per gradient descent before TimeoutError in seconds
+SPECTRACTOR_ATMOSPHERE_SIM = "none"  # library to compute atmospheric transmission: none, libradtran, getobsatmo
 
 # Paths
 DISPERSER_DIR = "./extractor/dispersers/"

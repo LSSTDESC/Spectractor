@@ -11,11 +11,6 @@ import spectractor.parameters as parameters
 import spectractor.simulation.libradtran as libradtran
 from spectractor.simulation.throughput import plot_transmission_simple
 
-try:
-    import getObsAtmo
-except ModuleNotFoundError:
-    getObsAtmo = None
-
 
 class Atmosphere:
 
@@ -64,12 +59,22 @@ class Atmosphere:
         self.label = ""
         self.emulator = None
         self.angstrom_exponent_default = 1.2
-        if getObsAtmo is not None and getObsAtmo.is_obssite(parameters.OBS_NAME):
+        if parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "getobsatmo":
+            import getObsAtmo
+            if not getObsAtmo.is_obssite(parameters.OBS_NAME):
+                raise ValueError(f"getObsAtmo does not have observatory site {parameters.OBS_NAME}.")
             self.emulator = getObsAtmo.ObsAtmo(obs_str=parameters.OBS_NAME, pressure=self.pressure)
             self.emulator.lambda0 = 500.
             self.angstrom_exponent_default = 1.2
             self.lambda_min = self.emulator.WLMIN
             self.lambda_max = self.emulator.WLMAX
+        elif parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "none":
+            raise ValueError(f"Can not can atmospheric simulation with {parameters.SPECTRACTOR_ATMOSPHERE_SIM=}. "
+                             f"Check your configuration.")
+        elif parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "libradtran":
+            self.emulator = None
+        else:
+            raise ValueError(f"Unknown value for {parameters.SPECTRACTOR_ATMOSPHERE_SIM=}.")
 
     def set_title(self):
         """Make a title string for the simulation.
@@ -133,7 +138,9 @@ class Atmosphere:
 
         Examples
         --------
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
         >>> a = Atmosphere(airmass=1.2, pressure=800, temperature=5, lambda_min=350, lambda_max=1000)
+        CTIO site name validated as CTIO observatory
         >>> transmission = a.simulate(aerosols=0.05, ozone=400, pwv=5, angstrom_exponent=None)
         >>> a.ozone
         400
@@ -151,7 +158,7 @@ class Atmosphere:
 
         Test concordance of atmospheric simualtors without emulator
 
-        >>> a.emulator = None
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
         >>> transmission_ang_exp2 = a.simulate(aerosols=0.05, ozone=400, pwv=5, angstrom_exponent=2)
         >>> transmission_ang_exp2([350, 550, 600, 800, 950])
         array([0.4846117, 0.8323524, 0.8426985, 0.9465884, 0.71872  ])
@@ -181,16 +188,18 @@ class Atmosphere:
         if angstrom_exponent is not None and angstrom_exponent < 0:
             raise ValueError(f"If not None, angstrom_exponnent must be positive. Got {angstrom_exponent=}.")
 
-        if self.emulator is not None:
+        if parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "getobsatmo":
             if angstrom_exponent is None:
                 angstrom_exponent = 1.2  # value that makes getObsAtmo and Libradtran class close
             wl = parameters.LAMBDAS
             atm = self.emulator.GetAllTransparencies(wl, am=self.airmass, pwv=pwv, oz=ozone,
                                                      tau=aerosols, beta=angstrom_exponent, flagAerosols=True)
-        else:
+        elif parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "libradtran":
             lib = libradtran.Libradtran()
             wl, atm = lib.simulate(self.airmass, aerosols, ozone, pwv, self.pressure, angstrom_exponent=angstrom_exponent,
                                    lambda_min=self.lambda_min, lambda_max=self.lambda_max, altitude=self.altitude)
+        else:
+            raise ValueError(f"Unknown value for {parameters.SPECTRACTOR_ATMOSPHERE_SIM=}.")
         self.transmission = interp1d(wl, atm, kind='linear', bounds_error=False, fill_value=(0, 0))
         return self.transmission
 
@@ -490,8 +499,7 @@ class AtmosphereGrid(Atmosphere):
         if self.filename == "":
             self.my_logger.error('\n\tNo file name is given...')
         else:
-            hdr['ATMSIM'] = "libradtran"
-            hdr['SIMVERS'] = "2.0.1"
+            hdr['ATMSIM'] = parameters.SPECTRACTOR_ATMOSPHERE_SIM
             hdr['DATAFILE'] = self.image_filename
             hdr['SIMUFILE'] = os.path.basename(self.filename)
 
