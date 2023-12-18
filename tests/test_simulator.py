@@ -16,6 +16,7 @@ import unittest  # noqa: E402
 # TODO: DM-33441 Fix broken spectractor tests
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
 def test_atmosphere():
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
     transmission = a.simulate(ozone=400, pwv=5, aerosols=0.05)
     assert transmission is not None
