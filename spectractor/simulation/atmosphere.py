@@ -69,7 +69,7 @@ class Atmosphere:
             self.lambda_min = self.emulator.WLMIN
             self.lambda_max = self.emulator.WLMAX
         elif parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "none":
-            raise ValueError(f"Can not can atmospheric simulation with {parameters.SPECTRACTOR_ATMOSPHERE_SIM=}. "
+            raise ValueError(f"Can not compute atmospheric transmission with {parameters.SPECTRACTOR_ATMOSPHERE_SIM=}. "
                              f"Check your configuration.")
         elif parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "libradtran":
             self.emulator = None
