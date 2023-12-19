@@ -3,7 +3,9 @@ mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all oth
 
 from spectractor.fit.fit_multispectra import _build_test_sample, MultiSpectraFitWorkspace, run_multispectra_minimisation  # noqa: E402
 from spectractor import parameters  # noqa: E402
+from spectractor.tools import uvspec_available  # noqa: E402
 import numpy as np  # noqa: E402
+import os  # noqa: E402
 import unittest  # noqa: E402
 
 
