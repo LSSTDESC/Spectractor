@@ -56,6 +56,7 @@ def test_simulator():
     parameters.VERBOSE = True
     parameters.DEBUG = False
     load_config('config/ctio.ini')
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
 
     for file_name in file_names:
         spectrum = Spectrum(file_name)

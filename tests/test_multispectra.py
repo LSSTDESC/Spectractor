@@ -6,14 +6,15 @@ from spectractor import parameters
 import numpy as np
 
 
-NSPECTRA = 4
 OZONE = 300
 PWV = 5
 AEROSOLS = 0.05
 LOG10A = -2
 
+@unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
+@astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
 def test_multispectra():
-    spectra = _build_test_sample(NSPECTRA, aerosols=AEROSOLS, ozone=OZONE, pwv=PWV, angstrom_exponent=10**LOG10A)
+    spectra = _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3), aerosols=AEROSOLS, ozone=OZONE, pwv=PWV, angstrom_exponent=10**LOG10A)
     parameters.VERBOSE = True
 
     nsigma = 3
