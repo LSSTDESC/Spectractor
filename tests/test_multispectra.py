@@ -1,9 +1,10 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-from spectractor.fit.fit_multispectra import _build_test_sample, MultiSpectraFitWorkspace, run_multispectra_minimisation
-from spectractor import parameters
-import numpy as np
+from spectractor.fit.fit_multispectra import _build_test_sample, MultiSpectraFitWorkspace, run_multispectra_minimisation  # noqa: E402
+from spectractor import parameters  # noqa: E402
+import numpy as np  # noqa: E402
+import unittest  # noqa: E402
 
 
 OZONE = 300
