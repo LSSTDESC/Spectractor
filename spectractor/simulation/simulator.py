@@ -113,8 +113,8 @@ class SpectrumSimulation(Spectrum):
         aerosols: float
             VAOD Vertical Aerosols Optical Depth
         angstrom_exponent: float, optional
-            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
-            If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
+            Angstrom exponent for aerosols.
+            If None, the Atmosphere.angstrom_exponent_default value is used (default: None).
         ozone: float
             Ozone quantity in Dobson
         pwv: float
@@ -212,7 +212,7 @@ class SpectrumSimulation(Spectrum):
             self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
         # Save the truth parameters
         self.header['OZONE_T'] = ozone
-        self.header['LOG10A_T'] = angstrom_exponent
+        self.header['ANGEXP_T'] = angstrom_exponent
         self.header['PWV_T'] = pwv
         self.header['VAOD_T'] = aerosols
         self.header['A1_T'] = A1
@@ -409,8 +409,8 @@ class SpectrogramModel(Spectrum):
         aerosols: float
             VAOD Vertical Aerosols Optical Depth.
         angstrom_exponent: float, optional
-            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
-            If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
+            Angstrom exponent for aerosols.
+            If None, the Atmosphere.angstrom_exponent_default value is used (default: None).
         ozone: float
             Ozone quantity in Dobson.
         pwv: float

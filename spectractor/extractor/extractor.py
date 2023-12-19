@@ -699,7 +699,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         Examples
         --------
 
-        >>> spec = Spectrum('tests/data/sim_20170530_134_spectrum.fits')
+        >>> spec = Spectrum('tests/data/reduc_20170530_134_spectrum.fits')
         >>> w = FullForwardModelFitWorkspace(spec, verbose=True, plot=True, live_fit=False)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
         >>> w.plot_fit()

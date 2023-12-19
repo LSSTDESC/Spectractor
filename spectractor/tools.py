@@ -2480,9 +2480,11 @@ def compute_correlation_matrix(cov):
 
     """
     rho = np.zeros_like(cov, dtype="float")
+    # rescale cov matrix in case it contains very low value in diagonal (for float precision)
+    cov_scaled = cov * np.mean([cov[i, i] for i in range(cov.shape[0])])
     for i in range(cov.shape[0]):
         for j in range(cov.shape[1]):
-            rho[i, j] = cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
+            rho[i, j] = cov_scaled[i, j] / np.sqrt(cov_scaled[i, i] * cov_scaled[j, j])
     return rho
 
 
@@ -2686,7 +2688,12 @@ class NumpyArrayEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        else:
+            return super().default(obj)
 
 
 if __name__ == "__main__":
