@@ -173,7 +173,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
             for ip in range(self.deltas_first_index, self.nspectra + self.deltas_first_index):
                 fixed[ip] = True
         labels = ["VAOD", "angstrom_exp", "ozone [db]", "PWV [mm]", "reso"] + [f"delta_{k}" for k in range(self.nspectra)] + [f"A1_{k}" for k in range(self.nspectra)]
-        axis_names = ["VAOD", r'$\"a$', "ozone [db]", "PWV [mm]", "reso"] + [f"$\delta_{k}$" for k in range(self.nspectra)] + ["$A_1^{(" + str(k) + ")}$" for k in range(self.nspectra)]
+        axis_names = ["VAOD", r'$\"a$', "ozone [db]", "PWV [mm]", "reso"] + [rf"$\delta_{k}$" for k in range(self.nspectra)] + ["$A_1^{(" + str(k) + ")}$" for k in range(self.nspectra)]
         bounds = [(0, 1), (0, 3), (100, 700), (0, 20), (0.1, 100)] + [(-20, 20)] * self.nspectra + [(1e-3, 2)] * self.nspectra
         if fixed[4]:  # reso
             bounds[4] = (-1, 0)

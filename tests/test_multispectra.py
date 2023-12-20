@@ -7,6 +7,7 @@ from spectractor.tools import uvspec_available  # noqa: E402
 import numpy as np  # noqa: E402
 import os  # noqa: E402
 import unittest  # noqa: E402
+import astropy.config  # noqa: E402
 
 
 OZONE = 300
