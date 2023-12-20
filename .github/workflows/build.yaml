@@ -63,6 +63,7 @@ jobs:
           pytest tests/test_simulator.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
           pytest tests/test_utils.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
           pytest tests/test_fitter.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
+          pytest tests/test_multispectra.py --log-cli-level=INFO --cov --cov-append --cov-report lcov
 
       - name: Run doctests and coverage
         shell: bash -l {0}
