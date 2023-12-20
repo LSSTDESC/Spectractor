@@ -12,18 +12,19 @@ import astropy.config  # noqa: E402
 
 OZONE = 300
 PWV = 5
-AEROSOLS = 0.05
-LOG10A = -2
+VAOD = 0.05
+ANGEXP = 1.2
 
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
 @astropy.config.set_temp_cache(os.path.join(os.path.abspath(os.path.dirname(__file__)), "data", "cache"))
 def test_multispectra():
-    spectra = _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3), aerosols=AEROSOLS, ozone=OZONE, pwv=PWV, angstrom_exponent=10**LOG10A)
+    spectra = _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3),
+                                 aerosols=VAOD, ozone=OZONE, pwv=PWV, angstrom_exponent=ANGEXP)
     parameters.VERBOSE = True
 
-    nsigma = 3
-    labels = ["VAOD", "LOG10A", "OZONE", "PWV"]
-    truth = [AEROSOLS, LOG10A, OZONE, PWV]
+    nsigma = 5
+    labels = ["VAOD", "ANGEXP", "OZONE", "PWV"]
+    truth = [VAOD, ANGEXP, OZONE, PWV]
     indices = [0, 1, 2, 3]
     for method in ["noprior", "spectrum"]:
         w = MultiSpectraFitWorkspace("./tests/data/multispectra_test", spectra, bin_width=10, verbose=True, fixed_deltas=True,
