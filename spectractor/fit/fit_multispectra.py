@@ -39,6 +39,7 @@ def _build_sim_sample(spectra, aerosols=0.05, ozone=300, pwv=5, angstrom_exponen
 
     Examples
     --------
+    >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
     >>> spectra = _build_sim_sample([Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")])
     >>> len(spectra)
     1
