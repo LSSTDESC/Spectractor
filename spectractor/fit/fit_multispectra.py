@@ -76,6 +76,7 @@ def _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3), aerosols
 
     Examples
     --------
+    >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
     >>> _build_test_sample(targets=["HD111980"]*3, zs=[1, 1.5, 2])  #doctest: +ELLIPSIS
     CTIO site name validated...
     """
@@ -135,6 +136,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         Examples
         --------
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
         >>> spectra = _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3))
         >>> w = MultiSpectraFitWorkspace("./outputs/test", spectra, bin_width=5, verbose=True)
         >>> w.output_file_name
@@ -488,6 +490,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         Examples
         --------
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
         >>> spectra = spectra = _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3))
         >>> w = MultiSpectraFitWorkspace("./outputs/test", spectra, bin_width=5, verbose=True)
         >>> lambdas, model, model_err = w.simulate(*w.params.values)
@@ -589,6 +592,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         Examples
         --------
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
         >>> spectra = _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3))
         >>> w = MultiSpectraFitWorkspace("./outputs/test", spectra, bin_width=5, verbose=True)
         >>> w.simulate(*w.params.values)  #doctest: +ELLIPSIS
@@ -668,6 +672,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
 
         Examples
         --------
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
         >>> spectra = _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3))
         >>> w = MultiSpectraFitWorkspace("./outputs/test", spectra, bin_width=5, verbose=True)
         >>> _ = w.simulate(*w.params.values)
@@ -743,6 +748,7 @@ class MultiSpectraFitWorkspace(FitWorkspace):
         """
         Examples
         --------
+        >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
         >>> spectra = _build_test_sample(targets=["HD111980"]*3, zs=np.linspace(1, 2, 3))
         >>> w = MultiSpectraFitWorkspace("./outputs/test", spectra, bin_width=5, verbose=True)
         >>> w.cov = np.eye(3 + w.nspectra - 1)
@@ -864,6 +870,7 @@ def run_multispectra_minimisation(fit_workspace, method="newton", verbose=False,
 
     Examples
     --------
+    >>> parameters.SPECTRACTOR_ATMOSPHERE_SIM = "getobsatmo"
     >>> spectra = _build_test_sample(targets=["HD111980"]*10, zs=np.linspace(1, 2, 10),
     ... aerosols=0.05, angstrom_exponent=1.5, ozone=300, pwv=3)
     >>> parameters.VERBOSE = True
