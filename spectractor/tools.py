@@ -2365,14 +2365,14 @@ def set_sources_file_name(file_name, output_directory=""):
     Examples
     --------
     >>> set_sources_file_name("image.fits", output_directory="")
-    'image_wcs/image.xyls'
+    'image_wcs/image.axy'
     >>> set_sources_file_name("image.png", output_directory="outputs")
-    'outputs/image_wcs/image.xyls'
+    'outputs/image_wcs/image.axy'
 
     """
     output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)
     tag = set_wcs_tag(file_name)
-    return os.path.join(output_directory, f"{tag}.xyls")
+    return os.path.join(output_directory, f"{tag}.axy")
 
 
 def set_gaia_catalog_file_name(file_name, output_directory=""):
