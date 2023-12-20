@@ -1,7 +1,6 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-from numpy.testing import run_module_suite  # noqa: E402
 import numpy as np  # noqa: E402
 from spectractor.fit.fitter import (FitParameters, FitWorkspace, run_minimisation,  # noqa: E402
                                     run_minimisation_sigma_clipping)  # noqa: E402
@@ -104,7 +103,3 @@ def test_minimisation_sigma_clipping(seed=42):
     run_minimisation_sigma_clipping(w, method="newton", sigma_clip=sigma, niter_clip=clip_niter)
     assert np.all([np.abs(w.params.values[i] - truth[i]) / sigma < 1 for i in range(w.params.ndim)])
     assert np.all(outliers == w.outliers)
-
-
-if __name__ == "__main__":
-    run_module_suite()

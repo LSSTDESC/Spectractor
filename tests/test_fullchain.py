@@ -1,7 +1,6 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-from numpy.testing import run_module_suite  # noqa: E402
 from scipy.interpolate import interp1d  # noqa: E402
 
 from spectractor import parameters  # noqa: E402
@@ -104,6 +103,7 @@ def make_image():
 def test_ctio_fullchain():
     parameters.VERBOSE = True
     parameters.DEBUG = False
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     sim_image = "./tests/data/sim_20170530_134.fits"
 
     # load test and make image simulation
@@ -121,6 +121,7 @@ def test_ctio_fullchain():
     logbook = LogBook(logbook="./tests/data/ctiofulllogbook_jun2017_v5.csv")
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     load_config("./config/ctio.ini")
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     parameters.CCD_REBIN = 1
     #  JN: > 1 not working well for now: I guess CTIO spectra are too narrow
@@ -192,6 +193,7 @@ def test_ctio_fullchain():
     assert np.isclose(np.abs(w.params.values[9]), 0, atol=1e-3)  # B
 
     parameters.DEBUG = False
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     w = SpectrogramFitWorkspace(spectrum, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
                                 verbose=True, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")
@@ -216,7 +218,3 @@ def test_ctio_fullchain():
     assert np.all(np.isclose(psf_poly_params[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              np.array(PSF_POLY_PARAMS_TRUTH)[(PSF_POLY_ORDER + 1):len(PSF_POLY_PARAMS_TRUTH)//N_DIFF_ORDERS - 1],
                              rtol=0.01, atol=0.01))
-
-
-if __name__ == "__main__":
-    run_module_suite()

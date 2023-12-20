@@ -522,7 +522,7 @@ def flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis
     --------
 
     >>> from spectractor.extractor.spectrum import Spectrum
-    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits", config="./config/ctio.ini")
+    >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
 
     Compute ADR in (RA, DEC) frame
 

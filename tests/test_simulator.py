@@ -1,7 +1,6 @@
 import matplotlib as mpl
 mpl.use('Agg')  # must be run first! But therefore requires noqa E402 on all other imports
 
-from numpy.testing import run_module_suite  # noqa: E402
 import numpy as np  # noqa: E402
 
 from spectractor import parameters  # noqa: E402
@@ -17,6 +16,7 @@ import unittest  # noqa: E402
 # TODO: DM-33441 Fix broken spectractor tests
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
 def test_atmosphere():
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     a = Atmosphere(airmass=1.2, pressure=800, temperature=5)
     transmission = a.simulate(ozone=400, pwv=5, aerosols=0.05)
     assert transmission is not None
@@ -56,6 +56,7 @@ def test_simulator():
     parameters.VERBOSE = True
     parameters.DEBUG = False
     load_config('config/ctio.ini')
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
 
     for file_name in file_names:
         spectrum = Spectrum(file_name)
@@ -68,7 +69,3 @@ def test_simulator():
         assert np.sum(spectrum_simulation.data) < 1e-10
         assert np.sum(spectrum_simulation.data_next_order) < 1e-10
 
-
-if __name__ == "__main__":
-
-    run_module_suite()
