@@ -764,6 +764,7 @@ def load_STARDICE_image(image):  # pragma: no cover
     elif image.header['MOUNTTAU'] >= 90:
         parameters.OBS_CAMERA_ROTATION = 0
 
+    image.target_label = image.header['mountTARGET']
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['cameraexptime'])
     image.filter_label = 'EMPTY'
