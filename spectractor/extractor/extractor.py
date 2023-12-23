@@ -1037,7 +1037,7 @@ def SpectractorRun(image, output_directory, guess=None):
     spectrum: Spectrum
         The extracted spectrum object.
     w: FullForwardModelFitWorkspace
-        The FFM wrokspace.
+        The FFM workspace.
 
     Examples
     --------
