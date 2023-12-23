@@ -209,7 +209,7 @@ class SpectrogramFitWorkspace(FitWorkspace):
                                                                              order=order)
             profile_params[:, 0] = 1
             profile_params[:, 1] = dispersion_law.real + self.simulation.r0.real
-            profile_params[:, 2] += dispersion_law.imag # - self.bgd_width
+            profile_params[:, 2] += dispersion_law.imag
             psf_cube_masked = self.spectrum.chromatic_psf.build_psf_cube_masked(self.simulation.pixels, profile_params,
                                                                                 fwhmx_clip=3 * parameters.PSF_FWHM_CLIP,
                                                                                 fwhmy_clip=parameters.PSF_FWHM_CLIP)
