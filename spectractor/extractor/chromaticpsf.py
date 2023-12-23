@@ -1320,11 +1320,14 @@ class ChromaticPSF:
         # pixels.shape = (2, Ny, Nx): self.pixels[1<-y, :, 0<-first pixel value column]
         # TODO: account for rotation ad projection effects is PSF is not round
         pixel_eval = np.arange(self.pixels[1, 0, 0], self.pixels[1, -1, 0], 0.5, dtype=np.float32)
+        center = (np.max(pixel_eval) - np.min(pixel_eval)) / 2
         for ix, x in enumerate(pixel_x):
-            p = profile_params[x, :]
-            # compute FWHM transverse to dispersion axis (assuming revolution symmetry of the PSF)
+            # centering the PSF on the pixel grid to compute FWHM
+            p = np.copy(profile_params[x, :])
+            p[2] = center
+            # compute FWHM transverse in 1D (assuming revolution symmetry of the PSF)
             out = self.psf.evaluate(pixel_eval, values=p)
-            fwhms[ix] = compute_fwhm(pixel_eval, out, center=p[2], minimum=0, epsilon=1e-2)
+            fwhms[ix] = compute_fwhm(pixel_eval, out, center=center, minimum=0, epsilon=1e-2)
         # clean fwhm bad points
         mask = np.logical_and(fwhms > 1, fwhms < self.Ny // 2)  # more than 1 pixel or less than window
         self.table['fwhm'] = interp1d(pixel_x[mask], fwhms[mask], kind="linear",
