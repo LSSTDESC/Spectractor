@@ -103,6 +103,7 @@ def make_image():
 def test_ctio_fullchain():
     parameters.VERBOSE = True
     parameters.DEBUG = False
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     sim_image = "./tests/data/sim_20170530_134.fits"
 
     # load test and make image simulation
@@ -120,6 +121,7 @@ def test_ctio_fullchain():
     logbook = LogBook(logbook="./tests/data/ctiofulllogbook_jun2017_v5.csv")
     disperser_label, target, xpos, ypos = logbook.search_for_image(tag)
     load_config("./config/ctio.ini")
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     parameters.PSF_POLY_ORDER = PSF_POLY_ORDER
     parameters.CCD_REBIN = 1
     #  JN: > 1 not working well for now: I guess CTIO spectra are too narrow
@@ -191,6 +193,7 @@ def test_ctio_fullchain():
     assert np.isclose(np.abs(w.params.values[9]), 0, atol=1e-3)  # B
 
     parameters.DEBUG = False
+    parameters.SPECTRACTOR_ATMOSPHERE_SIM = "libradtran"
     w = SpectrogramFitWorkspace(spectrum, atmgrid_file_name=atmgrid_filename, fit_angstrom_exponent=False,
                                 verbose=True, plot=True, live_fit=False)
     run_spectrogram_minimisation(w, method="newton")

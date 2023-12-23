@@ -2365,9 +2365,9 @@ def set_sources_file_name(file_name, output_directory=""):
     Examples
     --------
     >>> set_sources_file_name("image.fits", output_directory="")
-    'image_wcs/image.xyls'
+    'image_wcs/image.axy'
     >>> set_sources_file_name("image.png", output_directory="outputs")
-    'outputs/image_wcs/image.xyls'
+    'outputs/image_wcs/image.axy'
 
     """
     output_directory = set_wcs_output_directory(file_name, output_directory=output_directory)

@@ -1,6 +1,6 @@
 import configparser
 import os
-import sys
+import shutil
 import re
 
 import astropy.units.quantity
@@ -114,8 +114,23 @@ def load_config(config_filename, rebin=True):
 
     # check consistency
     if parameters.PIXWIDTH_BOXSIZE > parameters.PIXWIDTH_BACKGROUND:
-        sys.exit(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
+        raise ValueError(f'parameters.PIXWIDTH_BOXSIZE must be smaller than parameters.PIXWIDTH_BACKGROUND (or equal).')
 
+    # check presence of atmospheric simulation packages
+    if parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() not in ["none", "libradtran", "getobsatmo"]:
+        raise ValueError(f'parameters.SPECTRACTOR_ATMOSPHERE_SIM must be either ["none", "libradtran", "getobsatmo"]. '
+                         f'Got {parameters.SPECTRACTOR_ATMOSPHERE_SIM}.')
+    if parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "libradtran":
+        if not shutil.which("uvspec") and not os.path.isfile(os.path.join(parameters.LIBRADTRAN_DIR, 'bin/uvspec')):
+            raise OSError(f"{parameters.SPECTRACTOR_ATMOSPHERE_SIM=} but uvspec executable not found in $PATH "
+                          f"or {os.path.join(parameters.LIBRADTRAN_DIR, 'bin/')}")
+    if parameters.SPECTRACTOR_ATMOSPHERE_SIM.lower() == "getobsatmo":
+        try:
+            import getObsAtmo
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError(f"{parameters.SPECTRACTOR_ATMOSPHERE_SIM=} but getObsAtmo module not found.")
+
+    # verbosity
     if parameters.VERBOSE or parameters.DEBUG:
         txt = ""
         for section in config.sections():
