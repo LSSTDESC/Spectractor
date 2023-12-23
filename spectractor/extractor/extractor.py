@@ -847,8 +847,9 @@ def run_ffm_minimisation(w, method="newton", niter=2):
         # Optimize the regularisation parameter only if it was not done before
         if w.amplitude_priors_method == "spectrum" and w.reg == parameters.PSF_FIT_REG_PARAM:  # pragma: no cover
             my_logger.info("\n\tStart regularization parameter estimation...")
+            my_logger.info(f"\n\tExpected Ndof: {w.spectrum.chromatic_psf.Nx / weighted_mean_fwhm}")
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=True)
-            w_reg.run_regularisation(Ndof=w.trace_r)
+            w_reg.run_regularisation(Ndof=w.spectrum.chromatic_psf.Nx / weighted_mean_fwhm)
             w.opt_reg = w_reg.opt_reg
             w.reg = np.copy(w_reg.opt_reg)
             w.trace_r = np.trace(w_reg.resolution)

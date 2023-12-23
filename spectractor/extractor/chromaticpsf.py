@@ -1787,7 +1787,10 @@ class ChromaticPSF:
             raise ValueError(f"mode argument must be '1D' or '2D'. Got {mode=}.")
         if amplitude_priors_method == "psf1d":
             w_reg = RegFitWorkspace(w, opt_reg=parameters.PSF_FIT_REG_PARAM, verbose=verbose)
-            w_reg.run_regularisation(Ndof=w.trace_r)
+            weighted_mean_fwhm = np.average(self.table['fwhm'], weights=self.table['amplitude'])
+            self.my_logger.info(f"\n\tMean FWHM: {weighted_mean_fwhm} pixels (weighted with spectrum amplitude)"
+                                f"\n\tExpected Ndof: {self.Nx / weighted_mean_fwhm}")
+            w_reg.run_regularisation(Ndof=self.Nx / weighted_mean_fwhm)
             w.reg = np.copy(w_reg.opt_reg)
             w.trace_r = np.trace(w_reg.resolution)
             self.opt_reg = w_reg.opt_reg
@@ -1798,7 +1801,7 @@ class ChromaticPSF:
                     f"below the trace of the prior covariance matrix "
                     f"({np.trace(w.amplitude_priors_cov_matrix)}). This is probably due to a very "
                     f"high regularisation parameter in case of a bad fit. Therefore the final "
-                    f"covariance matrix is mulitiplied by the ratio of the traces and "
+                    f"covariance matrix is multiplied by the ratio of the traces and "
                     f"the amplitude parameters are very close the amplitude priors.")
                 r = np.trace(w.amplitude_priors_cov_matrix) / np.trace(w.amplitude_cov_matrix)
                 w.amplitude_cov_matrix *= r
