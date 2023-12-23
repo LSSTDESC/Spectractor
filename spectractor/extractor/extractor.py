@@ -61,7 +61,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.psf_poly_params = self.psf_poly_params[length:]
         psf_poly_params_labels = np.copy(spectrum.chromatic_psf.params.labels[length:])
         psf_poly_params_names = np.copy(spectrum.chromatic_psf.params.axis_names[length:])
-        spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=spectrum.spectrogram_Ny)
         psf_poly_params_bounds = spectrum.chromatic_psf.set_bounds()
         D2CCD = np.copy(spectrum.header['D2CCD'])
         p = np.array([1, 1, 1, D2CCD, np.copy(spectrum.header['PIXSHIFT']), 0,

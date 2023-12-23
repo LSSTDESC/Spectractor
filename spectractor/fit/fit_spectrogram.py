@@ -65,7 +65,6 @@ class SpectrogramFitWorkspace(FitWorkspace):
             raise ValueError(f"At least one diffraction order must be given for spectrogram simulation.")
         length = len(self.spectrum.chromatic_psf.table)
         self.psf_poly_params = self.spectrum.chromatic_psf.from_table_to_poly_params()[length:]
-        self.spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=self.spectrum.spectrogram_Ny)
         self.saturation = self.spectrum.spectrogram_saturation
         D2CCD = np.copy(spectrum.header['D2CCD'])
         p = np.array([1, 1, 1, 0.05, 1.2, 400, 5, D2CCD, self.spectrum.header['PIXSHIFT'],
