@@ -113,8 +113,8 @@ class SpectrumSimulation(Spectrum):
         aerosols: float
             VAOD Vertical Aerosols Optical Depth
         angstrom_exponent: float, optional
-            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
-            If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
+            Angstrom exponent for aerosols.
+            If None, the Atmosphere.angstrom_exponent_default value is used (default: None).
         ozone: float
             Ozone quantity in Dobson
         pwv: float
@@ -212,7 +212,7 @@ class SpectrumSimulation(Spectrum):
             self.err[np.isclose(self.err, 0., atol=0.01 * min_positive)] = min_positive
         # Save the truth parameters
         self.header['OZONE_T'] = ozone
-        self.header['LOG10A_T'] = angstrom_exponent
+        self.header['ANGEXP_T'] = angstrom_exponent
         self.header['PWV_T'] = pwv
         self.header['VAOD_T'] = aerosols
         self.header['A1_T'] = A1
@@ -409,8 +409,8 @@ class SpectrogramModel(Spectrum):
         aerosols: float
             VAOD Vertical Aerosols Optical Depth.
         angstrom_exponent: float, optional
-            Angstrom exponent for aerosols. If negative or None, default aerosol model from Libradtran is used.
-            If value is 0.0192, the atmospheric transmission is very close to the case with angstrom_exponent=None (default: None).
+            Angstrom exponent for aerosols.
+            If None, the Atmosphere.angstrom_exponent_default value is used (default: None).
         ozone: float
             Ozone quantity in Dobson.
         pwv: float
@@ -441,7 +441,7 @@ class SpectrogramModel(Spectrum):
         -------
         >>> spec = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
         >>> spec.disperser.ratio_ratio_order_3over2 = lambda lbda: 0.1
-        >>> psf_poly_params = spec.chromatic_psf.from_table_to_poly_params()
+        >>> psf_poly_params = list(spec.chromatic_psf.from_table_to_poly_params()) * 3
         >>> atmosphere = Atmosphere(airmass=1.2, pressure=800, temperature=10)
         >>> sim = SpectrogramModel(spec, atmosphere=atmosphere, with_background=True, fast_sim=True)
         >>> lambdas, model, model_err = sim.simulate(A2=1, angle=-1.5, psf_poly_params=psf_poly_params)
@@ -482,10 +482,14 @@ class SpectrogramModel(Spectrum):
 
             # Evaluate PSF profile
             if self.profile_params[order] is None or not self.fix_psf_cube:
-                self.profile_params[order] = self.chromatic_psf.update(poly_params[k], x0=self.r0.real + shift_x,
-                                                                       y0=self.r0.imag + shift_y, angle=angle, plot=False)
+                if k==0:
+                    self.profile_params[order] = self.chromatic_psf.update(poly_params[k], x0=self.r0.real + shift_x,
+                                                                           y0=self.r0.imag + shift_y, angle=angle,
+                                                                           plot=False, apply_bounds=True)
+                else:
+                    self.profile_params[order] = self.chromatic_psf.from_poly_params_to_profile_params(poly_params[k], apply_bounds=True)
                 self.profile_params[order][:, 0] = 1
-                self.profile_params[order][:, 1] = dispersion_law.real + self.r0.real
+                self.profile_params[order][:, 1] = dispersion_law.real + self.r0.real + shift_x
                 self.profile_params[order][:, 2] += dispersion_law.imag
             if k == 0:
                 self.chromatic_psf.table["Dx"] = self.profile_params[order][:, 1] - self.r0.real

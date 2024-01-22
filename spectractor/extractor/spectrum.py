@@ -12,13 +12,14 @@ import random
 import string
 import astropy
 import warnings
+import itertools
 warnings.filterwarnings('ignore', category=astropy.io.fits.card.VerifyWarning, append=True)
 
 from spectractor import parameters
 from spectractor.config import set_logger, load_config, update_derived_parameters
 from spectractor.extractor.dispersers import Hologram
 from spectractor.extractor.targets import load_target
-from spectractor.tools import (ensure_dir, load_fits, plot_image_simple,
+from spectractor.tools import (ensure_dir, load_fits, plot_image_simple, plot_table_in_axis,
                                find_nearest, plot_spectrum_simple, fit_poly1d_legendre, gauss,
                                rescale_x_to_legendre, fit_multigauss_and_bgd, multigauss_and_bgd, multigauss_and_bgd_jacobian)
 from spectractor.extractor.psf import load_PSF
@@ -26,6 +27,9 @@ from spectractor.extractor.chromaticpsf import ChromaticPSF
 from spectractor.simulation.adr import adr_calib, flip_and_rotate_adr_to_image_xy_coordinates
 from spectractor.simulation.throughput import TelescopeTransmission
 from spectractor.fit.fitter import FitWorkspace, FitParameters, run_minimisation
+
+from lsst.utils.threads import disable_implicit_threading
+disable_implicit_threading()
 
 
 fits_mappings = {'config': 'CONFIG',
@@ -382,7 +386,7 @@ class Spectrum:
             t.reset_lambda_range(transmission_threshold=1e-4)
         return t
 
-    def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False):
+    def plot_spectrum(self, ax=None, xlim=None, live_fit=False, label='', force_lines=False, calibration_only=False):
         """Plot spectrum with emission and absorption lines.
 
         Parameters
@@ -398,6 +402,8 @@ class Spectrum:
             (default: False).
         force_lines: bool
             Force the over plot of vertical lines for atomic lines if set to True (default: False).
+        calibration_only: bool
+            Plot only the lines used for calibration if True (default: False).
 
         Examples
         --------
@@ -405,8 +411,11 @@ class Spectrum:
         >>> s.plot_spectrum(xlim=[500,900], live_fit=False, force_lines=True)
         """
         if ax is None:
+            doplot = True
             plt.figure(figsize=[12, 6])
             ax = plt.gca()
+        else:
+            doplot = False
         if label == '':
             label = f'Order {self.order:d} spectrum\n' \
                     r'$D_{\mathrm{CCD}}=' \
@@ -426,18 +435,20 @@ class Spectrum:
                 plot_indices = np.logical_and(self.target.wavelengths[k] > np.min(self.lambdas),
                                               self.target.wavelengths[k] < np.max(self.lambdas))
                 s = self.target.spectra[k] / np.max(self.target.spectra[k][plot_indices]) * np.max(self.data)
-                ax.plot(self.target.wavelengths[k], s, lw=2, label='Tabulated spectra #%d' % k)
+                ax.plot(self.target.wavelengths[k], s, lw=2, label=f'Tabulated spectra #{k}')
         if self.lambdas is not None:
-            self.lines.plot_detected_lines(ax, print_table=parameters.VERBOSE)
+            self.lines.plot_detected_lines(ax)
+        if self.lines is not None and len(self.lines.table) > 0:
+            self.my_logger.info(f"\n{self.lines.table}")
         if self.lambdas is not None and self.lines is not None:
-            self.lines.plot_atomic_lines(ax, fontsize=12, force=force_lines)
+            self.lines.plot_atomic_lines(ax, fontsize=12, force=force_lines, calibration_only=calibration_only)
         ax.legend(loc='best')
         if self.filters is not None:
             ax.get_legend().set_title(self.filters)
         plt.gcf().tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
             plt.gcf().savefig(os.path.join(parameters.LSST_SAVEFIGPATH, f'{self.target.label}_spectrum.pdf'))
-        if parameters.DISPLAY:  # pragma: no cover
+        if parameters.DISPLAY and doplot:  # pragma: no cover
             if live_fit:
                 plt.draw()
                 plt.pause(1e-8)
@@ -502,6 +513,107 @@ class Spectrum:
             plt.show()
         if parameters.PdfPages:  # pragma: no cover
             parameters.PdfPages.savefig()
+
+    def plot_spectrum_summary(self, xlim=None, figsize=(12, 12), save_as=''):
+        """Plot spectrum with emission and absorption lines.
+
+        Parameters
+        ----------
+        xlim: list, optional
+            List of minimum and maximum abscisses (default: None).
+        figsize: tuple
+            Figure size (default: (12, 12)).
+        save_as : str, optional
+            Path to save the figure to, if specified.
+
+        Examples
+        --------
+        >>> s = Spectrum(file_name='tests/data/reduc_20170530_134_spectrum.fits')
+        >>> s.plot_spectrum_summary()
+        """
+        if not np.any([line.fitted for line in self.lines.lines]):
+            fwhm_func = interp1d(self.chromatic_psf.table['lambdas'],
+                                 self.chromatic_psf.table['fwhm'],
+                                 fill_value=(parameters.CALIB_PEAK_WIDTH, parameters.CALIB_PEAK_WIDTH),
+                                 bounds_error=False)
+            detect_lines(self.lines, self.lambdas, self.data, self.err, fwhm_func=fwhm_func,
+                         calibration_lines_only=True)
+
+        def generate_axes(fig):
+            tableShrink = 3
+            tableGap = 1
+            gridspec = fig.add_gridspec(nrows=23, ncols=20)
+            axes = {}
+            axes['A'] = fig.add_subplot(gridspec[0:3, 0:19])
+            axes['C'] = fig.add_subplot(gridspec[3:6, 0:19], sharex=axes['A'])
+            axes['B'] = fig.add_subplot(gridspec[6:14, 0:19])
+            axes['CA'] = fig.add_subplot(gridspec[0:3, 19:20])
+            axes['CC'] = fig.add_subplot(gridspec[3:6, 19:20])
+            axes['D'] = fig.add_subplot(gridspec[14:16, 0:19], sharex=axes['B'])
+            axes['E'] = fig.add_subplot(gridspec[16+tableGap:23, tableShrink:19-tableShrink])
+            return axes
+
+        fig = plt.figure(figsize=figsize)
+        axes = generate_axes(fig)
+        plt.suptitle(f"{self.target.label} {self.date_obs}", y=0.91, fontsize=16)
+        mainPlot = axes['B']
+        spectrogramPlot = axes['A']
+        spectrogramPlotCb = axes['CA']
+        residualsPlot = axes['C']
+        residualsPlotCb = axes['CC']
+        widthPlot = axes['D']
+        tablePlot = axes['E']
+
+        label = f'Order {self.order:d} spectrum\n' \
+                r'$D_{\mathrm{CCD}}=' \
+                rf'{self.disperser.D:.2f}\,$mm'
+        plot_spectrum_simple(mainPlot, self.lambdas, self.data, data_err=self.err, xlim=xlim, label=label,
+                             title='', units=self.units, lw=1, linestyle="-")
+        if len(self.target.spectra) > 0:
+            plot_indices = np.logical_and(self.target.wavelengths[0] > np.min(self.lambdas),
+                                          self.target.wavelengths[0] < np.max(self.lambdas))
+            s = self.target.spectra[0] / np.max(self.target.spectra[0][plot_indices]) * np.max(self.data)
+            mainPlot.plot(self.target.wavelengths[0], s, lw=2, label='Normalized\nCALSPEC spectrum')
+        self.lines.plot_atomic_lines(mainPlot, fontsize=12, force=False, calibration_only=True)
+        self.lines.plot_detected_lines(mainPlot, calibration_only=True)
+
+        table = self.lines.build_detected_line_table(calibration_only=True)
+        plot_table_in_axis(tablePlot, table)
+
+        mainPlot.legend()
+
+        widthPlot.plot(self.lambdas, np.array(self.chromatic_psf.table['fwhm']), "r-", lw=2)
+        widthPlot.set_ylabel("FWHM [pix]")
+        widthPlot.set_xlabel(r'$\lambda$ [nm]')
+        widthPlot.grid()
+
+        spectrogram = np.copy(self.spectrogram)
+        res = self.spectrogram_residuals.reshape((-1, self.spectrogram_Nx))
+        std = np.std(res)
+        if spectrogram.shape[0] != res.shape[0]:
+            margin = (spectrogram.shape[0] - res.shape[0]) // 2
+            spectrogram = spectrogram[margin:-margin]
+        plot_image_simple(spectrogramPlot, data=spectrogram, title='Data',
+                          aspect='auto', cax=spectrogramPlotCb, units='ADU/s', cmap='viridis')
+        spectrogramPlot.set_title('Data', fontsize=10, loc='center', color='white', y=0.8)
+        spectrogramPlot.grid(False)
+        plot_image_simple(residualsPlot, data=res, vmin=-5 * std, vmax=5 * std, title='(Data-Model)/Err',
+                          aspect='auto', cax=residualsPlotCb, units=r'$\sigma$', cmap='bwr')
+        residualsPlot.set_title('(Data-Model)/Err', fontsize=10, loc='center', color='black', y=0.8)
+        residualsPlot.grid(False)
+
+        # hide the tick labels in the plots which share an x axis
+        for label in itertools.chain(mainPlot.get_xticklabels(), residualsPlot.get_xticklabels(), spectrogramPlot.get_xticklabels()):
+            label.set_visible(False)
+
+        # align y labels
+        for ax in [spectrogramPlot, residualsPlot, mainPlot, widthPlot]:
+            ax.yaxis.set_label_coords(-0.05, 0.5)
+
+        fig.subplots_adjust(hspace=0)
+        if save_as:
+            plt.savefig(save_as)
+        plt.show()
 
     def save_spectrum(self, output_file_name, overwrite=False):
         """Save the spectrum into a fits file (data, error and wavelengths).
@@ -593,7 +705,7 @@ class Spectrum:
             elif extname == "LINES":
                 u.set_enabled_aliases({'flam': u.erg / u.s / u.cm**2 / u.nm,
                                        'reduced': u.dimensionless_unscaled})
-                tab = self.lines.print_detected_lines(amplitude_units=self.units.replace("erg/s/cm$^2$/nm", "flam"), print_table=False)
+                tab = self.lines.build_detected_line_table(amplitude_units=self.units.replace("erg/s/cm$^2$/nm", "flam"))
                 hdus[extname] = fits.table_to_hdu(tab)
             elif extname == "CONFIG":
                 # HIERARCH and CONTINUE not compatible together in FITS headers
@@ -702,7 +814,8 @@ class Spectrum:
         Examples
         --------
 
-        # Latest Spectractor output format: do not provide a config file (parameters are loaded from file header)
+        Latest Spectractor output format: do not provide a config file (parameters are loaded from file header)
+
         >>> from spectractor import parameters
         >>> s = Spectrum(config="")
         >>> s.load_spectrum('tests/data/reduc_20170530_134_spectrum.fits')
@@ -714,7 +827,8 @@ class Spectrum:
             >>> assert parameters.CCD_REBIN == s.header["REBIN"]
             >>> assert s.parallactic_angle == s.header["PARANGLE"]
 
-        # Spectractor output format older than version <=2.3: must give the config file
+        Spectractor output format older than version <=2.3: must give the config file
+
         >>> parameters.VERBOSE = False
         >>> s = Spectrum(config="./config/ctio.ini")
         >>> s.load_spectrum('tests/data/reduc_20170605_028_spectrum.fits')
@@ -737,12 +851,16 @@ class Spectrum:
         # check the version of the file
         if "VERSION" in self.header:
             from spectractor._version import __version__
+            from packaging import version
             if self.config != "":
                 raise AttributeError(f"With Spectractor above 2.4 do not provide a config file in Spectrum(config=...)."
                                      f"Now config parameters are loaded from the file header. Got {self.config=}.")
             if self.header["VERSION"] != str(__version__):
+                self.my_logger.debug(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
+                                     f"different from current Spectractor software {__version__}.")
+            if version.parse(self.header["VERSION"]) < version.parse("3.0"):
                 self.my_logger.warning(f"\n\tSpectrum file spectractor version {self.header['VERSION']} is "
-                                       f"different from current Spectractor software {__version__}.")
+                                       f"below Spectractor software 3.0. It may be deprecated.")
             self.load_spectrum_latest(input_file_name)
         else:
             self.my_logger.warning("\n\tNo information about Spectractor software version is given in the header. "
@@ -1190,102 +1308,6 @@ class Spectrum:
         # with respect to order 0 initial centroid position.
         dispersion_law = (Dx + shift_x + with_adr * adr_x) + 1j * (Dy_disp_axis + with_adr * adr_y + shift_y)
         return dispersion_law
-
-    def old_compute_dispersion_in_spectrogram(self, D, shift_x, shift_y, angle, niter=3, with_adr=True):
-        """Compute the dispersion relation in a spectrogram, using grating dispersion model and ADR.
-        Origin is the order 0 centroid.
-
-        Parameters
-        ----------
-        D: float
-            The distance between the CCD and the disperser in mm.
-        shift_x: float
-            Shift in the x axis direction for order 0 position in pixel.
-        shift_y: float
-            Shift in the y axis direction for order 0 position in pixel.
-        angle: float
-            Main dispersion axis angle in degrees.
-        niter: int, optional
-            Number of iterations to compute ADR (default: 3).
-        with_adr: bool, optional
-            If True, add ADR effect to grating dispersion model (default: True).
-
-        Returns
-        -------
-        lambdas: array_like
-            Wavelength array for parameters.SPECTRUM_ORDER diffraction.
-        lambdas_order2: array_like
-            Wavelength array for parameters.SPECTRUM_ORDER+1 diffraction.
-        dispersion_law: array_like
-            Complex array coding the 2D dispersion relation in the spectrogram for parameters.SPECTRUM_ORDER diffraction.
-        dispersion_law_order2: array_like
-            Complex array coding the 2D dispersion relation in the spectrogram for parameters.SPECTRUM_ORDER+1 diffraction.
-
-        Examples
-        --------
-        >>> s = Spectrum("./tests/data/reduc_20170530_134_spectrum.fits")
-        >>> s.x0 = [743, 683]
-        >>> s.spectrogram_x0 = -280
-        >>> lambdas, lambdas_order2, dispersion_law, dispersion_law_order2 = s.old_compute_dispersion_in_spectrogram(58, 0, 0, 0)
-        >>> lambdas[:4]
-        array([334.87418671, 336.02207498, 337.17007802, 338.31819098])
-        >>> lambdas_order2[:4]
-        array([175.24821864, 175.6613138 , 176.08856096, 176.52723832])
-        >>> dispersion_law[:4]
-        array([278.11756086+1.07838932j, 279.13819666+1.06656773j,
-               280.15859766+1.05488065j, 281.17876742+1.04332603j])
-        >>> dispersion_law[90:95]
-        array([369.3298545 +0.38390497j, 370.338383  +0.37901927j,
-               371.34683964+0.37417473j, 372.35522523+0.36937089j,
-               373.36354058+0.36460729j])
-        >>> dispersion_law_order2[:4]
-        array([573.69581057+1.07838932j, 575.80156994+1.06656773j,
-               577.90852175+1.05488065j, 580.01666653+1.04332603j])
-
-        """
-        # Distance in x and y with respect to the true order 0 position at lambda_ref
-        Dx = np.arange(self.spectrogram_Nx) - self.spectrogram_x0 - shift_x  # distance in (x,y) spectrogram frame for column x
-        Dy_disp_axis = np.tan(angle * np.pi / 180) * Dx  # disp axis height in spectrogram frame for x
-        distance = np.sign(Dx) * np.sqrt(Dx * Dx + Dy_disp_axis * Dy_disp_axis)  # algebraic distance along dispersion axis
-
-        # Wavelengths using the order 0 shifts (ADR has no impact as it shifts order 0 and order p equally)
-        new_x0 = [self.x0[0] + shift_x, self.x0[1] + shift_y]
-        # First guess of wavelengths
-        self.disperser.D = np.copy(D)
-        lambdas = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=self.order)
-        lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance, new_x0, order=self.order+np.sign(self.order))
-
-        # Evaluate ADR
-        adr_x = np.zeros_like(Dx)
-        adr_y = np.zeros_like(Dy_disp_axis)
-        for k in range(niter):
-            adr_ra, adr_dec = adr_calib(lambdas, self.adr_params, parameters.OBS_LATITUDE,
-                                        lambda_ref=self.lambda_ref)
-            adr_x, adr_y = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-            adr_u, adr_v = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
-
-            # Evaluate ADR for order 2
-            adr_ra, adr_dec = adr_calib(lambdas_order2, self.adr_params, parameters.OBS_LATITUDE,
-                                        lambda_ref=self.lambda_ref)
-            # adr_x_2, adr_y_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=0)
-            adr_u_2, adr_v_2 = flip_and_rotate_adr_to_image_xy_coordinates(adr_ra, adr_dec, dispersion_axis_angle=angle)
-
-            # Compute lambdas at pixel column x
-            lambdas = self.disperser.grating_pixel_to_lambda(distance - adr_u, new_x0, order=self.order)
-            lambdas_order2 = self.disperser.grating_pixel_to_lambda(distance - adr_u_2, new_x0, order=self.order+np.sign(self.order))
-
-        # Position (not distance) in pixel of wavelength lambda order 1 centroid in the (x,y) spectrogram frame
-        #distance = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=self.order)
-        #Dx = distance * np.cos(angle * np.pi / 180)
-        #Dy_disp_axis = distance * np.sin(angle * np.pi / 180)
-        dispersion_law = (Dx + shift_x + with_adr * adr_x) + 1j * (Dy_disp_axis + with_adr * adr_y + shift_y)
-        # Position (not distance) in pixel of wavelength lambda order 2 centroid in the (x,y) spectrogram frame
-        distance_order2 = self.disperser.grating_lambda_to_pixel(lambdas, x0=new_x0, order=self.order+np.sign(self.order))
-        Dx_order2 = distance_order2 * np.cos(angle * np.pi / 180)
-        Dy_disp_axis_order2 = distance_order2 * np.sin(angle * np.pi / 180)
-        dispersion_law_order2 = (Dx_order2 + shift_x + with_adr * adr_x) + \
-                                1j * (Dy_disp_axis_order2 + with_adr * adr_y + shift_y)
-        return lambdas, lambdas_order2, dispersion_law, dispersion_law_order2
 
 
 class MultigaussAndBgdFitWorkspace(FitWorkspace):
@@ -1788,7 +1810,9 @@ def detect_lines(lines, lambdas, spec, spec_err=None, cov_matrix=None, fwhm_func
                 lambda_shifts.append(peak_pos - line.wavelength)
                 snrs.append(snr)
     if ax is not None:
-        lines.plot_detected_lines(ax, print_table=parameters.DEBUG)
+        lines.plot_detected_lines(ax)
+    lines.table = lines.build_detected_line_table()
+    lines.my_logger.debug(f"\n{lines.table}")
     if len(lambda_shifts) > 0:
         global_chisq /= len(lambda_shifts)
         shift = np.average(np.abs(lambda_shifts) ** 2, weights=np.array(snrs) ** 2)

@@ -8,7 +8,7 @@ reqs = []
 if os.getenv('CONDA_PREFIX') is None:
     reqs = open('requirements.txt', 'r').read().strip().splitlines()
 
-if os.getenv('READTHEDOCS'):
+if os.getenv('READTHEDOCS') and 'mpi4py' in reqs:
     reqs.remove('mpi4py')
 
 with open('README.md') as file:

@@ -229,8 +229,10 @@ class Image(object):
             load_LPNHE_image(self)
         elif parameters.OBS_NAME == "AUXTEL":
             load_AUXTEL_image(self)
-        elif parameters.OBS_NAME == "STARDICE":
+        elif parameters.OBS_NAME == "STARDICE" or parameters.OBS_NAME == "OHP":
             load_STARDICE_image(self)
+        else:
+            raise ValueError(f"Unknown observatory {parameters.OBS_NAME=}.")
         # Load the disperser
         self.my_logger.info(f'\n\tLoading disperser {self.disperser_label}...')
         self.header["GRATING"] = self.disperser_label
@@ -764,6 +766,7 @@ def load_STARDICE_image(image):  # pragma: no cover
     elif image.header['MOUNTTAU'] >= 90:
         parameters.OBS_CAMERA_ROTATION = 0
 
+    image.target_label = image.header['mountTARGET']
     image.date_obs = image.header['DATE-OBS']
     image.expo = float(image.header['cameraexptime'])
     image.filter_label = 'EMPTY'
@@ -1127,11 +1130,13 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
     XX = np.arange(NX)
     YY = np.arange(NY)
     # find a first guess of the target position
-    avX, sigX = weighted_avg_and_std(XX, np.sum(sub_image_subtracted, axis=0) ** 4)
-    avY, sigY = weighted_avg_and_std(YY, np.sum(sub_image_subtracted, axis=1) ** 4)
+    xprofile = np.sum(sub_image_subtracted, axis=0)
+    yprofile = np.sum(sub_image_subtracted, axis=1)
+    _, sigX = weighted_avg_and_std(XX, xprofile)
+    _, sigY = weighted_avg_and_std(YY, yprofile)
+    avX = np.average(XX, weights=xprofile ** 4)
+    avY = np.average(YY, weights=yprofile ** 4)
     # fit a 2D star profile close to this position
-    # guess = [np.max(sub_image_subtracted),avX,avY,1,1] #for Moffat2Ds
-    # guess = [np.max(sub_image_subtracted),avX-2,avY-2,2,2,0] #for Gauss2D
     psf = Moffat(clip=True)
     total_flux = np.sum(sub_image_subtracted)
     psf.params.values[:3] = [total_flux, avX, avY]
@@ -1141,18 +1146,11 @@ def find_target_Moffat2D(image, sub_image_subtracted, sub_errors=None):
         psf.params.values[1] = avX
         psf.params.values[2] = avY
     mean_prior = 10  # in pixels
-    # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,-np.inf],
-    # [2*np.max(sub_image_subtracted),avX+mean_prior,avY+mean_prior,np.inf,np.inf] ] #for Moffat2D
-    # bounds = [ [0.5*np.max(sub_image_subtracted),avX-mean_prior,avY-mean_prior,0,0,0],
-    # [100*image.saturation,avX+mean_prior,avY+mean_prior,10,10,np.pi] ] #for Gauss2D
-    # bounds = [[0.5 * np.max(sub_image_subtracted), avX - mean_prior, avY - mean_prior, 2, 0.9 * image.saturation],
-    # [10 * image.saturation, avX + mean_prior, avY + mean_prior, 15, 1.1 * image.saturation]]
-    psf.params.bounds[:3] = [[0.1 * total_flux, 4 * total_flux],
+    psf.params.bounds[:4] = [[0.1 * total_flux, 10 * total_flux],
                              [avX - mean_prior, avX + mean_prior],
-                             [avY - mean_prior, avY + mean_prior]]
+                             [avY - mean_prior, avY + mean_prior],
+                             [0.5*min(sigX, sigY), min(NX, NY)]]
     # fit
-    # star2D = fit_PSF2D(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
-    # star2D = fit_PSF2D_minuit(X, Y, sub_image_subtracted, guess=guess, bounds=bounds)
     psf.fit_psf(sub_image_subtracted, data_errors=sub_errors, bgd_model_func=image.target_bkgd2D)
     new_avX = psf.params.values[1]
     new_avY = psf.params.values[2]
