@@ -376,8 +376,9 @@ class Star(Target):
                              f"\n\tCalspec? {is_calspec}"
                              f"\n\tNumber of spectra: {len(self.spectra)}"
                              f"\n\tRedshift: {self.redshift}"
-                             f"\n\tEmission spectrum ? {self.emission_spectrum}"
-                             f"\n\tLines: {[l.label for l in self.lines.lines]}")
+                             f"\n\tEmission spectrum ? {self.emission_spectrum}")
+        if self.lines is not None and len(self.lines.lines) > 0:
+            self.my_logger.debug(f"\n\tLines: {[l.label for l in self.lines.lines]}")
 
     def get_radec_position_after_pm(self, date_obs):
         if self.simbad_table is not None:
