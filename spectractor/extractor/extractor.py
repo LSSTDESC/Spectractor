@@ -1244,7 +1244,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Make a data copy
     data = np.copy(image.data_rotated)#[:, 0:right_edge]
-    err = np.copy(image.stat_errors_rotated)#[:, 0:right_edge]
+    err = np.copy(image.err_rotated)#[:, 0:right_edge]
 
     # Lateral bands to remove sky background
     Ny, Nx = data.shape
@@ -1355,7 +1355,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
 
     # Extract the spectrogram edges
     data = np.copy(image.data)[:, 0:right_edge]
-    err = np.copy(image.stat_errors)[:, 0:right_edge]
+    err = np.copy(image.err)[:, 0:right_edge]
     Ny, Nx = data.shape
     x0 = int(image.target_pixcoords[0])
     y0 = int(image.target_pixcoords[1])

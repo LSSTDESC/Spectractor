@@ -34,14 +34,18 @@ class Image(object):
         Units of the image.
     data: array
         Image 2D array in self.units units.
-    stat_errors: array
+    err: array
         Image 2D uncertainty array in self.units units.
     target_pixcoords: array
         Target position [x,y] in the image in pixels.
     data_rotated: array
         Rotated image 2D array in self.units units.
-    stat_errors_rotated: array
+    err_rotated: array
         Rotated image 2D uncertainty array in self.units units.
+    flat: array
+        Flat 2D array without units and median of 1.
+    star_field: array
+        Star field simulation, no units needed but better in ADU/s.
     target_pixcoords_rotated: array
         Target position [x,y] in the rotated image in pixels.
     date_obs: str
@@ -116,7 +120,7 @@ class Image(object):
             :hide:
 
             >>> assert im.data is not None and np.mean(im.data) > 0
-            >>> assert im.stat_errors is not None and np.mean(im.stat_errors) > 0
+            >>> assert im.err is not None and np.mean(im.err) > 0
             >>> assert im.header is not None
             >>> assert im.gain is not None and np.mean(im.gain) > 0
 
@@ -140,8 +144,8 @@ class Image(object):
         self.data_rotated = None
         self.gain = None  # in e-/ADU
         self.read_out_noise = None
-        self.stat_errors = None
-        self.stat_errors_rotated = None
+        self.err = None
+        self.err_rotated = None
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.saturation = None
@@ -157,7 +161,7 @@ class Image(object):
         self.flat = None
         self.star_field = None
 
-        self.imgs = [self.data, self.stat_errors, self.flat, self.star_field]
+        self.imgs = [self.data, self.err, self.flat, self.star_field]
 
         if parameters.CALLING_CODE != 'LSST_DM' and file_name != "":
             self.load_image(file_name)
@@ -204,14 +208,14 @@ class Image(object):
         >>> im.rebin()
         >>> im.data.shape
         (1024, 1024)
-        >>> im.stat_errors.shape
+        >>> im.err.shape
         (1024, 1024)
         >>> im.target_guess
         array([405., 295.])
         """
         new_shape = np.asarray(self.data.shape) // parameters.CCD_REBIN
         self.data = rebin(self.data, new_shape)
-        self.stat_errors = np.sqrt(rebin(self.stat_errors ** 2, new_shape))
+        self.err = np.sqrt(rebin(self.err ** 2, new_shape))
         if self.target_guess is not None:
             self.target_guess = np.asarray(self.target_guess) / parameters.CCD_REBIN
 
@@ -287,9 +291,9 @@ class Image(object):
             >>> assert np.all(np.isclose(data_before, im.data * im.expo))
         """
         self.data = self.data.astype(np.float64) / self.expo
-        self.stat_errors /= self.expo
-        if self.stat_errors_rotated is not None:
-            self.stat_errors_rotated /= self.expo
+        self.err /= self.expo
+        if self.err_rotated is not None:
+            self.err_rotated /= self.expo
         self.units = 'ADU/s'
 
     def convert_to_ADU_units(self):
@@ -311,9 +315,9 @@ class Image(object):
             >>> assert np.all(np.isclose(data_before, im.data))
         """
         self.data *= self.expo
-        self.stat_errors *= self.expo
-        if self.stat_errors_rotated is not None:
-            self.stat_errors_rotated *= self.expo
+        self.err *= self.expo
+        if self.err_rotated is not None:
+            self.err_rotated *= self.expo
         self.units = 'ADU'
 
     def compute_statistical_error(self):
@@ -353,9 +357,9 @@ class Image(object):
         # remove negative values (due to dead columns for instance
         min_noz = np.min(err2[err2 > 0])
         err2[err2 <= 0] = min_noz
-        self.stat_errors = np.sqrt(err2)
+        self.err = np.sqrt(err2)
         # convert in ADU
-        self.stat_errors /= self.gain
+        self.err /= self.gain
         # check uncertainty model
         self.check_statistical_error()
 
@@ -401,7 +405,7 @@ class Image(object):
         data = np.copy(self.data)
         min_noz = np.min(data[data > 0])
         data[data <= 0] = min_noz
-        y = self.stat_errors.flatten() ** 2
+        y = self.err.flatten() ** 2
         x = data.flatten()
         fit, cov, model = fit_poly1d(x, y, order=1)
         gain = 1 / fit[0]
@@ -449,7 +453,7 @@ class Image(object):
         ax[0].grid()
         ax[0].set_ylabel(r"$\sigma_{\mathrm{ADU}}^2$ [ADU$^2$]")
         ax[0].set_xlabel(r"Data pixel values [ADU]")
-        plot_image_simple(ax[1], data=self.stat_errors, scale="log10", title="Statistical uncertainty map",
+        plot_image_simple(ax[1], data=self.err, scale="log10", title="Statistical uncertainty map",
                           units=self.units, target_pixcoords=None, aspect="auto", cmap=None)
         fig.tight_layout()
         if parameters.LSST_SAVEFIGPATH:  # pragma: no cover
@@ -515,7 +519,7 @@ class Image(object):
             ax = plt.gca()
         data = np.copy(self.data)
         if plot_stats:
-            data = np.copy(self.stat_errors)
+            data = np.copy(self.err)
         if units == "":
             units = self.units
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
@@ -986,10 +990,10 @@ def find_target_init(image, guess, rotated=False, widths=[parameters.XWINDOW, pa
     Dx, Dy = widths
     if rotated:
         sub_image = np.copy(image.data_rotated[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-        sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
+        sub_errors = np.copy(image.err[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
     else:
         sub_image = np.copy(image.data[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
-        sub_errors = np.copy(image.stat_errors[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
+        sub_errors = np.copy(image.err[y0 - Dy:y0 + Dy, x0 - Dx:x0 + Dx])
 
     # usually one rebin by adding pixel contents
     image.saturation = parameters.CCD_MAXADU / image.expo *parameters.CCD_REBIN**2
@@ -1413,11 +1417,11 @@ def turn_image(image):
     if not np.isnan(image.rotation_angle):
         image.data_rotated = ndimage.rotate(image.data, image.rotation_angle,
                                             prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)
-        image.stat_errors_rotated = np.sqrt(
-            np.abs(ndimage.rotate(image.stat_errors ** 2, image.rotation_angle,
+        image.err_rotated = np.sqrt(
+            np.abs(ndimage.rotate(image.err ** 2, image.rotation_angle,
                                   prefilter=parameters.ROT_PREFILTER, order=parameters.ROT_ORDER)))
-        min_noz = np.min(image.stat_errors_rotated[image.stat_errors_rotated > 0])
-        image.stat_errors_rotated[image.stat_errors_rotated <= 0] = min_noz
+        min_noz = np.min(image.err_rotated[image.err_rotated > 0])
+        image.err_rotated[image.err_rotated <= 0] = min_noz
     if parameters.DEBUG:
         margin = 100 // parameters.CCD_REBIN
         y0 = int(image.target_pixcoords[1])
