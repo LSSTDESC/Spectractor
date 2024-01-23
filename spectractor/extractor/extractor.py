@@ -1352,10 +1352,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     spectrum.chromatic_psf = s
 
     # Extract the spectrogram edges
-    right_edge = image.data.shape[1]
-    data = np.copy(image.data)
-    err = np.copy(image.err)
-    Ny, Nx = data.shape
+    Ny, Nx = image.data.shape
     x0 = int(image.target_pixcoords[0])
     y0 = int(image.target_pixcoords[1])
     ymax = min(Ny, y0 + int(s.table['Dy_disp_axis'].max()) + ws[1] + 1)  # +1 to  include edges
@@ -1365,7 +1362,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     lambda_min_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MIN)))
     lambda_max_index = int(np.argmin(np.abs(lambdas[::np.sign(spectrum.order)] - parameters.LAMBDA_MAX)))
     xmin = max(0, int(s.table['Dx'][lambda_min_index] + x0))
-    xmax = min(right_edge, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
+    xmax = min(Nx, int(s.table['Dx'][lambda_max_index] + x0) + 1)  # +1 to  include edges
     # Position of the order 0 in the spectrogram coordinates
     target_pixcoords_spectrogram = [image.target_pixcoords[0] - xmin, image.target_pixcoords[1] - ymin]
     s.y0 = target_pixcoords_spectrogram[1]
@@ -1378,13 +1375,18 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
                     f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
 
     # Create spectrogram
-    data = data[ymin:ymax, xmin:xmax]
-    err = err[ymin:ymax, xmin:xmax]
+    spectrum.spectrogram_data = np.copy(image.data[ymin:ymax, xmin:xmax])
+    spectrum.spectrogram_err = np.copy(image.err[ymin:ymax, xmin:xmax])
+    if image.starfield is not None:
+        spectrum.spectrogram_starfield = np.copy(image.starfield[ymin:ymax, xmin:xmax])
+    else:
+        spectrum.spectrogram_starfield = None  # np.zeros_like(spectrum.spectrogram_data)
+    if image.flat is not None:
+        spectrum.spectrogram_flat = np.copy(image.flat[ymin:ymax, xmin:xmax])
+    else:
+        spectrum.spectrogram_flat = None  # np.ones_like(spectrum.spectrogram_data)
 
-    spectrum.spectrogram_data = data
-    spectrum.spectrogram_err = err
-
-    Ny, Nx = data.shape
+    Ny, Nx = spectrum.spectrogram_data.shape
     my_logger.info(f'\n\tExtract spectrogram: crop raw image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
     # Extract the non-rotated background
@@ -1448,7 +1450,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
         gs_kw = dict(width_ratios=[3, 0.08], height_ratios=[1, 1])
         fig, ax = plt.subplots(2, 2, sharex='none', figsize=(16, 6), gridspec_kw=gs_kw)
         xx = np.arange(s.table['Dx'].size)
-        plot_image_simple(ax[1, 0], data=data, scale="symlog", title='', units=image.units, aspect='auto', cax=ax[1, 1])
+        plot_image_simple(ax[1, 0], data=spectrum.spectrogram_data, scale="symlog", title='',
+                          units=image.units, aspect='auto', cax=ax[1, 1])
         ax[1, 0].plot(xx, target_pixcoords_spectrogram[1] + s.table['Dy_disp_axis'], label='Dispersion axis', color="r")
         ax[1, 0].scatter(xx, target_pixcoords_spectrogram[1] + s.table['Dy'],
                          c=s.table['lambdas'], edgecolors='None', cmap=from_lambda_to_colormap(s.table['lambdas']),

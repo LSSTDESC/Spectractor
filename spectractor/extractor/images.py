@@ -44,7 +44,7 @@ class Image(object):
         Rotated image 2D uncertainty array in self.units units.
     flat: array
         Flat 2D array without units and median of 1.
-    star_field: array
+    starfield: array
         Star field simulation, no units needed but better in ADU/s.
     target_pixcoords_rotated: array
         Target position [x,y] in the rotated image in pixels.
@@ -159,9 +159,7 @@ class Image(object):
         self.humidity = 0
 
         self.flat = None
-        self.star_field = None
-
-        self.imgs = [self.data, self.err, self.flat, self.star_field]
+        self.starfield = None
 
         if parameters.CALLING_CODE != 'LSST_DM' and file_name != "":
             self.load_image(file_name)

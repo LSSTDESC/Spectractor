@@ -243,6 +243,8 @@ class Spectrum:
         self.spectrogram_err = None
         self.spectrogram_residuals = None
         self.spectrogram_fit = None
+        self.spectrogram_flat = None
+        self.spectrogram_starfield = None
         self.spectrogram_x0 = None
         self.spectrogram_y0 = None
         self.spectrogram_xmin = None
@@ -700,6 +702,10 @@ class Spectrum:
                 hdus[extname].data = self.spectrogram_fit
             elif extname == "S_RES":
                 hdus[extname].data = self.spectrogram_residuals
+            elif extname == "S_FLAT" and self.spectrogram_flat is not None:
+                hdus[extname].data = self.spectrogram_flat
+            elif extname == "S_STAR" and self.spectrogram_starfield is not None:
+                hdus[extname].data = self.spectrogram_starfield
             elif extname == "PSF_TAB":
                 hdus[extname] = fits.table_to_hdu(self.chromatic_psf.table)
             elif extname == "LINES":
@@ -1080,6 +1086,10 @@ class Spectrum:
                 self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
                 self.spectrogram_fit = hdu_list["S_FIT"].data
                 self.spectrogram_residuals = hdu_list["S_RES"].data
+                if "S_FLAT" in hdu_list.keys():
+                    self.spectrogram_flat = hdu_list["S_FLAT"].data
+                if "S_STAR" in hdu_list.keys():
+                    self.spectrogram_starfield = hdu_list["S_STAR"].data
                 self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
                                                    saturation=self.spectrogram_saturation)
                 self.lines.table = Table.read(hdu_list["LINES"], unit_parse_strict="silent")
