@@ -1111,8 +1111,7 @@ def SpectractorRun(image, output_directory, guess=None):
     w_psf1d, bgd_model_func = extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
                                                           ws=(parameters.PIXDIST_BACKGROUND,
                                                               parameters.PIXDIST_BACKGROUND
-                                                              + parameters.PIXWIDTH_BACKGROUND),
-                                                          right_edge=image.data.shape[1])
+                                                              + parameters.PIXWIDTH_BACKGROUND))
 
     # PSF2D deconvolution
     if parameters.SPECTRACTOR_DECONVOLUTION_PSF2D:
@@ -1203,7 +1202,7 @@ def Spectractor(file_name, output_directory, target_label='', guess=None, disper
     return spectrum
 
 
-def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), right_edge=parameters.CCD_IMSIZE):
+def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     """Extract the 1D spectrum from the image.
 
     Method : remove a uniform background estimated from the rectangular lateral bands
@@ -1229,8 +1228,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         Half width of central region where the spectrum is extracted and summed (default: 10)
     ws: list
         up/down region extension where the sky background is estimated with format [int, int] (default: [20,30])
-    right_edge: int
-        Right-hand pixel position above which no pixel should be used (default: parameters.CCD_IMSIZE)
     """
 
     my_logger = set_logger(__name__)
@@ -1243,12 +1240,13 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
         f'and background from {ws[0]:.0f} to {ws[1]:.0f} pixels')
 
     # Make a data copy
-    data = np.copy(image.data_rotated)#[:, 0:right_edge]
-    err = np.copy(image.err_rotated)#[:, 0:right_edge]
+    data = np.copy(image.data_rotated)
+    err = np.copy(image.err_rotated)
 
     # Lateral bands to remove sky background
     Ny, Nx = data.shape
     y0 = int(image.target_pixcoords_rotated[1])
+    right_edge = image.data_rotated.shape[1]
     ymax = min(Ny, y0 + ws[1])
     ymin = max(0, y0 - ws[1])
 
@@ -1354,8 +1352,9 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     spectrum.chromatic_psf = s
 
     # Extract the spectrogram edges
-    data = np.copy(image.data)[:, 0:right_edge]
-    err = np.copy(image.err)[:, 0:right_edge]
+    right_edge = image.data.shape[1]
+    data = np.copy(image.data)
+    err = np.copy(image.err)
     Ny, Nx = data.shape
     x0 = int(image.target_pixcoords[0])
     y0 = int(image.target_pixcoords[1])
@@ -1381,26 +1380,30 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
+
+    spectrum.spectrogram_data = data
+    spectrum.spectrogram_err = err
+
     Ny, Nx = data.shape
     my_logger.info(f'\n\tExtract spectrogram: crop raw image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
-    # Extract the non rotated background
+    # Extract the non-rotated background
     my_logger.info('\n\t  ======================= Extract the non rotated background  =============================')
     if parameters.SPECTRACTOR_BACKGROUND_SUBTRACTION:
-        bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, err, ws=ws, Dy_disp_axis=s.table['y_c'])
+        bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(spectrum.spectrogram_data,
+                                                                                     spectrum.spectrogram_err,
+                                                                                     ws=ws, Dy_disp_axis=s.table['y_c'])
         bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
         my_logger.info(f"\n\tBackground statistics: mean={np.nanmean(bgd):.3f} {image.units}, "
                    f"RMS={np.nanmean(bgd_rms):.3f} {image.units}.")
 
         # Propagate background uncertainties
-        err = np.sqrt(err * err + bgd_rms * bgd_rms)
+        spectrum.spectrogram_err = np.sqrt(spectrum.spectrogram_err * spectrum.spectrogram_err + bgd_rms * bgd_rms)
         spectrum.spectrogram_bgd = bgd
         spectrum.spectrogram_bgd_rms = bgd_rms
 
     # First guess for lambdas
-
     my_logger.info('\n\t  ======================= first guess for lambdas  =============================')
-
     first_guess_lambdas = image.disperser.grating_pixel_to_lambda(s.get_algebraic_distance_along_dispersion_axis(),
                                                                   x0=image.target_pixcoords, order=spectrum.order)
     s.table['lambdas'] = first_guess_lambdas
@@ -1411,8 +1414,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                    f'\n\tNew target position in spectrogram frame: {target_pixcoords_spectrogram}')
 
     # Save results
-    spectrum.spectrogram_data = data
-    spectrum.spectrogram_err = err
     spectrum.spectrogram_x0 = target_pixcoords_spectrogram[0]
     spectrum.spectrogram_y0 = target_pixcoords_spectrogram[1]
     spectrum.spectrogram_xmin = xmin
