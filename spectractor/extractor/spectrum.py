@@ -1086,9 +1086,9 @@ class Spectrum:
                 self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
                 self.spectrogram_fit = hdu_list["S_FIT"].data
                 self.spectrogram_residuals = hdu_list["S_RES"].data
-                if "S_FLAT" in hdu_list.keys():
+                if "S_FLAT" in hdu_list.__dict__.keys():
                     self.spectrogram_flat = hdu_list["S_FLAT"].data
-                if "S_STAR" in hdu_list.keys():
+                if "S_STAR" in hdu_list.__dict__.keys():
                     self.spectrogram_starfield = hdu_list["S_STAR"].data
                 self.chromatic_psf.init_from_table(Table.read(hdu_list["PSF_TAB"]),
                                                    saturation=self.spectrogram_saturation)
