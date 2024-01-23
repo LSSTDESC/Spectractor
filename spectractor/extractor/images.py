@@ -154,6 +154,11 @@ class Image(object):
         self.pressure = 0
         self.humidity = 0
 
+        self.flat = None
+        self.star_field = None
+
+        self.imgs = [self.data, self.stat_errors, self.flat, self.star_field]
+
         if parameters.CALLING_CODE != 'LSST_DM' and file_name != "":
             self.load_image(file_name)
         else:
