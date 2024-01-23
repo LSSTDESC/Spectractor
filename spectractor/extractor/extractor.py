@@ -431,14 +431,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.psf_profile_params[order][:, 2] += dispersion_law.imag - self.bgd_width
 
             # Matrix filling
-            # Older piece of code, using full matrices (non sparse). Keep here for temporary archive.
-            # psf_cube_order = self.spectrum.chromatic_psf.build_psf_cube(self.pixels, profile_params[-1], fwhmx_clip=3 * parameters.PSF_FWHM_CLIP, fwhmy_clip=parameters.PSF_FWHM_CLIP, dtype="float32", mask=self.psf_cubes_masked[order], boundaries=self.boundaries[order])
-            # if self.sparse_indices is None:
-            #    self.sparse_indices = np.concatenate([np.where(self.psf_cube_masked[k].ravel() > 0)[0] for k in range(len(profile_params))])
-            # if psf_cube is None:
-            #     psf_cube = psf_cube_order
-            # else:
-            #     psf_cube += psf_cube_order
             M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, self.psf_profile_params[order],
                                                                  dtype="float32", M_sparse_indices=self.M_sparse_indices[order], boundaries=self.boundaries[order])
             if M is None:
@@ -446,10 +438,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             else:
                 M += M_order
 
-        # M = psf_cube.reshape(len(profile_params[0]), self.pixels[0].size).T  # flattening
-        # if self.sparse_indices is None:
-        #     self.sparse_indices = np.where(M > 0)
-        # M = sparse.csc_matrix((M[self.sparse_indices].ravel(), self.sparse_indices), shape=M.shape, dtype="float32")
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
             M_dot_W = M.T @ self.sqrtW
