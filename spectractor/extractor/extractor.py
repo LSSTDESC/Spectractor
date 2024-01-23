@@ -1093,6 +1093,7 @@ def SpectractorRun(image, output_directory, guess=None):
                                                                  parameters.YWINDOW_ROT))
     # Create Spectrum object
     spectrum = Spectrum(image=image, order=parameters.SPEC_ORDER)
+
     # First 1D spectrum extraction and background extraction
 
     my_logger.info('\n\t ======================== PSF1D Extraction ====================================')
