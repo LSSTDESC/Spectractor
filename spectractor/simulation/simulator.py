@@ -521,11 +521,11 @@ class SpectrogramModel(Spectrum):
                 self.profile_params[order][:, 0] = spec
 
         # self.spectrogram is in ADU/s units here
-        self.spectrogram = A1 * ima
+        self.spectrogram_data = A1 * ima
         self.spectrogram_err = A1 * np.sqrt(ima_err2)
 
         if self.with_background:
-            self.spectrogram += B * self.spectrogram_bgd
+            self.spectrogram_data += B * self.spectrogram_bgd
         # Save the simulation parameters
         self.psf_poly_params = np.copy(poly_params[0])
         self.header['OZONE_T'] = ozone
@@ -539,7 +539,7 @@ class SpectrogramModel(Spectrum):
         self.header['Y0_T'] = shift_y
         self.header['ROTANGLE'] = angle
 
-        return self.lambdas, self.spectrogram, self.spectrogram_err
+        return self.lambdas, self.spectrogram_data, self.spectrogram_err
 
 
 if __name__ == "__main__":
