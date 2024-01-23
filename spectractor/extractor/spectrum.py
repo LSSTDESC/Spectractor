@@ -133,7 +133,7 @@ class Spectrum:
         Outside relative humidity in fraction of one.
     throughput: callable
         Instrumental throughput of the telescope.
-    spectrogram: array
+    spectrogram_data: array
         Spectrogram 2D image in image units.
     spectrogram_bgd: array
         Estimated 2D background fitted below the spectrogram in image units.
@@ -237,7 +237,7 @@ class Spectrum:
         self.rotation_angle = 0
         self.parallactic_angle = None
         self.camera_angle = 0
-        self.spectrogram = None
+        self.spectrogram_data = None
         self.spectrogram_bgd = None
         self.spectrogram_bgd_rms = None
         self.spectrogram_err = None
@@ -504,7 +504,7 @@ class Spectrum:
         if ax is None:
             plt.figure(figsize=figsize)
             ax = plt.gca()
-        data = np.copy(self.spectrogram)
+        data = np.copy(self.spectrogram_data)
         if plot_stats:
             data = np.copy(self.spectrogram_err)
         plot_image_simple(ax, data=data, scale=scale, title=title, units=units, cax=cax,
@@ -587,7 +587,7 @@ class Spectrum:
         widthPlot.set_xlabel(r'$\lambda$ [nm]')
         widthPlot.grid()
 
-        spectrogram = np.copy(self.spectrogram)
+        spectrogram = np.copy(self.spectrogram_data)
         res = self.spectrogram_residuals.reshape((-1, self.spectrogram_Nx))
         std = np.std(res)
         if spectrogram.shape[0] != res.shape[0]:
@@ -688,7 +688,7 @@ class Spectrum:
                 hdus[extname].header["IM_X0"] = self.target.image_x0
                 hdus[extname].header["IM_Y0"] = self.target.image_y0
             elif extname == "S_DATA":
-                hdus[extname].data = self.spectrogram
+                hdus[extname].data = self.spectrogram_data
                 hdus[extname].header['UNIT1'] = self.units
             elif extname == "S_ERR":
                 hdus[extname].data = self.spectrogram_err
@@ -784,7 +784,7 @@ class Spectrum:
         hdu6 = fits.ImageHDU()
         hdu6.header["EXTNAME"] = "S_RES"
         hdu1.header = self.header
-        hdu1.data = self.spectrogram
+        hdu1.data = self.spectrogram_data
         hdu2.data = self.spectrogram_err
         hdu3.data = self.spectrogram_bgd
         hdu4.data = self.spectrogram_bgd_rms
@@ -961,7 +961,7 @@ class Spectrum:
                             self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
                 # load spectrogram info
                 if len(hdu_list) > 4:
-                    self.spectrogram = hdu_list["S_DATA"].data
+                    self.spectrogram_data = hdu_list["S_DATA"].data
                     self.spectrogram_err = hdu_list["S_ERR"].data
                     self.spectrogram_bgd = hdu_list["S_BGD"].data
                     if len(hdu_list) > 7:
@@ -1074,7 +1074,7 @@ class Spectrum:
                 self.target.image_x0 = float(hdu_list["ORDER0"].header["IM_X0"])
                 self.target.image_y0 = float(hdu_list["ORDER0"].header["IM_Y0"])
                 # load spectrogram info
-                self.spectrogram = hdu_list["S_DATA"].data
+                self.spectrogram_data = hdu_list["S_DATA"].data
                 self.spectrogram_err = hdu_list["S_ERR"].data
                 self.spectrogram_bgd = hdu_list["S_BGD"].data
                 self.spectrogram_bgd_rms = hdu_list["S_BGD_ER"].data
@@ -1100,7 +1100,7 @@ class Spectrum:
         if os.path.isfile(input_file_name):
             with fits.open(input_file_name) as hdu_list:
                 header = hdu_list[0].header
-                self.spectrogram = hdu_list[0].data
+                self.spectrogram_data = hdu_list[0].data
                 self.spectrogram_err = hdu_list[1].data
                 self.spectrogram_bgd = hdu_list[2].data
                 if len(hdu_list) > 3:

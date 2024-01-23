@@ -125,8 +125,8 @@ class SpectrogramFitWorkspace(FitWorkspace):
         if self.spectrum.spectrogram_Ny > 2 * parameters.PIXDIST_BACKGROUND:
             self.crop_spectrogram()
         self.lambdas = self.spectrum.lambdas
-        self.Ny, self.Nx = self.spectrum.spectrogram.shape
-        self.data = self.spectrum.spectrogram.flatten()
+        self.Ny, self.Nx = self.spectrum.spectrogram_data.shape
+        self.data = self.spectrum.spectrogram_data.flatten()
         self.err = self.spectrum.spectrogram_err.flatten()
         self.fit_angstrom_exponent = fit_angstrom_exponent
 
@@ -164,11 +164,11 @@ class SpectrogramFitWorkspace(FitWorkspace):
         self.spectrum.spectrogram_ymax = self.spectrum.spectrogram_ymax - bgd_width
         self.spectrum.spectrogram_ymin += bgd_width
         self.spectrum.spectrogram_bgd = self.spectrum.spectrogram_bgd[bgd_width:-bgd_width, :]
-        self.spectrum.spectrogram = self.spectrum.spectrogram[bgd_width:-bgd_width, :]
+        self.spectrum.spectrogram_data = self.spectrum.spectrogram_data[bgd_width:-bgd_width, :]
         self.spectrum.spectrogram_err = self.spectrum.spectrogram_err[bgd_width:-bgd_width, :]
         self.spectrum.spectrogram_y0 -= bgd_width
         self.spectrum.chromatic_psf.y0 -= bgd_width
-        self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram.shape
+        self.spectrum.spectrogram_Ny, self.spectrum.spectrogram_Nx = self.spectrum.spectrogram_data.shape
         self.spectrum.chromatic_psf.table["y_c"] -= bgd_width
         self.my_logger.debug(f'\n\tSize of the spectrogram region after cropping: '
                              f'({self.spectrum.spectrogram_Nx},{self.spectrum.spectrogram_Ny})')

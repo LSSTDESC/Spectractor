@@ -325,10 +325,10 @@ class ImageModel(Image):
         yy, xx = np.mgrid[0:parameters.CCD_IMSIZE:1, 0:parameters.CCD_IMSIZE:1]
         self.data = star.psf.evaluate(np.array([xx, yy])) + background.model()
         if spectrogram.full_image:
-            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.spectrogram
+            self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax, :] += spectrogram.spectrogram_data
         else:
             self.data[spectrogram.spectrogram_ymin:spectrogram.spectrogram_ymax,
-                      spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.spectrogram
+                      spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.spectrogram_data
         # - spectrogram.spectrogram_bgd)
         if starfield is not None:
             self.data += starfield.model(xx, yy)

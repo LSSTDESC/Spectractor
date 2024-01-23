@@ -120,7 +120,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # crop data to fit faster
         self.lambdas = self.spectrum.lambdas
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
-        self.data = spectrum.spectrogram[self.bgd_width:-self.bgd_width, :]
+        self.data = spectrum.spectrogram_data[self.bgd_width:-self.bgd_width, :]
         self.err = spectrum.spectrogram_err[self.bgd_width:-self.bgd_width, :]
         self.bgd = spectrum.spectrogram_bgd[self.bgd_width:-self.bgd_width, :]
         self.bgd_flat = self.bgd.flatten()
@@ -643,7 +643,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
-        sub = np.where(sub < self.spectrum.spectrogram.shape[1])[0]
+        sub = np.where(sub < self.spectrum.spectrogram_data.shape[1])[0]
         data = (data + self.bgd_flat).reshape((self.Ny, self.Nx))
         err = self.err.reshape((self.Ny, self.Nx))
         model = (self.model + self.params["B"] * self.bgd_flat).reshape((self.Ny, self.Nx))
@@ -1411,7 +1411,7 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30), r
                    f'\n\tNew target position in spectrogram frame: {target_pixcoords_spectrogram}')
 
     # Save results
-    spectrum.spectrogram = data
+    spectrum.spectrogram_data = data
     spectrum.spectrogram_err = err
     spectrum.spectrogram_x0 = target_pixcoords_spectrogram[0]
     spectrum.spectrogram_y0 = target_pixcoords_spectrogram[1]
@@ -1491,7 +1491,7 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
     """
     my_logger = set_logger(__name__)
     s = spectrum.chromatic_psf
-    Ny, Nx = spectrum.spectrogram.shape
+    Ny, Nx = spectrum.spectrogram_data.shape
 
     # build 1D priors
     Dx_rot = np.copy(s.table['Dx'])
@@ -1525,7 +1525,7 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
                     f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
     my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
                    f'mode={mode} and amplitude_priors_method={method}...')
-    data = spectrum.spectrogram
+    data = spectrum.spectrogram_data
     err = spectrum.spectrogram_err
 
     my_logger.info('\n\t  ======================= ChromaticPSF2D polynomial fit  =============================')
