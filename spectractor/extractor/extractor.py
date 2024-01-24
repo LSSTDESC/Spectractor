@@ -64,23 +64,23 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         spectrum.chromatic_psf.psf.apply_max_width_to_bounds(max_half_width=spectrum.spectrogram_Ny)
         psf_poly_params_bounds = spectrum.chromatic_psf.set_bounds()
         D2CCD = np.copy(spectrum.header['D2CCD'])
-        p = np.array([1, 1, 1, D2CCD, np.copy(spectrum.header['PIXSHIFT']), 0,
+        p = np.array([1, 1, 1, 1, D2CCD, np.copy(spectrum.header['PIXSHIFT']), 0,
                       np.copy(spectrum.rotation_angle), 1, parameters.OBS_CAMERA_ROTATION,
                       np.copy(spectrum.pressure),  np.copy(spectrum.temperature),  np.copy(spectrum.airmass)])
-        self.psf_params_start_index = np.array([12 + len(self.psf_poly_params) * k for k in range(len(self.diffraction_orders))])
+        self.psf_params_start_index = np.array([13 + len(self.psf_poly_params) * k for k in range(len(self.diffraction_orders))])
         self.saturation = spectrum.spectrogram_saturation
         p = np.concatenate([p] + [self.psf_poly_params] * len(self.diffraction_orders))
         input_labels = [f"A{order}" for order in self.diffraction_orders]
-        input_labels += [r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B", "R", "P [hPa]", "T [Celsius]", "z"]
+        input_labels += ["A_star", r"D_CCD [mm]", r"shift_x [pix]", r"shift_y [pix]", r"angle [deg]", "B", "R", "P [hPa]", "T [Celsius]", "z"]
         for order in self.diffraction_orders:
             input_labels += [label+f"_{order}" for label in psf_poly_params_labels]
         axis_names = [f"$A_{order}$" for order in self.diffraction_orders]
-        axis_names += [r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^{(\mathrm{fit})}$ [pix]",
+        axis_names += [r"$A_{star}$", r"$D_{CCD}$ [mm]", r"$\delta_{\mathrm{x}}^{(\mathrm{fit})}$ [pix]",
                        r"$\delta_{\mathrm{y}}^{(\mathrm{fit})}$ [pix]", r"$\alpha$ [deg]", "$B$", "R",
                        r"$P_{\mathrm{atm}}$ [hPa]", r"$T_{\mathrm{atm}}$ [Celcius]", "$z$"]
         for order in self.diffraction_orders:
             axis_names += [label+rf"$\!_{order}$" for label in psf_poly_params_names]
-        bounds = [[0, 2], [0, 2], [0, 2],
+        bounds = [[0, 2], [0, 2], [0, 2], [0, np.inf],
                   [D2CCD - 3 * parameters.DISTANCE2CCD_ERR, D2CCD + 3 * parameters.DISTANCE2CCD_ERR],
                   [-parameters.PIXSHIFT_PRIOR, parameters.PIXSHIFT_PRIOR],
                   [-10 * parameters.PIXSHIFT_PRIOR, 10 * parameters.PIXSHIFT_PRIOR],
@@ -104,6 +104,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             params.fixed[params.get_index(f"A{order}")] = True
         if "A2" in params.labels:
             params.fixed[params.get_index("A2")] = (not spectrum.disperser.flat_ratio_order_2over1) and (not ("A2_T" in spectrum.header))
+        if spectrum.spectrogram_starfield is None:
+            params.fixed[params.get_index("A_star")] = True  # Astar
         params.fixed[params.get_index("D_CCD [mm]")] = True  # D2CCD: spectrogram can not tell something on this parameter: rely on calibrate_spectrum
         params.fixed[params.get_index("shift_x [pix]")] = True  # delta x: if False, extracted spectrum is biased compared with truth
         params.fixed[params.get_index("shift_y [pix]")] = True  # delta y
@@ -261,7 +263,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.my_logger.info("\n\tReset spectrogram mask with current parameters.")
         if params is None:
             params = self.params.values
-        A1, A2, A3, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *psf_poly_params_all = params
+        A1, A2, A3, Astar, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *psf_poly_params_all = params
         poly_params = np.array(psf_poly_params_all).reshape((len(self.diffraction_orders), -1))
 
         lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
@@ -397,7 +399,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # linear regression for the amplitude parameters
         # prepare the vectors
         self.params.values = np.asarray(params)
-        A1, A2, A3, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *poly_params_all = params
+        A1, A2, A3, Astar, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *poly_params_all = params
         poly_params = np.array(poly_params_all).reshape((len(self.diffraction_orders), -1))
         self.spectrum.adr_params[2] = temperature
         self.spectrum.adr_params[3] = pressure
@@ -501,6 +503,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Compute the model
         self.model = M @ amplitude_params
+        if self.spectrum.spectrogram_starfield is not None:
+            self.model += Astar * self.spectrum.spectrogram_starfield
+        if self.spectrum.spectrogram_flat is not None:
+            self.model *= self.spectrum.spectrogram_flat
         self.model_err = np.zeros_like(self.model)
 
         return self.pixels, self.model, self.model_err
