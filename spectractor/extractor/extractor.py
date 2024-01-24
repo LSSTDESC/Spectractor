@@ -933,14 +933,13 @@ def run_ffm_minimisation(w, method="newton", niter=2):
             parameters.SAVE = False
 
     # Propagate parameters
-    A1, A2, A3, D2CCD, dx0, dy0, angle, B, rot, pressure, temperature, airmass, *poly_params_all = w.params.values
-    w.spectrum.rotation_angle = angle
-    w.spectrum.spectrogram_bgd *= B
-    w.spectrum.spectrogram_bgd_rms *= B
-    w.spectrum.spectrogram_x0 += dx0
-    w.spectrum.spectrogram_y0 += dy0
-    w.spectrum.x0[0] += dx0
-    w.spectrum.x0[1] += dy0
+    w.spectrum.rotation_angle = w.params.values[get_index("angle [deg]")]
+    w.spectrum.spectrogram_bgd *= w.params.values[get_index("B")]
+    w.spectrum.spectrogram_bgd_rms *= w.params.values[get_index("B")]
+    w.spectrum.spectrogram_x0 += w.params.values[get_index("shift_x [pix]")]
+    w.spectrum.spectrogram_y0 += w.params.values[get_index("shift_y [pix]")]
+    w.spectrum.x0[0] += w.params.values[get_index("shift_x [pix]")]
+    w.spectrum.x0[1] += w.params.values[get_index("shift_y [pix]")]
     w.spectrum.header["TARGETX"] = w.spectrum.x0[0]
     w.spectrum.header["TARGETY"] = w.spectrum.x0[1]
     w.spectrum.header['MEANFWHM'] = np.mean(np.array(w.spectrum.chromatic_psf.table['fwhm']))
