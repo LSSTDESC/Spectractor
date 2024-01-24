@@ -122,13 +122,23 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         # crop data to fit faster
         self.lambdas = self.spectrum.lambdas
         self.bgd_width = parameters.PIXWIDTH_BACKGROUND + parameters.PIXDIST_BACKGROUND - parameters.PIXWIDTH_SIGNAL
-        self.data = spectrum.spectrogram_data[self.bgd_width:-self.bgd_width, :]
-        self.err = spectrum.spectrogram_err[self.bgd_width:-self.bgd_width, :]
-        self.bgd = spectrum.spectrogram_bgd[self.bgd_width:-self.bgd_width, :]
-        self.bgd_flat = self.bgd.flatten()
-        self.Ny, self.Nx = self.data.shape
+        self.Ny, self.Nx = spectrum.spectrogram_data[self.bgd_width:-self.bgd_width, :].shape
         yy, xx = np.mgrid[:self.Ny, :self.Nx]
         self.pixels = np.asarray([xx, yy], dtype=int)
+        self.data = spectrum.spectrogram_data[self.bgd_width:-self.bgd_width, :].flatten()
+        self.err = spectrum.spectrogram_err[self.bgd_width:-self.bgd_width, :].flatten()
+        self.bgd = spectrum.spectrogram_bgd[self.bgd_width:-self.bgd_width, :].flatten()
+        if spectrum.spectrogram_flat is not None:
+            self.flat = spectrum.spectrogram_flat[self.bgd_width:-self.bgd_width, :].flatten()
+            self.bgd *= self.flat
+        else:
+            self.flat = None
+        if spectrum.spectrogram_starfield is not None:
+            self.starfield = spectrum.spectrogram_starfield[self.bgd_width:-self.bgd_width, :].flatten()
+            if self.flat is not None:
+                self.starfield *= self.flat
+        else:
+            self.starfield = None
 
         # adapt the ChromaticPSF table shape
         if self.Nx != self.spectrum.chromatic_psf.Nx:
@@ -160,18 +170,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.psf_profile_params[order] = None
         self.fix_psf_cube = False
 
-        # prepare the background, data and errors
-        self.bgd_std = float(np.std(np.random.poisson(np.abs(self.bgd))))
-
         # error matrix
         # here image uncertainties are assumed to be uncorrelated
         # (which is not exactly true in rotated images)
         self.W = 1. / (self.err * self.err)
-        self.W = self.W.flatten()
-
-        # flat data for fitworkspace
-        self.data = self.data.flatten() - self.bgd_flat
-        self.err = self.err.flatten()
         self.data_before_mask = np.copy(self.data)
         self.W_before_mask = np.copy(self.W)
 
@@ -301,17 +303,24 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         Compute a ChromaticPSF2D model given PSF shape parameters and minimizing
         amplitude parameters using a spectrogram data array.
 
-        The ChromaticPSF2D model :math:`\vec{m}(\vec{x},\vec{p})` can be written as
+        The full forward model of the spectrogram image :math:`\vec{I}(\vec{x},\vec{p})` can be written as
 
         .. math ::
-            :label: chromaticpsf2d
+            :label: ffm
 
-            \vec{m}(\vec{x},\vec{p}) = \sum_{i=0}^{N_x} A_i \phi\left(\vec{x},\vec{p}_i\right)
+            \vec{I}(\vec{x},\vec{p}) = \sum_{i=0}^{N_x} A_i F_i \phi\left(\vec{x},\vec{p}_i\right)
+            + \bar F B b\left(\vec{x}\right) + \bar F S s\left(\vec{x}\right)
 
-        with :math:`\vec{x}` the 2D array  of the pixel coordinates, :math:`\vec{A}` the amplitude parameter array
-        along the x axis of the spectrogram, :math:`\phi\left(\vec{x},\vec{p}_i\right)` the 2D PSF kernel whose integral
-        is normalised to one parametrized with the :math:`\vec{p}_i` non-linear parameter array. If the :math:`\vec{x}`
-        2D array is flatten in 1D, equation :eq:`chromaticpsf2d` is
+        with
+        - :math:`\vec{x}` the 2D array of the pixel coordinates,
+        - :math:`\vec{A}` the amplitude parameter array along the x axis of the spectrogram,
+        - :math:`\phi\left(\vec{x},\vec{p}_i\right)` the 2D PSF kernel whose integral is normalised to one parametrized
+        with the :math:`\vec{p}_i` non-linear parameter array,
+        - math:`B b\left(\vec{x}\right)` the background function weighted by a scalar math:`B`,
+        - math:`S s\left(\vec{x}\right)` the star field function weighted by a scalar math:`S`,
+        - :math:`F_i` a flat cube (wavelengths indexed by :math:`i`) and \bar F the mean flat.
+
+        If the :math:`\vec{x}` 2D array is flatten in 1D, equation :eq:`ffm` is
 
         .. math ::
             :label: chromaticpsf2d_matrix
@@ -321,11 +330,11 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             \vec{m}(\vec{x},\vec{p}) & = \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \\
 
             \mathbf{M}\left(\vec{x},\vec{p}\right) & = \left(\begin{array}{cccc}
-             \phi\left(\vec{x}_1,\vec{p}_1\right) & \phi\left(\vec{x}_2,\vec{p}_1\right) & ...
-             & \phi\left(\vec{x}_{N_x},\vec{p}_1\right) \\
+             F_1\phi\left(\vec{x}_1,\vec{p}_1\right) & F_2\phi\left(\vec{x}_2,\vec{p}_1\right) & ...
+             & F_{N_x}\phi\left(\vec{x}_{N_x},\vec{p}_1\right) \\
              ... & ... & ... & ...\\
-             \phi\left(\vec{x}_1,\vec{p}_{N_x}\right) & \phi\left(\vec{x}_2,\vec{p}_{N_x}\right) & ...
-             & \phi\left(\vec{x}_{N_x},\vec{p}_{N_x}\right) \\
+             F_1\phi\left(\vec{x}_1,\vec{p}_{N_x}\right) & F_2\phi\left(\vec{x}_2,\vec{p}_{N_x}\right) & ...
+             & F_{N_x}\phi\left(\vec{x}_{N_x},\vec{p}_{N_x}\right) \\
             \end{array}\right)
             \end{align}
 
@@ -333,26 +342,26 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         with :math:`\mathbf{M}` the design matrix.
 
         The goal of this function is to perform a minimisation of the amplitude vector :math:`\mathbf{A}` given
-        a set of non-linear parameters :math:`\mathbf{p}` and a spectrogram data array :math:`mathbf{y}` modelise as
+        a set of non-linear parameters :math:`\mathbf{p}` and a spectrogram data array :math:`\mathbf{D}` modelised as
 
-        .. math:: \mathbf{y} = \mathbf{m}(\vec{x},\vec{p}) + \vec{\epsilon}
+        .. math:: \mathbf{D} = \mathbf{m}(\vec{x},\vec{p}) + \bar F B b\left(\vec{x}\right) + \bar F S s\left(\vec{x}\right) + \vec{\epsilon}
 
         with :math:`\vec{\epsilon}` a random noise vector. The :math:`\chi^2` function to minimise is
 
         .. math::
-            :label: chromaticspsf2d_chi2
+            :label: ffm_chi2
 
-            \chi^2(\mathbf{A})= \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A}\right)^T \mathbf{W}
-            \left(\mathbf{y} - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)
+            \chi^2(\mathbf{A})= \left(\mathbf{D} - \bar F B b\left(\vec{x}\right) - \bar F S s\left(\vec{x}\right) - \mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A}\right)^T \mathbf{W}
+            \left(\mathbf{D} - \bar F B b\left(\vec{x}\right) - \bar F S s\left(\vec{x}\right) -\mathbf{M}\left(\vec{x},\vec{p}\right) \mathbf{A} \right)
 
 
         with :math:`\mathbf{W}` the weight matrix, inverse of the covariance matrix. In our case this matrix is diagonal
-        as the pixels are considered all independent. The minimum of equation :eq:`chromaticspsf2d_chi2` is reached for
+        as the pixels are considered all independent. The minimum of equation :eq:`ffm_chi2` is reached for
         a set of amplitude parameters :math:`\hat{\mathbf{A}}` given by
 
         .. math::
 
-            \hat{\mathbf{A}} =  (\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1} \mathbf{M}^T \mathbf{W} \mathbf{y}
+            \hat{\mathbf{A}} =  (\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1} \mathbf{M}^T \mathbf{W}\left( \mathbf{D} - \bar F B b\left(\vec{x}\right) - \bar F S s\left(\vec{x}\right) \right)
 
         The error matrix on the :math:`\hat{\mathbf{A}}` coefficient is simply
         :math:`(\mathbf{M}^T \mathbf{W} \mathbf{M})^{-1}`.
@@ -406,7 +415,10 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         self.spectrum.adr_params[-1] = airmass
 
         parameters.OBS_CAMERA_ROTATION = rot
-        W_dot_data = (self.W * (self.data + (1 - B) * self.bgd_flat)).astype("float32")
+        R = self.data - B * self.bgd
+        if self.starfield is not None:
+            R -= self.starfield
+        W_dot_data = (self.W * R).astype("float32")
 
         # Evaluate ADR and compute wavelength arrays
         self.lambdas = self.spectrum.compute_lambdas_in_spectrogram(D2CCD, dx0, dy0, angle, niter=5, with_adr=True,
@@ -434,11 +446,19 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
             # Matrix filling
             M_order = self.spectrum.chromatic_psf.build_sparse_M(self.pixels, self.psf_profile_params[order],
-                                                                 dtype="float32", M_sparse_indices=self.M_sparse_indices[order], boundaries=self.boundaries[order])
+                                                                 dtype="float32", M_sparse_indices=self.M_sparse_indices[order],
+                                                                 boundaries=self.boundaries[order])
             if M is None:
                 M = M_order
             else:
                 M += M_order
+
+        if self.flat is not None:
+            # multiply each M matrix columns by the flat array
+            # TODO: if flat array is a cube flat, needs to multiply directly in build_sparse_M
+            dia = sparse.dia_matrix(([self.flat], [0]), shape=(self.flat.size, self.flat.size))
+            M = (dia @ M).tocsc()
+
 
         # Algebra to compute amplitude parameters
         if self.amplitude_priors_method != "fixed":
@@ -447,7 +467,8 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 M_dot_W_dot_M = M_dot_W @ M_dot_W.T
             else:
                 tri = sparse_dot_mkl.gram_matrix_mkl(M_dot_W, transpose=True)
-                dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))), shape=tri.shape, dtype="float32")
+                dia = sparse.csr_matrix((tri.diagonal(), (np.arange(tri.shape[0]), np.arange(tri.shape[0]))),
+                                        shape=tri.shape, dtype="float32")
                 M_dot_W_dot_M = (tri + tri.T - dia).toarray()
             if self.amplitude_priors_method != "spectrum":
                 if self.amplitude_priors_method == "keep":
@@ -503,10 +524,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
 
         # Compute the model
         self.model = M @ amplitude_params
-        if self.spectrum.spectrogram_starfield is not None:
-            self.model += Astar * self.spectrum.spectrogram_starfield
-        if self.spectrum.spectrogram_flat is not None:
-            self.model *= self.spectrum.spectrogram_flat
+        self.model += B * self.bgd
+        if self.starfield is not None:
+            self.model += Astar * self.starfield
         self.model_err = np.zeros_like(self.model)
 
         return self.pixels, self.model, self.model_err
@@ -516,7 +536,6 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             lambdas, model, model_err = model_input
         else:
             lambdas, model, model_err = self.simulate(*params)
-        model = model.flatten()
         J = np.zeros((params.size, model.size))
         method = copy.copy(self.amplitude_priors_method)
         self.amplitude_priors_method = "keep"
@@ -530,7 +549,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
                 epsilon[ip] = - epsilon[ip]
             tmp_p[ip] += epsilon[ip]
             tmp_lambdas, tmp_model, tmp_model_err = self.simulate(*tmp_p)
-            J[ip] = (tmp_model.flatten() - model) / epsilon[ip]
+            J[ip] = (tmp_model - model) / epsilon[ip]
         self.amplitude_priors_method = method
         for k, order in enumerate(self.diffraction_orders):
             if self.psf_profile_params[order] is None:
@@ -586,7 +605,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         """
         # compute matrices without derivatives
         WM = sparse.dia_matrix((self.W, 0), shape=(self.W.size, self.W.size), dtype="float32") @ self.M
-        WD = (self.W * (self.data + (1 - self.params.values[self.params.get_index("B")]) * self.bgd_flat)).astype("float32")
+        WD = (self.W * (self.data + (1 - self.params.values[self.params.get_index("B")]) * self.bgd)).astype("float32")
         MWD = self.M.T @ WD
         if self.amplitude_priors_method == "spectrum":
               MWD += np.float32(self.reg) * self.Q_dot_A0
@@ -638,9 +657,9 @@ class FullForwardModelFitWorkspace(FitWorkspace):
         lambdas = self.spectrum.lambdas
         sub = np.where((lambdas > parameters.LAMBDA_MIN) & (lambdas < parameters.LAMBDA_MAX))[0]
         sub = np.where(sub < self.spectrum.spectrogram_data.shape[1])[0]
-        data = (data + self.bgd_flat).reshape((self.Ny, self.Nx))
+        data = data.reshape((self.Ny, self.Nx))
         err = self.err.reshape((self.Ny, self.Nx))
-        model = (self.model + self.params["B"] * self.bgd_flat).reshape((self.Ny, self.Nx))
+        model = self.model.reshape((self.Ny, self.Nx))
         if extent is not None:
             sub = np.where((lambdas > extent[0]) & (lambdas < extent[1]))[0]
         if len(sub) > 0:
