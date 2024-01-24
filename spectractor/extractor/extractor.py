@@ -1263,6 +1263,8 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     # Create spectrogram
     data = data[ymin:ymax, xmin:xmax]
     err = err[ymin:ymax, xmin:xmax]
+    if image.flat is not None:
+        data /= image.flat[ymin:ymax, xmin:xmax]
     Ny, Nx = data.shape
     my_logger.info(f'\n\tExtract spectrogram: crop rotated image [{xmin}:{xmax},{ymin}:{ymax}] (size ({Nx}, {Ny}))')
 
@@ -1385,8 +1387,10 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
     # Extract the non-rotated background
     my_logger.info('\n\t  ======================= Extract the non rotated background  =============================')
     if parameters.SPECTRACTOR_BACKGROUND_SUBTRACTION:
-        bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(spectrum.spectrogram_data,
-                                                                                     spectrum.spectrogram_err,
+        data = np.copy(spectrum.spectrogram_data)
+        if spectrum.spectrogram_flat is not None:
+            data /= spectrum.spectrogram_flat
+        bgd_model_func, bgd_res, bgd_rms = extract_spectrogram_background_sextractor(data, spectrum.spectrogram_err,
                                                                                      ws=ws, Dy_disp_axis=s.table['y_c'])
         bgd = bgd_model_func(np.arange(Nx), np.arange(Ny))
         my_logger.info(f"\n\tBackground statistics: mean={np.nanmean(bgd):.3f} {image.units}, "
@@ -1522,8 +1526,10 @@ def run_spectrogram_deconvolution_psf2d(spectrum, bgd_model_func):
                     f"\n{s.table[['amplitude', 'x_c', 'y_c', 'Dx', 'Dy', 'Dy_disp_axis']]}")
     my_logger.info(f'\n\tStart ChromaticPSF polynomial fit with '
                    f'mode={mode} and amplitude_priors_method={method}...')
-    data = spectrum.spectrogram_data
-    err = spectrum.spectrogram_err
+    data = np.copy(spectrum.spectrogram_data)
+    err = np.copy(spectrum.spectrogram_err)
+    if spectrum.spectrogram_flat is not None:
+        data /= spectrum.spectrogram_flat
 
     my_logger.info('\n\t  ======================= ChromaticPSF2D polynomial fit  =============================')
     w = s.fit_chromatic_psf(data, bgd_model_func=bgd_model_func, data_errors=err, live_fit=False,
