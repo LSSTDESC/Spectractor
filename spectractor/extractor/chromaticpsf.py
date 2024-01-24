@@ -1927,7 +1927,7 @@ class ChromaticPSFFitWorkspace(FitWorkspace):
         self.amplitude_priors_method = amplitude_priors_method
         self.fwhm_priors = np.copy(self.chromatic_psf.table['fwhm'])
         self.reg = parameters.PSF_FIT_REG_PARAM
-        self.trace_r = self.Nx / np.min(self.fwhm_priors)  # spectrophotometric uncertainty principle
+        self.trace_r = self.Nx / np.median(self.fwhm_priors)  # spectrophotometric uncertainty principle
         self.Q = np.zeros((self.Nx, self.Nx))
         self.Q_dot_A0 = np.zeros(self.Nx)
         if amplitude_priors_method not in self.amplitude_priors_list:

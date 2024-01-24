@@ -200,7 +200,7 @@ class FullForwardModelFitWorkspace(FitWorkspace):
             self.reg = float(spectrum.header['PSF_REG'])
         if self.reg < 0:
             self.reg = parameters.PSF_FIT_REG_PARAM
-        self.trace_r = self.Nx / np.min(self.fwhm_priors)  # spectrophotometric uncertainty principle
+        self.trace_r = self.Nx / np.median(self.fwhm_priors)  # spectrophotometric uncertainty principle
         self.my_logger.info(f"\n\tFull forward model fitting with regularisation parameter r={self.reg}.")
         self.Q = np.zeros((self.Nx, self.Nx), dtype="float32")
         self.Q_dot_A0 = np.zeros(self.Nx, dtype="float32")
@@ -1095,7 +1095,6 @@ def SpectractorRun(image, output_directory, guess=None):
     spectrum = Spectrum(image=image, order=parameters.SPEC_ORDER)
 
     # First 1D spectrum extraction and background extraction
-
     my_logger.info('\n\t ======================== PSF1D Extraction ====================================')
     w_psf1d, bgd_model_func = extract_spectrum_from_image(image, spectrum, signal_width=parameters.PIXWIDTH_SIGNAL,
                                                           ws=(parameters.PIXDIST_BACKGROUND,
@@ -1285,7 +1284,6 @@ def extract_spectrum_from_image(image, spectrum, signal_width=10, ws=(20, 30)):
 
     # Fit the transverse profile
     my_logger.info('\n\t  ======================= Fit the transverse profile =============================')
-
     my_logger.info(f'\n\tStart PSF1D transverse fit...')
     psf = load_PSF(psf_type=parameters.PSF_TYPE, target=image.target, clip=False)
     s = ChromaticPSF(psf, Nx=Nx, Ny=Ny, x0=target_pixcoords_spectrogram[0], y0=target_pixcoords_spectrogram[1],
