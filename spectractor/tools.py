@@ -269,7 +269,7 @@ def rescale_x_from_legendre(x_norm, Xmin, Xmax):
 
     Parameters
     ----------
-    x: np.ndarray
+    x_norm: np.ndarray
     Xmin: float
     Xmax: float
 

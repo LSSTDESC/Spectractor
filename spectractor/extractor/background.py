@@ -54,7 +54,7 @@ def make_source_mask(data, nsigma, npixels, mask=None, sigclip_sigma=3.0,
 
     Parameters
     ----------
-    data : 2D `~numpy.ndarray`
+    data : np.ndarray
         The 2D array of the image.
     nsigma : float
         The number of standard deviations per pixel above the ``background``
