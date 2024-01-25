@@ -325,7 +325,7 @@ class FlatModel:
         If True, a random quantum efficiency is applied to pixels (default: False).
     """
 
-    def __init__(self, gains, with_noise=False):
+    def __init__(self, gains, with_randomness=False):
         """Create a FlatModel instance. Flat is dimensionless and its average must be one.
 
         The flat model size is set with the parameters.CCD_IMSIZE global keyword.
@@ -334,14 +334,14 @@ class FlatModel:
         ----------
         gains: array_like
             The list of gains to apply. The average must be one.
-        with_noise: bool
+        with_randomness: bool
             If True, a random quantum efficiency is applied to pixels (default: False).
 
         Examples
         --------
         >>> from spectractor import parameters
         >>> parameters.CCD_IMSIZE = 200
-        >>> flat = FlatModel(gains=[[1, 2, 3, 4], [4, 3, 2, 1]], with_noise=True)
+        >>> flat = FlatModel(gains=[[1, 2, 3, 4], [4, 3, 2, 1]], with_randomness=True)
         >>> model = flat.model()
         >>> print(f"{np.mean(model):.4f}")
         1.0000
@@ -360,7 +360,7 @@ class FlatModel:
                                    "I scaled them to have an average of one.")
             self.gains /= np.mean(self.gains)
         self.my_logger.warning(f'\n\tRelative gains are set to {self.gains}.')
-        self.with_noise = with_noise
+        self.with_noise = with_randomness
 
     def model(self):
         """Compute the flat model for the image simulation (no units).
@@ -426,9 +426,13 @@ class ImageModel(Image):
                       spectrogram.spectrogram_xmin:spectrogram.spectrogram_xmax] += spectrogram.spectrogram_data
         # - spectrogram.spectrogram_bgd)
         if starfield is not None:
-            self.data += starfield.model(xx, yy)
+            starfield_mod = starfield.model(xx, yy)
+            self.data += starfield_mod
+            self.starfield = starfield_mod
         if flat is not None:
-            self.data += flat.model()
+            flat_mod = flat.model()
+            self.data *= flat_mod
+            self.flat = flat_mod
 
     def add_poisson_and_read_out_noise(self):  # pragma: no cover
         if self.units != 'ADU':
@@ -524,7 +528,7 @@ def ImageSim(image_filename, spectrum_filename, outputdir, pwv=5, ozone=300, aer
     flat = None
     if with_flat:
         my_logger.info('\n\tStar field model...')
-        flat = FlatModel(image)
+        flat = FlatModel(gains=[[1, 2, 3, 4], [4, 3, 2, 1]], with_randomness=True)
         if parameters.DEBUG:
             flat.plot_model()
 

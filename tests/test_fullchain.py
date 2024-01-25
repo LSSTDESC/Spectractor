@@ -7,7 +7,7 @@ from scipy.interpolate import interp1d  # noqa: E402
 from spectractor import parameters  # noqa: E402
 from spectractor.extractor.images import Image  # noqa: E402
 from spectractor.extractor.spectrum import Spectrum  # noqa: E402
-from spectractor.extractor.extractor import Spectractor  # noqa: E402
+from spectractor.extractor.extractor import Spectractor, SpectractorRun, SpectractorInit  # noqa: E402
 from spectractor.logbook import LogBook  # noqa: E402
 from spectractor.config import load_config, apply_rebinning_to_parameters  # noqa: E402
 from spectractor.simulation.image_simulation import ImageSim  # noqa: E402
@@ -95,8 +95,10 @@ def plot_residuals(spectrum, lambdas_truth, amplitude_truth):
 def make_image():
     spectrum_filename = "./tests/data/reduc_20170530_134_spectrum.fits"
     image_filename = "./tests/data/reduc_20170530_134.fits"
-    ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T, A3=A3_T,
-             psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=True, with_noise=False)
+    sim = ImageSim(image_filename, spectrum_filename, "./tests/data/", A1=A1_T, A2=A2_T, A3=A3_T,
+                   psf_poly_params=PSF_POLY_PARAMS_TRUTH, with_stars=False, with_rotation=True, with_noise=False,
+                   with_flat=True)
+    return sim
 
 
 @unittest.skipIf(uvspec_available() is False, 'Skipping to avoid libradtran dependency')
